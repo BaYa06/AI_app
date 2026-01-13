@@ -61,6 +61,8 @@ coverage/
 # Environment
 .env
 .env.*
+.env.local
+!.env.example
 
 # Temporary
 tmp/
