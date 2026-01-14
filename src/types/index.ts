@@ -24,11 +24,14 @@ export type CardStatus = 'new' | 'learning' | 'review' | 'mastered';
  */
 export interface Card {
   id: string;
-  setId: string;
+ setId: string;
   
   // Контент
   frontText: string;
   backText: string;
+  // Допустимы альтернативные поля для совместимости с API
+  front?: string;
+  back?: string;
   frontImage?: string;
   backImage?: string;
   frontAudio?: string;

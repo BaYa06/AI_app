@@ -6,6 +6,7 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { v4 as uuid } from 'uuid';
 import type { Card, CreateCardInput, UpdateCardInput } from '@/types';
+import { NeonService } from '@/services/NeonService';
 
 interface CardsState {
   // Данные - храним в объекте для O(1) доступа
@@ -156,6 +157,15 @@ export const useCardsStore = create<CardsState & CardsActions>()(
           Object.assign(card, srsData, { updatedAt: Date.now() });
         }
       });
+
+      // Синхронизируем SRS с базой (best-effort)
+      (async () => {
+        try {
+          await NeonService.updateCardSRS(cardId, srsData);
+        } catch (error) {
+          console.error('Failed to sync SRS to Neon:', error);
+        }
+      })();
     },
 
     resetCardProgress: (cardId) => {

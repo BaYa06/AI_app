@@ -5,22 +5,11 @@
 import { MMKV } from 'react-native-mmkv';
 
 // Инициализация MMKV
-let storage: MMKV;
-
-try {
-  storage = new MMKV({
-    id: 'flashcards-app',
-    encryptionKey: undefined,
-  });
-} catch (error) {
-  // Для веб используем localStorage через полифилл
-  if (typeof window !== 'undefined') {
-    const { MMKV: WebMMKV } = require('../polyfills/mmkv.web');
-    storage = new WebMMKV();
-  } else {
-    throw error;
-  }
-}
+// Webpack автоматически заменит react-native-mmkv на веб-полифилл при сборке для веба
+const storage = new MMKV({
+  id: 'flashcards-app',
+  encryptionKey: undefined,
+});
 
 /**
  * Интерфейс для работы с хранилищем

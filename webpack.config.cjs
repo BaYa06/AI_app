@@ -1,23 +1,30 @@
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const webpack = require('webpack');
+const dotenv = require('dotenv');
+
+// Загружаем переменные окружения из .env.local
+const envConfig = dotenv.config({ path: '.env.local' });
 
 module.exports = (env, argv) => {
   const isDev = argv.mode === 'development';
   
   return {
     mode: argv.mode || 'production',
-    entry: './index.web.js',
+    target: 'web',
+    entry: './index.web.jsx',
     output: {
       path: path.resolve(__dirname, 'dist'),
       filename: isDev ? 'bundle.js' : 'bundle.[contenthash].js',
       publicPath: '/',
       clean: true,
+      globalObject: 'self',
     },
     resolve: {
       alias: {
         'react-native$': 'react-native-web',
-        'react-native-gesture-handler': 'react-native-gesture-handler/lib/commonjs',
+        'react-native-gesture-handler': path.resolve(__dirname, 'src/polyfills/gesture-handler.web.ts'),
+        'react-native-mmkv': path.resolve(__dirname, 'src/polyfills/mmkv.web.ts'),
         '@': path.resolve(__dirname, 'src'),
       },
       extensions: ['.web.js', '.web.ts', '.web.tsx', '.js', '.jsx', '.ts', '.tsx', '.json'],
@@ -26,13 +33,20 @@ module.exports = (env, argv) => {
       rules: [
         {
           test: /\.(js|jsx|ts|tsx)$/,
-          exclude: /node_modules\/(?!(react-native-gesture-handler|@react-navigation|@react-native|react-native-svg|lucide-react-native)\/).*/,
+          exclude: /node_modules\/(?!(@react-native|react-native-svg|lucide-react-native|@react-navigation)\/).*/,
           use: {
             loader: 'babel-loader',
             options: {
+              cacheDirectory: true,
+              sourceType: 'unambiguous',
               presets: [
-                '@babel/preset-env',
-                '@babel/preset-react',
+                ['@babel/preset-env', {
+                  modules: false,
+                  targets: {
+                    browsers: ['last 2 versions', 'not dead']
+                  }
+                }],
+                ['@babel/preset-react', { runtime: 'automatic' }],
                 '@babel/preset-typescript',
                 ['@babel/preset-flow', { allowDeclareFields: true }],
               ],
@@ -58,6 +72,11 @@ module.exports = (env, argv) => {
       new webpack.DefinePlugin({
         __DEV__: JSON.stringify(isDev),
         'process.env.NODE_ENV': JSON.stringify(argv.mode || 'production'),
+        'process.env.JEST_WORKER_ID': JSON.stringify(null),
+        'process.env.POSTGRES_URL': JSON.stringify(process.env.POSTGRES_URL || ''),
+      }),
+      new webpack.ProvidePlugin({
+        process: 'process/browser',
       }),
     ],
     devServer: isDev ? {

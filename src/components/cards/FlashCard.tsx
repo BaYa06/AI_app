@@ -32,6 +32,8 @@ export const FlashCard = memo<FlashCardProps>(function FlashCard({
   onFlip,
 }) {
   const colors = useThemeColors();
+  const front = card.frontText ?? (card as any).front ?? '';
+  const back = card.backText ?? (card as any).back ?? '';
   const flipProgress = useSharedValue(0);
 
   // Анимация переворота
@@ -81,7 +83,7 @@ export const FlashCard = memo<FlashCardProps>(function FlashCard({
       <Animated.View style={[styles.card, cardStyle, frontAnimatedStyle]}>
         <View style={styles.content}>
           <Text variant="cardText" align="center">
-            {card.frontText}
+            {front}
           </Text>
         </View>
         <View style={[styles.label, { backgroundColor: colors.primary }]}>
@@ -95,7 +97,7 @@ export const FlashCard = memo<FlashCardProps>(function FlashCard({
       <Animated.View style={[styles.card, styles.backCard, cardStyle, backAnimatedStyle]}>
         <View style={styles.content}>
           <Text variant="cardText" align="center">
-            {card.backText}
+            {back}
           </Text>
         </View>
         <View style={[styles.label, { backgroundColor: colors.success }]}>

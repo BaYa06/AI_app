@@ -3,6 +3,7 @@
  * @description Сервис для работы с локальной базой данных (персистентность)
  */
 import { StorageService, STORAGE_KEYS } from './StorageService';
+import { NeonService } from './NeonService';
 import { useCardsStore } from '@/store/cardsStore';
 import { useSetsStore } from '@/store/setsStore';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -31,42 +32,95 @@ export const DatabaseService = {
    */
   async loadAll(): Promise<boolean> {
     try {
-      // Загружаем карточки
-      const cardsData = StorageService.getObject<{
-        cards: Record<string, Card>;
-        cardsBySet: Record<string, string[]>;
-      }>(STORAGE_KEYS.CARDS);
+      console.log('🔄 Загрузка данных из Neon PostgreSQL...');
+      
+      // Пытаемся загрузить данные из Neon
+      const [sets, allCards] = await Promise.all([
+        NeonService.loadSets(),
+        NeonService.loadAllCards(),
+      ]);
 
-      if (cardsData) {
-        // Используем setState напрямую для batch update
-        useCardsStore.setState({
-          cards: cardsData.cards || {},
-          cardsBySet: cardsData.cardsBySet || {},
+      console.log(`📚 Загружено наборов: ${sets.length}`);
+      console.log(`🃏 Загружено карточек: ${allCards.length}`);
+
+      if (sets.length > 0) {
+        // Преобразуем массивы в объекты для store
+        const setsMap: Record<string, CardSet> = {};
+        const setsOrder: string[] = [];
+
+        sets.forEach(set => {
+          setsMap[set.id] = set;
+          setsOrder.push(set.id);
         });
-      }
 
-      // Загружаем наборы
-      const setsData = StorageService.getObject<{
-        sets: Record<string, CardSet>;
-        setsOrder: string[];
-      }>(STORAGE_KEYS.SETS);
-
-      if (setsData) {
         useSetsStore.setState({
-          sets: setsData.sets || {},
-          setsOrder: setsData.setsOrder || [],
+          sets: setsMap,
+          setsOrder,
         });
+
+        console.log('✅ Наборы загружены в store');
       }
 
-      // Загружаем настройки
+      if (allCards.length > 0) {
+        // Преобразуем карточки в объекты
+        const cardsMap: Record<string, Card> = {};
+        const cardsBySet: Record<string, string[]> = {};
+
+        allCards.forEach(card => {
+          cardsMap[card.id] = card;
+          
+          if (!cardsBySet[card.setId]) {
+            cardsBySet[card.setId] = [];
+          }
+          cardsBySet[card.setId].push(card.id);
+        });
+
+        useCardsStore.setState({
+          cards: cardsMap,
+          cardsBySet,
+        });
+
+        console.log('✅ Карточки загружены в store');
+      }
+
+      // Загружаем настройки из локального хранилища
       const settings = StorageService.getObject<UserSettings>(STORAGE_KEYS.SETTINGS);
       if (settings) {
         useSettingsStore.getState().updateSettings(settings);
       }
 
+      // Если данных из Neon нет, пробуем загрузить из локального хранилища
+      if (sets.length === 0) {
+        console.log('⚠️  Данных из Neon нет, загружаем из локального хранилища...');
+        
+        const cardsData = StorageService.getObject<{
+          cards: Record<string, Card>;
+          cardsBySet: Record<string, string[]>;
+        }>(STORAGE_KEYS.CARDS);
+
+        if (cardsData) {
+          useCardsStore.setState({
+            cards: cardsData.cards || {},
+            cardsBySet: cardsData.cardsBySet || {},
+          });
+        }
+
+        const setsData = StorageService.getObject<{
+          sets: Record<string, CardSet>;
+          setsOrder: string[];
+        }>(STORAGE_KEYS.SETS);
+
+        if (setsData) {
+          useSetsStore.setState({
+            sets: setsData.sets || {},
+            setsOrder: setsData.setsOrder || [],
+          });
+        }
+      }
+
       return true;
     } catch (error) {
-      console.error('Failed to load data:', error);
+      console.error('❌ Failed to load data:', error);
       return false;
     }
   },

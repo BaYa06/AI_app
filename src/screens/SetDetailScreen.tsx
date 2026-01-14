@@ -84,6 +84,8 @@ export function SetDetailScreen({ navigation, route }: Props) {
   }, [set]);
 
   const filteredCards = useMemo(() => {
+    const getFront = (card: Card) => card.frontText ?? (card as any).front ?? '';
+    const getBack = (card: Card) => card.backText ?? (card as any).back ?? '';
     const query = search.trim().toLowerCase();
 
     return cards
@@ -94,17 +96,18 @@ export function SetDetailScreen({ navigation, route }: Props) {
       })
       .filter((card) => {
         if (!query) return true;
-        return (
-          card.frontText.toLowerCase().includes(query) ||
-          card.backText.toLowerCase().includes(query)
-        );
+        const front = getFront(card).toLowerCase();
+        const back = getBack(card).toLowerCase();
+        return front.includes(query) || back.includes(query);
       });
   }, [cards, filter, search]);
 
   // Обработчики
   const handleStartStudy = useCallback(() => {
-    navigation.navigate('Study', { setId, mode: 'classic' });
-  }, [navigation, setId]);
+    // "Учить всё" — запускаем тренировку по выбранному количеству карточек
+    const limit = wordLimit === 'all' ? undefined : Number(wordLimit);
+    navigation.navigate('Study', { setId, mode: 'classic', studyAll: true, cardLimit: limit, onlyHard });
+  }, [navigation, setId, wordLimit, onlyHard]);
 
   const openAddCardSheet = useCallback(() => {
     setNewFront('');
@@ -202,7 +205,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
         </View>
 
         <Text variant="h3" style={[styles.cardFront, { color: colors.textPrimary }]} numberOfLines={2}>
-          {item.frontText}
+          {item.frontText ?? (item as any).front}
         </Text>
         <Text
           variant="bodySmall"
@@ -210,7 +213,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
           numberOfLines={2}
           style={styles.cardBack}
         >
-          {item.backText}
+          {item.backText ?? (item as any).back}
         </Text>
 
         <Pressable hitSlop={8} style={styles.menuButton} onPress={() => setActionCardId(item.id)}>
@@ -338,7 +341,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
         keyExtractor={keyExtractor}
         ListHeaderComponent={ListHeader}
         ListEmptyComponent={ListEmpty}
-        contentContainerStyle={[styles.listContent, { paddingBottom: spacing.xxl * 1.5 }]}
+        contentContainerStyle={[styles.listContent, { paddingBottom: 100 }]}
         showsVerticalScrollIndicator={false}
         numColumns={2}
         columnWrapperStyle={styles.columns}
@@ -648,7 +651,10 @@ export function SetDetailScreen({ navigation, route }: Props) {
             <View style={styles.startBlock}>
               <Pressable
                 style={[styles.startButton, { backgroundColor: colors.primary }]}
-                onPress={() => setShowStudySheet(false)}
+                onPress={() => {
+                  setShowStudySheet(false);
+                  handleStartStudy();
+                }}
               >
                 <Text variant="body" style={{ color: colors.textInverse, fontWeight: '700' }}>
                   Начать

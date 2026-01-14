@@ -3,7 +3,6 @@
  * @description Главный навигатор приложения
  */
 import React from 'react';
-import { View, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -18,6 +17,7 @@ import { StatisticsScreen } from '@/screens/StatisticsScreen';
 import { ProfileScreen } from '@/screens/ProfileScreen';
 import { SetDetailScreen } from '@/screens/SetDetailScreen';
 import { StudyScreen } from '@/screens/StudyScreen';
+import { StudyResultsScreen } from '@/screens/StudyResultsScreen';
 import { CardEditorScreen } from '@/screens/CardEditorScreen';
 import { SetEditorScreen } from '@/screens/SetEditorScreen';
 
@@ -142,6 +142,15 @@ export function AppNavigator() {
             title: 'Изучение',
             headerShown: false,
             gestureEnabled: false, // Нельзя свайпнуть назад во время изучения
+          }}
+        />
+        <Stack.Screen
+          name="StudyResults"
+          component={StudyResultsScreen}
+          options={{
+            title: 'Результаты',
+            headerShown: false,
+            gestureEnabled: false,
           }}
         />
         <Stack.Screen

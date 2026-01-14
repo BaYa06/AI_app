@@ -25,6 +25,7 @@
     "dotenv": "^17.2.3",
     "immer": "^10.0.3",
     "lucide-react-native": "^0.344.0",
+    "process": "^0.11.10",
     "react": "18.2.0",
     "react-dom": "^18.2.0",
     "react-native": "0.73.2",
@@ -42,6 +43,7 @@
   "devDependencies": {
     "@babel/core": "^7.28.5",
     "@babel/preset-env": "^7.28.5",
+    "@babel/preset-flow": "^7.27.1",
     "@babel/preset-react": "^7.28.5",
     "@babel/preset-typescript": "^7.28.5",
     "@babel/runtime": "^7.23.7",

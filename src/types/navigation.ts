@@ -11,7 +11,15 @@ import type { StudyMode } from './index';
 export type RootStackParamList = {
   Main: NavigatorScreenParams<MainTabParamList>;
   SetDetail: { setId: string };
-  Study: { setId: string; mode: StudyMode };
+  Study: { setId: string; mode: StudyMode; errorCardsFronts?: string[]; studyAll?: boolean; cardLimit?: number; onlyHard?: boolean };
+  StudyResults: { 
+    setId: string;
+    totalCards: number;
+    learnedCards: number;
+    timeSpent: number;
+    errors: number;
+    errorCards: Array<{ front: string; back: string; rating: number }>;
+  };
   CardEditor: { setId: string; cardId?: string };
   SetEditor: { setId?: string };
   Settings: undefined;
