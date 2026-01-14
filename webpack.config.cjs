@@ -1,5 +1,6 @@
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
 const webpack = require('webpack');
 const dotenv = require('dotenv');
 
@@ -68,6 +69,13 @@ module.exports = (env, argv) => {
       new HtmlWebpackPlugin({
         template: './public/index.html',
         inject: 'body',
+      }),
+      new CopyWebpackPlugin({
+        patterns: [
+          { from: 'public/manifest.json', to: 'manifest.json' },
+          { from: 'public/sw.js', to: 'sw.js' },
+          { from: 'public/icons', to: 'icons' },
+        ],
       }),
       new webpack.DefinePlugin({
         __DEV__: JSON.stringify(isDev),
