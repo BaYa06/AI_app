@@ -59,6 +59,9 @@ react {
  */
 def enableProguardInReleaseBuilds = false
 
+def newArchEnabled = project.hasProperty("newArchEnabled") ? project.getProperty("newArchEnabled") : "false"
+def hermesEnabled = project.hasProperty("hermesEnabled") ? project.getProperty("hermesEnabled") : "true"
+
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
  *
@@ -138,3 +141,6 @@ dependencies {
         implementation jscFlavor
     }
 }
+
+apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle")
+applyNativeModulesAppBuildGradle(project)
