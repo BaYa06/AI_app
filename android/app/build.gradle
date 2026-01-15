@@ -140,5 +140,10 @@ dependencies {
 }
 
 // Apply autolinking configuration for native modules
-apply(from: file("../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"))
-applyNativeModulesAppBuildGradle(project)
+def cliAndroidGradle = file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle")
+if (cliAndroidGradle.exists()) {
+    apply(from: cliAndroidGradle)
+    applyNativeModulesAppBuildGradle(project)
+} else {
+    logger.warn("native_modules.gradle not found at ${cliAndroidGradle}. Skipping autolink configuration.")
+}
