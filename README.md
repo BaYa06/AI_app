@@ -105,3 +105,10 @@ src/
 - **Zustand** - state management
 - **MMKV** - локальное хранилище
 - **Reanimated** 3 - анимации
+
+## 🤖 Сборка APK в Codemagic
+
+1. Добавьте в Codemagic group `keystore_credentials` переменные: `CM_KEYSTORE_BASE64` (base64 от release keystore), `CM_KEYSTORE_PASSWORD`, `CM_KEY_ALIAS`, `CM_KEY_PASSWORD`.
+2. Пример кодирования keystore локально: `base64 my-release-key.keystore > keystore.b64` и вставьте содержимое в `CM_KEYSTORE_BASE64`.
+3. В репозитории уже есть `codemagic.yaml`, workflow `android-apk` использует Node 18 / Java 17, декодирует keystore и запускает `./gradlew clean assembleRelease`.
+4. Артефакт после сборки: `android/app/build/outputs/apk/release/app-release.apk`.

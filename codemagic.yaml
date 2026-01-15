@@ -1,0 +1,31 @@
+workflows:
+  android-apk:
+    name: Android APK
+    environment:
+      node: 18
+      java: 17
+      groups:
+        - keystore_credentials
+      vars:
+        CM_KEYSTORE_PATH: "$CM_BUILD_DIR/android/app/codemagic.keystore"
+    cache:
+      cache_paths:
+        - ~/.npm
+        - ~/.gradle/caches
+        - ~/.gradle/wrapper
+    scripts:
+      - name: Install dependencies
+        script: npm ci
+      - name: Decode keystore
+        script: |
+          if [ -z "$CM_KEYSTORE_BASE64" ]; then
+            echo "CM_KEYSTORE_BASE64 is not set. Add your base64-encoded keystore to the keystore_credentials group."
+            exit 1
+          fi
+          echo "$CM_KEYSTORE_BASE64" | base64 --decode > "$CM_KEYSTORE_PATH"
+      - name: Build Android release APK
+        script: |
+          cd android
+          ./gradlew clean assembleRelease
+    artifacts:
+      - android/app/build/outputs/apk/release/app-release.apk
