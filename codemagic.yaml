@@ -22,8 +22,15 @@ workflows:
         script: npm ci
       - name: Ensure Android SDK/NDK
         script: |
-          sdkmanager "platforms;android-34" "platform-tools" "build-tools;34.0.0" "ndk;25.1.8937393" "cmake;3.22.1"
-          yes | sdkmanager --licenses
+          export ANDROID_HOME=${ANDROID_HOME:-$ANDROID_SDK_ROOT}
+          export ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-$ANDROID_HOME}
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+          if command -v sdkmanager >/dev/null 2>&1; then
+            sdkmanager "platforms;android-34" "platform-tools" "build-tools;34.0.0" "ndk;25.1.8937393" "cmake;3.22.1"
+            yes | sdkmanager --licenses
+          else
+            echo "sdkmanager not found in PATH, skipping SDK installation (assuming image already has components)"
+          fi
       - name: Decode keystore
         script: |
           if [ -z "$CM_KEYSTORE_BASE64" ]; then
