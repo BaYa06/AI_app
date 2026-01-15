@@ -1,21 +1,16 @@
 pluginManagement {
     repositories {
-        google()
+        // React Native's Android build artifacts (needed for the Gradle plugin)
+        maven { url = uri("$rootDir/../node_modules/react-native/android") }
         mavenCentral()
+        google()
         gradlePluginPortal()
     }
-}
-
-dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
-    repositories {
-        google()
-        mavenCentral()
-    }
+    includeBuild("../node_modules/@react-native/gradle-plugin")
 }
 
 rootProject.name = 'FlashcardsApp'
 include ':app'
-
-apply from: file("../node_modules/@react-native-community/cli-platform-android/native_modules.gradle")
+includeBuild('../node_modules/@react-native/gradle-plugin')
+apply(from: file("../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"))
 applyNativeModulesSettingsGradle(settings)

@@ -5,7 +5,7 @@ workflows:
       node: 18
       java: 17
       vars:
-        CM_KEYSTORE_PATH: /tmp/codemagic.keystore
+        CM_KEYSTORE_PATH: "$CM_BUILD_DIR/android/app/codemagic.keystore"
         CM_KEYSTORE_BASE64: "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"
         CM_KEYSTORE_PASSWORD: "cmFlashcards2024!"
         CM_KEY_ALIAS: "flashcards"
@@ -15,22 +15,19 @@ workflows:
         - ~/.npm
         - ~/.gradle/caches
         - ~/.gradle/wrapper
-        - node_modules
     scripts:
       - name: Install dependencies
-        script: |
-          npm ci
+        script: npm ci
       - name: Decode keystore
         script: |
+          if [ -z "$CM_KEYSTORE_BASE64" ]; then
+            echo "CM_KEYSTORE_BASE64 is not set. Add your base64-encoded keystore to the keystore_credentials group."
+            exit 1
+          fi
           echo "$CM_KEYSTORE_BASE64" | base64 --decode > "$CM_KEYSTORE_PATH"
-      - name: Set Android SDK
-        script: |
-          echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
       - name: Build Android release APK
         script: |
           cd android
-          chmod +x gradlew
-          ./gradlew clean assembleRelease --no-daemon
+          ./gradlew clean assembleRelease
     artifacts:
-      - android/app/build/outputs/apk/release/*.apk
-      - android/app/build/outputs/bundle/release/*.aab
+      - android/app/build/outputs/apk/release/app-release.apk
