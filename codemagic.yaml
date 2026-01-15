@@ -21,6 +21,8 @@ workflows:
     scripts:
       - name: Install dependencies
         script: npm ci
+      - name: Apply patches
+        script: npx --yes patch-package
       - name: Ensure Android SDK/NDK
         script: |
           export ANDROID_HOME=${ANDROID_HOME:-/usr/local/share/android-sdk}
