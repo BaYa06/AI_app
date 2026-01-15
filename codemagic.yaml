@@ -22,7 +22,10 @@ workflows:
       - name: Install dependencies
         script: npm ci
       - name: Apply patches
-        script: npx --yes patch-package
+        script: |
+          if [ -f patches/react-native-reanimated+3.5.4.patch ]; then
+            patch -p1 --forward --input patches/react-native-reanimated+3.5.4.patch || true
+          fi
       - name: Ensure Android SDK/NDK
         script: |
           export ANDROID_HOME=${ANDROID_HOME:-/usr/local/share/android-sdk}
