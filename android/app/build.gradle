@@ -51,7 +51,7 @@ react {
     // hermesFlags = ["-O", "-output-source-map"]
 
     /* Autolinking */
-    autolinkLibrariesWithApp()
+    // Autolinking is handled by applyNativeModulesAppBuildGradle below
 }
 
 /**
@@ -138,3 +138,7 @@ dependencies {
         implementation jscFlavor
     }
 }
+
+// Apply autolinking configuration for native modules
+apply(from: file("../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"))
+applyNativeModulesAppBuildGradle(project)
