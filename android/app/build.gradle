@@ -94,6 +94,7 @@ android {
     }
     buildFeatures {
         buildConfig true
+        prefab true
     }
     signingConfigs {
         debug {
