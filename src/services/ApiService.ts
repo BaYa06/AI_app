@@ -128,12 +128,10 @@ class ApiService {
     front?: string;
     back?: string;
     example?: string;
-    interval?: number;
-    easeFactor?: number;
-    repetitions?: number;
+    learningStep?: number;
     nextReview?: string;
     lastReviewed?: string;
-    status?: 'new' | 'learning' | 'review' | 'mastered';
+    status?: 'new' | 'learning' | 'young' | 'mature';
   }) {
     const response = await fetch(`${API_BASE_URL}/cards`, {
       method: 'PUT',

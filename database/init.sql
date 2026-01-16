@@ -44,13 +44,14 @@ CREATE TABLE IF NOT EXISTS cards (
   audio_url TEXT,
   created_at TIMESTAMP DEFAULT NOW(),
   
-  -- Spaced Repetition System данные
+  -- Spaced Repetition System данные (новая система как Flashcards World)
   interval INTEGER DEFAULT 0,
   ease_factor DECIMAL(3,2) DEFAULT 2.5,
   repetitions INTEGER DEFAULT 0,
+  learning_step INTEGER DEFAULT 0,
   next_review TIMESTAMP DEFAULT NOW(),
   last_reviewed TIMESTAMP,
-  status VARCHAR(20) DEFAULT 'new'
+  status VARCHAR(20) DEFAULT 'new' -- new, learning, relearning, young, mature
 );
 
 -- Таблица истории повторений
@@ -66,6 +67,8 @@ CREATE TABLE IF NOT EXISTS reviews (
 -- Создание индексов для оптимизации
 CREATE INDEX IF NOT EXISTS idx_cards_set_id ON cards(set_id);
 CREATE INDEX IF NOT EXISTS idx_cards_next_review ON cards(next_review);
+CREATE INDEX IF NOT EXISTS idx_cards_status ON cards(status);
+CREATE INDEX IF NOT EXISTS idx_cards_learning_step ON cards(learning_step);
 CREATE INDEX IF NOT EXISTS idx_card_sets_user_id ON card_sets(user_id);
 CREATE INDEX IF NOT EXISTS idx_reviews_card_id ON reviews(card_id);
 

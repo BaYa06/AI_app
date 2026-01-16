@@ -3,35 +3,16 @@
  */
 
 export const config = {
-  // SRS параметры по умолчанию
+  // SRS параметры (упрощенная система)
   srs: {
-    initialEaseFactor: 2.5,
-    minimumEaseFactor: 1.3,
-    maxInterval: 365, // Максимальный интервал в днях
+    // Интервалы повторения в днях по шагам обучения
+    // step 0: сегодня, step 1: 1 день, step 2: 3 дня, и т.д.
+    intervals: [0, 1, 3, 7, 14, 30, 60],
     
-    // Интервалы для первого повторения (в днях)
-    firstIntervals: {
-      again: 0.00694, // ~10 минут (в днях)
-      hard: 0.0104,   // ~15 минут
-      good: 1,        // 1 день
-      easy: 4,        // 4 дня
-    },
-    
-    // Множители для следующих интервалов
-    intervalMultipliers: {
-      again: 0,       // Сброс
-      hard: 1.2,
-      good: 2.5,
-      easy: 3.0,
-    },
-    
-    // Изменение ease factor
-    easeFactorChanges: {
-      again: -0.2,
-      hard: -0.15,
-      good: 0,
-      easy: 0.15,
-    },
+    // Пороги для статусов
+    learningThreshold: 2,   // step <= 2 → learning
+    youngThreshold: 4,      // step <= 4 → young
+    // step > 4 → mature
   },
   
   // Лимиты по умолчанию

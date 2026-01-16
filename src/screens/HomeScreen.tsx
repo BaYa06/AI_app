@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.m,
-    paddingVertical: spacing.m,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     ...Platform.select({
       ios: {

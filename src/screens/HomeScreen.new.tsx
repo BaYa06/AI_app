@@ -4,7 +4,9 @@
  */
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSetsStore, useSettingsStore, useThemeColors } from '@/store';
+import { selectSetStats } from '@/store/cardsStore';
 import { Text } from '@/components/common';
 import { spacing, borderRadius } from '@/constants';
 import { 
@@ -28,6 +30,23 @@ export function HomeScreen({ navigation }: any) {
   
   const todayStats = useSettingsStore((s) => s.todayStats);
   const sets = useSetsStore((s) => s.getAllSets());
+  const updateSetStats = useSetsStore((s) => s.updateSetStats);
+
+  // Обновляем статистику всех наборов из БД при фокусе на экране
+  useFocusEffect(
+    React.useCallback(() => {
+      sets.forEach((set) => {
+        const stats = selectSetStats(set.id);
+        updateSetStats(set.id, {
+          cardCount: stats.total,
+          newCount: stats.newCount,
+          learningCount: stats.learningCount,
+          reviewCount: stats.reviewCount,
+          masteredCount: stats.masteredCount,
+        });
+      });
+    }, [sets.length, updateSetStats])
+  );
 
   // Вычисляем карточки на сегодня
   const dueCards = sets.reduce((sum, set) => sum + (set.reviewCount || 0) + (set.newCount || 0), 0);
@@ -145,9 +164,9 @@ export function HomeScreen({ navigation }: any) {
                 return colors.error;
               };
               
-              // Генерируем дату (временно используем текущую дату, позже можно использовать set.createdAt)
+              // Дата создания набора
               const getDateDisplay = () => {
-                const date = new Date();
+                const date = new Date(set.createdAt);
                 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                 return {
                   month: months[date.getMonth()],
@@ -246,7 +265,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: spacing.m,
-    paddingVertical: spacing.m,
+    paddingVertical: 10,
     borderBottomWidth: 1,
   },
   headerLeft: {

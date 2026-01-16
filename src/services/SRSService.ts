@@ -1,106 +1,85 @@
 /**
  * SRS (Spaced Repetition System) Service
- * @description Реализация алгоритма интервальных повторений (SM-2)
+ * @description Упрощенная система интервальных повторений
+ * 
+ * Логика:
+ * 1. Не знаю (1) - сброс learningStep на 0, nextReview НЕ меняется
+ * 2. Сомневаюсь (2) - ничего не меняется
+ * 3. Почти (3) - learningStep +1, nextReview обновляется
+ * 4. Уверенно (4) - learningStep +2, nextReview обновляется
  */
 import type { Card, Rating, ReviewResult, CardStatus } from '@/types';
-import { config } from '@/constants';
 
-const { srs } = config;
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Интервалы повторения в днях в зависимости от learningStep
+ * step 0: сегодня (не выучено)
+ * step 1: 1 день
+ * step 2: 3 дня
+ * step 3: 7 дней
+ * step 4: 14 дней
+ * step 5: 30 дней
+ * step 6+: 60 дней
+ */
+const INTERVALS = [0, 1, 3, 7, 14, 30, 60];
+
+function getIntervalForStep(step: number): number {
+  if (step < 0) return 0;
+  if (step >= INTERVALS.length) return INTERVALS[INTERVALS.length - 1];
+  return INTERVALS[step];
+}
+
+/**
+ * Определяет статус карточки на основе learningStep
+ */
+function getStatusForStep(step: number): CardStatus {
+  if (step === 0) return 'new';
+  if (step <= 2) return 'learning';
+  if (step <= 4) return 'young';
+  return 'mature';
+}
 
 /**
  * Рассчитывает следующую дату повторения и обновляет параметры карточки
  */
 export function calculateNextReview(card: Card, rating: Rating): ReviewResult {
   const now = Date.now();
-  const dayInMs = 24 * 60 * 60 * 1000;
+  let newLearningStep = card.learningStep || 0;
+  let nextReviewDate: number;
 
-  let newEaseFactor = card.easeFactor;
-  let newInterval = card.interval;
-  let newRepetitions = card.repetitions;
-  let newStatus: CardStatus = card.status;
+  switch (rating) {
+    case 1: // Не знаю - сброс на 0, nextReview удаляется
+      newLearningStep = 0;
+      nextReviewDate = 0; // Удаляем дату повторения
+      break;
 
-  // Обновление easeFactor
-  const easeChange = getEaseFactorChange(rating);
-  newEaseFactor = Math.max(srs.minimumEaseFactor, newEaseFactor + easeChange);
+    case 2: // Сомневаюсь - nextReview удаляется
+      nextReviewDate = 0; // Удаляем дату повторения
+      break;
 
-  // Логика в зависимости от оценки
-  if (rating === 1) {
-    // Again - сброс, повторяем через 10 минут
-    newRepetitions = 0;
-    newInterval = srs.firstIntervals.again;
-    newStatus = 'learning';
-  } else if (card.repetitions === 0 || card.status === 'new') {
-    // Первое повторение новой карточки
-    newRepetitions = 1;
-    newInterval = getFirstInterval(rating);
-    newStatus = 'learning';
-  } else {
-    // Последующие повторения
-    newRepetitions++;
-    
-    const multiplier = getIntervalMultiplier(rating);
-    newInterval = card.interval * multiplier * newEaseFactor;
-    
-    // Ограничиваем максимальный интервал
-    newInterval = Math.min(newInterval, srs.maxInterval);
-    
-    // Обновляем статус
-    if (newInterval >= 21) {
-      newStatus = 'mastered';
-    } else if (newInterval >= 1) {
-      newStatus = 'review';
-    } else {
-      newStatus = 'learning';
-    }
+    case 3: // Почти - step +1, обновляем nextReview
+      newLearningStep = newLearningStep + 1;
+      const intervalGood = getIntervalForStep(newLearningStep);
+      nextReviewDate = now + (intervalGood * DAY_IN_MS);
+      break;
+
+    case 4: // Уверенно - step +2, обновляем nextReview
+      newLearningStep = newLearningStep + 2;
+      const intervalEasy = getIntervalForStep(newLearningStep);
+      nextReviewDate = now + (intervalEasy * DAY_IN_MS);
+      break;
   }
 
-  // Рассчитываем дату следующего повторения
-  const nextReviewDate = now + (newInterval * dayInMs);
+  const newStatus = getStatusForStep(newLearningStep);
 
   return {
     cardId: card.id,
     rating,
     nextReviewDate,
-    newInterval,
-    newEaseFactor,
     newStatus,
+    newLearningStep,
   };
-}
-
-/**
- * Получить интервал для первого повторения
- */
-function getFirstInterval(rating: Rating): number {
-  switch (rating) {
-    case 1: return srs.firstIntervals.again;
-    case 2: return srs.firstIntervals.hard;
-    case 3: return srs.firstIntervals.good;
-    case 4: return srs.firstIntervals.easy;
-  }
-}
-
-/**
- * Получить множитель интервала
- */
-function getIntervalMultiplier(rating: Rating): number {
-  switch (rating) {
-    case 1: return srs.intervalMultipliers.again;
-    case 2: return srs.intervalMultipliers.hard;
-    case 3: return srs.intervalMultipliers.good;
-    case 4: return srs.intervalMultipliers.easy;
-  }
-}
-
-/**
- * Получить изменение ease factor
- */
-function getEaseFactorChange(rating: Rating): number {
-  switch (rating) {
-    case 1: return srs.easeFactorChanges.again;
-    case 2: return srs.easeFactorChanges.hard;
-    case 3: return srs.easeFactorChanges.good;
-    case 4: return srs.easeFactorChanges.easy;
-  }
 }
 
 /**
@@ -121,11 +100,11 @@ export function buildStudyQueue(
   const newCards: Card[] = [];
 
   for (const card of cards) {
-    if (card.status === 'new') {
+    if (card.status === 'new' || card.learningStep === 0) {
       newCards.push(card);
     } else if (card.nextReviewDate <= now) {
       // Просроченные - те, которые нужно было повторить раньше
-      if (card.nextReviewDate < now - 24 * 60 * 60 * 1000) {
+      if (card.nextReviewDate < now - DAY_IN_MS) {
         overdueCards.push(card);
       } else {
         dueCards.push(card);
@@ -156,11 +135,11 @@ export function buildStudyQueue(
  */
 export function formatInterval(days: number): string {
   if (days < 1) {
-    const minutes = Math.round(days * 24 * 60);
-    return `${minutes} мин`;
+    return 'сегодня';
+  } else if (days === 1) {
+    return '1 день';
   } else if (days < 7) {
-    const d = Math.round(days);
-    return `${d} ${pluralize(d, 'день', 'дня', 'дней')}`;
+    return `${Math.round(days)} ${pluralize(Math.round(days), 'день', 'дня', 'дней')}`;
   } else if (days < 30) {
     const weeks = Math.round(days / 7);
     return `${weeks} ${pluralize(weeks, 'неделя', 'недели', 'недель')}`;
@@ -193,13 +172,21 @@ function pluralize(n: number, one: string, few: string, many: string): string {
 }
 
 /**
- * Получить предполагаемый интервал для каждой оценки
+ * Получить предполагаемые интервалы для каждой оценки
+ * Возвращает строки для отображения на кнопках
  */
 export function getExpectedIntervals(card: Card): Record<Rating, string> {
+  const currentStep = card.learningStep || 0;
+  
+  // Не знаю (1) - сброс, показываем текущий интервал
+  // Сомневаюсь (2) - без изменений
+  // Почти (3) - +1 шаг
+  // Уверенно (4) - +2 шага
+  
   return {
-    1: formatInterval(calculateNextReview(card, 1).newInterval),
-    2: formatInterval(calculateNextReview(card, 2).newInterval),
-    3: formatInterval(calculateNextReview(card, 3).newInterval),
-    4: formatInterval(calculateNextReview(card, 4).newInterval),
+    1: 'сброс',
+    2: '—',
+    3: formatInterval(getIntervalForStep(currentStep + 1)),
+    4: formatInterval(getIntervalForStep(currentStep + 2)),
   };
 }

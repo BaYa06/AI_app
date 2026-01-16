@@ -1,10 +1,9 @@
-const CACHE_NAME = 'flashly-v1';
-const urlsToCache = [
+const CACHE_NAME = 'flashly-static-v2';
+const PRECACHE_URLS = [
   '/',
   '/index.html',
-  '/bundle.js',
   '/icons/icon-192.png',
-  '/icons/icon-512.png'
+  '/icons/icon-512.png',
 ];
 
 // Install event - cache resources
@@ -13,7 +12,7 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME)
       .then((cache) => {
         console.log('Opened cache');
-        return cache.addAll(urlsToCache);
+        return cache.addAll(PRECACHE_URLS);
       })
       .catch((error) => {
         console.log('Cache install failed:', error);
@@ -49,27 +48,10 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
-        // Return cached version or fetch from network
-        if (response) {
-          return response;
-        }
-
-        return fetch(event.request).then((response) => {
-          // Don't cache non-successful responses
-          if (!response || response.status !== 200 || response.type !== 'basic') {
-            return response;
-          }
-
-          // Clone the response
-          const responseToCache = response.clone();
-
-          caches.open(CACHE_NAME)
-            .then((cache) => {
-              cache.put(event.request, responseToCache);
-            });
-
-          return response;
-        });
+        // Serve from cache first
+        if (response) return response;
+        // Otherwise fetch from network
+        return fetch(event.request);
       })
       .catch(() => {
         // Return offline page for navigation requests

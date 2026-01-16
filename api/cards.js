@@ -99,10 +99,8 @@ async function updateCard(req, res, sql) {
     id, 
     front, 
     back, 
-    example, 
-    interval, 
-    easeFactor, 
-    repetitions, 
+    example,
+    learningStep,
     nextReview, 
     lastReviewed, 
     status 
@@ -118,9 +116,7 @@ async function updateCard(req, res, sql) {
       front = COALESCE(${front}, front),
       back = COALESCE(${back}, back),
       example = COALESCE(${example}, example),
-      interval = COALESCE(${interval}, interval),
-      ease_factor = COALESCE(${easeFactor}, ease_factor),
-      repetitions = COALESCE(${repetitions}, repetitions),
+      learning_step = COALESCE(${learningStep}, learning_step),
       next_review = COALESCE(${nextReview}, next_review),
       last_reviewed = COALESCE(${lastReviewed}, last_reviewed),
       status = COALESCE(${status}, status)

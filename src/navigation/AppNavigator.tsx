@@ -3,9 +3,11 @@
  * @description Главный навигатор приложения
  */
 import React from 'react';
+import { Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '@/store';
 import type { RootStackParamList, MainTabParamList } from '@/types/navigation';
 import { Home, Library, BarChart3, User } from 'lucide-react-native';
@@ -28,6 +30,7 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 
 function MainTabs() {
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
 
   return (
     <Tab.Navigator
@@ -39,9 +42,15 @@ function MainTabs() {
           backgroundColor: colors.surface,
           borderTopWidth: 1,
           borderTopColor: colors.border,
-          paddingBottom: 8,
+          paddingBottom: Platform.select({
+            web: Math.max(insets.bottom, 8),
+            default: 8,
+          }),
           paddingTop: 8,
-          height: 68,
+          height: Platform.select({
+            web: 68 + Math.max(insets.bottom - 8, 0),
+            default: 68,
+          }),
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -2 },
           shadowOpacity: 0.1,

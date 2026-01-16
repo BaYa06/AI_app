@@ -2,7 +2,7 @@
  * Set Detail Screen
  * @description Экран детали набора карточек
  */
-import React, { useCallback, useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { View, FlatList, StyleSheet, Pressable, TextInput, ScrollView } from 'react-native';
 import { useSetsStore, useCardsStore, useThemeColors, selectSetStats } from '@/store';
 import { Container, Text, ProgressBar, Loading, Button } from '@/components/common';
@@ -37,7 +37,6 @@ export function SetDetailScreen({ navigation, route }: Props) {
   const decrementCardCount = useSetsStore((s) => s.decrementCardCount);
   const cards = useCardsStore((s) => s.getCardsBySet(setId));
   const addCard = useCardsStore((s) => s.addCard);
-  const addCards = useCardsStore((s) => s.addCards);
   const deleteCard = useCardsStore((s) => s.deleteCard);
 
   const [filter, setFilter] = useState<Filter>('all');
@@ -51,27 +50,6 @@ export function SetDetailScreen({ navigation, route }: Props) {
   const [onlyHard, setOnlyHard] = useState(false);
   const [showMnemonic, setShowMnemonic] = useState(true);
   const [wordLimit, setWordLimit] = useState<'10' | '20' | '30' | 'all'>('20');
-
-  // Вспомогательные тестовые карточки для верстки (если набора пустой)
-  useEffect(() => {
-    if (!set || cards.length > 0) return;
-
-    const seed = [
-      { setId, frontText: 'scharf', backText: 'острый' },
-      { setId, frontText: 'die Reise', backText: 'путешествие' },
-      { setId, frontText: 'buchen', backText: 'бронировать' },
-      { setId, frontText: 'das Hotel', backText: 'отель' },
-    ];
-
-    addCards(seed);
-    updateSetStats(setId, {
-      cardCount: seed.length,
-      newCount: seed.length,
-      learningCount: 0,
-      reviewCount: 0,
-      masteredCount: 0,
-    });
-  }, [setId, set, cards.length, addCards, updateSetStats]);
 
   // Расчет статистики
   const stats = useMemo(() => {
@@ -87,11 +65,13 @@ export function SetDetailScreen({ navigation, route }: Props) {
     const getFront = (card: Card) => card.frontText ?? (card as any).front ?? '';
     const getBack = (card: Card) => card.backText ?? (card as any).back ?? '';
     const query = search.trim().toLowerCase();
+    const now = Date.now();
 
     return cards
       .filter((card) => {
-        if (filter === 'mastered') return card.status === 'mastered';
-        if (filter === 'unmastered') return card.status !== 'mastered';
+        // mastered = nextReview > сейчас (выученные)
+        if (filter === 'mastered') return card.nextReviewDate > now;
+        if (filter === 'unmastered') return card.nextReviewDate <= now;
         return true;
       })
       .filter((card) => {
@@ -182,13 +162,19 @@ export function SetDetailScreen({ navigation, route }: Props) {
               styles.statusBadge,
               {
                 backgroundColor:
-                  item.status === 'mastered' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(148, 163, 184, 0.15)',
+                  // Галочка только если nextReview в будущем (выучено)
+                  item.nextReviewDate > Date.now()
+                    ? 'rgba(16, 185, 129, 0.15)' 
+                    : 'rgba(148, 163, 184, 0.15)',
                 borderColor:
-                  item.status === 'mastered' ? 'rgba(16, 185, 129, 0.3)' : colors.border,
+                  item.nextReviewDate > Date.now()
+                    ? 'rgba(16, 185, 129, 0.3)' 
+                    : colors.border,
               },
             ]}
           >
-            {item.status === 'mastered' ? (
+            {/* Галочка показывается только если выучено (nextReview > сейчас) */}
+            {item.nextReviewDate > Date.now() ? (
               <Check size={16} color={colors.success} strokeWidth={2.5} />
             ) : (
               <Circle size={14} color={colors.textTertiary} strokeWidth={2} />

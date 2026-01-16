@@ -4,7 +4,7 @@
  */
 
 import { neon } from '@neondatabase/serverless';
-import type { Card, CardSet } from '@/types';
+import type { Card, CardSet, CardStatus } from '@/types';
 
 // Используем переменную окружения для подключения
 const getConnectionString = () => {
@@ -16,6 +16,16 @@ const getConnectionString = () => {
   }
   return '';
 };
+
+/**
+ * Определяет статус карточки на основе learningStep
+ */
+function getStatusFromStep(learningStep: number): CardStatus {
+  if (learningStep === 0) return 'new';
+  if (learningStep <= 2) return 'learning';
+  if (learningStep <= 4) return 'young';
+  return 'mature';
+}
 
 export const NeonService = {
   /**
@@ -57,14 +67,17 @@ export const NeonService = {
         title: set.title,
         description: set.description || '',
         category: set.category || 'Общие',
-        languageFrom: set.language_from || 'de',
-        languageTo: set.language_to || 'ru',
+        tags: [],
+        createdAt: new Date(set.created_at).getTime(),
+        updatedAt: new Date(set.updated_at).getTime(),
+        cardCount: set.total_cards || 0,
+        newCount: 0,
+        learningCount: set.studying_cards || 0,
+        reviewCount: 0,
+        masteredCount: set.mastered_cards || 0,
         isPublic: set.is_public,
-        createdAt: new Date(set.created_at).toISOString(),
-        updatedAt: new Date(set.updated_at).toISOString(),
-        totalCards: set.total_cards || 0,
-        masteredCards: set.mastered_cards || 0,
-        studyingCards: set.studying_cards || 0,
+        isFavorite: false,
+        isArchived: false,
       }));
     } catch (error) {
       console.error('Failed to load sets:', error);
@@ -95,9 +108,7 @@ export const NeonService = {
           image_url,
           audio_url,
           created_at,
-          interval,
-          ease_factor,
-          repetitions,
+          learning_step,
           next_review,
           last_reviewed,
           status
@@ -109,19 +120,20 @@ export const NeonService = {
       return cards.map(card => ({
         id: card.id,
         setId: card.set_id,
-        front: card.front,
-        back: card.back,
+        frontText: card.front,
+        backText: card.back,
         example: card.example || '',
-        imageUrl: card.image_url,
-        audioUrl: card.audio_url,
-        createdAt: new Date(card.created_at).toISOString(),
+        frontImage: card.image_url,
+        backImage: undefined,
+        frontAudio: card.audio_url,
+        backAudio: undefined,
+        createdAt: new Date(card.created_at).getTime(),
+        updatedAt: new Date(card.created_at).getTime(),
         // SRS данные
-        interval: card.interval || 0,
-        easeFactor: parseFloat(card.ease_factor) || 2.5,
-        repetitions: card.repetitions || 0,
-        nextReview: card.next_review ? new Date(card.next_review).toISOString() : new Date().toISOString(),
-        lastReviewed: card.last_reviewed ? new Date(card.last_reviewed).toISOString() : undefined,
-        status: card.status as 'new' | 'learning' | 'review' | 'mastered',
+        learningStep: card.learning_step || 0,
+        nextReviewDate: card.next_review ? new Date(card.next_review).getTime() : Date.now(),
+        lastReviewDate: card.last_reviewed ? new Date(card.last_reviewed).getTime() : Date.now(),
+        status: getStatusFromStep(card.learning_step || 0),
       }));
     } catch (error) {
       console.error('Failed to load cards:', error);
@@ -152,9 +164,7 @@ export const NeonService = {
           image_url,
           audio_url,
           created_at,
-          interval,
-          ease_factor,
-          repetitions,
+          learning_step,
           next_review,
           last_reviewed,
           status
@@ -165,19 +175,20 @@ export const NeonService = {
       return cards.map(card => ({
         id: card.id,
         setId: card.set_id,
-        front: card.front,
-        back: card.back,
+        frontText: card.front,
+        backText: card.back,
         example: card.example || '',
-        imageUrl: card.image_url,
-        audioUrl: card.audio_url,
-        createdAt: new Date(card.created_at).toISOString(),
+        frontImage: card.image_url,
+        backImage: undefined,
+        frontAudio: card.audio_url,
+        backAudio: undefined,
+        createdAt: new Date(card.created_at).getTime(),
+        updatedAt: new Date(card.created_at).getTime(),
         // SRS данные
-        interval: card.interval || 0,
-        easeFactor: parseFloat(card.ease_factor) || 2.5,
-        repetitions: card.repetitions || 0,
-        nextReview: card.next_review ? new Date(card.next_review).toISOString() : new Date().toISOString(),
-        lastReviewed: card.last_reviewed ? new Date(card.last_reviewed).toISOString() : undefined,
-        status: card.status as 'new' | 'learning' | 'review' | 'mastered',
+        learningStep: card.learning_step || 0,
+        nextReviewDate: card.next_review ? new Date(card.next_review).getTime() : Date.now(),
+        lastReviewDate: card.last_reviewed ? new Date(card.last_reviewed).getTime() : Date.now(),
+        status: getStatusFromStep(card.learning_step || 0),
       }));
     } catch (error) {
       console.error('Failed to load all cards:', error);
@@ -190,7 +201,7 @@ export const NeonService = {
    */
   async updateCardSRS(
     cardId: string,
-    data: Partial<Pick<Card, 'interval' | 'easeFactor' | 'repetitions' | 'nextReviewDate' | 'lastReviewDate' | 'status'>>
+    data: Partial<Pick<Card, 'learningStep' | 'nextReviewDate' | 'lastReviewDate' | 'status'>>
   ): Promise<boolean> {
     try {
       const connectionString = getConnectionString();
@@ -202,17 +213,14 @@ export const NeonService = {
       const sql = neon(connectionString);
 
       // Нормализуем значения для SQL
-      const interval = data.interval != null ? Math.round(data.interval) : null;
-      const easeFactor = data.easeFactor != null ? Number(data.easeFactor.toFixed(2)) : null;
+      const learningStep = data.learningStep != null ? data.learningStep : null;
       const nextReview = data.nextReviewDate ? new Date(data.nextReviewDate).toISOString() : null;
       const lastReviewed = data.lastReviewDate ? new Date(data.lastReviewDate).toISOString() : null;
 
       await sql`
         UPDATE cards
         SET
-          interval = COALESCE(${interval}::int, interval),
-          ease_factor = COALESCE(${easeFactor}::numeric, ease_factor),
-          repetitions = COALESCE(${data.repetitions}::int, repetitions),
+          learning_step = COALESCE(${learningStep}::int, learning_step),
           next_review = COALESCE(${nextReview}::timestamptz, next_review),
           last_reviewed = COALESCE(${lastReviewed}::timestamptz, last_reviewed),
           status = COALESCE(${data.status}, status)

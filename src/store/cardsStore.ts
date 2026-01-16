@@ -29,7 +29,7 @@ interface CardsActions {
   deleteCardsBySet: (setId: string) => void;
   
   // SRS обновления
-  updateCardSRS: (cardId: string, srsData: Partial<Pick<Card, 'easeFactor' | 'interval' | 'repetitions' | 'nextReviewDate' | 'lastReviewDate' | 'status'>>) => void;
+  updateCardSRS: (cardId: string, srsData: Partial<Pick<Card, 'learningStep' | 'nextReviewDate' | 'lastReviewDate' | 'status'>>) => void;
   resetCardProgress: (cardId: string) => void;
   
   // Селекторы (встроенные геттеры)
@@ -44,10 +44,8 @@ interface CardsActions {
   clearCards: () => void;
 }
 
-const createDefaultSRSData = (): Pick<Card, 'easeFactor' | 'interval' | 'repetitions' | 'nextReviewDate' | 'lastReviewDate' | 'status'> => ({
-  easeFactor: 2.5,
-  interval: 0,
-  repetitions: 0,
+const createDefaultSRSData = (): Pick<Card, 'learningStep' | 'nextReviewDate' | 'lastReviewDate' | 'status'> => ({
+  learningStep: 0,
   nextReviewDate: Date.now(), // Доступна сразу
   lastReviewDate: 0,
   status: 'new',
@@ -236,38 +234,39 @@ export const useCardsStore = create<CardsState & CardsActions>()(
 
 /**
  * Селектор для получения количества карточек по статусам для набора
+ * Упрощенная логика: выученной считается карточка с nextReview > сейчас
  */
 export const selectSetStats = (setId: string) => {
   const state = useCardsStore.getState();
   const cardIds = state.cardsBySet[setId] || [];
   
-  let newCount = 0;
-  let learningCount = 0;
-  let reviewCount = 0;
-  let masteredCount = 0;
+  let learnedCount = 0;   // Выученные (nextReview > сейчас)
+  let dueCount = 0;       // К повторению (nextReview <= сейчас)
   const now = Date.now();
 
   for (const id of cardIds) {
     const card = state.cards[id];
     if (!card) continue;
 
-    switch (card.status) {
-      case 'new':
-        newCount++;
-        break;
-      case 'learning':
-        learningCount++;
-        break;
-      case 'review':
-        if (card.nextReviewDate <= now) {
-          reviewCount++;
-        }
-        break;
-      case 'mastered':
-        masteredCount++;
-        break;
+    // Простая логика: только время повторения
+    if (card.nextReviewDate > now) {
+      learnedCount++;  // Выучено - повторение в будущем
+    } else {
+      dueCount++;      // Нужно повторить
     }
   }
 
-  return { newCount, learningCount, reviewCount, masteredCount, total: cardIds.length };
+  const total = cardIds.length;
+
+  return {
+    total,
+    newCount: dueCount,         // Для совместимости - все что нужно повторить
+    learningCount: 0,           // Deprecated
+    youngCount: 0,              // Deprecated
+    matureCount: 0,             // Deprecated
+    masteredCount: learnedCount,// Выученные
+    dueCount,                   // К повторению
+    learnedCount,               // Выученные
+    reviewCount: dueCount,      // Для совместимости
+  };
 };

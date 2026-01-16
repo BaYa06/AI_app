@@ -16,8 +16,13 @@ export type Rating = 1 | 2 | 3 | 4;
 
 /**
  * Статус изучения карточки
+ * new - новая карточка, еще не изучалась
+ * learning - в процессе первичного запоминания (шаги обучения)
+ * relearning - переучивание (забыл карточку, нажал Again на young/mature)
+ * young - выучил, но недавно (интервал < 21 дня)
+ * mature - хорошо выучил (интервал >= 21 дня)
  */
-export type CardStatus = 'new' | 'learning' | 'review' | 'mastered';
+export type CardStatus = 'new' | 'learning' | 'relearning' | 'young' | 'mature';
 
 /**
  * Основная карточка
@@ -41,10 +46,8 @@ export interface Card {
   createdAt: number; // timestamp
   updatedAt: number;
   
-  // SRS данные
-  easeFactor: number;     // Коэффициент легкости (начальное: 2.5)
-  interval: number;       // Текущий интервал в днях
-  repetitions: number;    // Количество правильных повторений
+  // SRS данные (упрощенная система)
+  learningStep: number;   // Текущий шаг обучения (0, 1, 2, 3...)
   nextReviewDate: number; // Timestamp следующего повторения
   lastReviewDate: number; // Timestamp последнего повторения
   status: CardStatus;
@@ -176,10 +179,8 @@ export interface ReviewLog {
   timeTaken: number; // Время на ответ в миллисекундах
   
   // Состояние до и после
-  previousInterval: number;
-  newInterval: number;
-  previousEaseFactor: number;
-  newEaseFactor: number;
+  previousLearningStep: number;
+  newLearningStep: number;
 }
 
 /**
@@ -189,9 +190,8 @@ export interface ReviewResult {
   cardId: string;
   rating: Rating;
   nextReviewDate: number;
-  newInterval: number;
-  newEaseFactor: number;
   newStatus: CardStatus;
+  newLearningStep: number;
 }
 
 // ==================== STUDY SESSION TYPES ====================

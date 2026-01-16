@@ -43,7 +43,7 @@ export function StudyScreen({ navigation, route }: Props) {
   // Локальное состояние
   const [currentCard, setCurrentCard] = useState<Card | null>(null);
   const [errorCards, setErrorCards] = useState<Array<{ front: string; back: string; rating: number }>>([]);
-  const isCurrentMastered = currentCard?.status === 'mastered';
+  const isCurrentMastered = currentCard ? currentCard.nextReviewDate > Date.now() : false;
 
   // Инициализация сессии
   useEffect(() => {
@@ -52,18 +52,27 @@ export function StudyScreen({ navigation, route }: Props) {
     const onlyUnmastered = Boolean(onlyHard);
     
     // Если переданы ошибочные карточки, фильтруем только их
-    if (isErrorReview) {
+    if (isErrorReview && errorCardsFronts) {
+      const now = Date.now();
       cards = cards.filter(card => {
         const front = card.frontText ?? (card as any).front ?? '';
         return errorCardsFronts.includes(front);
-      }).filter(card => card.status !== 'mastered'); // Повторяем только те, что не выучены
+      }).filter(card => {
+        // Повторяем только те, что не выучены
+        // Выучено = nextReview > сейчас
+        return card.nextReviewDate <= now;
+      });
       // Очищаем список ошибок для новой сессии повторения
       setErrorCards([]);
     }
 
     // Если выбран режим "Учить всё" + "только не запомнил", оставляем только невыученные
     if (studyAll && onlyUnmastered) {
-      cards = cards.filter(card => card.status !== 'mastered');
+      const now = Date.now();
+      cards = cards.filter(card => {
+        // "Не запомнил" = карточки с nextReview <= сейчас
+        return card.nextReviewDate <= now;
+      });
     }
 
     const limitCards = (list: Card[]) => {
@@ -137,9 +146,7 @@ export function StudyScreen({ navigation, route }: Props) {
 
       // Обновляем карточку
       updateCardSRS(currentCard.id, {
-        easeFactor: result.newEaseFactor,
-        interval: result.newInterval,
-        repetitions: currentCard.repetitions + 1,
+        learningStep: result.newLearningStep,
         nextReviewDate: result.nextReviewDate,
         lastReviewDate: Date.now(),
         status: result.newStatus,
