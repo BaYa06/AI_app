@@ -273,7 +273,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
               onChangeText={setSearch}
               placeholder="Поиск по словам…"
               placeholderTextColor={colors.textTertiary}
-              style={[styles.searchInput, { color: colors.textPrimary }]}
+              style={[styles.searchInput, { color: colors.textPrimary, outlineStyle: 'none' }]}
             />
           </View>
           <Pressable style={[styles.sortButton, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -408,7 +408,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                 onChangeText={setNewFront}
                 placeholder="Например: scharf"
                 placeholderTextColor={colors.textTertiary}
-                style={[styles.addInput, { color: colors.textPrimary, borderColor: colors.border }]}
+                style={[styles.addInput, { color: colors.textPrimary, borderColor: colors.border, outlineStyle: 'none' }]}
               />
             </View>
 
@@ -421,7 +421,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                 onChangeText={setNewBack}
                 placeholder="Например: острый"
                 placeholderTextColor={colors.textTertiary}
-                style={[styles.addInput, { color: colors.textPrimary, borderColor: colors.border }]}
+                style={[styles.addInput, { color: colors.textPrimary, borderColor: colors.border, outlineStyle: 'none' }]}
               />
             </View>
 

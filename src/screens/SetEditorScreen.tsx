@@ -241,7 +241,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
                   onChangeText={setTitle}
                   placeholder="Например: Путешествия (A1)"
                   placeholderTextColor={colors.textTertiary}
-                  style={[styles.input, { color: colors.textPrimary }]}
+                  style={[styles.input, { color: colors.textPrimary, outlineStyle: 'none' }]}
                   onFocus={() => setTitleFocused(true)}
                   onBlur={() => setTitleFocused(false)}
                   maxLength={100}
@@ -285,7 +285,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
                   onChangeText={setDescription}
                   placeholder="Для каких тем/уровня и как использовать"
                   placeholderTextColor={colors.textTertiary}
-                  style={[styles.textarea, { color: colors.textPrimary }]}
+                  style={[styles.textarea, { color: colors.textPrimary, outlineStyle: 'none' }]}
                   multiline
                   maxLength={DESCRIPTION_LIMIT}
                   onFocus={() => setDescriptionFocused(true)}

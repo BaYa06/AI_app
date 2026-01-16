@@ -43,13 +43,15 @@ function MainTabs() {
           borderTopWidth: 1,
           borderTopColor: colors.border,
           paddingBottom: Platform.select({
+            ios: Math.max(insets.bottom, 8),
+            android: 8,
             web: Math.max(insets.bottom, 8),
-            default: 8,
           }),
           paddingTop: 8,
           height: Platform.select({
+            ios: 60 + Math.max(insets.bottom, 8),
+            android: 68,
             web: 68 + Math.max(insets.bottom - 8, 0),
-            default: 68,
           }),
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -2 },

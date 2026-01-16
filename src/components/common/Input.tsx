@@ -88,7 +88,7 @@ export const Input = memo(
             style={[
               styles.input,
               typography.body,
-              { color: colors.textPrimary },
+              { color: colors.textPrimary, outlineStyle: 'none' },
               leftIcon ? styles.inputWithLeftIcon : null,
               rightIcon ? styles.inputWithRightIcon : null,
               inputStyle,

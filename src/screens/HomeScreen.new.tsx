@@ -82,7 +82,7 @@ export function HomeScreen({ navigation }: any) {
       {searchVisible && (
         <View style={[styles.searchBar, { backgroundColor: colors.surface }]}>
           <TextInput
-            style={[styles.searchInput, { color: colors.textPrimary }]}
+            style={[styles.searchInput, { color: colors.textPrimary, outlineStyle: 'none' }]}
             placeholder="Поиск по наборам..."
             placeholderTextColor={colors.textSecondary}
             value={searchQuery}
