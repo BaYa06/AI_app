@@ -66,8 +66,12 @@ export function HomeScreen({ navigation }: any) {
 
   return (
     <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }, debugLayers.container]}
-      edges={['top', 'left', 'right']}
+      style={[
+        styles.container,
+        { backgroundColor: colors.background, paddingBottom: 0 },
+        debugLayers.container,
+      ]}
+      edges={['top']}
     >
       {/* Header */}
       <View
