@@ -32,6 +32,20 @@ function MainTabs() {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
 
+  // Для PWA на iOS insets.bottom = 0, так как tab bar сам обрабатывает safe area
+  // Используем компактную высоту для web/PWA
+  const tabBarHeight = Platform.select({
+    ios: 56 + insets.bottom,
+    android: 64,
+    web: 56, // Компактная высота для web/PWA
+  }) || 56;
+
+  const tabBarPaddingBottom = Platform.select({
+    ios: insets.bottom || 6,
+    android: 6,
+    web: 6, // Компактный padding для web/PWA
+  }) || 6;
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -42,17 +56,9 @@ function MainTabs() {
           backgroundColor: colors.surface,
           borderTopWidth: 1,
           borderTopColor: colors.border,
-          paddingBottom: Platform.select({
-            ios: Math.max(insets.bottom, 8),
-            android: 8,
-            web: Math.max(insets.bottom, 8),
-          }),
-          paddingTop: 8,
-          height: Platform.select({
-            ios: 60 + Math.max(insets.bottom, 8),
-            android: 68,
-            web: 68 + Math.max(insets.bottom - 8, 0),
-          }),
+          paddingBottom: tabBarPaddingBottom,
+          paddingTop: 6,
+          height: tabBarHeight,
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -2 },
           shadowOpacity: 0.1,
@@ -62,10 +68,10 @@ function MainTabs() {
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: '600',
-          marginTop: 4,
+          marginTop: 2,
         },
         tabBarItemStyle: {
-          paddingVertical: 4,
+          paddingVertical: 2,
         },
       }}
     >

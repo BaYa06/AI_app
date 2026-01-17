@@ -2,8 +2,9 @@
  * Home Screen - Новый UI
  * @description Главная страница с современным дизайном
  */
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
+import React, { useState, useRef, useCallback } from 'react';
+import { View, StyleSheet, ScrollView, Pressable, TextInput, useWindowDimensions } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSetsStore, useSettingsStore, useThemeColors } from '@/store';
 import { selectSetStats } from '@/store/cardsStore';
@@ -23,10 +24,22 @@ import {
   MoreVertical,
 } from 'lucide-react-native';
 
+
 export function HomeScreen({ navigation }: any) {
   const colors = useThemeColors();
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const { height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const [headerHeight, setHeaderHeight] = useState(0);
+  
+  // Вычисляем высоту контента: экран - header - tab bar - safe areas
+  const TAB_BAR_HEIGHT = 56;  // Соответствует высоте в AppNavigator для web
+  const contentMinHeight = windowHeight - headerHeight - TAB_BAR_HEIGHT - insets.top;
+  
+  const onHeaderLayout = useCallback((e: any) => {
+    setHeaderHeight(e.nativeEvent.layout.height);
+  }, []);
   
   const todayStats = useSettingsStore((s) => s.todayStats);
   const sets = useSetsStore((s) => s.getAllSets());
@@ -52,9 +65,19 @@ export function HomeScreen({ navigation }: any) {
   const dueCards = sets.reduce((sum, set) => sum + (set.reviewCount || 0) + (set.newCount || 0), 0);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }, debugLayers.container]}
+      edges={['top', 'left', 'right']}
+    >
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+      <View
+        onLayout={onHeaderLayout}
+        style={[
+          styles.header,
+          { backgroundColor: colors.surface, borderBottomColor: colors.border },
+          debugLayers.header,
+        ]}
+      >
         <View style={styles.headerLeft}>
           <Pressable style={styles.menuButton}>
             <Menu size={24} color={colors.textPrimary} />
@@ -80,7 +103,7 @@ export function HomeScreen({ navigation }: any) {
 
       {/* Search Bar */}
       {searchVisible && (
-        <View style={[styles.searchBar, { backgroundColor: colors.surface }]}>
+        <View style={[styles.searchBar, { backgroundColor: colors.surface }, debugLayers.searchBar]}>
           <TextInput
             style={[styles.searchInput, { color: colors.textPrimary, outlineStyle: 'none' }]}
             placeholder="Поиск по наборам..."
@@ -92,9 +115,14 @@ export function HomeScreen({ navigation }: any) {
         </View>
       )}
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={[styles.content, debugLayers.content]}
+        contentContainerStyle={[styles.scrollContent, { minHeight: contentMinHeight }, debugLayers.scrollContent]}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
         {/* Daily Summary Card */}
-        <View style={[styles.summaryCard, { backgroundColor: colors.primary }]}>
+        <View style={[styles.summaryCard, { backgroundColor: colors.primary }, debugLayers.summaryCard]}>
           <View style={styles.summaryHeader}>
             <Calendar size={24} color="#FFFFFF" style={{ marginRight: spacing.s }} />
             <Text style={styles.summaryTitle}>Сегодня</Text>
@@ -122,7 +150,7 @@ export function HomeScreen({ navigation }: any) {
         </View>
 
         {/* Section Header */}
-        <View style={styles.sectionHeader}>
+        <View style={[styles.sectionHeader, debugLayers.sectionHeader]}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Мои наборы</Text>
           <Pressable>
             <Text style={[styles.viewAllButton, { color: colors.primary }]}>Посмотреть все</Text>
@@ -131,7 +159,7 @@ export function HomeScreen({ navigation }: any) {
 
         {/* Card Sets List */}
         {sets.length === 0 ? (
-          <View style={styles.emptyState}>
+          <View style={[styles.emptyState, debugLayers.emptyState]}>
             <Library size={64} color={colors.textSecondary} style={{ marginBottom: spacing.l }} />
             <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
               Создайте свой первый набор{'\n'}карточек!
@@ -154,7 +182,7 @@ export function HomeScreen({ navigation }: any) {
             </Pressable>
           </View>
         ) : (
-          <View style={styles.setsList}>
+          <View style={[styles.setsList, debugLayers.setsList]}>
             {sets.map((set) => {
               const progress = set.cardCount > 0 ? Math.round((set.masteredCount / set.cardCount) * 100) : 0;
               const getStatusColor = () => {
@@ -178,7 +206,11 @@ export function HomeScreen({ navigation }: any) {
               return (
                 <Pressable
                   key={set.id}
-                  style={[styles.setCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  style={[
+                    styles.setCard,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                    debugLayers.setCard,
+                  ]}
                   onPress={() => navigation?.navigate('SetDetail', { setId: set.id })}
                 >
                   {/* Header with icon, title, status dot, and button */}
@@ -217,12 +249,18 @@ export function HomeScreen({ navigation }: any) {
                   </View>
 
                   {/* Progress Section */}
-                  <View style={styles.progressSection}>
+                  <View style={[styles.progressSection, debugLayers.progressSection]}>
                     <View style={styles.progressHeader}>
                       <Text style={[styles.progressLabel, { color: colors.textTertiary }]}>PROGRESS</Text>
                       <Text style={[styles.progressPercentage, { color: colors.textTertiary }]}>{progress}%</Text>
                     </View>
-                    <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+                    <View
+                      style={[
+                        styles.progressBar,
+                        { backgroundColor: colors.border },
+                        debugLayers.progressBar,
+                      ]}
+                    >
                       <View 
                         style={[
                           styles.progressFill, 
@@ -244,19 +282,20 @@ export function HomeScreen({ navigation }: any) {
       {/* FAB */}
       {sets.length > 0 && (
         <Pressable 
-          style={[styles.fab, { backgroundColor: colors.primary }]}
+          style={[styles.fab, { backgroundColor: colors.primary }, debugLayers.fab]}
           onPress={() => navigation?.navigate('SetEditor', {})}
         >
           <Plus size={28} color="#FFFFFF" />
         </Pressable>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    minHeight: '100%',
   },
   
   // Header
@@ -301,6 +340,11 @@ const styles = StyleSheet.create({
   // Content
   content: {
     flex: 1,
+    backgroundColor: 'transparent',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: spacing.xxl,
   },
 
   // Summary Card
@@ -366,7 +410,9 @@ const styles = StyleSheet.create({
 
   // Empty State
   emptyState: {
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: spacing.xxl * 2,
     paddingHorizontal: spacing.l,
   },
@@ -413,6 +459,7 @@ const styles = StyleSheet.create({
 
   // Sets List
   setsList: {
+    flex: 1,
     padding: spacing.m,
     gap: 0,
   },
@@ -528,4 +575,21 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
 
+});
+
+// Оттенки для визуальной проверки слоёв/блоков
+const debugLayers = StyleSheet.create({
+  container: { backgroundColor: '#e8f5ff' },  // Контейнер - голубой
+  header: { backgroundColor: '#ffe5ec' },
+  searchBar: { backgroundColor: '#fff8e1' },
+  content: { backgroundColor: '#e7ffed' },    // ScrollView - зелёный
+  scrollContent: { backgroundColor: '#f5e9ff' }, // Контент скролла - фиолетовый
+  summaryCard: { backgroundColor: '#e0f7fa' },
+  sectionHeader: { backgroundColor: '#fff0f5' },
+  emptyState: { backgroundColor: '#e3f2fd' },
+  setsList: { backgroundColor: '#fef3e7' },   // Список сетов - оранжевый
+  setCard: { backgroundColor: '#f0fff4' },
+  progressSection: { backgroundColor: '#fbeff5' },
+  progressBar: { backgroundColor: '#ffe0b2' },
+  fab: { backgroundColor: '#f6e0ff' },
 });

@@ -320,7 +320,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
   }
 
   return (
-    <Container padded={false}>
+    <Container padded={false} edges={['top', 'bottom']}>
       <FlatList
         data={filteredCards}
         renderItem={renderCard}

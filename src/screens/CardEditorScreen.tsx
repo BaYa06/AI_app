@@ -143,7 +143,7 @@ export function CardEditorScreen({ navigation, route }: Props) {
   }, [frontText, backText, setId, addCard, incrementCardCount, handleSave]);
 
   return (
-    <Container>
+    <Container edges={['top', 'bottom']}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"

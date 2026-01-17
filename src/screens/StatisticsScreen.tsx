@@ -21,7 +21,7 @@ export function StatisticsScreen() {
     : 0;
 
   return (
-    <Container>
+    <Container edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <Heading2 style={styles.title}>Статистика</Heading2>
 

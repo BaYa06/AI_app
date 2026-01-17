@@ -1,0 +1,26 @@
+{
+  "name": "Git Kit",
+  "short_name": "Git Kit",
+  "description": "Сервис для турфирм: гиды, отели, транспорт в одном месте",
+  "lang": "ru",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#111621",
+  "theme_color": "#111621",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -74,7 +74,7 @@ export function ProfileScreen() {
   }, []);
 
   return (
-    <Container>
+    <Container edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <Heading2 style={styles.title}>Профиль</Heading2>
 

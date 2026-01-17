@@ -72,7 +72,7 @@ module.exports = (env, argv) => {
       }),
       new CopyWebpackPlugin({
         patterns: [
-          { from: 'public/manifest.json', to: 'manifest.json' },
+          { from: 'public/manifest.webmanifest', to: 'manifest.webmanifest' },
           { from: 'public/sw.js', to: 'sw.js' },
           { from: 'public/icons', to: 'icons' },
         ],

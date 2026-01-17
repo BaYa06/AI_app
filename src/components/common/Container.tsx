@@ -19,7 +19,7 @@ export const Container = memo<ContainerProps>(function Container({
   children,
   style,
   safeArea = true,
-  edges = ['top', 'bottom'],
+  edges = ['top'],
   padded = true,
 }) {
   const colors = useThemeColors();

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'flashly-static-v2';
+const CACHE_NAME = 'flashly-static-v3';
 const PRECACHE_URLS = [
   '/',
   '/index.html',

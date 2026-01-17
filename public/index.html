@@ -11,7 +11,7 @@
   <meta name="description" content="Учи слова эффективно с интервальным повторением">
   
   <!-- PWA Manifest -->
-  <link rel="manifest" href="/manifest.json">
+  <link rel="manifest" href="/manifest.webmanifest">
   
   <!-- Icons -->
   <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
@@ -27,38 +27,31 @@
     }
     
     html, body, #root {
-      width: 100%;
       height: 100%;
+      width: 100%;
+    }
+    
+    html {
       overflow: hidden;
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
     }
     
     body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
         'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
         sans-serif;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
-      background-color: #f6f6f8;
-      /* Prevent pull-to-refresh */
+      background-color: #0f0f0f;
       overscroll-behavior-y: contain;
-      /* Prevent iOS Safari bounce */
-      -webkit-overflow-scrolling: touch;
-      touch-action: pan-y;
     }
     
     #root {
       display: flex;
       flex-direction: column;
-      height: 100vh;
-      /* Use viewport height units with fallback */
-      height: -webkit-fill-available;
-      min-height: 100vh;
-      min-height: -webkit-fill-available;
+      background-color: #0f0f0f;
     }
 
     /* Splash screen */

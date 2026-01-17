@@ -9,7 +9,7 @@ import { spacing } from '@/constants';
 
 export function LibraryScreen() {
   return (
-    <Container>
+    <Container edges={['top']}>
       <View style={styles.container}>
         <Text style={styles.icon}>📚</Text>
         <Heading2 align="center">Библиотека</Heading2>
