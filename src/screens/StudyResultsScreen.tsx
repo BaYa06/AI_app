@@ -4,7 +4,6 @@
  */
 import React from 'react';
 import { View, StyleSheet, Pressable, ScrollView, Platform, Modal } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useThemeColors } from '@/store';
 import { Text } from '@/components/common';
 import type { RootStackScreenProps } from '@/types/navigation';
@@ -53,8 +52,8 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      {/* Header */}
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Header */}}
       <View style={[styles.header, { backgroundColor: colors.background }]}>
         <Pressable
           onPress={handleBack}
@@ -364,7 +363,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 

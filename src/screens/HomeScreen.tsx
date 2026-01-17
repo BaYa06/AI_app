@@ -11,7 +11,6 @@ import {
   Text as RNText,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   School,
   Search,
@@ -57,8 +56,8 @@ export function HomeScreen({ navigation }: Props) {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      {/* Top Navigation Bar */}
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Top Navigation Bar */}}
       <View
         style={[
           styles.header,
@@ -264,7 +263,7 @@ export function HomeScreen({ navigation }: Props) {
       >
         <Plus size={28} color="#FFFFFF" />
       </Pressable>
-    </SafeAreaView>
+    </View>
   );
 }
 

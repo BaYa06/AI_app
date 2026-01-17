@@ -4,7 +4,6 @@
  */
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { View, StyleSheet, Pressable, Dimensions, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCardsStore, useSetsStore, useStudyStore, useThemeColors, useSettingsStore, selectSetStats } from '@/store';
 import { Text, Loading } from '@/components/common';
 import { calculateNextReview, buildStudyQueue } from '@/services/SRSService';
@@ -250,8 +249,8 @@ export function StudyScreen({ navigation, route }: Props) {
   const example = (currentCard as any).example ?? '';
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Хедер */}
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Хедер */}}
       <View style={styles.header}>
         <Pressable 
           onPress={handleFinish} 
@@ -419,7 +418,7 @@ export function StudyScreen({ navigation, route }: Props) {
           </Pressable>
         </View>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 

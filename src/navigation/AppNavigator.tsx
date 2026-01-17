@@ -7,7 +7,6 @@ import { Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '@/store';
 import type { RootStackParamList, MainTabParamList } from '@/types/navigation';
 import { Home, Library, BarChart3, User } from 'lucide-react-native';
@@ -30,21 +29,10 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 
 function MainTabs() {
   const colors = useThemeColors();
-  const insets = useSafeAreaInsets();
 
-  // Для PWA на iOS insets.bottom = 0, так как tab bar сам обрабатывает safe area
-  // Используем компактную высоту для web/PWA
-  const tabBarHeight = Platform.select({
-    ios: 56 + insets.bottom,
-    android: 64,
-    web: 56, // Компактная высота для web/PWA
-  }) || 56;
-
-  const tabBarPaddingBottom = Platform.select({
-    ios: insets.bottom || 6,
-    android: 6,
-    web: 6, // Компактный padding для web/PWA
-  }) || 6;
+  // Фиксированная высота tab bar для всех платформ
+  const tabBarHeight = 66;
+  const tabBarPaddingBottom = 16;
 
   return (
     <Tab.Navigator
@@ -59,11 +47,6 @@ function MainTabs() {
           paddingBottom: tabBarPaddingBottom,
           paddingTop: 6,
           height: tabBarHeight,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 8,
-          elevation: 8,
         },
         tabBarLabelStyle: {
           fontSize: 11,

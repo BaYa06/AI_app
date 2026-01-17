@@ -2,7 +2,7 @@
  * Set Editor Screen
  * @description Экран создания/редактирования набора
  */
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -11,8 +11,10 @@ import {
   Pressable,
   StatusBar,
   Alert,
+  Animated,
+  Easing,
+  Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSetsStore, useCardsStore, useThemeColors, useSettingsStore } from '@/store';
 import { Text } from '@/components/common';
 import { spacing, borderRadius } from '@/constants';
@@ -41,6 +43,9 @@ export function SetEditorScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
   const theme = useSettingsStore((s) => s.resolvedTheme);
   const isEditing = !!setId;
+  const screenHeight = Dimensions.get('window').height;
+  const hiddenOffset = Math.min(screenHeight, 720);
+  const sheetTranslate = useRef(new Animated.Value(hiddenOffset)).current;
 
   // Store
   const getSet = useSetsStore((s) => s.getSet);
@@ -112,6 +117,29 @@ export function SetEditorScreen({ navigation, route }: Props) {
     });
   }, [targetLanguage]);
 
+  // Анимация появления/скрытия модального шита
+  useEffect(() => {
+    Animated.timing(sheetTranslate, {
+      toValue: 0,
+      duration: 220,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
+    }).start();
+  }, [sheetTranslate]);
+
+  const closeSheet = useCallback(() => {
+    Animated.timing(sheetTranslate, {
+      toValue: hiddenOffset,
+      duration: 180,
+      easing: Easing.in(Easing.ease),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) {
+        navigation.goBack();
+      }
+    });
+  }, [hiddenOffset, navigation, sheetTranslate]);
+
   // Сохранение
   const handleSave = useCallback(async () => {
     setShowValidation(true);
@@ -145,13 +173,13 @@ export function SetEditorScreen({ navigation, route }: Props) {
         return;
       }
 
-      navigation.goBack();
+      closeSheet();
     } catch (error) {
       Alert.alert('Ошибка', 'Не удалось сохранить набор');
     } finally {
       setIsSaving(false);
     }
-  }, [title, description, category, isPublic, isEditing, setId, updateSet, addSet, navigation]);
+  }, [title, description, category, isPublic, isEditing, setId, updateSet, addSet, navigation, closeSheet]);
 
   // Удаление
   const handleDelete = useCallback(() => {
@@ -182,8 +210,8 @@ export function SetEditorScreen({ navigation, route }: Props) {
         backgroundColor="rgba(0,0,0,0.25)"
         barStyle={theme === 'dark' ? 'light-content' : 'dark-content'}
       />
-      <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.safeArea}>
-        <View
+      <View style={styles.safeArea}>
+        <Animated.View
           style={[
             styles.sheet,
             {
@@ -191,6 +219,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
               borderColor: colors.border,
               shadowColor: colors.shadow,
             },
+            { transform: [{ translateY: sheetTranslate }] },
           ]}
         >
           <View style={styles.grabberContainer}>
@@ -201,7 +230,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
             <Text variant="h2" style={[styles.headerTitle, { color: colors.textPrimary }]}>
               {isEditing ? 'Редактировать набор' : 'Создать набор'}
             </Text>
-            <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
+            <Pressable onPress={closeSheet} hitSlop={8}>
               <Text
                 variant="body"
                 style={[styles.link, { color: colors.primary }]}
@@ -441,8 +470,8 @@ export function SetEditorScreen({ navigation, route }: Props) {
               </Text>
             </Pressable>
           </View>
-        </View>
-      </SafeAreaView>
+        </Animated.View>
+      </View>
     </View>
   );
 }

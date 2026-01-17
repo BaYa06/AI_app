@@ -4,7 +4,7 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { View, FlatList, StyleSheet, Pressable, TextInput, ScrollView } from 'react-native';
-import { useSetsStore, useCardsStore, useThemeColors, selectSetStats } from '@/store';
+import { useSetsStore, useCardsStore, useThemeColors, selectSetStats, useSettingsStore } from '@/store';
 import { Container, Text, ProgressBar, Loading, Button } from '@/components/common';
 import { spacing, borderRadius } from '@/constants';
 import type { RootStackScreenProps } from '@/types/navigation';
@@ -31,6 +31,7 @@ type Filter = 'all' | 'mastered' | 'unmastered';
 export function SetDetailScreen({ navigation, route }: Props) {
   const { setId } = route.params;
   const colors = useThemeColors();
+  const theme = useSettingsStore((s) => s.resolvedTheme);
 
   const set = useSetsStore((s) => s.getSet(setId));
   const updateSetStats = useSetsStore((s) => s.updateSetStats);
@@ -338,7 +339,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
           styles.bottomBar,
           {
             borderTopColor: colors.border,
-            backgroundColor: colors.surface,
+            backgroundColor: theme === 'dark' ? 'rgb(16, 17, 34)' : colors.surface,
           },
         ]}
       >
@@ -461,7 +462,10 @@ export function SetDetailScreen({ navigation, route }: Props) {
           <View
             style={[
               styles.studySheet,
-              { backgroundColor: colors.surface, borderColor: colors.border },
+              {
+                backgroundColor: theme === 'dark' ? 'rgb(16, 17, 34)' : colors.surface,
+                borderColor: colors.border,
+              },
             ]}
           >
             <View style={styles.studyHandle} />
