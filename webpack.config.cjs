@@ -73,6 +73,8 @@ module.exports = (env, argv) => {
       new CopyWebpackPlugin({
         patterns: [
           { from: 'public/manifest.webmanifest', to: 'manifest.webmanifest' },
+          // Дублируем манифест как manifest.json для совместимости с клиентами, ожидающими json-расширение
+          { from: 'public/manifest.webmanifest', to: 'manifest.json' },
           { from: 'public/sw.js', to: 'sw.js' },
           { from: 'public/icons', to: 'icons' },
         ],
