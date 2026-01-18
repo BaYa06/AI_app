@@ -43,79 +43,83 @@ export const DatabaseService = {
       console.log(`📚 Загружено наборов: ${sets.length}`);
       console.log(`🃏 Загружено карточек: ${allCards.length}`);
 
-      if (sets.length > 0) {
-        // Преобразуем массивы в объекты для store
-        const setsMap: Record<string, CardSet> = {};
-        const setsOrder: string[] = [];
+      // Преобразуем данные из Neon в объекты для store
+      const setsMap: Record<string, CardSet> = {};
+      const setsOrder: string[] = [];
 
-        sets.forEach(set => {
-          setsMap[set.id] = set;
-          setsOrder.push(set.id);
-        });
+      sets.forEach(set => {
+        setsMap[set.id] = set;
+        setsOrder.push(set.id);
+      });
 
-        useSetsStore.setState({
-          sets: setsMap,
-          setsOrder,
-        });
+      // Загружаем также локальные данные и объединяем
+      const localSetsData = StorageService.getObject<{
+        sets: Record<string, CardSet>;
+        setsOrder: string[];
+      }>(STORAGE_KEYS.SETS);
 
-        console.log('✅ Наборы загружены в store');
-      }
-
-      if (allCards.length > 0) {
-        // Преобразуем карточки в объекты
-        const cardsMap: Record<string, Card> = {};
-        const cardsBySet: Record<string, string[]> = {};
-
-        allCards.forEach(card => {
-          cardsMap[card.id] = card;
-          
-          if (!cardsBySet[card.setId]) {
-            cardsBySet[card.setId] = [];
+      if (localSetsData) {
+        // Добавляем локальные наборы, которых нет в Neon
+        Object.entries(localSetsData.sets || {}).forEach(([id, set]) => {
+          if (!setsMap[id]) {
+            setsMap[id] = set;
+            setsOrder.push(id);
           }
-          cardsBySet[card.setId].push(card.id);
         });
-
-        useCardsStore.setState({
-          cards: cardsMap,
-          cardsBySet,
-        });
-
-        console.log('✅ Карточки загружены в store');
       }
+
+      // Сохраняем объединенные данные в store
+      useSetsStore.setState({
+        sets: setsMap,
+        setsOrder,
+      });
+
+      console.log('✅ Наборы загружены в store (Neon + локальные)');
+
+      // Преобразуем карточки в объекты
+      const cardsMap: Record<string, Card> = {};
+      const cardsBySet: Record<string, string[]> = {};
+
+      allCards.forEach(card => {
+        cardsMap[card.id] = card;
+        
+        if (!cardsBySet[card.setId]) {
+          cardsBySet[card.setId] = [];
+        }
+        cardsBySet[card.setId].push(card.id);
+      });
+
+      // Загружаем также локальные карточки
+      const localCardsData = StorageService.getObject<{
+        cards: Record<string, Card>;
+        cardsBySet: Record<string, string[]>;
+      }>(STORAGE_KEYS.CARDS);
+
+      if (localCardsData) {
+        // Добавляем локальные карточки, которых нет в Neon
+        Object.entries(localCardsData.cards || {}).forEach(([id, card]) => {
+          if (!cardsMap[id]) {
+            cardsMap[id] = card;
+            
+            if (!cardsBySet[card.setId]) {
+              cardsBySet[card.setId] = [];
+            }
+            cardsBySet[card.setId].push(card.id);
+          }
+        });
+      }
+
+      useCardsStore.setState({
+        cards: cardsMap,
+        cardsBySet,
+      });
+
+      console.log('✅ Карточки загружены в store (Neon + локальные)');
 
       // Загружаем настройки из локального хранилища
       const settings = StorageService.getObject<UserSettings>(STORAGE_KEYS.SETTINGS);
       if (settings) {
         useSettingsStore.getState().updateSettings(settings);
-      }
-
-      // Если данных из Neon нет, пробуем загрузить из локального хранилища
-      if (sets.length === 0) {
-        console.log('⚠️  Данных из Neon нет, загружаем из локального хранилища...');
-        
-        const cardsData = StorageService.getObject<{
-          cards: Record<string, Card>;
-          cardsBySet: Record<string, string[]>;
-        }>(STORAGE_KEYS.CARDS);
-
-        if (cardsData) {
-          useCardsStore.setState({
-            cards: cardsData.cards || {},
-            cardsBySet: cardsData.cardsBySet || {},
-          });
-        }
-
-        const setsData = StorageService.getObject<{
-          sets: Record<string, CardSet>;
-          setsOrder: string[];
-        }>(STORAGE_KEYS.SETS);
-
-        if (setsData) {
-          useSetsStore.setState({
-            sets: setsData.sets || {},
-            setsOrder: setsData.setsOrder || [],
-          });
-        }
       }
 
       return true;

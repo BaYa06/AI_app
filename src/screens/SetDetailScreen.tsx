@@ -2,13 +2,14 @@
  * Set Detail Screen
  * @description Экран детали набора карточек
  */
-import React, { useCallback, useMemo, useState } from 'react';
-import { View, FlatList, StyleSheet, Pressable, TextInput, ScrollView } from 'react-native';
+import React, { useCallback, useMemo, useState, useRef } from 'react';
+import { View, FlatList, StyleSheet, Pressable, TextInput, ScrollView, ActivityIndicator, Platform } from 'react-native';
 import { useSetsStore, useCardsStore, useThemeColors, selectSetStats, useSettingsStore } from '@/store';
 import { Container, Text, ProgressBar, Loading, Button } from '@/components/common';
 import { spacing, borderRadius } from '@/constants';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card } from '@/types';
+import { DatabaseService } from '@/services';
 import {
   ArrowLeft,
   MoreHorizontal,
@@ -23,10 +24,16 @@ import {
   Headphones,
   ClipboardList,
   Type,
+  File,
+  Upload,
+  Lightbulb,
+  CheckCircle,
+  Info,
 } from 'lucide-react-native';
 
 type Props = RootStackScreenProps<'SetDetail'>;
 type Filter = 'all' | 'mastered' | 'unmastered';
+const EXPORT_BUTTON_HEIGHT = 42;
 
 export function SetDetailScreen({ navigation, route }: Props) {
   const { setId } = route.params;
@@ -44,6 +51,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
   const [search, setSearch] = useState('');
   const [actionCardId, setActionCardId] = useState<string | null>(null);
   const [showAddCard, setShowAddCard] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [newFront, setNewFront] = useState('');
   const [newBack, setNewBack] = useState('');
   const [isAdding, setIsAdding] = useState(false);
@@ -51,6 +59,13 @@ export function SetDetailScreen({ navigation, route }: Props) {
   const [onlyHard, setOnlyHard] = useState(false);
   const [showMnemonic, setShowMnemonic] = useState(true);
   const [wordLimit, setWordLimit] = useState<'10' | '20' | '30' | 'all'>('20');
+
+  // Import TSV states
+  const [importLoading, setImportLoading] = useState(false);
+  const [importedCards, setImportedCards] = useState<Array<{ front: string; back: string }>>([]);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importStep, setImportStep] = useState<'select' | 'loading' | 'preview'>('select');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Расчет статистики
   const stats = useMemo(() => {
@@ -95,6 +110,122 @@ export function SetDetailScreen({ navigation, route }: Props) {
     setNewBack('');
     setShowAddCard(true);
   }, []);
+
+  const openImportModal = useCallback(() => {
+    setImportStep('select');
+    setImportedCards([]);
+    setImportError(null);
+    setShowImportModal(true);
+  }, []);
+
+  const closeImportModal = useCallback(() => {
+    setShowImportModal(false);
+    setImportStep('select');
+    setImportedCards([]);
+    setImportError(null);
+  }, []);
+
+  // Parse TSV file content
+  const parseTSV = useCallback((content: string): Array<{ front: string; back: string }> => {
+    const lines = content.trim().split('\n');
+    const cards: Array<{ front: string; back: string }> = [];
+    
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      if (!trimmedLine) continue;
+      
+      // Split by tab
+      const parts = trimmedLine.split('\t');
+      if (parts.length >= 2) {
+        const front = parts[0].trim();
+        const back = parts[1].trim();
+        if (front && back) {
+          cards.push({ front, back });
+        }
+      }
+    }
+    
+    return cards;
+  }, []);
+
+  // Handle file selection (web)
+  const handleFileSelect = useCallback(async (event: any) => {
+    const file = event.target?.files?.[0];
+    if (!file) return;
+
+    // Check file extension
+    const fileName = file.name.toLowerCase();
+    if (!fileName.endsWith('.tsv')) {
+      setImportError('Сейчас мы работаем только с TSV файлами. Пожалуйста, выберите файл с расширением .tsv');
+      return;
+    }
+
+    setImportStep('loading');
+    setImportLoading(true);
+    setImportError(null);
+
+    try {
+      const content = await file.text();
+      const parsedCards = parseTSV(content);
+      
+      if (parsedCards.length === 0) {
+        setImportError('Не удалось найти карточки в файле. Проверьте формат TSV (слово[TAB]перевод)');
+        setImportStep('select');
+      } else {
+        setImportedCards(parsedCards);
+        setImportStep('preview');
+      }
+    } catch (error) {
+      setImportError('Ошибка при чтении файла');
+      setImportStep('select');
+    } finally {
+      setImportLoading(false);
+      // Reset input
+      if (event.target) {
+        event.target.value = '';
+      }
+    }
+  }, [parseTSV]);
+
+  // Trigger file input click
+  const triggerFileSelect = useCallback(() => {
+    if (Platform.OS === 'web' && fileInputRef.current) {
+      (fileInputRef.current as any).click();
+    }
+  }, []);
+
+  // Import all cards from preview
+  const handleImportCards = useCallback(async () => {
+    if (importedCards.length === 0) return;
+    
+    setImportLoading(true);
+    
+    try {
+      for (const card of importedCards) {
+        addCard({ setId, frontText: card.front, backText: card.back });
+      }
+      
+      // Update stats
+      const statsSnapshot = selectSetStats(setId);
+      updateSetStats(setId, {
+        cardCount: statsSnapshot.total,
+        newCount: statsSnapshot.newCount,
+        learningCount: statsSnapshot.learningCount,
+        reviewCount: statsSnapshot.reviewCount,
+        masteredCount: statsSnapshot.masteredCount,
+      });
+      
+      // Save to database
+      await DatabaseService.saveCards();
+      await DatabaseService.saveSets();
+      
+      closeImportModal();
+    } catch (error) {
+      setImportError('Ошибка при создании карточек');
+    } finally {
+      setImportLoading(false);
+    }
+  }, [importedCards, addCard, setId, updateSetStats, closeImportModal]);
 
   const handleEditCard = useCallback(
     (cardId: string) => {
@@ -390,20 +521,31 @@ export function SetDetailScreen({ navigation, route }: Props) {
       {showAddCard && (
         <View style={[styles.sheetWrapper, { zIndex: 30 }]} pointerEvents="box-none">
           <Pressable style={styles.sheetBackdrop} onPress={() => setShowAddCard(false)} />
-          <View
-            style={[
-              styles.addSheet,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
+      <View
+        style={[
+          styles.addSheet,
+          { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}
+      >
+        <View style={styles.addSheetHeader}>
+          <Text variant="h3" style={{ color: colors.textPrimary }}>
+            Новая карточка
+          </Text>
+          <Pressable
+            onPress={openImportModal}
+            style={[styles.exportButton, { backgroundColor: colors.primary }]}
           >
-            <Text variant="h3" style={{ color: colors.textPrimary, marginBottom: spacing.m }}>
-              Новая карточка
+            <File size={18} color={colors.textInverse} />
+            <Text variant="bodySmall" style={{ color: colors.textInverse, fontWeight: '700' }}>
+              Импорт
             </Text>
+          </Pressable>
+        </View>
 
-            <View style={styles.addField}>
-              <Text variant="label" color="primary" style={styles.fieldLabel}>
-                Иностранное слово
-              </Text>
+        <View style={styles.addField}>
+          <Text variant="label" color="primary" style={styles.fieldLabel}>
+            Иностранное слово
+          </Text>
               <TextInput
                 value={newFront}
                 onChangeText={setNewFront}
@@ -654,6 +796,190 @@ export function SetDetailScreen({ navigation, route }: Props) {
                 Режим: Flashcards • {wordLimit === 'all' ? set?.cardCount || 0 : wordLimit} слов
               </Text>
             </View>
+          </View>
+        </View>
+      )}
+
+      {showImportModal && (
+        <View style={[styles.importOverlay]} pointerEvents="box-none">
+          <Pressable style={styles.sheetBackdrop} onPress={closeImportModal} />
+          <View
+            style={[
+              styles.importCard,
+              {
+                backgroundColor: theme === 'dark' ? 'rgb(16, 17, 34)' : colors.background,
+                borderColor: colors.border,
+                maxHeight: importStep === 'preview' ? '80%' : undefined,
+              },
+            ]}
+          >
+            <View style={styles.importTopBar}>
+              <Pressable onPress={closeImportModal} hitSlop={10} style={styles.topIcon}>
+                <ArrowLeft size={20} color={colors.textPrimary} />
+              </Pressable>
+              <Text variant="body" style={[styles.importTitle, { color: colors.textPrimary }]}>
+                {importStep === 'preview' ? `Импорт (${importedCards.length} карточек)` : 'Импорт из файла'}
+              </Text>
+              <View style={styles.topIcon} />
+            </View>
+
+            {/* Hidden file input for web */}
+            {Platform.OS === 'web' && (
+              <input
+                ref={fileInputRef as any}
+                type="file"
+                accept=".tsv"
+                onChange={handleFileSelect as any}
+                style={{ display: 'none' }}
+              />
+            )}
+
+            {/* Loading State */}
+            {importStep === 'loading' && (
+              <View style={styles.importLoadingContainer}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text variant="body" color="secondary" style={{ marginTop: spacing.m }}>
+                  Загрузка файла...
+                </Text>
+              </View>
+            )}
+
+            {/* Select File State */}
+            {importStep === 'select' && (
+              <>
+                <View style={styles.importHero}>
+                  <View style={[styles.importHeroIcon, { backgroundColor: `${colors.primary}1A` }]}>
+                    <File size={36} color={colors.primary} />
+                  </View>
+                  <Text variant="h3" align="center" style={{ color: colors.textPrimary }}>
+                    Импорт карточек из TSV
+                  </Text>
+                  <Text
+                    variant="body"
+                    color="secondary"
+                    align="center"
+                    style={{ paddingHorizontal: spacing.m }}
+                  >
+                    Загрузите TSV файл со словами и переводами для быстрого создания карточек.
+                  </Text>
+                </View>
+
+                {importError && (
+                  <View style={[styles.importError, { backgroundColor: `${colors.error}15`, borderColor: colors.error }]}>
+                    <Info size={18} color={colors.error} />
+                    <Text variant="bodySmall" style={{ color: colors.error, flex: 1 }}>
+                      {importError}
+                    </Text>
+                  </View>
+                )}
+
+                <Pressable
+                  onPress={triggerFileSelect}
+                  style={[styles.importSelectButton, { backgroundColor: colors.primary }]}
+                >
+                  <Upload size={20} color={colors.textInverse} />
+                  <Text variant="body" style={{ color: colors.textInverse, fontWeight: '700' }}>
+                    Выбрать TSV файл
+                  </Text>
+                </Pressable>
+
+                <View
+                  style={[
+                    styles.importTips,
+                    {
+                      backgroundColor: 'rgba(100, 103, 242, 0.08)',
+                      borderColor: `${colors.primary}1A`,
+                    },
+                  ]}
+                >
+                  <View style={styles.importTipsHeader}>
+                    <Lightbulb size={18} color={colors.primary} />
+                    <Text variant="bodySmall" style={{ color: colors.primary, fontWeight: '700' }}>
+                      Формат файла
+                    </Text>
+                  </View>
+
+                  <View style={styles.tipRow}>
+                    <CheckCircle size={16} color={colors.primary} style={styles.tipIcon} />
+                    <Text variant="caption" color="secondary" style={styles.tipText}>
+                      Формат: <Text style={{ fontWeight: '700', color: colors.textPrimary }}>слово[TAB]перевод</Text>
+                    </Text>
+                  </View>
+                  <View style={styles.tipRow}>
+                    <CheckCircle size={16} color={colors.primary} style={styles.tipIcon} />
+                    <Text variant="caption" color="secondary" style={styles.tipText}>
+                      Поддерживается только <Text style={{ fontWeight: '700', color: colors.textPrimary }}>.tsv</Text> формат
+                    </Text>
+                  </View>
+                  <View style={styles.tipRow}>
+                    <Info size={16} color={colors.primary} style={styles.tipIcon} />
+                    <Text variant="caption" color="secondary" style={styles.tipText}>
+                      Каждая строка — одна карточка
+                    </Text>
+                  </View>
+                </View>
+              </>
+            )}
+
+            {/* Preview State */}
+            {importStep === 'preview' && (
+              <>
+                <ScrollView 
+                  style={styles.importPreviewList}
+                  showsVerticalScrollIndicator={true}
+                >
+                  {importedCards.map((card, index) => (
+                    <View 
+                      key={index} 
+                      style={[
+                        styles.importPreviewCard, 
+                        { 
+                          backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                          borderColor: colors.border,
+                        }
+                      ]}
+                    >
+                      <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '600' }}>
+                        {card.front}
+                      </Text>
+                      <Text variant="bodySmall" color="secondary">
+                        {card.back}
+                      </Text>
+                    </View>
+                  ))}
+                </ScrollView>
+
+                <View style={styles.importPreviewActions}>
+                  <Pressable
+                    onPress={() => setImportStep('select')}
+                    style={[styles.importCancelButton, { borderColor: colors.border }]}
+                  >
+                    <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '600' }}>
+                      Отмена
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={handleImportCards}
+                    disabled={importLoading}
+                    style={[
+                      styles.importConfirmButton, 
+                      { backgroundColor: colors.primary, opacity: importLoading ? 0.7 : 1 }
+                    ]}
+                  >
+                    {importLoading ? (
+                      <ActivityIndicator size="small" color={colors.textInverse} />
+                    ) : (
+                      <>
+                        <Check size={18} color={colors.textInverse} />
+                        <Text variant="body" style={{ color: colors.textInverse, fontWeight: '700' }}>
+                          Импортировать
+                        </Text>
+                      </>
+                    )}
+                  </Pressable>
+                </View>
+              </>
+            )}
           </View>
         </View>
       )}
@@ -1106,6 +1432,12 @@ const styles = StyleSheet.create({
     padding: spacing.l,
     gap: spacing.m,
   },
+  addSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.s,
+  },
   addField: {
     gap: spacing.xs,
   },
@@ -1119,9 +1451,143 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.s + 2,
     fontSize: 16,
   },
+  exportButton: {
+    height: EXPORT_BUTTON_HEIGHT,
+    minWidth: 132,
+    paddingHorizontal: spacing.m,
+    borderRadius: Math.round(EXPORT_BUTTON_HEIGHT * 0.2),
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+  },
   addActions: {
     flexDirection: 'row',
     gap: spacing.s,
     marginTop: spacing.s,
+  },
+  importOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.m,
+    zIndex: 45,
+  },
+  importCard: {
+    width: '100%',
+    maxWidth: 480,
+    borderRadius: borderRadius.xl,
+    borderWidth: 1,
+    padding: spacing.l,
+    gap: spacing.m,
+  },
+  importTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  importTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  importHero: {
+    alignItems: 'center',
+    gap: spacing.s,
+  },
+  importHeroIcon: {
+    width: 90,
+    height: 90,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xs,
+  },
+  importButton: {
+    height: 56,
+    borderRadius: borderRadius.l,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.s,
+  },
+  importSelectButton: {
+    height: 56,
+    borderRadius: borderRadius.l,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.s,
+  },
+  importTips: {
+    borderWidth: 1,
+    borderRadius: borderRadius.l,
+    padding: spacing.m,
+    gap: spacing.s,
+  },
+  importTipsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  tipRow: {
+    flexDirection: 'row',
+    gap: spacing.s,
+    alignItems: 'flex-start',
+  },
+  tipIcon: {
+    marginTop: 2,
+  },
+  tipText: {
+    flex: 1,
+    lineHeight: 18,
+  },
+  importLoadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xxl,
+  },
+  importError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+    padding: spacing.m,
+    borderRadius: borderRadius.m,
+    borderWidth: 1,
+  },
+  importPreviewList: {
+    maxHeight: 400,
+    marginVertical: spacing.s,
+  },
+  importPreviewCard: {
+    padding: spacing.m,
+    borderRadius: borderRadius.m,
+    borderWidth: 1,
+    marginBottom: spacing.s,
+    gap: spacing.xs,
+  },
+  importPreviewActions: {
+    flexDirection: 'row',
+    gap: spacing.s,
+    marginTop: spacing.s,
+  },
+  importCancelButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: borderRadius.l,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  importConfirmButton: {
+    flex: 2,
+    height: 48,
+    borderRadius: borderRadius.l,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
   },
 });

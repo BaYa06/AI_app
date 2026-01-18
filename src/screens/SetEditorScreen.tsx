@@ -14,6 +14,7 @@ import {
   Animated,
   Easing,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { useSetsStore, useCardsStore, useThemeColors, useSettingsStore } from '@/store';
 import { Text } from '@/components/common';
@@ -185,22 +186,36 @@ export function SetEditorScreen({ navigation, route }: Props) {
   const handleDelete = useCallback(() => {
     if (!setId) return;
 
-    Alert.alert(
-      'Удалить набор?',
-      'Все карточки в этом наборе также будут удалены. Это действие нельзя отменить.',
-      [
-        { text: 'Отмена', style: 'cancel' },
-        {
-          text: 'Удалить',
-          style: 'destructive',
-          onPress: () => {
-            deleteCardsBySet(setId);
-            deleteSet(setId);
-            navigation.navigate('Main', { screen: 'Home' });
+    const performDelete = () => {
+      console.log('Удаление набора:', setId);
+      deleteCardsBySet(setId);
+      deleteSet(setId);
+      navigation.navigate('Main', { screen: 'Home' });
+    };
+
+    if (Platform.OS === 'web') {
+      // Для веба используем window.confirm
+      const confirmed = window.confirm(
+        'Удалить набор?\n\nВсе карточки в этом наборе также будут удалены. Это действие нельзя отменить.'
+      );
+      if (confirmed) {
+        performDelete();
+      }
+    } else {
+      // Для нативных платформ используем Alert
+      Alert.alert(
+        'Удалить набор?',
+        'Все карточки в этом наборе также будут удалены. Это действие нельзя отменить.',
+        [
+          { text: 'Отмена', style: 'cancel' },
+          {
+            text: 'Удалить',
+            style: 'destructive',
+            onPress: performDelete,
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   }, [setId, deleteCardsBySet, deleteSet, navigation]);
 
   return (
@@ -421,7 +436,12 @@ export function SetEditorScreen({ navigation, route }: Props) {
             </View>
 
             {isEditing && (
-              <Pressable onPress={handleDelete} style={styles.deleteLink} disabled={isSaving}>
+              <Pressable 
+                onPress={handleDelete} 
+                style={styles.deleteLink} 
+                disabled={isSaving}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
                 <Text variant="bodySmall" style={{ color: colors.error, fontWeight: '600' }}>
                   Удалить набор
                 </Text>

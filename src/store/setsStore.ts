@@ -6,6 +6,8 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { v4 as uuid } from 'uuid';
 import type { CardSet, CreateSetInput, UpdateSetInput } from '@/types';
+import { NeonService } from '@/services/NeonService';
+import { DatabaseService } from '@/services';
 
 interface SetsState {
   // Данные - объект для O(1) доступа
@@ -46,7 +48,8 @@ interface SetsActions {
   clearSets: () => void;
 }
 
-const DEFAULT_USER_ID = 'local'; // Для локального хранения
+const LOCAL_USER_ID = 'local'; // Для локального хранения
+const REMOTE_USER_ID = process.env.POSTGRES_DEFAULT_USER_ID || '00000000-0000-0000-0000-000000000001';
 
 export const useSetsStore = create<SetsState & SetsActions>()(
   immer((set, get) => ({
@@ -62,7 +65,7 @@ export const useSetsStore = create<SetsState & SetsActions>()(
       const now = Date.now();
       const newSet: CardSet = {
         id: uuid(),
-        userId: DEFAULT_USER_ID,
+        userId: NeonService.isEnabled() ? REMOTE_USER_ID : LOCAL_USER_ID,
         title: input.title,
         description: input.description,
         category: input.category || 'general',
@@ -87,6 +90,34 @@ export const useSetsStore = create<SetsState & SetsActions>()(
         state.setsOrder.unshift(newSet.id); // Новые сверху
       });
 
+      // Сохраняем локально сразу, чтобы не потерять набор при выходе
+      DatabaseService.saveSets();
+      console.log('✅ Набор сохранен локально:', newSet.title);
+
+      // Асинхронно отправляем в Neon (best-effort)
+      if (NeonService.isEnabled()) {
+        console.log('🔄 Отправка набора в Neon PostgreSQL...');
+        (async () => {
+          const ok = await NeonService.createSet({
+            id: newSet.id,
+            userId: newSet.userId,
+            title: newSet.title,
+            description: newSet.description,
+            category: newSet.category,
+            isPublic: newSet.isPublic,
+            createdAt: newSet.createdAt,
+            updatedAt: newSet.updatedAt,
+          });
+          if (ok) {
+            console.log('✅ Набор сохранен в Neon PostgreSQL:', newSet.title);
+          } else {
+            console.warn('⚠️  Не удалось синхронизировать набор с Neon:', newSet.title);
+          }
+        })();
+      } else {
+        console.log('ℹ️  Neon PostgreSQL не настроен, набор сохранен только локально');
+      }
+
       return newSet;
     },
 
@@ -107,6 +138,21 @@ export const useSetsStore = create<SetsState & SetsActions>()(
           state.setsOrder.splice(index, 1);
         }
       });
+
+      // Сохраняем локально
+      DatabaseService.saveSets();
+      console.log('✅ Набор удален локально:', setId);
+
+      // Асинхронно удаляем из Neon
+      if (NeonService.isEnabled()) {
+        console.log('🔄 Удаление набора из Neon PostgreSQL...');
+        (async () => {
+          const ok = await NeonService.deleteSet(setId);
+          if (!ok) {
+            console.warn('⚠️  Не удалось удалить набор из Neon:', setId);
+          }
+        })();
+      }
     },
 
     // ==================== ДЕЙСТВИЯ ====================

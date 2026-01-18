@@ -7,6 +7,7 @@ import { immer } from 'zustand/middleware/immer';
 import { v4 as uuid } from 'uuid';
 import type { Card, CreateCardInput, UpdateCardInput } from '@/types';
 import { NeonService } from '@/services/NeonService';
+import { DatabaseService } from '@/services';
 
 interface CardsState {
   // Данные - храним в объекте для O(1) доступа
@@ -80,6 +81,18 @@ export const useCardsStore = create<CardsState & CardsActions>()(
         state.cardsBySet[input.setId].push(card.id);
       });
 
+      // Сохраняем локально сразу
+      DatabaseService.saveCards();
+
+      if (NeonService.isEnabled()) {
+        (async () => {
+          const ok = await NeonService.createCard(card);
+          if (!ok) {
+            console.warn('Не удалось синхронизировать карточку с Neon');
+          }
+        })();
+      }
+
       return card;
     },
 
@@ -93,9 +106,12 @@ export const useCardsStore = create<CardsState & CardsActions>()(
     },
 
     deleteCard: (cardId) => {
+      let deletedCard: Card | undefined;
+      
       set((state) => {
         const card = state.cards[cardId];
         if (card) {
+          deletedCard = card;
           // Удаляем из индекса setId -> cardIds
           const setCards = state.cardsBySet[card.setId];
           if (setCards) {
@@ -108,6 +124,22 @@ export const useCardsStore = create<CardsState & CardsActions>()(
           delete state.cards[cardId];
         }
       });
+
+      if (deletedCard) {
+        // Сохраняем локально
+        DatabaseService.saveCards();
+        console.log('✅ Карточка удалена локально:', cardId);
+
+        // Асинхронно удаляем из Neon
+        if (NeonService.isEnabled()) {
+          (async () => {
+            const ok = await NeonService.deleteCard(cardId);
+            if (!ok) {
+              console.warn('⚠️  Не удалось удалить карточку из Neon:', cardId);
+            }
+          })();
+        }
+      }
     },
 
     // ==================== ПАКЕТНЫЕ ====================
@@ -133,6 +165,18 @@ export const useCardsStore = create<CardsState & CardsActions>()(
         }
       });
 
+      // Сохраняем локально сразу (после импорта)
+      DatabaseService.saveCards();
+
+      if (NeonService.isEnabled()) {
+        (async () => {
+          const ok = await NeonService.createCardsBatch(newCards);
+          if (!ok) {
+            console.warn('Не удалось синхронизировать импорт карточек с Neon');
+          }
+        })();
+      }
+
       return newCards;
     },
 
@@ -144,6 +188,10 @@ export const useCardsStore = create<CardsState & CardsActions>()(
         }
         delete state.cardsBySet[setId];
       });
+
+      // Сохраняем локально
+      DatabaseService.saveCards();
+      console.log('✅ Карточки набора удалены локально:', setId);
     },
 
     // ==================== SRS ====================

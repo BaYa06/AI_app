@@ -34,6 +34,7 @@ export interface Card {
   // Контент
   frontText: string;
   backText: string;
+  example?: string;
   // Допустимы альтернативные поля для совместимости с API
   front?: string;
   back?: string;
@@ -60,6 +61,7 @@ export interface CreateCardInput {
   setId: string;
   frontText: string;
   backText: string;
+  example?: string;
   frontImage?: string;
   backImage?: string;
   frontAudio?: string;
@@ -72,6 +74,7 @@ export interface CreateCardInput {
 export interface UpdateCardInput {
   frontText?: string;
   backText?: string;
+  example?: string;
   frontImage?: string;
   backImage?: string;
   frontAudio?: string;
