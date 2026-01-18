@@ -19,9 +19,11 @@ export type RootStackParamList = {
     timeSpent: number;
     errors: number;
     errorCards: Array<{ front: string; back: string; rating: number }>;
+    modeTitle?: string;
   };
   CardEditor: { setId: string; cardId?: string };
   SetEditor: { setId?: string };
+  Match: { setId: string; cardLimit?: number };
   Settings: undefined;
   Search: undefined;
 };

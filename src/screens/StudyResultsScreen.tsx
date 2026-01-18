@@ -12,7 +12,15 @@ import { ArrowLeft, Settings, CheckCircle2, List, ArrowRight, RotateCcw, BookOpe
 type Props = RootStackScreenProps<'StudyResults'>;
 
 export function StudyResultsScreen({ navigation, route }: Props) {
-  const { setId, totalCards, learnedCards, timeSpent, errors, errorCards } = route.params;
+  const {
+    setId,
+    totalCards,
+    learnedCards,
+    timeSpent,
+    errors,
+    errorCards,
+    modeTitle = 'Flashcards',
+  } = route.params;
   const colors = useThemeColors();
   const [showErrorsModal, setShowErrorsModal] = React.useState(false);
 
@@ -66,7 +74,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
         </Pressable>
         
         <Text variant="h3" style={styles.headerTitle}>
-          Flashcards
+          {modeTitle}
         </Text>
         
         <Pressable

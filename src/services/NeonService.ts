@@ -4,7 +4,7 @@
  */
 
 import { neon } from '@neondatabase/serverless';
-import type { Card, CardSet, CardStatus } from '@/types';
+import type { Card, CardSet, CardStatus, UpdateCardInput } from '@/types';
 
 // Используем переменную окружения для подключения
 const getConnectionString = () => {
@@ -239,6 +239,37 @@ export const NeonService = {
           next_review = COALESCE(${nextReview}::timestamptz, next_review),
           last_reviewed = COALESCE(${lastReviewed}::timestamptz, last_reviewed),
           status = COALESCE(${data.status}, status)
+        WHERE id = ${cardId}
+      `;
+
+      return true;
+    } catch (error) {
+      console.error('Failed to update card in Neon:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Обновить содержимое карточки (текст, медиа)
+   */
+  async updateCard(cardId: string, data: UpdateCardInput): Promise<boolean> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) {
+        console.warn('POSTGRES_URL не настроен, пропускаем обновление карточки');
+        return false;
+      }
+
+      const sql = neon(connectionString);
+
+      await sql`
+        UPDATE cards
+        SET
+          front = COALESCE(${data.frontText ?? null}, front),
+          back = COALESCE(${data.backText ?? null}, back),
+          example = COALESCE(${data.example ?? null}, example),
+          image_url = COALESCE(${data.frontImage ?? null}, image_url),
+          audio_url = COALESCE(${data.frontAudio ?? null}, audio_url)
         WHERE id = ${cardId}
       `;
 

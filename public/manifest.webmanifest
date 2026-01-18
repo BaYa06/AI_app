@@ -1,7 +1,7 @@
 {
-  "name": "Git Kit",
-  "short_name": "Git Kit",
-  "description": "Сервис для турфирм: гиды, отели, транспорт в одном месте",
+  "name": "Flashly",
+  "short_name": "Flashly",
+  "description": "Flash cards",
   "lang": "ru",
   "start_url": "/",
   "scope": "/",

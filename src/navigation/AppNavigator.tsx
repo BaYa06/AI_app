@@ -21,6 +21,7 @@ import { StudyScreen } from '@/screens/StudyScreen';
 import { StudyResultsScreen } from '@/screens/StudyResultsScreen';
 import { CardEditorScreen } from '@/screens/CardEditorScreen';
 import { SetEditorScreen } from '@/screens/SetEditorScreen';
+import { MatchScreen } from '@/screens/MatchScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -123,6 +124,7 @@ export function AppNavigator() {
             backgroundColor: colors.background,
           },
           animation: 'slide_from_right',
+          gestureEnabled: Platform.OS === 'ios',
         }}
       >
         <Stack.Screen
@@ -133,6 +135,11 @@ export function AppNavigator() {
         <Stack.Screen
           name="SetDetail"
           component={SetDetailScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="Match"
+          component={MatchScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen

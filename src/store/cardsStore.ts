@@ -103,6 +103,19 @@ export const useCardsStore = create<CardsState & CardsActions>()(
           Object.assign(card, input, { updatedAt: Date.now() });
         }
       });
+
+      // Сохраняем изменения локально сразу
+      DatabaseService.saveCards();
+
+      // Синхронизируем изменения с Neon (best-effort)
+      if (NeonService.isEnabled()) {
+        (async () => {
+          const ok = await NeonService.updateCard(cardId, input);
+          if (!ok) {
+            console.warn('Не удалось обновить карточку в Neon');
+          }
+        })();
+      }
     },
 
     deleteCard: (cardId) => {

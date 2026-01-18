@@ -102,8 +102,15 @@ export function SetDetailScreen({ navigation, route }: Props) {
   const handleStartStudy = useCallback(() => {
     // "Учить всё" — запускаем тренировку по выбранному количеству карточек
     const limit = wordLimit === 'all' ? undefined : Number(wordLimit);
+    setShowStudySheet(false);
     navigation.navigate('Study', { setId, mode: 'classic', studyAll: true, cardLimit: limit, onlyHard });
   }, [navigation, setId, wordLimit, onlyHard]);
+
+  const handleStartMatch = useCallback(() => {
+    const limit = wordLimit === 'all' ? undefined : Number(wordLimit);
+    setShowStudySheet(false);
+    navigation.navigate('Match', { setId, cardLimit: limit });
+  }, [navigation, setId, wordLimit]);
 
   const openAddCardSheet = useCallback(() => {
     setNewFront('');
@@ -629,17 +636,18 @@ export function SetDetailScreen({ navigation, route }: Props) {
                 Набор: {set?.title || 'Набор'} • {set?.cardCount || 0} слов
               </Text>
 
-              <View
-                style={[
-                  styles.recommendCard,
-                  { borderColor: colors.primary, backgroundColor: colors.surface },
-                ]}
-              >
-                <View style={styles.recommendBadge}>
-                  <Text variant="caption" style={{ color: '#fff', fontWeight: '700' }}>
-                    Recommended
-                  </Text>
-                </View>
+                <Pressable
+                  onPress={handleStartStudy}
+                  style={[
+                    styles.recommendCard,
+                    { borderColor: colors.primary, backgroundColor: colors.surface },
+                  ]}
+                >
+                  <View style={styles.recommendBadge}>
+                    <Text variant="caption" style={{ color: '#fff', fontWeight: '700' }}>
+                      Recommended
+                    </Text>
+                  </View>
                 <View style={styles.recommendHeader}>
                   <View style={styles.recommendIcon}>
                     <Sparkles size={20} color={colors.primary} />
@@ -684,7 +692,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                     );
                   })}
                 </View>
-              </View>
+              </Pressable>
 
               <View style={styles.section}>
                 <Text variant="caption" color="secondary" style={styles.sectionTitle}>
@@ -697,6 +705,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                     tag="Быстро"
                     description="Сопоставление слов и переводов"
                     colors={colors}
+                    onPress={handleStartMatch}
                   />
                   <GameRow
                     icon={<ClipboardList size={18} color={colors.textPrimary} />}
@@ -779,23 +788,6 @@ export function SetDetailScreen({ navigation, route }: Props) {
                 </View>
               </View>
             </ScrollView>
-
-            <View style={styles.startBlock}>
-              <Pressable
-                style={[styles.startButton, { backgroundColor: colors.primary }]}
-                onPress={() => {
-                  setShowStudySheet(false);
-                  handleStartStudy();
-                }}
-              >
-                <Text variant="body" style={{ color: colors.textInverse, fontWeight: '700' }}>
-                  Начать
-                </Text>
-              </Pressable>
-              <Text variant="caption" color="secondary" style={{ textAlign: 'center', marginTop: spacing.xs }}>
-                Режим: Flashcards • {wordLimit === 'all' ? set?.cardCount || 0 : wordLimit} слов
-              </Text>
-            </View>
           </View>
         </View>
       )}
@@ -1025,15 +1017,18 @@ function GameRow({
   tag,
   description,
   colors,
+  onPress,
 }: {
   icon: React.ReactNode;
   title: string;
   tag: string;
   description: string;
   colors: ReturnType<typeof useThemeColors>;
+  onPress?: () => void;
 }) {
   return (
     <Pressable
+      onPress={onPress}
       style={[
         styles.gameRow,
         { backgroundColor: colors.surface, borderColor: colors.border },

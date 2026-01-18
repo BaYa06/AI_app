@@ -182,6 +182,7 @@ export function StudyScreen({ navigation, route }: Props) {
             back: currentCard.backText ?? (currentCard as any).back ?? '',
             rating,
           }],
+          modeTitle: 'Flashcards',
         });
       } else {
         useStudyStore.setState((s) => ({
