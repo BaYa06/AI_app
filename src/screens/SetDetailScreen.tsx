@@ -112,6 +112,17 @@ export function SetDetailScreen({ navigation, route }: Props) {
     navigation.navigate('Match', { setId, cardLimit: limit });
   }, [navigation, setId, wordLimit]);
 
+  const handleStartMultipleChoice = useCallback(() => {
+    const limit = wordLimit === 'all' ? undefined : Number(wordLimit);
+    setShowStudySheet(false);
+    navigation.navigate('MultipleChoice', {
+      setId,
+      cardLimit: limit,
+      questionIndex: 1,
+      totalQuestions: limit ?? cards.length,
+    });
+  }, [navigation, setId, wordLimit, cards.length]);
+
   const openAddCardSheet = useCallback(() => {
     setNewFront('');
     setNewBack('');
@@ -713,6 +724,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                     tag="Лёгко"
                     description="Выбери правильный из 4 вариантов"
                     colors={colors}
+                    onPress={handleStartMultipleChoice}
                   />
                   <GameRow
                     icon={<Type size={18} color={colors.textPrimary} />}

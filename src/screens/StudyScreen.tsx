@@ -2,12 +2,13 @@
  * Study Screen
  * @description Экран изучения карточек с CSS-анимациями для web
  */
-import React, { useCallback, useEffect, useState, useMemo } from 'react';
-import { View, StyleSheet, Pressable, Dimensions, Platform } from 'react-native';
+import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
+import { View, StyleSheet, Pressable, Dimensions, Platform, Animated, Modal, Switch } from 'react-native';
 import { useCardsStore, useSetsStore, useStudyStore, useThemeColors, useSettingsStore, selectSetStats } from '@/store';
 import { Text, Loading } from '@/components/common';
 import { calculateNextReview, buildStudyQueue } from '@/services/SRSService';
 import { spacing } from '@/constants';
+import { DatabaseService } from '@/services';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Rating, Card } from '@/types';
 import { ArrowLeft, Settings, Volume2, Star, Check } from 'lucide-react-native';
@@ -22,6 +23,7 @@ export function StudyScreen({ navigation, route }: Props) {
   const { setId, mode, errorCardsFronts, studyAll, cardLimit, onlyHard } = route.params;
   const colors = useThemeColors();
   const settings = useSettingsStore((s) => s.settings);
+  const theme = useSettingsStore((s) => s.resolvedTheme);
   const incrementTodayCards = useSettingsStore((s) => s.incrementTodayCards);
   
   // Store
@@ -42,6 +44,11 @@ export function StudyScreen({ navigation, route }: Props) {
   // Локальное состояние
   const [currentCard, setCurrentCard] = useState<Card | null>(null);
   const [errorCards, setErrorCards] = useState<Array<{ front: string; back: string; rating: number }>>([]);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const reverseEnabled = useSettingsStore((s) => s.settings.reverseCards);
+  const updateSettings = useSettingsStore((s) => s.updateSettings);
+  const sheetTranslate = useRef(new Animated.Value(-220)).current;
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
   const isCurrentMastered = currentCard ? currentCard.nextReviewDate > Date.now() : false;
 
   // Инициализация сессии
@@ -183,6 +190,8 @@ export function StudyScreen({ navigation, route }: Props) {
             rating,
           }],
           modeTitle: 'Flashcards',
+          cardLimit,
+          nextMode: 'study',
         });
       } else {
         useStudyStore.setState((s) => ({
@@ -195,6 +204,34 @@ export function StudyScreen({ navigation, route }: Props) {
       }
     },
     [currentCard, updateCardSRS, incrementTodayCards, session, setId, updateSetStats, navigation, errorCards]
+  );
+
+  const openSettings = useCallback(() => {
+    sheetTranslate.setValue(-220);
+    backdropOpacity.setValue(0);
+    setIsSettingsOpen(true);
+
+    requestAnimationFrame(() => {
+      Animated.parallel([
+        Animated.timing(sheetTranslate, { toValue: 0, duration: 220, useNativeDriver: true }),
+        Animated.timing(backdropOpacity, { toValue: 1, duration: 220, useNativeDriver: true }),
+      ]).start();
+    });
+  }, [backdropOpacity, sheetTranslate]);
+
+  const closeSettings = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(sheetTranslate, { toValue: -220, duration: 180, useNativeDriver: true }),
+      Animated.timing(backdropOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
+    ]).start(() => setIsSettingsOpen(false));
+  }, [backdropOpacity, sheetTranslate]);
+
+  const handleToggleReverse = useCallback(
+    (value: boolean) => {
+      updateSettings({ reverseCards: value });
+      DatabaseService.saveSettings();
+    },
+    [updateSettings]
   );
 
   // Переворот карточки (переключение туда-обратно)
@@ -245,13 +282,16 @@ export function StudyScreen({ navigation, route }: Props) {
     return <Loading fullScreen message="Подготовка карточек..." />;
   }
 
-  const front = currentCard.frontText ?? (currentCard as any).front ?? '';
-  const back = currentCard.backText ?? (currentCard as any).back ?? '';
+  const baseFront = currentCard.frontText ?? (currentCard as any).front ?? '';
+  const baseBack = currentCard.backText ?? (currentCard as any).back ?? '';
   const example = (currentCard as any).example ?? '';
+
+  const questionText = reverseEnabled ? baseBack : baseFront;
+  const answerText = reverseEnabled ? baseFront : baseBack;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Хедер */}}
+      {/* Хедер */}
       <View style={styles.header}>
         <Pressable 
           onPress={handleFinish} 
@@ -263,7 +303,7 @@ export function StudyScreen({ navigation, route }: Props) {
         <Text style={[styles.title, { color: colors.textPrimary }]}>
           Flashcards
         </Text>
-        <Pressable hitSlop={20} style={styles.iconButton}>
+        <Pressable hitSlop={20} style={styles.iconButton} onPress={openSettings}>
           <Settings size={24} color={colors.textPrimary} />
         </Pressable>
       </View>
@@ -321,7 +361,7 @@ export function StudyScreen({ navigation, route }: Props) {
             
             <View style={styles.cardContent}>
               <Text style={[styles.cardWord, { color: colors.textPrimary }]}>
-                {front}
+                {questionText}
               </Text>
             </View>
             
@@ -362,7 +402,7 @@ export function StudyScreen({ navigation, route }: Props) {
             
             <View style={styles.cardContent}>
               <Text style={[styles.cardWord, { color: colors.textPrimary }]}>
-                {back}
+                {answerText}
               </Text>
               <View style={[styles.divider, { backgroundColor: colors.border }]} />
               {example ? (
@@ -386,6 +426,44 @@ export function StudyScreen({ navigation, route }: Props) {
           </Pressable>
         </View>
       </View>
+
+      <Modal
+        visible={isSettingsOpen}
+        transparent
+        animationType="none"
+        statusBarTranslucent
+        onRequestClose={closeSettings}
+      >
+        <View style={styles.modalRoot}>
+          <Pressable style={styles.backdrop} onPress={closeSettings}>
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.backdropTint, { opacity: backdropOpacity }]}
+            />
+          </Pressable>
+
+          <Animated.View
+            style={[
+              styles.settingsSheet,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                transform: [{ translateY: sheetTranslate }],
+              },
+            ]}
+          >
+            <View style={styles.settingsRow}>
+              <Text style={[styles.settingsLabel, { color: colors.textPrimary }]}>Реверс</Text>
+              <Switch
+                value={reverseEnabled}
+                onValueChange={handleToggleReverse}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor={theme === 'dark' ? '#0f172a' : '#ffffff'}
+              />
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
 
       {/* Нижняя панель SRS - всегда доступна */}
       <View style={[styles.bottomPanel, { backgroundColor: colors.background }]}>
@@ -630,6 +708,42 @@ const styles = StyleSheet.create({
   ratingEasyText: {
     color: '#ffffff',
     fontSize: 13,
+    fontWeight: '700',
+  },
+  modalRoot: {
+    flex: 1,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  backdropTint: {
+    flex: 1,
+    backgroundColor: '#00000055',
+  },
+  settingsSheet: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: spacing.m,
+    paddingTop: 50,
+    paddingBottom: spacing.m,
+    borderBottomWidth: 1,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  settingsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  settingsLabel: {
+    fontSize: 16,
     fontWeight: '700',
   },
 

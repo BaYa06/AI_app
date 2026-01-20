@@ -20,10 +20,13 @@ export type RootStackParamList = {
     errors: number;
     errorCards: Array<{ front: string; back: string; rating: number }>;
     modeTitle?: string;
+    cardLimit?: number;
+    nextMode?: 'study' | 'match' | 'multipleChoice';
   };
   CardEditor: { setId: string; cardId?: string };
   SetEditor: { setId?: string };
   Match: { setId: string; cardLimit?: number };
+  MultipleChoice: { setId: string; cardLimit?: number; questionIndex?: number; totalQuestions?: number };
   Settings: undefined;
   Search: undefined;
 };

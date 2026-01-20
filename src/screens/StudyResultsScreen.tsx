@@ -20,6 +20,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
     errors,
     errorCards,
     modeTitle = 'Flashcards',
+    cardLimit,
   } = route.params;
   const colors = useThemeColors();
   const [showErrorsModal, setShowErrorsModal] = React.useState(false);
@@ -46,7 +47,17 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   };
 
   const handleNextCards = () => {
-    navigation.push('Study', { setId, mode: 'classic' });
+    if (route.params.nextMode === 'match') {
+      navigation.push('Match', { setId, cardLimit });
+      return;
+    }
+
+    if (route.params.nextMode === 'multipleChoice') {
+      navigation.push('MultipleChoice', { setId, cardLimit });
+      return;
+    }
+
+    navigation.push('Study', { setId, mode: 'classic', studyAll: true, cardLimit });
   };
 
   const handleReviewMistakes = () => {
@@ -61,7 +72,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}}
+      {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.background }]}>
         <Pressable
           onPress={handleBack}

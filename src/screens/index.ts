@@ -11,3 +11,5 @@ export { StudyScreen } from './StudyScreen';
 export { StudyResultsScreen } from './StudyResultsScreen';
 export { CardEditorScreen } from './CardEditorScreen';
 export { SetEditorScreen } from './SetEditorScreen';
+export { MatchScreen } from './MatchScreen';
+export { MultipleChoiceScreen } from './MultipleChoiceScreen';

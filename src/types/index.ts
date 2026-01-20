@@ -291,6 +291,9 @@ export interface UserSettings {
   // Звук
   soundEnabled: boolean;
   hapticEnabled: boolean;
+
+  // Режимы
+  reverseCards: boolean;
 }
 
 // ==================== STATISTICS TYPES ====================

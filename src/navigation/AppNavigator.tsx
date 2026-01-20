@@ -22,6 +22,7 @@ import { StudyResultsScreen } from '@/screens/StudyResultsScreen';
 import { CardEditorScreen } from '@/screens/CardEditorScreen';
 import { SetEditorScreen } from '@/screens/SetEditorScreen';
 import { MatchScreen } from '@/screens/MatchScreen';
+import { MultipleChoiceScreen } from '@/screens/MultipleChoiceScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -140,6 +141,11 @@ export function AppNavigator() {
         <Stack.Screen
           name="Match"
           component={MatchScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="MultipleChoice"
+          component={MultipleChoiceScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen

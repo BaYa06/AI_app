@@ -49,6 +49,7 @@ const defaultSettings: UserSettings = {
   language: 'ru',
   soundEnabled: true,
   hapticEnabled: true,
+  reverseCards: false,
 };
 
 const getTodayDate = () => new Date().toISOString().split('T')[0];
