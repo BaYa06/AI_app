@@ -1,9 +1,10 @@
-const CACHE_NAME = 'flashly-static-v5';
+const CACHE_NAME = 'flashly-static-v6';
 const PRECACHE_URLS = [
   '/',
   '/index.html',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
+  '/icons/splash-illustration.svg',
 ];
 
 // Install event - cache resources

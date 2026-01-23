@@ -6,6 +6,7 @@ import React from 'react';
 import { View, StyleSheet, Pressable, ScrollView, Platform, Modal } from 'react-native';
 import { useThemeColors } from '@/store';
 import { Text } from '@/components/common';
+import { spacing } from '@/constants';
 import type { RootStackScreenProps } from '@/types/navigation';
 import { ArrowLeft, Settings, CheckCircle2, List, ArrowRight, RotateCcw, BookOpen, X } from 'lucide-react-native';
 
@@ -21,9 +22,47 @@ export function StudyResultsScreen({ navigation, route }: Props) {
     errorCards,
     modeTitle = 'Flashcards',
     cardLimit,
+    phaseId,
+    totalPhaseCards = 0,
+    studiedInPhase = 0,
+    phaseOffset = 0,
+    phaseFailedIds = [],
   } = route.params;
   const colors = useThemeColors();
   const [showErrorsModal, setShowErrorsModal] = React.useState(false);
+
+  // Логика фаз: проверяем завершена ли фаза
+  // Фаза завершена только если все карточки просмотрены (phaseOffset >= totalPhaseCards) И нет ошибок
+  const allCardsViewed = phaseOffset >= totalPhaseCards;
+  const hasFailedCards = phaseFailedIds && phaseFailedIds.length > 0;
+  const isPhaseComplete = phaseId && totalPhaseCards > 0 && allCardsViewed && !hasFailedCards;
+  
+  // Осталось = карточки которые еще не просмотрены + ошибочные карточки
+  const remainingNewCards = phaseId && totalPhaseCards > 0 ? Math.max(0, totalPhaseCards - phaseOffset) : 0;
+  const remainingFailedCards = phaseFailedIds?.length || 0;
+  const remainingInPhase = remainingNewCards + remainingFailedCards;
+  
+  // Debug info
+  console.log('[StudyResults] Параметры фазы:', {
+    phaseId,
+    totalPhaseCards,
+    phaseOffset,
+    studiedInPhase,
+    phaseFailedIds,
+    remainingNewCards,
+    remainingFailedCards,
+    remainingInPhase,
+    isPhaseComplete,
+    allCardsViewed,
+    hasFailedCards
+  });
+
+  // Логика кнопки: если фаза завершена - "Закончить", иначе - "Следующие карточки (N осталось)"
+  const primaryButtonLabel = isPhaseComplete 
+    ? 'Закончить' 
+    : remainingInPhase > 0 
+      ? `Следующие карточки (${remainingInPhase} ${remainingInPhase === 1 ? 'осталась' : remainingInPhase < 5 ? 'осталось' : 'осталось'})`
+      : 'Следующие карточки';
 
   // Форматирование времени (в минуты:секунды)
   const formatTime = (seconds: number) => {
@@ -47,23 +86,78 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   };
 
   const handleNextCards = () => {
+    console.log('[StudyResults] handleNextCards вызван:', {
+      isPhaseComplete,
+      phaseId,
+      totalPhaseCards,
+      studiedInPhase,
+      phaseOffset,
+      phaseFailedIds,
+      remainingInPhase
+    });
+    
+    // Если фаза завершена — возвращаем к набору
+    if (isPhaseComplete) {
+      navigation.navigate('SetDetail', { setId });
+      return;
+    }
+
+    // Продолжаем фазу - запускаем следующую порцию
     if (route.params.nextMode === 'match') {
-      navigation.push('Match', { setId, cardLimit });
+      navigation.push('Match', { 
+        setId, 
+        cardLimit,
+        phaseId,
+        totalPhaseCards,
+        studiedInPhase,
+        phaseOffset,
+        phaseFailedIds,
+      });
       return;
     }
 
     if (route.params.nextMode === 'multipleChoice') {
-      navigation.push('MultipleChoice', { setId, cardLimit });
+      navigation.push('MultipleChoice', { 
+        setId, 
+        cardLimit,
+        phaseId,
+        totalPhaseCards,
+        studiedInPhase,
+        phaseOffset,
+        phaseFailedIds,
+      });
       return;
     }
 
-    navigation.push('Study', { setId, mode: 'classic', studyAll: true, cardLimit });
+    navigation.push('Study', { 
+      setId, 
+      mode: 'classic', 
+      studyAll: true, 
+      cardLimit,
+      phaseId,
+      totalPhaseCards,
+      studiedInPhase,
+      phaseOffset,
+      phaseFailedIds,
+    });
   };
 
   const handleReviewMistakes = () => {
     // Передаем front текст ошибочных карточек для повторения
     const errorFronts = errorCards.map(card => card.front);
-    navigation.push('Study', { setId, mode: 'classic', errorCardsFronts: errorFronts });
+    // Продолжаем ту же фазу, не сбрасывая прогресс
+    navigation.push('Study', { 
+      setId, 
+      mode: 'classic', 
+      errorCardsFronts: errorFronts,
+      phaseId,
+      totalPhaseCards,
+      studiedInPhase,
+      phaseOffset,
+      phaseFailedIds,
+      cardLimit,
+      studyAll: true,
+    });
   };
 
   const handleReviewWords = () => {
@@ -129,9 +223,18 @@ export function StudyResultsScreen({ navigation, route }: Props) {
             Выучено <Text style={{ color: colors.primary }}>{learnedCards} слов</Text> из {totalCards}
           </Text>
           
+          {/* Прогресс фазы */}
+          {phaseId && totalPhaseCards > 0 && (
+            <Text variant="body" color="secondary" align="center" style={{ marginTop: spacing.xs }}>
+              Прогресс фазы: {studiedInPhase}/{totalPhaseCards} ({Math.round((studiedInPhase / totalPhaseCards) * 100)}%)
+            </Text>
+          )}
+          
           <Text variant="body" color="secondary" align="center" style={styles.description}>
             {errors === 0 
-              ? 'Все карточки выучены! Так держать! 🎉' 
+              ? isPhaseComplete 
+                ? 'Все карточки фазы выучены! Так держать! 🎉'
+                : 'Отличная работа — продолжай серию!'
               : 'Отличная работа — продолжай серию!'}
           </Text>
         </View>
@@ -242,7 +345,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
           ]}
         >
           <Text variant="button" style={styles.primaryButtonText}>
-            Следующие карточки
+            {primaryButtonLabel}
           </Text>
           <ArrowRight size={22} color="#FFFFFF" />
         </Pressable>

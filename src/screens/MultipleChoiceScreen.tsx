@@ -17,7 +17,7 @@ type OptionState = 'neutral' | 'correct' | 'wrong';
 type Option = { id: string; label: string; text: string; isCorrect: boolean };
 
 export function MultipleChoiceScreen({ navigation, route }: Props) {
-  const { setId, cardLimit } = route.params;
+  const { setId, cardLimit, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0, phaseFailedIds } = route.params;
   const colors = useThemeColors();
   const set = useSetsStore((s) => s.getSet(setId));
   const { ids, map } = useCardsStore(
@@ -27,13 +27,25 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
     () => ids.map((id) => map[id]).filter(Boolean) as Card[],
     [ids, map]
   );
+  
+  // Мемоизируем список ошибочных карточек из фазы
+  const phaseFailedList = useMemo(
+    () => phaseFailedIds || [],
+    [phaseFailedIds ? phaseFailedIds.join('|') : '']
+  );
+  
+  // Генерируем phaseId при первом запуске (если не передан)
+  const currentPhaseId = useRef(phaseId || `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+  const currentTotalPhaseCards = useRef(totalPhaseCards || 0);
+  // Количество ошибочных карточек из прошлых порций в текущей очереди
+  const pendingCardsInQueueRef = useRef(0);
 
   const [questions, setQuestions] = useState<Card[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [errors, setErrors] = useState(0);
-  const [errorCards, setErrorCards] = useState<Array<{ front: string; back: string; rating: number }>>([]);
+  const [errorCards, setErrorCards] = useState<Array<{ id: string; front: string; back: string; rating: number }>>([]);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const startedAtRef = useRef<number>(Date.now());
 
@@ -48,9 +60,53 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
   };
 
   useEffect(() => {
-    const limited = !cardLimit || cardLimit <= 0 ? cards : cards.slice(0, cardLimit);
-    const shuffled = shuffle(limited);
-    setQuestions(shuffled);
+    let questionCards: Card[] = [];
+    
+    if (phaseId) {
+      // Собираем карточки для фазы: сначала ошибочные из прошлых порций, потом новые по offset
+      const pendingIds = phaseFailedList || [];
+      
+      // Получаем ошибочные карточки по ID
+      const pendingCards: Card[] = pendingIds
+        .map((id) => cards.find(c => c.id === id))
+        .filter((c): c is Card => Boolean(c));
+      
+      // Получаем оставшиеся карточки по offset
+      const remaining = phaseOffset > 0 ? cards.slice(phaseOffset) : cards;
+      
+      // Исключаем из remaining те, что уже есть в pendingCards
+      const pendingIdsSet = new Set(pendingCards.map(c => c.id));
+      const filteredRemaining = remaining.filter(c => !pendingIdsSet.has(c.id));
+      
+      // Собираем: сначала ошибочные, потом новые
+      const combined = [...pendingCards, ...filteredRemaining];
+      
+      // Применяем лимит
+      const limited = cardLimit && cardLimit > 0 ? combined.slice(0, cardLimit) : combined;
+      questionCards = shuffle(limited);
+      
+      // Сохраняем количество ошибочных карточек в очереди
+      const pendingInQueue = limited.filter(c => pendingIdsSet.has(c.id)).length;
+      pendingCardsInQueueRef.current = pendingInQueue;
+      
+      console.log('[MultipleChoice] Фаза:', {
+        phaseId,
+        phaseOffset,
+        pendingIds: pendingIds.length,
+        pendingCards: pendingCards.length,
+        remaining: filteredRemaining.length,
+        pendingInQueue,
+        total: questionCards.length
+      });
+    } else {
+      // Без фазы - просто берём карточки
+      const availableCards = cards.slice(phaseOffset);
+      const limited = !cardLimit || cardLimit <= 0 ? availableCards : availableCards.slice(0, cardLimit);
+      questionCards = shuffle(limited);
+      pendingCardsInQueueRef.current = 0;
+    }
+    
+    setQuestions(questionCards);
     setCurrentIndex(0);
     setSelectedOption(null);
     setShowResult(false);
@@ -61,7 +117,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [cards, cardLimit]);
+  }, [cards, cardLimit, phaseOffset, phaseId, phaseFailedList]);
 
   const totalQuestions = questions.length;
   const currentCard = questions[currentIndex];
@@ -90,21 +146,70 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
   };
 
   const finishQuiz = React.useCallback(
-    (errorsCount: number, errorList: Array<{ front: string; back: string; rating: number }>) => {
+    (errorsCount: number, errorList: Array<{ id: string; front: string; back: string; rating: number }>) => {
       const timeSpent = Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000));
+      const learnedCards = Math.max(0, totalQuestions - errorsCount);
+      
+      // Считаем сколько НОВЫХ карточек было в этой порции
+      const newCardsInBatch = totalQuestions - pendingCardsInQueueRef.current;
+      
+      // Обновляем прогресс фазы
+      const newStudiedInPhase = studiedInPhase + learnedCards;
+      // phaseOffset увеличивается только на количество НОВЫХ карточек
+      const newPhaseOffset = phaseOffset + newCardsInBatch;
+      const phaseTotal = currentTotalPhaseCards.current || totalQuestions;
+      
+      // Собираем ID ошибочных карточек
+      const errorIds = new Set(errorList.map(c => c.id).filter(Boolean));
+      
+      // Обновляем список незавершенных карточек фазы
+      const prevFailed = new Set(phaseFailedList || []);
+      // Убираем те, что исправили (были в очереди, но не в ошибках)
+      questions.forEach((card) => {
+        if (!errorIds.has(card.id)) {
+          prevFailed.delete(card.id);
+        }
+      });
+      // Добавляем новые ошибки
+      errorIds.forEach((id) => {
+        if (id) {
+          prevFailed.add(id);
+        }
+      });
+      const newPhaseFailedIds = Array.from(prevFailed);
+      
+      console.log('[MultipleChoice] Завершение порции:', {
+        totalQuestions,
+        newCardsInBatch,
+        pendingCardsInQueue: pendingCardsInQueueRef.current,
+        learnedCards,
+        errorsCount,
+        errorIds: Array.from(errorIds),
+        newPhaseFailedIds,
+        newStudiedInPhase,
+        newPhaseOffset,
+        phaseTotal
+      });
+      
       navigation.replace('StudyResults', {
         setId,
         totalCards: totalQuestions,
-        learnedCards: Math.max(0, totalQuestions - errorsCount),
+        learnedCards,
         timeSpent,
         errors: errorsCount,
         errorCards: errorList,
         modeTitle: 'Multiple Choice',
         cardLimit,
         nextMode: 'multipleChoice',
+        // Параметры фазы
+        phaseId: currentPhaseId.current,
+        totalPhaseCards: phaseTotal,
+        studiedInPhase: newStudiedInPhase,
+        phaseOffset: newPhaseOffset,
+        phaseFailedIds: newPhaseFailedIds,
       });
     },
-    [navigation, setId, totalQuestions, cardLimit]
+    [navigation, setId, totalQuestions, cardLimit, studiedInPhase, phaseOffset, phaseFailedList, questions]
   );
 
   const handleSelectOption = (option: Option) => {
@@ -117,6 +222,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
       : [
           ...errorCards,
           {
+            id: currentCard.id,
             front: getFront(currentCard),
             back: getBack(currentCard),
             rating: 1,

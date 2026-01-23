@@ -20,11 +20,22 @@ const CARD_HEIGHT = CARD_WIDTH * 1.25;
 type Props = RootStackScreenProps<'Study'>;
 
 export function StudyScreen({ navigation, route }: Props) {
-  const { setId, mode, errorCardsFronts, studyAll, cardLimit, onlyHard } = route.params;
+  const { setId, mode, errorCardsFronts, studyAll, cardLimit, onlyHard, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0, phaseFailedIds } = route.params;
   const colors = useThemeColors();
   const settings = useSettingsStore((s) => s.settings);
   const theme = useSettingsStore((s) => s.resolvedTheme);
   const incrementTodayCards = useSettingsStore((s) => s.incrementTodayCards);
+  const isErrorReview = Boolean(errorCardsFronts && errorCardsFronts.length > 0);
+  const phaseFailedList = React.useMemo(
+    () => phaseFailedIds || [],
+    [phaseFailedIds ? phaseFailedIds.join('|') : '']
+  );
+  
+  // Генерируем phaseId при первом запуске (если не передан)
+  const currentPhaseId = useRef(phaseId || `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+  const currentTotalPhaseCards = useRef(totalPhaseCards || 0);
+  // Количество ошибочных карточек из прошлых порций в текущей очереди
+  const pendingCardsInQueueRef = useRef(0);
   
   // Store
   const updateLastStudied = useSetsStore((s) => s.updateLastStudied);
@@ -43,7 +54,7 @@ export function StudyScreen({ navigation, route }: Props) {
 
   // Локальное состояние
   const [currentCard, setCurrentCard] = useState<Card | null>(null);
-  const [errorCards, setErrorCards] = useState<Array<{ front: string; back: string; rating: number }>>([]);
+  const [errorCards, setErrorCards] = useState<Array<{ id: string; front: string; back: string; rating: number }>>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const reverseEnabled = useSettingsStore((s) => s.settings.reverseCards);
   const updateSettings = useSettingsStore((s) => s.updateSettings);
@@ -54,28 +65,82 @@ export function StudyScreen({ navigation, route }: Props) {
   // Инициализация сессии
   useEffect(() => {
     let cards = getCardsBySet(setId);
-    const isErrorReview = Boolean(errorCardsFronts && errorCardsFronts.length > 0);
     const onlyUnmastered = Boolean(onlyHard);
+    
+    if (phaseId) {
+      // Собираем карточки для фазы: сначала невыполненные ошибки прошлых порций, потом оставшиеся по offset
+      const pendingIds = phaseFailedList || [];
+      const state = useCardsStore.getState();
+      
+      // Получаем ошибочные карточки по ID
+      const pendingCards: Card[] = pendingIds
+        .map((id) => state.getCard(id))
+        .filter((c): c is Card => Boolean(c));
+      
+      // Если не смогли найти карточки по ID, пробуем найти их в текущем наборе
+      if (pendingIds.length > 0 && pendingCards.length === 0) {
+        console.warn('[StudyScreen] Не удалось найти ошибочные карточки по ID, пробуем найти в наборе');
+        const pendingSet = new Set(pendingIds);
+        const foundInSet = cards.filter(c => pendingSet.has(c.id));
+        pendingCards.push(...foundInSet);
+      }
+
+      // Получаем оставшиеся карточки по offset
+      const remaining = phaseOffset > 0 ? cards.slice(phaseOffset) : cards;
+      
+      // Исключаем из remaining те, что уже есть в pendingCards (ошибочные)
+      const pendingIdsSet = new Set(pendingCards.map(c => c.id));
+      const filteredRemaining = remaining.filter(c => !pendingIdsSet.has(c.id));
+
+      // Собираем уникальные карточки: сначала ошибочные, потом новые
+      const map = new Map<string, Card>();
+      [...pendingCards, ...filteredRemaining].forEach((card) => {
+        if (!map.has(card.id)) {
+          map.set(card.id, card);
+        }
+      });
+      cards = Array.from(map.values());
+      
+      console.log('[StudyScreen] Фаза:', {
+        phaseId,
+        phaseOffset,
+        pendingIds: pendingIds.length,
+        pendingCards: pendingCards.length,
+        remaining: filteredRemaining.length,
+        total: cards.length
+      });
+      
+      // Сохраняем количество ошибочных карточек для правильного расчёта phaseOffset
+      pendingCardsInQueueRef.current = pendingCards.length;
+    } else {
+      pendingCardsInQueueRef.current = 0;
+    }
     
     // Если переданы ошибочные карточки, фильтруем только их
     if (isErrorReview && errorCardsFronts) {
-      const now = Date.now();
       cards = cards.filter(card => {
         const front = card.frontText ?? (card as any).front ?? '';
         return errorCardsFronts.includes(front);
-      }).filter(card => {
-        // Повторяем только те, что не выучены
-        // Выучено = nextReview > сейчас
-        return card.nextReviewDate <= now;
       });
+      // В фазах повторяем ошибки сразу, без проверки расписания SRS (nextReviewDate)
+      if (!phaseId) {
+        const now = Date.now();
+        cards = cards.filter(card => card.nextReviewDate <= now);
+      }
       // Очищаем список ошибок для новой сессии повторения
       setErrorCards([]);
     }
 
     // Если выбран режим "Учить всё" + "только не запомнил", оставляем только невыученные
+    // НО: исключаем из фильтра ошибочные карточки фазы (phaseFailedIds), они должны быть показаны независимо от nextReviewDate
     if (studyAll && onlyUnmastered) {
       const now = Date.now();
+      const failedIdsSet = new Set(phaseFailedList || []);
       cards = cards.filter(card => {
+        // Ошибочные карточки фазы всегда включаем
+        if (failedIdsSet.has(card.id)) {
+          return true;
+        }
         // "Не запомнил" = карточки с nextReview <= сейчас
         return card.nextReviewDate <= now;
       });
@@ -83,6 +148,11 @@ export function StudyScreen({ navigation, route }: Props) {
 
     const limitCards = (list: Card[]) => {
       if (!cardLimit) return list;
+      // Если используем фазы (phaseId), берём карточки последовательно, без перемешивания
+      if (phaseId) {
+        return list.slice(0, Math.min(cardLimit, list.length));
+      }
+      // Без фаз - перемешиваем как раньше
       const shuffled = [...list].sort(() => Math.random() - 0.5);
       return shuffled.slice(0, Math.min(cardLimit, shuffled.length));
     };
@@ -99,7 +169,28 @@ export function StudyScreen({ navigation, route }: Props) {
             settings.dailyReviewLimit
           );
 
+    console.log('[StudyScreen] Очередь сформирована:', {
+      queueLength: queue.length,
+      cardsLength: cards.length,
+      isErrorReview,
+      studyAll,
+      cardLimit,
+      phaseId,
+      phaseOffset,
+      phaseFailedList: phaseFailedList?.length || 0
+    });
+
     if (queue.length === 0) {
+      console.warn('[StudyScreen] Пустая очередь');
+      
+      // Если есть ошибочные карточки, но очередь пустая - это баг, логируем детали
+      if (phaseFailedList && phaseFailedList.length > 0) {
+        console.error('[StudyScreen] Есть ошибочные карточки, но очередь пустая!', {
+          phaseFailedList,
+          allCards: getCardsBySet(setId).map(c => c.id)
+        });
+      }
+      
       navigation.goBack();
       return;
     }
@@ -110,7 +201,7 @@ export function StudyScreen({ navigation, route }: Props) {
         mode,
         newCardsLimit: settings.dailyNewCardsLimit,
         reviewCardsLimit: settings.dailyReviewLimit,
-        shuffleCards: true,
+        shuffleCards: !phaseId, // Не перемешиваем если используем фазы
         prioritizeOverdue: true,
         showTimer: false,
       },
@@ -119,7 +210,7 @@ export function StudyScreen({ navigation, route }: Props) {
 
     setCurrentCard(queue[0]);
     updateLastStudied(setId);
-  }, [setId, errorCardsFronts, studyAll, cardLimit, onlyHard]);
+  }, [setId, errorCardsFronts, studyAll, cardLimit, onlyHard, phaseId, phaseOffset, phaseFailedList]);
 
   // Получить текущую карточку из очереди
   useEffect(() => {
@@ -138,9 +229,10 @@ export function StudyScreen({ navigation, route }: Props) {
       // Логика: 1,2 = ошибка, 3,4 = правильно
       const isCorrect = rating >= 3;
       
-      // Если ошибка, добавляем в список ошибочных карточек
+      // Если ошибка, добавляем в список ошибочных карточек (с id для фаз)
       if (!isCorrect) {
         setErrorCards(prev => [...prev, {
+          id: currentCard.id,
           front: currentCard.frontText ?? (currentCard as any).front ?? '',
           back: currentCard.backText ?? (currentCard as any).back ?? '',
           rating,
@@ -174,9 +266,78 @@ export function StudyScreen({ navigation, route }: Props) {
       if (session && session.currentIndex + 1 >= session.queue.length) {
         // Переходим на экран результатов
         const totalCards = session.queue.length;
-        const learnedCards = totalCards - errorCards.length - (isCorrect ? 0 : 1);
+        const finalErrorCards = isCorrect ? errorCards : [...errorCards, {
+          id: currentCard.id,
+          front: currentCard.frontText ?? (currentCard as any).front ?? '',
+          back: currentCard.backText ?? (currentCard as any).back ?? '',
+          rating,
+        }];
+        const learnedCards = totalCards - finalErrorCards.length;
         const timeSpent = Math.floor((Date.now() - session.startedAt) / 1000);
-        const errors = errorCards.length + (isCorrect ? 0 : 1);
+        const errors = finalErrorCards.length;
+        const state = useCardsStore.getState();
+        const queueCards: Card[] = (session.queue || [])
+          .map((id) => state.getCard(id))
+          .filter((c): c is Card => Boolean(c));
+        const resolveErrorId = (card: { id?: string; front: string; back: string }) => {
+          if (card.id) return card.id;
+          const match = queueCards.find((c) => {
+            const front = c.frontText ?? (c as any).front ?? '';
+            const back = c.backText ?? (c as any).back ?? '';
+            return front === card.front && back === card.back;
+          });
+          return match?.id;
+        };
+        const errorCardsWithIds = finalErrorCards.map((card) => ({
+          ...card,
+          id: resolveErrorId(card) ?? card.id,
+        }));
+        
+        // Обновляем прогресс фазы
+        // Считаем сколько НОВЫХ карточек было в этой порции (не включая повторные ошибки)
+        const newCardsInBatch = totalCards - pendingCardsInQueueRef.current;
+        const newStudiedInPhase = studiedInPhase + learnedCards;
+        // phaseOffset увеличивается только на количество НОВЫХ карточек, не на ошибочные
+        const newPhaseOffset = isErrorReview ? phaseOffset : phaseOffset + newCardsInBatch;
+        const phaseTotal = currentTotalPhaseCards.current || totalCards;
+        const resolvedErrorIds = errorCardsWithIds
+          .map((c) => c.id)
+          .filter((id): id is string => Boolean(id));
+        // Если не смогли сопоставить id ошибок, считаем все карточки очереди нерешёнными, чтобы не потерять их в фазе
+        const effectiveErrorIds =
+          resolvedErrorIds.length === finalErrorCards.length
+            ? resolvedErrorIds
+            : Array.from(new Set([...(session.queue || []), ...resolvedErrorIds]));
+        const errorIds = new Set(effectiveErrorIds);
+
+        // Обновляем список незавершенных карточек фазы: добавляем ошибки и убираем те, что исправлены
+        const prevFailed = new Set(phaseFailedList || []);
+        const queueIds = session.queue || [];
+        queueIds.forEach((id) => {
+          if (!errorIds.has(id)) {
+            prevFailed.delete(id); // исправили
+          }
+        });
+        effectiveErrorIds.forEach((id) => {
+          if (id) {
+            prevFailed.add(id);
+          }
+        });
+        const newPhaseFailedIds = Array.from(prevFailed);
+        
+        console.log('[StudyScreen] Завершение порции:', {
+          totalCards,
+          newCardsInBatch,
+          pendingCardsInQueue: pendingCardsInQueueRef.current,
+          learnedCards,
+          errors,
+          errorCardsWithIds: errorCardsWithIds.map(c => ({ id: c.id, front: c.front })),
+          effectiveErrorIds,
+          newPhaseFailedIds,
+          newStudiedInPhase,
+          newPhaseOffset,
+          phaseTotal
+        });
 
         navigation.replace('StudyResults', {
           setId,
@@ -184,14 +345,16 @@ export function StudyScreen({ navigation, route }: Props) {
           learnedCards,
           timeSpent,
           errors,
-          errorCards: isCorrect ? errorCards : [...errorCards, {
-            front: currentCard.frontText ?? (currentCard as any).front ?? '',
-            back: currentCard.backText ?? (currentCard as any).back ?? '',
-            rating,
-          }],
+          errorCards: errorCardsWithIds,
           modeTitle: 'Flashcards',
           cardLimit,
           nextMode: 'study',
+          // Параметры фазы
+          phaseId: currentPhaseId.current,
+          totalPhaseCards: phaseTotal,
+          studiedInPhase: newStudiedInPhase,
+          phaseOffset: newPhaseOffset,
+          phaseFailedIds: newPhaseFailedIds,
         });
       } else {
         useStudyStore.setState((s) => ({
@@ -203,7 +366,7 @@ export function StudyScreen({ navigation, route }: Props) {
         }));
       }
     },
-    [currentCard, updateCardSRS, incrementTodayCards, session, setId, updateSetStats, navigation, errorCards]
+    [currentCard, updateCardSRS, incrementTodayCards, session, setId, updateSetStats, navigation, errorCards, studiedInPhase, phaseOffset, isErrorReview]
   );
 
   const openSettings = useCallback(() => {

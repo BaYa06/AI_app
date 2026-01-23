@@ -43,6 +43,7 @@ interface SettingsActions {
 const defaultSettings: UserSettings = {
   dailyNewCardsLimit: 20,
   dailyReviewLimit: 100,
+  studyCardLimit: 20,
   reminderEnabled: false,
   reminderTime: '09:00',
   theme: 'system',

@@ -15,9 +15,13 @@ import type { Card } from '@/types';
 type Props = RootStackScreenProps<'Match'>;
 
 export function MatchScreen({ navigation, route }: Props) {
-  const { setId, cardLimit } = route.params;
+  const { setId, cardLimit, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0 } = route.params;
   const colors = useThemeColors();
   const theme = useSettingsStore((s) => s.resolvedTheme);
+
+  // Генерируем phaseId при первом запуске (если не передан)
+  const currentPhaseId = useRef(phaseId || `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+  const currentTotalPhaseCards = useRef(totalPhaseCards || 0);
 
   const set = useSetsStore((s) => s.getSet(setId));
   const { ids, map } = useCardsStore(
@@ -60,7 +64,9 @@ export function MatchScreen({ navigation, route }: Props) {
 
   // Инициализация партии: ограничение по количеству и перемешивание правой колонки
   useEffect(() => {
-    const limited = !cardLimit || cardLimit <= 0 ? cards : cards.slice(0, cardLimit);
+    // Пропускаем уже изученные карточки (используем phaseOffset)
+    const availableCards = cards.slice(phaseOffset);
+    const limited = !cardLimit || cardLimit <= 0 ? availableCards : availableCards.slice(0, cardLimit);
     const shuffled = [...limited].sort(() => Math.random() - 0.5);
     fadeValues.current = {};
 
@@ -83,7 +89,7 @@ export function MatchScreen({ navigation, route }: Props) {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [cards, cardLimit]);
+  }, [cards, cardLimit, phaseOffset]);
 
   const matchedPairs = matchedIds.size;
   const progress = totalPairs ? Math.round((matchedPairs / totalPairs) * 100) : 0;
@@ -187,6 +193,11 @@ export function MatchScreen({ navigation, route }: Props) {
     if (timerRef.current) clearInterval(timerRef.current);
 
     const timeSpent = Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000));
+    
+    // Обновляем прогресс фазы
+    const newStudiedInPhase = studiedInPhase + totalPairs;
+    const newPhaseOffset = phaseOffset + totalPairs;
+    const phaseTotal = currentTotalPhaseCards.current || totalPairs;
 
     navigation.replace('StudyResults', {
       setId,
@@ -198,8 +209,13 @@ export function MatchScreen({ navigation, route }: Props) {
       modeTitle: 'Match',
       cardLimit,
       nextMode: 'match',
+      // Параметры фазы
+      phaseId: currentPhaseId.current,
+      totalPhaseCards: phaseTotal,
+      studiedInPhase: newStudiedInPhase,
+      phaseOffset: newPhaseOffset,
     });
-  }, [isComplete, navigation, setId, totalPairs, mistakes]);
+  }, [isComplete, navigation, setId, totalPairs, mistakes, studiedInPhase, cardLimit, phaseOffset]);
 
   useEffect(() => {
     if (!isComplete && totalPairs > 0 && matchedPairs === totalPairs) {

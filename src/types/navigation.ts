@@ -11,22 +11,61 @@ import type { StudyMode } from './index';
 export type RootStackParamList = {
   Main: NavigatorScreenParams<MainTabParamList>;
   SetDetail: { setId: string };
-  Study: { setId: string; mode: StudyMode; errorCardsFronts?: string[]; studyAll?: boolean; cardLimit?: number; onlyHard?: boolean };
+  Study: { 
+    setId: string; 
+    mode: StudyMode; 
+    errorCardsFronts?: string[]; 
+    studyAll?: boolean; 
+    cardLimit?: number; 
+    onlyHard?: boolean;
+    // Параметры фазы
+    phaseId?: string;
+    totalPhaseCards?: number;
+    studiedInPhase?: number;
+    phaseOffset?: number;
+    phaseFailedIds?: string[];
+  };
   StudyResults: { 
     setId: string;
     totalCards: number;
     learnedCards: number;
     timeSpent: number;
     errors: number;
-    errorCards: Array<{ front: string; back: string; rating: number }>;
+    errorCards: Array<{ id?: string; front: string; back: string; rating: number }>;
     modeTitle?: string;
     cardLimit?: number;
     nextMode?: 'study' | 'match' | 'multipleChoice';
+    // Параметры фазы
+    phaseId?: string;
+    totalPhaseCards?: number;
+    studiedInPhase?: number;
+    phaseOffset?: number;
+    phaseFailedIds?: string[];
   };
   CardEditor: { setId: string; cardId?: string };
   SetEditor: { setId?: string };
-  Match: { setId: string; cardLimit?: number };
-  MultipleChoice: { setId: string; cardLimit?: number; questionIndex?: number; totalQuestions?: number };
+  Match: { 
+    setId: string; 
+    cardLimit?: number;
+    // Параметры фазы
+    phaseId?: string;
+    totalPhaseCards?: number;
+    studiedInPhase?: number;
+    phaseOffset?: number;
+    phaseFailedIds?: string[];
+  };
+  MultipleChoice: { 
+    setId: string; 
+    cardLimit?: number; 
+    questionIndex?: number; 
+    totalQuestions?: number;
+    // Параметры фазы
+    phaseId?: string;
+    totalPhaseCards?: number;
+    studiedInPhase?: number;
+    phaseOffset?: number;
+    phaseFailedIds?: string[];
+  };
   Settings: undefined;
   Search: undefined;
 };

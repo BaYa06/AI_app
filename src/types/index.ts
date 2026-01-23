@@ -279,7 +279,8 @@ export interface UserSettings {
   // Изучение
   dailyNewCardsLimit: number;
   dailyReviewLimit: number;
-  
+  studyCardLimit: number | null; // null = все карты
+
   // Уведомления
   reminderEnabled: boolean;
   reminderTime?: string; // HH:mm

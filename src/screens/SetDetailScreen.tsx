@@ -2,7 +2,7 @@
  * Set Detail Screen
  * @description Экран детали набора карточек
  */
-import React, { useCallback, useMemo, useState, useRef } from 'react';
+import React, { useCallback, useMemo, useState, useRef, useEffect } from 'react';
 import { View, FlatList, StyleSheet, Pressable, TextInput, ScrollView, ActivityIndicator, Platform } from 'react-native';
 import { useSetsStore, useCardsStore, useThemeColors, selectSetStats, useSettingsStore } from '@/store';
 import { Container, Text, ProgressBar, Loading, Button } from '@/components/common';
@@ -39,6 +39,8 @@ export function SetDetailScreen({ navigation, route }: Props) {
   const { setId } = route.params;
   const colors = useThemeColors();
   const theme = useSettingsStore((s) => s.resolvedTheme);
+  const userSettings = useSettingsStore((s) => s.settings);
+  const updateSettings = useSettingsStore((s) => s.updateSettings);
 
   const set = useSetsStore((s) => s.getSet(setId));
   const updateSetStats = useSetsStore((s) => s.updateSetStats);
@@ -58,7 +60,12 @@ export function SetDetailScreen({ navigation, route }: Props) {
   const [showStudySheet, setShowStudySheet] = useState(false);
   const [onlyHard, setOnlyHard] = useState(false);
   const [showMnemonic, setShowMnemonic] = useState(true);
-  const [wordLimit, setWordLimit] = useState<'10' | '20' | '30' | 'all'>('20');
+  const [wordLimit, setWordLimit] = useState<'10' | '20' | '30' | 'all'>(() => {
+    const limit = userSettings.studyCardLimit;
+    if (limit === null) return 'all';
+    if (limit === 10 || limit === 30) return String(limit) as '10' | '30';
+    return '20';
+  });
 
   // Import TSV states
   const [importLoading, setImportLoading] = useState(false);
@@ -98,30 +105,89 @@ export function SetDetailScreen({ navigation, route }: Props) {
       });
   }, [cards, filter, search]);
 
+  // Синхронизация выбранного лимита с сохраненными настройками (поддержка загрузки)
+  useEffect(() => {
+    const limit = userSettings.studyCardLimit;
+    const next = limit === null ? 'all' : (limit === 10 || limit === 30 ? String(limit) : '20');
+    setWordLimit((prev) => (prev === next ? prev : next as '10' | '20' | '30' | 'all'));
+  }, [userSettings.studyCardLimit]);
+
   // Обработчики
   const handleStartStudy = useCallback(() => {
     // "Учить всё" — запускаем тренировку по выбранному количеству карточек
     const limit = wordLimit === 'all' ? undefined : Number(wordLimit);
     setShowStudySheet(false);
-    navigation.navigate('Study', { setId, mode: 'classic', studyAll: true, cardLimit: limit, onlyHard });
-  }, [navigation, setId, wordLimit, onlyHard]);
+    
+    // Создаем новую фазу при каждом запуске
+    const phaseId = `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const totalCards = onlyHard 
+      ? cards.filter(c => c.nextReviewDate <= Date.now()).length
+      : cards.length;
+    
+    navigation.navigate('Study', { 
+      setId, 
+      mode: 'classic', 
+      studyAll: true, 
+      cardLimit: limit, 
+      onlyHard,
+      phaseId,
+      totalPhaseCards: totalCards,
+      studiedInPhase: 0,
+      phaseOffset: 0,
+    });
+  }, [navigation, setId, wordLimit, onlyHard, cards]);
 
   const handleStartMatch = useCallback(() => {
     const limit = wordLimit === 'all' ? undefined : Number(wordLimit);
     setShowStudySheet(false);
-    navigation.navigate('Match', { setId, cardLimit: limit });
-  }, [navigation, setId, wordLimit]);
+    
+    // Создаем новую фазу при каждом запуске
+    const phaseId = `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const totalCards = onlyHard 
+      ? cards.filter(c => c.nextReviewDate <= Date.now()).length
+      : cards.length;
+    
+    navigation.navigate('Match', { 
+      setId, 
+      cardLimit: limit,
+      phaseId,
+      totalPhaseCards: totalCards,
+      studiedInPhase: 0,
+      phaseOffset: 0,
+    });
+  }, [navigation, setId, wordLimit, onlyHard, cards]);
 
   const handleStartMultipleChoice = useCallback(() => {
     const limit = wordLimit === 'all' ? undefined : Number(wordLimit);
     setShowStudySheet(false);
+    
+    // Создаем новую фазу при каждом запуске
+    const phaseId = `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const totalCards = onlyHard 
+      ? cards.filter(c => c.nextReviewDate <= Date.now()).length
+      : cards.length;
+    
     navigation.navigate('MultipleChoice', {
       setId,
       cardLimit: limit,
       questionIndex: 1,
       totalQuestions: limit ?? cards.length,
+      phaseId,
+      totalPhaseCards: totalCards,
+      studiedInPhase: 0,
+      phaseOffset: 0,
     });
-  }, [navigation, setId, wordLimit, cards.length]);
+  }, [navigation, setId, wordLimit, cards.length, onlyHard, cards]);
+
+  const handleSelectWordLimit = useCallback(
+    (val: '10' | '20' | '30' | 'all') => {
+      setWordLimit(val);
+      const limit = val === 'all' ? null : Number(val);
+      updateSettings({ studyCardLimit: limit });
+      DatabaseService.saveSettings();
+    },
+    [updateSettings]
+  );
 
   const openAddCardSheet = useCallback(() => {
     setNewFront('');
@@ -775,7 +841,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                     {(['10', '20', '30', 'all'] as const).map((val) => (
                       <Pressable
                         key={val}
-                        onPress={() => setWordLimit(val)}
+                        onPress={() => handleSelectWordLimit(val)}
                         style={[
                           styles.wordChip,
                           {
