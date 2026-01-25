@@ -6,10 +6,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { ArrowLeft, Settings, Volume2 } from 'lucide-react-native';
 import { Container, Text, ProgressBar, Loading } from '@/components/common';
-import { useCardsStore, useSetsStore, useThemeColors } from '@/store';
+import { useCardsStore, useSetsStore, useThemeColors, useSettingsStore, selectSetStats } from '@/store';
 import { spacing, borderRadius } from '@/constants';
+import { calculateNextReview } from '@/services/SRSService';
 import type { RootStackScreenProps } from '@/types/navigation';
-import type { Card } from '@/types';
+import type { Card, Rating } from '@/types';
 
 type Props = RootStackScreenProps<'MultipleChoice'>;
 
@@ -20,18 +21,24 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
   const { setId, cardLimit, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0, phaseFailedIds } = route.params;
   const colors = useThemeColors();
   const set = useSetsStore((s) => s.getSet(setId));
-  const { ids, map } = useCardsStore(
-    React.useCallback((s) => ({ ids: s.cardsBySet[setId] || [], map: s.cards }), [setId])
-  );
-  const cards = useMemo(
-    () => ids.map((id) => map[id]).filter(Boolean) as Card[],
-    [ids, map]
-  );
+  const updateSetStats = useSetsStore((s) => s.updateSetStats);
+  const updateCardSRS = useCardsStore((s) => s.updateCardSRS);
+  const incrementTodayCards = useSettingsStore((s) => s.incrementTodayCards);
   
   // Мемоизируем список ошибочных карточек из фазы
   const phaseFailedList = useMemo(
     () => phaseFailedIds || [],
     [phaseFailedIds ? phaseFailedIds.join('|') : '']
+  );
+  const initKey = useMemo(
+    () => [
+      setId,
+      cardLimit ?? 'all',
+      phaseId || 'noPhase',
+      phaseOffset,
+      phaseFailedList.join(','),
+    ].join('|'),
+    [setId, cardLimit, phaseId, phaseOffset, phaseFailedList]
   );
   
   // Генерируем phaseId при первом запуске (если не передан)
@@ -52,6 +59,31 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
   const getFront = (card: Card) => card.frontText ?? (card as any).front ?? '';
   const getBack = (card: Card) => card.backText ?? (card as any).back ?? '';
 
+  const applySrsUpdate = React.useCallback(
+    (card: Card, rating: Rating) => {
+      const result = calculateNextReview(card, rating);
+
+      updateCardSRS(card.id, {
+        learningStep: result.newLearningStep,
+        nextReviewDate: result.nextReviewDate,
+        lastReviewDate: Date.now(),
+        status: result.newStatus,
+      });
+
+      incrementTodayCards();
+
+      const statsSnapshot = selectSetStats(card.setId);
+      updateSetStats(card.setId, {
+        cardCount: statsSnapshot.total,
+        newCount: statsSnapshot.newCount,
+        learningCount: statsSnapshot.learningCount,
+        reviewCount: statsSnapshot.reviewCount,
+        masteredCount: statsSnapshot.masteredCount,
+      });
+    },
+    [updateCardSRS, updateSetStats, incrementTodayCards]
+  );
+
   const shuffle = <T,>(arr: T[]): T[] => {
     return arr
       .map((item) => ({ item, sort: Math.random() }))
@@ -60,6 +92,10 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
   };
 
   useEffect(() => {
+    const state = useCardsStore.getState();
+    const ids = state.cardsBySet[setId] || [];
+    const cards = ids.map((id) => state.cards[id]).filter(Boolean) as Card[];
+
     let questionCards: Card[] = [];
     
     if (phaseId) {
@@ -117,7 +153,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [cards, cardLimit, phaseOffset, phaseId, phaseFailedList]);
+  }, [initKey, phaseFailedList, phaseId, phaseOffset, cardLimit, setId]);
 
   const totalQuestions = questions.length;
   const currentCard = questions[currentIndex];
@@ -216,6 +252,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
     if (!currentCard || selectedOption) return;
 
     const isCorrect = option.isCorrect;
+    const rating: Rating = isCorrect ? 3 : 2;
     const nextErrors = errors + (isCorrect ? 0 : 1);
     const updatedErrorCards = isCorrect
       ? errorCards
@@ -225,9 +262,11 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
             id: currentCard.id,
             front: getFront(currentCard),
             back: getBack(currentCard),
-            rating: 1,
+            rating,
           },
         ];
+
+    applySrsUpdate(currentCard, rating);
 
     setSelectedOption(option.id);
     setShowResult(true);
@@ -508,7 +547,7 @@ const styles = StyleSheet.create({
   },
   word: {
     textAlign: 'center',
-    fontSize: 38,
+    fontSize: 30,
     fontWeight: '800',
     letterSpacing: -0.5,
   },

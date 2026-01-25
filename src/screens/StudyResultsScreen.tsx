@@ -206,7 +206,6 @@ export function StudyResultsScreen({ navigation, route }: Props) {
         <View style={styles.heroSection}>
           {/* Medallion with glow effect */}
           <View style={styles.medallionContainer}>
-            <View style={[styles.medallionGlow, { backgroundColor: colors.primary + '4D' }]} />
             <View style={[styles.medallion, { 
               backgroundColor: colors.primary,
               borderColor: colors.background,
@@ -533,20 +532,6 @@ const styles = StyleSheet.create({
     position: 'relative',
     marginBottom: 24,
   },
-  medallionGlow: {
-    position: 'absolute',
-    top: -12,
-    left: -12,
-    right: -12,
-    bottom: -12,
-    borderRadius: 9999,
-    opacity: 0.6,
-    ...Platform.select({
-      web: {
-        filter: 'blur(32px)',
-      }
-    }),
-  },
   medallion: {
     width: 96,
     height: 96,
@@ -639,6 +624,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
+    paddingHorizontal: 15,
   },
   primaryButtonText: {
     color: '#FFFFFF',
@@ -658,6 +644,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     backgroundColor: 'transparent',
+    paddingHorizontal: 15,
   },
   // Modal styles
   modalOverlay: {

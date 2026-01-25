@@ -84,6 +84,15 @@ export function SetDetailScreen({ navigation, route }: Props) {
     return { progress, dueCount };
   }, [set]);
 
+  const backdropColor = 'rgba(0,0,0,0.35)';
+  const modalSurface = theme === 'dark' ? 'rgb(32, 34, 44)' : colors.surface;
+  const modalBorder = theme === 'dark' ? 'rgba(255,255,255,0.08)' : colors.border;
+  const modalTextPrimary = theme === 'dark' ? '#F8FAFC' : colors.textPrimary;
+  const modalTextSecondary = theme === 'dark' ? '#A8B3C1' : colors.textSecondary;
+  const modalPlaceholder = theme === 'dark' ? '#94A3B8' : colors.textTertiary;
+  const modalInputBg = theme === 'dark' ? 'rgba(255,255,255,0.04)' : colors.surface;
+  const modalHandleColor = theme === 'dark' ? '#4b5563' : '#cbd5e1';
+
   const filteredCards = useMemo(() => {
     const getFront = (card: Card) => card.frontText ?? (card as any).front ?? '';
     const getBack = (card: Card) => card.backText ?? (card as any).back ?? '';
@@ -178,6 +187,26 @@ export function SetDetailScreen({ navigation, route }: Props) {
       phaseOffset: 0,
     });
   }, [navigation, setId, wordLimit, cards.length, onlyHard, cards]);
+
+  const handleStartWordBuilder = useCallback(() => {
+    const limit = wordLimit === 'all' ? undefined : Number(wordLimit);
+    setShowStudySheet(false);
+
+    // Новая фаза
+    const phaseId = `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const totalCards = onlyHard 
+      ? cards.filter(c => c.nextReviewDate <= Date.now()).length
+      : cards.length;
+
+    navigation.navigate('WordBuilder', {
+      setId,
+      cardLimit: limit,
+      phaseId,
+      totalPhaseCards: totalCards,
+      studiedInPhase: 0,
+      phaseOffset: 0,
+    });
+  }, [navigation, setId, wordLimit, onlyHard, cards]);
 
   const handleSelectWordLimit = useCallback(
     (val: '10' | '20' | '30' | 'all') => {
@@ -581,11 +610,14 @@ export function SetDetailScreen({ navigation, route }: Props) {
 
       {actionCardId && (
         <View style={[styles.sheetWrapper, { zIndex: 25 }]} pointerEvents="box-none">
-          <Pressable style={styles.sheetBackdrop} onPress={() => setActionCardId(null)} />
+          <Pressable
+            style={[styles.sheetBackdrop, { backgroundColor: backdropColor }]}
+            onPress={() => setActionCardId(null)}
+          />
           <View
             style={[
               styles.sheet,
-              { backgroundColor: colors.surface, borderColor: colors.border },
+              { backgroundColor: modalSurface, borderColor: modalBorder },
             ]}
           >
             <Pressable style={styles.sheetAction} onPress={handleDeleteCard}>
@@ -594,7 +626,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
               </Text>
             </Pressable>
             <Pressable style={styles.sheetAction} onPress={() => setActionCardId(null)}>
-              <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
+              <Text variant="body" style={{ color: modalTextPrimary, fontWeight: '700' }}>
                 Отмена
               </Text>
             </Pressable>
@@ -604,38 +636,49 @@ export function SetDetailScreen({ navigation, route }: Props) {
 
       {showAddCard && (
         <View style={[styles.sheetWrapper, { zIndex: 30 }]} pointerEvents="box-none">
-          <Pressable style={styles.sheetBackdrop} onPress={() => setShowAddCard(false)} />
-      <View
-        style={[
-          styles.addSheet,
-          { backgroundColor: colors.surface, borderColor: colors.border },
-        ]}
-      >
-        <View style={styles.addSheetHeader}>
-          <Text variant="h3" style={{ color: colors.textPrimary }}>
-            Новая карточка
-          </Text>
           <Pressable
-            onPress={openImportModal}
-            style={[styles.exportButton, { backgroundColor: colors.primary }]}
+            style={[styles.sheetBackdrop, { backgroundColor: backdropColor }]}
+            onPress={() => setShowAddCard(false)}
+          />
+          <View
+            style={[
+              styles.addSheet,
+              { backgroundColor: modalSurface, borderColor: modalBorder },
+            ]}
           >
-            <File size={18} color={colors.textInverse} />
-            <Text variant="bodySmall" style={{ color: colors.textInverse, fontWeight: '700' }}>
-              Импорт
-            </Text>
-          </Pressable>
-        </View>
+            <View style={styles.addSheetHeader}>
+              <Text variant="h3" style={{ color: modalTextPrimary }}>
+                Новая карточка
+              </Text>
+              <Pressable
+                onPress={openImportModal}
+                style={[styles.exportButton, { backgroundColor: colors.primary }]}
+              >
+                <File size={18} color={colors.textInverse} />
+                <Text variant="bodySmall" style={{ color: colors.textInverse, fontWeight: '700' }}>
+                  Импорт
+                </Text>
+              </Pressable>
+            </View>
 
-        <View style={styles.addField}>
-          <Text variant="label" color="primary" style={styles.fieldLabel}>
-            Иностранное слово
-          </Text>
+            <View style={styles.addField}>
+              <Text variant="label" color="primary" style={styles.fieldLabel}>
+                Иностранное слово
+              </Text>
               <TextInput
                 value={newFront}
                 onChangeText={setNewFront}
                 placeholder="Например: scharf"
-                placeholderTextColor={colors.textTertiary}
-                style={[styles.addInput, { color: colors.textPrimary, borderColor: colors.border, outlineStyle: 'none' }]}
+                placeholderTextColor={modalPlaceholder}
+                style={[
+                  styles.addInput,
+                  { 
+                    color: modalTextPrimary,
+                    borderColor: modalBorder,
+                    backgroundColor: modalInputBg,
+                    outlineStyle: 'none',
+                  }
+                ]}
               />
             </View>
 
@@ -647,14 +690,22 @@ export function SetDetailScreen({ navigation, route }: Props) {
                 value={newBack}
                 onChangeText={setNewBack}
                 placeholder="Например: острый"
-                placeholderTextColor={colors.textTertiary}
-                style={[styles.addInput, { color: colors.textPrimary, borderColor: colors.border, outlineStyle: 'none' }]}
+                placeholderTextColor={modalPlaceholder}
+                style={[
+                  styles.addInput,
+                  { 
+                    color: modalTextPrimary,
+                    borderColor: modalBorder,
+                    backgroundColor: modalInputBg,
+                    outlineStyle: 'none',
+                  }
+                ]}
               />
             </View>
 
             <View style={styles.addActions}>
-              <Pressable style={[styles.secondaryAction, { borderColor: colors.border }]} onPress={() => setShowAddCard(false)}>
-                <Text variant="body" style={{ color: colors.textSecondary, fontWeight: '700' }}>
+              <Pressable style={[styles.secondaryAction, { borderColor: modalBorder }]} onPress={() => setShowAddCard(false)}>
+                <Text variant="body" style={{ color: modalTextSecondary, fontWeight: '700' }}>
                   Отмена
                 </Text>
               </Pressable>
@@ -664,7 +715,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                   {
                     backgroundColor: newFront.trim() && newBack.trim() && !isAdding
                       ? colors.primary
-                      : colors.border,
+                      : modalBorder,
                   },
                 ]}
                 disabled={!newFront.trim() || !newBack.trim() || isAdding}
@@ -684,27 +735,30 @@ export function SetDetailScreen({ navigation, route }: Props) {
 
       {showStudySheet && (
         <View style={[styles.sheetWrapper, { zIndex: 35 }]} pointerEvents="box-none">
-          <Pressable style={styles.sheetBackdrop} onPress={() => setShowStudySheet(false)} />
+          <Pressable
+            style={[styles.sheetBackdrop, { backgroundColor: backdropColor }]}
+            onPress={() => setShowStudySheet(false)}
+          />
           <View
             style={[
               styles.studySheet,
               {
-                backgroundColor: theme === 'dark' ? 'rgb(16, 17, 34)' : colors.surface,
-                borderColor: colors.border,
+                backgroundColor: modalSurface,
+                borderColor: modalBorder,
               },
             ]}
           >
-            <View style={styles.studyHandle} />
+            <View style={[styles.studyHandle, { backgroundColor: modalHandleColor }]} />
             <ScrollView
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.studyContent}
             >
               <View style={styles.studyHeader}>
-                <Text variant="h3" style={{ color: colors.textPrimary }}>
+                <Text variant="h3" style={{ color: modalTextPrimary }}>
                   Выбор режима
                 </Text>
                 <Pressable onPress={() => setShowStudySheet(false)} hitSlop={8}>
-                  <Text variant="body" style={{ color: colors.textSecondary, fontWeight: '600' }}>
+                  <Text variant="body" style={{ color: modalTextSecondary, fontWeight: '600' }}>
                     Отмена
                   </Text>
                 </Pressable>
@@ -792,13 +846,14 @@ export function SetDetailScreen({ navigation, route }: Props) {
                     colors={colors}
                     onPress={handleStartMultipleChoice}
                   />
-                  <GameRow
-                    icon={<Type size={18} color={colors.textPrimary} />}
-                    title="Word Builder"
-                    tag="Правописание"
-                    description="Собери слово из букв"
-                    colors={colors}
-                  />
+                <GameRow
+                  icon={<Type size={18} color={colors.textPrimary} />}
+                  title="Word Builder"
+                  tag="Правописание"
+                  description="Собери слово из букв"
+                  colors={colors}
+                  onPress={handleStartWordBuilder}
+                />
                   <GameRow
                     icon={<Headphones size={18} color={colors.textPrimary} />}
                     title="Audio Tap"
@@ -871,23 +926,26 @@ export function SetDetailScreen({ navigation, route }: Props) {
       )}
 
       {showImportModal && (
-        <View style={[styles.importOverlay]} pointerEvents="box-none">
-          <Pressable style={styles.sheetBackdrop} onPress={closeImportModal} />
+        <View style={[styles.importOverlay, { backgroundColor: backdropColor }]} pointerEvents="box-none">
+          <Pressable
+            style={[styles.sheetBackdrop, { backgroundColor: backdropColor }]}
+            onPress={closeImportModal}
+          />
           <View
             style={[
               styles.importCard,
               {
-                backgroundColor: theme === 'dark' ? 'rgb(16, 17, 34)' : colors.background,
-                borderColor: colors.border,
+                backgroundColor: modalSurface,
+                borderColor: modalBorder,
                 maxHeight: importStep === 'preview' ? '80%' : undefined,
               },
             ]}
           >
             <View style={styles.importTopBar}>
               <Pressable onPress={closeImportModal} hitSlop={10} style={styles.topIcon}>
-                <ArrowLeft size={20} color={colors.textPrimary} />
+                <ArrowLeft size={20} color={modalTextPrimary} />
               </Pressable>
-              <Text variant="body" style={[styles.importTitle, { color: colors.textPrimary }]}>
+              <Text variant="body" style={[styles.importTitle, { color: modalTextPrimary }]}>
                 {importStep === 'preview' ? `Импорт (${importedCards.length} карточек)` : 'Импорт из файла'}
               </Text>
               <View style={styles.topIcon} />

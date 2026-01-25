@@ -34,7 +34,7 @@ module.exports = (env, argv) => {
       rules: [
         {
           test: /\.(js|jsx|ts|tsx)$/,
-          exclude: /node_modules\/(?!(@react-native|react-native-svg|lucide-react-native|@react-navigation)\/).*/,
+          exclude: /node_modules\/(?!(@react-native|react-native-svg|lucide-react-native|@react-navigation|react-native-vector-icons)\/).*/,
           use: {
             loader: 'babel-loader',
             options: {
@@ -60,7 +60,32 @@ module.exports = (env, argv) => {
           },
         },
         {
+          // Явно обрабатываем react-native-vector-icons (JSX внутри node_modules)
+          test: /node_modules\/react-native-vector-icons\/.*\.(js|jsx)$/,
+          use: {
+            loader: 'babel-loader',
+            options: {
+              cacheDirectory: true,
+              presets: [
+                ['@babel/preset-env', { modules: false }],
+                ['@babel/preset-react', { runtime: 'automatic' }],
+                '@babel/preset-typescript',
+                ['@babel/preset-flow', { allowDeclareFields: true }],
+              ],
+              plugins: [
+                ['@babel/plugin-transform-class-properties', { loose: true }],
+                ['@babel/plugin-transform-private-methods', { loose: true }],
+                ['@babel/plugin-transform-private-property-in-object', { loose: true }],
+              ],
+            },
+          },
+        },
+        {
           test: /\.(png|jpe?g|gif|svg)$/i,
+          type: 'asset/resource',
+        },
+        {
+          test: /\.(ttf|otf|eot|woff2?)$/i,
           type: 'asset/resource',
         },
       ],
@@ -77,6 +102,8 @@ module.exports = (env, argv) => {
           { from: 'public/manifest.webmanifest', to: 'manifest.json' },
           { from: 'public/sw.js', to: 'sw.js' },
           { from: 'public/icons', to: 'icons' },
+          // Шрифты для react-native-vector-icons
+          { from: 'node_modules/react-native-vector-icons/Fonts/Ionicons.ttf', to: 'fonts/Ionicons.ttf' },
         ],
       }),
       new webpack.DefinePlugin({

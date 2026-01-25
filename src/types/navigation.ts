@@ -66,6 +66,16 @@ export type RootStackParamList = {
     phaseOffset?: number;
     phaseFailedIds?: string[];
   };
+  WordBuilder: {
+    setId: string;
+    cardLimit?: number;
+    // Параметры фазы (на будущее)
+    phaseId?: string;
+    totalPhaseCards?: number;
+    studiedInPhase?: number;
+    phaseOffset?: number;
+    phaseFailedIds?: string[];
+  };
   Settings: undefined;
   Search: undefined;
 };
@@ -76,6 +86,7 @@ export type MainTabParamList = {
   Home: undefined;
   Library: undefined;
   Statistics: undefined;
+  Study: undefined;
   Profile: undefined;
 };
 

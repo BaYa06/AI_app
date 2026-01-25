@@ -9,7 +9,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useThemeColors } from '@/store';
 import type { RootStackParamList, MainTabParamList } from '@/types/navigation';
-import { Home, Library, BarChart3, User } from 'lucide-react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 // Экраны
 import { HomeScreen } from '@/screens/HomeScreen.new';
@@ -17,12 +17,14 @@ import { LibraryScreen } from '@/screens/LibraryScreen';
 import { StatisticsScreen } from '@/screens/StatisticsScreen';
 import { ProfileScreen } from '@/screens/ProfileScreen';
 import { SetDetailScreen } from '@/screens/SetDetailScreen';
-import { StudyScreen } from '@/screens/StudyScreen';
 import { StudyResultsScreen } from '@/screens/StudyResultsScreen';
 import { CardEditorScreen } from '@/screens/CardEditorScreen';
 import { SetEditorScreen } from '@/screens/SetEditorScreen';
 import { MatchScreen } from '@/screens/MatchScreen';
 import { MultipleChoiceScreen } from '@/screens/MultipleChoiceScreen';
+import { WordBuilderScreen } from '@/screens/WordBuilderScreen';
+import { StudyScreen } from '@/screens/StudyScreen';
+import { StudyPlaceholderScreen } from '@/screens/StudyPlaceholderScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -42,6 +44,7 @@ function MainTabs() {
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textTertiary,
+        tabBarShowLabel: false,
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopWidth: 1,
@@ -64,40 +67,35 @@ function MainTabs() {
         name="Home"
         component={HomeScreen}
         options={{
-          tabBarLabel: 'Главная',
-          tabBarIcon: ({ focused, color }) => (
-            <Home size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
-          ),
+          tabBarIcon: ({ color }) => <Ionicons name="home" size={26} color={color} />,
         }}
       />
       <Tab.Screen
         name="Library"
         component={LibraryScreen}
         options={{
-          tabBarLabel: 'Библиотека',
-          tabBarIcon: ({ focused, color }) => (
-            <Library size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
-          ),
+          tabBarIcon: ({ color }) => <Ionicons name="albums" size={26} color={color} />,
+        }}
+      />
+      <Tab.Screen
+        name="Study"
+        component={StudyPlaceholderScreen}
+        options={{
+          tabBarIcon: ({ color }) => <Ionicons name="school" size={26} color={color} />,
         }}
       />
       <Tab.Screen
         name="Statistics"
         component={StatisticsScreen}
         options={{
-          tabBarLabel: 'Статистика',
-          tabBarIcon: ({ focused, color }) => (
-            <BarChart3 size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
-          ),
+          tabBarIcon: ({ color }) => <Ionicons name="stats-chart" size={26} color={color} />,
         }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
         options={{
-          tabBarLabel: 'Профиль',
-          tabBarIcon: ({ focused, color }) => (
-            <User size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
-          ),
+          tabBarIcon: ({ color }) => <Ionicons name="person" size={26} color={color} />,
         }}
       />
     </Tab.Navigator>
@@ -146,6 +144,11 @@ export function AppNavigator() {
         <Stack.Screen
           name="MultipleChoice"
           component={MultipleChoiceScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="WordBuilder"
+          component={WordBuilderScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen
