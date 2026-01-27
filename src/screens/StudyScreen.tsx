@@ -12,6 +12,7 @@ import { DatabaseService } from '@/services';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Rating, Card } from '@/types';
 import { ArrowLeft, Settings, Volume2, Star, Check } from 'lucide-react-native';
+import { speak, detectLanguage } from '@/utils/speech';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = Math.min(340, SCREEN_WIDTH - 32);
@@ -61,6 +62,17 @@ export function StudyScreen({ navigation, route }: Props) {
   const sheetTranslate = useRef(new Animated.Value(-220)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const isCurrentMastered = currentCard ? currentCard.nextReviewDate > Date.now() : false;
+  const handleSpeak = useCallback(
+    (text: string, counterpart?: string) => {
+      const normalized = (text || '').trim();
+      if (!normalized) return;
+      const lang = detectLanguage(normalized, counterpart);
+      speak(normalized, lang).catch((error) => {
+        console.warn('[StudyScreen] TTS error:', error);
+      });
+    },
+    []
+  );
 
   // Инициализация сессии
   useEffect(() => {
@@ -517,6 +529,7 @@ export function StudyScreen({ navigation, route }: Props) {
               <Pressable 
                 style={[styles.audioButton, { backgroundColor: '#f1f5f9' }]}
                 hitSlop={10}
+                onPress={() => handleSpeak(questionText, answerText)}
               >
                 <Volume2 size={20} color={colors.primary} />
               </Pressable>
@@ -558,6 +571,7 @@ export function StudyScreen({ navigation, route }: Props) {
               <Pressable 
                 style={[styles.audioButton, { backgroundColor: '#f1f5f9' }]}
                 hitSlop={10}
+                onPress={() => handleSpeak(answerText, questionText)}
               >
                 <Volume2 size={20} color={colors.primary} />
               </Pressable>

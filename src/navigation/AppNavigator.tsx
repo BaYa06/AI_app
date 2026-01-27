@@ -36,7 +36,7 @@ function MainTabs() {
 
   // Фиксированная высота tab bar для всех платформ
   const tabBarHeight = 66;
-  const tabBarPaddingBottom = 16;
+  const tabBarPaddingBottom = 20;
 
   return (
     <Tab.Navigator
@@ -67,35 +67,35 @@ function MainTabs() {
         name="Home"
         component={HomeScreen}
         options={{
-          tabBarIcon: ({ color }) => <Ionicons name="home" size={26} color={color} />,
+          tabBarIcon: ({ color }) => <Ionicons name="home" size={31} color={color} />,
         }}
       />
       <Tab.Screen
         name="Library"
         component={LibraryScreen}
         options={{
-          tabBarIcon: ({ color }) => <Ionicons name="albums" size={26} color={color} />,
+          tabBarIcon: ({ color }) => <Ionicons name="albums" size={31} color={color} />,
         }}
       />
       <Tab.Screen
         name="Study"
         component={StudyPlaceholderScreen}
         options={{
-          tabBarIcon: ({ color }) => <Ionicons name="school" size={26} color={color} />,
+          tabBarIcon: ({ color }) => <Ionicons name="school" size={31} color={color} />,
         }}
       />
       <Tab.Screen
         name="Statistics"
         component={StatisticsScreen}
         options={{
-          tabBarIcon: ({ color }) => <Ionicons name="stats-chart" size={26} color={color} />,
+          tabBarIcon: ({ color }) => <Ionicons name="stats-chart" size={31} color={color} />,
         }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
         options={{
-          tabBarIcon: ({ color }) => <Ionicons name="person" size={26} color={color} />,
+          tabBarIcon: ({ color }) => <Ionicons name="person" size={31} color={color} />,
         }}
       />
     </Tab.Navigator>
