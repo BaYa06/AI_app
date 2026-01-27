@@ -65,6 +65,10 @@ coverage/
 .env.local
 !.env.example
 
+# Secrets / Service Account Keys
+flashly.json
+*.json.bak
+
 # Temporary
 tmp/
 temp/
