@@ -83,6 +83,8 @@ export const NeonService = {
         description: set.description || '',
         category: set.category || 'Общие',
         tags: [],
+        languageFrom: set.language_from || 'de',
+        languageTo: set.language_to || 'ru',
         createdAt: new Date(set.created_at).getTime(),
         updatedAt: new Date(set.updated_at).getTime(),
         cardCount: set.total_cards || 0,

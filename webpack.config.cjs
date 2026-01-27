@@ -5,7 +5,12 @@ const webpack = require('webpack');
 const dotenv = require('dotenv');
 
 // Загружаем переменные окружения из .env.local
-const envConfig = dotenv.config({ path: '.env.local' });
+const envResult = dotenv.config({ path: '.env.local' });
+const envVars = envResult.parsed || {};
+
+// Debug: проверяем загрузку TTS переменных
+console.log('[webpack] GCLOUD TTS Key loaded:', !!envVars.EXPO_PUBLIC_GCLOUD_TTS_KEY);
+console.log('[webpack] GCLOUD TTS SA loaded:', !!envVars.EXPO_PUBLIC_GCLOUD_TTS_SA);
 
 module.exports = (env, argv) => {
   const isDev = argv.mode === 'development';
@@ -108,9 +113,17 @@ module.exports = (env, argv) => {
       }),
       new webpack.DefinePlugin({
         __DEV__: JSON.stringify(isDev),
-        'process.env.NODE_ENV': JSON.stringify(argv.mode || 'production'),
-        'process.env.JEST_WORKER_ID': JSON.stringify(null),
-        'process.env.POSTGRES_URL': JSON.stringify(process.env.POSTGRES_URL || ''),
+        'process.env': JSON.stringify({
+          NODE_ENV: argv.mode || 'production',
+          JEST_WORKER_ID: null,
+          POSTGRES_URL: envVars.POSTGRES_URL || process.env.POSTGRES_URL || '',
+          EXPO_PUBLIC_GCLOUD_TTS_KEY: envVars.EXPO_PUBLIC_GCLOUD_TTS_KEY || process.env.EXPO_PUBLIC_GCLOUD_TTS_KEY || '',
+          EXPO_PUBLIC_GCLOUD_TTS_SA: envVars.EXPO_PUBLIC_GCLOUD_TTS_SA || process.env.EXPO_PUBLIC_GCLOUD_TTS_SA || '',
+          GCLOUD_TTS_KEY: envVars.GCLOUD_TTS_KEY || process.env.GCLOUD_TTS_KEY || '',
+          GCLOUD_TTS_SA: envVars.GCLOUD_TTS_SA || process.env.GCLOUD_TTS_SA || '',
+          REACT_APP_GCLOUD_TTS_KEY: envVars.REACT_APP_GCLOUD_TTS_KEY || process.env.REACT_APP_GCLOUD_TTS_KEY || '',
+          REACT_APP_GCLOUD_TTS_SA: envVars.REACT_APP_GCLOUD_TTS_SA || process.env.REACT_APP_GCLOUD_TTS_SA || '',
+        }),
       }),
       new webpack.ProvidePlugin({
         process: 'process/browser',

@@ -72,6 +72,8 @@ export const useSetsStore = create<SetsState & SetsActions>()(
         tags: input.tags || [],
         icon: input.icon,
         color: input.color,
+        languageFrom: input.languageFrom || 'de',
+        languageTo: input.languageTo || 'ru',
         isPublic: input.isPublic ?? false,
         createdAt: now,
         updatedAt: now,

@@ -17,6 +17,7 @@ import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card, Rating } from '@/types';
 import { spacing, borderRadius } from '@/constants';
 import { calculateNextReview } from '@/services/SRSService';
+import { speak, detectLanguage } from '@/utils/speech';
 
 type Props = RootStackScreenProps<'WordBuilder'>;
 
@@ -344,6 +345,20 @@ export function WordBuilderScreen({ navigation, route }: Props) {
     [slots, isLocked],
   );
 
+  // Обработчик озвучивания
+  const handleSpeak = useCallback(
+    (text: string, counterpartText?: string) => {
+      if (!text) return;
+      const normalized = text.trim().split(/\r?\n/)[0].trim();
+      if (!normalized) return;
+      const lang = detectLanguage(normalized, counterpartText);
+      speak(normalized, lang).catch((error) => {
+        console.warn('[WordBuilder] Speech error:', error);
+      });
+    },
+    [],
+  );
+
   const resultBorderColor = useMemo(() => {
     if (!wordResult) return null;
     return wordResult === 'correct' ? colors.success : colors.error;
@@ -505,6 +520,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
                 borderColor: colors.border,
               },
             ]}
+            onPress={() => handleSpeak(targetWord, promptText)}
           >
             <Volume2 size={22} color={colors.primary} />
           </Pressable>

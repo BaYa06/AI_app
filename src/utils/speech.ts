@@ -183,10 +183,13 @@ const signJwt = async (payload: Record<string, unknown>, pem: string) => {
 
 let cachedToken: { token: string; exp: number } | null = null;
 
-const getApiKey = () =>
-  getEnv('EXPO_PUBLIC_GCLOUD_TTS_KEY') ||
-  getEnv('REACT_APP_GCLOUD_TTS_KEY') ||
-  getEnv('GCLOUD_TTS_KEY');
+const getApiKey = () => {
+  const key = getEnv('EXPO_PUBLIC_GCLOUD_TTS_KEY') ||
+    getEnv('REACT_APP_GCLOUD_TTS_KEY') ||
+    getEnv('GCLOUD_TTS_KEY');
+  console.log('[speech] API Key available:', !!key, key ? `(${key.substring(0, 10)}...)` : '');
+  return key;
+};
 
 const getServiceAccount = (): ServiceAccount | null => {
   const envJson =
@@ -194,9 +197,31 @@ const getServiceAccount = (): ServiceAccount | null => {
     getEnv('REACT_APP_GCLOUD_TTS_SA') ||
     getEnv('GCLOUD_TTS_SA');
 
+  console.log('[speech] Service Account JSON available:', !!envJson, envJson ? `(length: ${envJson.length})` : '');
+
   if (envJson) {
     try {
-      const parsed = JSON.parse(decodeMaybeBase64(envJson));
+      // Remove surrounding quotes if present
+      let cleaned = envJson.trim();
+      if ((cleaned.startsWith("'") && cleaned.endsWith("'")) || 
+          (cleaned.startsWith('"') && cleaned.endsWith('"'))) {
+        cleaned = cleaned.slice(1, -1);
+      }
+      
+      const decoded = decodeMaybeBase64(cleaned);
+      const parsed = JSON.parse(decoded);
+      console.log('[speech] Service Account parsed:', !!parsed?.client_email, !!parsed?.private_key);
+      
+      // Validate private key format
+      if (parsed?.private_key) {
+        if (!parsed.private_key.includes('-----BEGIN PRIVATE KEY-----')) {
+          console.warn('[speech] Private key missing BEGIN marker');
+        }
+        if (!parsed.private_key.includes('-----END PRIVATE KEY-----')) {
+          console.warn('[speech] Private key missing END marker');
+        }
+      }
+      
       if (parsed?.client_email && parsed?.private_key) return parsed;
     } catch (e) {
       console.warn('[speech] Failed to parse GCLOUD_TTS_SA:', e);
@@ -277,30 +302,51 @@ const speakWithGoogle = async (
   options?: { rate?: number; pitch?: number; volume?: number }
 ) => {
   const fetchFn = getGlobal().fetch as FetchLike | undefined;
-  if (!fetchFn) return false;
-
-  const apiKey = getApiKey();
-  let token: string | null = null;
-
-  if (!apiKey) {
-    try {
-      token = await getAccessToken();
-    } catch (e) {
-      console.warn('[speech] getAccessToken failed:', e);
-    }
+  if (!fetchFn) {
+    console.log('[speech] fetch not available');
+    return false;
   }
 
-  if (!apiKey && !token) return false;
+  // Prefer service account over API key for better Neural2/Wavenet support
+  let token: string | null = null;
+  const apiKey = getApiKey();
+  
+  console.log('[speech] Checking service account first...');
+  try {
+    token = await getAccessToken();
+    console.log('[speech] Got access token:', !!token);
+  } catch (e) {
+    console.warn('[speech] getAccessToken failed:', e);
+  }
+
+  if (!token && !apiKey) {
+    console.log('[speech] No service account token and no API key available');
+    return false;
+  }
+  
+  if (token) {
+    console.log('[speech] Using service account token');
+  } else {
+    console.log('[speech] Falling back to API key');
+  }
 
   const languageCode = (lang || 'en-US').split('-').slice(0, 2).join('-');
   const voiceName = pickGoogleVoice(lang);
 
-  const res = await fetchFn(apiKey ? `${GOOGLE_TTS_ENDPOINT}?key=${apiKey}` : GOOGLE_TTS_ENDPOINT, {
+  // Use token if available, otherwise fall back to API key
+  const url = token ? GOOGLE_TTS_ENDPOINT : `${GOOGLE_TTS_ENDPOINT}?key=${apiKey}`;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  console.log('[speech] Calling Google TTS API...', { languageCode, voiceName, hasToken: !!token, hasApiKey: !!apiKey });
+
+  const res = await fetchFn(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
+    headers,
     body: JSON.stringify({
       input: { text },
       voice: {
@@ -316,9 +362,14 @@ const speakWithGoogle = async (
     }),
   });
 
-  if (!res.ok) throw new Error(`Google TTS failed: ${res.status}`);
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => 'unknown error');
+    console.error('[speech] Google TTS API error:', res.status, errorText);
+    throw new Error(`Google TTS failed: ${res.status} - ${errorText}`);
+  }
   const data = await res.json();
   if (!data?.audioContent) throw new Error('Google TTS: empty audio');
+  console.log('[speech] Got audio content, playing...');
   await playAudio(data.audioContent, options?.volume);
   return true;
 };
@@ -356,10 +407,16 @@ export async function speak(
 ) {
   if (!text) return;
   try {
+    console.log('[speech] Attempting Google Cloud TTS...');
     const done = await speakWithGoogle(text, lang, options);
-    if (done) return;
+    if (done) {
+      console.log('[speech] ✅ Google Cloud TTS succeeded');
+      return;
+    }
+    console.log('[speech] Google TTS returned false, falling back to Web Speech');
   } catch (e) {
     console.warn('[speech] Google TTS failed, fallback to Web Speech:', e);
   }
+  console.log('[speech] Using Web Speech fallback');
   await speakWithWebSpeech(text, lang, options);
 }

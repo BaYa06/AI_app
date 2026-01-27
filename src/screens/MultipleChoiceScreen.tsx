@@ -9,6 +9,7 @@ import { Container, Text, ProgressBar, Loading } from '@/components/common';
 import { useCardsStore, useSetsStore, useThemeColors, useSettingsStore, selectSetStats } from '@/store';
 import { spacing, borderRadius } from '@/constants';
 import { calculateNextReview } from '@/services/SRSService';
+import { speak, detectLanguage } from '@/utils/speech';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card, Rating } from '@/types';
 
@@ -154,6 +155,20 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, [initKey, phaseFailedList, phaseId, phaseOffset, cardLimit, setId]);
+
+  // Обработчик озвучивания
+  const handleSpeak = React.useCallback(
+    (text: string, counterpartText?: string) => {
+      if (!text) return;
+      const normalized = text.trim().split(/\r?\n/)[0].trim();
+      if (!normalized) return;
+      const lang = detectLanguage(normalized, counterpartText);
+      speak(normalized, lang).catch((error) => {
+        console.warn('[MultipleChoice] Speech error:', error);
+      });
+    },
+    [],
+  );
 
   const totalQuestions = questions.length;
   const currentCard = questions[currentIndex];
@@ -423,6 +438,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
                 borderColor: colors.border,
               },
             ]}
+            onPress={() => handleSpeak(getFront(currentCard), getBack(currentCard))}
           >
             <Volume2 size={22} color={colors.primary} />
           </Pressable>

@@ -43,6 +43,7 @@ export function StudyScreen({ navigation, route }: Props) {
   const updateSetStats = useSetsStore((s) => s.updateSetStats);
   const getCardsBySet = useCardsStore((s) => s.getCardsBySet);
   const updateCardSRS = useCardsStore((s) => s.updateCardSRS);
+  const currentSet = useSetsStore((s) => s.getSet(setId));
   
   // Study store
   const session = useStudyStore((s) => s.session);
@@ -62,11 +63,22 @@ export function StudyScreen({ navigation, route }: Props) {
   const sheetTranslate = useRef(new Animated.Value(-220)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const isCurrentMastered = currentCard ? currentCard.nextReviewDate > Date.now() : false;
+  const normalizeLang = (lang?: string): string | undefined => {
+    if (!lang) return undefined;
+    const lower = lang.toLowerCase();
+    if (lower.startsWith('ru')) return 'ru-RU';
+    if (lower.startsWith('de')) return 'de-DE';
+    if (lower.startsWith('en')) return 'en-US';
+    return lang;
+  };
+
   const handleSpeak = useCallback(
-    (text: string, counterpart?: string) => {
+    (text: string, langHint?: string, counterpart?: string) => {
       const normalized = (text || '').trim();
       if (!normalized) return;
-      const lang = detectLanguage(normalized, counterpart);
+      const lang =
+        normalizeLang(langHint) ||
+        detectLanguage(normalized, counterpart);
       speak(normalized, lang).catch((error) => {
         console.warn('[StudyScreen] TTS error:', error);
       });
@@ -463,6 +475,10 @@ export function StudyScreen({ navigation, route }: Props) {
 
   const questionText = reverseEnabled ? baseBack : baseFront;
   const answerText = reverseEnabled ? baseFront : baseBack;
+  const frontLang = normalizeLang(currentSet?.languageFrom);
+  const backLang = normalizeLang(currentSet?.languageTo);
+  const questionLang = reverseEnabled ? backLang : frontLang;
+  const answerLang = reverseEnabled ? frontLang : backLang;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -529,7 +545,7 @@ export function StudyScreen({ navigation, route }: Props) {
               <Pressable 
                 style={[styles.audioButton, { backgroundColor: '#f1f5f9' }]}
                 hitSlop={10}
-                onPress={() => handleSpeak(questionText, answerText)}
+                onPress={() => handleSpeak(questionText, questionLang, answerText)}
               >
                 <Volume2 size={20} color={colors.primary} />
               </Pressable>
@@ -571,7 +587,7 @@ export function StudyScreen({ navigation, route }: Props) {
               <Pressable 
                 style={[styles.audioButton, { backgroundColor: '#f1f5f9' }]}
                 hitSlop={10}
-                onPress={() => handleSpeak(answerText, questionText)}
+                onPress={() => handleSpeak(answerText, answerLang, questionText)}
               >
                 <Volume2 size={20} color={colors.primary} />
               </Pressable>

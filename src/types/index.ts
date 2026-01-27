@@ -119,6 +119,8 @@ export interface CardSet {
   tags: string[];
   icon?: string; // Emoji или имя иконки
   color?: string; // Цвет набора
+  languageFrom?: string; // Язык лицевой стороны
+  languageTo?: string;   // Язык оборотной стороны
   
   // Метаданные
   createdAt: number;
@@ -148,6 +150,8 @@ export interface CreateSetInput {
   tags?: string[];
   icon?: string;
   color?: string;
+  languageFrom?: string;
+  languageTo?: string;
   isPublic?: boolean;
 }
 
@@ -164,6 +168,8 @@ export interface UpdateSetInput {
   isPublic?: boolean;
   isFavorite?: boolean;
   isArchived?: boolean;
+  languageFrom?: string;
+  languageTo?: string;
 }
 
 // ==================== REVIEW TYPES ====================
