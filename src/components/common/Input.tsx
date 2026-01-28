@@ -60,6 +60,8 @@ export const Input = memo(
       [onBlur]
     );
 
+    const isMultiline = !!rest.multiline;
+
     const inputContainerStyle: ViewStyle[] = [
       styles.inputContainer,
       {
@@ -71,6 +73,14 @@ export const Input = memo(
           : colors.border,
       },
     ];
+    if (isMultiline) {
+      inputContainerStyle.push({
+        minHeight: 112,
+        height: undefined,
+        alignItems: 'flex-start',
+        paddingVertical: spacing.s,
+      });
+    }
 
     return (
       <View style={[styles.container, containerStyle]}>
@@ -91,6 +101,14 @@ export const Input = memo(
               { color: colors.textPrimary, outlineStyle: 'none' },
               leftIcon ? styles.inputWithLeftIcon : null,
               rightIcon ? styles.inputWithRightIcon : null,
+              isMultiline
+                ? {
+                    height: undefined,
+                    minHeight: 100,
+                    textAlignVertical: 'top',
+                    paddingVertical: spacing.xs,
+                  }
+                : null,
               inputStyle,
             ]}
             placeholderTextColor={colors.textTertiary}

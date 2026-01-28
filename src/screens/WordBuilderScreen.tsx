@@ -75,6 +75,10 @@ export function WordBuilderScreen({ navigation, route }: Props) {
   const currentTotalPhaseCards = useRef(totalPhaseCards || 0);
   const startedAtRef = useRef<number>(Date.now());
   const advanceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingAdvanceRef = useRef<{
+    errors: number;
+    errorCards: Array<{ id?: string; front: string; back: string; rating: number }>;
+  } | null>(null);
 
   const cardMap = useMemo(() => {
     const map: Record<string, Card> = {};
@@ -144,6 +148,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
     setTiles([]);
     setIsLocked(false);
     setWordResult(null);
+    pendingAdvanceRef.current = null;
     startedAtRef.current = Date.now();
 
     return () => {
@@ -364,6 +369,27 @@ export function WordBuilderScreen({ navigation, route }: Props) {
     return wordResult === 'correct' ? colors.success : colors.error;
   }, [wordResult, colors.success, colors.error]);
 
+  const advanceToNextCard = useCallback(
+    (
+      errorsCount: number,
+      errorList: Array<{ id?: string; front: string; back: string; rating: number }>,
+    ) => {
+      const isLast = currentIndex >= totalWords - 1;
+      if (isLast) {
+        finishSession(errorsCount, errorList);
+        return;
+      }
+
+      pendingAdvanceRef.current = null;
+      setSlots([]);
+      setTiles([]);
+      setWordResult(null);
+      setIsLocked(false);
+      setCurrentIndex((idx) => Math.min(totalWords - 1, idx + 1));
+    },
+    [currentIndex, totalWords, finishSession],
+  );
+
   const handleCompleteWord = useCallback(() => {
     if (!currentCard || !targetWord || isLocked) return;
     const userWord = slots.map((slot) => slot.char ?? '').join('');
@@ -392,19 +418,15 @@ export function WordBuilderScreen({ navigation, route }: Props) {
     if (advanceTimeoutRef.current) {
       clearTimeout(advanceTimeoutRef.current);
     }
-    advanceTimeoutRef.current = setTimeout(() => {
-      const isLast = currentIndex >= totalWords - 1;
-      if (isLast) {
-        finishSession(nextErrors, updatedErrorCards);
-      } else {
-        // Сбрасываем состояние слотов до переключения, чтобы не триггерить автопроверку следующей карточки
-        setSlots([]);
-        setTiles([]);
-        setWordResult(null);
-        setIsLocked(false);
-        setCurrentIndex((idx) => Math.min(totalWords - 1, idx + 1));
-      }
-    }, FEEDBACK_DELAY_MS);
+    if (isCorrect) {
+      pendingAdvanceRef.current = null;
+      advanceTimeoutRef.current = setTimeout(() => {
+        advanceToNextCard(nextErrors, updatedErrorCards);
+      }, FEEDBACK_DELAY_MS);
+    } else {
+      pendingAdvanceRef.current = { errors: nextErrors, errorCards: updatedErrorCards };
+      advanceTimeoutRef.current = null;
+    }
   }, [
     currentCard,
     targetWord,
@@ -416,7 +438,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
     errorCards,
     currentIndex,
     totalWords,
-    finishSession,
+    advanceToNextCard,
     applySrsUpdate,
   ]);
 
@@ -428,6 +450,13 @@ export function WordBuilderScreen({ navigation, route }: Props) {
     if (!allFilled) return;
     handleCompleteWord();
   }, [slots, isLocked, currentCard, targetWord, handleCompleteWord]);
+
+  const handleConfirmNext = useCallback(() => {
+    const pending = pendingAdvanceRef.current;
+    const fallback = { errors, errorCards };
+    const payload = pending ?? fallback;
+    advanceToNextCard(payload.errors, payload.errorCards);
+  }, [advanceToNextCard, errors, errorCards]);
 
   const progressPercent = totalWords ? Math.round(((currentIndex + 1) / totalWords) * 100) : 0;
 
@@ -512,18 +541,20 @@ export function WordBuilderScreen({ navigation, route }: Props) {
             </Text>
           </View>
 
-          <Pressable
-            style={({ pressed }) => [
-              styles.audioButton,
-              {
-                backgroundColor: pressed ? `${colors.primary}22` : colors.surfaceVariant,
-                borderColor: colors.border,
-              },
-            ]}
-            onPress={() => handleSpeak(targetWord, promptText)}
-          >
-            <Volume2 size={22} color={colors.primary} />
-          </Pressable>
+          {wordResult === 'wrong' && (
+            <Pressable
+              style={({ pressed }) => [
+                styles.audioButton,
+                {
+                  backgroundColor: pressed ? `${colors.primary}22` : colors.surfaceVariant,
+                  borderColor: colors.border,
+                },
+              ]}
+              onPress={() => handleSpeak(targetWord, promptText)}
+            >
+              <Volume2 size={22} color={colors.primary} />
+            </Pressable>
+          )}
         </View>
 
         {/* Slots */}
@@ -575,47 +606,69 @@ export function WordBuilderScreen({ navigation, route }: Props) {
               );
             })}
           </View>
-          <Pressable style={[styles.backspaceButton, { opacity: 0 }]} />
+          {wordResult === 'wrong' && (
+            <Pressable
+              style={({ pressed }) => [
+                styles.backspaceButton,
+                {
+                  backgroundColor: pressed ? `${colors.primary}12` : 'transparent',
+                  alignSelf: 'center',
+                  paddingHorizontal: spacing.m,
+                  paddingVertical: spacing.s,
+                  borderRadius: borderRadius.l,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                },
+              ]}
+              onPress={handleConfirmNext}
+            >
+              <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
+                Хорошо
+              </Text>
+            </Pressable>
+          )}
         </View>
 
         {/* Letters grid */}
-        <View style={styles.grid}>
-          {tiles.map((tile) => (
-            <Pressable
-              key={tile.id}
-              disabled={tile.used || isLocked}
-              onPress={() => handleTilePress(tile.id)}
-              style={({ pressed }) => [
-                styles.tile,
-                {
-                  backgroundColor:
-                    resultBorderColor && tile.used
-                      ? `${resultBorderColor}22`
-                      : tile.used
-                        ? colors.surfaceVariant
-                        : colors.surface,
-                  borderColor:
-                    resultBorderColor && tile.used
-                      ? resultBorderColor
-                      : tile.used
-                        ? colors.surfaceVariant
-                        : colors.border,
-                },
-                pressed && !tile.used && { transform: [{ translateY: 1 }] },
-              ]}
-            >
-              <Text
-                variant="h2"
-                style={{
-                  color: tile.used ? colors.textTertiary : colors.textPrimary,
-                  fontWeight: '800',
-                }}
+        {wordResult !== 'wrong' && (
+          <View style={styles.grid}>
+            {tiles.map((tile) => (
+              <Pressable
+                key={tile.id}
+                disabled={tile.used || isLocked}
+                onPress={() => handleTilePress(tile.id)}
+                style={({ pressed }) => [
+                  styles.tile,
+                  {
+                    backgroundColor:
+                      resultBorderColor && tile.used
+                        ? `${resultBorderColor}22`
+                        : tile.used
+                          ? colors.surfaceVariant
+                          : colors.surface,
+                    borderColor:
+                      resultBorderColor && tile.used
+                        ? resultBorderColor
+                        : tile.used
+                          ? colors.surfaceVariant
+                          : colors.border,
+                  },
+                  pressed && !tile.used && { transform: [{ translateY: 1 }] },
+                ]}
               >
-                {tile.char}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+                <Text
+                  variant="h2"
+                  style={{
+                    color: tile.used ? colors.textTertiary : colors.textPrimary,
+                    fontWeight: '800',
+                  }}
+                >
+                  {tile.char}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
       </ScrollView>
     </View>
   );

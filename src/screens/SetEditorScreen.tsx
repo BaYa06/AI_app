@@ -36,7 +36,7 @@ const CATEGORY_OPTIONS: { value: SetCategory; label: string; icon: string }[] = 
 ];
 
 const SOURCE_LANGUAGES = ['Немецкий (DE)', 'Английский (EN)'];
-const TARGET_LANGUAGES = ['Русский (RU)', 'Украинский (UA)'];
+const TARGET_LANGUAGES = ['Русский (RU)'];
 const DESCRIPTION_LIMIT = 200;
 
 export function SetEditorScreen({ navigation, route }: Props) {
@@ -62,6 +62,9 @@ export function SetEditorScreen({ navigation, route }: Props) {
   const [isPublic, setIsPublic] = useState(false);
   const [sourceLanguage, setSourceLanguage] = useState(SOURCE_LANGUAGES[0]);
   const [targetLanguage, setTargetLanguage] = useState(TARGET_LANGUAGES[0]);
+  const [sourcePickerOpen, setSourcePickerOpen] = useState(false);
+  const [targetPickerOpen, setTargetPickerOpen] = useState(false);
+  const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
   const [titleFocused, setTitleFocused] = useState(false);
@@ -75,7 +78,8 @@ export function SetEditorScreen({ navigation, route }: Props) {
         setTitle(set.title);
         setDescription(set.description || '');
         setCategory(set.category);
-        setIsPublic(!!set.isPublic);
+        // Публичные наборы временно недоступны
+        setIsPublic(false);
       }
     }
   }, [setId, getSet]);
@@ -90,32 +94,45 @@ export function SetEditorScreen({ navigation, route }: Props) {
   const isSaveDisabled = !isFormValid || isSaving;
 
   const cycleCategory = useCallback(() => {
-    const index = CATEGORY_OPTIONS.findIndex((c) => c.value === category);
-    const nextIndex = (index + 1) % CATEGORY_OPTIONS.length;
-    setCategory(CATEGORY_OPTIONS[nextIndex].value);
-  }, [category]);
-
-  const cycleSourceLanguage = useCallback(() => {
-    setSourceLanguage((current) => {
-      const index = SOURCE_LANGUAGES.indexOf(current);
-      const nextIndex = (index + 1) % SOURCE_LANGUAGES.length;
-      return SOURCE_LANGUAGES[nextIndex];
-    });
+    setCategoryPickerOpen((open) => !open);
+    setSourcePickerOpen(false);
+    setTargetPickerOpen(false);
   }, []);
 
-  const cycleTargetLanguage = useCallback(() => {
-    setTargetLanguage((current) => {
-      const index = TARGET_LANGUAGES.indexOf(current);
-      const nextIndex = (index + 1) % TARGET_LANGUAGES.length;
-      return TARGET_LANGUAGES[nextIndex];
-    });
+  const toggleSourcePicker = useCallback(() => {
+    setSourcePickerOpen((open) => !open);
+    setTargetPickerOpen(false);
+    setCategoryPickerOpen(false);
+  }, []);
+
+  const toggleTargetPicker = useCallback(() => {
+    setTargetPickerOpen((open) => !open);
+    setSourcePickerOpen(false);
+    setCategoryPickerOpen(false);
+  }, []);
+
+  const handleSelectSourceLanguage = useCallback((lang: string) => {
+    setSourceLanguage(lang);
+    setSourcePickerOpen(false);
+    setCategoryPickerOpen(false);
+  }, []);
+
+  const handleSelectTargetLanguage = useCallback((lang: string) => {
+    setTargetLanguage(lang);
+    setTargetPickerOpen(false);
+    setCategoryPickerOpen(false);
   }, []);
 
   const swapLanguages = useCallback(() => {
     setSourceLanguage((prevSource) => {
-      setTargetLanguage(prevSource);
+      // Переключаем, но целевой язык остаётся среди доступных целей
+      const newTarget = prevSource;
+      setTargetLanguage(TARGET_LANGUAGES.includes(newTarget) ? newTarget : TARGET_LANGUAGES[0]);
       return targetLanguage;
     });
+    setSourcePickerOpen(false);
+    setTargetPickerOpen(false);
+    setCategoryPickerOpen(false);
   }, [targetLanguage]);
 
   // Анимация появления/скрытия модального шита
@@ -347,7 +364,8 @@ export function SetEditorScreen({ navigation, route }: Props) {
               <View style={styles.languageRow}>
                 <SelectPill
                   label={sourceLanguage}
-                  onPress={cycleSourceLanguage}
+                  onPress={toggleSourcePicker}
+                  isOpen={sourcePickerOpen}
                   colors={colors}
                 />
                 <Pressable
@@ -358,10 +376,29 @@ export function SetEditorScreen({ navigation, route }: Props) {
                 </Pressable>
                 <SelectPill
                   label={targetLanguage}
-                  onPress={cycleTargetLanguage}
+                  onPress={toggleTargetPicker}
+                  isOpen={targetPickerOpen}
                   colors={colors}
                 />
               </View>
+              {sourcePickerOpen && (
+                <LanguageDropdown
+                  options={SOURCE_LANGUAGES}
+                  selected={sourceLanguage}
+                  onSelect={handleSelectSourceLanguage}
+                  colors={colors}
+                  align="left"
+                />
+              )}
+              {targetPickerOpen && (
+                <LanguageDropdown
+                  options={TARGET_LANGUAGES}
+                  selected={targetLanguage}
+                  onSelect={handleSelectTargetLanguage}
+                  colors={colors}
+                  align="right"
+                />
+              )}
               <Text variant="caption" color="tertiary" style={styles.helperText}>
                 Используется для импорта и тренировок
               </Text>
@@ -375,8 +412,22 @@ export function SetEditorScreen({ navigation, route }: Props) {
               <SelectPill
                 label={categoryOption?.label || 'Другое'}
                 onPress={cycleCategory}
+                isOpen={categoryPickerOpen}
                 colors={colors}
               />
+              {categoryPickerOpen && (
+                <CategoryDropdown
+                  options={CATEGORY_OPTIONS}
+                  selected={category}
+                  onSelect={(value) => {
+                    setCategory(value);
+                    setCategoryPickerOpen(false);
+                    setSourcePickerOpen(false);
+                    setTargetPickerOpen(false);
+                  }}
+                  colors={colors}
+                />
+              )}
             </View>
 
             {/* Доступ */}
@@ -409,21 +460,21 @@ export function SetEditorScreen({ navigation, route }: Props) {
                   </Text>
                 </Pressable>
                 <Pressable
-                  onPress={() => setIsPublic(true)}
+                  disabled
                   style={[
                     styles.segmentButton,
-                    isPublic && { backgroundColor: colors.surface },
+                    { opacity: 0.45 },
                   ]}
                 >
                   <Unlock
                     size={16}
-                    color={!isPublic ? colors.textSecondary : colors.textPrimary}
+                    color={colors.textSecondary}
                   />
                   <Text
                     variant="bodySmall"
                     style={[
                       styles.segmentLabel,
-                      { color: !isPublic ? colors.textSecondary : colors.textPrimary },
+                      { color: colors.textSecondary },
                     ]}
                   >
                     Публичный
@@ -452,13 +503,13 @@ export function SetEditorScreen({ navigation, route }: Props) {
           <View
             style={[
               styles.actions,
-              { borderTopColor: colors.border, backgroundColor: colors.surface },
+              { borderTopColor: colors.border, backgroundColor: 'transparent' },
             ]}
           >
             <Pressable
               style={[
                 styles.secondaryAction,
-                { borderColor: colors.border, backgroundColor: colors.surface },
+                { borderColor: colors.border },
               ]}
               onPress={() => navigation.goBack()}
               disabled={isSaving}
@@ -502,10 +553,12 @@ function SelectPill({
   label,
   onPress,
   colors,
+  isOpen = false,
 }: {
   label: string;
   onPress: () => void;
   colors: ReturnType<typeof useThemeColors>;
+  isOpen?: boolean;
 }) {
   return (
     <Pressable
@@ -522,8 +575,113 @@ function SelectPill({
       >
         {label}
       </Text>
-      <ChevronDown size={16} color={colors.textSecondary} />
+      <ChevronDown
+        size={16}
+        color={colors.textSecondary}
+        style={isOpen ? { transform: [{ rotate: '180deg' }] } : undefined}
+      />
     </Pressable>
+  );
+}
+
+function LanguageDropdown({
+  options,
+  selected,
+  onSelect,
+  colors,
+  align = 'left',
+}: {
+  options: string[];
+  selected: string;
+  onSelect: (value: string) => void;
+  colors: ReturnType<typeof useThemeColors>;
+  align?: 'left' | 'right';
+}) {
+  return (
+    <View
+      style={[
+        styles.dropdown,
+        {
+          backgroundColor: colors.surface,
+          borderColor: colors.border,
+          shadowColor: colors.shadow,
+          alignSelf: align === 'right' ? 'flex-end' : 'flex-start',
+        },
+      ]}
+    >
+      {options.map((option) => {
+        const isActive = option === selected;
+        return (
+          <Pressable
+            key={option}
+            onPress={() => onSelect(option)}
+            style={[
+              styles.dropdownOption,
+              isActive && { backgroundColor: colors.surfaceVariant },
+            ]}
+          >
+            <Text
+              variant="body"
+              style={{
+                color: isActive ? colors.primary : colors.textPrimary,
+                fontWeight: isActive ? '700' : '600',
+              }}
+            >
+              {option}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function CategoryDropdown({
+  options,
+  selected,
+  onSelect,
+  colors,
+}: {
+  options: typeof CATEGORY_OPTIONS;
+  selected: SetCategory;
+  onSelect: (value: SetCategory) => void;
+  colors: ReturnType<typeof useThemeColors>;
+}) {
+  return (
+    <View
+      style={[
+        styles.dropdown,
+        {
+          backgroundColor: colors.surface,
+          borderColor: colors.border,
+          shadowColor: colors.shadow,
+        },
+      ]}
+    >
+      {options.map((option) => {
+        const isActive = option.value === selected;
+        return (
+          <Pressable
+            key={option.value}
+            onPress={() => onSelect(option.value)}
+            style={[
+              styles.dropdownOption,
+              isActive && { backgroundColor: colors.surfaceVariant },
+            ]}
+          >
+            <Text
+              variant="body"
+              style={{
+                color: isActive ? colors.primary : colors.textPrimary,
+                fontWeight: isActive ? '700' : '600',
+              }}
+            >
+              {`${option.icon} ${option.label}`}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
@@ -647,6 +805,20 @@ const styles = StyleSheet.create({
   },
   selectLabel: {
     fontWeight: '600',
+  },
+  dropdown: {
+    marginTop: spacing.xs,
+    borderWidth: 1,
+    borderRadius: borderRadius.l,
+    minWidth: '48%',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  dropdownOption: {
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.s,
   },
   deleteLink: {
     alignSelf: 'flex-start',

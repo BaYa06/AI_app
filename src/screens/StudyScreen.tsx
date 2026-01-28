@@ -58,6 +58,7 @@ export function StudyScreen({ navigation, route }: Props) {
   const [currentCard, setCurrentCard] = useState<Card | null>(null);
   const [errorCards, setErrorCards] = useState<Array<{ id: string; front: string; back: string; rating: number }>>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [cardVisible, setCardVisible] = useState(true);
   const reverseEnabled = useSettingsStore((s) => s.settings.reverseCards);
   const updateSettings = useSettingsStore((s) => s.updateSettings);
   const sheetTranslate = useRef(new Animated.Value(-220)).current;
@@ -388,6 +389,10 @@ export function StudyScreen({ navigation, route }: Props) {
             : null,
           isFlipped: false,
         }));
+        setCardVisible(false);
+        requestAnimationFrame(() => {
+          setTimeout(() => setCardVisible(true), 60);
+        });
       }
     },
     [currentCard, updateCardSRS, incrementTodayCards, session, setId, updateSetStats, navigation, errorCards, studiedInPhase, phaseOffset, isErrorReview]
@@ -445,7 +450,8 @@ export function StudyScreen({ navigation, route }: Props) {
       return {
         transform: isFlipped ? 'perspective(1000px) rotateY(180deg)' : 'perspective(1000px) rotateY(0deg)',
         opacity: isFlipped ? 0 : 1,
-        transition: 'transform 0.4s ease-in-out, opacity 0.2s ease-in-out',
+        visibility: isFlipped ? 'hidden' : 'visible',
+        transition: 'transform 0.4s ease-in-out, opacity 0.2s ease-in-out, visibility 0s linear 0.2s',
         backfaceVisibility: 'hidden' as const,
       };
     }
@@ -457,7 +463,8 @@ export function StudyScreen({ navigation, route }: Props) {
       return {
         transform: isFlipped ? 'perspective(1000px) rotateY(360deg)' : 'perspective(1000px) rotateY(180deg)',
         opacity: isFlipped ? 1 : 0,
-        transition: 'transform 0.4s ease-in-out, opacity 0.2s ease-in-out',
+        visibility: isFlipped ? 'visible' : 'hidden',
+        transition: 'transform 0.4s ease-in-out, opacity 0.2s ease-in-out, visibility 0s linear 0.2s',
         backfaceVisibility: 'hidden' as const,
       };
     }
@@ -522,7 +529,18 @@ export function StudyScreen({ navigation, route }: Props) {
       {/* Основной контент */}
       <View style={styles.mainContent}>
         {/* Флеш-карточка */}
-        <Pressable onPress={handleToggleCard} style={styles.cardWrapper}>
+        <Pressable
+          onPress={handleToggleCard}
+          style={[
+            styles.cardWrapper,
+            Platform.OS === 'web'
+              ? {
+                  opacity: cardVisible ? 1 : 0,
+                  transition: 'opacity 0.12s ease',
+                }
+              : null,
+          ]}
+        >
           {/* Передняя сторона (вопрос) */}
           <View 
             style={[

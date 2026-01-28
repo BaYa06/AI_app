@@ -521,7 +521,12 @@ export function SetDetailScreen({ navigation, route }: Props) {
               style={[styles.searchInput, { color: colors.textPrimary, outlineStyle: 'none' }]}
             />
           </View>
-          <Pressable style={[styles.sortButton, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Pressable
+            style={[
+              styles.sortButton,
+              { backgroundColor: colors.surface, borderColor: colors.border, display: 'none' },
+            ]}
+          >
             <SlidersHorizontal size={18} color={colors.textSecondary} />
           </Pressable>
         </View>

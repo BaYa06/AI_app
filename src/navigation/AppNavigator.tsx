@@ -172,7 +172,7 @@ export function AppNavigator() {
         <Stack.Screen
           name="CardEditor"
           component={CardEditorScreen}
-          options={{ title: 'Карточка' }}
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="SetEditor"
