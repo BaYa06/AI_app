@@ -1,31 +1,94 @@
 /**
- * EmailAuthScreen
- * @description Шаг 1: ввод email для получения кода. Визуал похож на переданный макет, текст переведён на русский.
+ * Google-only auth screen for React Native + Supabase.
+ * Opens Google in the system browser, listens for session changes, and exposes the logged-in user.
  */
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  StyleSheet,
-  Platform,
-  ScrollView,
+  ActivityIndicator,
   KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  View,
 } from 'react-native';
-import Ionicons from 'react-native-vector-icons/Ionicons';
-import { Button, Input, Text } from '@/components/common';
-import { spacing, borderRadius } from '@/constants';
-import { useThemeColors } from '@/store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import type { Session } from '@supabase/supabase-js';
+
+import { Button, Text } from '@/components/common';
+import { borderRadius, spacing } from '@/constants';
+import { SUPABASE_OAUTH_REDIRECT, supabase } from '@/services/supabaseClient';
+import { useThemeColors } from '@/store';
 
 type Props = {
   onBack?: () => void;
+  // Kept optional for backward navigation compatibility; not used because flow is Google-only.
   onRequestCode?: (email?: string, password?: string) => void;
 };
 
-export function EmailAuthScreen({ onBack, onRequestCode }: Props) {
+export function EmailAuthScreen({ onBack }: Props) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [session, setSession] = useState<Session | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  /**
+   * Triggers the Supabase OAuth flow in the system browser.
+   * Supabase handles PKCE + code exchange and will deliver the session back via the deep link redirect URI.
+   */
+  const signInWithGoogle = useCallback(async () => {
+    setAuthError(null);
+    setIsLoading(true);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: SUPABASE_OAUTH_REDIRECT,
+      },
+    });
+
+    if (error) {
+      console.error('[auth] Google sign-in error', error);
+      setAuthError(error.message);
+      setIsLoading(false);
+    }
+    // Loading spinner stays until onAuthStateChange fires or we get the existing session below.
+  }, []);
+
+  /**
+   * Subscribes to Supabase auth state changes and restores any existing session on mount.
+   */
+  useEffect(() => {
+    let isMounted = true;
+
+    // Restore session if the user already signed in earlier.
+    supabase.auth
+      .getSession()
+      .then(({ data, error }) => {
+        if (!isMounted) return;
+        if (error) setAuthError(error.message);
+        if (data.session) setSession(data.session);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+
+    const { data } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      if (!isMounted) return;
+      setSession(newSession);
+      setIsLoading(false);
+      if (newSession?.user) {
+        console.log('[auth] signed in', {
+          id: newSession.user.id,
+          email: newSession.user.email,
+        });
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      data.subscription.unsubscribe();
+    };
+  }, []);
 
   return (
     <View
@@ -33,129 +96,72 @@ export function EmailAuthScreen({ onBack, onRequestCode }: Props) {
         styles.screen,
         {
           backgroundColor: colors.background,
-          paddingTop: 0,
-          paddingBottom: 0,
+          paddingTop: insets.top,
+          paddingBottom: Math.max(insets.bottom, spacing.l),
         },
       ]}
     >
       <KeyboardAvoidingView
-        style={{ flex: 1, width: '100%' }}
+        style={styles.shell}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View
-          style={[
-            styles.shell,
-            {
-              backgroundColor: colors.surface,
-              shadowColor: colors.shadow,
-              borderColor: colors.border,
-            },
-          ]}
-        >
-          {/* Статусная строка / хедер */}
-          <View style={styles.statusBarSpace} />
+        <View style={styles.navBar}>
+          <Button
+            title=""
+            variant="ghost"
+            onPress={onBack}
+            style={styles.backButton}
+            leftIcon={<Ionicons name="chevron-back" size={22} color={colors.textPrimary} />}
+          />
+        </View>
 
-          {/* Навигационная панель */}
-          <View style={styles.navBar}>
-            <Button
-              title=""
-              variant="ghost"
-              onPress={onBack}
-              style={styles.backButton}
-              leftIcon={<Ionicons name="chevron-back" size={22} color={colors.textPrimary} />}
-            />
-          </View>
-
-          {/* Контент */}
-          <ScrollView
-            contentContainerStyle={styles.contentContainer}
-            showsVerticalScrollIndicator={false}
-          >
-            {/* Прогресс */}
-            <View style={styles.progressBlock}>
-              <View style={styles.progressHeader}>
-                <Text variant="bodySmall" color="primary">
-                  Шаг 1 из 5
-                </Text>
-                <Text variant="bodySmall" color="secondary">
-                  20%
-                </Text>
-              </View>
-              <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-                <View
-                  style={[
-                    styles.progressFill,
-                    { backgroundColor: colors.primary, width: '20%' },
-                  ]}
-                />
-              </View>
-            </View>
-
-            {/* Заголовок */}
-            <View style={styles.headlineBlock}>
-              <Text variant="h1" style={[styles.headline, { color: colors.textPrimary }]}>
-                Добро пожаловать в Flashly
-              </Text>
-              <Text
-                variant="body"
-                color="secondary"
-                style={styles.bodyText}
-              >
-                Мы отправим на вашу почту 6-значный код, чтобы вы могли начать.
-              </Text>
-            </View>
-
-            {/* Поле ввода */}
-            <Input
-              label="Электронная почта"
-              placeholder="name@example.com"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
-              value={email}
-              onChangeText={setEmail}
-              containerStyle={styles.inputContainer}
-              inputStyle={styles.input}
-            />
-            <Input
-              label="Пароль"
-              placeholder="Введите пароль"
-              secureTextEntry
-              autoCapitalize="none"
-              textContentType="password"
-              value={password}
-              onChangeText={setPassword}
-              containerStyle={styles.inputContainer}
-              inputStyle={styles.input}
-            />
-          </ScrollView>
-
-          {/* Кнопка + футер */}
-          <View style={styles.footer}>
-            <Button
-              title="Получить код"
-              onPress={() => onRequestCode?.(email, password)}
-              fullWidth
-            />
-            <Button
-              title="Через Google"
-              variant="outline"
-              onPress={() => {}}
-              fullWidth
-              leftIcon={<Ionicons name="logo-google" size={18} color={colors.primary} />}
-            />
-            <Text
-              variant="caption"
-              color="tertiary"
-              align="center"
-              style={styles.footerText}
-            >
-              Продолжая, вы соглашаетесь с Условиями использования и Политикой конфиденциальности Flashly.
+        <View style={styles.content}>
+          <View style={styles.heading}>
+            <Text variant="h1" style={[styles.title, { color: colors.textPrimary }]}>
+              Войти через Google
+            </Text>
+            <Text variant="body" color="secondary">
+              Мы откроем системный браузер, вы выберете аккаунт Google, и вернётесь в приложение
+              с активной сессией Supabase.
             </Text>
           </View>
 
-          {/* Home indicator */}
-          <View style={[styles.homeIndicator, { backgroundColor: colors.border }]} />
+          <Button
+            title="Continue with Google"
+            onPress={signInWithGoogle}
+            fullWidth
+            disabled={isLoading}
+            leftIcon={<Ionicons name="logo-google" size={18} color={colors.surface} />}
+          />
+
+          {isLoading && (
+            <View style={styles.indicatorRow}>
+              <ActivityIndicator color={colors.primary} />
+              <Text variant="bodySmall" color="secondary" style={styles.indicatorText}>
+                Открываем Google…
+              </Text>
+            </View>
+          )}
+
+          {session?.user && (
+            <View style={[styles.sessionCard, { borderColor: colors.border }]}>
+              <Text variant="body" style={{ color: colors.textPrimary }}>
+                Вы вошли
+              </Text>
+              <Text variant="bodySmall" color="secondary">
+                User ID: {session.user.id}
+              </Text>
+              <Text variant="bodySmall" color="secondary">
+                Email: {session.user.email ?? '—'}
+              </Text>
+            </View>
+          )}
+
+          {authError && (
+            <Text variant="bodySmall" color="error" style={styles.error}>
+              {authError}
+            </Text>
+          )}
         </View>
       </KeyboardAvoidingView>
     </View>
@@ -165,29 +171,16 @@ export function EmailAuthScreen({ onBack, onRequestCode }: Props) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    alignItems: 'center',
-    paddingHorizontal: 0,
   },
   shell: {
     flex: 1,
     width: '100%',
-    maxWidth: '100%',
-    borderRadius: 0,
-    borderWidth: 0,
-    overflow: 'hidden',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
-  },
-  statusBarSpace: {
-    height: 22,
   },
   navBar: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.s,
-    paddingBottom: spacing.xs,
+    paddingVertical: spacing.xs,
   },
   backButton: {
     width: 44,
@@ -195,59 +188,32 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignSelf: 'flex-start',
   },
-  contentContainer: {
+  content: {
+    flex: 1,
     paddingHorizontal: spacing.l,
-    paddingBottom: spacing.l,
+    gap: spacing.m,
+    justifyContent: 'center',
   },
-  progressBlock: {
-    marginBottom: spacing.l,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.s,
-  },
-  progressBar: {
-    height: 8,
-    borderRadius: borderRadius.full,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: borderRadius.full,
-  },
-  headlineBlock: {
-    paddingTop: spacing.m,
-    paddingBottom: spacing.m,
+  heading: {
     gap: spacing.s,
   },
-  headline: {
+  title: {
     letterSpacing: -0.4,
   },
-  bodyText: {
-    lineHeight: 22,
+  indicatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
-  inputContainer: {
-    marginTop: spacing.s,
+  indicatorText: {
+    marginLeft: spacing.xs,
   },
-  input: {
-    height: 56,
+  sessionCard: {
+    padding: spacing.m,
+    borderRadius: borderRadius.m,
+    borderWidth: 1,
   },
-  footer: {
-    paddingHorizontal: spacing.l,
-    paddingVertical: spacing.l,
-    gap: spacing.s,
-  },
-  footerText: {
-    lineHeight: 16,
-  },
-  homeIndicator: {
-    alignSelf: 'center',
-    width: 120,
-    height: 6,
-    borderRadius: borderRadius.full,
-    opacity: 0.6,
-    marginBottom: spacing.s,
+  error: {
+    marginTop: spacing.xs,
   },
 });

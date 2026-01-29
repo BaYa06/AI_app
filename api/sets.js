@@ -51,7 +51,7 @@ async function getSets(req, res, sql) {
 
   const sets = await sql`
     SELECT * FROM card_sets 
-    WHERE user_id = ${userId} OR is_public = true
+    WHERE user_id = ${userId}
     ORDER BY created_at DESC
   `;
 
@@ -77,12 +77,17 @@ async function createSet(req, res, sql) {
 
 // Обновить набор
 async function updateSet(req, res, sql) {
-  const { id, title, description, category, isPublic } = req.body;
+  const { id, userId, title, description, category, isPublic } = req.body;
 
   if (!id) {
     return res.status(400).json({ error: 'id is required' });
   }
 
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+
+  // Проверяем, что набор принадлежит пользователю
   const result = await sql`
     UPDATE card_sets 
     SET 
@@ -91,22 +96,35 @@ async function updateSet(req, res, sql) {
       category = COALESCE(${category}, category),
       is_public = COALESCE(${isPublic}, is_public),
       updated_at = NOW()
-    WHERE id = ${id}
+    WHERE id = ${id} AND user_id = ${userId}
     RETURNING *
   `;
+
+  if (result.length === 0) {
+    return res.status(404).json({ error: 'Set not found or access denied' });
+  }
 
   return res.status(200).json(result[0]);
 }
 
 // Удалить набор
 async function deleteSet(req, res, sql) {
-  const { id } = req.query;
+  const { id, userId } = req.query;
 
   if (!id) {
     return res.status(400).json({ error: 'id is required' });
   }
 
-  await sql`DELETE FROM card_sets WHERE id = ${id}`;
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+
+  // Удаляем только если набор принадлежит пользователю
+  const result = await sql`DELETE FROM card_sets WHERE id = ${id} AND user_id = ${userId} RETURNING id`;
+
+  if (result.length === 0) {
+    return res.status(404).json({ error: 'Set not found or access denied' });
+  }
 
   return res.status(200).json({ success: true });
 }

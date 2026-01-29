@@ -2,13 +2,13 @@
  * App.tsx
  * @description Главный компонент приложения
  */
-import React, { useCallback, useEffect, useState } from 'react';
-import { View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Linking, Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AppNavigator } from '@/navigation';
 import { Loading } from '@/components/common';
-import { AuthService, DatabaseService, setupAutoSave } from '@/services';
+import { DatabaseService, setupAutoSave, supabase, NeonService } from '@/services';
 import { useThemeColors } from '@/store';
 import { WelcomeScreen } from '@/screens/WelcomeScreen';
 import { EmailAuthScreen } from '@/screens/EmailAuthScreen';
@@ -114,6 +114,7 @@ export default function App() {
   const [authChecked, setAuthChecked] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authStep, setAuthStep] = useState<'welcome' | 'email' | 'otp' | 'name' | 'goal' | 'daily' | 'signin'>('welcome');
+  const ensuredUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -121,13 +122,10 @@ export default function App() {
 
     const init = async () => {
       try {
-        await DatabaseService.loadAll();
-        unsubscribe = setupAutoSave();
-
-        // Временное отключение сохранения сессии: очищаем любые предыдущие токены
-        await AuthService.signOut();
-        if (isMounted) {
-          setIsAuthenticated(false);
+        const loaded = await DatabaseService.loadAll();
+        if (!isMounted) return;
+        if (loaded) {
+          unsubscribe = setupAutoSave();
         }
       } catch (error) {
         console.error('Failed to initialize app:', error);
@@ -147,6 +145,78 @@ export default function App() {
         unsubscribe();
       }
       DatabaseService.saveAll();
+    };
+  }, []);
+
+  // Keep isAuthenticated in sync with Supabase session state.
+  useEffect(() => {
+    let isMounted = true;
+
+    supabase.auth
+      .getSession()
+      .then(({ data, error }) => {
+        if (!isMounted) return;
+        if (error) {
+          console.error('Supabase session error:', error.message);
+        }
+        setIsAuthenticated(Boolean(data.session));
+        const user = data.session?.user;
+        if (user && ensuredUserIdRef.current !== user.id) {
+          ensuredUserIdRef.current = user.id;
+          NeonService.ensureUserExists({
+            id: user.id,
+            email: user.email,
+            displayName: (user.user_metadata as any)?.full_name,
+          });
+          DatabaseService.reloadRemoteDataForUser(user.id);
+        }
+      });
+
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) return;
+      setIsAuthenticated(Boolean(session));
+      if (session?.user && ensuredUserIdRef.current !== session.user.id) {
+        ensuredUserIdRef.current = session.user.id;
+        NeonService.ensureUserExists({
+          id: session.user.id,
+          email: session.user.email,
+          displayName: (session.user.user_metadata as any)?.full_name,
+        });
+        DatabaseService.reloadRemoteDataForUser(session.user.id);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      data.subscription.unsubscribe();
+    };
+  }, []);
+
+  /**
+   * Handle OAuth deep links from Supabase (PKCE flow).
+   * When the app is opened via flashly://auth-callback?code=..., exchange code for a session.
+   */
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      return;
+    }
+
+    const handleUrl = async (url: string) => {
+      const { error } = await supabase.auth.exchangeCodeForSession(url);
+      if (error) {
+        console.error('Supabase code exchange failed:', error.message);
+      }
+    };
+
+    const subscription = Linking.addEventListener('url', ({ url }) => handleUrl(url));
+
+    // Also handle the cold-start case when the app was opened from a deep link.
+    Linking.getInitialURL().then((url) => {
+      if (url) handleUrl(url);
+    });
+
+    return () => {
+      subscription.remove();
     };
   }, []);
 

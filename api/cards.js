@@ -43,10 +43,18 @@ export default async function handler(req, res) {
 
 // Получить карточки набора
 async function getCards(req, res, sql) {
-  const { setId, dueOnly } = req.query;
+  const { setId, userId, dueOnly } = req.query;
 
   if (!setId) {
     return res.status(400).json({ error: 'setId is required' });
+  }
+
+  // Проверяем, что набор принадлежит пользователю (если userId передан)
+  if (userId) {
+    const setCheck = await sql`SELECT id FROM card_sets WHERE id = ${setId} AND user_id = ${userId}`;
+    if (setCheck.length === 0) {
+      return res.status(404).json({ error: 'Set not found or access denied' });
+    }
   }
 
   let cards;
@@ -71,10 +79,18 @@ async function getCards(req, res, sql) {
 
 // Создать новую карточку
 async function createCard(req, res, sql) {
-  const { setId, front, back, example, imageUrl, audioUrl } = req.body;
+  const { setId, userId, front, back, example, imageUrl, audioUrl } = req.body;
 
   if (!setId || !front || !back) {
     return res.status(400).json({ error: 'setId, front, and back are required' });
+  }
+
+  // Проверяем, что набор принадлежит пользователю (если userId передан)
+  if (userId) {
+    const setCheck = await sql`SELECT id FROM card_sets WHERE id = ${setId} AND user_id = ${userId}`;
+    if (setCheck.length === 0) {
+      return res.status(404).json({ error: 'Set not found or access denied' });
+    }
   }
 
   const result = await sql`
@@ -96,7 +112,8 @@ async function createCard(req, res, sql) {
 // Обновить карточку (включая SRS данные)
 async function updateCard(req, res, sql) {
   const { 
-    id, 
+    id,
+    userId,
     front, 
     back, 
     example,
@@ -108,6 +125,18 @@ async function updateCard(req, res, sql) {
 
   if (!id) {
     return res.status(400).json({ error: 'id is required' });
+  }
+
+  // Проверяем, что карточка принадлежит набору пользователя (если userId передан)
+  if (userId) {
+    const cardCheck = await sql`
+      SELECT c.id FROM cards c
+      INNER JOIN card_sets s ON c.set_id = s.id
+      WHERE c.id = ${id} AND s.user_id = ${userId}
+    `;
+    if (cardCheck.length === 0) {
+      return res.status(404).json({ error: 'Card not found or access denied' });
+    }
   }
 
   const result = await sql`
@@ -129,10 +158,18 @@ async function updateCard(req, res, sql) {
 
 // Удалить карточку
 async function deleteCard(req, res, sql) {
-  const { id, setId } = req.query;
+  const { id, setId, userId } = req.query;
 
   if (!id || !setId) {
     return res.status(400).json({ error: 'id and setId are required' });
+  }
+
+  // Проверяем, что набор принадлежит пользователю (если userId передан)
+  if (userId) {
+    const setCheck = await sql`SELECT id FROM card_sets WHERE id = ${setId} AND user_id = ${userId}`;
+    if (setCheck.length === 0) {
+      return res.status(404).json({ error: 'Set not found or access denied' });
+    }
   }
 
   await sql`DELETE FROM cards WHERE id = ${id}`;

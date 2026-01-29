@@ -178,7 +178,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
           isPublic,
         });
       } else {
-        const newSet = addSet({
+        const newSet = await addSet({
           title: title.trim(),
           description: description.trim() || undefined,
           category,

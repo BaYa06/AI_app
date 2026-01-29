@@ -1,8 +1,8 @@
 /**
  * SignInScreen
- * @description Экран входа по email с отправкой кода. UI only.
+ * @description Экран входа: только Google OAuth (без email/кода).
  */
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -15,6 +15,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Button, Input, Text } from '@/components/common';
 import { spacing, borderRadius } from '@/constants';
 import { useThemeColors } from '@/store';
+import { SUPABASE_OAUTH_REDIRECT, supabase } from '@/services/supabaseClient';
 
 type Props = {
   onBack?: () => void;
@@ -24,7 +25,22 @@ type Props = {
 
 export function SignInScreen({ onBack, onSendCode, onCreateAccount }: Props) {
   const colors = useThemeColors();
-  const [email, setEmail] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const signInWithGoogle = useCallback(async () => {
+    setError(null);
+    setIsLoading(true);
+    const { error: authError } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: SUPABASE_OAUTH_REDIRECT },
+    });
+    if (authError) {
+      setError(authError.message);
+      setIsLoading(false);
+    }
+    // успешный поток завершится на редиректе, состояние сбросится после onAuthStateChange
+  }, []);
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
@@ -61,34 +77,19 @@ export function SignInScreen({ onBack, onSendCode, onCreateAccount }: Props) {
               </Text>
             </View>
 
-            <Input
-              label="Email"
-              placeholder="you@example.com"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
-              value={email}
-              onChangeText={setEmail}
-              containerStyle={styles.inputContainer}
-              inputStyle={styles.input}
-            />
-
             <View style={styles.ctaBlock}>
               <Button
-                title="Отправить код"
-                onPress={() => onSendCode?.(email)}
-                fullWidth
-              />
-              <Button
                 title="Войти через Google"
-                variant="outline"
-                onPress={() => {}}
+                onPress={signInWithGoogle}
                 fullWidth
-                leftIcon={<Ionicons name="logo-google" size={18} color={colors.primary} />}
+                disabled={isLoading}
+                leftIcon={<Ionicons name="logo-google" size={18} color={colors.primaryLight} />}
               />
-              <Text variant="caption" color="tertiary" align="center" style={styles.hint}>
-                Мы отправим 5-значный код на ваш email
-              </Text>
+              {error && (
+                <Text variant="bodySmall" color="error" align="center">
+                  {error}
+                </Text>
+              )}
             </View>
           </ScrollView>
 

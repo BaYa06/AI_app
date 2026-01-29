@@ -28,6 +28,12 @@ const getConnectionString = () => {
 
 const DEFAULT_USER_ID = process.env.POSTGRES_DEFAULT_USER_ID || '00000000-0000-0000-0000-000000000001';
 
+type EnsureUserArgs = {
+  id: string;
+  email?: string | null;
+  displayName?: string | null;
+};
+
 /**
  * Определяет статус карточки на основе learningStep
  */
@@ -44,13 +50,43 @@ export const NeonService = {
   },
 
   /**
+   * Гарантировать наличие пользователя в таблице users (идемпотентно).
+   */
+  async ensureUserExists(user: EnsureUserArgs): Promise<void> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) {
+        console.warn('POSTGRES_URL не настроен, пропускаем ensureUserExists');
+        return;
+      }
+      const sql = neon(connectionString);
+      const displayName =
+        user.displayName ||
+        (user.email ? user.email.split('@')[0] : null);
+
+      await sql`
+        INSERT INTO users (id, email, display_name, is_anonymous)
+        VALUES (${user.id}::uuid, ${user.email}, ${displayName}, false)
+        ON CONFLICT (id) DO NOTHING;
+      `;
+    } catch (error) {
+      console.error('Failed to ensure user exists:', error);
+    }
+  },
+
+  /**
    * Загрузить все наборы карточек
    */
-  async loadSets(): Promise<CardSet[]> {
+  async loadSets(userId?: string): Promise<CardSet[]> {
     try {
       const connectionString = getConnectionString();
       if (!connectionString) {
         console.warn('POSTGRES_URL не настроен');
+        return [];
+      }
+
+      if (!userId) {
+        console.warn('userId не передан, пропускаем загрузку наборов');
         return [];
       }
 
@@ -72,7 +108,7 @@ export const NeonService = {
           mastered_cards,
           studying_cards
         FROM card_sets
-        WHERE is_public = true
+        WHERE user_id = ${userId}
         ORDER BY created_at DESC
       `;
 
@@ -161,7 +197,7 @@ export const NeonService = {
   /**
    * Загрузить все карточки
    */
-  async loadAllCards(): Promise<Card[]> {
+  async loadAllCards(userId?: string): Promise<Card[]> {
     try {
       const connectionString = getConnectionString();
       if (!connectionString) {
@@ -169,24 +205,31 @@ export const NeonService = {
         return [];
       }
 
+      if (!userId) {
+        console.warn('userId не передан, пропускаем загрузку карточек');
+        return [];
+      }
+
       const sql = neon(connectionString);
       
       const cards = await sql`
         SELECT 
-          id,
-          set_id,
-          front,
-          back,
-          example,
-          image_url,
-          audio_url,
-          created_at,
-          learning_step,
-          next_review,
-          last_reviewed,
-          status
-        FROM cards
-        ORDER BY created_at ASC
+          c.id,
+          c.set_id,
+          c.front,
+          c.back,
+          c.example,
+          c.image_url,
+          c.audio_url,
+          c.created_at,
+          c.learning_step,
+          c.next_review,
+          c.last_reviewed,
+          c.status
+        FROM cards c
+        INNER JOIN card_sets s ON c.set_id = s.id
+        WHERE s.user_id = ${userId}
+        ORDER BY c.created_at ASC
       `;
 
       return cards.map(card => ({

@@ -2,12 +2,13 @@
  * Profile Screen
  * @description Экран профиля и настроек
  */
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, StyleSheet, ScrollView, Pressable, Alert, Switch } from 'react-native';
 import { useSettingsStore, useThemeColors } from '@/store';
-import { DatabaseService } from '@/services';
+import { DatabaseService, supabase } from '@/services';
 import { Container, Text, Heading2, Heading3 } from '@/components/common';
 import { spacing, borderRadius } from '@/constants';
+import type { Session } from '@supabase/supabase-js';
 
 export function ProfileScreen() {
   const colors = useThemeColors();
@@ -15,6 +16,34 @@ export function ProfileScreen() {
   const themeMode = useSettingsStore((s) => s.themeMode);
   const updateSettings = useSettingsStore((s) => s.updateSettings);
   const toggleTheme = useSettingsStore((s) => s.toggleTheme);
+  const [session, setSession] = useState<Session | null>(null);
+
+  // Подтягиваем актуальную сессию Supabase
+  useEffect(() => {
+    let isMounted = true;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!isMounted) return;
+      setSession(data.session ?? null);
+    });
+
+    const { data } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      if (!isMounted) return;
+      setSession(newSession);
+    });
+
+    return () => {
+      isMounted = false;
+      data.subscription.unsubscribe();
+    };
+  }, []);
+
+  const userEmail = session?.user?.email;
+  const userId = session?.user?.id;
+  const avatarLetter = useMemo(
+    () => (userEmail ? userEmail[0].toUpperCase() : '👤'),
+    [userEmail]
+  );
 
   // Переключение темной темы
   const handleToggleDarkMode = useCallback(() => {
@@ -78,19 +107,39 @@ export function ProfileScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         <Heading2 style={styles.title}>Профиль</Heading2>
 
-        {/* Аккаунт (заглушка) */}
+        {/* Аккаунт */}
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <View style={styles.userSection}>
             <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-              <Text style={styles.avatarText}>👤</Text>
+              <Text style={styles.avatarText}>{avatarLetter}</Text>
             </View>
             <View style={styles.userInfo}>
-              <Text variant="h3">Гость</Text>
-              <Text variant="bodySmall" color="secondary">
-                Войдите для синхронизации
+              <Text variant="h3">
+                {userEmail ? userEmail.split('@')[0] : 'Гость'}
               </Text>
+              <Text variant="bodySmall" color="secondary">
+                {userEmail ?? 'Войдите через Google, чтобы синхронизировать прогресс'}
+              </Text>
+              {userId && (
+                <Text variant="caption" color="tertiary" style={{ marginTop: spacing.xs }}>
+                  ID: {userId}
+                </Text>
+              )}
             </View>
           </View>
+          {session && (
+            <Pressable
+              style={({ pressed }) => [
+                styles.signOut,
+                { borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
+              ]}
+              onPress={() => supabase.auth.signOut()}
+            >
+              <Text variant="body" style={{ color: colors.error }}>
+                Выйти
+              </Text>
+            </Pressable>
+          )}
         </View>
 
         {/* Настройки изучения */}

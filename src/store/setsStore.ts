@@ -7,7 +7,7 @@ import { immer } from 'zustand/middleware/immer';
 import { v4 as uuid } from 'uuid';
 import type { CardSet, CreateSetInput, UpdateSetInput } from '@/types';
 import { NeonService } from '@/services/NeonService';
-import { DatabaseService } from '@/services';
+import { DatabaseService, supabase } from '@/services';
 
 interface SetsState {
   // Данные - объект для O(1) доступа
@@ -21,7 +21,7 @@ interface SetsState {
 
 interface SetsActions {
   // CRUD
-  addSet: (input: CreateSetInput) => CardSet;
+  addSet: (input: CreateSetInput) => Promise<CardSet>;
   updateSet: (setId: string, input: UpdateSetInput) => void;
   deleteSet: (setId: string) => void;
   
@@ -61,11 +61,15 @@ export const useSetsStore = create<SetsState & SetsActions>()(
 
     // ==================== CRUD ====================
     
-    addSet: (input) => {
+    addSet: async (input) => {
       const now = Date.now();
+      const currentUserId = NeonService.isEnabled()
+        ? (await supabase.auth.getSession()).data.session?.user?.id || REMOTE_USER_ID
+        : LOCAL_USER_ID;
+
       const newSet: CardSet = {
         id: uuid(),
-        userId: NeonService.isEnabled() ? REMOTE_USER_ID : LOCAL_USER_ID,
+        userId: currentUserId,
         title: input.title,
         description: input.description,
         category: input.category || 'general',

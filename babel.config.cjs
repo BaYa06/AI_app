@@ -5,6 +5,16 @@ module.exports = {
     ['@babel/plugin-transform-private-methods', { loose: true }],
     ['@babel/plugin-transform-private-property-in-object', { loose: true }],
     [
+      'babel-plugin-transform-inline-environment-variables',
+      {
+        include: [
+          'SUPABASE_URL',
+          'SUPABASE_ANON_KEY',
+          'SUPABASE_REDIRECT_URI',
+        ],
+      },
+    ],
+    [
       'module-resolver',
       {
         root: ['./src'],

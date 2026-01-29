@@ -4,6 +4,7 @@
  */
 import { StorageService, STORAGE_KEYS } from './StorageService';
 import { NeonService } from './NeonService';
+import { supabase } from './supabaseClient';
 import { useCardsStore } from '@/store/cardsStore';
 import { useSetsStore } from '@/store/setsStore';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -32,12 +33,16 @@ export const DatabaseService = {
    */
   async loadAll(): Promise<boolean> {
     try {
+      // Определяем текущего авторизованного пользователя (если есть)
+      const { data: sessionData } = await supabase.auth.getSession();
+      const currentUserId = sessionData.session?.user?.id;
+
       console.log('🔄 Загрузка данных из Neon PostgreSQL...');
       
       // Пытаемся загрузить данные из Neon
       const [sets, allCards] = await Promise.all([
-        NeonService.loadSets(),
-        NeonService.loadAllCards(),
+        NeonService.loadSets(currentUserId),
+        NeonService.loadAllCards(currentUserId),
       ]);
 
       console.log(`📚 Загружено наборов: ${sets.length}`);
@@ -59,11 +64,14 @@ export const DatabaseService = {
       }>(STORAGE_KEYS.SETS);
 
       if (localSetsData) {
-        // Добавляем локальные наборы, которых нет в Neon
+        // Добавляем локальные наборы, которых нет в Neon (только для текущего пользователя или локальные)
         Object.entries(localSetsData.sets || {}).forEach(([id, set]) => {
           if (!setsMap[id]) {
-            setsMap[id] = set;
-            setsOrder.push(id);
+            // Фильтруем по userId: показываем только свои наборы или локальные (userId === 'local')
+            if (!currentUserId || set.userId === currentUserId || set.userId === 'local') {
+              setsMap[id] = set;
+              setsOrder.push(id);
+            }
           }
         });
       }
@@ -96,15 +104,19 @@ export const DatabaseService = {
       }>(STORAGE_KEYS.CARDS);
 
       if (localCardsData) {
-        // Добавляем локальные карточки, которых нет в Neon
+        // Добавляем локальные карточки, которых нет в Neon (только для наборов текущего пользователя)
         Object.entries(localCardsData.cards || {}).forEach(([id, card]) => {
           if (!cardsMap[id]) {
-            cardsMap[id] = card;
-            
-            if (!cardsBySet[card.setId]) {
-              cardsBySet[card.setId] = [];
+            // Добавляем карточку только если её набор принадлежит текущему пользователю
+            const cardSet = setsMap[card.setId];
+            if (cardSet && (!currentUserId || cardSet.userId === currentUserId || cardSet.userId === 'local')) {
+              cardsMap[id] = card;
+              
+              if (!cardsBySet[card.setId]) {
+                cardsBySet[card.setId] = [];
+              }
+              cardsBySet[card.setId].push(card.id);
             }
-            cardsBySet[card.setId].push(card.id);
           }
         });
       }
@@ -127,6 +139,17 @@ export const DatabaseService = {
       console.error('❌ Failed to load data:', error);
       return false;
     }
+  },
+
+  /**
+   * Перегрузить удалённые данные для указанного пользователя:
+   * очищает карточки/наборы в store и грузит только его данные.
+   */
+  async reloadRemoteDataForUser(userId: string | undefined): Promise<void> {
+    useCardsStore.getState().clearCards();
+    useSetsStore.getState().clearSets();
+
+    await DatabaseService.loadAll();
   },
 
   /**
