@@ -16,7 +16,7 @@ import {
   Dimensions,
   Platform,
 } from 'react-native';
-import { useSetsStore, useCardsStore, useThemeColors, useSettingsStore } from '@/store';
+import { useSetsStore, useCardsStore, useThemeColors, useSettingsStore, useCoursesStore } from '@/store';
 import { Text } from '@/components/common';
 import { spacing, borderRadius } from '@/constants';
 import type { RootStackScreenProps } from '@/types/navigation';
@@ -40,13 +40,14 @@ const TARGET_LANGUAGES = ['Русский (RU)'];
 const DESCRIPTION_LIMIT = 200;
 
 export function SetEditorScreen({ navigation, route }: Props) {
-  const { setId } = route.params || {};
+  const { setId, autoFocusTitle } = route.params || {};
   const colors = useThemeColors();
   const theme = useSettingsStore((s) => s.resolvedTheme);
   const isEditing = !!setId;
   const screenHeight = Dimensions.get('window').height;
   const hiddenOffset = Math.min(screenHeight, 720);
   const sheetTranslate = useRef(new Animated.Value(hiddenOffset)).current;
+  const titleInputRef = useRef<TextInput>(null);
 
   // Store
   const getSet = useSetsStore((s) => s.getSet);
@@ -54,17 +55,22 @@ export function SetEditorScreen({ navigation, route }: Props) {
   const updateSet = useSetsStore((s) => s.updateSet);
   const deleteSet = useSetsStore((s) => s.deleteSet);
   const deleteCardsBySet = useCardsStore((s) => s.deleteCardsBySet);
+  
+  // Courses store - для назначения courseId при создании набора
+  const activeCourseId = useCoursesStore((s) => s.activeCourseId);
+  const courses = useCoursesStore((s) => s.courses);
 
   // Состояние формы
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<SetCategory>('general');
+  const [courseId, setCourseId] = useState<string | null>(activeCourseId ?? null);
   const [isPublic, setIsPublic] = useState(false);
   const [sourceLanguage, setSourceLanguage] = useState(SOURCE_LANGUAGES[0]);
   const [targetLanguage, setTargetLanguage] = useState(TARGET_LANGUAGES[0]);
   const [sourcePickerOpen, setSourcePickerOpen] = useState(false);
   const [targetPickerOpen, setTargetPickerOpen] = useState(false);
-  const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
+  const [coursePickerOpen, setCoursePickerOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
   const [titleFocused, setTitleFocused] = useState(false);
@@ -78,23 +84,39 @@ export function SetEditorScreen({ navigation, route }: Props) {
         setTitle(set.title);
         setDescription(set.description || '');
         setCategory(set.category);
+        setCourseId(set.courseId ?? null);
         // Публичные наборы временно недоступны
         setIsPublic(false);
       }
     }
   }, [setId, getSet]);
 
+  // Автофокус на названии при открытии по запросу
+  useEffect(() => {
+    if (autoFocusTitle) {
+      const timer = setTimeout(() => {
+        titleInputRef.current?.focus();
+      }, 220);
+      return () => clearTimeout(timer);
+    }
+  }, [autoFocusTitle]);
+
   const categoryOption = useMemo(
     () => CATEGORY_OPTIONS.find((c) => c.value === category),
     [category]
   );
 
+  const selectedCourseTitle = useMemo(() => {
+    if (!courseId) return 'Без курса';
+    return courses.find((c) => c.id === courseId)?.title || 'Без курса';
+  }, [courseId, courses]);
+
   const isFormValid = !!title.trim();
   const titleError = showValidation && !title.trim();
   const isSaveDisabled = !isFormValid || isSaving;
 
-  const cycleCategory = useCallback(() => {
-    setCategoryPickerOpen((open) => !open);
+  const toggleCoursePicker = useCallback(() => {
+    setCoursePickerOpen((open) => !open);
     setSourcePickerOpen(false);
     setTargetPickerOpen(false);
   }, []);
@@ -102,13 +124,13 @@ export function SetEditorScreen({ navigation, route }: Props) {
   const toggleSourcePicker = useCallback(() => {
     setSourcePickerOpen((open) => !open);
     setTargetPickerOpen(false);
-    setCategoryPickerOpen(false);
+    setCoursePickerOpen(false);
   }, []);
 
   const toggleTargetPicker = useCallback(() => {
     setTargetPickerOpen((open) => !open);
     setSourcePickerOpen(false);
-    setCategoryPickerOpen(false);
+    setCoursePickerOpen(false);
   }, []);
 
   const handleSelectSourceLanguage = useCallback((lang: string) => {
@@ -176,14 +198,17 @@ export function SetEditorScreen({ navigation, route }: Props) {
           category,
           icon: categoryData?.icon,
           isPublic,
+          courseId,
         });
       } else {
+        // Создаем набор с courseId из активного курса
         const newSet = await addSet({
           title: title.trim(),
           description: description.trim() || undefined,
           category,
           icon: categoryData?.icon,
           isPublic,
+          courseId, // выбранный курс (может быть null)
         });
         
         // Переход к новому набору
@@ -197,7 +222,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
     } finally {
       setIsSaving(false);
     }
-  }, [title, description, category, isPublic, isEditing, setId, updateSet, addSet, navigation, closeSheet]);
+  }, [title, description, category, isPublic, isEditing, setId, updateSet, addSet, navigation, closeSheet, activeCourseId]);
 
   // Удаление
   const handleDelete = useCallback(() => {
@@ -298,6 +323,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
                 ]}
               >
                 <TextInput
+                  ref={titleInputRef}
                   value={title}
                   onChangeText={setTitle}
                   placeholder="Например: Путешествия (A1)"
@@ -404,24 +430,24 @@ export function SetEditorScreen({ navigation, route }: Props) {
               </Text>
             </View>
 
-            {/* Категория */}
+            {/* Курс */}
             <View style={styles.field}>
               <Text variant="label" color="primary" style={styles.fieldLabel}>
-                Категория
+                Курс
               </Text>
               <SelectPill
-                label={categoryOption?.label || 'Другое'}
-                onPress={cycleCategory}
-                isOpen={categoryPickerOpen}
+                label={selectedCourseTitle}
+                onPress={toggleCoursePicker}
+                isOpen={coursePickerOpen}
                 colors={colors}
               />
-              {categoryPickerOpen && (
-                <CategoryDropdown
-                  options={CATEGORY_OPTIONS}
-                  selected={category}
+              {coursePickerOpen && (
+                <CourseDropdown
+                  courses={courses}
+                  selectedCourseId={courseId}
                   onSelect={(value) => {
-                    setCategory(value);
-                    setCategoryPickerOpen(false);
+                    setCourseId(value);
+                    setCoursePickerOpen(false);
                     setSourcePickerOpen(false);
                     setTargetPickerOpen(false);
                   }}
@@ -677,6 +703,57 @@ function CategoryDropdown({
               }}
             >
               {`${option.icon} ${option.label}`}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function CourseDropdown({
+  courses,
+  selectedCourseId,
+  onSelect,
+  colors,
+}: {
+  courses: Array<{ id: string; title: string }>;
+  selectedCourseId: string | null;
+  onSelect: (value: string | null) => void;
+  colors: ReturnType<typeof useThemeColors>;
+}) {
+  const items = [{ id: null, title: 'Без курса' }, ...courses];
+
+  return (
+    <View
+      style={[
+        styles.dropdown,
+        {
+          backgroundColor: colors.surface,
+          borderColor: colors.border,
+          shadowColor: colors.shadow,
+        },
+      ]}
+    >
+      {items.map((course) => {
+        const isActive = course.id === selectedCourseId;
+        return (
+          <Pressable
+            key={course.id ?? 'none'}
+            onPress={() => onSelect(course.id)}
+            style={[
+              styles.dropdownOption,
+              isActive && { backgroundColor: colors.surfaceVariant },
+            ]}
+          >
+            <Text
+              variant="body"
+              style={{
+                color: isActive ? colors.primary : colors.textPrimary,
+                fontWeight: isActive ? '700' : '600',
+              }}
+            >
+              {course.title}
             </Text>
           </Pressable>
         );

@@ -4,7 +4,7 @@
  */
 
 import { neon } from '@neondatabase/serverless';
-import type { Card, CardSet, CardStatus, UpdateCardInput } from '@/types';
+import type { Card, CardSet, CardStatus, UpdateCardInput, Course } from '@/types';
 
 // Используем переменную окружения для подключения
 const getConnectionString = () => {
@@ -96,6 +96,7 @@ export const NeonService = {
         SELECT 
           id,
           user_id,
+          course_id,
           title,
           description,
           category,
@@ -115,6 +116,7 @@ export const NeonService = {
       return sets.map(set => ({
         id: set.id,
         userId: set.user_id,
+        courseId: set.course_id || null,
         title: set.title,
         description: set.description || '',
         category: set.category || 'Общие',
@@ -331,6 +333,7 @@ export const NeonService = {
   async createSet(payload: {
     id: string;
     userId?: string;
+    courseId?: string | null;
     title: string;
     description?: string;
     category?: string;
@@ -354,6 +357,7 @@ export const NeonService = {
         INSERT INTO card_sets (
           id,
           user_id,
+          course_id,
           title,
           description,
           category,
@@ -368,6 +372,7 @@ export const NeonService = {
         ) VALUES (
           ${payload.id},
           ${payload.userId || DEFAULT_USER_ID},
+          ${payload.courseId ?? null},
           ${payload.title},
           ${payload.description || null},
           ${payload.category || 'custom'},
@@ -559,6 +564,438 @@ export const NeonService = {
     } catch (error) {
       console.error('Failed to delete card from Neon:', error);
       return false;
+    }
+  },
+
+  // ==============================================
+  // COURSES API
+  // ==============================================
+
+  /**
+   * Загрузить все курсы пользователя
+   */
+  async loadCourses(userId?: string): Promise<Array<{
+    id: string;
+    title: string;
+    createdAt: number;
+    updatedAt?: number;
+  }>> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString || !userId) {
+        return [];
+      }
+
+      const sql = neon(connectionString);
+      
+      const courses = await sql`
+        SELECT 
+          id,
+          title,
+          created_at,
+          updated_at
+        FROM courses
+        WHERE user_id = ${userId}
+        ORDER BY created_at ASC
+      `;
+
+      return courses.map(course => ({
+        id: course.id,
+        title: course.title,
+        createdAt: new Date(course.created_at).getTime(),
+        updatedAt: course.updated_at ? new Date(course.updated_at).getTime() : undefined,
+      }));
+    } catch (error) {
+      console.error('Failed to load courses:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Создать курс
+   */
+  async createCourse(course: {
+    id: string;
+    userId: string;
+    title: string;
+    createdAt: number;
+  }): Promise<boolean> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) {
+        return false;
+      }
+
+      const sql = neon(connectionString);
+      
+      await sql`
+        INSERT INTO courses (id, user_id, title, created_at, updated_at)
+        VALUES (
+          ${course.id}::uuid,
+          ${course.userId}::uuid,
+          ${course.title},
+          ${new Date(course.createdAt).toISOString()},
+          ${new Date(course.createdAt).toISOString()}
+        )
+      `;
+
+      console.log('✅ Курс создан в Neon:', course.title);
+      return true;
+    } catch (error) {
+      console.error('Failed to create course in Neon:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Переименовать курс
+   */
+  async renameCourse(courseId: string, title: string): Promise<boolean> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) {
+        return false;
+      }
+
+      const sql = neon(connectionString);
+      
+      await sql`
+        UPDATE courses
+        SET title = ${title}, updated_at = NOW()
+        WHERE id = ${courseId}
+      `;
+
+      console.log('✅ Курс переименован в Neon:', title);
+      return true;
+    } catch (error) {
+      console.error('Failed to rename course in Neon:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Удалить курс
+   */
+  async deleteCourse(courseId: string): Promise<boolean> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) {
+        return false;
+      }
+
+      const sql = neon(connectionString);
+      
+      // При удалении курса, наборы автоматически получат course_id = NULL
+      // благодаря ON DELETE SET NULL в миграции
+      await sql`DELETE FROM courses WHERE id = ${courseId}`;
+
+      console.log('✅ Курс удален из Neon:', courseId);
+      return true;
+    } catch (error) {
+      console.error('Failed to delete course from Neon:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Обновить course_id у набора
+   */
+  async updateSetCourse(setId: string, courseId: string | null): Promise<boolean> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) {
+        return false;
+      }
+
+      const sql = neon(connectionString);
+      
+      // Используем разные запросы для null и не-null значений
+      if (courseId) {
+        await sql`
+          UPDATE card_sets
+          SET course_id = ${courseId}::uuid, updated_at = NOW()
+          WHERE id = ${setId}::uuid
+        `;
+      } else {
+        await sql`
+          UPDATE card_sets
+          SET course_id = NULL, updated_at = NOW()
+          WHERE id = ${setId}::uuid
+        `;
+      }
+
+      console.log('✅ SQL UPDATE выполнен для card_sets:', { setId, courseId });
+      return true;
+    } catch (error) {
+      console.error('Failed to update set course in Neon:', error);
+      return false;
+    }
+  },
+
+  // ==================== STREAK SYSTEM ====================
+
+  /**
+   * Upsert запись в daily_activity
+   */
+  async upsertDailyActivity(
+    userId: string,
+    localDate: string,
+    deltas: { wordsDelta: number; minutesDelta: number; cardsDelta: number }
+  ): Promise<boolean> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) {
+        return false;
+      }
+
+      const sql = neon(connectionString);
+      
+      // Используем INSERT ... ON CONFLICT для атомарного upsert
+      await sql`
+        INSERT INTO daily_activity (user_id, local_date, words_learned, minutes_learned, cards_studied)
+        VALUES (
+          ${userId}::uuid,
+          ${localDate}::date,
+          ${deltas.wordsDelta},
+          ${deltas.minutesDelta},
+          ${deltas.cardsDelta}
+        )
+        ON CONFLICT (user_id, local_date) DO UPDATE SET
+          words_learned = daily_activity.words_learned + ${deltas.wordsDelta},
+          minutes_learned = daily_activity.minutes_learned + ${deltas.minutesDelta},
+          cards_studied = daily_activity.cards_studied + ${deltas.cardsDelta},
+          updated_at = NOW()
+      `;
+
+      console.log('✅ Streak: daily_activity upserted', { userId, localDate, deltas });
+      return true;
+    } catch (error) {
+      console.error('Failed to upsert daily_activity in Neon:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Обновить user_stats с расчётом стрика
+   */
+  async updateUserStatsStreak(
+    userId: string,
+    localDate: string,
+    yesterdayDate: string,
+    deltas: { wordsDelta: number; minutesDelta: number; cardsDelta: number }
+  ): Promise<boolean> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) {
+        return false;
+      }
+
+      const sql = neon(connectionString);
+
+      // Получаем текущую статистику пользователя
+      const existing = await sql`
+        SELECT current_streak, longest_streak, last_active_date
+        FROM user_stats
+        WHERE user_id = ${userId}::uuid
+      `;
+
+      let currentStreak = 0;
+      let longestStreak = 0;
+      let lastActiveDate: string | null = null;
+
+      if (existing.length > 0) {
+        currentStreak = existing[0].current_streak || 0;
+        longestStreak = existing[0].longest_streak || 0;
+        // Конвертируем last_active_date из DB (может быть Date или string) в YYYY-MM-DD
+        const rawDate = existing[0].last_active_date;
+        if (rawDate instanceof Date) {
+          lastActiveDate = rawDate.toISOString().split('T')[0];
+        } else if (rawDate) {
+          // Может быть строка типа '2026-02-07T00:00:00.000Z' или '2026-02-07'
+          lastActiveDate = String(rawDate).split('T')[0];
+        }
+      }
+
+      console.log('🔍 Streak calc:', { lastActiveDate, localDate, yesterdayDate, currentStreak });
+
+      // Рассчитываем новый стрик
+      if (lastActiveDate === localDate) {
+        // Уже записали сегодня - стрик не меняется
+        console.log('ℹ️ Streak: уже записано сегодня, стрик не меняется');
+      } else if (lastActiveDate === yesterdayDate) {
+        // Учились вчера - продолжаем серию
+        currentStreak += 1;
+        console.log('✅ Streak: продолжаем серию', { currentStreak });
+      } else {
+        // Пропустили день(и) - начинаем заново
+        currentStreak = 1;
+        console.log('🔄 Streak: начинаем серию заново', { currentStreak });
+      }
+
+      // Обновляем longest_streak если нужно
+      if (currentStreak > longestStreak) {
+        longestStreak = currentStreak;
+      }
+
+      // Upsert user_stats
+      await sql`
+        INSERT INTO user_stats (user_id, current_streak, longest_streak, last_active_date, total_words_learned, total_minutes_learned, total_cards_studied)
+        VALUES (
+          ${userId}::uuid,
+          ${currentStreak},
+          ${longestStreak},
+          ${localDate}::date,
+          ${deltas.wordsDelta},
+          ${deltas.minutesDelta},
+          ${deltas.cardsDelta}
+        )
+        ON CONFLICT (user_id) DO UPDATE SET
+          current_streak = ${currentStreak},
+          longest_streak = ${longestStreak},
+          last_active_date = ${localDate}::date,
+          total_words_learned = user_stats.total_words_learned + ${deltas.wordsDelta},
+          total_minutes_learned = user_stats.total_minutes_learned + ${deltas.minutesDelta},
+          total_cards_studied = user_stats.total_cards_studied + ${deltas.cardsDelta},
+          updated_at = NOW()
+      `;
+
+      console.log('✅ Streak: user_stats updated', { userId, currentStreak, longestStreak, localDate });
+      return true;
+    } catch (error) {
+      console.error('Failed to update user_stats in Neon:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Получить активность за последние N дней
+   */
+  async getWeekActivity(userId: string, days: number = 7): Promise<{
+    local_date: string;
+    words_learned: number;
+    minutes_learned: number;
+    cards_studied: number;
+  }[]> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) {
+        return [];
+      }
+
+      const sql = neon(connectionString);
+
+      const result = await sql`
+        SELECT local_date, words_learned, minutes_learned, cards_studied
+        FROM daily_activity
+        WHERE user_id = ${userId}::uuid
+          AND local_date >= CURRENT_DATE - ${days}::int
+        ORDER BY local_date DESC
+      `;
+
+      return result.map((row: any) => ({
+        local_date: row.local_date instanceof Date 
+          ? row.local_date.toISOString().split('T')[0]
+          : String(row.local_date),
+        words_learned: row.words_learned || 0,
+        minutes_learned: row.minutes_learned || 0,
+        cards_studied: row.cards_studied || 0,
+      }));
+    } catch (error) {
+      console.error('Failed to get week activity from Neon:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Получить статистику пользователя
+   */
+  async getUserStats(userId: string): Promise<{
+    current_streak: number;
+    longest_streak: number;
+    last_active_date: string | null;
+    timezone: string;
+    total_words_learned: number;
+    total_minutes_learned: number;
+    total_cards_studied: number;
+  } | null> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) {
+        return null;
+      }
+
+      const sql = neon(connectionString);
+
+      const result = await sql`
+        SELECT current_streak, longest_streak, last_active_date, timezone,
+               total_words_learned, total_minutes_learned, total_cards_studied
+        FROM user_stats
+        WHERE user_id = ${userId}::uuid
+      `;
+
+      if (result.length === 0) {
+        return null;
+      }
+
+      const row = result[0];
+      return {
+        current_streak: row.current_streak || 0,
+        longest_streak: row.longest_streak || 0,
+        last_active_date: row.last_active_date 
+          ? (row.last_active_date instanceof Date 
+              ? row.last_active_date.toISOString().split('T')[0]
+              : String(row.last_active_date))
+          : null,
+        timezone: row.timezone || 'Asia/Bishkek',
+        total_words_learned: row.total_words_learned || 0,
+        total_minutes_learned: row.total_minutes_learned || 0,
+        total_cards_studied: row.total_cards_studied || 0,
+      };
+    } catch (error) {
+      console.error('Failed to get user stats from Neon:', error);
+      return null;
+    }
+  },
+
+  /**
+   * Получить активность за конкретную дату
+   */
+  async getDailyActivity(userId: string, localDate: string): Promise<{
+    local_date: string;
+    words_learned: number;
+    minutes_learned: number;
+    cards_studied: number;
+  } | null> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) {
+        return null;
+      }
+
+      const sql = neon(connectionString);
+
+      const result = await sql`
+        SELECT local_date, words_learned, minutes_learned, cards_studied
+        FROM daily_activity
+        WHERE user_id = ${userId}::uuid AND local_date = ${localDate}::date
+      `;
+
+      if (result.length === 0) {
+        return null;
+      }
+
+      const row = result[0];
+      return {
+        local_date: row.local_date instanceof Date 
+          ? row.local_date.toISOString().split('T')[0]
+          : String(row.local_date),
+        words_learned: row.words_learned || 0,
+        minutes_learned: row.minutes_learned || 0,
+        cards_studied: row.cards_studied || 0,
+      };
+    } catch (error) {
+      console.error('Failed to get daily activity from Neon:', error);
+      return null;
     }
   },
 };

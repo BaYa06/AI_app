@@ -7,7 +7,8 @@ import { immer } from 'zustand/middleware/immer';
 import { v4 as uuid } from 'uuid';
 import type { CardSet, CreateSetInput, UpdateSetInput } from '@/types';
 import { NeonService } from '@/services/NeonService';
-import { DatabaseService, supabase } from '@/services';
+import { DatabaseService } from '@/services/DatabaseService';
+import { supabase } from '@/services/supabaseClient';
 
 interface SetsState {
   // Данные - объект для O(1) доступа
@@ -30,6 +31,10 @@ interface SetsActions {
   archiveSet: (setId: string) => void;
   unarchiveSet: (setId: string) => void;
   updateLastStudied: (setId: string) => void;
+  
+  // Курсы
+  moveSetsFromCourse: (courseId: string) => void; // Перемещает наборы из курса в "All"
+  getSetsByCourse: (courseId: string | null) => CardSet[]; // Получить наборы по курсу
   
   // Обновление статистики набора
   updateSetStats: (setId: string, stats: Partial<Pick<CardSet, 'cardCount' | 'newCount' | 'learningCount' | 'reviewCount' | 'masteredCount'>>) => void;
@@ -70,6 +75,7 @@ export const useSetsStore = create<SetsState & SetsActions>()(
       const newSet: CardSet = {
         id: uuid(),
         userId: currentUserId,
+        courseId: input.courseId ?? null, // ID курса (null = глобальный)
         title: input.title,
         description: input.description,
         category: input.category || 'general',
@@ -107,6 +113,7 @@ export const useSetsStore = create<SetsState & SetsActions>()(
           const ok = await NeonService.createSet({
             id: newSet.id,
             userId: newSet.userId,
+            courseId: newSet.courseId,
             title: newSet.title,
             description: newSet.description,
             category: newSet.category,
@@ -134,6 +141,23 @@ export const useSetsStore = create<SetsState & SetsActions>()(
           Object.assign(cardSet, input, { updatedAt: Date.now() });
         }
       });
+
+      // Сохраняем локально
+      DatabaseService.saveSets();
+
+      // Синхронизируем courseId в Neon, если задан и включён Neon
+      if (NeonService.isEnabled() && 'courseId' in input) {
+        const courseId = (input as any).courseId ?? null;
+        console.log('🔄 Обновление course_id набора в Neon:', { setId, courseId });
+        (async () => {
+          const ok = await NeonService.updateSetCourse(setId, courseId);
+          if (ok) {
+            console.log('✅ Course_id обновлен в Neon PostgreSQL для набора:', setId);
+          } else {
+            console.warn('⚠️  Не удалось обновить course_id набора в Neon:', setId);
+          }
+        })();
+      }
     },
 
     deleteSet: (setId) => {
@@ -259,6 +283,35 @@ export const useSetsStore = create<SetsState & SetsActions>()(
         .filter((s) => s && !s.isArchived && s.lastStudiedAt)
         .sort((a, b) => (b.lastStudiedAt || 0) - (a.lastStudiedAt || 0))
         .slice(0, limit);
+    },
+
+    // ==================== КУРСЫ ====================
+
+    moveSetsFromCourse: (courseId) => {
+      set((state) => {
+        Object.values(state.sets).forEach((cardSet) => {
+          if (cardSet.courseId === courseId) {
+            cardSet.courseId = null; // Перемещаем в "All"
+            cardSet.updatedAt = Date.now();
+          }
+        });
+      });
+
+      // Сохраняем изменения
+      DatabaseService.saveSets();
+      console.log('✅ Наборы перемещены из курса в "All":', courseId);
+    },
+
+    getSetsByCourse: (courseId) => {
+      const state = get();
+      return state.setsOrder
+        .map((id) => state.sets[id])
+        .filter((s) => {
+          if (!s || s.isArchived) return false;
+          if (courseId === null) return true; // "All" показывает все
+          // Учитываем, что courseId может быть undefined для старых наборов
+          return s.courseId === courseId;
+        });
     },
 
     // ==================== СОСТОЯНИЕ ====================

@@ -2,14 +2,14 @@
 
 ## Быстрая загрузка данных
 
-### 1. Убедитесь, что .env.local содержит POSTGRES_URL
+### 1. Убедитесь, что .env.local содержит NEON_DATABASE_URL
 
 ```bash
 # Проверьте файл .env.local
-cat .env.local | grep POSTGRES_URL
+cat .env.local | grep NEON_DATABASE_URL
 ```
 
-Если пусто, скопируйте из Vercel Dashboard → Settings → Environment Variables
+Если пусто, скопируйте из Neon Console → Connection Details → Connection String
 
 ### 2. Загрузите таблицы и примеры данных
 
@@ -18,9 +18,18 @@ npm run db:init
 ```
 
 Это выполнит:
-- ✅ Создание всех таблиц (users, card_sets, cards, reviews)
+- ✅ Создание всех таблиц (users, card_sets, cards, reviews, courses)
 - ✅ Создание индексов
 - ✅ Загрузку тестовых данных (3 набора с карточками)
+
+### 3. Примените миграции (для обновления структуры БД)
+
+```bash
+# Применить все миграции автоматически
+NEON_DATABASE_URL="your-connection-string" node database/apply-migration.js
+
+# Или применить вручную через Neon Console (см. migrations/MIGRATION_GUIDE.md)
+```
 
 ### Что будет загружено:
 
@@ -33,16 +42,43 @@ npm run db:init
 
 ---
 
+## Миграции базы данных
+
+Миграции находятся в папке `database/migrations/`:
+
+- `001_add_learning_step.sql` - Добавление поля learning_step
+- `002_add_courses.sql` - **[НОВОЕ]** Добавление курсов (папок для организации наборов)
+
+### Применение миграций:
+
+**Способ 1: Автоматический скрипт (рекомендуется)**
+```bash
+NEON_DATABASE_URL="postgresql://user:pass@host/db" node database/apply-migration.js
+```
+
+**Способ 2: Вручную через Neon Console**
+1. Откройте [Neon Console](https://console.neon.tech/)
+2. SQL Editor → скопируйте содержимое миграции
+3. Run
+
+Подробнее: [migrations/MIGRATION_GUIDE.md](./migrations/MIGRATION_GUIDE.md)
+
+---
+
 ## Альтернативный способ: Через psql
 
 Если у вас установлен PostgreSQL клиент:
 
 ```bash
 # Получите строку подключения из .env.local
-export POSTGRES_URL="ваша_строка_подключения"
+export NEON_DATABASE_URL="ваша_строка_подключения"
 
 # Выполните SQL файл
-psql $POSTGRES_URL < database/init.sql
+psql $NEON_DATABASE_URL < database/init.sql
+
+# Примените миграции
+psql $NEON_DATABASE_URL < database/migrations/001_add_learning_step.sql
+psql $NEON_DATABASE_URL < database/migrations/002_add_courses.sql
 ```
 
 ---

@@ -11,7 +11,7 @@ import { spacing } from '@/constants';
 import { DatabaseService } from '@/services';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Rating, Card } from '@/types';
-import { ArrowLeft, Settings, Volume2, Star, Check } from 'lucide-react-native';
+import { ArrowLeft, Settings, Volume2, Check } from 'lucide-react-native';
 import { speak, detectLanguage } from '@/utils/speech';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -64,6 +64,9 @@ export function StudyScreen({ navigation, route }: Props) {
   const sheetTranslate = useRef(new Animated.Value(-220)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const isCurrentMastered = currentCard ? currentCard.nextReviewDate > Date.now() : false;
+  const overlayColor = theme === 'dark' ? 'rgba(0, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.55)';
+  const settingsSheetBackground = theme === 'dark' ? '#0f172a' : colors.surface;
+  const settingsSheetBorder = theme === 'dark' ? 'rgba(255, 255, 255, 0.12)' : colors.border;
   const normalizeLang = (lang?: string): string | undefined => {
     if (!lang) return undefined;
     const lower = lang.toLowerCase();
@@ -284,8 +287,10 @@ export function StudyScreen({ navigation, route }: Props) {
         masteredCount: statsSnapshot.masteredCount,
       });
 
-      // Обновляем статистику
-      incrementTodayCards();
+      // Обновляем статистику только для правильных ответов (rating >= 3)
+      if (isCorrect) {
+        incrementTodayCards();
+      }
 
       // Переход к следующей карточке
       if (session && session.currentIndex + 1 >= session.queue.length) {
@@ -622,20 +627,17 @@ export function StudyScreen({ navigation, route }: Props) {
                 </Text>
               ) : null}
             </View>
-            
+
+            {/* Подсказка: показывается как простой текст справа внизу карточки */}
+            <View style={[styles.hintContainer, styles.hintHidden]}>
+              <Text style={[styles.hintText, { color: colors.textSecondary }]}>
+                Какой бред — вокруг один хлеб.
+              </Text>
+            </View>
+
             <View style={styles.cardBottom} />
           </View>
         </Pressable>
-
-        {/* Вторичные действия */}
-        <View style={styles.secondaryActions}>
-          <Pressable 
-            style={styles.starButton}
-            hitSlop={10}
-          >
-            <Star size={24} color={colors.textSecondary} />
-          </Pressable>
-        </View>
       </View>
 
       <Modal
@@ -649,7 +651,7 @@ export function StudyScreen({ navigation, route }: Props) {
           <Pressable style={styles.backdrop} onPress={closeSettings}>
             <Animated.View
               pointerEvents="none"
-              style={[styles.backdropTint, { opacity: backdropOpacity }]}
+              style={[styles.backdropTint, { opacity: backdropOpacity, backgroundColor: overlayColor }]}
             />
           </Pressable>
 
@@ -657,8 +659,8 @@ export function StudyScreen({ navigation, route }: Props) {
             style={[
               styles.settingsSheet,
               {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
+                backgroundColor: settingsSheetBackground,
+                borderColor: settingsSheetBorder,
                 transform: [{ translateY: sheetTranslate }],
               },
             ]}
@@ -846,21 +848,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // Secondary actions
-  secondaryActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 16,
-    marginTop: 32,
-    width: CARD_WIDTH,
+  // Hint text inside card (plain, no background/blur)
+  hintContainer: {
+    width: '100%',
+    paddingHorizontal: 16,
+    marginTop: 12,
+    alignItems: 'flex-end',
   },
-  starButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+  hintHidden: {
+    display: 'none',
+  },
+  hintText: {
+    fontSize: 16,
+    fontWeight: '500',
+    lineHeight: 22,
+    textAlign: 'center',
   },
 
   // Bottom panel

@@ -120,6 +120,7 @@ export const STORAGE_KEYS = {
   // Данные
   CARDS: 'cards',
   SETS: 'sets',
+  COURSES: 'courses',
   REVIEW_LOGS: 'review_logs',
   
   // Настройки

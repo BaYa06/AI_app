@@ -7,7 +7,7 @@ import { immer } from 'zustand/middleware/immer';
 import { v4 as uuid } from 'uuid';
 import type { Card, CreateCardInput, UpdateCardInput } from '@/types';
 import { NeonService } from '@/services/NeonService';
-import { DatabaseService } from '@/services';
+import { DatabaseService } from '@/services/DatabaseService';
 
 interface CardsState {
   // Данные - храним в объекте для O(1) доступа

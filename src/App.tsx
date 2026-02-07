@@ -8,7 +8,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AppNavigator } from '@/navigation';
 import { Loading } from '@/components/common';
-import { DatabaseService, setupAutoSave, supabase, NeonService } from '@/services';
+import { DatabaseService, setupAutoSave, supabase, NeonService, firebaseApp } from '@/services';
 import { useThemeColors } from '@/store';
 import { WelcomeScreen } from '@/screens/WelcomeScreen';
 import { EmailAuthScreen } from '@/screens/EmailAuthScreen';

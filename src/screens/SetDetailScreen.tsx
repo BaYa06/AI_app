@@ -56,6 +56,8 @@ export function SetDetailScreen({ navigation, route }: Props) {
   const [showImportModal, setShowImportModal] = useState(false);
   const [newFront, setNewFront] = useState('');
   const [newBack, setNewBack] = useState('');
+  const [newExample, setNewExample] = useState('');
+  const [newMnemonic, setNewMnemonic] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [showStudySheet, setShowStudySheet] = useState(false);
   const [onlyHard, setOnlyHard] = useState(false);
@@ -365,10 +367,18 @@ export function SetDetailScreen({ navigation, route }: Props) {
   const handleCreateCard = useCallback(() => {
     const front = newFront.trim();
     const back = newBack.trim();
+    const example = newExample.trim();
+    const mnemonic = newMnemonic.trim();
     if (!front || !back) return;
     setIsAdding(true);
     try {
-      addCard({ setId, frontText: front, backText: back });
+      addCard({ 
+        setId, 
+        frontText: front, 
+        backText: back, 
+        example: example || undefined,
+        mnemonic: mnemonic || undefined,
+      });
       const statsSnapshot = selectSetStats(setId);
       updateSetStats(setId, {
         cardCount: statsSnapshot.total,
@@ -380,10 +390,12 @@ export function SetDetailScreen({ navigation, route }: Props) {
       setShowAddCard(false);
       setNewFront('');
       setNewBack('');
+      setNewExample('');
+      setNewMnemonic('');
     } finally {
       setIsAdding(false);
     }
-  }, [addCard, newFront, newBack, setId, updateSetStats]);
+  }, [addCard, newFront, newBack, newExample, newMnemonic, setId, updateSetStats]);
 
   const handleEditSet = useCallback(() => {
     navigation.navigate('SetEditor', { setId });
@@ -705,6 +717,50 @@ export function SetDetailScreen({ navigation, route }: Props) {
                     outlineStyle: 'none',
                   }
                 ]}
+              />
+            </View>
+
+            <View style={styles.addField}>
+              <Text variant="label" color="primary" style={styles.fieldLabel}>
+                Пример
+              </Text>
+              <TextInput
+                value={newExample}
+                onChangeText={setNewExample}
+                placeholder="Например: Der scharfe Pfeffer..."
+                placeholderTextColor={modalPlaceholder}
+                style={[
+                  styles.addInput,
+                  { 
+                    color: modalTextPrimary,
+                    borderColor: modalBorder,
+                    backgroundColor: modalInputBg,
+                    outlineStyle: 'none',
+                  }
+                ]}
+                multiline
+              />
+            </View>
+
+            <View style={styles.addField}>
+              <Text variant="label" color="primary" style={styles.fieldLabel}>
+                Мнемоника
+              </Text>
+              <TextInput
+                value={newMnemonic}
+                onChangeText={setNewMnemonic}
+                placeholder="Своя ассоциация для запоминания"
+                placeholderTextColor={modalPlaceholder}
+                style={[
+                  styles.addInput,
+                  { 
+                    color: modalTextPrimary,
+                    borderColor: modalBorder,
+                    backgroundColor: modalInputBg,
+                    outlineStyle: 'none',
+                  }
+                ]}
+                multiline
               />
             </View>
 

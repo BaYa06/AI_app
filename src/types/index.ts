@@ -35,6 +35,7 @@ export interface Card {
   frontText: string;
   backText: string;
   example?: string;
+  mnemonic?: string;
   // Допустимы альтернативные поля для совместимости с API
   front?: string;
   back?: string;
@@ -62,6 +63,7 @@ export interface CreateCardInput {
   frontText: string;
   backText: string;
   example?: string;
+  mnemonic?: string;
   frontImage?: string;
   backImage?: string;
   frontAudio?: string;
@@ -75,6 +77,7 @@ export interface UpdateCardInput {
   frontText?: string;
   backText?: string;
   example?: string;
+  mnemonic?: string;
   frontImage?: string;
   backImage?: string;
   frontAudio?: string;
@@ -105,12 +108,25 @@ export type SetCategory =
   | 'music'
   | 'other';
 
+// ==================== COURSE TYPES ====================
+
+/**
+ * Курс (папка/контейнер для наборов карточек)
+ */
+export interface Course {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt?: number;
+}
+
 /**
  * Набор карточек
  */
 export interface CardSet {
   id: string;
   userId: string;
+  courseId?: string | null; // ID курса, к которому принадлежит набор (null = глобальный)
   
   // Основная информация
   title: string;
@@ -153,6 +169,7 @@ export interface CreateSetInput {
   languageFrom?: string;
   languageTo?: string;
   isPublic?: boolean;
+  courseId?: string | null; // ID курса, к которому принадлежит набор
 }
 
 /**
@@ -170,6 +187,7 @@ export interface UpdateSetInput {
   isArchived?: boolean;
   languageFrom?: string;
   languageTo?: string;
+  courseId?: string | null;
 }
 
 // ==================== REVIEW TYPES ====================

@@ -2,7 +2,7 @@
  * Home Screen - Flashly Design
  * @description Главный экран с новым дизайном
  */
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -28,11 +28,49 @@ import type { MainTabScreenProps } from '@/types/navigation';
 import type { CardSet } from '@/types';
 
 type Props = MainTabScreenProps<'Home'>;
+type CourseTab = {
+  id: string;
+  label: string;
+  count: number;
+};
 
 export function HomeScreen({ navigation }: Props) {
   const colors = useSettingsStore((s) => s.colors);
   const todayStats = useSettingsStore((s) => s.todayStats);
   const sets = useSetsStore((s) => s.getAllSets());
+  const [activeCourse, setActiveCourse] = useState<string>('all');
+
+  const toTitleCase = (value: string) =>
+    value
+      .replace(/[_-]/g, ' ')
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+
+  const courseKeyFromSet = (set: CardSet) => {
+    const lang = (set.languageTo || set.languageFrom || '').trim();
+    if (lang) return lang.toLowerCase();
+    return set.category || 'general';
+  };
+
+  const courseLabelFromSet = (set: CardSet) => {
+    const lang = (set.languageTo || set.languageFrom || '').trim();
+    if (lang) {
+      const normalized = lang.toLowerCase();
+      const languageMap: Record<string, string> = {
+        de: 'German',
+        en: 'English',
+        es: 'Spanish',
+        fr: 'French',
+        ru: 'Russian',
+      };
+      return languageMap[normalized] || toTitleCase(lang);
+    }
+
+    if (set.category) {
+      return toTitleCase(set.category);
+    }
+
+    return set.title;
+  };
 
   // Подсчет карточек на сегодня
   const totalDueCards = useMemo(() => {
@@ -55,9 +93,41 @@ export function HomeScreen({ navigation }: Props) {
     return colors.error;
   };
 
+  const courseTabs = useMemo<CourseTab[]>(() => {
+    if (sets.length === 0) {
+      return [{ id: 'all', label: 'All Decks', count: 0 }];
+    }
+
+    const aggregated = new Map<string, CourseTab>();
+
+    sets.forEach((set) => {
+      const key = courseKeyFromSet(set);
+      if (!aggregated.has(key)) {
+        aggregated.set(key, { id: key, label: courseLabelFromSet(set), count: 0 });
+      }
+      aggregated.get(key)!.count += 1;
+    });
+
+    return [
+      { id: 'all', label: 'All Decks', count: sets.length },
+      ...Array.from(aggregated.values()).sort((a, b) => b.count - a.count),
+    ];
+  }, [sets]);
+
+  useEffect(() => {
+    if (!courseTabs.some((tab) => tab.id === activeCourse)) {
+      setActiveCourse('all');
+    }
+  }, [activeCourse, courseTabs]);
+
+  const filteredSets = useMemo(() => {
+    if (activeCourse === 'all') return sets;
+    return sets.filter((set) => courseKeyFromSet(set) === activeCourse);
+  }, [activeCourse, sets]);
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Top Navigation Bar */}}
+      {/* Top Navigation Bar */}
       <View
         style={[
           styles.header,
@@ -71,23 +141,94 @@ export function HomeScreen({ navigation }: Props) {
           },
         ]}
       >
-        <View style={styles.headerLeft}>
-          <View style={[styles.logoContainer, { backgroundColor: colors.primary }]}>
-            <School size={20} color="#FFFFFF" />
+        <View style={styles.headerTop}>
+          <View style={styles.headerLeft}>
+            <View style={[styles.logoContainer, { backgroundColor: colors.primary }]}>
+              <School size={20} color="#FFFFFF" />
+            </View>
+            <RNText style={[styles.headerTitle, { color: colors.textPrimary }]}>Flashly</RNText>
           </View>
-          <RNText style={[styles.headerTitle, { color: colors.textPrimary }]}>Flashly</RNText>
+          <View style={styles.headerRight}>
+            <Pressable style={styles.iconButton}>
+              <Search size={20} color={colors.textPrimary} />
+            </Pressable>
+            <Pressable
+              style={styles.iconButton}
+              onPress={() => navigation.navigate('SetEditor', {})}
+            >
+              <Plus size={20} color={colors.textPrimary} />
+            </Pressable>
+          </View>
         </View>
-        <View style={styles.headerRight}>
-          <Pressable style={styles.iconButton}>
-            <Search size={20} color={colors.textPrimary} />
-          </Pressable>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.courseTabsRow}
+          style={styles.courseTabsWrapper}
+        >
+          {courseTabs.map((tab) => {
+            const isActive = tab.id === activeCourse;
+            return (
+              <Pressable
+                key={tab.id}
+                style={[
+                  styles.courseTab,
+                  {
+                    backgroundColor: isActive ? colors.background : colors.surfaceVariant,
+                    borderColor: isActive ? colors.primary : colors.surfaceVariant,
+                    borderTopWidth: isActive ? 2 : 1,
+                  },
+                ]}
+                onPress={() => setActiveCourse(tab.id)}
+              >
+                <RNText
+                  style={[
+                    styles.courseTabText,
+                    isActive
+                      ? { color: colors.primary, fontWeight: '700' }
+                      : { color: colors.textSecondary },
+                  ]}
+                >
+                  {tab.label}
+                </RNText>
+                {tab.count > 0 && (
+                  <View
+                    style={[
+                      styles.courseTabBadge,
+                      {
+                        backgroundColor: isActive ? colors.primary : colors.background,
+                        borderColor: isActive ? colors.primary : colors.border,
+                      },
+                    ]}
+                  >
+                    <RNText
+                      style={[
+                        styles.courseTabBadgeText,
+                        { color: isActive ? colors.textInverse : colors.textSecondary },
+                      ]}
+                    >
+                      {tab.count}
+                    </RNText>
+                  </View>
+                )}
+              </Pressable>
+            );
+          })}
+
           <Pressable
-            style={styles.iconButton}
+            style={[
+              styles.courseAddButton,
+              {
+                backgroundColor: colors.surfaceVariant,
+                borderColor: colors.border,
+              },
+            ]}
             onPress={() => navigation.navigate('SetEditor', {})}
           >
-            <Plus size={20} color={colors.textPrimary} />
+            <Plus size={16} color={colors.textPrimary} />
           </Pressable>
-        </View>
+        </ScrollView>
       </View>
 
       <ScrollView
@@ -144,18 +285,20 @@ export function HomeScreen({ navigation }: Props) {
           </View>
 
           <View style={styles.decksList}>
-            {sets.length === 0 ? (
+            {filteredSets.length === 0 ? (
               <View style={styles.emptyState}>
                 <BookOpen size={64} color={colors.textSecondary} />
-                <RNText style={[styles.emptyTitle, { color: colors.textPrimary }]}>
-                  No decks yet
+                <RNText style={[styles.emptyTitle, { color: colors.textPrimary }]}>                
+                  {sets.length === 0 ? 'No decks yet' : 'No decks in this course'}
                 </RNText>
-                <RNText style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-                  Create your first deck to get started
+                <RNText style={[styles.emptySubtitle, { color: colors.textSecondary }]}>                
+                  {sets.length === 0
+                    ? 'Create your first deck to get started'
+                    : 'Try another tab or create a new deck'}
                 </RNText>
               </View>
             ) : (
-              sets.slice(0, 3).map((set) => {
+              filteredSets.slice(0, 3).map((set) => {
                 const progress = getProgress(set);
                 const statusColor = getStatusColor(progress);
 
@@ -274,11 +417,9 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: spacing.m,
-    paddingVertical: 10,
+    paddingTop: 10,
+    paddingBottom: spacing.s,
     borderBottomWidth: 1,
     ...Platform.select({
       ios: {
@@ -291,6 +432,11 @@ const styles = StyleSheet.create({
         elevation: 4,
       },
     }),
+  },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   headerLeft: {
     flexDirection: 'row',
@@ -319,6 +465,48 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  courseTabsWrapper: {
+    marginTop: spacing.xs,
+  },
+  courseTabsRow: {
+    paddingHorizontal: spacing.s,
+    alignItems: 'flex-end',
+  },
+  courseTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.s,
+    borderRadius: borderRadius.l,
+    marginRight: spacing.s,
+    borderWidth: 1,
+  },
+  courseTabText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  courseTabBadge: {
+    marginLeft: spacing.xs,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xs,
+    borderWidth: 1,
+  },
+  courseTabBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  courseAddButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
   },
 
   // Scroll View

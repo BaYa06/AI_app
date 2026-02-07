@@ -52,6 +52,7 @@ export function MatchScreen({ navigation, route }: Props) {
   const fadeValues = useRef<Record<string, Animated.Value>>({});
   const sheetTranslate = useRef(new Animated.Value(-220)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
+  const audioRef = useRef<any>(null);
 
   const getFront = (card: Card) => card.frontText ?? (card as any).front ?? '';
   const getBack = (card: Card) => card.backText ?? (card as any).back ?? '';
@@ -105,6 +106,59 @@ export function MatchScreen({ navigation, route }: Props) {
   const resetSelection = useCallback(() => {
     setSelectedLeft(null);
     setSelectedRight(null);
+  }, []);
+
+  const playCorrectSound = useCallback(() => {
+    // Используем предзагруженный экземпляр, чтобы убрать задержку
+    const cached = audioRef.current;
+    if (cached) {
+      try {
+        cached.currentTime = 0;
+        cached.play().catch(() => {});
+        return;
+      } catch {
+        // fallback ниже
+      }
+    }
+
+    const AudioCtor = (global as any).Audio;
+    if (AudioCtor) {
+      try {
+        const audio = new AudioCtor('/correct2.wav');
+        audio.volume = 0.7;
+        audio.play().catch(() => {});
+        audioRef.current = audio;
+        return;
+      } catch {
+        // fallback ниже
+      }
+    }
+
+    const AudioContextCtor =
+      (global as any).AudioContext || (global as any).webkitAudioContext || null;
+    if (!AudioContextCtor) return;
+
+    try {
+      const ctx = new AudioContextCtor();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const duration = 0.18;
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start();
+      osc.stop(ctx.currentTime + duration);
+
+      osc.onended = () => ctx.close();
+    } catch {
+      // ignore audio errors silently
+    }
   }, []);
 
   const triggerSuccessHaptic = useCallback(() => {
@@ -173,6 +227,7 @@ export function MatchScreen({ navigation, route }: Props) {
       });
 
       triggerSuccessHaptic();
+      playCorrectSound();
       setMatchedIds((prev) => {
         const next = new Set(prev);
         next.add(selectedLeft);
@@ -228,6 +283,20 @@ export function MatchScreen({ navigation, route }: Props) {
       if (timerRef.current) clearInterval(timerRef.current);
       if (mismatchRef.current) clearTimeout(mismatchRef.current);
     };
+  }, []);
+
+  // Предзагрузка звука correct2.wav для мгновенного отклика
+  useEffect(() => {
+    const AudioCtor = (global as any).Audio;
+    if (!AudioCtor) return;
+    try {
+      const audio = new AudioCtor('/correct.wav');
+      audio.preload = 'auto';
+      audio.load();
+      audioRef.current = audio;
+    } catch {
+      audioRef.current = null;
+    }
   }, []);
 
   if (!set) {

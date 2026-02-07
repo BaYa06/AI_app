@@ -43,7 +43,7 @@ export type RootStackParamList = {
     phaseFailedIds?: string[];
   };
   CardEditor: { setId: string; cardId?: string };
-  SetEditor: { setId?: string };
+  SetEditor: { setId?: string; autoFocusTitle?: boolean };
   Match: { 
     setId: string; 
     cardLimit?: number;

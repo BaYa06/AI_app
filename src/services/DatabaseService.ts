@@ -5,10 +5,15 @@
 import { StorageService, STORAGE_KEYS } from './StorageService';
 import { NeonService } from './NeonService';
 import { supabase } from './supabaseClient';
-import { useCardsStore } from '@/store/cardsStore';
-import { useSetsStore } from '@/store/setsStore';
-import { useSettingsStore } from '@/store/settingsStore';
-import type { Card, CardSet, UserSettings } from '@/types';
+import type { Card, CardSet, Course, UserSettings } from '@/types';
+
+// Lazy imports для store чтобы избежать циклических зависимостей
+const getStores = () => ({
+  useCardsStore: require('../store/cardsStore').useCardsStore,
+  useSetsStore: require('../store/setsStore').useSetsStore,
+  useCoursesStore: require('../store/coursesStore').useCoursesStore,
+  useSettingsStore: require('../store/settingsStore').useSettingsStore,
+});
 
 /**
  * Интерфейс сохраненных данных
@@ -40,13 +45,15 @@ export const DatabaseService = {
       console.log('🔄 Загрузка данных из Neon PostgreSQL...');
       
       // Пытаемся загрузить данные из Neon
-      const [sets, allCards] = await Promise.all([
+      const [sets, allCards, courses] = await Promise.all([
         NeonService.loadSets(currentUserId),
         NeonService.loadAllCards(currentUserId),
+        NeonService.loadCourses(currentUserId),
       ]);
 
       console.log(`📚 Загружено наборов: ${sets.length}`);
       console.log(`🃏 Загружено карточек: ${allCards.length}`);
+      console.log(`📁 Загружено курсов: ${courses.length}`);
 
       // Преобразуем данные из Neon в объекты для store
       const setsMap: Record<string, CardSet> = {};
@@ -76,13 +83,37 @@ export const DatabaseService = {
         });
       }
 
-      // Сохраняем объединенные данные в store
-      useSetsStore.setState({
+      // Курсы: берём только из базы для текущего пользователя.
+      // Если пользователь не авторизован (нет currentUserId), используем локальные данные как fallback.
+      const localCoursesData = StorageService.getObject<{
+        courses: Course[];
+        activeCourseId: string | null;
+      }>(STORAGE_KEYS.COURSES);
+
+      const allCourses: Course[] =
+        currentUserId ? courses : localCoursesData?.courses || courses;
+
+      const savedActiveCourseId = localCoursesData?.activeCourseId ?? null;
+      const activeCourseId = allCourses.some((c) => c.id === savedActiveCourseId)
+        ? savedActiveCourseId
+        : null;
+
+      // Сохраняем данные в store
+      const stores = getStores();
+      stores.useSetsStore.setState({
         sets: setsMap,
         setsOrder,
       });
 
       console.log('✅ Наборы загружены в store (Neon + локальные)');
+
+      // Сохраняем курсы в store
+      stores.useCoursesStore.setState({
+        courses: allCourses,
+        activeCourseId,
+      });
+
+      console.log('✅ Курсы загружены в store из Neon');
 
       // Преобразуем карточки в объекты
       const cardsMap: Record<string, Card> = {};
@@ -121,7 +152,7 @@ export const DatabaseService = {
         });
       }
 
-      useCardsStore.setState({
+      stores.useCardsStore.setState({
         cards: cardsMap,
         cardsBySet,
       });
@@ -131,7 +162,24 @@ export const DatabaseService = {
       // Загружаем настройки из локального хранилища
       const settings = StorageService.getObject<UserSettings>(STORAGE_KEYS.SETTINGS);
       if (settings) {
-        useSettingsStore.getState().updateSettings(settings);
+        stores.useSettingsStore.getState().updateSettings(settings);
+      }
+
+      // Загружаем статистику стрика из БД
+      if (currentUserId) {
+        try {
+          const userStats = await NeonService.getUserStats(currentUserId);
+          if (userStats) {
+            stores.useSettingsStore.getState().syncStreakFromServer({
+              currentStreak: userStats.current_streak,
+              longestStreak: userStats.longest_streak,
+              lastActiveDate: userStats.last_active_date,
+            });
+            console.log('🔥 Streak загружен:', userStats.current_streak, 'дней');
+          }
+        } catch (e) {
+          console.warn('⚠️ Не удалось загрузить streak:', e);
+        }
       }
 
       return true;
@@ -146,8 +194,9 @@ export const DatabaseService = {
    * очищает карточки/наборы в store и грузит только его данные.
    */
   async reloadRemoteDataForUser(userId: string | undefined): Promise<void> {
-    useCardsStore.getState().clearCards();
-    useSetsStore.getState().clearSets();
+    const stores = getStores();
+    stores.useCardsStore.getState().clearCards();
+    stores.useSetsStore.getState().clearSets();
 
     await DatabaseService.loadAll();
   },
@@ -157,22 +206,23 @@ export const DatabaseService = {
    */
   async saveAll(): Promise<boolean> {
     try {
+      const stores = getStores();
       // Сохраняем карточки
-      const cardsState = useCardsStore.getState();
+      const cardsState = stores.useCardsStore.getState();
       StorageService.setObject(STORAGE_KEYS.CARDS, {
         cards: cardsState.cards,
         cardsBySet: cardsState.cardsBySet,
       });
 
       // Сохраняем наборы
-      const setsState = useSetsStore.getState();
+      const setsState = stores.useSetsStore.getState();
       StorageService.setObject(STORAGE_KEYS.SETS, {
         sets: setsState.sets,
         setsOrder: setsState.setsOrder,
       });
 
       // Сохраняем настройки
-      const settingsState = useSettingsStore.getState();
+      const settingsState = stores.useSettingsStore.getState();
       StorageService.setObject(STORAGE_KEYS.SETTINGS, settingsState.settings);
 
       return true;
@@ -186,7 +236,8 @@ export const DatabaseService = {
    * Сохранить только карточки (для автосохранения)
    */
   saveCards(): void {
-    const state = useCardsStore.getState();
+    const stores = getStores();
+    const state = stores.useCardsStore.getState();
     StorageService.setObject(STORAGE_KEYS.CARDS, {
       cards: state.cards,
       cardsBySet: state.cardsBySet,
@@ -197,7 +248,8 @@ export const DatabaseService = {
    * Сохранить только наборы
    */
   saveSets(): void {
-    const state = useSetsStore.getState();
+    const stores = getStores();
+    const state = stores.useSetsStore.getState();
     StorageService.setObject(STORAGE_KEYS.SETS, {
       sets: state.sets,
       setsOrder: state.setsOrder,
@@ -205,10 +257,19 @@ export const DatabaseService = {
   },
 
   /**
+   * Сохранить курсы
+   */
+  saveCourses(): void {
+    const stores = getStores();
+    stores.useCoursesStore.getState().saveCourses();
+  },
+
+  /**
    * Сохранить настройки
    */
   saveSettings(): void {
-    const state = useSettingsStore.getState();
+    const stores = getStores();
+    const state = stores.useSettingsStore.getState();
     StorageService.setObject(STORAGE_KEYS.SETTINGS, state.settings);
   },
 
@@ -218,22 +279,25 @@ export const DatabaseService = {
   clearAll(): void {
     StorageService.clearAll();
     
+    const stores = getStores();
     // Сбрасываем store
-    useCardsStore.getState().clearCards();
-    useSetsStore.getState().clearSets();
-    useSettingsStore.getState().resetSettings();
+    stores.useCardsStore.getState().clearCards();
+    stores.useSetsStore.getState().clearSets();
+    stores.useCoursesStore.getState().clearCourses();
+    stores.useSettingsStore.getState().resetSettings();
   },
 
   /**
    * Экспорт данных в JSON
    */
   exportData(): string {
+    const stores = getStores();
     const data: PersistedData = {
-      cards: useCardsStore.getState().cards,
-      cardsBySet: useCardsStore.getState().cardsBySet,
-      sets: useSetsStore.getState().sets,
-      setsOrder: useSetsStore.getState().setsOrder,
-      settings: useSettingsStore.getState().settings,
+      cards: stores.useCardsStore.getState().cards,
+      cardsBySet: stores.useCardsStore.getState().cardsBySet,
+      sets: stores.useSetsStore.getState().sets,
+      setsOrder: stores.useSetsStore.getState().setsOrder,
+      settings: stores.useSettingsStore.getState().settings,
       version: CURRENT_VERSION,
     };
 
@@ -252,23 +316,24 @@ export const DatabaseService = {
         throw new Error('Unsupported data version');
       }
 
+      const stores = getStores();
       // Загружаем данные в store
       if (data.cards && data.cardsBySet) {
-        useCardsStore.setState({
+        stores.useCardsStore.setState({
           cards: data.cards,
           cardsBySet: data.cardsBySet,
         });
       }
 
       if (data.sets && data.setsOrder) {
-        useSetsStore.setState({
+        stores.useSetsStore.setState({
           sets: data.sets,
           setsOrder: data.setsOrder,
         });
       }
 
       if (data.settings) {
-        useSettingsStore.getState().updateSettings(data.settings);
+        stores.useSettingsStore.getState().updateSettings(data.settings);
       }
 
       // Сохраняем в хранилище
@@ -316,9 +381,10 @@ export function scheduleSave(saveType: 'cards' | 'sets' | 'settings' | 'all' = '
  * Подписка на изменения store для автосохранения
  */
 export function setupAutoSave(): () => void {
-  const unsubCards = useCardsStore.subscribe(() => scheduleSave('cards'));
-  const unsubSets = useSetsStore.subscribe(() => scheduleSave('sets'));
-  const unsubSettings = useSettingsStore.subscribe(() => scheduleSave('settings'));
+  const stores = getStores();
+  const unsubCards = stores.useCardsStore.subscribe(() => scheduleSave('cards'));
+  const unsubSets = stores.useSetsStore.subscribe(() => scheduleSave('sets'));
+  const unsubSettings = stores.useSettingsStore.subscribe(() => scheduleSave('settings'));
 
   return () => {
     unsubCards();

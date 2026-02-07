@@ -62,9 +62,8 @@ coverage/
 # Environment
 .env
 .env.*
-.env.local
 !.env.example
-.env.example
+.env.local
 
 # Secrets / Service Account Keys
 flashly.json

@@ -2,7 +2,7 @@
  * Multiple Choice Screen
  * @description Экран выбора перевода
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { View, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { ArrowLeft, Settings, Volume2 } from 'lucide-react-native';
 import { Container, Text, ProgressBar, Loading } from '@/components/common';
@@ -71,7 +71,10 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
         status: result.newStatus,
       });
 
-      incrementTodayCards();
+      // Считаем только правильные ответы (rating >= 3 - "почти" и "уверен")
+      if (rating >= 3) {
+        incrementTodayCards();
+      }
 
       const statsSnapshot = selectSetStats(card.setId);
       updateSetStats(card.setId, {
@@ -196,6 +199,44 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
     return 'neutral';
   };
 
+  const playCorrectSound = useCallback(() => {
+    const AudioCtor = (global as any).Audio;
+    if (AudioCtor) {
+      try {
+        const audio = new AudioCtor('/correct.wav');
+        audio.volume = 0.7;
+        audio.play().catch(() => {});
+        return;
+      } catch {
+        // fallback ниже
+      }
+    }
+    const AudioContextCtor =
+      (global as any).AudioContext || (global as any).webkitAudioContext || null;
+    if (!AudioContextCtor) return;
+
+    try {
+      const ctx = new AudioContextCtor();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const duration = 0.18;
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start();
+      osc.stop(ctx.currentTime + duration);
+      osc.onended = () => ctx.close();
+    } catch {
+      // ignore silently
+    }
+  }, []);
+
   const finishQuiz = React.useCallback(
     (errorsCount: number, errorList: Array<{ id: string; front: string; back: string; rating: number }>) => {
       const timeSpent = Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000));
@@ -282,6 +323,9 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
         ];
 
     applySrsUpdate(currentCard, rating);
+    if (isCorrect) {
+      playCorrectSound();
+    }
 
     setSelectedOption(option.id);
     setShowResult(true);

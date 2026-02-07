@@ -79,6 +79,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
     errors: number;
     errorCards: Array<{ id?: string; front: string; back: string; rating: number }>;
   } | null>(null);
+  const audioRef = useRef<any>(null);
 
   const cardMap = useMemo(() => {
     const map: Record<string, Card> = {};
@@ -159,6 +160,34 @@ export function WordBuilderScreen({ navigation, route }: Props) {
     };
   }, [initKey, totalPhaseCards]);
 
+  // Предзагружаем звук правильного ответа, чтобы убрать задержку первого проигрывания
+  useEffect(() => {
+    const AudioCtor = (global as any).Audio;
+    if (!AudioCtor) return;
+    try {
+      const audio = new AudioCtor('/correct2.wav');
+      audio.preload = 'auto';
+      audio.load();
+      audioRef.current = audio;
+    } catch {
+      audioRef.current = null;
+    }
+  }, []);
+
+  // Предзагрузка звука успеха, чтобы убрать задержку первого воспроизведения
+  useEffect(() => {
+    const AudioCtor = (global as any).Audio;
+    if (!AudioCtor) return;
+    try {
+      const audio = new AudioCtor('/correct2.wav');
+      audio.preload = 'auto';
+      audio.load();
+      audioRef.current = audio;
+    } catch {
+      audioRef.current = null;
+    }
+  }, []);
+
   const currentCard = cardsQueue[currentIndex];
 
   const getFront = (card: Card) => card.frontText ?? (card as any).front ?? '';
@@ -228,7 +257,10 @@ export function WordBuilderScreen({ navigation, route }: Props) {
         status: result.newStatus,
       });
 
-      incrementTodayCards();
+      // Считаем только правильные ответы (rating >= 3 - "почти" и "уверен")
+      if (rating >= 3) {
+        incrementTodayCards();
+      }
 
       const statsSnapshot = selectSetStats(card.setId);
       updateSetStats(card.setId, {
@@ -369,6 +401,57 @@ export function WordBuilderScreen({ navigation, route }: Props) {
     return wordResult === 'correct' ? colors.success : colors.error;
   }, [wordResult, colors.success, colors.error]);
 
+  const playCorrectSound = useCallback(() => {
+    // Используем предзагруженный экземпляр, чтобы избежать задержки
+    const cached = audioRef.current;
+    if (cached) {
+      try {
+        cached.currentTime = 0;
+        cached.play().catch(() => {});
+        return;
+      } catch {
+        // fallback ниже
+      }
+    }
+
+    const AudioCtor = (global as any).Audio;
+    if (AudioCtor) {
+      try {
+        const audio = new AudioCtor('/correct2.wav');
+        audio.volume = 0.7;
+        audio.play().catch(() => {});
+        audioRef.current = audio;
+        return;
+      } catch {
+        // fallback ниже
+      }
+    }
+    const AudioContextCtor =
+      (global as any).AudioContext || (global as any).webkitAudioContext || null;
+    if (!AudioContextCtor) return;
+
+    try {
+      const ctx = new AudioContextCtor();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const duration = 0.18;
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start();
+      osc.stop(ctx.currentTime + duration);
+      osc.onended = () => ctx.close();
+    } catch {
+      // ignore silently
+    }
+  }, []);
+
   const advanceToNextCard = useCallback(
     (
       errorsCount: number,
@@ -419,6 +502,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
       clearTimeout(advanceTimeoutRef.current);
     }
     if (isCorrect) {
+      playCorrectSound();
       pendingAdvanceRef.current = null;
       advanceTimeoutRef.current = setTimeout(() => {
         advanceToNextCard(nextErrors, updatedErrorCards);
