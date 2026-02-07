@@ -1,6 +1,6 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
+import { getAnalytics, setUserId } from "firebase/analytics";
 import { Platform } from "react-native";
 
 // Your web app's Firebase configuration
@@ -20,5 +20,27 @@ export const app = initializeApp(firebaseConfig);
 
 // Initialize Analytics only on web platform
 export const analytics = Platform.OS === 'web' ? getAnalytics(app) : null;
+
+/**
+ * Установить user_id для Firebase Analytics для отслеживания конкретного пользователя
+ * @param userId - UUID пользователя (не email!). Передать null для сброса при выходе.
+ */
+export function setAnalyticsUserId(userId: string | null) {
+  if (!analytics) {
+    console.log('ℹ️ Analytics: недоступно (только web)');
+    return;
+  }
+  
+  try {
+    setUserId(analytics, userId);
+    if (userId) {
+      console.log('✅ Analytics: user_id установлен:', userId);
+    } else {
+      console.log('🔄 Analytics: user_id сброшен');
+    }
+  } catch (error) {
+    console.warn('⚠️ Analytics: ошибка setUserId:', error);
+  }
+}
 
 export default app;

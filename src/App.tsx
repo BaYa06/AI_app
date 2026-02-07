@@ -8,7 +8,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AppNavigator } from '@/navigation';
 import { Loading } from '@/components/common';
-import { DatabaseService, setupAutoSave, supabase, NeonService, firebaseApp } from '@/services';
+import { DatabaseService, setupAutoSave, supabase, NeonService, firebaseApp, setAnalyticsUserId } from '@/services';
 import { useThemeColors } from '@/store';
 import { WelcomeScreen } from '@/screens/WelcomeScreen';
 import { EmailAuthScreen } from '@/screens/EmailAuthScreen';
@@ -169,6 +169,8 @@ export default function App() {
             displayName: (user.user_metadata as any)?.full_name,
           });
           DatabaseService.reloadRemoteDataForUser(user.id);
+          // Устанавливаем user_id в Firebase Analytics
+          setAnalyticsUserId(user.id);
         }
       });
 
@@ -183,6 +185,11 @@ export default function App() {
           displayName: (session.user.user_metadata as any)?.full_name,
         });
         DatabaseService.reloadRemoteDataForUser(session.user.id);
+        // Устанавливаем user_id в Firebase Analytics
+        setAnalyticsUserId(session.user.id);
+      } else if (!session) {
+        // Пользователь вышел - сбрасываем user_id
+        setAnalyticsUserId(null);
       }
     });
 
