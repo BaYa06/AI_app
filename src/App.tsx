@@ -3,12 +3,12 @@
  * @description Главный компонент приложения
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Linking, Platform, View } from 'react-native';
+import { Linking, Platform, View, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AppNavigator } from '@/navigation';
 import { Loading } from '@/components/common';
-import { DatabaseService, setupAutoSave, supabase, NeonService, firebaseApp, setAnalyticsUserId } from '@/services';
+import { DatabaseService, setupAutoSave, supabase, NeonService, setAnalyticsUserId } from '@/services';
 import { useThemeColors } from '@/store';
 import { WelcomeScreen } from '@/screens/WelcomeScreen';
 import { EmailAuthScreen } from '@/screens/EmailAuthScreen';
@@ -19,6 +19,22 @@ import { DailyGoalScreen } from '@/screens/DailyGoalScreen';
 import { SignInScreen } from '@/screens/SignInScreen';
 
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+
+// Стили для веб-платформы (iOS PWA scroll fix)
+const webStyles = Platform.OS === 'web' ? StyleSheet.create({
+  scrollContainer: {
+    position: 'absolute' as any,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    overflow: 'auto' as any,
+    // @ts-ignore - web-only properties
+    WebkitOverflowScrolling: 'touch',
+    overscrollBehavior: 'none',
+    overscrollBehaviorY: 'none',
+  },
+}) : undefined;
 
 type AppRootProps = {
   isReady: boolean;
@@ -57,52 +73,67 @@ function AppRoot({
   // ✅ уменьшаем safe-area сверху (например на 10px)
   const top = insets.top > 0 ? Math.max(insets.top - 15, 0) : 0;
 
+  // Контент приложения
+  const appContent = (
+    <>
+      {!isReady ? (
+        <Loading fullScreen message="Загрузка..." />
+      ) : isAuthenticated ? (
+        <AppNavigator />
+      ) : (
+        authStep === 'welcome' ? (
+          <WelcomeScreen onCreateAccount={onStartEmail} onSignIn={onStartSignIn} />
+        ) : authStep === 'email' ? (
+          <EmailAuthScreen
+            onBack={onBackToWelcome}
+            onRequestCode={onRequestCode}
+          />
+        ) : authStep === 'otp' ? (
+          <OTPVerifyScreen
+            onBack={onBackToEmail}
+            onSubmit={onSubmitOTP}
+          />
+        ) : authStep === 'name' ? (
+          <NameOnboardingScreen
+            onBack={onBackToEmail}
+            onContinue={onSubmitName}
+            onSkip={onSubmitName}
+          />
+        ) : authStep === 'goal' ? (
+          <LearningGoalScreen
+            onBack={onBackToEmail}
+            onContinue={onSubmitGoal}
+          />
+        ) : authStep === 'signin' ? (
+          <SignInScreen
+            onBack={onBackToWelcome}
+            onSendCode={(email) => onRequestCode(email)}
+            onCreateAccount={onStartEmail}
+          />
+        ) : (
+          <DailyGoalScreen
+            onBack={onBackToGoal}
+            onContinue={onSubmitDaily}
+          />
+        )
+      )}
+    </>
+  );
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Safe-area зона сверху под цвет темы */}
       <View style={{ height: top, backgroundColor: colors.background }} />
 
       <GestureHandlerRootView style={{ flex: 1 }}>
-        {!isReady ? (
-          <Loading fullScreen message="Загрузка..." />
-        ) : isAuthenticated ? (
-          <AppNavigator />
+        {Platform.OS === 'web' ? (
+          // На веб оборачиваем в scroll-контейнер для фиксации iOS overscroll
+          <View style={webStyles?.scrollContainer}>
+            {appContent}
+          </View>
         ) : (
-          authStep === 'welcome' ? (
-            <WelcomeScreen onCreateAccount={onStartEmail} onSignIn={onStartSignIn} />
-          ) : authStep === 'email' ? (
-            <EmailAuthScreen
-              onBack={onBackToWelcome}
-              onRequestCode={onRequestCode}
-            />
-          ) : authStep === 'otp' ? (
-            <OTPVerifyScreen
-              onBack={onBackToEmail}
-              onSubmit={onSubmitOTP}
-            />
-          ) : authStep === 'name' ? (
-            <NameOnboardingScreen
-              onBack={onBackToEmail}
-              onContinue={onSubmitName}
-              onSkip={onSubmitName}
-            />
-          ) : authStep === 'goal' ? (
-            <LearningGoalScreen
-              onBack={onBackToEmail}
-              onContinue={onSubmitGoal}
-            />
-          ) : authStep === 'signin' ? (
-            <SignInScreen
-              onBack={onBackToWelcome}
-              onSendCode={(email) => onRequestCode(email)}
-              onCreateAccount={onStartEmail}
-            />
-          ) : (
-            <DailyGoalScreen
-              onBack={onBackToGoal}
-              onContinue={onSubmitDaily}
-            />
-          )
+          // На нативных платформах используем как есть
+          appContent
         )}
       </GestureHandlerRootView>
     </View>

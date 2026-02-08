@@ -1,0 +1,85 @@
+/**
+ * iOS PWA Scroll Fix
+ * Исправление rubber-band / overscroll bounce эффекта в Safari/iPhone PWA
+ */
+
+/* Блокируем скролл на уровне документа */
+html {
+  position: fixed;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: auto;
+}
+
+/* Фиксируем root контейнер */
+#root {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+}
+
+/* Все прямые дочерние элементы root становятся scroll-контейнерами */
+#root > div {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
+}
+
+/* iOS-специфичные стили */
+@supports (-webkit-touch-callout: none) {
+  /* Убираем momentum scrolling для body */
+  body {
+    -webkit-overflow-scrolling: auto;
+  }
+  
+  /* Включаем smooth scrolling для контейнеров */
+  #root > div {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Предотвращаем pull-to-refresh */
+  body {
+    overscroll-behavior-y: none;
+  }
+}
+
+/* Дополнительная защита для вложенных scroll-контейнеров */
+.scroll-container,
+[data-scroll-container] {
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: none;
+}
+}
+  
+  #root {
+    touch-action: pan-y
+  
+  /* Убираем лишний padding у scroll-контейнера */
+  #root > div {
+    padding-bottom: 0;
+    margin-bottom: 0;
+  }
+}
