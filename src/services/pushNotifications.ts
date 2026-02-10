@@ -317,23 +317,37 @@ const API_BASE = '/api/push';
  * Защита от дублей — backend должен делать upsert.
  */
 async function sendTokenToBackend(token: string, userId?: string | null): Promise<void> {
+  const url = `${API_BASE}/subscribe`;
+  const payload = {
+    token,
+    platform: 'web',
+    userId: userId || null,
+  };
+  
+  console.log('[Push] Sending token to backend...');
+  console.log('[Push] URL:', url);
+  console.log('[Push] Payload:', JSON.stringify(payload, null, 2));
+  
   try {
-    const res = await fetch(`${API_BASE}/subscribe`, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        token,
-        platform: 'web',
-        userId: userId || null,
-      }),
+      body: JSON.stringify(payload),
     });
+    
+    console.log('[Push] Response status:', res.status);
+    console.log('[Push] Response headers:', Object.fromEntries(res.headers.entries()));
+    
+    const text = await res.text();
+    console.log('[Push] Response body:', text);
+    
     if (!res.ok) {
-      console.warn('[Push] Backend subscribe failed:', res.status, await res.text());
+      console.warn('[Push] Backend subscribe failed:', res.status, text);
     } else {
-      console.log('[Push] Token sent to backend');
+      console.log('[Push] ✅ Token sent to backend successfully');
     }
   } catch (error) {
-    console.warn('[Push] Failed to send token to backend:', error);
+    console.error('[Push] ❌ Failed to send token to backend:', error);
   }
 }
 
@@ -341,18 +355,30 @@ async function sendTokenToBackend(token: string, userId?: string | null): Promis
  * POST /api/push/unsubscribe — удаляет токен с backend.
  */
 async function removeTokenFromBackend(token: string): Promise<void> {
+  const url = `${API_BASE}/unsubscribe`;
+  const payload = { token };
+  
+  console.log('[Push] Removing token from backend...');
+  console.log('[Push] URL:', url);
+  console.log('[Push] Payload:', JSON.stringify(payload, null, 2));
+  
   try {
-    const res = await fetch(`${API_BASE}/unsubscribe`, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token }),
+      body: JSON.stringify(payload),
     });
+    
+    console.log('[Push] Response status:', res.status);
+    const text = await res.text();
+    console.log('[Push] Response body:', text);
+    
     if (!res.ok) {
-      console.warn('[Push] Backend unsubscribe failed:', res.status);
+      console.warn('[Push] Backend unsubscribe failed:', res.status, text);
     } else {
-      console.log('[Push] Token removed from backend');
+      console.log('[Push] ✅ Token removed from backend successfully');
     }
   } catch (error) {
-    console.warn('[Push] Failed to remove token from backend:', error);
+    console.error('[Push] ❌ Failed to remove token from backend:', error);
   }
 }

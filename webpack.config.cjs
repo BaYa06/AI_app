@@ -1,4 +1,6 @@
 const path = require('path');
+const fs = require('fs');
+const express = require('express');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const webpack = require('webpack');
@@ -154,8 +156,74 @@ module.exports = (env, argv) => {
         directory: path.join(__dirname, 'public'),
         publicPath: '/',
       },
+      // HTTPS config: use certs if available, otherwise fallback to HTTP (works for localhost)
+      server: (() => {
+        const keyPath = path.join(__dirname, '172.20.10.5-key.pem');
+        const certPath = path.join(__dirname, '172.20.10.5.pem');
+        
+        // Check if we have valid certs
+        if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+          console.log('[webpack] Using HTTPS with custom certs');
+          return {
+            type: 'https',
+            options: {
+              key: fs.readFileSync(keyPath),
+              cert: fs.readFileSync(certPath),
+            },
+          };
+        }
+        
+        // Fallback to HTTP (Service Workers work on http://localhost)
+        console.log('[webpack] No certs found, using HTTP (OK for localhost)');
+        return undefined;
+      })(),
       headers: {
         'Cache-Control': 'no-store',
+      },
+      setupMiddlewares: (middlewares, devServer) => {
+        const app = devServer.app;
+        
+        // Custom API middleware (must be added at the BEGINNING)
+        const apiMiddleware = express.Router();
+        apiMiddleware.use(express.json());
+        
+        apiMiddleware.post('/api/push/subscribe', async (req, res) => {
+          console.log('[devServer] POST /api/push/subscribe called');
+          console.log('[devServer] Body:', JSON.stringify(req.body));
+          try {
+            const mod = await import('./api/push/subscribe.js');
+            return mod.default(req, res);
+          } catch (e) {
+            console.error('[devServer] push/subscribe error', e);
+            return res.status(500).json({ error: 'dev-server error', message: e.message });
+          }
+        });
+
+        apiMiddleware.post('/api/push/unsubscribe', async (req, res) => {
+          console.log('[devServer] POST /api/push/unsubscribe called');
+          console.log('[devServer] Body:', JSON.stringify(req.body));
+          try {
+            const mod = await import('./api/push/unsubscribe.js');
+            return mod.default(req, res);
+          } catch (e) {
+            console.error('[devServer] push/unsubscribe error', e);
+            return res.status(500).json({ error: 'dev-server error', message: e.message });
+          }
+        });
+
+        // Debug: log all API requests
+        apiMiddleware.use('/api', (req, res, next) => {
+          console.log('[devServer] API request:', req.method, req.url);
+          next();
+        });
+
+        // Insert custom API middleware at the BEGINNING of the stack
+        middlewares.unshift({
+          name: 'api-routes',
+          middleware: apiMiddleware,
+        });
+
+        return middlewares;
       },
     } : undefined,
   };
