@@ -9,7 +9,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AppNavigator } from '@/navigation';
 import { Loading } from '@/components/common';
 import { DatabaseService, setupAutoSave, supabase, NeonService, setAnalyticsUserId } from '@/services';
-import { useThemeColors } from '@/store';
+import { refreshPushToken, subscribeForegroundMessages } from '@/services/pushNotifications';
+import { useThemeColors, useSettingsStore } from '@/store';
 import { WelcomeScreen } from '@/screens/WelcomeScreen';
 import { EmailAuthScreen } from '@/screens/EmailAuthScreen';
 import { OTPVerifyScreen } from '@/screens/OTPVerifyScreen';
@@ -68,10 +69,32 @@ function AppRoot({
   authStep,
 }: AppRootProps) {
   const colors = useThemeColors();
+  const resolvedTheme = useSettingsStore((state) => state.resolvedTheme);
   const insets = useSafeAreaInsets();
 
-  // ✅ уменьшаем safe-area сверху (например на 10px)
+  // ✅ уменьшаем safe-area сверху на 15px
   const top = insets.top > 0 ? Math.max(insets.top - 15, 0) : 0;
+  // ✅ для PWA полностью убираем bottom safe-area, для нативных урезаем на 15px
+  const bottom = Platform.OS === 'web' 
+    ? 0 
+    : (insets.bottom > 0 ? Math.max(insets.bottom - 15, 0) : 0);
+
+
+  // Синхронизируем meta theme-color с текущей темой (только веб)
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    const meta = document.querySelector('meta[name=\"theme-color\"]');
+    const themeColor = resolvedTheme === 'dark' ? 'rgba(0, 0, 0, 0)' : 'rgb(255, 255, 255)';
+
+    if (meta) {
+      meta.setAttribute('content', themeColor);
+    } else {
+      const newMeta = document.createElement('meta');
+      newMeta.name = 'theme-color';
+      newMeta.content = themeColor;
+      document.head.appendChild(newMeta);
+    }
+  }, [resolvedTheme]);
 
   // Контент приложения
   const appContent = (
@@ -202,6 +225,8 @@ export default function App() {
           DatabaseService.reloadRemoteDataForUser(user.id);
           // Устанавливаем user_id в Firebase Analytics
           setAnalyticsUserId(user.id);
+          // Обновляем FCM push-токен (если разрешение уже дано)
+          refreshPushToken(user.id).catch(() => {});
         }
       });
 
@@ -218,6 +243,8 @@ export default function App() {
         DatabaseService.reloadRemoteDataForUser(session.user.id);
         // Устанавливаем user_id в Firebase Analytics
         setAnalyticsUserId(session.user.id);
+        // Обновляем FCM push-токен
+        refreshPushToken(session.user.id).catch(() => {});
       } else if (!session) {
         // Пользователь вышел - сбрасываем user_id
         setAnalyticsUserId(null);
@@ -228,6 +255,19 @@ export default function App() {
       isMounted = false;
       data.subscription.unsubscribe();
     };
+  }, []);
+
+  // Подписка на foreground push-сообщения (показываем alert, пока приложение открыто)
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    subscribeForegroundMessages((msg) => {
+      if (msg.title || msg.body) {
+        // Показываем нативное браузерное уведомление, даже когда вкладка в фокусе
+        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+          new Notification(msg.title || 'Flashly', { body: msg.body, icon: '/icons/icon-192.png' });
+        }
+      }
+    });
   }, []);
 
   /**
@@ -309,8 +349,15 @@ export default function App() {
 
   const appReady = isReady && authChecked;
 
+  // На вебе (PWA) урезаем safe-area, чтобы на iPhone не было лишнего отступа.
+  // Вместо полного обнуления используем урезание в AppRoot компоненте.
+  const webSafeAreaOverride = Platform.OS === 'web' ? {
+    frame: { x: 0, y: 0, width: 0, height: 0 },
+    insets: { top: 0, right: 0, bottom: 0, left: 0 },
+  } : undefined;
+
   return (
-    <SafeAreaProvider>
+    <SafeAreaProvider initialMetrics={webSafeAreaOverride}>
       <AppRoot
         isReady={appReady}
         isAuthenticated={isAuthenticated}

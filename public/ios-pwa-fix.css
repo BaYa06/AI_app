@@ -1,20 +1,32 @@
 /**
  * iOS PWA Scroll Fix
  * Исправление rubber-band / overscroll bounce эффекта в Safari/iPhone PWA
+ * + fix для зазора под bottom navbar (safe-area-inset-bottom)
+ *
+ * ВАЖНО: Все контейнеры используют inset:0 (top/bottom/left/right:0) вместо
+ * явных viewport-юнитов (100dvh/100svh), т.к. эти юниты НЕ гарантированно
+ * включают safe-area-inset-bottom на iOS PWA, и элемент заканчивается выше
+ * нижнего края экрана → видна подложка браузера.
  */
 
 /* Блокируем скролл на уровне документа */
 html {
   position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   overflow: hidden;
   width: 100%;
-  height: 100%;
 }
 
 body {
   position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   width: 100%;
-  height: 100%;
   overflow: hidden;
   overscroll-behavior: none;
   overscroll-behavior-y: none;
@@ -38,7 +50,6 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
@@ -48,19 +59,23 @@ body {
 
 /* iOS-специфичные стили */
 @supports (-webkit-touch-callout: none) {
-  /* Убираем momentum scrolling для body */
   body {
     -webkit-overflow-scrolling: auto;
   }
-  
-  /* Включаем smooth scrolling для контейнеров */
+
   #root > div {
     -webkit-overflow-scrolling: touch;
   }
-  
-  /* Предотвращаем pull-to-refresh */
+
   body {
     overscroll-behavior-y: none;
+  }
+}
+
+/* ===== iOS PWA standalone: закрашиваем зону safe-area снизу ===== */
+@media all and (display-mode: standalone) {
+  body {
+    background-color: var(--app-bg, #101122);
   }
 }
 
@@ -72,14 +87,19 @@ body {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: none;
 }
+
+#root {
+  touch-action: pan-y;
 }
-  
-  #root {
-    touch-action: pan-y
-  
-  /* Убираем лишний padding у scroll-контейнера */
-  #root > div {
-    padding-bottom: 0;
-    margin-bottom: 0;
+
+#root > div {
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* Принудительно убираем нижний safe-area отступ на iOS PWA */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  html, body, #root, #root > div {
+    padding-bottom: 0 !important;
   }
 }

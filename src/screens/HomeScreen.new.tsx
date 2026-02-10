@@ -40,6 +40,7 @@ export function HomeScreen({ navigation }: any) {
   const colors = useThemeColors();
   const resolvedTheme = useSettingsStore((s) => s.resolvedTheme);
   const isDarkMode = resolvedTheme === 'dark';
+  const headerBackground = isDarkMode ? 'rgba(0, 0, 0, 0)' : 'rgb(255, 255, 255)';
   const backdropColor = isDarkMode ? 'rgba(6, 8, 20, 0.65)' : 'rgba(0, 0, 0, 0.35)';
   const drawerBackground = isDarkMode ? '#15192f' : colors.surface;
   const drawerBorder = isDarkMode ? 'rgba(255,255,255,0.08)' : colors.border;
@@ -245,20 +246,21 @@ export function HomeScreen({ navigation }: any) {
   }, [isCreatingCourse]);
   
   // Вычисляем высоту контента: экран - header - tab bar
-  const TAB_BAR_HEIGHT = 56;
+  const safeBottomPad = 0; // убираем нижний safe-area/паддинг
+  const TAB_BAR_HEIGHT = 46;
   const contentMinHeight = windowHeight - headerHeight - TAB_BAR_HEIGHT;
 
   // Базовый стиль нижней навигации (должен совпадать с AppNavigator)
   const baseTabBarStyle = useMemo(
     () => ({
-      backgroundColor: colors.surface,
+      backgroundColor: 'rgba(0, 0, 0, 0)',
       borderTopWidth: 1,
       borderTopColor: colors.border,
-      paddingBottom: 20,
+      paddingBottom: safeBottomPad,
       paddingTop: 6,
-      height: 66,
+      height: TAB_BAR_HEIGHT,
     }),
-    [colors]
+    [colors, safeBottomPad, TAB_BAR_HEIGHT]
   );
 
   // Прячем tab bar, когда открыт боковой drawer
@@ -461,7 +463,7 @@ export function HomeScreen({ navigation }: any) {
         onLayout={onHeaderLayout}
         style={[
           styles.header,
-          { backgroundColor: colors.surface, borderBottomColor: colors.border },
+          { backgroundColor: headerBackground, borderBottomColor: colors.border },
         ]}
       >
         <View style={styles.headerLeft}>

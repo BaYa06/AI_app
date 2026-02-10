@@ -2,7 +2,7 @@
  * App Navigator
  * @description Главный навигатор приложения
  */
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -33,10 +33,16 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 
 function MainTabs() {
   const colors = useThemeColors();
+  const tabBarPaddingBottom = 0; // убираем нижний safe-area/паддинг
+  const tabBarHeight = 46; // фиксированная высота без inset
 
-  // Фиксированная высота tab bar для всех платформ
-  const tabBarHeight = 66;
-  const tabBarPaddingBottom = 20;
+  // Синхронизируем CSS-переменную --app-bg с текущей темой (для ios-pwa-fix.css)
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      document.documentElement.style.setProperty('--app-bg', colors.background);
+      document.body.style.backgroundColor = colors.background;
+    }
+  }, [colors.background]);
 
   return (
     <Tab.Navigator
@@ -45,8 +51,9 @@ function MainTabs() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textTertiary,
         tabBarShowLabel: false,
+        safeAreaInsets: { bottom: 0 },
         tabBarStyle: {
-          backgroundColor: colors.surface,
+          backgroundColor: 'rgba(0, 0, 0, 0)',
           borderTopWidth: 1,
           borderTopColor: colors.border,
           paddingBottom: tabBarPaddingBottom,

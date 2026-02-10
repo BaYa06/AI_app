@@ -12,6 +12,7 @@
         { "key": "Service-Worker-Allowed", "value": "/" }
       ]
     },
+
     {
       "source": "/manifest.webmanifest",
       "headers": [

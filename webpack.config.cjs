@@ -136,6 +136,7 @@ module.exports = (env, argv) => {
           FIREBASE_MESSAGING_SENDER_ID: envVars.FIREBASE_MESSAGING_SENDER_ID || process.env.FIREBASE_MESSAGING_SENDER_ID || '',
           FIREBASE_APP_ID: envVars.FIREBASE_APP_ID || process.env.FIREBASE_APP_ID || '',
           FIREBASE_MEASUREMENT_ID: envVars.FIREBASE_MEASUREMENT_ID || process.env.FIREBASE_MEASUREMENT_ID || '',
+          FIREBASE_VAPID_KEY: envVars.FIREBASE_VAPID_KEY || process.env.FIREBASE_VAPID_KEY || '',
         }),
       }),
       new webpack.ProvidePlugin({
@@ -149,6 +150,10 @@ module.exports = (env, argv) => {
       hot: true,
       open: false,
       historyApiFallback: true,
+      static: {
+        directory: path.join(__dirname, 'public'),
+        publicPath: '/',
+      },
       headers: {
         'Cache-Control': 'no-store',
       },

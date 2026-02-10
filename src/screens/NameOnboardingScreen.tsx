@@ -7,7 +7,7 @@ import { View, StyleSheet, Platform, KeyboardAvoidingView, ScrollView } from 're
 import { Button, Input, Text } from '@/components/common';
 import { spacing, borderRadius } from '@/constants';
 import { useThemeColors } from '@/store';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 
 type Props = {
   onContinue?: (fullName?: string) => void;
@@ -17,7 +17,7 @@ type Props = {
 
 export function NameOnboardingScreen({ onContinue, onSkip, onBack }: Props) {
   const colors = useThemeColors();
-  const insets = useSafeAreaInsets();
+
   const [name, setName] = useState('');
 
   return (

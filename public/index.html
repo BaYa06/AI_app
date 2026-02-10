@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, minimal-ui">
-  <meta name="theme-color" content="#7C3AED">
+  <meta name="theme-color" content="rgb(255, 255, 255)">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Flashly">
@@ -42,25 +42,30 @@
     
     html {
       position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
       overflow: hidden;
       width: 100%;
-      height: 100%;
     }
     
     body {
       position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
       margin: 0;
       padding: 0;
       width: 100%;
-      height: 100%;
       overflow: hidden;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
         'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
         sans-serif;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
-      background-color: #0f0f0f;
-      /* Запрещаем overscroll на iOS */
+      background-color: #101122;
       overscroll-behavior: none;
       overscroll-behavior-y: none;
       -webkit-overflow-scrolling: auto;
@@ -72,11 +77,9 @@
       left: 0;
       right: 0;
       bottom: 0;
-      width: 100%;
-      height: 100%;
       display: flex;
       flex-direction: column;
-      background-color: #0f0f0f;
+      background-color: #101122;
       overflow: hidden;
     }
     
@@ -87,8 +90,6 @@
       left: 0;
       right: 0;
       bottom: 0;
-      width: 100%;
-      height: 100%;
       overflow-y: auto;
       overflow-x: hidden;
       -webkit-overflow-scrolling: touch;
@@ -106,6 +107,11 @@
       #root > div {
         overflow-y: scroll;
         -webkit-overflow-scrolling: touch;
+      }
+
+      /* Убираем нижний safe-area отступ в iOS PWA */
+      html, body, #root, #root > div {
+        padding-bottom: 0 !important;
       }
     }
 

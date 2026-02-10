@@ -17,7 +17,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Button, Text } from '@/components/common';
 import { spacing, borderRadius } from '@/constants';
 import { useThemeColors } from '@/store';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 
 type Props = {
   onBack?: () => void;
@@ -26,7 +26,7 @@ type Props = {
 
 export function OTPVerifyScreen({ onBack, onSubmit }: Props) {
   const colors = useThemeColors();
-  const insets = useSafeAreaInsets();
+
   const codeLength = 5;
   const [code, setCode] = useState<string[]>(Array(codeLength).fill(''));
 

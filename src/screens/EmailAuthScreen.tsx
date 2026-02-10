@@ -97,7 +97,7 @@ export function EmailAuthScreen({ onBack }: Props) {
         {
           backgroundColor: colors.background,
           paddingTop: insets.top,
-          paddingBottom: Math.max(insets.bottom, spacing.l),
+          paddingBottom: spacing.l,
         },
       ]}
     >

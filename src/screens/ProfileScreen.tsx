@@ -3,12 +3,18 @@
  * @description Экран профиля и настроек
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, StyleSheet, ScrollView, Pressable, Alert, Switch } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable, Alert, Switch, ActivityIndicator } from 'react-native';
 import { useSettingsStore, useThemeColors } from '@/store';
 import { DatabaseService, supabase } from '@/services';
 import { Container, Text, Heading2, Heading3 } from '@/components/common';
 import { spacing, borderRadius } from '@/constants';
 import type { Session } from '@supabase/supabase-js';
+import {
+  requestPushPermission,
+  unsubscribePush,
+  getPushStatus,
+  type PushStatus,
+} from '@/services/pushNotifications';
 
 export function ProfileScreen() {
   const colors = useThemeColors();
@@ -17,6 +23,10 @@ export function ProfileScreen() {
   const updateSettings = useSettingsStore((s) => s.updateSettings);
   const toggleTheme = useSettingsStore((s) => s.toggleTheme);
   const [session, setSession] = useState<Session | null>(null);
+
+  // Push notifications state
+  const [pushStatus, setPushStatus] = useState<PushStatus | null>(null);
+  const [pushLoading, setPushLoading] = useState(false);
 
   // Подтягиваем актуальную сессию Supabase
   useEffect(() => {
@@ -36,6 +46,11 @@ export function ProfileScreen() {
       isMounted = false;
       data.subscription.unsubscribe();
     };
+  }, []);
+
+  // Проверяем текущий статус push-уведомлений
+  useEffect(() => {
+    getPushStatus().then(setPushStatus);
   }, []);
 
   const userEmail = session?.user?.email;
@@ -71,6 +86,35 @@ export function ProfileScreen() {
       String(settings.dailyNewCardsLimit)
     );
   }, [settings.dailyNewCardsLimit, updateSettings]);
+
+  // Push notifications toggle
+  const handleTogglePush = useCallback(async () => {
+    if (pushLoading) return;
+    setPushLoading(true);
+    try {
+      if (pushStatus?.permission === 'granted' && pushStatus?.token) {
+        // Отписка
+        const ok = await unsubscribePush();
+        if (ok) {
+          setPushStatus({ permission: 'default', token: null, isSupported: true });
+        }
+      } else {
+        // Подписка
+        const status = await requestPushPermission(userId);
+        setPushStatus(status);
+        if (status.permission === 'denied') {
+          Alert.alert(
+            'Уведомления заблокированы',
+            'Разрешите уведомления в настройках браузера и попробуйте снова.'
+          );
+        }
+      }
+    } catch (error) {
+      console.error('[Profile] Push toggle error:', error);
+    } finally {
+      setPushLoading(false);
+    }
+  }, [pushLoading, pushStatus, userId]);
 
   // Экспорт данных
   const handleExport = useCallback(async () => {
@@ -181,6 +225,37 @@ export function ProfileScreen() {
             onPress={() => {}}
             colors={colors}
           />
+        </View>
+
+        {/* Уведомления */}
+        <View style={[styles.card, { backgroundColor: colors.surface }]}>
+          <Heading3 style={styles.sectionTitle}>Уведомления</Heading3>
+
+          <View style={styles.settingsRow}>
+            <View style={{ flex: 1, marginRight: spacing.s }}>
+              <Text variant="body">Push-уведомления</Text>
+              <Text variant="caption" color="secondary" style={{ marginTop: 2 }}>
+                {pushStatus?.permission === 'granted' && pushStatus?.token
+                  ? 'Уведомления включены ✅'
+                  : pushStatus?.permission === 'denied'
+                  ? 'Заблокированы в настройках ⛔'
+                  : pushStatus?.isSupported === false || pushStatus?.permission === 'unsupported'
+                  ? 'Недоступно на этой платформе'
+                  : 'Напоминания о повторении карточек'}
+              </Text>
+            </View>
+            {pushLoading ? (
+              <ActivityIndicator color={colors.primary} />
+            ) : (
+              <Switch
+                value={pushStatus?.permission === 'granted' && !!pushStatus?.token}
+                onValueChange={handleTogglePush}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor={colors.surface}
+                disabled={pushStatus?.permission === 'denied' || pushStatus?.isSupported === false}
+              />
+            )}
+          </View>
         </View>
 
         {/* Данные */}

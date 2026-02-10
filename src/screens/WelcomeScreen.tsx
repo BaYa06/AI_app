@@ -33,7 +33,7 @@ export function WelcomeScreen({ onCreateAccount, onSignIn }: Props) {
         {
           backgroundColor: colors.background,
           paddingTop: Math.max(insets.top, spacing.xl),
-          paddingBottom: Math.max(insets.bottom, spacing.l),
+          paddingBottom: spacing.l,
         },
       ]}
     >

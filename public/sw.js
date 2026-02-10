@@ -1,12 +1,69 @@
 // ============================================================
-// Flashly Service Worker — production-safe, anti-black-screen
+// Flashly Service Worker — PWA cache + Firebase Cloud Messaging
 // ============================================================
 // ВАЖНО: bump CACHE_VERSION при каждом значимом изменении SW,
 // webpack contenthash в именах чанков позаботится об остальном.
-const CACHE_VERSION = 7;
+const CACHE_VERSION = 8;
 const CACHE_NAME = `flashly-static-v${CACHE_VERSION}`;
 
-// Ресурсы для precache (только иконки/статика без HTML — HTML всегда network-first)
+// ==================== FCM (Firebase Cloud Messaging) ====================
+// Compat-версия Firebase — единственная, которая стабильно работает в SW.
+importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js');
+
+firebase.initializeApp({
+  apiKey: 'AIzaSyAJIhirrPAvSLQRGI2ahDyV7oJKEQWGdA0',
+  authDomain: 'flashly-84e0a.firebaseapp.com',
+  projectId: 'flashly-84e0a',
+  storageBucket: 'flashly-84e0a.firebasestorage.app',
+  messagingSenderId: '509047998599',
+  appId: '1:509047998599:web:abc45e563dee361b185022',
+  measurementId: 'G-T7WRY5SBC6',
+});
+
+const messaging = firebase.messaging();
+
+// Background Push — когда страница НЕ в фокусе или закрыта
+messaging.onBackgroundMessage((payload) => {
+  console.log('[SW] Background push:', payload);
+
+  const notification = payload.notification || {};
+  const data = payload.data || {};
+
+  const title = notification.title || data.title || 'Flashly';
+  const options = {
+    body: notification.body || data.body || '',
+    icon: notification.icon || '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    tag: data.tag || 'flashly-notification',
+    data: { url: data.url || data.link || '/', ...data },
+  };
+
+  return self.registration.showNotification(title, options);
+});
+
+// Notification click — открываем нужную вкладку
+self.addEventListener('notificationclick', (event) => {
+  console.log('[SW] Notification click:', event.notification.tag);
+  event.notification.close();
+
+  const targetUrl = event.notification.data?.url || '/';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          client.navigate(targetUrl);
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(targetUrl);
+    })
+  );
+});
+
+// ==================== PWA CACHE ====================
+
 const PRECACHE_URLS = [
   '/icons/icon-192.png',
   '/icons/icon-512.png',
@@ -21,7 +78,6 @@ self.addEventListener('install', (event) => {
       .then((cache) => cache.addAll(PRECACHE_URLS))
       .catch((err) => console.warn('[SW] Precache failed:', err))
   );
-  // Не ждём, пока старый SW отпустит клиентов — активируемся сразу
   self.skipWaiting();
 });
 
@@ -40,7 +96,6 @@ self.addEventListener('activate', (event) => {
       )
     )
   );
-  // Берём контроль над ВСЕМИ открытыми вкладками немедленно
   self.clients.claim();
 });
 
@@ -48,39 +103,33 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
-  // Пропускаем не-GET и API-запросы
-  if (request.method !== 'GET' || request.url.includes('/api/')) {
+  // Пропускаем не-GET и API/FCM-запросы
+  if (request.method !== 'GET' || request.url.includes('/api/') || request.url.includes('googleapis.com')) {
     return;
   }
 
-  // === Navigation (HTML) — ВСЕГДА network-first ===
-  // Это ключ: после redeploy пользователь сразу получит свежий index.html
-  // с правильными ссылками на новые чанки.
+  // Navigation (HTML) — ВСЕГДА network-first
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          // Кэшируем свежий HTML для офлайна
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
           return response;
         })
         .catch(() => {
-          // Офлайн — отдаём закэшированную версию
           return caches.match(request).then((cached) => cached || caches.match('/index.html'));
         })
     );
     return;
   }
 
-  // === Статические ассеты (JS/CSS/изображения/шрифты) — cache-first ===
-  // Webpack добавляет contenthash в имена, поэтому cache-first безопасен.
+  // Статические ассеты — cache-first
   event.respondWith(
     caches.match(request).then((cached) => {
       if (cached) return cached;
 
       return fetch(request).then((response) => {
-        // Кэшируем только успешные ответы от нашего origin
         if (response.ok && response.type === 'basic') {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
