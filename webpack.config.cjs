@@ -109,6 +109,7 @@ module.exports = (env, argv) => {
           // Дублируем манифест как manifest.json для совместимости с клиентами, ожидающими json-расширение
           { from: 'public/manifest.webmanifest', to: 'manifest.json' },
           { from: 'public/sw.js', to: 'sw.js' },
+          { from: 'public/ios-pwa-fix.css', to: 'ios-pwa-fix.css' },
           { from: 'public/icons', to: 'icons' },
           // Шрифты для react-native-vector-icons
           { from: 'node_modules/react-native-vector-icons/Fonts/Ionicons.ttf', to: 'fonts/Ionicons.ttf' },
