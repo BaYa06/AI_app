@@ -1,5 +1,4 @@
 const path = require('path');
-const fs = require('fs');
 const express = require('express');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
@@ -111,6 +110,9 @@ module.exports = (env, argv) => {
           { from: 'public/sw.js', to: 'sw.js' },
           { from: 'public/ios-pwa-fix.css', to: 'ios-pwa-fix.css' },
           { from: 'public/icons', to: 'icons' },
+          // Аудио-файлы для звуковых эффектов викторин
+          { from: 'public/correct.wav', to: 'correct.wav' },
+          { from: 'public/correct2.wav', to: 'correct2.wav' },
           // Шрифты для react-native-vector-icons
           { from: 'node_modules/react-native-vector-icons/Fonts/Ionicons.ttf', to: 'fonts/Ionicons.ttf' },
         ],
@@ -157,27 +159,8 @@ module.exports = (env, argv) => {
         directory: path.join(__dirname, 'public'),
         publicPath: '/',
       },
-      // HTTPS config: use certs if available, otherwise fallback to HTTP (works for localhost)
-      server: (() => {
-        const keyPath = path.join(__dirname, '172.20.10.5-key.pem');
-        const certPath = path.join(__dirname, '172.20.10.5.pem');
-        
-        // Check if we have valid certs
-        if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
-          console.log('[webpack] Using HTTPS with custom certs');
-          return {
-            type: 'https',
-            options: {
-              key: fs.readFileSync(keyPath),
-              cert: fs.readFileSync(certPath),
-            },
-          };
-        }
-        
-        // Fallback to HTTP (Service Workers work on http://localhost)
-        console.log('[webpack] No certs found, using HTTP (OK for localhost)');
-        return undefined;
-      })(),
+      // Force plain HTTP dev server to avoid certificate prompts in PWA testing
+      server: { type: 'http' },
       headers: {
         'Cache-Control': 'no-store',
       },

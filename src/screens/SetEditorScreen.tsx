@@ -136,13 +136,11 @@ export function SetEditorScreen({ navigation, route }: Props) {
   const handleSelectSourceLanguage = useCallback((lang: string) => {
     setSourceLanguage(lang);
     setSourcePickerOpen(false);
-    setCategoryPickerOpen(false);
   }, []);
 
   const handleSelectTargetLanguage = useCallback((lang: string) => {
     setTargetLanguage(lang);
     setTargetPickerOpen(false);
-    setCategoryPickerOpen(false);
   }, []);
 
   const swapLanguages = useCallback(() => {
@@ -154,7 +152,6 @@ export function SetEditorScreen({ navigation, route }: Props) {
     });
     setSourcePickerOpen(false);
     setTargetPickerOpen(false);
-    setCategoryPickerOpen(false);
   }, [targetLanguage]);
 
   // Анимация появления/скрытия модального шита
@@ -222,7 +219,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
     } finally {
       setIsSaving(false);
     }
-  }, [title, description, category, isPublic, isEditing, setId, updateSet, addSet, navigation, closeSheet, activeCourseId]);
+  }, [title, description, category, isPublic, isEditing, setId, updateSet, addSet, navigation, closeSheet, courseId]);
 
   // Удаление
   const handleDelete = useCallback(() => {
@@ -388,45 +385,49 @@ export function SetEditorScreen({ navigation, route }: Props) {
                 Языки
               </Text>
               <View style={styles.languageRow}>
-                <SelectPill
-                  label={sourceLanguage}
-                  onPress={toggleSourcePicker}
-                  isOpen={sourcePickerOpen}
-                  colors={colors}
-                />
+                <View style={styles.languageSelectWrapper}>
+                  <SelectPill
+                    label={sourceLanguage}
+                    onPress={toggleSourcePicker}
+                    isOpen={sourcePickerOpen}
+                    colors={colors}
+                  />
+                  {sourcePickerOpen && (
+                    <LanguageDropdown
+                      options={SOURCE_LANGUAGES}
+                      selected={sourceLanguage}
+                      onSelect={handleSelectSourceLanguage}
+                      colors={colors}
+                    />
+                  )}
+                </View>
+
                 <Pressable
                   onPress={swapLanguages}
-                  style={[styles.swapButton, { backgroundColor: colors.surfaceVariant }]}
+                  style={[styles.swapButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
                 >
-                  <ArrowLeftRight size={18} color={colors.primary} />
+                  <ArrowLeftRight size={20} color={colors.primary} />
                 </Pressable>
-                <SelectPill
-                  label={targetLanguage}
-                  onPress={toggleTargetPicker}
-                  isOpen={targetPickerOpen}
-                  colors={colors}
-                />
+
+                <View style={styles.languageSelectWrapper}>
+                  <SelectPill
+                    label={targetLanguage}
+                    onPress={toggleTargetPicker}
+                    isOpen={targetPickerOpen}
+                    colors={colors}
+                  />
+                  {targetPickerOpen && (
+                    <LanguageDropdown
+                      options={TARGET_LANGUAGES}
+                      selected={targetLanguage}
+                      onSelect={handleSelectTargetLanguage}
+                      colors={colors}
+                    />
+                  )}
+                </View>
               </View>
-              {sourcePickerOpen && (
-                <LanguageDropdown
-                  options={SOURCE_LANGUAGES}
-                  selected={sourceLanguage}
-                  onSelect={handleSelectSourceLanguage}
-                  colors={colors}
-                  align="left"
-                />
-              )}
-              {targetPickerOpen && (
-                <LanguageDropdown
-                  options={TARGET_LANGUAGES}
-                  selected={targetLanguage}
-                  onSelect={handleSelectTargetLanguage}
-                  colors={colors}
-                  align="right"
-                />
-              )}
               <Text variant="caption" color="tertiary" style={styles.helperText}>
-                Используется для импорта и тренировок
+                Выберите язык источника и язык перевода
               </Text>
             </View>
 
@@ -435,25 +436,31 @@ export function SetEditorScreen({ navigation, route }: Props) {
               <Text variant="label" color="primary" style={styles.fieldLabel}>
                 Курс
               </Text>
-              <SelectPill
-                label={selectedCourseTitle}
-                onPress={toggleCoursePicker}
-                isOpen={coursePickerOpen}
-                colors={colors}
-              />
-              {coursePickerOpen && (
-                <CourseDropdown
-                  courses={courses}
-                  selectedCourseId={courseId}
-                  onSelect={(value) => {
-                    setCourseId(value);
-                    setCoursePickerOpen(false);
-                    setSourcePickerOpen(false);
-                    setTargetPickerOpen(false);
-                  }}
+              <View style={styles.courseSelectContainer}>
+                <SelectPill
+                  label={selectedCourseTitle}
+                  onPress={toggleCoursePicker}
+                  isOpen={coursePickerOpen}
                   colors={colors}
+                  fullWidth
                 />
-              )}
+                {coursePickerOpen && (
+                  <CourseDropdown
+                    courses={courses}
+                    selectedCourseId={courseId}
+                    onSelect={(value) => {
+                      setCourseId(value);
+                      setCoursePickerOpen(false);
+                      setSourcePickerOpen(false);
+                      setTargetPickerOpen(false);
+                    }}
+                    colors={colors}
+                  />
+                )}
+              </View>
+              <Text variant="caption" color="tertiary" style={styles.helperText}>
+                Организуйте наборы по курсам для удобного управления
+              </Text>
             </View>
 
             {/* Доступ */}
@@ -580,18 +587,25 @@ function SelectPill({
   onPress,
   colors,
   isOpen = false,
+  fullWidth = false,
 }: {
   label: string;
   onPress: () => void;
   colors: ReturnType<typeof useThemeColors>;
   isOpen?: boolean;
+  fullWidth?: boolean;
 }) {
   return (
     <Pressable
       onPress={onPress}
       style={[
         styles.select,
-        { backgroundColor: colors.surface, borderColor: colors.border, shadowColor: colors.shadow },
+        fullWidth && styles.selectFullWidth,
+        {
+          backgroundColor: colors.surface,
+          borderColor: isOpen ? colors.primary : colors.border,
+          shadowColor: colors.shadow
+        },
       ]}
     >
       <Text
@@ -602,9 +616,12 @@ function SelectPill({
         {label}
       </Text>
       <ChevronDown
-        size={16}
-        color={colors.textSecondary}
-        style={isOpen ? { transform: [{ rotate: '180deg' }] } : undefined}
+        size={18}
+        color={isOpen ? colors.primary : colors.textSecondary}
+        style={[
+          { transition: 'transform 0.2s ease' },
+          isOpen ? { transform: [{ rotate: '180deg' }] } : undefined,
+        ]}
       />
     </Pressable>
   );
@@ -615,49 +632,69 @@ function LanguageDropdown({
   selected,
   onSelect,
   colors,
-  align = 'left',
 }: {
   options: string[];
   selected: string;
   onSelect: (value: string) => void;
   colors: ReturnType<typeof useThemeColors>;
-  align?: 'left' | 'right';
 }) {
   return (
     <View
       style={[
-        styles.dropdown,
+        styles.languageDropdown,
         {
-          backgroundColor: colors.surface,
+          backgroundColor: colors.background,
           borderColor: colors.border,
           shadowColor: colors.shadow,
-          alignSelf: align === 'right' ? 'flex-end' : 'flex-start',
         },
       ]}
     >
-      {options.map((option) => {
-        const isActive = option === selected;
-        return (
-          <Pressable
-            key={option}
-            onPress={() => onSelect(option)}
-            style={[
-              styles.dropdownOption,
-              isActive && { backgroundColor: colors.surfaceVariant },
-            ]}
-          >
-            <Text
-              variant="body"
-              style={{
-                color: isActive ? colors.primary : colors.textPrimary,
-                fontWeight: isActive ? '700' : '600',
-              }}
+      <ScrollView
+        style={styles.languageDropdownScroll}
+        nestedScrollEnabled
+        showsVerticalScrollIndicator={false}
+      >
+        {options.map((option, index) => {
+          const isActive = option === selected;
+          const isFirst = index === 0;
+          const isLast = index === options.length - 1;
+          return (
+            <Pressable
+              key={option}
+              onPress={() => onSelect(option)}
+              style={({ pressed }) => [
+                styles.languageDropdownOption,
+                {
+                  backgroundColor: pressed && !isActive
+                    ? colors.surfaceVariant
+                    : isActive
+                    ? colors.primary + '12'
+                    : colors.surface,
+                  borderBottomColor: colors.border,
+                },
+                isFirst && styles.languageDropdownOptionFirst,
+                isLast && styles.languageDropdownOptionLast,
+              ]}
             >
-              {option}
-            </Text>
-          </Pressable>
-        );
-      })}
+              <Text
+                variant="body"
+                style={{
+                  color: isActive ? colors.primary : colors.textPrimary,
+                  fontWeight: isActive ? '700' : '600',
+                  fontSize: 15,
+                }}
+              >
+                {option}
+              </Text>
+              {isActive && (
+                <View style={[styles.checkmark, { backgroundColor: colors.primary }]}>
+                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>✓</Text>
+                </View>
+              )}
+            </Pressable>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 }
@@ -727,37 +764,60 @@ function CourseDropdown({
   return (
     <View
       style={[
-        styles.dropdown,
+        styles.courseDropdown,
         {
-          backgroundColor: colors.surface,
+          backgroundColor: colors.background,
           borderColor: colors.border,
           shadowColor: colors.shadow,
         },
       ]}
     >
-      {items.map((course) => {
-        const isActive = course.id === selectedCourseId;
-        return (
-          <Pressable
-            key={course.id ?? 'none'}
-            onPress={() => onSelect(course.id)}
-            style={[
-              styles.dropdownOption,
-              isActive && { backgroundColor: colors.surfaceVariant },
-            ]}
-          >
-            <Text
-              variant="body"
-              style={{
-                color: isActive ? colors.primary : colors.textPrimary,
-                fontWeight: isActive ? '700' : '600',
-              }}
+      <ScrollView
+        style={styles.courseDropdownScroll}
+        nestedScrollEnabled
+        showsVerticalScrollIndicator={false}
+      >
+        {items.map((course, index) => {
+          const isActive = course.id === selectedCourseId;
+          const isFirst = index === 0;
+          const isLast = index === items.length - 1;
+          return (
+            <Pressable
+              key={course.id ?? 'none'}
+              onPress={() => onSelect(course.id)}
+              style={({ pressed }) => [
+                styles.courseDropdownOption,
+                {
+                  backgroundColor: pressed && !isActive
+                    ? colors.surfaceVariant
+                    : isActive
+                    ? colors.primary + '12'
+                    : colors.surface,
+                  borderBottomColor: colors.border,
+                },
+                isFirst && styles.courseDropdownOptionFirst,
+                isLast && styles.courseDropdownOptionLast,
+              ]}
             >
-              {course.title}
-            </Text>
-          </Pressable>
-        );
-      })}
+              <Text
+                variant="body"
+                style={{
+                  color: isActive ? colors.primary : colors.textPrimary,
+                  fontWeight: isActive ? '700' : '600',
+                  fontSize: 15,
+                }}
+              >
+                {course.title}
+              </Text>
+              {isActive && (
+                <View style={[styles.checkmark, { backgroundColor: colors.primary }]}>
+                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>✓</Text>
+                </View>
+              )}
+            </Pressable>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 }
@@ -856,15 +916,60 @@ const styles = StyleSheet.create({
   },
   languageRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: spacing.s,
+    zIndex: 20,
+  },
+  languageSelectWrapper: {
+    flex: 1,
+    position: 'relative',
+    zIndex: 10,
   },
   swapButton: {
-    width: 42,
-    height: 42,
-    borderRadius: borderRadius.full,
+    width: 48,
+    height: 52,
+    borderRadius: borderRadius.l,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1.5,
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+    flexShrink: 0,
+  },
+  languageDropdown: {
+    marginTop: spacing.xs,
+    borderWidth: 1.5,
+    borderRadius: borderRadius.l,
+    maxHeight: 280,
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+    overflow: 'hidden',
+    zIndex: 100,
+    position: 'relative',
+  },
+  languageDropdownScroll: {
+    maxHeight: 280,
+  },
+  languageDropdownOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.m,
+    borderBottomWidth: 1,
+  },
+  languageDropdownOptionFirst: {
+    borderTopLeftRadius: borderRadius.l,
+    borderTopRightRadius: borderRadius.l,
+  },
+  languageDropdownOptionLast: {
+    borderBottomWidth: 0,
+    borderBottomLeftRadius: borderRadius.l,
+    borderBottomRightRadius: borderRadius.l,
   },
   select: {
     flexDirection: 'row',
@@ -872,16 +977,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.m,
     paddingVertical: spacing.s + 2,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderRadius: borderRadius.l,
     flex: 1,
     shadowOpacity: 0.05,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
+    minHeight: 52,
+    position: 'relative',
+    zIndex: 1,
+  },
+  selectFullWidth: {
+    width: '100%',
+    flex: undefined,
   },
   selectLabel: {
     fontWeight: '600',
+    flex: 1,
   },
   dropdown: {
     marginTop: spacing.xs,
@@ -896,6 +1009,52 @@ const styles = StyleSheet.create({
   dropdownOption: {
     paddingHorizontal: spacing.m,
     paddingVertical: spacing.s,
+  },
+  courseSelectContainer: {
+    position: 'relative',
+    width: '100%',
+    zIndex: 10,
+    marginBottom: spacing.s,
+  },
+  courseDropdown: {
+    marginTop: spacing.xs,
+    borderWidth: 1.5,
+    borderRadius: borderRadius.l,
+    maxHeight: 280,
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+    overflow: 'hidden',
+    zIndex: 100,
+    position: 'relative',
+  },
+  courseDropdownScroll: {
+    maxHeight: 280,
+  },
+  courseDropdownOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.m,
+    borderBottomWidth: 1,
+  },
+  courseDropdownOptionFirst: {
+    borderTopLeftRadius: borderRadius.l,
+    borderTopRightRadius: borderRadius.l,
+  },
+  courseDropdownOptionLast: {
+    borderBottomWidth: 0,
+    borderBottomLeftRadius: borderRadius.l,
+    borderBottomRightRadius: borderRadius.l,
+  },
+  checkmark: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   deleteLink: {
     alignSelf: 'flex-start',

@@ -18,7 +18,7 @@ export const colors = {
     info: '#3B82F6',
     
     // Фон
-    background: '#f6f6f8',
+    background: '#FFFFFF',
     surface: '#FFFFFF',
     surfaceVariant: '#F3F4F6',
     

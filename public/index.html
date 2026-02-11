@@ -122,7 +122,7 @@
       left: 0;
       right: 0;
       bottom: 0;
-      background: linear-gradient(135deg, #7C3AED 0%, #9333EA 100%);
+      background: #ffffff;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -135,22 +135,33 @@
     }
     .splash-content {
       text-align: center;
-      color: white;
+      color: #1a1a1a;
+    }
+    .splash-logo-circle {
+      width: 80px;
+      height: 80px;
+      background-color: rgba(243, 244, 246, 0.8);
+      border-radius: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
     }
     .splash-icon {
-      width: 140px;
-      max-width: 70vw;
-      height: auto;
-      margin-bottom: 16px;
+      width: 48px;
+      height: 48px;
+      fill: #6467f2;
     }
     .splash-title {
-      font-size: 28px;
-      font-weight: 700;
-      margin-bottom: 8px;
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 4px;
+      color: #1a1a1a;
     }
     .splash-subtitle {
-      font-size: 14px;
-      opacity: 0.8;
+      font-size: 16px;
+      color: #6b7280;
     }
   </style>
 </head>
@@ -158,9 +169,13 @@
   <!-- Splash Screen -->
   <div class="splash" id="splash">
     <div class="splash-content">
-      <img src="/icons/splash-illustration.svg" alt="Flashly cards" class="splash-icon">
+      <div class="splash-logo-circle">
+        <svg class="splash-icon" viewBox="0 0 512 512">
+          <path d="M315.27 33L96 304h128l-31.51 173.23a2.36 2.36 0 002.33 2.77h0a2.36 2.36 0 001.89-.95L416 208H288l31.66-173.25a2.45 2.45 0 00-2.44-2.75h0a2.42 2.42 0 00-1.95 1z"/>
+        </svg>
+      </div>
       <div class="splash-title">Flashly</div>
-      <div class="splash-subtitle">Учи слова эффективно</div>
+      <div class="splash-subtitle">Learn smarter. Remember longer.</div>
     </div>
   </div>
 

@@ -3,7 +3,7 @@
 // ============================================================
 // ВАЖНО: bump CACHE_VERSION при каждом значимом изменении SW,
 // webpack contenthash в именах чанков позаботится об остальном.
-const CACHE_VERSION = 8;
+const CACHE_VERSION = 9;
 const CACHE_NAME = `flashly-static-v${CACHE_VERSION}`;
 
 // ==================== FCM (Firebase Cloud Messaging) ====================
@@ -68,6 +68,8 @@ const PRECACHE_URLS = [
   '/icons/icon-192.png',
   '/icons/icon-512.png',
   '/icons/splash-illustration.svg',
+  '/correct.wav',
+  '/correct2.wav',
 ];
 
 // ------ Install: precache + мгновенная активация ------

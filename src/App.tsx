@@ -7,7 +7,7 @@ import { Linking, Platform, View, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AppNavigator } from '@/navigation';
-import { Loading } from '@/components/common';
+import { LoadingSplash } from '@/components/common';
 import { DatabaseService, setupAutoSave, supabase, NeonService, setAnalyticsUserId } from '@/services';
 import { refreshPushToken, subscribeForegroundMessages } from '@/services/pushNotifications';
 import { useThemeColors, useSettingsStore } from '@/store';
@@ -100,7 +100,7 @@ function AppRoot({
   const appContent = (
     <>
       {!isReady ? (
-        <Loading fullScreen message="Загрузка..." />
+        <LoadingSplash />
       ) : isAuthenticated ? (
         <AppNavigator />
       ) : (
@@ -144,9 +144,9 @@ function AppRoot({
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Safe-area зона сверху под цвет темы */}
-      <View style={{ height: top, backgroundColor: colors.background }} />
+    <View style={{ flex: 1, backgroundColor: isReady ? colors.background : '#ffffff' }}>
+      {/* Safe-area зона сверху под цвет темы (белая на загрузке) */}
+      <View style={{ height: top, backgroundColor: isReady ? colors.background : '#ffffff' }} />
 
       <GestureHandlerRootView style={{ flex: 1 }}>
         {Platform.OS === 'web' ? (

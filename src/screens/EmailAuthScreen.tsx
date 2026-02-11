@@ -9,6 +9,7 @@ import {
   Platform,
   StyleSheet,
   View,
+  ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -96,8 +97,6 @@ export function EmailAuthScreen({ onBack }: Props) {
         styles.screen,
         {
           backgroundColor: colors.background,
-          paddingTop: insets.top,
-          paddingBottom: spacing.l,
         },
       ]}
     >
@@ -105,7 +104,7 @@ export function EmailAuthScreen({ onBack }: Props) {
         style={styles.shell}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={styles.navBar}>
+        <View style={[styles.navBar, { paddingTop: insets.top }]}>
           <Button
             title=""
             variant="ghost"
@@ -115,54 +114,65 @@ export function EmailAuthScreen({ onBack }: Props) {
           />
         </View>
 
-        <View style={styles.content}>
-          <View style={styles.heading}>
-            <Text variant="h1" style={[styles.title, { color: colors.textPrimary }]}>
-              Войти через Google
-            </Text>
-            <Text variant="body" color="secondary">
-              Мы откроем системный браузер, вы выберете аккаунт Google, и вернётесь в приложение
-              с активной сессией Supabase.
-            </Text>
+        <ScrollView
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: Math.max(insets.bottom, spacing.l) }
+          ]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.contentWrapper}>
+            <View style={styles.content}>
+              <View style={styles.heading}>
+                <Text variant="h1" style={[styles.title, { color: colors.textPrimary }]}>
+                  Войти через Google
+                </Text>
+                <Text variant="body" color="secondary">
+                  Мы откроем системный браузер, вы выберете аккаунт Google, и вернётесь в приложение
+                  с активной сессией Supabase.
+                </Text>
+              </View>
+
+              <Button
+                title="Continue with Google"
+                onPress={signInWithGoogle}
+                fullWidth
+                disabled={isLoading}
+                leftIcon={<Ionicons name="logo-google" size={18} color={colors.surface} />}
+              />
+
+              {isLoading && (
+                <View style={styles.indicatorRow}>
+                  <ActivityIndicator color={colors.primary} />
+                  <Text variant="bodySmall" color="secondary" style={styles.indicatorText}>
+                    Открываем Google…
+                  </Text>
+                </View>
+              )}
+
+              {session?.user && (
+                <View style={[styles.sessionCard, { borderColor: colors.border }]}>
+                  <Text variant="body" style={{ color: colors.textPrimary }}>
+                    Вы вошли
+                  </Text>
+                  <Text variant="bodySmall" color="secondary">
+                    User ID: {session.user.id}
+                  </Text>
+                  <Text variant="bodySmall" color="secondary">
+                    Email: {session.user.email ?? '—'}
+                  </Text>
+                </View>
+              )}
+
+              {authError && (
+                <Text variant="bodySmall" color="error" style={styles.error}>
+                  {authError}
+                </Text>
+              )}
+            </View>
           </View>
-
-          <Button
-            title="Continue with Google"
-            onPress={signInWithGoogle}
-            fullWidth
-            disabled={isLoading}
-            leftIcon={<Ionicons name="logo-google" size={18} color={colors.surface} />}
-          />
-
-          {isLoading && (
-            <View style={styles.indicatorRow}>
-              <ActivityIndicator color={colors.primary} />
-              <Text variant="bodySmall" color="secondary" style={styles.indicatorText}>
-                Открываем Google…
-              </Text>
-            </View>
-          )}
-
-          {session?.user && (
-            <View style={[styles.sessionCard, { borderColor: colors.border }]}>
-              <Text variant="body" style={{ color: colors.textPrimary }}>
-                Вы вошли
-              </Text>
-              <Text variant="bodySmall" color="secondary">
-                User ID: {session.user.id}
-              </Text>
-              <Text variant="bodySmall" color="secondary">
-                Email: {session.user.email ?? '—'}
-              </Text>
-            </View>
-          )}
-
-          {authError && (
-            <Text variant="bodySmall" color="error" style={styles.error}>
-              {authError}
-            </Text>
-          )}
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </View>
   );
@@ -188,11 +198,19 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignSelf: 'flex-start',
   },
-  content: {
+  scrollContent: {
+    flexGrow: 1,
+  },
+  contentWrapper: {
     flex: 1,
-    paddingHorizontal: spacing.l,
-    gap: spacing.m,
+    alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: spacing.m,
+  },
+  content: {
+    width: '100%',
+    maxWidth: 480,
+    gap: spacing.m,
   },
   heading: {
     gap: spacing.s,

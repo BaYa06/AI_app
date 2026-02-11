@@ -3,7 +3,7 @@
  * @description Онбординг / заглушка авторизации. Показываем, если нет аккаунта.
  */
 import React from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
+import { View, StyleSheet, ScrollView } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Button, Text } from '@/components/common';
 import { useThemeColors } from '@/store';
@@ -32,14 +32,19 @@ export function WelcomeScreen({ onCreateAccount, onSignIn }: Props) {
         styles.screen,
         {
           backgroundColor: colors.background,
-          paddingTop: Math.max(insets.top, spacing.xl),
-          paddingBottom: spacing.l,
         },
       ]}
     >
-      {/* Легкая подсветка фона */}
-      <View style={[styles.glow, { backgroundColor: colors.primary, opacity: 0.12 }]} />
-
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingTop: Math.max(insets.top, spacing.xl),
+            paddingBottom: Math.max(insets.bottom, spacing.l),
+          },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
       <View
         style={[
           styles.shell,
@@ -118,6 +123,7 @@ export function WelcomeScreen({ onCreateAccount, onSignIn }: Props) {
 
         <View style={[styles.homeIndicator, { backgroundColor: colors.border }]} />
       </View>
+      </ScrollView>
     </View>
   );
 }
@@ -125,23 +131,16 @@ export function WelcomeScreen({ onCreateAccount, onSignIn }: Props) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 0,
+    minHeight: '100%',
   },
-  glow: {
-    position: 'absolute',
-    top: -120,
-    width: 380,
-    height: 380,
-    borderRadius: 190,
-    transform: [{ scaleX: 1.2 }],
-    filter: Platform.OS === 'web' ? 'blur(120px)' : undefined,
-    opacity: 0.15,
-  } as any,
   shell: {
     width: '100%',
-    maxWidth: '100%',
+    maxWidth: 480,
     borderRadius: 0,
     paddingHorizontal: spacing.l,
     paddingVertical: spacing.xl,
@@ -156,7 +155,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.l,
   },
   logoCircle: {
-    backgroundColor: 'rgba(100, 103, 242, 0.14)',
+    backgroundColor: 'rgba(243, 244, 246, 0.8)',
     padding: spacing.m,
     borderRadius: 18,
   },

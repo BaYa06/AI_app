@@ -10,6 +10,7 @@ import { useCardsStore, useSetsStore, useThemeColors, useSettingsStore, selectSe
 import { spacing, borderRadius } from '@/constants';
 import { calculateNextReview } from '@/services/SRSService';
 import { speak, detectLanguage } from '@/utils/speech';
+import { playCorrectSound, preloadSound } from '@/utils/sound';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card, Rating } from '@/types';
 
@@ -199,42 +200,9 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
     return 'neutral';
   };
 
-  const playCorrectSound = useCallback(() => {
-    const AudioCtor = (global as any).Audio;
-    if (AudioCtor) {
-      try {
-        const audio = new AudioCtor('/correct.wav');
-        audio.volume = 0.7;
-        audio.play().catch(() => {});
-        return;
-      } catch {
-        // fallback ниже
-      }
-    }
-    const AudioContextCtor =
-      (global as any).AudioContext || (global as any).webkitAudioContext || null;
-    if (!AudioContextCtor) return;
-
-    try {
-      const ctx = new AudioContextCtor();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const duration = 0.18;
-
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, ctx.currentTime);
-      gain.gain.setValueAtTime(0.18, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start();
-      osc.stop(ctx.currentTime + duration);
-      osc.onended = () => ctx.close();
-    } catch {
-      // ignore silently
-    }
+  // Предзагружаем звук при монтировании компонента
+  useEffect(() => {
+    preloadSound('/correct.wav');
   }, []);
 
   const finishQuiz = React.useCallback(

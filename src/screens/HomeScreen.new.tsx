@@ -3,7 +3,7 @@
  * @description Главная страница с современным дизайном
  */
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { View, StyleSheet, ScrollView, Pressable, TextInput, useWindowDimensions, TextInput as RNTextInput, Alert, Platform, Modal } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable, TextInput, useWindowDimensions, TextInput as RNTextInput, Modal } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import type { PanGestureHandlerStateChangeEvent } from 'react-native-gesture-handler';
 import { useFocusEffect } from '@react-navigation/native';
@@ -60,6 +60,7 @@ export function HomeScreen({ navigation }: any) {
   const [newCourseTitle, setNewCourseTitle] = useState('');
   const [isCreatingCourse, setIsCreatingCourse] = useState(false);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [deleteModalCourseId, setDeleteModalCourseId] = useState<string | null>(null);
   const editInputRef = useRef<RNTextInput>(null);
   const newCourseInputRef = useRef<RNTextInput>(null);
   const editModalInputRef = useRef<RNTextInput>(null);
@@ -114,12 +115,9 @@ export function HomeScreen({ navigation }: any) {
   const createCourse = useCoursesStore((s) => s.createCourse);
   const renameCourse = useCoursesStore((s) => s.renameCourse);
   const deleteCourse = useCoursesStore((s) => s.deleteCourse);
-  const getActiveCourse = useCoursesStore((s) => s.getActiveCourse);
-  
+
   // Sets store
   const allSets = useSetsStore((s) => s.getAllSets());
-  const getSetsByCourse = useSetsStore((s) => s.getSetsByCourse);
-  const moveSetsFromCourse = useSetsStore((s) => s.moveSetsFromCourse);
   const courseOrder = useMemo(() => [null, ...courses.map((c) => c.id)], [courses]);
   const totalMastered = useMemo(
     () => allSets.reduce((sum, set) => sum + (set.masteredCount || 0), 0),
@@ -355,6 +353,12 @@ export function HomeScreen({ navigation }: any) {
     },
     [allSets]
   );
+
+  const formatSetWord = useCallback((count: number) => {
+    if (count === 1) return 'набор';
+    if (count >= 2 && count <= 4) return 'набора';
+    return 'наборов';
+  }, []);
   
   // Обработка создания нового курса
   const handleCreateCourse = useCallback(() => {
@@ -369,50 +373,47 @@ export function HomeScreen({ navigation }: any) {
     setIsCreatingCourse(false);
     setNewCourseTitle('');
   }, [newCourseTitle, createCourse]);
-  
-  // Обработка удаления курса
-  const handleDeleteCourse = useCallback((courseId: string) => {
-    const course = courses.find((c) => c.id === courseId);
-    const stats = getCourseStats(courseId);
-    const setCount = stats.setCount;
 
-    // Проверяем есть ли наборы в курсе
-    if (setCount > 0) {
-      const setWord = setCount === 1 ? 'набор' : setCount < 5 ? 'набора' : 'наборов';
-      const text = `Невозможно удалить курс "${course?.title}".\n\nВ этом курсе ${setCount} ${setWord}. Сначала удалите все наборы из этого курса.`;
-      
-      if (Platform.OS === 'web') {
-        window.alert(text);
-      } else {
-        Alert.alert('Удаление невозможно', text, [{ text: 'Понятно' }]);
-      }
-      setCourseMenuOpen(null);
-      return;
+  const deleteModalCourse = useMemo(
+    () => courses.find((c) => c.id === deleteModalCourseId) || null,
+    [courses, deleteModalCourseId]
+  );
+
+  const deleteModalStats = useMemo(
+    () => (deleteModalCourseId ? getCourseStats(deleteModalCourseId) : null),
+    [deleteModalCourseId, getCourseStats]
+  );
+
+  const deleteModalHasSets = deleteModalStats ? deleteModalStats.setCount > 0 : false;
+
+  const deleteModalMessage = useMemo(() => {
+    if (!deleteModalCourse || !deleteModalStats) return '';
+    if (deleteModalHasSets) {
+      const setWord = formatSetWord(deleteModalStats.setCount);
+      return `В курсе "${deleteModalCourse.title}" ${deleteModalStats.setCount} ${setWord}. Переместите наборы в другие курсы или удалите их.`;
     }
+    return `Удалить курс "${deleteModalCourse.title}"?`;
+  }, [deleteModalCourse, deleteModalHasSets, deleteModalStats, formatSetWord]);
 
-    // Если наборов нет - подтверждаем удаление
-    const performDelete = () => {
-      deleteCourse(courseId);
-      setCourseMenuOpen(null);
-    };
+  // Обработка удаления курса через модальное окно
+  const openDeleteModal = useCallback((courseId: string) => {
+    setCourseMenuOpen(null);
+    setDeleteModalCourseId(courseId);
+    setDrawerOpen(false);
+  }, []);
 
-    const message = `Удалить курс "${course?.title}"?`;
+  const closeDeleteModal = useCallback(() => {
+    setDeleteModalCourseId(null);
+  }, []);
 
-    if (Platform.OS === 'web') {
-      if (window.confirm(message)) {
-        performDelete();
-      }
-    } else {
-      Alert.alert(
-        'Удаление курса',
-        message,
-        [
-          { text: 'Отмена', style: 'cancel' },
-          { text: 'Удалить', style: 'destructive', onPress: performDelete },
-        ]
-      );
-    }
-  }, [courses, getCourseStats, deleteCourse]);
+  const confirmDeleteCourse = useCallback(() => {
+    if (!deleteModalCourseId) return;
+    const stats = getCourseStats(deleteModalCourseId);
+    if (stats.setCount > 0) return;
+
+    deleteCourse(deleteModalCourseId);
+    setDeleteModalCourseId(null);
+  }, [deleteModalCourseId, deleteCourse, getCourseStats]);
 
   const saveCourseTitle = useCallback(
     (courseId: string) => {
@@ -742,10 +743,16 @@ export function HomeScreen({ navigation }: any) {
           <Pressable
             style={[styles.backdrop, { backgroundColor: backdropColor }]}
             onPress={() => {
-              setCourseMenuOpen(null);
-              setEditingCourseId(null);
-              setIsCreatingCourse(false);
-              setDrawerOpen(false);
+              if (courseMenuOpen) {
+                // Если меню курса открыто, просто закрываем его
+                setCourseMenuOpen(null);
+              } else {
+                // Иначе закрываем весь drawer
+                setCourseMenuOpen(null);
+                setEditingCourseId(null);
+                setIsCreatingCourse(false);
+                setDrawerOpen(false);
+              }
             }}
           />
           <View
@@ -759,12 +766,6 @@ export function HomeScreen({ navigation }: any) {
               },
             ]}
           >
-            {courseMenuOpen && (
-              <Pressable
-                style={styles.drawerOverlay}
-                onPress={() => setCourseMenuOpen(null)}
-              />
-            )}
             <View style={styles.drawerHeader}>
               <Text style={[styles.drawerTitle, { color: colors.textPrimary }]}>Courses</Text>
               <Pressable style={styles.drawerIconButton} onPress={() => setDrawerOpen(false)}>
@@ -972,7 +973,7 @@ export function HomeScreen({ navigation }: any) {
                             ]}
                             onPress={(e) => {
                               e.stopPropagation();
-                              handleDeleteCourse(course.id);
+                              openDeleteModal(course.id);
                             }}
                           >
                             <Trash2 size={16} color={colors.error} style={{ marginRight: spacing.s }} />
@@ -1027,7 +1028,7 @@ export function HomeScreen({ navigation }: any) {
             <View
               style={[
                 styles.editModalInputContainer,
-                { backgroundColor: colors.surfaceVariant || colors.border, borderColor: colors.primary },
+                { backgroundColor: colors.surfaceVariant || colors.border, borderColor: colors.border },
               ]}
             >
               <Folder size={20} color={colors.primary} />
@@ -1062,6 +1063,75 @@ export function HomeScreen({ navigation }: any) {
               >
                 <Text style={[styles.editModalButtonText, { color: '#FFFFFF' }]}>
                   Save
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Delete Course Modal */}
+      <Modal
+        visible={deleteModalCourseId !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={closeDeleteModal}
+      >
+        <Pressable style={styles.modalOverlay} onPress={closeDeleteModal}>
+          <Pressable
+            style={[
+              styles.editModalContent,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.editModalHeader}>
+              <Text style={[styles.editModalTitle, { color: colors.textPrimary }]}>
+                Удаление курса
+              </Text>
+              <Pressable onPress={closeDeleteModal}>
+                <X size={20} color={colors.textSecondary} />
+              </Pressable>
+            </View>
+
+            <Text style={[styles.deleteModalMessage, { color: colors.textPrimary }]}>
+              {deleteModalMessage}
+            </Text>
+            {deleteModalHasSets && (
+              <Text style={[styles.deleteModalWarning, { color: colors.warning }]}>
+                Удаление недоступно: сначала переместите наборы.
+              </Text>
+            )}
+
+            <View style={styles.editModalButtons}>
+              <Pressable
+                style={[styles.editModalButton, { backgroundColor: colors.border }]}
+                onPress={closeDeleteModal}
+              >
+                <Text style={[styles.editModalButtonText, { color: colors.textSecondary }]}>
+                  Отмена
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.editModalButton,
+                  styles.deleteModalButton,
+                  deleteModalHasSets
+                    ? { backgroundColor: colors.border }
+                    : { backgroundColor: colors.error },
+                ]}
+                onPress={confirmDeleteCourse}
+                disabled={deleteModalHasSets}
+              >
+                <Text
+                  style={[
+                    styles.editModalButtonText,
+                    deleteModalHasSets
+                      ? { color: colors.textSecondary }
+                      : { color: '#FFFFFF' },
+                  ]}
+                >
+                  Удалить
                 </Text>
               </Pressable>
             </View>
@@ -1653,7 +1723,7 @@ const styles = StyleSheet.create({
     zIndex: 40,
     borderRightWidth: 1,
     paddingHorizontal: spacing.m,
-    paddingTop: spacing.l,
+    paddingTop: 40,
     paddingBottom: spacing.l,
     shadowColor: '#000',
     shadowOffset: { width: 2, height: 0 },
@@ -1817,14 +1887,6 @@ const styles = StyleSheet.create({
   courseMoreButton: {
     padding: spacing.xs,
   },
-  drawerOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 5,
-  },
   courseMenu: {
     position: 'absolute',
     top: spacing.s,
@@ -1905,6 +1967,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     padding: 0,
     margin: 0,
+    // @ts-ignore
+    outlineStyle: 'none',
   },
   editModalButtons: {
     flexDirection: 'row',
@@ -1923,6 +1987,19 @@ const styles = StyleSheet.create({
   editModalButtonText: {
     fontSize: 15,
     fontWeight: '700',
+  },
+  deleteModalMessage: {
+    fontSize: 15,
+    lineHeight: 20,
+    marginBottom: spacing.m,
+  },
+  deleteModalWarning: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: spacing.m,
+  },
+  deleteModalButton: {
+    borderWidth: 0,
   },
 
   // Streak modal
