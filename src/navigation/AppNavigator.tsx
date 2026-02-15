@@ -23,8 +23,11 @@ import { SetEditorScreen } from '@/screens/SetEditorScreen';
 import { MatchScreen } from '@/screens/MatchScreen';
 import { MultipleChoiceScreen } from '@/screens/MultipleChoiceScreen';
 import { WordBuilderScreen } from '@/screens/WordBuilderScreen';
+import { AudioLearningScreen } from '@/screens/AudioLearningScreen';
 import { StudyScreen } from '@/screens/StudyScreen';
 import { StudyPlaceholderScreen } from '@/screens/StudyPlaceholderScreen';
+import { AchievementsScreen } from '@/screens/AchievementsScreen';
+import { NotificationSettingsScreen } from '@/screens/NotificationSettingsScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -33,8 +36,8 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 
 function MainTabs() {
   const colors = useThemeColors();
-  const tabBarPaddingBottom = 0; // убираем нижний safe-area/паддинг
-  const tabBarHeight = 46; // фиксированная высота без inset
+  const tabBarPaddingBottom = Platform.OS === 'android' ? 15 : 0;
+  const tabBarHeight = 46 + tabBarPaddingBottom;
 
   // Синхронизируем CSS-переменную --app-bg с текущей темой (для ios-pwa-fix.css)
   useEffect(() => {
@@ -48,14 +51,17 @@ function MainTabs() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
+        lazy: true,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textTertiary,
         tabBarShowLabel: false,
         safeAreaInsets: { bottom: 0 },
         tabBarStyle: {
-          backgroundColor: 'rgba(0, 0, 0, 0)',
+          backgroundColor: colors.background,
           borderTopWidth: 1,
           borderTopColor: colors.border,
+          elevation: 0,
+          shadowOpacity: 0,
           paddingBottom: tabBarPaddingBottom,
           paddingTop: 6,
           height: tabBarHeight,
@@ -129,7 +135,7 @@ export function AppNavigator() {
           contentStyle: {
             backgroundColor: colors.background,
           },
-          animation: 'slide_from_right',
+          animation: Platform.OS === 'android' ? 'fade' : 'slide_from_right',
           gestureEnabled: Platform.OS === 'ios',
         }}
       >
@@ -159,6 +165,11 @@ export function AppNavigator() {
           options={{ headerShown: false }}
         />
         <Stack.Screen
+          name="AudioLearning"
+          component={AudioLearningScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
           name="Study"
           component={StudyScreen}
           options={{
@@ -180,6 +191,20 @@ export function AppNavigator() {
           name="CardEditor"
           component={CardEditorScreen}
           options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="Achievements"
+          component={AchievementsScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="NotificationSettings"
+          component={NotificationSettingsScreen}
+          options={{
+            headerShown: false,
+            animation: 'slide_from_right',
+            animationDuration: 300,
+          }}
         />
         <Stack.Screen
           name="SetEditor"

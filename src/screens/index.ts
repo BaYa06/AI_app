@@ -13,3 +13,5 @@ export { CardEditorScreen } from './CardEditorScreen';
 export { SetEditorScreen } from './SetEditorScreen';
 export { MatchScreen } from './MatchScreen';
 export { MultipleChoiceScreen } from './MultipleChoiceScreen';
+export { AudioLearningScreen } from './AudioLearningScreen';
+export { NotificationSettingsScreen } from './NotificationSettingsScreen';

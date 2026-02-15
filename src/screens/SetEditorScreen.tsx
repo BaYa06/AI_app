@@ -9,7 +9,6 @@ import {
   ScrollView,
   TextInput,
   Pressable,
-  StatusBar,
   Alert,
   Animated,
   Easing,
@@ -258,12 +257,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
   }, [setId, deleteCardsBySet, deleteSet, navigation]);
 
   return (
-    <View style={[styles.backdrop, { backgroundColor: colors.overlay }]}>
-      <StatusBar
-        translucent
-        backgroundColor="rgba(0,0,0,0.25)"
-        barStyle={theme === 'dark' ? 'light-content' : 'dark-content'}
-      />
+    <View style={[styles.backdrop, { backgroundColor: Platform.OS === 'android' ? 'transparent' : colors.overlay }]}>
       <View style={styles.safeArea}>
         <Animated.View
           style={[
@@ -325,7 +319,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
                   onChangeText={setTitle}
                   placeholder="Например: Путешествия (A1)"
                   placeholderTextColor={colors.textTertiary}
-                  style={[styles.input, { color: colors.textPrimary, outlineStyle: 'none' }]}
+                  style={[styles.input, { color: colors.textPrimary }, Platform.OS === 'web' && { outlineStyle: 'none' }]}
                   onFocus={() => setTitleFocused(true)}
                   onBlur={() => setTitleFocused(false)}
                   maxLength={100}
@@ -369,7 +363,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
                   onChangeText={setDescription}
                   placeholder="Для каких тем/уровня и как использовать"
                   placeholderTextColor={colors.textTertiary}
-                  style={[styles.textarea, { color: colors.textPrimary, outlineStyle: 'none' }]}
+                  style={[styles.textarea, { color: colors.textPrimary }, Platform.OS === 'web' && { outlineStyle: 'none' }]}
                   multiline
                   maxLength={DESCRIPTION_LIMIT}
                   onFocus={() => setDescriptionFocused(true)}

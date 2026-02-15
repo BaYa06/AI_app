@@ -1,14 +1,36 @@
 /**
  * Sound utility for playing audio files across platforms
- * Works on web (localhost and production) with fallback to synthesized sound
+ * Web: HTML5 Audio API with AudioContext fallback
+ * Native (Android/iOS): react-native-sound from assets
  */
 
-// Кеш для предзагруженных аудио файлов
+import { Platform } from 'react-native';
+import Sound from 'react-native-sound';
+
+const isNative = Platform.OS !== 'web';
+
+// Enable playback in silence mode (iOS)
+if (isNative) {
+  Sound.setCategory('Playback');
+}
+
+// Native sound cache
+const nativeSoundCache = new Map<string, any>();
+
+// Web audio cache
 const audioCache = new Map<string, HTMLAudioElement>();
 
 /**
- * Получить правильный Audio конструктор в зависимости от окружения
+ * Convert URL like '/correct.wav' to native asset path.
+ * Android: needs 'asset:/' prefix to load from assets/ directory.
  */
+function urlToAssetName(url: string): string {
+  const name = url.replace(/^\//, '');
+  return Platform.OS === 'android' ? `asset:/${name}` : name;
+}
+
+// ----------------- Web helpers -----------------
+
 function getAudioConstructor(): typeof Audio | null {
   if (typeof window !== 'undefined' && window.Audio) {
     return window.Audio;
@@ -16,55 +38,19 @@ function getAudioConstructor(): typeof Audio | null {
   if (typeof globalThis !== 'undefined' && (globalThis as any).Audio) {
     return (globalThis as any).Audio;
   }
-  if (typeof global !== 'undefined' && (global as any).Audio) {
-    return (global as any).Audio;
-  }
   return null;
 }
 
-/**
- * Получить AudioContext конструктор для fallback синтезированного звука
- */
 function getAudioContextConstructor(): typeof AudioContext | null {
   if (typeof window !== 'undefined') {
     return (window as any).AudioContext || (window as any).webkitAudioContext || null;
   }
-  if (typeof globalThis !== 'undefined') {
-    return (globalThis as any).AudioContext || (globalThis as any).webkitAudioContext || null;
-  }
   return null;
 }
 
-/**
- * Предзагрузить аудио файл для быстрого воспроизведения
- */
-export function preloadSound(url: string): void {
-  const AudioCtor = getAudioConstructor();
-  if (!AudioCtor) {
-    console.warn('[sound] Audio not available, cannot preload');
-    return;
-  }
-
-  try {
-    const audio = new AudioCtor(url);
-    audio.preload = 'auto';
-    audio.load();
-    audioCache.set(url, audio);
-    console.log('[sound] Preloaded:', url);
-  } catch (error) {
-    console.warn('[sound] Failed to preload:', url, error);
-  }
-}
-
-/**
- * Воспроизвести синтезированный звук как fallback
- */
 function playSynthesizedSound(): void {
   const AudioContextCtor = getAudioContextConstructor();
-  if (!AudioContextCtor) {
-    console.warn('[sound] AudioContext not available');
-    return;
-  }
+  if (!AudioContextCtor) return;
 
   try {
     const ctx = new AudioContextCtor();
@@ -88,28 +74,90 @@ function playSynthesizedSound(): void {
   }
 }
 
-/**
- * Воспроизвести звук из файла
- * @param url - путь к аудио файлу (например, '/correct.wav')
- * @param volume - громкость от 0 до 1 (по умолчанию 0.7)
- */
+// ----------------- Native helpers -----------------
+
+function playNativeSound(assetName: string, volume: number): Promise<void> {
+  return new Promise((resolve) => {
+    // Check cache
+    const cached = nativeSoundCache.get(assetName);
+    if (cached) {
+      cached.setVolume(volume);
+      cached.stop(() => {
+        cached.play((success: boolean) => {
+          if (!success) console.warn('[sound] Native playback failed:', assetName);
+          resolve();
+        });
+      });
+      return;
+    }
+
+    // Load from assets directory
+    const sound = new Sound(assetName, Sound.MAIN_BUNDLE, (err: any) => {
+      if (err) {
+        console.warn('[sound] Failed to load native sound:', assetName, err);
+        resolve();
+        return;
+      }
+      sound.setVolume(volume);
+      nativeSoundCache.set(assetName, sound);
+      sound.play((success: boolean) => {
+        if (!success) console.warn('[sound] Native playback failed:', assetName);
+        resolve();
+      });
+    });
+  });
+}
+
+// ----------------- Public API -----------------
+
+export function preloadSound(url: string): void {
+  if (isNative) {
+    const assetName = urlToAssetName(url);
+    if (nativeSoundCache.has(assetName)) return;
+    const sound = new Sound(assetName, Sound.MAIN_BUNDLE, (err: any) => {
+      if (err) {
+        console.warn('[sound] Failed to preload native sound:', assetName, err);
+        return;
+      }
+      nativeSoundCache.set(assetName, sound);
+      console.log('[sound] Preloaded native:', assetName);
+    });
+    return;
+  }
+
+  const AudioCtor = getAudioConstructor();
+  if (!AudioCtor) return;
+
+  try {
+    const audio = new AudioCtor(url);
+    audio.preload = 'auto';
+    audio.load();
+    audioCache.set(url, audio);
+  } catch (error) {
+    console.warn('[sound] Failed to preload:', url, error);
+  }
+}
+
 export async function playSound(url: string, volume = 0.7): Promise<void> {
-  // Проверяем кеш
+  if (isNative) {
+    const assetName = urlToAssetName(url);
+    return playNativeSound(assetName, volume);
+  }
+
+  // Web: try cache
   const cached = audioCache.get(url);
   if (cached) {
     try {
       cached.currentTime = 0;
       cached.volume = Math.max(0, Math.min(1, volume));
       await cached.play();
-      console.log('[sound] Played from cache:', url);
       return;
-    } catch (error) {
-      console.warn('[sound] Failed to play from cache:', error);
-      // Продолжаем к созданию нового экземпляра
+    } catch {
+      // fall through
     }
   }
 
-  // Создаем новый экземпляр Audio
+  // Web: new instance
   const AudioCtor = getAudioConstructor();
   if (AudioCtor) {
     try {
@@ -117,33 +165,19 @@ export async function playSound(url: string, volume = 0.7): Promise<void> {
       audio.volume = Math.max(0, Math.min(1, volume));
       await audio.play();
       audioCache.set(url, audio);
-      console.log('[sound] Played new instance:', url);
       return;
-    } catch (error) {
-      console.warn('[sound] Failed to play audio file:', error);
-      // Продолжаем к fallback
+    } catch {
+      // fall through
     }
   }
 
-  // Fallback на синтезированный звук
-  console.log('[sound] Using synthesized fallback');
   playSynthesizedSound();
 }
 
-/**
- * Воспроизвести звук правильного ответа
- */
 export function playCorrectSound(): void {
-  playSound('/correct.wav', 0.7).catch((error) => {
-    console.warn('[sound] playCorrectSound failed:', error);
-  });
+  playSound('/correct.wav', 0.7).catch(() => {});
 }
 
-/**
- * Воспроизвести звук правильного ответа (альтернативный)
- */
 export function playCorrectSound2(): void {
-  playSound('/correct2.wav', 0.7).catch((error) => {
-    console.warn('[sound] playCorrectSound2 failed:', error);
-  });
+  playSound('/correct2.wav', 0.7).catch(() => {});
 }

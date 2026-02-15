@@ -3,7 +3,8 @@
  * @description Экран детали набора карточек
  */
 import React, { useCallback, useMemo, useState, useRef, useEffect } from 'react';
-import { View, FlatList, StyleSheet, Pressable, TextInput, ScrollView, ActivityIndicator, Platform } from 'react-native';
+import { View, FlatList, StyleSheet, Pressable, TextInput, ScrollView, ActivityIndicator, Platform, Alert, KeyboardAvoidingView } from 'react-native';
+import DocumentPicker from 'react-native-document-picker';
 import { useSetsStore, useCardsStore, useThemeColors, selectSetStats, useSettingsStore } from '@/store';
 import { Container, Text, ProgressBar, Loading, Button } from '@/components/common';
 import { spacing, borderRadius } from '@/constants';
@@ -210,6 +211,26 @@ export function SetDetailScreen({ navigation, route }: Props) {
     });
   }, [navigation, setId, wordLimit, onlyHard, cards]);
 
+  const handleStartAudio = useCallback(() => {
+    const limit = wordLimit === 'all' ? undefined : Number(wordLimit);
+    setShowStudySheet(false);
+
+    // Новая фаза
+    const phaseId = `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const totalCards = onlyHard 
+      ? cards.filter(c => c.nextReviewDate <= Date.now()).length
+      : cards.length;
+
+    navigation.navigate('AudioLearning', {
+      setId,
+      cardLimit: limit,
+      phaseId,
+      totalPhaseCards: totalCards,
+      studiedInPhase: 0,
+      phaseOffset: 0,
+    });
+  }, [navigation, setId, wordLimit, onlyHard, cards]);
+
   const handleSelectWordLimit = useCallback(
     (val: '10' | '20' | '30' | 'all') => {
       setWordLimit(val);
@@ -303,11 +324,58 @@ export function SetDetailScreen({ navigation, route }: Props) {
   }, [parseTSV]);
 
   // Trigger file input click
-  const triggerFileSelect = useCallback(() => {
-    if (Platform.OS === 'web' && fileInputRef.current) {
-      (fileInputRef.current as any).click();
+  const triggerFileSelect = useCallback(async () => {
+    if (Platform.OS === 'web') {
+      if (fileInputRef.current) {
+        (fileInputRef.current as any).click();
+      }
+      return;
     }
-  }, []);
+
+    // Native (Android / iOS)
+    try {
+      const result = await DocumentPicker.pick({
+        type: [DocumentPicker.types.allFiles],
+        copyTo: 'cachesDirectory',
+      });
+      const file = result[0];
+      if (!file) return;
+
+      const fileName = (file.name || '').toLowerCase();
+      if (!fileName.endsWith('.tsv')) {
+        setImportError('Сейчас мы работаем только с TSV файлами. Пожалуйста, выберите файл с расширением .tsv');
+        return;
+      }
+
+      setImportStep('loading');
+      setImportLoading(true);
+      setImportError(null);
+
+      try {
+        const fileUri = (file as any).fileCopyUri || file.uri;
+        const response = await fetch(fileUri);
+        const content = await response.text();
+        const parsedCards = parseTSV(content);
+
+        if (parsedCards.length === 0) {
+          setImportError('Не удалось найти карточки в файле. Проверьте формат TSV (слово[TAB]перевод)');
+          setImportStep('select');
+        } else {
+          setImportedCards(parsedCards);
+          setImportStep('preview');
+        }
+      } catch (error) {
+        setImportError('Ошибка при чтении файла');
+        setImportStep('select');
+      } finally {
+        setImportLoading(false);
+      }
+    } catch (err: any) {
+      if (!DocumentPicker.isCancel(err)) {
+        setImportError('Ошибка при выборе файла');
+      }
+    }
+  }, [parseTSV]);
 
   // Import all cards from preview
   const handleImportCards = useCallback(async () => {
@@ -530,7 +598,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
               onChangeText={setSearch}
               placeholder="Поиск по словам…"
               placeholderTextColor={colors.textTertiary}
-              style={[styles.searchInput, { color: colors.textPrimary, outlineStyle: 'none' }]}
+              style={[styles.searchInput, { color: colors.textPrimary }, Platform.OS === 'web' && { outlineStyle: 'none' }]}
             />
           </View>
           <Pressable
@@ -593,6 +661,11 @@ export function SetDetailScreen({ navigation, route }: Props) {
         showsVerticalScrollIndicator={false}
         numColumns={2}
         columnWrapperStyle={styles.columns}
+        removeClippedSubviews={Platform.OS !== 'web'}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        initialNumToRender={8}
+        updateCellsBatchingPeriod={50}
       />
 
       <View
@@ -652,7 +725,11 @@ export function SetDetailScreen({ navigation, route }: Props) {
       )}
 
       {showAddCard && (
-        <View style={[styles.sheetWrapper, { zIndex: 30 }]} pointerEvents="box-none">
+        <KeyboardAvoidingView
+          style={[styles.sheetWrapper, { zIndex: 30 }]}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          pointerEvents="box-none"
+        >
           <Pressable
             style={[styles.sheetBackdrop, { backgroundColor: backdropColor }]}
             onPress={() => setShowAddCard(false)}
@@ -660,7 +737,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
           <View
             style={[
               styles.addSheet,
-              { backgroundColor: modalSurface, borderColor: modalBorder },
+              { backgroundColor: modalSurface, borderColor: modalBorder, maxHeight: '85%' },
             ]}
           >
             <View style={styles.addSheetHeader}>
@@ -678,91 +755,97 @@ export function SetDetailScreen({ navigation, route }: Props) {
               </Pressable>
             </View>
 
-            <View style={styles.addField}>
-              <Text variant="label" color="primary" style={styles.fieldLabel}>
-                Иностранное слово
-              </Text>
-              <TextInput
-                value={newFront}
-                onChangeText={setNewFront}
-                placeholder="Например: scharf"
-                placeholderTextColor={modalPlaceholder}
-                style={[
-                  styles.addInput,
-                  { 
-                    color: modalTextPrimary,
-                    borderColor: modalBorder,
-                    backgroundColor: modalInputBg,
-                    outlineStyle: 'none',
-                  }
-                ]}
-              />
-            </View>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ gap: spacing.m, paddingBottom: spacing.s }}
+            >
+              <View style={styles.addField}>
+                <Text variant="label" color="primary" style={styles.fieldLabel}>
+                  Иностранное слово
+                </Text>
+                <TextInput
+                  value={newFront}
+                  onChangeText={setNewFront}
+                  placeholder="Например: scharf"
+                  placeholderTextColor={modalPlaceholder}
+                  style={[
+                    styles.addInput,
+                    {
+                      color: modalTextPrimary,
+                      borderColor: modalBorder,
+                      backgroundColor: modalInputBg,
+                      ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
+                    }
+                  ]}
+                />
+              </View>
 
-            <View style={styles.addField}>
-              <Text variant="label" color="primary" style={styles.fieldLabel}>
-                Перевод
-              </Text>
-              <TextInput
-                value={newBack}
-                onChangeText={setNewBack}
-                placeholder="Например: острый"
-                placeholderTextColor={modalPlaceholder}
-                style={[
-                  styles.addInput,
-                  { 
-                    color: modalTextPrimary,
-                    borderColor: modalBorder,
-                    backgroundColor: modalInputBg,
-                    outlineStyle: 'none',
-                  }
-                ]}
-              />
-            </View>
+              <View style={styles.addField}>
+                <Text variant="label" color="primary" style={styles.fieldLabel}>
+                  Перевод
+                </Text>
+                <TextInput
+                  value={newBack}
+                  onChangeText={setNewBack}
+                  placeholder="Например: острый"
+                  placeholderTextColor={modalPlaceholder}
+                  style={[
+                    styles.addInput,
+                    {
+                      color: modalTextPrimary,
+                      borderColor: modalBorder,
+                      backgroundColor: modalInputBg,
+                      ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
+                    }
+                  ]}
+                />
+              </View>
 
-            <View style={styles.addField}>
-              <Text variant="label" color="primary" style={styles.fieldLabel}>
-                Пример
-              </Text>
-              <TextInput
-                value={newExample}
-                onChangeText={setNewExample}
-                placeholder="Например: Der scharfe Pfeffer..."
-                placeholderTextColor={modalPlaceholder}
-                style={[
-                  styles.addInput,
-                  { 
-                    color: modalTextPrimary,
-                    borderColor: modalBorder,
-                    backgroundColor: modalInputBg,
-                    outlineStyle: 'none',
-                  }
-                ]}
-                multiline
-              />
-            </View>
+              <View style={styles.addField}>
+                <Text variant="label" color="primary" style={styles.fieldLabel}>
+                  Пример
+                </Text>
+                <TextInput
+                  value={newExample}
+                  onChangeText={setNewExample}
+                  placeholder="Например: Der scharfe Pfeffer..."
+                  placeholderTextColor={modalPlaceholder}
+                  style={[
+                    styles.addInput,
+                    {
+                      color: modalTextPrimary,
+                      borderColor: modalBorder,
+                      backgroundColor: modalInputBg,
+                      ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
+                    }
+                  ]}
+                  multiline
+                />
+              </View>
 
-            <View style={styles.addField}>
-              <Text variant="label" color="primary" style={styles.fieldLabel}>
-                Мнемоника
-              </Text>
-              <TextInput
-                value={newMnemonic}
-                onChangeText={setNewMnemonic}
-                placeholder="Своя ассоциация для запоминания"
-                placeholderTextColor={modalPlaceholder}
-                style={[
-                  styles.addInput,
-                  { 
-                    color: modalTextPrimary,
-                    borderColor: modalBorder,
-                    backgroundColor: modalInputBg,
-                    outlineStyle: 'none',
-                  }
-                ]}
-                multiline
-              />
-            </View>
+              <View style={styles.addField}>
+                <Text variant="label" color="primary" style={styles.fieldLabel}>
+                  Мнемоника
+                </Text>
+                <TextInput
+                  value={newMnemonic}
+                  onChangeText={setNewMnemonic}
+                  placeholder="Своя ассоциация для запоминания"
+                  placeholderTextColor={modalPlaceholder}
+                  style={[
+                    styles.addInput,
+                    {
+                      color: modalTextPrimary,
+                      borderColor: modalBorder,
+                      backgroundColor: modalInputBg,
+                      ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
+                    }
+                  ]}
+                  multiline
+                />
+              </View>
+            </ScrollView>
 
             <View style={styles.addActions}>
               <Pressable style={[styles.secondaryAction, { borderColor: modalBorder }]} onPress={() => setShowAddCard(false)}>
@@ -791,7 +874,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
               </Pressable>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       )}
 
       {showStudySheet && (
@@ -921,6 +1004,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                     tag="Аудирование"
                     description="Прослушай и выбери верное"
                     colors={colors}
+                    onPress={handleStartAudio}
                   />
                 </View>
               </View>
@@ -930,7 +1014,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                   Настройки
                 </Text>
                 <View style={styles.settingRow}>
-                  <Text variant="body" style={{ color: colors.textPrimary }}>
+                  <Text variant="body" style={{ color: colors.textPrimary, flexShrink: 1 }}>
                     Только «Не запомнил»
                   </Text>
                   <ToggleSwitch
@@ -940,7 +1024,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                   />
                 </View>
                 <View style={styles.settingRow}>
-                  <Text variant="body" style={{ color: colors.textPrimary }}>
+                  <Text variant="body" style={{ color: colors.textPrimary, flexShrink: 1 }}>
                     Показывать мнемонику после ошибки
                   </Text>
                   <ToggleSwitch
@@ -950,10 +1034,10 @@ export function SetDetailScreen({ navigation, route }: Props) {
                   />
                 </View>
                 <View style={styles.settingRow}>
-                  <Text variant="body" style={{ color: colors.textPrimary }}>
+                  <Text variant="body" style={{ color: colors.textPrimary, flexShrink: 1 }}>
                     Количество слов
                   </Text>
-                  <View style={styles.wordChips}>
+                  <View style={[styles.wordChips, { flexShrink: 0 }]}>
                     {(['10', '20', '30', 'all'] as const).map((val) => (
                       <Pressable
                         key={val}

@@ -33,6 +33,11 @@ module.exports = (env, argv) => {
         'react-native$': 'react-native-web',
         'react-native-gesture-handler': path.resolve(__dirname, 'src/polyfills/gesture-handler.web.ts'),
         'react-native-mmkv': path.resolve(__dirname, 'src/polyfills/mmkv.web.ts'),
+        'react-native-document-picker': path.resolve(__dirname, 'src/polyfills/document-picker.web.ts'),
+        'react-native-tts': path.resolve(__dirname, 'src/polyfills/tts.web.ts'),
+        'react-native-fs': path.resolve(__dirname, 'src/polyfills/react-native-fs.web.ts'),
+        'react-native-sound': path.resolve(__dirname, 'src/polyfills/react-native-sound.web.ts'),
+        '@react-native-voice/voice': path.resolve(__dirname, 'src/polyfills/voice.web.ts'),
         '@': path.resolve(__dirname, 'src'),
       },
       extensions: ['.web.js', '.web.ts', '.web.tsx', '.js', '.jsx', '.ts', '.tsx', '.json'],
@@ -41,7 +46,7 @@ module.exports = (env, argv) => {
       rules: [
         {
           test: /\.(js|jsx|ts|tsx)$/,
-          exclude: /node_modules\/(?!(@react-native|react-native-svg|lucide-react-native|@react-navigation|react-native-vector-icons)\/).*/,
+          exclude: /node_modules\/(?!(@react-native|react-native-svg|lucide-react-native|@react-navigation|react-native-vector-icons|react-native-inappbrowser-reborn)\/).*/,
           use: {
             loader: 'babel-loader',
             options: {

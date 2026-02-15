@@ -8,10 +8,12 @@ import {
   StyleSheet,
   Platform,
   KeyboardAvoidingView,
+  Linking,
   ScrollView,
   Pressable,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import InAppBrowser from 'react-native-inappbrowser-reborn';
 import { Button, Input, Text } from '@/components/common';
 import { spacing, borderRadius } from '@/constants';
 import { useThemeColors } from '@/store';
@@ -31,15 +33,49 @@ export function SignInScreen({ onBack, onSendCode, onCreateAccount }: Props) {
   const signInWithGoogle = useCallback(async () => {
     setError(null);
     setIsLoading(true);
-    const { error: authError } = await supabase.auth.signInWithOAuth({
+    const { data, error: authError } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: SUPABASE_OAUTH_REDIRECT },
+      options: {
+        redirectTo: SUPABASE_OAUTH_REDIRECT,
+        skipBrowserRedirect: true,
+      },
     });
     if (authError) {
       setError(authError.message);
       setIsLoading(false);
+      return;
     }
-    // успешный поток завершится на редиректе, состояние сбросится после onAuthStateChange
+
+    if (data?.url) {
+      try {
+        if (Platform.OS !== 'web' && await InAppBrowser.isAvailable()) {
+          const result = await InAppBrowser.openAuth(data.url, SUPABASE_OAUTH_REDIRECT, {
+            showTitle: false,
+            enableUrlBarHiding: true,
+            enableDefaultShare: false,
+            ephemeralWebSession: false,
+          });
+          if (result.type === 'success' && result.url) {
+            const codeMatch = result.url.match(/[?&]code=([^&]+)/);
+            const code = codeMatch?.[1];
+            if (code) {
+              const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+              if (exchangeError) {
+                console.error('[auth] Code exchange failed:', exchangeError.message);
+                setError(exchangeError.message);
+              }
+            }
+          }
+        } else {
+          await Linking.openURL(data.url);
+        }
+      } catch (e) {
+        console.error('[auth] Failed to open browser:', e);
+        setError('Не удалось открыть браузер для входа через Google');
+      } finally {
+        setIsLoading(false);
+      }
+    }
   }, []);
 
   return (
@@ -51,7 +87,7 @@ export function SignInScreen({ onBack, onSendCode, onCreateAccount }: Props) {
         <View
           style={[
             styles.shell,
-            { backgroundColor: colors.surface, shadowColor: colors.shadow, borderColor: colors.border },
+            { backgroundColor: colors.background, shadowColor: colors.shadow, borderColor: colors.border },
           ]}
         >
           {/* Top app bar */}

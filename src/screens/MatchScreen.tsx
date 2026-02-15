@@ -326,7 +326,7 @@ export function MatchScreen({ navigation, route }: Props) {
                             : isSelected
                               ? colors.primary
                               : colors.border,
-                          transform: pressed ? [{ scale: 0.98 }] : undefined,
+                          transform: pressed ? [{ scale: 0.98 }] : [{ scale: 1 }],
                         },
                       ]}
                     >
@@ -380,7 +380,7 @@ export function MatchScreen({ navigation, route }: Props) {
                             : isSelected
                               ? colors.primary
                               : colors.border,
-                          transform: pressed ? [{ scale: 0.98 }] : undefined,
+                          transform: pressed ? [{ scale: 0.98 }] : [{ scale: 1 }],
                         },
                       ]}
                     >
@@ -507,13 +507,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: spacing.m,
     paddingVertical: spacing.l,
-    // minHeight: 120,
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowOffset: { width: 0, height: 6 },
-    shadowRadius: 10,
-    elevation: 3,
   },
   cardText: {
     fontWeight: '700',

@@ -556,7 +556,6 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 12 },
     elevation: 4,
-    overflow: 'hidden',
     gap: spacing.s,
   },
   cardTopLine: {
@@ -565,6 +564,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 6,
+    borderTopLeftRadius: spacing.xl,
+    borderTopRightRadius: spacing.xl,
   },
   cardChip: {
     alignSelf: 'center',

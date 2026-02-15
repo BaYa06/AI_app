@@ -39,8 +39,18 @@ export const DatabaseService = {
   async loadAll(): Promise<boolean> {
     try {
       // Определяем текущего авторизованного пользователя (если есть)
-      const { data: sessionData } = await supabase.auth.getSession();
-      const currentUserId = sessionData.session?.user?.id;
+      let currentUserId: string | undefined;
+      
+      if (supabase?.auth?.getSession) {
+        try {
+          const { data: sessionData } = await supabase.auth.getSession();
+          currentUserId = sessionData.session?.user?.id;
+        } catch (error) {
+          console.warn('⚠️ Не удалось получить сессию Supabase:', error);
+        }
+      } else {
+        console.warn('⚠️ Supabase не инициализирован, используем локальные данные');
+      }
 
       console.log('🔄 Загрузка данных из Neon PostgreSQL...');
       

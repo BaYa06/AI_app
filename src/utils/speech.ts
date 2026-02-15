@@ -1,7 +1,36 @@
 /**
  * Speech helper
  * Google Cloud TTS (API key or service account) with Web Speech fallback.
+ * On native (Android/iOS) uses react-native-tts as fallback instead of Web Speech API.
  */
+
+import { Platform } from 'react-native';
+import Tts from 'react-native-tts';
+import RNFS from 'react-native-fs';
+import Sound from 'react-native-sound';
+
+const isNative = Platform.OS !== 'web';
+
+// Initialize native TTS
+let nativeTtsReady = false;
+if (isNative) {
+  Tts.getInitStatus()
+    .then(() => {
+      nativeTtsReady = true;
+      console.log('[speech] Native TTS initialized');
+    })
+    .catch((err: any) => {
+      // On some Android devices, TTS engine needs to be installed
+      if (err?.code === 'no_engine') {
+        console.warn('[speech] No TTS engine installed on device');
+        Tts.requestInstallEngine();
+      } else {
+        console.warn('[speech] Native TTS init error:', err);
+        // Still mark as ready — speak() may work anyway
+        nativeTtsReady = true;
+      }
+    });
+}
 
 type SpeechVoice = {
   name?: string;
@@ -53,13 +82,18 @@ const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
 const getGlobal = () => (typeof globalThis !== 'undefined' ? (globalThis as any) : {}) as any;
 
-const getEnv = (key: string): string | undefined => {
-  if (typeof process !== 'undefined' && process.env && process.env[key]) return process.env[key];
-  const g = getGlobal();
-  if (typeof window !== 'undefined' && (window as any)[key]) return (window as any)[key];
-  if (g[key]) return g[key];
-  return undefined;
-};
+// Static env access — babel inlines process.env.VAR at build time (dynamic process.env[key] won't work)
+const ENV_GCLOUD_TTS_KEY =
+  process.env.EXPO_PUBLIC_GCLOUD_TTS_KEY ||
+  process.env.REACT_APP_GCLOUD_TTS_KEY ||
+  process.env.GCLOUD_TTS_KEY ||
+  '';
+
+const ENV_GCLOUD_TTS_SA =
+  process.env.EXPO_PUBLIC_GCLOUD_TTS_SA ||
+  process.env.REACT_APP_GCLOUD_TTS_SA ||
+  process.env.GCLOUD_TTS_SA ||
+  '';
 
 const decodeMaybeBase64 = (value: string): string => {
   const trimmed = value.trim();
@@ -184,18 +218,13 @@ const signJwt = async (payload: Record<string, unknown>, pem: string) => {
 let cachedToken: { token: string; exp: number } | null = null;
 
 const getApiKey = () => {
-  const key = getEnv('EXPO_PUBLIC_GCLOUD_TTS_KEY') ||
-    getEnv('REACT_APP_GCLOUD_TTS_KEY') ||
-    getEnv('GCLOUD_TTS_KEY');
+  const key = ENV_GCLOUD_TTS_KEY || undefined;
   console.log('[speech] API Key available:', !!key, key ? `(${key.substring(0, 10)}...)` : '');
   return key;
 };
 
 const getServiceAccount = (): ServiceAccount | null => {
-  const envJson =
-    getEnv('EXPO_PUBLIC_GCLOUD_TTS_SA') ||
-    getEnv('REACT_APP_GCLOUD_TTS_SA') ||
-    getEnv('GCLOUD_TTS_SA');
+  const envJson = ENV_GCLOUD_TTS_SA || undefined;
 
   console.log('[speech] Service Account JSON available:', !!envJson, envJson ? `(length: ${envJson.length})` : '');
 
@@ -203,33 +232,20 @@ const getServiceAccount = (): ServiceAccount | null => {
     try {
       // Remove surrounding quotes if present
       let cleaned = envJson.trim();
-      if ((cleaned.startsWith("'") && cleaned.endsWith("'")) || 
+      if ((cleaned.startsWith("'") && cleaned.endsWith("'")) ||
           (cleaned.startsWith('"') && cleaned.endsWith('"'))) {
         cleaned = cleaned.slice(1, -1);
       }
-      
+
       const decoded = decodeMaybeBase64(cleaned);
       const parsed = JSON.parse(decoded);
       console.log('[speech] Service Account parsed:', !!parsed?.client_email, !!parsed?.private_key);
-      
-      // Validate private key format
-      if (parsed?.private_key) {
-        if (!parsed.private_key.includes('-----BEGIN PRIVATE KEY-----')) {
-          console.warn('[speech] Private key missing BEGIN marker');
-        }
-        if (!parsed.private_key.includes('-----END PRIVATE KEY-----')) {
-          console.warn('[speech] Private key missing END marker');
-        }
-      }
-      
+
       if (parsed?.client_email && parsed?.private_key) return parsed;
     } catch (e) {
       console.warn('[speech] Failed to parse GCLOUD_TTS_SA:', e);
     }
   }
-
-  const globalSA = (getEnv('FLASHLY_SA') || getGlobal().FLASHLY_SA) as ServiceAccount | undefined;
-  if (globalSA?.client_email && globalSA?.private_key) return globalSA;
 
   return null;
 };
@@ -288,7 +304,34 @@ const toGooglePitch = (pitch = 1) => {
   return (clamped - 1) * 10; // ±10 semitones
 };
 
+const playAudioNative = (audioBase64: string, volume = 1): Promise<void> => {
+  const filePath = `${RNFS.CachesDirectoryPath}/tts_${Date.now()}.mp3`;
+  return RNFS.writeFile(filePath, audioBase64, 'base64').then(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        const sound = new Sound(filePath, '', (err: any) => {
+          if (err) {
+            console.error('[speech] Sound load error:', err);
+            reject(err);
+            return;
+          }
+          sound.setVolume(clamp01(volume));
+          sound.play((success: boolean) => {
+            sound.release();
+            // Clean up temp file
+            RNFS.unlink(filePath).catch(() => {});
+            if (success) resolve();
+            else reject(new Error('Sound playback failed'));
+          });
+        });
+      })
+  );
+};
+
 const playAudio = async (audioBase64: string, volume = 1) => {
+  if (isNative) {
+    return playAudioNative(audioBase64, volume);
+  }
   const AudioCtor = getGlobal().Audio;
   if (!AudioCtor) return;
   const audio = new AudioCtor(`data:audio/mp3;base64,${audioBase64}`);
@@ -398,6 +441,29 @@ const speakWithWebSpeech = async (
   synth.speak(utterance);
 };
 
+// ----------------- Native TTS (Android/iOS) -----------------
+
+const speakWithNativeTTS = async (
+  text: string,
+  lang: string,
+  options?: { rate?: number; pitch?: number; volume?: number }
+): Promise<boolean> => {
+  if (!isNative || !nativeTtsReady) return false;
+
+  try {
+    await Tts.stop();
+    await Tts.setDefaultLanguage(lang);
+    await Tts.setDefaultRate(options?.rate ?? 0.5);
+    await Tts.setDefaultPitch(options?.pitch ?? 1);
+    Tts.speak(text);
+    console.log('[speech] Native TTS speaking:', lang);
+    return true;
+  } catch (e) {
+    console.warn('[speech] Native TTS failed:', e);
+    return false;
+  }
+};
+
 // ----------------- Public API -----------------
 
 export async function speak(
@@ -406,11 +472,30 @@ export async function speak(
   options?: { rate?: number; pitch?: number; volume?: number }
 ) {
   if (!text) return;
+
+  if (isNative) {
+    // On native: try Google Cloud TTS first (high quality), fall back to device TTS
+    try {
+      console.log('[speech] [native] Attempting Google Cloud TTS...');
+      const done = await speakWithGoogle(text, lang, options);
+      if (done) {
+        console.log('[speech] [native] Google Cloud TTS succeeded');
+        return;
+      }
+    } catch (e) {
+      console.warn('[speech] [native] Google TTS failed:', e);
+    }
+    console.log('[speech] [native] Falling back to native TTS');
+    await speakWithNativeTTS(text, lang, options);
+    return;
+  }
+
+  // On web: try Google Cloud TTS first, fall back to Web Speech API
   try {
     console.log('[speech] Attempting Google Cloud TTS...');
     const done = await speakWithGoogle(text, lang, options);
     if (done) {
-      console.log('[speech] ✅ Google Cloud TTS succeeded');
+      console.log('[speech] Google Cloud TTS succeeded');
       return;
     }
     console.log('[speech] Google TTS returned false, falling back to Web Speech');

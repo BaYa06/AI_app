@@ -84,7 +84,7 @@ function AppRoot({
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof document === 'undefined') return;
     const meta = document.querySelector('meta[name=\"theme-color\"]');
-    const themeColor = resolvedTheme === 'dark' ? 'rgba(0, 0, 0, 0)' : 'rgb(255, 255, 255)';
+    const themeColor = resolvedTheme === 'dark' ? '#101122' : '#FFFFFF';
 
     if (meta) {
       meta.setAttribute('content', themeColor);
@@ -202,9 +202,14 @@ export default function App() {
     };
   }, []);
 
-  // Keep isAuthenticated in sync with Supabase session state.
+  // Синхронизация isAuthenticated с сессией Supabase
   useEffect(() => {
     let isMounted = true;
+
+    if (!supabase?.auth) {
+      console.warn('⚠️ Supabase не инициализирован');
+      return;
+    }
 
     supabase.auth
       .getSession()
@@ -223,11 +228,12 @@ export default function App() {
             displayName: (user.user_metadata as any)?.full_name,
           });
           DatabaseService.reloadRemoteDataForUser(user.id);
-          // Устанавливаем user_id в Firebase Analytics
           setAnalyticsUserId(user.id);
-          // Обновляем FCM push-токен (если разрешение уже дано)
           refreshPushToken(user.id).catch(() => {});
         }
+      })
+      .catch((error) => {
+        console.error('⚠️ Ошибка получения сессии:', error);
       });
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -241,12 +247,9 @@ export default function App() {
           displayName: (session.user.user_metadata as any)?.full_name,
         });
         DatabaseService.reloadRemoteDataForUser(session.user.id);
-        // Устанавливаем user_id в Firebase Analytics
         setAnalyticsUserId(session.user.id);
-        // Обновляем FCM push-токен
         refreshPushToken(session.user.id).catch(() => {});
       } else if (!session) {
-        // Пользователь вышел - сбрасываем user_id
         setAnalyticsUserId(null);
       }
     });
@@ -280,9 +283,23 @@ export default function App() {
     }
 
     const handleUrl = async (url: string) => {
-      const { error } = await supabase.auth.exchangeCodeForSession(url);
-      if (error) {
-        console.error('Supabase code exchange failed:', error.message);
+      try {
+        // Parse the authorization code from the deep link URL.
+        // URL format: flashly://auth-callback?code=AUTH_CODE
+        const codeMatch = url.match(/[?&]code=([^&]+)/);
+        const code = codeMatch?.[1];
+
+        if (!code) {
+          console.warn('[auth] No code found in deep link URL:', url);
+          return;
+        }
+
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          console.error('Supabase code exchange failed:', error.message);
+        }
+      } catch (e) {
+        console.error('[auth] Failed to handle deep link:', e);
       }
     };
 

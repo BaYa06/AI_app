@@ -80,7 +80,7 @@ export function OTPVerifyScreen({ onBack, onSubmit }: Props) {
           style={[
             styles.shell,
             {
-              backgroundColor: colors.surface,
+              backgroundColor: colors.background,
               shadowColor: colors.shadow,
               borderColor: colors.border,
             },
@@ -275,7 +275,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 20,
     fontWeight: '700',
-    outlineStyle: 'none',
   },
   meta: {
     marginTop: spacing.l,

@@ -1,9 +1,6 @@
 module.exports = {
   presets: ['module:@react-native/babel-preset'],
   plugins: [
-    ['@babel/plugin-transform-class-properties', { loose: true }],
-    ['@babel/plugin-transform-private-methods', { loose: true }],
-    ['@babel/plugin-transform-private-property-in-object', { loose: true }],
     [
       'babel-plugin-transform-inline-environment-variables',
       {
@@ -24,6 +21,12 @@ module.exports = {
           'FIREBASE_MESSAGING_SENDER_ID',
           'FIREBASE_APP_ID',
           'FIREBASE_MEASUREMENT_ID',
+          'EXPO_PUBLIC_GCLOUD_TTS_KEY',
+          'EXPO_PUBLIC_GCLOUD_TTS_SA',
+          'GCLOUD_TTS_KEY',
+          'GCLOUD_TTS_SA',
+          'REACT_APP_GCLOUD_TTS_KEY',
+          'REACT_APP_GCLOUD_TTS_SA',
         ],
       },
     ],
@@ -37,6 +40,9 @@ module.exports = {
         },
       },
     ],
+    ...(process.env.NODE_ENV === 'production'
+      ? [['transform-remove-console', { exclude: ['error'] }]]
+      : []),
     'react-native-reanimated/plugin', // Must be last
   ],
 };

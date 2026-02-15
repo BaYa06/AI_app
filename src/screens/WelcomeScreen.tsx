@@ -39,8 +39,8 @@ export function WelcomeScreen({ onCreateAccount, onSignIn }: Props) {
         contentContainerStyle={[
           styles.scrollContent,
           {
-            paddingTop: Math.max(insets.top, spacing.xl),
-            paddingBottom: Math.max(insets.bottom, spacing.l),
+            paddingTop: insets.top + 10,
+            paddingBottom: insets.bottom,
           },
         ]}
         showsVerticalScrollIndicator={false}
@@ -49,7 +49,7 @@ export function WelcomeScreen({ onCreateAccount, onSignIn }: Props) {
         style={[
           styles.shell,
           {
-            backgroundColor: colors.surface,
+            backgroundColor: colors.background,
             shadowColor: colors.shadow,
           },
         ]}
@@ -136,14 +136,13 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    minHeight: '100%',
   },
   shell: {
     width: '100%',
     maxWidth: 480,
     borderRadius: 0,
     paddingHorizontal: spacing.l,
-    paddingVertical: spacing.xl,
+    paddingVertical: 0,
     overflow: 'hidden',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0,
@@ -174,7 +173,6 @@ const styles = StyleSheet.create({
   tilesGrid: {
     width: '100%',
     maxWidth: 320,
-    aspectRatio: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',

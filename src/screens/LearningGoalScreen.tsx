@@ -94,7 +94,7 @@ export function LearningGoalScreen({ onContinue, onBack }: Props) {
         style={[
           styles.shell,
           {
-            backgroundColor: colors.surface,
+            backgroundColor: colors.background,
             shadowColor: colors.shadow,
             borderColor: colors.border,
           },

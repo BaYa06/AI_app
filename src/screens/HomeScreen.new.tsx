@@ -3,7 +3,7 @@
  * @description Главная страница с современным дизайном
  */
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { View, StyleSheet, ScrollView, Pressable, TextInput, useWindowDimensions, TextInput as RNTextInput, Modal } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable, TextInput, useWindowDimensions, TextInput as RNTextInput, Modal, Platform, Animated } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import type { PanGestureHandlerStateChangeEvent } from 'react-native-gesture-handler';
 import { useFocusEffect } from '@react-navigation/native';
@@ -64,6 +64,29 @@ export function HomeScreen({ navigation }: any) {
   const editInputRef = useRef<RNTextInput>(null);
   const newCourseInputRef = useRef<RNTextInput>(null);
   const editModalInputRef = useRef<RNTextInput>(null);
+  // Drawer slide animation
+  const drawerAnim = useRef(new Animated.Value(0)).current;
+  const [drawerVisible, setDrawerVisible] = useState(false);
+
+  useEffect(() => {
+    if (drawerOpen) {
+      setDrawerVisible(true);
+      Animated.timing(drawerAnim, {
+        toValue: 1,
+        duration: 280,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(drawerAnim, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished) setDrawerVisible(false);
+      });
+    }
+  }, [drawerOpen]);
+
   const SWIPE_THRESHOLD = 50;
   const SWIPE_VELOCITY = 200;
   const closeStreakModal = useCallback(() => setStreakModalVisible(false), []);
@@ -514,7 +537,7 @@ export function HomeScreen({ navigation }: any) {
           onLayout={(e) => setSearchBarHeight(e.nativeEvent.layout.height)}
         >
           <TextInput
-            style={[styles.searchInput, { color: colors.textPrimary, outlineStyle: 'none' }]}
+            style={[styles.searchInput, { color: colors.textPrimary }, Platform.OS === 'web' && { outlineStyle: 'none' }]}
             placeholder="Поиск по наборам..."
             placeholderTextColor={colors.textSecondary}
             value={searchQuery}
@@ -729,9 +752,9 @@ export function HomeScreen({ navigation }: any) {
 
       {/* Courses Drawer - render in Modal so it stays above tab bar on all platforms */}
       <Modal
-        visible={drawerOpen}
+        visible={drawerVisible}
         transparent
-        animationType="fade"
+        animationType="none"
         onRequestClose={() => {
           setCourseMenuOpen(null);
           setEditingCourseId(null);
@@ -740,22 +763,30 @@ export function HomeScreen({ navigation }: any) {
         }}
       >
         <View style={styles.modalContainer}>
-          <Pressable
-            style={[styles.backdrop, { backgroundColor: backdropColor }]}
-            onPress={() => {
-              if (courseMenuOpen) {
-                // Если меню курса открыто, просто закрываем его
-                setCourseMenuOpen(null);
-              } else {
-                // Иначе закрываем весь drawer
-                setCourseMenuOpen(null);
-                setEditingCourseId(null);
-                setIsCreatingCourse(false);
-                setDrawerOpen(false);
-              }
-            }}
-          />
-          <View
+          <Animated.View
+            style={[
+              styles.backdrop,
+              {
+                backgroundColor: backdropColor,
+                opacity: drawerAnim,
+              },
+            ]}
+          >
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => {
+                if (courseMenuOpen) {
+                  setCourseMenuOpen(null);
+                } else {
+                  setCourseMenuOpen(null);
+                  setEditingCourseId(null);
+                  setIsCreatingCourse(false);
+                  setDrawerOpen(false);
+                }
+              }}
+            />
+          </Animated.View>
+          <Animated.View
             style={[
               styles.drawer,
               {
@@ -763,6 +794,14 @@ export function HomeScreen({ navigation }: any) {
                 borderColor: drawerBorder,
                 width: Math.min(windowWidth * 0.8, 320),
                 shadowOpacity: isDarkMode ? 0.35 : 0.2,
+                transform: [
+                  {
+                    translateX: drawerAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-Math.min(windowWidth * 0.8, 320), 0],
+                    }),
+                  },
+                ],
               },
             ]}
           >
@@ -994,7 +1033,7 @@ export function HomeScreen({ navigation }: any) {
                 )}
               </ScrollView>
             </View>
-          </View>
+          </Animated.View>
         </View>
       </Modal>
 
@@ -1776,8 +1815,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     paddingVertical: 0,
-    // @ts-ignore
-    outlineStyle: 'none',
+    ...Platform.select({ web: { outlineStyle: 'none' } }),
   },
   editCourseInputContainer: {
     flexDirection: 'row',
@@ -1793,8 +1831,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     paddingVertical: 0,
-    // @ts-ignore
-    outlineStyle: 'none',
+    ...Platform.select({ web: { outlineStyle: 'none' } }),
   },
   editRow: {
     flexDirection: 'row',
@@ -1877,8 +1914,7 @@ const styles = StyleSheet.create({
     margin: 0,
     borderBottomWidth: 1,
     minWidth: 100,
-    // @ts-ignore
-    outlineStyle: 'none',
+    ...Platform.select({ web: { outlineStyle: 'none' } }),
   },
   courseMeta: {
     fontSize: 11,
@@ -1967,8 +2003,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     padding: 0,
     margin: 0,
-    // @ts-ignore
-    outlineStyle: 'none',
+    ...Platform.select({ web: { outlineStyle: 'none' } }),
   },
   editModalButtons: {
     flexDirection: 'row',

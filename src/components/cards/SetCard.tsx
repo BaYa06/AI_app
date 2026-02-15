@@ -154,6 +154,7 @@ const styles = StyleSheet.create({
 
   icon: {
     fontSize: 32,
+    lineHeight: 42,
     marginRight: spacing.m,
   },
 

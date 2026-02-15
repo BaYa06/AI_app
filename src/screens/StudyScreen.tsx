@@ -3,7 +3,7 @@
  * @description Экран изучения карточек с CSS-анимациями для web
  */
 import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
-import { View, StyleSheet, Pressable, Dimensions, Platform, Animated, Modal, Switch } from 'react-native';
+import { View, StyleSheet, Pressable, Dimensions, Animated, Modal, Switch } from 'react-native';
 import { useCardsStore, useSetsStore, useStudyStore, useThemeColors, useSettingsStore, selectSetStats } from '@/store';
 import { Text, Loading } from '@/components/common';
 import { calculateNextReview, buildStudyQueue } from '@/services/SRSService';
@@ -13,6 +13,13 @@ import type { RootStackScreenProps } from '@/types/navigation';
 import type { Rating, Card } from '@/types';
 import { ArrowLeft, Settings, Volume2, Check } from 'lucide-react-native';
 import { speak, detectLanguage } from '@/utils/speech';
+import ReAnimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  interpolate,
+  Easing as REasing,
+} from 'react-native-reanimated';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = Math.min(340, SCREEN_WIDTH - 32);
@@ -449,32 +456,35 @@ export function StudyScreen({ navigation, route }: Props) {
   // Прогресс
   const progress = getProgress();
 
-  // CSS стили для анимации карточек (web)
-  const frontCardStyle = useMemo(() => {
-    if (Platform.OS === 'web') {
-      return {
-        transform: isFlipped ? 'perspective(1000px) rotateY(180deg)' : 'perspective(1000px) rotateY(0deg)',
-        opacity: isFlipped ? 0 : 1,
-        visibility: isFlipped ? 'hidden' : 'visible',
-        transition: 'transform 0.4s ease-in-out, opacity 0.2s ease-in-out, visibility 0s linear 0.2s',
-        backfaceVisibility: 'hidden' as const,
-      };
-    }
-    return {};
+  // Анимация переворота карточки (reanimated для native + web)
+  const flipProgress = useSharedValue(0);
+
+  useEffect(() => {
+    flipProgress.value = withTiming(isFlipped ? 1 : 0, {
+      duration: 400,
+      easing: REasing.inOut(REasing.ease),
+    });
   }, [isFlipped]);
 
-  const backCardStyle = useMemo(() => {
-    if (Platform.OS === 'web') {
-      return {
-        transform: isFlipped ? 'perspective(1000px) rotateY(360deg)' : 'perspective(1000px) rotateY(180deg)',
-        opacity: isFlipped ? 1 : 0,
-        visibility: isFlipped ? 'visible' : 'hidden',
-        transition: 'transform 0.4s ease-in-out, opacity 0.2s ease-in-out, visibility 0s linear 0.2s',
-        backfaceVisibility: 'hidden' as const,
-      };
-    }
-    return {};
-  }, [isFlipped]);
+  const frontAnimStyle = useAnimatedStyle(() => {
+    const rotateY = interpolate(flipProgress.value, [0, 1], [0, 180]);
+    const opacity = interpolate(flipProgress.value, [0, 0.5, 0.5, 1], [1, 1, 0, 0]);
+    return {
+      transform: [{ perspective: 1000 }, { rotateY: `${rotateY}deg` }],
+      opacity,
+      backfaceVisibility: 'hidden' as const,
+    };
+  });
+
+  const backAnimStyle = useAnimatedStyle(() => {
+    const rotateY = interpolate(flipProgress.value, [0, 1], [180, 360]);
+    const opacity = interpolate(flipProgress.value, [0, 0.5, 0.5, 1], [0, 0, 1, 1]);
+    return {
+      transform: [{ perspective: 1000 }, { rotateY: `${rotateY}deg` }],
+      opacity,
+      backfaceVisibility: 'hidden' as const,
+    };
+  });
 
   // Загрузка
   if (!currentCard) {
@@ -538,105 +548,94 @@ export function StudyScreen({ navigation, route }: Props) {
           onPress={handleToggleCard}
           style={[
             styles.cardWrapper,
-            Platform.OS === 'web'
-              ? {
-                  opacity: cardVisible ? 1 : 0,
-                  transition: 'opacity 0.12s ease',
-                }
-              : null,
+            { opacity: cardVisible ? 1 : 0 },
           ]}
         >
           {/* Передняя сторона (вопрос) */}
-          <View 
-            style={[
-              styles.card, 
-              { 
-                backgroundColor: colors.surface, 
-                borderColor: colors.border,
-              },
-              frontCardStyle
-            ]}
-          >
-            <View style={styles.cardTopRow}>
-              <View style={styles.statusPlaceholder}>
-                {isCurrentMastered ? (
-                  <View style={[styles.masteredBadge, { backgroundColor: colors.success + '1A', borderColor: colors.success + '40' }]}>
-                    <Check size={16} color={colors.success} />
-                  </View>
-                ) : null}
+          <ReAnimated.View style={[styles.cardAnim, frontAnimStyle]}>
+            <View
+              style={[
+                styles.cardInner,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <View style={styles.cardTopRow}>
+                <View style={styles.statusPlaceholder}>
+                  {isCurrentMastered ? (
+                    <View style={[styles.masteredBadge, { backgroundColor: colors.success + '1A', borderColor: colors.success + '40' }]}>
+                      <Check size={16} color={colors.success} />
+                    </View>
+                  ) : null}
+                </View>
+                <Pressable
+                  style={[styles.audioButton, { backgroundColor: '#f1f5f9' }]}
+                  hitSlop={10}
+                  onPress={(e) => { e.stopPropagation(); handleSpeak(questionText, questionLang, answerText); }}
+                >
+                  <Volume2 size={20} color={colors.primary} />
+                </Pressable>
               </View>
-              <Pressable 
-                style={[styles.audioButton, { backgroundColor: '#f1f5f9' }]}
-                hitSlop={10}
-                onPress={() => handleSpeak(questionText, questionLang, answerText)}
-              >
-                <Volume2 size={20} color={colors.primary} />
-              </Pressable>
+
+              <View style={styles.cardContent}>
+                <Text style={[styles.cardWord, { color: colors.textPrimary }]}>
+                  {questionText}
+                </Text>
+              </View>
+
+              <View style={styles.cardBottom}>
+                <Text style={[styles.tapHint, { color: colors.textSecondary }]}>
+                  Нажмите, чтобы перевернуть
+                </Text>
+              </View>
             </View>
-            
-            <View style={styles.cardContent}>
-              <Text style={[styles.cardWord, { color: colors.textPrimary }]}>
-                {questionText}
-              </Text>
-            </View>
-            
-            <View style={styles.cardBottom}>
-              <Text style={[styles.tapHint, { color: colors.textSecondary }]}>
-                Нажмите, чтобы перевернуть
-              </Text>
-            </View>
-          </View>
+          </ReAnimated.View>
 
           {/* Задняя сторона (ответ) */}
-          <View 
-            style={[
-              styles.card, 
-              styles.cardBack,
-              { 
-                backgroundColor: colors.surface, 
-                borderColor: colors.border,
-              },
-              backCardStyle
-            ]}
-          >
-            <View style={styles.cardTopRow}>
-              <View style={styles.statusPlaceholder}>
-                {isCurrentMastered ? (
-                  <View style={[styles.masteredBadge, { backgroundColor: colors.success + '1A', borderColor: colors.success + '40' }]}>
-                    <Check size={16} color={colors.success} />
-                  </View>
+          <ReAnimated.View style={[styles.cardAnim, backAnimStyle]}>
+            <View
+              style={[
+                styles.cardInner,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <View style={styles.cardTopRow}>
+                <View style={styles.statusPlaceholder}>
+                  {isCurrentMastered ? (
+                    <View style={[styles.masteredBadge, { backgroundColor: colors.success + '1A', borderColor: colors.success + '40' }]}>
+                      <Check size={16} color={colors.success} />
+                    </View>
+                  ) : null}
+                </View>
+                <Pressable
+                  style={[styles.audioButton, { backgroundColor: '#f1f5f9' }]}
+                  hitSlop={10}
+                  onPress={(e) => { e.stopPropagation(); handleSpeak(answerText, answerLang, questionText); }}
+                >
+                  <Volume2 size={20} color={colors.primary} />
+                </Pressable>
+              </View>
+
+              <View style={styles.cardContent}>
+                <Text style={[styles.cardWord, { color: colors.textPrimary }]}>
+                  {answerText}
+                </Text>
+                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                {example ? (
+                  <Text style={[styles.cardExample, { color: colors.textSecondary }]}>
+                    {example}
+                  </Text>
                 ) : null}
               </View>
-              <Pressable 
-                style={[styles.audioButton, { backgroundColor: '#f1f5f9' }]}
-                hitSlop={10}
-                onPress={() => handleSpeak(answerText, answerLang, questionText)}
-              >
-                <Volume2 size={20} color={colors.primary} />
-              </Pressable>
-            </View>
-            
-            <View style={styles.cardContent}>
-              <Text style={[styles.cardWord, { color: colors.textPrimary }]}>
-                {answerText}
-              </Text>
-              <View style={[styles.divider, { backgroundColor: colors.border }]} />
-              {example ? (
-                <Text style={[styles.cardExample, { color: colors.textSecondary }]}>
-                  {example}
-                </Text>
-              ) : null}
-            </View>
 
-            {/* Подсказка: показывается как простой текст справа внизу карточки */}
-            <View style={[styles.hintContainer, styles.hintHidden]}>
-              <Text style={[styles.hintText, { color: colors.textSecondary }]}>
-                Какой бред — вокруг один хлеб.
-              </Text>
+              <View style={styles.cardBottom} />
             </View>
-
-            <View style={styles.cardBottom} />
-          </View>
+          </ReAnimated.View>
         </Pressable>
       </View>
 
@@ -781,18 +780,17 @@ const styles = StyleSheet.create({
     height: CARD_HEIGHT,
     maxHeight: 420,
   },
-  card: {
+  cardAnim: {
     position: 'absolute',
     width: '100%',
     height: '100%',
+  },
+  cardInner: {
+    flex: 1,
     borderRadius: 24,
     borderWidth: 1,
     padding: 24,
-  },
-  cardBack: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
+    overflow: 'hidden',
   },
   cardTopRow: {
     flexDirection: 'row',
@@ -828,6 +826,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '700',
     textAlign: 'center',
+    lineHeight: 38,
   },
   divider: {
     width: 48,

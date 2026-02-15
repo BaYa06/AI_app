@@ -11,6 +11,7 @@ import {
   TextInputProps,
   ViewStyle,
   TextStyle,
+  Platform,
 } from 'react-native';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, heights, typography } from '@/constants';
@@ -98,7 +99,8 @@ export const Input = memo(
             style={[
               styles.input,
               typography.body,
-              { color: colors.textPrimary, outlineStyle: 'none' },
+              { color: colors.textPrimary },
+              Platform.OS === 'web' && { outlineStyle: 'none' },
               leftIcon ? styles.inputWithLeftIcon : null,
               rightIcon ? styles.inputWithRightIcon : null,
               isMultiline

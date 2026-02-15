@@ -76,6 +76,18 @@ export type RootStackParamList = {
     phaseOffset?: number;
     phaseFailedIds?: string[];
   };
+  AudioLearning: {
+    setId: string;
+    cardLimit?: number;
+    // Параметры фазы
+    phaseId?: string;
+    totalPhaseCards?: number;
+    studiedInPhase?: number;
+    phaseOffset?: number;
+    phaseFailedIds?: string[];
+  };
+  Achievements: undefined;
+  NotificationSettings: undefined;
   Settings: undefined;
   Search: undefined;
 };

@@ -2,8 +2,9 @@ const path = require('path');
 const {getDefaultConfig, mergeConfig} = require('@react-native/metro-config');
 const dotenv = require('dotenv');
 
-// Load local env vars for Metro so babel inline plugin can replace process.env.*
-dotenv.config({ path: path.resolve(__dirname, '.env.local') });
+// Load env vars for Metro so babel inline plugin can replace process.env.*
+dotenv.config({ path: path.resolve(__dirname, '.env') });
+dotenv.config({ path: path.resolve(__dirname, '.env.local'), override: true });
 
 /**
  * Metro configuration
@@ -11,6 +12,8 @@ dotenv.config({ path: path.resolve(__dirname, '.env.local') });
  *
  * @type {import('metro-config').MetroConfig}
  */
+const exclusionList = require('metro-config/src/defaults/exclusionList');
+
 const config = {
   transformer: {
     getTransformOptions: async () => ({
@@ -22,6 +25,10 @@ const config = {
   },
   resolver: {
     sourceExts: ['jsx', 'js', 'ts', 'tsx', 'json'],
+    blockList: exclusionList([
+      // Exclude native CMake build artifacts — temp files cause ENOENT during bundling
+      /.*\/\.cxx\/.*/,
+    ]),
   },
 };
 

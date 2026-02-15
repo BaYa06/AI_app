@@ -67,6 +67,10 @@ coverage/
 
 # Secrets / Service Account Keys
 flashly.json
+flashly-vertex.json
+text-to-speech.json
+speech-to-text.json
+.push-tokens.json
 *.json.bak
 
 # Temporary

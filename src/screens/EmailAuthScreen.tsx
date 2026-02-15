@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   StyleSheet,
   View,
@@ -13,6 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import InAppBrowser from 'react-native-inappbrowser-reborn';
 import type { Session } from '@supabase/supabase-js';
 
 import { Button, Text } from '@/components/common';
@@ -40,10 +42,11 @@ export function EmailAuthScreen({ onBack }: Props) {
   const signInWithGoogle = useCallback(async () => {
     setAuthError(null);
     setIsLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: SUPABASE_OAUTH_REDIRECT,
+        skipBrowserRedirect: true,
       },
     });
 
@@ -51,8 +54,39 @@ export function EmailAuthScreen({ onBack }: Props) {
       console.error('[auth] Google sign-in error', error);
       setAuthError(error.message);
       setIsLoading(false);
+      return;
     }
-    // Loading spinner stays until onAuthStateChange fires or we get the existing session below.
+
+    if (data?.url) {
+      try {
+        if (Platform.OS !== 'web' && await InAppBrowser.isAvailable()) {
+          const result = await InAppBrowser.openAuth(data.url, SUPABASE_OAUTH_REDIRECT, {
+            showTitle: false,
+            enableUrlBarHiding: true,
+            enableDefaultShare: false,
+            ephemeralWebSession: false,
+          });
+          if (result.type === 'success' && result.url) {
+            const codeMatch = result.url.match(/[?&]code=([^&]+)/);
+            const code = codeMatch?.[1];
+            if (code) {
+              const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+              if (exchangeError) {
+                console.error('[auth] Code exchange failed:', exchangeError.message);
+                setAuthError(exchangeError.message);
+              }
+            }
+          }
+        } else {
+          await Linking.openURL(data.url);
+        }
+      } catch (e) {
+        console.error('[auth] Failed to open browser:', e);
+        setAuthError('Не удалось открыть браузер для входа через Google');
+      } finally {
+        setIsLoading(false);
+      }
+    }
   }, []);
 
   /**
