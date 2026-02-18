@@ -86,6 +86,10 @@ export type RootStackParamList = {
     phaseOffset?: number;
     phaseFailedIds?: string[];
   };
+  SharedSetDetail: { setId: string };
+  PersonalInfo: undefined;
+  Security: undefined;
+  Subscription: undefined;
   Achievements: undefined;
   NotificationSettings: undefined;
   Settings: undefined;

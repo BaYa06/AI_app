@@ -28,6 +28,10 @@ import { StudyScreen } from '@/screens/StudyScreen';
 import { StudyPlaceholderScreen } from '@/screens/StudyPlaceholderScreen';
 import { AchievementsScreen } from '@/screens/AchievementsScreen';
 import { NotificationSettingsScreen } from '@/screens/NotificationSettingsScreen';
+import { SharedSetDetailScreen } from '@/screens/SharedSetDetailScreen';
+import { PersonalInfoScreen } from '@/screens/PersonalInfoScreen';
+import { SecurityScreen } from '@/screens/SecurityScreen';
+import { SubscriptionScreen } from '@/screens/SubscriptionScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -205,6 +209,26 @@ export function AppNavigator() {
             animation: 'slide_from_right',
             animationDuration: 300,
           }}
+        />
+        <Stack.Screen
+          name="SharedSetDetail"
+          component={SharedSetDetailScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="PersonalInfo"
+          component={PersonalInfoScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="Security"
+          component={SecurityScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="Subscription"
+          component={SubscriptionScreen}
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="SetEditor"

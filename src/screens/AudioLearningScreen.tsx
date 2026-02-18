@@ -71,7 +71,6 @@ export function AudioLearningScreen({ navigation, route }: Props) {
   const [sessionState, setSessionState] = useState<SessionState>('idle');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [errorCardIds, setErrorCardIds] = useState<string[]>([]);
-  const [countdown, setCountdown] = useState(5);
   const [partialText, setPartialText] = useState('');
   const [recognizedText, setRecognizedText] = useState('');
   const [isRunning, setIsRunning] = useState(false);
@@ -82,6 +81,12 @@ export function AudioLearningScreen({ navigation, route }: Props) {
   const errorCardIdsRef = useRef<string[]>([]);
   const reverseRef = useRef(reverseEnabled);
   reverseRef.current = reverseEnabled;
+
+  // Ref for "Не знаю" button to resolve the listening promise
+  const skipResolveRef = useRef<(() => void) | null>(null);
+
+  // Pulsing animation for mic icon
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   // Cards preparation
   const cards = useMemo(() => {
@@ -201,34 +206,28 @@ export function AudioLearningScreen({ navigation, route }: Props) {
 
     // Start listening for this card (mic is already running)
     setSessionState('listening');
-    setCountdown(5);
     setPartialText('');
     setRecognizedText('');
 
-    const countdownInterval = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) { clearInterval(countdownInterval); return 0; }
-        return prev - 1;
-      });
-    }, 1000);
-
-    // Wait for correct answer or timeout via continuous listener
+    // Wait for correct answer or "Не знаю" skip
     const result = await new Promise<RecognitionResult>((resolve) => {
       let settled = false;
       let allAlternatives: string[] = [];
 
-      const timeoutId = setTimeout(() => {
+      // Allow "Не знаю" button to resolve the promise
+      skipResolveRef.current = () => {
         if (!settled) {
           settled = true;
+          skipResolveRef.current = null;
           setContinuousHandlers(null, null);
           resolve({
-            recognized: allAlternatives.length > 0,
+            recognized: false,
             alternatives: allAlternatives,
-            isCorrect: isAnswerCorrect(allAlternatives, expectedAnswer),
-            timedOut: true,
+            isCorrect: false,
+            timedOut: false,
           });
         }
-      }, 5000);
+      };
 
       setContinuousHandlers(
         (results) => {
@@ -236,7 +235,7 @@ export function AudioLearningScreen({ navigation, route }: Props) {
           if (isAnswerCorrect(results, expectedAnswer)) {
             if (!settled) {
               settled = true;
-              clearTimeout(timeoutId);
+              skipResolveRef.current = null;
               setContinuousHandlers(null, null);
               resolve({
                 recognized: true,
@@ -250,8 +249,6 @@ export function AudioLearningScreen({ navigation, route }: Props) {
         (partial) => setPartialText(partial),
       );
     });
-
-    clearInterval(countdownInterval);
 
     // Stopped while listening?
     if (!isRunningRef.current) {
@@ -273,8 +270,8 @@ export function AudioLearningScreen({ navigation, route }: Props) {
       Vibration.vibrate([0, 50, 50, 50]);
     }
 
-    // Show result 1.5s, then advance (mic stays on!)
-    await new Promise(r => setTimeout(r, 1500));
+    // Show result: 1s for correct, 2s for incorrect (to read the answer)
+    await new Promise(r => setTimeout(r, result.isCorrect ? 1000 : 2000));
 
     if (!isRunningRef.current) {
       setSessionState('idle');
@@ -329,11 +326,35 @@ export function AudioLearningScreen({ navigation, route }: Props) {
   const handleStop = useCallback(() => {
     isRunningRef.current = false;
     setIsRunning(false);
+    skipResolveRef.current = null;
     stopContinuousListening();
     setSessionState('idle');
     setPartialText('');
     setRecognizedText('');
   }, []);
+
+  // Skip ("Не знаю") handler
+  const handleSkip = useCallback(() => {
+    if (skipResolveRef.current) {
+      skipResolveRef.current();
+    }
+  }, []);
+
+  // Pulsing mic animation
+  useEffect(() => {
+    if (sessionState === 'listening') {
+      const animation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 0.4, duration: 800, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+        ]),
+      );
+      animation.start();
+      return () => animation.stop();
+    } else {
+      pulseAnim.setValue(1);
+    }
+  }, [sessionState, pulseAnim]);
 
   // Settings callbacks
   const openSettings = useCallback(() => {
@@ -511,15 +532,23 @@ export function AudioLearningScreen({ navigation, route }: Props) {
             </Text>
           </Pressable>
         ) : (
-          /* Сессия активна: показываем состояние + кнопку "Стоп" */
+          /* Сессия активна: показываем состояние + кнопки */
           <View style={styles.runningArea}>
             {sessionState === 'listening' ? (
-              <View style={styles.listeningRow}>
-                <AudioLines size={28} color="#F59E0B" />
-                <Text style={[styles.countdownText, { color: colors.textPrimary }]}>
-                  {countdown}
-                </Text>
-              </View>
+              <>
+                <Animated.View style={[styles.listeningRow, { opacity: pulseAnim }]}>
+                  <AudioLines size={28} color="#F59E0B" />
+                </Animated.View>
+
+                <Pressable
+                  onPress={handleSkip}
+                  style={[styles.skipButton, { backgroundColor: theme === 'dark' ? '#1e293b' : '#f1f5f9' }]}
+                >
+                  <Text style={[styles.skipButtonText, { color: colors.textPrimary }]}>
+                    Не знаю
+                  </Text>
+                </Pressable>
+              </>
             ) : sessionState === 'correct' ? (
               <View style={[styles.resultIndicator, { backgroundColor: '#10B9811A' }]}>
                 <Check size={28} color="#10B981" />
@@ -534,7 +563,7 @@ export function AudioLearningScreen({ navigation, route }: Props) {
               onPress={handleStop}
               style={[styles.stopButton, { borderColor: colors.border }]}
             >
-              <Text style={[styles.stopButtonText, { color: colors.textPrimary }]}>
+              <Text style={[styles.stopButtonText, { color: colors.textSecondary }]}>
                 Стоп
               </Text>
             </Pressable>
@@ -690,9 +719,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   partialText: {
-    fontSize: 16,
+    fontSize: 20,
     fontStyle: 'italic',
     textAlign: 'center',
+    opacity: 0.7,
   },
   recognizedText: {
     fontSize: 18,
@@ -743,15 +773,19 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   listeningRow: {
-    height: 64,
-    flexDirection: 'row',
+    height: 48,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: spacing.m,
   },
-  countdownText: {
-    fontSize: 32,
-    fontWeight: '700',
+  skipButton: {
+    height: 56,
+    borderRadius: borderRadius.l,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  skipButtonText: {
+    fontSize: 17,
+    fontWeight: '600',
   },
   resultIndicator: {
     height: 48,
@@ -763,15 +797,15 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   stopButton: {
-    height: 48,
+    height: 40,
     borderRadius: borderRadius.l,
-    borderWidth: 1.5,
+    borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   stopButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '500',
   },
 
   // Settings modal

@@ -229,7 +229,14 @@ export function ProfileScreen({ navigation }: any) {
           {ACCOUNT_ITEMS.map((item, i) => (
             <React.Fragment key={i}>
               {i > 0 && <View style={[st.divider, { backgroundColor: dividerColor }]} />}
-              <Pressable style={st.settingsItem}>
+              <Pressable
+                style={st.settingsItem}
+                onPress={() => {
+                  if (i === 0) navigation?.navigate('PersonalInfo');
+                  if (i === 1) navigation?.navigate('Security');
+                  if (i === 2) navigation?.navigate('Subscription');
+                }}
+              >
                 <Ionicons name={item.icon as any} size={22} color={colors.textTertiary} />
                 <Text style={[st.settingsItemText, { color: colors.textPrimary }]}>{item.label}</Text>
                 {item.badge && (

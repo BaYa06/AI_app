@@ -12,6 +12,7 @@ import {
   Platform,
   Modal,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { Text } from '@/components/common';
 import { useThemeColors, useSettingsStore } from '@/store';
 import { spacing, borderRadius } from '@/constants';
@@ -132,12 +133,14 @@ const RATINGS = ['4+', '3+'];
 function HorizontalCard({
   item,
   colors,
+  onPress,
 }: {
   item: (typeof TRENDING)[0];
   colors: ReturnType<typeof useThemeColors>;
+  onPress?: () => void;
 }) {
   return (
-    <View style={[s.hCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+    <Pressable onPress={onPress} style={[s.hCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={s.hCardTop}>
         <View style={[s.hCardIcon, { backgroundColor: colors.primary + '15' }]}>
           <Text style={s.hCardEmoji}>{item.emoji}</Text>
@@ -171,19 +174,21 @@ function HorizontalCard({
           <Text style={[s.statText, { color: colors.textTertiary }]}>{item.likes}</Text>
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
 function RecentCard({
   item,
   colors,
+  onPress,
 }: {
   item: (typeof RECENT)[0];
   colors: ReturnType<typeof useThemeColors>;
+  onPress?: () => void;
 }) {
   return (
-    <View style={[s.rCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+    <Pressable onPress={onPress} style={[s.rCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={[s.rCardIcon, { backgroundColor: colors.primary + '15' }]}>
         <Text style={s.rCardEmoji}>{item.emoji}</Text>
       </View>
@@ -202,13 +207,14 @@ function RecentCard({
         <Text style={[s.rCardCards, { color: colors.textSecondary }]}>{item.cards} карт</Text>
         <Text style={[s.rCardTime, { color: colors.textTertiary }]}>{item.time}</Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
 // ---- Main Screen ----
 
 export function LibraryScreen() {
+  const navigation = useNavigation();
   const colors = useThemeColors();
   const resolvedTheme = useSettingsStore((s) => s.resolvedTheme);
   const isDark = resolvedTheme === 'dark';
@@ -345,7 +351,7 @@ export function LibraryScreen() {
             contentContainerStyle={s.hScroll}
           >
             {TRENDING.map((item) => (
-              <HorizontalCard key={item.id} item={item} colors={colors} />
+              <HorizontalCard key={item.id} item={item} colors={colors} onPress={() => navigation.navigate('SharedSetDetail', { setId: item.id })} />
             ))}
           </ScrollView>
         </View>
@@ -366,7 +372,7 @@ export function LibraryScreen() {
             contentContainerStyle={s.hScroll}
           >
             {TOP_RATED.map((item) => (
-              <HorizontalCard key={item.id} item={item} colors={colors} />
+              <HorizontalCard key={item.id} item={item} colors={colors} onPress={() => navigation.navigate('SharedSetDetail', { setId: item.id })} />
             ))}
           </ScrollView>
         </View>
@@ -380,7 +386,7 @@ export function LibraryScreen() {
           </View>
           <View style={s.recentList}>
             {RECENT.map((item) => (
-              <RecentCard key={item.id} item={item} colors={colors} />
+              <RecentCard key={item.id} item={item} colors={colors} onPress={() => navigation.navigate('SharedSetDetail', { setId: item.id })} />
             ))}
           </View>
         </View>
