@@ -33,6 +33,26 @@ export function SignInScreen({ onBack, onSendCode, onCreateAccount }: Props) {
   const signInWithGoogle = useCallback(async () => {
     setError(null);
     setIsLoading(true);
+
+    // On web/PWA: let Supabase handle the redirect natively via window.location
+    // This ensures the OAuth callback returns to the same PWA window
+    if (Platform.OS === 'web') {
+      const { error: authError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: SUPABASE_OAUTH_REDIRECT,
+          // skipBrowserRedirect: false (default) — Supabase will redirect via window.location
+        },
+      });
+      if (authError) {
+        setError(authError.message);
+        setIsLoading(false);
+      }
+      // Page will navigate away to Google; no finally needed
+      return;
+    }
+
+    // Native mobile: use InAppBrowser with PKCE
     const { data, error: authError } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -48,7 +68,7 @@ export function SignInScreen({ onBack, onSendCode, onCreateAccount }: Props) {
 
     if (data?.url) {
       try {
-        if (Platform.OS !== 'web' && await InAppBrowser.isAvailable()) {
+        if (await InAppBrowser.isAvailable()) {
           const result = await InAppBrowser.openAuth(data.url, SUPABASE_OAUTH_REDIRECT, {
             showTitle: false,
             enableUrlBarHiding: true,

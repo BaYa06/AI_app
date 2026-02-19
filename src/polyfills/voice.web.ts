@@ -26,6 +26,12 @@ const Voice = {
       return;
     }
 
+    // Abort previous instance to avoid duplicate listeners / "aborted" errors
+    if (recognition) {
+      try { recognition.onend = null; recognition.onerror = null; recognition.abort(); } catch {}
+      recognition = null;
+    }
+
     recognition = new SpeechRecognition();
     recognition.lang = locale;
     recognition.interimResults = true;

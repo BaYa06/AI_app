@@ -42,6 +42,25 @@ export function EmailAuthScreen({ onBack }: Props) {
   const signInWithGoogle = useCallback(async () => {
     setAuthError(null);
     setIsLoading(true);
+
+    // On web/PWA: let Supabase handle the redirect natively via window.location
+    // This ensures the OAuth callback returns to the same PWA window
+    if (Platform.OS === 'web') {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: SUPABASE_OAUTH_REDIRECT,
+        },
+      });
+      if (error) {
+        console.error('[auth] Google sign-in error', error);
+        setAuthError(error.message);
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    // Native mobile: use InAppBrowser with PKCE
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -59,7 +78,7 @@ export function EmailAuthScreen({ onBack }: Props) {
 
     if (data?.url) {
       try {
-        if (Platform.OS !== 'web' && await InAppBrowser.isAvailable()) {
+        if (await InAppBrowser.isAvailable()) {
           const result = await InAppBrowser.openAuth(data.url, SUPABASE_OAUTH_REDIRECT, {
             showTitle: false,
             enableUrlBarHiding: true,

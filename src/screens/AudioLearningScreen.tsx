@@ -292,6 +292,16 @@ export function AudioLearningScreen({ navigation, route }: Props) {
     }
   }, [cards, finishSession]);
 
+  // Compute the STT language based on current reverse state
+  const getAnswerLang = useCallback((isReversed: boolean) => {
+    // Normal: front=languageFrom is shown, user speaks answer in languageTo
+    // Reversed: back=languageTo is shown, user speaks answer in languageFrom
+    const lang = isReversed
+      ? (currentSet?.languageFrom || currentSet?.languageTo || 'en')
+      : (currentSet?.languageTo || currentSet?.languageFrom || 'en');
+    return normalizeLangForSTT(lang);
+  }, [currentSet]);
+
   const handleBack = useCallback(() => {
     isRunningRef.current = false;
     stopContinuousListening();
@@ -308,10 +318,7 @@ export function AudioLearningScreen({ navigation, route }: Props) {
       return;
     }
 
-    const isReversed = reverseRef.current;
-    const lang = normalizeLangForSTT(
-      isReversed ? (currentSet?.languageFrom || 'de') : (currentSet?.languageTo || 'ru')
-    );
+    const lang = getAnswerLang(reverseRef.current);
 
     isRunningRef.current = true;
     setIsRunning(true);
@@ -320,7 +327,7 @@ export function AudioLearningScreen({ navigation, route }: Props) {
     // Start mic once — it stays on for the entire session
     await startContinuousListening(lang);
     processCard(currentIndexRef.current);
-  }, [processCard, currentSet]);
+  }, [processCard, getAnswerLang]);
 
   // Stop session
   const handleStop = useCallback(() => {
@@ -376,10 +383,16 @@ export function AudioLearningScreen({ navigation, route }: Props) {
     ]).start(() => setIsSettingsOpen(false));
   }, [backdropOpacity, sheetTranslate]);
 
-  const handleToggleReverse = useCallback((value: boolean) => {
+  const handleToggleReverse = useCallback(async (value: boolean) => {
     updateSettings({ reverseCards: value });
     DatabaseService.saveSettings();
-  }, [updateSettings]);
+    // If session is running, restart STT with the new answer language
+    if (isRunningRef.current) {
+      const newLang = getAnswerLang(value);
+      await stopContinuousListening();
+      await startContinuousListening(newLang);
+    }
+  }, [updateSettings, getAnswerLang]);
 
   // Reverse logic: swap question/answer
   const questionText = reverseEnabled

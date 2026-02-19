@@ -306,6 +306,9 @@ function _attachContinuousListeners(): void {
   };
 
   Voice.onSpeechError = (e: SpeechErrorEvent) => {
+    const msg = String(e.error?.message ?? e.error?.code ?? '');
+    // "aborted" is expected when restarting recognition — ignore to avoid restart loop
+    if (msg === 'aborted' || msg === 'no-speech') return;
     console.warn('[speechRecognition] Continuous error:', e.error);
     _restartContinuous();
   };

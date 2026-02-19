@@ -11,6 +11,7 @@ import { spacing, borderRadius } from '@/constants';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card } from '@/types';
 import { DatabaseService } from '@/services';
+import { apiService } from '@/services/ApiService';
 import {
   ArrowLeft,
   MoreHorizontal,
@@ -72,9 +73,9 @@ export function SetDetailScreen({ navigation, route }: Props) {
 
   // Import TSV states
   const [importLoading, setImportLoading] = useState(false);
-  const [importedCards, setImportedCards] = useState<Array<{ front: string; back: string }>>([]);
+  const [importedCards, setImportedCards] = useState<Array<{ front: string; back: string; example?: string }>>([]);
   const [importError, setImportError] = useState<string | null>(null);
-  const [importStep, setImportStep] = useState<'select' | 'loading' | 'preview'>('select');
+  const [importStep, setImportStep] = useState<'select' | 'loading' | 'preview' | 'generating'>('select');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Расчет статистики
@@ -377,17 +378,35 @@ export function SetDetailScreen({ navigation, route }: Props) {
     }
   }, [parseTSV]);
 
-  // Import all cards from preview
+  // Generate examples via Gemini then import all cards
   const handleImportCards = useCallback(async () => {
     if (importedCards.length === 0) return;
-    
+
     setImportLoading(true);
-    
+    setImportStep('generating');
+
     try {
-      for (const card of importedCards) {
-        addCard({ setId, frontText: card.front, backText: card.back });
+      // Генерируем примеры через Gemini
+      let cardsWithExamples = importedCards;
+      try {
+        const result = await apiService.generateExamples(
+          importedCards.map(c => ({ front: c.front, back: c.back }))
+        );
+        if (result.length > 0) {
+          cardsWithExamples = importedCards.map((card, i) => ({
+            ...card,
+            example: result[i]?.example || '',
+          }));
+        }
+      } catch (aiError) {
+        console.warn('Gemini examples failed, importing without examples:', aiError);
+        // Продолжаем импорт без примеров
       }
-      
+
+      for (const card of cardsWithExamples) {
+        addCard({ setId, frontText: card.front, backText: card.back, example: card.example });
+      }
+
       // Update stats
       const statsSnapshot = selectSetStats(setId);
       updateSetStats(setId, {
@@ -397,14 +416,15 @@ export function SetDetailScreen({ navigation, route }: Props) {
         reviewCount: statsSnapshot.reviewCount,
         masteredCount: statsSnapshot.masteredCount,
       });
-      
+
       // Save to database
       await DatabaseService.saveCards();
       await DatabaseService.saveSets();
-      
+
       closeImportModal();
     } catch (error) {
       setImportError('Ошибка при создании карточек');
+      setImportStep('preview');
     } finally {
       setImportLoading(false);
     }
@@ -1082,7 +1102,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
               {
                 backgroundColor: modalSurface,
                 borderColor: modalBorder,
-                maxHeight: importStep === 'preview' ? '80%' : undefined,
+                maxHeight: importStep === 'preview' || importStep === 'generating' ? '80%' : undefined,
               },
             ]}
           >
@@ -1091,7 +1111,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                 <ArrowLeft size={20} color={modalTextPrimary} />
               </Pressable>
               <Text variant="body" style={[styles.importTitle, { color: modalTextPrimary }]}>
-                {importStep === 'preview' ? `Импорт (${importedCards.length} карточек)` : 'Импорт из файла'}
+                {importStep === 'preview' ? `Импорт (${importedCards.length} карточек)` : importStep === 'generating' ? 'Генерация примеров...' : 'Импорт из файла'}
               </Text>
               <View style={styles.topIcon} />
             </View>
@@ -1114,6 +1134,22 @@ export function SetDetailScreen({ navigation, route }: Props) {
                 <Text variant="body" color="secondary" style={{ marginTop: spacing.m }}>
                   Загрузка файла...
                 </Text>
+              </View>
+            )}
+
+            {/* Generating Examples State */}
+            {importStep === 'generating' && (
+              <View style={styles.importLoadingContainer}>
+                <View style={[styles.importHeroIcon, { backgroundColor: `${colors.primary}1A` }]}>
+                  <Sparkles size={36} color={colors.primary} />
+                </View>
+                <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '600', marginTop: spacing.m }}>
+                  AI генерирует примеры...
+                </Text>
+                <Text variant="bodySmall" color="secondary" style={{ marginTop: spacing.xs, textAlign: 'center', paddingHorizontal: spacing.l }}>
+                  Gemini создаёт короткие примеры для {importedCards.length} карточек
+                </Text>
+                <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: spacing.l }} />
               </View>
             )}
 

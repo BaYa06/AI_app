@@ -3,7 +3,7 @@
 // ============================================================
 // ВАЖНО: bump CACHE_VERSION при каждом значимом изменении SW,
 // webpack contenthash в именах чанков позаботится об остальном.
-const CACHE_VERSION = 9;
+const CACHE_VERSION = 10;
 const CACHE_NAME = `flashly-static-v${CACHE_VERSION}`;
 
 // ==================== FCM (Firebase Cloud Messaging) ====================
@@ -105,8 +105,13 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
-  // Пропускаем не-GET и API/FCM-запросы
+  // Пропускаем не-GET, API/FCM-запросы и OAuth callback
   if (request.method !== 'GET' || request.url.includes('/api/') || request.url.includes('googleapis.com')) {
+    return;
+  }
+
+  // Never cache or intercept the OAuth callback — let Supabase JS handle the code in URL
+  if (request.url.includes('/auth-callback')) {
     return;
   }
 

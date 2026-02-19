@@ -200,6 +200,17 @@ module.exports = (env, argv) => {
           }
         });
 
+        apiMiddleware.post('/api/generate-examples', async (req, res) => {
+          console.log('[devServer] POST /api/generate-examples called');
+          try {
+            const mod = await import('./api/generate-examples.js');
+            return mod.default(req, res);
+          } catch (e) {
+            console.error('[devServer] generate-examples error', e);
+            return res.status(500).json({ error: 'dev-server error', message: e.message });
+          }
+        });
+
         // Debug: log all API requests
         apiMiddleware.use('/api', (req, res, next) => {
           console.log('[devServer] API request:', req.method, req.url);
