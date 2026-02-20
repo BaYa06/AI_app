@@ -4,6 +4,15 @@
   "devCommand": "npm run web",
   "installCommand": "npm install",
   "framework": null,
+  "functions": {
+    "api/extract-pdf.js": {
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "api/generate-examples.js": {
+      "maxDuration": 60
+    }
+  },
   "headers": [
     {
       "source": "/api/(.*)",

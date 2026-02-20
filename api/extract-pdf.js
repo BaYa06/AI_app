@@ -13,35 +13,28 @@ function getVertexClient() {
   const project = process.env.GOOGLE_CLOUD_PROJECT_ID || 'flashly-485417';
   const location = process.env.VERTEX_AI_LOCATION || 'us-central1';
 
+  if (!saKey) {
+    throw new Error('VERTEX_SA_KEY environment variable is not set');
+  }
+
   const options = { project, location };
 
-  if (saKey) {
-    try {
-      const credentials = JSON.parse(saKey);
-      options.googleAuthOptions = { credentials };
-    } catch {
-      console.error('Failed to parse VERTEX_SA_KEY');
-    }
+  try {
+    const credentials = JSON.parse(saKey);
+    options.googleAuthOptions = { credentials };
+  } catch {
+    throw new Error('Failed to parse VERTEX_SA_KEY as JSON');
   }
 
   return new VertexAI(options);
 }
 
-// ~10MB base64 limit (~7.5MB raw file)
-const MAX_BASE64_LENGTH = 14_000_000;
-
-// Vercel: increase body size limit for PDF uploads
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '15mb',
-    },
-  },
-};
+// ~4MB base64 limit (~3MB raw file) — Vercel body limit is 4.5MB
+const MAX_BASE64_LENGTH = 5_500_000;
 
 export default async function handler(req, res) {
   // CORS
-  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -54,14 +47,14 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { base64 } = req.body;
+  const { base64 } = req.body || {};
 
   if (!base64 || typeof base64 !== 'string') {
     return res.status(400).json({ error: 'base64 string is required' });
   }
 
   if (base64.length > MAX_BASE64_LENGTH) {
-    return res.status(400).json({ error: 'File too large. Maximum 10MB.' });
+    return res.status(400).json({ error: 'File too large. Maximum ~4MB.' });
   }
 
   try {
@@ -129,7 +122,8 @@ Example: [{"front": "der Abschnitt", "back": "раздел"}, {"front": "sterben
 
     return res.status(200).json({ cards: validCards });
   } catch (error) {
-    console.error('Gemini PDF extraction error:', error);
-    return res.status(500).json({ error: 'Failed to extract cards from PDF: ' + error.message });
+    console.error('Gemini PDF extraction error:', error?.message || error);
+    const message = error?.message || 'Unknown error';
+    return res.status(500).json({ error: 'Failed to extract cards from PDF: ' + message });
   }
 }

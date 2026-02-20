@@ -299,8 +299,8 @@ export function SetDetailScreen({ navigation, route }: Props) {
       return;
     }
 
-    if (isPdf && file.size > 10 * 1024 * 1024) {
-      setImportError('PDF файл слишком большой. Максимум 10 МБ.');
+    if (isPdf && file.size > 4 * 1024 * 1024) {
+      setImportError('PDF файл слишком большой. Максимум 4 МБ.');
       return;
     }
 
@@ -383,8 +383,8 @@ export function SetDetailScreen({ navigation, route }: Props) {
         return;
       }
 
-      if (isPdf && file.size && file.size > 10 * 1024 * 1024) {
-        setImportError('PDF файл слишком большой. Максимум 10 МБ.');
+      if (isPdf && file.size && file.size > 4 * 1024 * 1024) {
+        setImportError('PDF файл слишком большой. Максимум 4 МБ.');
         return;
       }
 
