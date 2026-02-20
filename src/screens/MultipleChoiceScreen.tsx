@@ -3,7 +3,7 @@
  * @description Экран выбора перевода
  */
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { View, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { View, StyleSheet, Pressable, ScrollView, AppState } from 'react-native';
 import { ArrowLeft, Settings, Volume2 } from 'lucide-react-native';
 import { Container, Text, ProgressBar, Loading } from '@/components/common';
 import { useCardsStore, useSetsStore, useThemeColors, useSettingsStore, selectSetStats } from '@/store';
@@ -26,6 +26,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
   const updateSetStats = useSetsStore((s) => s.updateSetStats);
   const updateCardSRS = useCardsStore((s) => s.updateCardSRS);
   const incrementTodayCards = useSettingsStore((s) => s.incrementTodayCards);
+  const finishStudySession = useSettingsStore((s) => s.finishStudySession);
   
   // Мемоизируем список ошибочных карточек из фазы
   const phaseFailedList = useMemo(
@@ -251,6 +252,8 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
         phaseTotal
       });
       
+      finishStudySession();
+
       navigation.replace('StudyResults', {
         setId,
         totalCards: totalQuestions,
@@ -269,7 +272,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
         phaseFailedIds: newPhaseFailedIds,
       });
     },
-    [navigation, setId, totalQuestions, cardLimit, studiedInPhase, phaseOffset, phaseFailedList, questions]
+    [finishStudySession, navigation, setId, totalQuestions, cardLimit, studiedInPhase, phaseOffset, phaseFailedList, questions]
   );
 
   const handleSelectOption = (option: Option) => {
@@ -355,12 +358,22 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
     );
   }
 
+  // Сохраняем активность при уходе в background
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'background' || state === 'inactive') {
+        finishStudySession();
+      }
+    });
+    return () => sub.remove();
+  }, [finishStudySession]);
+
   return (
     <Container padded={false}>
       <View style={[styles.header, { backgroundColor: colors.background }]}>
         <Pressable
           aria-label="Назад"
-          onPress={() => navigation.goBack()}
+          onPress={() => { finishStudySession(); navigation.goBack(); }}
           style={({ pressed }) => [
             styles.iconButton,
             { backgroundColor: pressed ? colors.surface : 'transparent' },

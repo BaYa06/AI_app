@@ -35,6 +35,21 @@ type EnsureUserArgs = {
 };
 
 /**
+ * Безопасно извлечь YYYY-MM-DD из PostgreSQL DATE.
+ * Используем локальные геттеры, т.к. драйвер может вернуть Date в local midnight,
+ * и toISOString() сдвинет дату назад при положительном UTC-offset.
+ */
+function pgDateToString(value: unknown): string {
+  if (value instanceof Date) {
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, '0');
+    const d = String(value.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  return String(value).split('T')[0];
+}
+
+/**
  * Определяет статус карточки на основе learningStep
  */
 function getStatusFromStep(learningStep: number): CardStatus {
@@ -806,13 +821,9 @@ export const NeonService = {
       if (existing.length > 0) {
         currentStreak = existing[0].current_streak || 0;
         longestStreak = existing[0].longest_streak || 0;
-        // Конвертируем last_active_date из DB (может быть Date или string) в YYYY-MM-DD
         const rawDate = existing[0].last_active_date;
-        if (rawDate instanceof Date) {
-          lastActiveDate = rawDate.toISOString().split('T')[0];
-        } else if (rawDate) {
-          // Может быть строка типа '2026-02-07T00:00:00.000Z' или '2026-02-07'
-          lastActiveDate = String(rawDate).split('T')[0];
+        if (rawDate) {
+          lastActiveDate = pgDateToString(rawDate);
         }
       }
 
@@ -893,9 +904,7 @@ export const NeonService = {
       `;
 
       return result.map((row: any) => ({
-        local_date: row.local_date instanceof Date 
-          ? row.local_date.toISOString().split('T')[0]
-          : String(row.local_date),
+        local_date: pgDateToString(row.local_date),
         words_learned: row.words_learned || 0,
         minutes_learned: row.minutes_learned || 0,
         cards_studied: row.cards_studied || 0,
@@ -938,15 +947,54 @@ export const NeonService = {
       }
 
       const row = result[0];
+      const lastActiveDate = row.last_active_date
+        ? pgDateToString(row.last_active_date)
+        : null;
+      let currentStreak = row.current_streak || 0;
+      const longestStreak = row.longest_streak || 0;
+
+      // Определяем таймзон: из БД или системный
+      let timezone: string;
+      try {
+        timezone = row.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+      } catch {
+        timezone = 'UTC';
+      }
+
+      // Серверная проверка сброса стрика: если пропущено > 1 дня — обнуляем
+      if (lastActiveDate && currentStreak > 0) {
+        try {
+          const todayKey = new Intl.DateTimeFormat('en-CA', {
+            timeZone: timezone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          }).format(new Date());
+
+          const lastDate = new Date(lastActiveDate + 'T12:00:00Z');
+          const todayDate = new Date(todayKey + 'T12:00:00Z');
+          const diffDays = Math.round(
+            (todayDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24)
+          );
+
+          if (diffDays > 1) {
+            currentStreak = 0;
+            await sql`
+              UPDATE user_stats SET current_streak = 0, updated_at = NOW()
+              WHERE user_id = ${userId}::uuid
+            `;
+            console.log(`🔄 Streak: сброс на сервере — пропущено ${diffDays} дней`);
+          }
+        } catch (e) {
+          console.warn('⚠️ Streak: ошибка при проверке сброса стрика', e);
+        }
+      }
+
       return {
-        current_streak: row.current_streak || 0,
-        longest_streak: row.longest_streak || 0,
-        last_active_date: row.last_active_date 
-          ? (row.last_active_date instanceof Date 
-              ? row.last_active_date.toISOString().split('T')[0]
-              : String(row.last_active_date))
-          : null,
-        timezone: row.timezone || 'Asia/Bishkek',
+        current_streak: currentStreak,
+        longest_streak: longestStreak,
+        last_active_date: lastActiveDate,
+        timezone,
         total_words_learned: row.total_words_learned || 0,
         total_minutes_learned: row.total_minutes_learned || 0,
         total_cards_studied: row.total_cards_studied || 0,
@@ -986,9 +1034,7 @@ export const NeonService = {
 
       const row = result[0];
       return {
-        local_date: row.local_date instanceof Date 
-          ? row.local_date.toISOString().split('T')[0]
-          : String(row.local_date),
+        local_date: pgDateToString(row.local_date),
         words_learned: row.words_learned || 0,
         minutes_learned: row.minutes_learned || 0,
         cards_studied: row.cards_studied || 0,

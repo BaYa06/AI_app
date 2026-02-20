@@ -2,9 +2,9 @@
  * API Client для работы с Neon PostgreSQL через Vercel Functions
  */
 
-const API_BASE_URL = __DEV__ 
-  ? 'http://localhost:3000/api' 
-  : 'https://ваш-домен.vercel.app/api';
+const API_BASE_URL = __DEV__
+  ? 'http://localhost:3000/api'
+  : '/api';
 
 class ApiService {
   /**
@@ -170,6 +170,22 @@ class ApiService {
     }
     const data = await response.json();
     return data.examples || [];
+  }
+  /**
+   * Извлечь карточки из PDF через Gemini
+   */
+  async extractPdfCards(base64: string): Promise<Array<{ front: string; back: string }>> {
+    const response = await fetch(`${API_BASE_URL}/extract-pdf`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ base64 }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(err.error || 'Failed to extract cards from PDF');
+    }
+    const data = await response.json();
+    return data.cards || [];
   }
 }
 

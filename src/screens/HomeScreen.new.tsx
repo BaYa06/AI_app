@@ -153,7 +153,7 @@ export function HomeScreen({ navigation }: any) {
   const dateFormatter = useMemo(
     () =>
       new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Asia/Bishkek',
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
@@ -178,19 +178,23 @@ export function HomeScreen({ navigation }: any) {
     return streak;
   }, [weekActivity, dateFormatter]);
   const streakValue = Math.max(todayStats.streak, computedStreak);
+  const todayGoalReached = cardsLearned >= DAILY_GOAL;
   const goalProgress = useMemo(() => {
     if (!dailyGoal) return 0;
     return Math.min(100, Math.round((cardsLearned / dailyGoal) * 100));
   }, [dailyGoal, cardsLearned]);
   const streakSupportText = useMemo(() => {
     const remaining = Math.max(dailyGoal - cardsLearned, 0);
+    if (goalProgress >= 10) {
+      return `Отлично! Цель на сегодня выполнена — ${cardsLearned} из ${dailyGoal}. Серия продлена!`;
+    }
     if (goalProgress === 0) {
       return `Главное — не идеальность, а привычка. Открой на минуту, выучи одно слово — и ты уже впереди. Цель: ${dailyGoal}`;
     }
-    if (goalProgress <= 10) {
-      return `Круто, ты уже начал! Осталось ${remaining} слов — сделай ещё пару и закрепи результат.`;
+    if (remaining <= 3) {
+      return `Осталось всего ${remaining} — ты почти у цели! Ещё чуть-чуть и серия продлена.`;
     }
-    return `Осталось совсем немного, чтобы продлить серию. Продолжай в том же духе! Цель: ${dailyGoal}, выучено: ${cardsLearned}`;
+    return `Хорошее начало! Осталось ${remaining} слов до цели. Продолжай в том же духе!`;
   }, [goalProgress, dailyGoal, cardsLearned]);
   
   // Фильтрация наборов по активному курсу
@@ -499,8 +503,8 @@ export function HomeScreen({ navigation }: any) {
           <View style={styles.headerCenter}>
           <View style={styles.headerBadges}>
             <Pressable style={styles.badge} onPress={() => setStreakModalVisible(true)}>
-              <Ionicons name="flame" size={24} color={isDarkMode ? '#FBBF24' : '#EA580C'} />
-              <Text style={[styles.badgeText, { color: isDarkMode ? '#FDE68A' : '#C2410C' }]}>
+              <Ionicons name="flame" size={24} color={todayGoalReached ? (isDarkMode ? '#FBBF24' : '#EA580C') : (isDarkMode ? '#6B7280' : '#9CA3AF')} />
+              <Text style={[styles.badgeText, { color: todayGoalReached ? (isDarkMode ? '#FDE68A' : '#C2410C') : (isDarkMode ? '#9CA3AF' : '#6B7280') }]}>
                 {formatDays(streakValue)}
               </Text>
             </Pressable>
@@ -1208,16 +1212,20 @@ export function HomeScreen({ navigation }: any) {
                 style={[
                   styles.streakTopIcon,
                   {
-                    backgroundColor: isDarkMode ? 'rgba(234,88,12,0.12)' : '#FFF4E5',
-                    borderColor: isDarkMode ? 'rgba(234,88,12,0.2)' : '#FED7AA',
+                    backgroundColor: todayGoalReached
+                      ? (isDarkMode ? 'rgba(234,88,12,0.12)' : '#FFF4E5')
+                      : (isDarkMode ? 'rgba(107,114,128,0.12)' : '#F3F4F6'),
+                    borderColor: todayGoalReached
+                      ? (isDarkMode ? 'rgba(234,88,12,0.2)' : '#FED7AA')
+                      : (isDarkMode ? 'rgba(107,114,128,0.2)' : '#D1D5DB'),
                   },
                 ]}
               >
                 <Ionicons
                   name="flame"
                   size={42}
-                  color={isDarkMode ? '#FBBF24' : '#EA580C'}
-                  style={{ textShadowColor: 'rgba(249,115,22,0.35)', textShadowRadius: 10 }}
+                  color={todayGoalReached ? (isDarkMode ? '#FBBF24' : '#EA580C') : (isDarkMode ? '#6B7280' : '#9CA3AF')}
+                  style={todayGoalReached ? { textShadowColor: 'rgba(249,115,22,0.35)', textShadowRadius: 10 } : undefined}
                 />
               </View>
               <View style={styles.streakTopText}>
@@ -1239,7 +1247,7 @@ export function HomeScreen({ navigation }: any) {
                 
                 // Форматтер для получения YYYY-MM-DD в правильном timezone
                 const dateFmt = new Intl.DateTimeFormat('en-CA', {
-                  timeZone: 'Asia/Bishkek',
+                  timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
                   year: 'numeric',
                   month: '2-digit',
                   day: '2-digit',

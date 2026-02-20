@@ -171,10 +171,12 @@ module.exports = (env, argv) => {
       },
       setupMiddlewares: (middlewares, devServer) => {
         const app = devServer.app;
-        
+
+        // Override default body parser limit for PDF uploads
+        app.use(express.json({ limit: '50mb' }));
+
         // Custom API middleware (must be added at the BEGINNING)
         const apiMiddleware = express.Router();
-        apiMiddleware.use(express.json());
         
         apiMiddleware.post('/api/push/subscribe', async (req, res) => {
           console.log('[devServer] POST /api/push/subscribe called');
@@ -207,6 +209,17 @@ module.exports = (env, argv) => {
             return mod.default(req, res);
           } catch (e) {
             console.error('[devServer] generate-examples error', e);
+            return res.status(500).json({ error: 'dev-server error', message: e.message });
+          }
+        });
+
+        apiMiddleware.post('/api/extract-pdf', async (req, res) => {
+          console.log('[devServer] POST /api/extract-pdf called');
+          try {
+            const mod = await import('./api/extract-pdf.js');
+            return mod.default(req, res);
+          } catch (e) {
+            console.error('[devServer] extract-pdf error', e);
             return res.status(500).json({ error: 'dev-server error', message: e.message });
           }
         });

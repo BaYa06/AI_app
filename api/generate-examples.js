@@ -70,15 +70,17 @@ export default async function handler(req, res) {
       .map((w, i) => `${i + 1}. ${w.front} — ${w.back}`)
       .join('\n');
 
-    const prompt = `You are a language learning assistant. Below is a list of words the user is studying. The LEFT side is the word in the language being learned, the RIGHT side is the translation in the user's native language.
+    const prompt = `You are a language learning assistant. Below is a numbered list of words the user is studying. The LEFT side is the word in the language being learned, the RIGHT side is the translation in the user's native language.
 
 For each word, write ONE short example sentence (max 10 words) that uses the LEFT-side word in context. The example MUST be written in the same language as the LEFT side (the language being learned), NOT in the native language.
 
 Words:
 ${wordList}
 
-Reply ONLY with a JSON array of strings, where each string is the example sentence for the corresponding word. No numbering, no explanations. Example format:
-["I saw a big dog in the park.", "She drinks coffee every morning."]`;
+IMPORTANT: Return EXACTLY ${batch.length} examples, one for each word, in the SAME order as the numbered list above.
+Reply ONLY with a JSON array of objects. Each object must have "word" (the exact LEFT-side word from the list) and "example" (the sentence). No extra text.
+Example format:
+[{"word": "dog", "example": "I saw a big dog in the park."}, {"word": "coffee", "example": "She drinks coffee every morning."}]`;
 
     const result = await generativeModel.generateContent(prompt);
     const response = result.response;
@@ -94,12 +96,36 @@ Reply ONLY with a JSON array of strings, where each string is the example senten
       examples = [];
     }
 
-    // Собираем результат
-    const result_words = batch.map((w, i) => ({
-      front: w.front,
-      back: w.back,
-      example: examples[i] || '',
-    }));
+    // Собираем результат — сопоставляем по слову, а не по индексу
+    const result_words = batch.map((w, i) => {
+      let example = '';
+
+      if (Array.isArray(examples) && examples.length > 0) {
+        if (typeof examples[0] === 'object' && examples[0] !== null) {
+          // Новый формат: массив объектов {word, example}
+          // Сначала ищем точное совпадение по слову
+          const frontLower = w.front.toLowerCase().trim();
+          const match = examples.find(
+            e => e.word && e.word.toLowerCase().trim() === frontLower
+          );
+          if (match) {
+            example = match.example || '';
+          } else {
+            // Фоллбэк: по индексу
+            example = examples[i]?.example || '';
+          }
+        } else {
+          // Старый формат: массив строк — по индексу
+          example = examples[i] || '';
+        }
+      }
+
+      return {
+        front: w.front,
+        back: w.back,
+        example,
+      };
+    });
 
     return res.status(200).json({ examples: result_words });
   } catch (error) {

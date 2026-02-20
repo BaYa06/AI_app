@@ -43,9 +43,10 @@ interface SettingsActions {
   
   // Статистика за сегодня
   incrementTodayCards: () => void;
+  finishStudySession: () => Promise<void>;
   updateStreak: (streak: number) => void;
   resetTodayStats: () => void;
-  
+
   // Синхронизация стрика
   syncStreakFromServer: (data: { currentStreak: number; longestStreak: number; lastActiveDate: string | null }) => void;
   
@@ -133,27 +134,29 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
     incrementTodayCards: () => {
       set((state) => {
         const today = getTodayDate();
-        
+
         // Сбрасываем если новый день
         if (state.todayStats.lastStudyDate !== today) {
           state.todayStats.cardsStudied = 0;
           state.todayStats.lastStudyDate = today;
         }
-        
+
         state.todayStats.cardsStudied++;
       });
+    },
 
-      // Записываем активность в БД когда достигнут порог для стрика
-      // Минимум 10 карточек для продления стрика
-      const currentCards = get().todayStats.cardsStudied;
-      
-      // Записываем при достижении 10, 20, 30... карточек
-      if (currentCards === 10 || (currentCards > 10 && currentCards % 10 === 0)) {
-        StreakService.recordActivity({
-          cardsDelta: 10,
-          wordsDelta: 10, // Примерно 1 слово = 1 карточка
-          minutesDelta: 2, // Примерно 2 минуты на 10 карточек
-        }).catch((e) => console.warn('Streak sync error:', e));
+    finishStudySession: async () => {
+      const { cardsStudied } = get().todayStats;
+      if (cardsStudied <= 0) return;
+
+      try {
+        await StreakService.recordActivity({
+          cardsDelta: cardsStudied,
+          wordsDelta: cardsStudied,
+          minutesDelta: Math.max(1, Math.round(cardsStudied / 5)),
+        });
+      } catch (e) {
+        console.warn('Streak sync error:', e);
       }
     },
 
@@ -177,37 +180,17 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
     // ==================== СИНХРОНИЗАЦИЯ СТРИКА ====================
     
     syncStreakFromServer: (data) => {
-      // Проверяем, не устарел ли стрик (пропущено 2+ дня)
-      const todayKey = getTodayDate();
-      let validStreak = data.currentStreak;
-      
-      if (data.lastActiveDate && data.currentStreak > 0) {
-        // Вычисляем разницу в днях
-        const lastDate = new Date(data.lastActiveDate + 'T00:00:00');
-        const today = new Date(todayKey + 'T00:00:00');
-        const diffDays = Math.floor((today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
-        
-        if (diffDays > 1) {
-          // Пропущено больше 1 дня — стрик сброшен
-          validStreak = 0;
-          console.log(`🔄 Streak: сброс — пропущено ${diffDays} дней (последняя активность: ${data.lastActiveDate})`);
-        }
-        // diffDays === 1 — стрик ещё жив, но нужно позаниматься сегодня
-        // diffDays === 0 — сегодня уже занимались
-      }
-      
       set((state) => {
         state.streakCache = {
-          currentStreak: validStreak,
+          currentStreak: data.currentStreak,
           longestStreak: data.longestStreak,
           lastActiveDate: data.lastActiveDate,
           loaded: true,
         };
-        // Также обновляем todayStats для UI
-        state.todayStats.streak = validStreak;
+        state.todayStats.streak = data.currentStreak;
         state.todayStats.longestStreak = data.longestStreak;
       });
-      console.log('✅ Streak: синхронизировано с сервером', { ...data, validStreak });
+      console.log('✅ Streak: синхронизировано с сервером', data);
     },
 
     // ==================== СБРОС ====================

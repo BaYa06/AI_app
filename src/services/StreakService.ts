@@ -41,12 +41,21 @@ export interface RecordActivityParams {
 
 // ==================== ХЕЛПЕРЫ ====================
 
-const DEFAULT_TIMEZONE = 'Asia/Bishkek';
+/**
+ * Получить системный таймзон устройства
+ */
+function getDeviceTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return 'UTC';
+  }
+}
 
 /**
  * Получить текущую дату в формате YYYY-MM-DD в заданном timezone
  */
-export function getLocalDateKey(timezone: string = DEFAULT_TIMEZONE): string {
+export function getLocalDateKey(timezone: string = getDeviceTimezone()): string {
   try {
     const now = new Date();
     const formatter = new Intl.DateTimeFormat('en-CA', {
@@ -65,7 +74,7 @@ export function getLocalDateKey(timezone: string = DEFAULT_TIMEZONE): string {
 /**
  * Получить дату N дней назад
  */
-function getDateKeyDaysAgo(days: number, timezone: string = DEFAULT_TIMEZONE): string {
+function getDateKeyDaysAgo(days: number, timezone: string = getDeviceTimezone()): string {
   const date = new Date();
   date.setDate(date.getDate() - days);
   try {
@@ -84,7 +93,7 @@ function getDateKeyDaysAgo(days: number, timezone: string = DEFAULT_TIMEZONE): s
 /**
  * Получить "вчера" в формате YYYY-MM-DD
  */
-function getYesterdayKey(timezone: string = DEFAULT_TIMEZONE): string {
+function getYesterdayKey(timezone: string = getDeviceTimezone()): string {
   return getDateKeyDaysAgo(1, timezone);
 }
 
@@ -99,33 +108,6 @@ const MIN_CARDS_FOR_STREAK = 10; // Минимум карточек для пр�
 export async function recordActivity(params: RecordActivityParams): Promise<boolean> {
   const { wordsDelta = 0, minutesDelta = 0, cardsDelta = 0 } = params;
 
-  // Проверка минимального порога карточек для стрика
-  if (cardsDelta < MIN_CARDS_FOR_STREAK) {
-    console.log(`ℹ️ Streak: недостаточно карточек для стрика (${cardsDelta}/${MIN_CARDS_FOR_STREAK})`);
-    
-    // Записываем активность в БД, но стрик не обновляем
-    if (cardsDelta > 0) {
-      try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const userId = sessionData.session?.user?.id;
-        
-        if (userId && NeonService.isEnabled()) {
-          const localDate = getLocalDateKey();
-          await NeonService.upsertDailyActivity(userId, localDate, {
-            wordsDelta,
-            minutesDelta,
-            cardsDelta,
-          });
-          console.log('✅ Streak: активность записана (без обновления стрика)');
-        }
-      } catch (e) {
-        console.warn('⚠️ Streak: ошибка записи активности', e);
-      }
-    }
-    
-    return false;
-  }
-
   try {
     // Проверяем авторизацию
     const { data: sessionData } = await supabase.auth.getSession();
@@ -136,7 +118,20 @@ export async function recordActivity(params: RecordActivityParams): Promise<bool
       return false;
     }
 
-    const timezone = DEFAULT_TIMEZONE; // В будущем можно брать из user_stats
+    if (!NeonService.isEnabled()) {
+      console.log('ℹ️ Streak: Neon не настроен');
+      return false;
+    }
+
+    // Получаем таймзон из user_stats, фолбек на системный
+    let timezone = getDeviceTimezone();
+    try {
+      const stats = await NeonService.getUserStats(userId);
+      if (stats?.timezone) {
+        timezone = stats.timezone;
+      }
+    } catch {}
+
     const localDate = getLocalDateKey(timezone);
     const yesterdayDate = getYesterdayKey(timezone);
 
@@ -154,7 +149,13 @@ export async function recordActivity(params: RecordActivityParams): Promise<bool
       return false;
     }
 
-    // 2. Обновляем user_stats (стрик)
+    // 2. Проверка минимального порога карточек для стрика
+    if (cardsDelta < MIN_CARDS_FOR_STREAK) {
+      console.log(`ℹ️ Streak: недостаточно карточек для стрика (${cardsDelta}/${MIN_CARDS_FOR_STREAK}), активность записана без обновления стрика`);
+      return false;
+    }
+
+    // 3. Обновляем user_stats (стрик)
     await updateUserStats(userId, localDate, yesterdayDate, {
       wordsDelta,
       minutesDelta,
@@ -271,7 +272,7 @@ export function buildWeekStatus(
 
   // Форматтер для YYYY-MM-DD в правильном timezone
   const dateFmt = new Intl.DateTimeFormat('en-CA', {
-    timeZone: DEFAULT_TIMEZONE,
+    timeZone: getDeviceTimezone(),
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

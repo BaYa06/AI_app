@@ -3,7 +3,7 @@
  * @description Экран сборки слова (интерактивный)
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { View, StyleSheet, Pressable, ScrollView, AppState } from 'react-native';
 import { ArrowLeft, Settings, Volume2 } from 'lucide-react-native';
 import {
   useThemeColors,
@@ -50,6 +50,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
   const updateSetStats = useSetsStore((s) => s.updateSetStats);
   const updateCardSRS = useCardsStore((s) => s.updateCardSRS);
   const incrementTodayCards = useSettingsStore((s) => s.incrementTodayCards);
+  const finishStudySession = useSettingsStore((s) => s.finishStudySession);
   const { ids, map } = useCardsStore(
     useCallback((s) => ({ ids: s.cardsBySet[setId] || [], map: s.cards }), [setId]),
   );
@@ -278,6 +279,8 @@ export function WordBuilderScreen({ navigation, route }: Props) {
       });
       const newPhaseFailedIds = Array.from(prevFailed);
 
+      finishStudySession();
+
       navigation.replace('StudyResults', {
         setId,
         totalCards: totalWords,
@@ -296,6 +299,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
       });
     },
     [
+      finishStudySession,
       navigation,
       setId,
       totalWords,
@@ -469,6 +473,16 @@ export function WordBuilderScreen({ navigation, route }: Props) {
     advanceToNextCard(payload.errors, payload.errorCards);
   }, [advanceToNextCard, errors, errorCards]);
 
+  // Сохраняем активность при уходе в background
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'background' || state === 'inactive') {
+        finishStudySession();
+      }
+    });
+    return () => sub.remove();
+  }, [finishStudySession]);
+
   const progressPercent = totalWords ? Math.round(((currentIndex + 1) / totalWords) * 100) : 0;
 
   if (!currentCard) {
@@ -480,7 +494,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.background }]}>
         <Pressable
-          onPress={() => navigation.goBack()}
+          onPress={() => { finishStudySession(); navigation.goBack(); }}
           style={({ pressed }) => [
             styles.iconButton,
             { backgroundColor: pressed ? colors.surface : 'transparent' },

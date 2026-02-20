@@ -3,7 +3,7 @@
  * @description Экран изучения карточек с CSS-анимациями для web
  */
 import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
-import { View, StyleSheet, Pressable, Dimensions, Animated, Modal, Switch } from 'react-native';
+import { View, StyleSheet, Pressable, Dimensions, Animated, Modal, Switch, AppState } from 'react-native';
 import { useCardsStore, useSetsStore, useStudyStore, useThemeColors, useSettingsStore, selectSetStats } from '@/store';
 import { Text, Loading } from '@/components/common';
 import { calculateNextReview, buildStudyQueue } from '@/services/SRSService';
@@ -33,6 +33,7 @@ export function StudyScreen({ navigation, route }: Props) {
   const settings = useSettingsStore((s) => s.settings);
   const theme = useSettingsStore((s) => s.resolvedTheme);
   const incrementTodayCards = useSettingsStore((s) => s.incrementTodayCards);
+  const finishStudySession = useSettingsStore((s) => s.finishStudySession);
   const isErrorReview = Boolean(errorCardsFronts && errorCardsFronts.length > 0);
   const phaseFailedList = React.useMemo(
     () => phaseFailedIds || [],
@@ -449,9 +450,20 @@ export function StudyScreen({ navigation, route }: Props) {
 
   // Завершить сессию
   const handleFinish = useCallback(() => {
+    finishStudySession();
     endSession();
     navigation.goBack();
-  }, [endSession, navigation]);
+  }, [finishStudySession, endSession, navigation]);
+
+  // Сохраняем активность при уходе в background
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'background' || state === 'inactive') {
+        finishStudySession();
+      }
+    });
+    return () => sub.remove();
+  }, [finishStudySession]);
 
   // Прогресс
   const progress = getProgress();

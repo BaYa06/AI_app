@@ -71,11 +71,11 @@ export function SetDetailScreen({ navigation, route }: Props) {
     return '20';
   });
 
-  // Import TSV states
+  // Import states
   const [importLoading, setImportLoading] = useState(false);
   const [importedCards, setImportedCards] = useState<Array<{ front: string; back: string; example?: string }>>([]);
   const [importError, setImportError] = useState<string | null>(null);
-  const [importStep, setImportStep] = useState<'select' | 'loading' | 'preview' | 'generating'>('select');
+  const [importStep, setImportStep] = useState<'select' | 'loading' | 'extracting' | 'preview' | 'generating'>('select');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Расчет статистики
@@ -290,34 +290,66 @@ export function SetDetailScreen({ navigation, route }: Props) {
     const file = event.target?.files?.[0];
     if (!file) return;
 
-    // Check file extension
     const fileName = file.name.toLowerCase();
-    if (!fileName.endsWith('.tsv')) {
-      setImportError('Сейчас мы работаем только с TSV файлами. Пожалуйста, выберите файл с расширением .tsv');
+    const isPdf = fileName.endsWith('.pdf');
+    const isTsv = fileName.endsWith('.tsv');
+
+    if (!isPdf && !isTsv) {
+      setImportError('Поддерживаются только файлы .tsv и .pdf');
       return;
     }
 
-    setImportStep('loading');
+    if (isPdf && file.size > 10 * 1024 * 1024) {
+      setImportError('PDF файл слишком большой. Максимум 10 МБ.');
+      return;
+    }
+
     setImportLoading(true);
     setImportError(null);
 
     try {
-      const content = await file.text();
-      const parsedCards = parseTSV(content);
-      
-      if (parsedCards.length === 0) {
-        setImportError('Не удалось найти карточки в файле. Проверьте формат TSV (слово[TAB]перевод)');
-        setImportStep('select');
+      if (isTsv) {
+        setImportStep('loading');
+        const content = await file.text();
+        const parsedCards = parseTSV(content);
+
+        if (parsedCards.length === 0) {
+          setImportError('Не удалось найти карточки в файле. Проверьте формат TSV (слово[TAB]перевод)');
+          setImportStep('select');
+        } else {
+          setImportedCards(parsedCards);
+          setImportStep('preview');
+        }
       } else {
-        setImportedCards(parsedCards);
-        setImportStep('preview');
+        // PDF
+        setImportStep('extracting');
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            // Remove data:application/pdf;base64, prefix
+            const base64Data = result.split(',')[1] || result;
+            resolve(base64Data);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        const parsedCards = await apiService.extractPdfCards(base64);
+
+        if (parsedCards.length === 0) {
+          setImportError('Не удалось найти карточки в PDF. Убедитесь, что файл содержит список слов в формате "слово – перевод".');
+          setImportStep('select');
+        } else {
+          setImportedCards(parsedCards);
+          setImportStep('preview');
+        }
       }
     } catch (error) {
-      setImportError('Ошибка при чтении файла');
+      setImportError(isPdf ? 'Ошибка при обработке PDF. Попробуйте ещё раз.' : 'Ошибка при чтении файла');
       setImportStep('select');
     } finally {
       setImportLoading(false);
-      // Reset input
       if (event.target) {
         event.target.value = '';
       }
@@ -343,30 +375,56 @@ export function SetDetailScreen({ navigation, route }: Props) {
       if (!file) return;
 
       const fileName = (file.name || '').toLowerCase();
-      if (!fileName.endsWith('.tsv')) {
-        setImportError('Сейчас мы работаем только с TSV файлами. Пожалуйста, выберите файл с расширением .tsv');
+      const isPdf = fileName.endsWith('.pdf');
+      const isTsv = fileName.endsWith('.tsv');
+
+      if (!isPdf && !isTsv) {
+        setImportError('Поддерживаются только файлы .tsv и .pdf');
         return;
       }
 
-      setImportStep('loading');
+      if (isPdf && file.size && file.size > 10 * 1024 * 1024) {
+        setImportError('PDF файл слишком большой. Максимум 10 МБ.');
+        return;
+      }
+
       setImportLoading(true);
       setImportError(null);
 
       try {
         const fileUri = (file as any).fileCopyUri || file.uri;
-        const response = await fetch(fileUri);
-        const content = await response.text();
-        const parsedCards = parseTSV(content);
 
-        if (parsedCards.length === 0) {
-          setImportError('Не удалось найти карточки в файле. Проверьте формат TSV (слово[TAB]перевод)');
-          setImportStep('select');
+        if (isTsv) {
+          setImportStep('loading');
+          const response = await fetch(fileUri);
+          const content = await response.text();
+          const parsedCards = parseTSV(content);
+
+          if (parsedCards.length === 0) {
+            setImportError('Не удалось найти карточки в файле. Проверьте формат TSV (слово[TAB]перевод)');
+            setImportStep('select');
+          } else {
+            setImportedCards(parsedCards);
+            setImportStep('preview');
+          }
         } else {
-          setImportedCards(parsedCards);
-          setImportStep('preview');
+          // PDF — read as base64 via react-native-fs
+          setImportStep('extracting');
+          const RNFS = (await import('react-native-fs')).default;
+          const base64 = await RNFS.readFile(fileUri, 'base64');
+
+          const parsedCards = await apiService.extractPdfCards(base64);
+
+          if (parsedCards.length === 0) {
+            setImportError('Не удалось найти карточки в PDF. Убедитесь, что файл содержит список слов в формате "слово – перевод".');
+            setImportStep('select');
+          } else {
+            setImportedCards(parsedCards);
+            setImportStep('preview');
+          }
         }
       } catch (error) {
-        setImportError('Ошибка при чтении файла');
+        setImportError(isPdf ? 'Ошибка при обработке PDF. Попробуйте ещё раз.' : 'Ошибка при чтении файла');
         setImportStep('select');
       } finally {
         setImportLoading(false);
@@ -1102,7 +1160,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
               {
                 backgroundColor: modalSurface,
                 borderColor: modalBorder,
-                maxHeight: importStep === 'preview' || importStep === 'generating' ? '80%' : undefined,
+                maxHeight: importStep === 'preview' || importStep === 'generating' || importStep === 'extracting' ? '80%' : undefined,
               },
             ]}
           >
@@ -1111,7 +1169,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                 <ArrowLeft size={20} color={modalTextPrimary} />
               </Pressable>
               <Text variant="body" style={[styles.importTitle, { color: modalTextPrimary }]}>
-                {importStep === 'preview' ? `Импорт (${importedCards.length} карточек)` : importStep === 'generating' ? 'Генерация примеров...' : 'Импорт из файла'}
+                {importStep === 'preview' ? `Импорт (${importedCards.length} карточек)` : importStep === 'generating' ? 'Генерация примеров...' : importStep === 'extracting' ? 'Обработка PDF...' : 'Импорт из файла'}
               </Text>
               <View style={styles.topIcon} />
             </View>
@@ -1121,7 +1179,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
               <input
                 ref={fileInputRef as any}
                 type="file"
-                accept=".tsv"
+                accept=".tsv,.pdf"
                 onChange={handleFileSelect as any}
                 style={{ display: 'none' }}
               />
@@ -1153,6 +1211,22 @@ export function SetDetailScreen({ navigation, route }: Props) {
               </View>
             )}
 
+            {/* Extracting PDF State */}
+            {importStep === 'extracting' && (
+              <View style={styles.importLoadingContainer}>
+                <View style={[styles.importHeroIcon, { backgroundColor: `${colors.primary}1A` }]}>
+                  <File size={36} color={colors.primary} />
+                </View>
+                <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '600', marginTop: spacing.m }}>
+                  Обрабатываем PDF...
+                </Text>
+                <Text variant="bodySmall" color="secondary" style={{ marginTop: spacing.xs, textAlign: 'center', paddingHorizontal: spacing.l }}>
+                  AI извлекает слова и переводы из документа
+                </Text>
+                <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: spacing.l }} />
+              </View>
+            )}
+
             {/* Select File State */}
             {importStep === 'select' && (
               <>
@@ -1161,7 +1235,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                     <File size={36} color={colors.primary} />
                   </View>
                   <Text variant="h3" align="center" style={{ color: colors.textPrimary }}>
-                    Импорт карточек из TSV
+                    Импорт карточек
                   </Text>
                   <Text
                     variant="body"
@@ -1169,7 +1243,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                     align="center"
                     style={{ paddingHorizontal: spacing.m }}
                   >
-                    Загрузите TSV файл со словами и переводами для быстрого создания карточек.
+                    Загрузите файл со словами и переводами для быстрого создания карточек.
                   </Text>
                 </View>
 
@@ -1188,7 +1262,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                 >
                   <Upload size={20} color={colors.textInverse} />
                   <Text variant="body" style={{ color: colors.textInverse, fontWeight: '700' }}>
-                    Выбрать TSV файл
+                    Выбрать файл
                   </Text>
                 </Pressable>
 
@@ -1204,26 +1278,26 @@ export function SetDetailScreen({ navigation, route }: Props) {
                   <View style={styles.importTipsHeader}>
                     <Lightbulb size={18} color={colors.primary} />
                     <Text variant="bodySmall" style={{ color: colors.primary, fontWeight: '700' }}>
-                      Формат файла
+                      Поддерживаемые форматы
                     </Text>
                   </View>
 
                   <View style={styles.tipRow}>
                     <CheckCircle size={16} color={colors.primary} style={styles.tipIcon} />
                     <Text variant="caption" color="secondary" style={styles.tipText}>
-                      Формат: <Text style={{ fontWeight: '700', color: colors.textPrimary }}>слово[TAB]перевод</Text>
+                      <Text style={{ fontWeight: '700', color: colors.textPrimary }}>.pdf</Text> — словарь из PDF (AI извлечение)
                     </Text>
                   </View>
                   <View style={styles.tipRow}>
                     <CheckCircle size={16} color={colors.primary} style={styles.tipIcon} />
                     <Text variant="caption" color="secondary" style={styles.tipText}>
-                      Поддерживается только <Text style={{ fontWeight: '700', color: colors.textPrimary }}>.tsv</Text> формат
+                      <Text style={{ fontWeight: '700', color: colors.textPrimary }}>.tsv</Text> — табличный формат (слово[TAB]перевод)
                     </Text>
                   </View>
                   <View style={styles.tipRow}>
                     <Info size={16} color={colors.primary} style={styles.tipIcon} />
                     <Text variant="caption" color="secondary" style={styles.tipText}>
-                      Каждая строка — одна карточка
+                      Максимальный размер PDF: 10 МБ
                     </Text>
                   </View>
                 </View>
