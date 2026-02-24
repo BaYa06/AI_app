@@ -95,6 +95,15 @@
     }
   ],
   "rewrites": [
+    { "source": "/api/push/subscribe",            "destination": "/api/push?action=subscribe" },
+    { "source": "/api/push/unsubscribe",           "destination": "/api/push?action=unsubscribe" },
+    { "source": "/api/library/check-published",    "destination": "/api/library?action=check-published" },
+    { "source": "/api/library/my-publications",    "destination": "/api/library?action=my-publications" },
+    { "source": "/api/library/publish",            "destination": "/api/library?action=publish" },
+    { "source": "/api/library/like",               "destination": "/api/library?action=like" },
+    { "source": "/api/library/rate",               "destination": "/api/library?action=rate" },
+    { "source": "/api/library/report",             "destination": "/api/library?action=report" },
+    { "source": "/api/library/import",             "destination": "/api/library?action=import" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/((?!.*\\.).*)", "destination": "/index.html" }
   ]
