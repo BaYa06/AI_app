@@ -43,7 +43,7 @@ interface SettingsActions {
   
   // Статистика за сегодня
   incrementTodayCards: () => void;
-  finishStudySession: () => Promise<void>;
+  finishStudySession: () => Promise<{ streakIncreased: boolean; newStreakCount: number }>;
   updateStreak: (streak: number) => void;
   resetTodayStats: () => void;
 
@@ -147,17 +147,28 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
 
     finishStudySession: async () => {
       const { cardsStudied } = get().todayStats;
-      if (cardsStudied <= 0) return;
+      if (cardsStudied <= 0) return { streakIncreased: false, newStreakCount: 0 };
+
+      const lastActiveDate = get().streakCache.lastActiveDate;
+      const today = getTodayDate();
+      const wasAlreadyActiveToday = lastActiveDate === today;
 
       try {
-        await StreakService.recordActivity({
+        const success = await StreakService.recordActivity({
           cardsDelta: cardsStudied,
           wordsDelta: cardsStudied,
           minutesDelta: Math.max(1, Math.round(cardsStudied / 5)),
         });
+
+        if (success && !wasAlreadyActiveToday) {
+          const currentStreak = get().streakCache.currentStreak;
+          const newCount = currentStreak > 0 ? currentStreak : get().todayStats.streak + 1;
+          return { streakIncreased: true, newStreakCount: newCount };
+        }
       } catch (e) {
         console.warn('Streak sync error:', e);
       }
+      return { streakIncreased: false, newStreakCount: 0 };
     },
 
     updateStreak: (streak) => {

@@ -10,8 +10,10 @@ import { Container, Text, ProgressBar, Loading, Button } from '@/components/comm
 import { spacing, borderRadius } from '@/constants';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card } from '@/types';
-import { DatabaseService } from '@/services';
+import { DatabaseService, LibraryService } from '@/services';
 import { apiService } from '@/services/ApiService';
+import { supabase } from '@/services/supabaseClient';
+import { LIBRARY_CATEGORIES } from '@/constants/library';
 import {
   ArrowLeft,
   MoreHorizontal,
@@ -31,6 +33,8 @@ import {
   Lightbulb,
   CheckCircle,
   Info,
+  Globe,
+  X,
 } from 'lucide-react-native';
 
 type Props = RootStackScreenProps<'SetDetail'>;
@@ -77,6 +81,15 @@ export function SetDetailScreen({ navigation, route }: Props) {
   const [importError, setImportError] = useState<string | null>(null);
   const [importStep, setImportStep] = useState<'select' | 'loading' | 'extracting' | 'preview' | 'generating'>('select');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Publish states
+  const [isPublished, setIsPublished] = useState(false);
+  const [librarySetId, setLibrarySetId] = useState<string | null>(null);
+  const [showPublishModal, setShowPublishModal] = useState(false);
+  const [publishDescription, setPublishDescription] = useState('');
+  const [publishCategory, setPublishCategory] = useState('');
+  const [publishTags, setPublishTags] = useState('');
+  const [isPublishing, setIsPublishing] = useState(false);
 
   // Расчет статистики
   const stats = useMemo(() => {
@@ -125,72 +138,90 @@ export function SetDetailScreen({ navigation, route }: Props) {
     setWordLimit((prev) => (prev === next ? prev : next as '10' | '20' | '30' | 'all'));
   }, [userSettings.studyCardLimit]);
 
+  // Check if set is published
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user?.id) return;
+        const result = await LibraryService.checkPublished(setId, session.user.id);
+        setIsPublished(result.isPublished);
+        setLibrarySetId(result.librarySetId || null);
+      } catch {}
+    })();
+  }, [setId]);
+
   // Обработчики
+  const getShuffledDueCardIds = useCallback(() => {
+    const now = Date.now();
+    const dueCards = onlyHard
+      ? cards.filter(c => c.nextReviewDate <= now).map(c => c.id)
+      : cards.map(c => c.id);
+    return [...dueCards].sort(() => Math.random() - 0.5);
+  }, [onlyHard, cards]);
+
   const handleStartStudy = useCallback(() => {
     // "Учить всё" — запускаем тренировку по выбранному количеству карточек
     const limit = wordLimit === 'all' ? undefined : Number(wordLimit);
     setShowStudySheet(false);
-    
+
     // Создаем новую фазу при каждом запуске
     const phaseId = `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const totalCards = onlyHard 
-      ? cards.filter(c => c.nextReviewDate <= Date.now()).length
-      : cards.length;
-    
-    navigation.navigate('Study', { 
-      setId, 
-      mode: 'classic', 
-      studyAll: true, 
-      cardLimit: limit, 
+    const shuffled = getShuffledDueCardIds();
+
+    navigation.navigate('Study', {
+      setId,
+      mode: 'classic',
+      studyAll: true,
+      cardLimit: limit,
       onlyHard,
+      dueCardIds: shuffled,
       phaseId,
-      totalPhaseCards: totalCards,
+      totalPhaseCards: shuffled.length,
       studiedInPhase: 0,
       phaseOffset: 0,
     });
-  }, [navigation, setId, wordLimit, onlyHard, cards]);
+  }, [navigation, setId, wordLimit, onlyHard, getShuffledDueCardIds]);
 
   const handleStartMatch = useCallback(() => {
     const limit = wordLimit === 'all' ? undefined : Number(wordLimit);
     setShowStudySheet(false);
-    
+
     // Создаем новую фазу при каждом запуске
     const phaseId = `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const totalCards = onlyHard 
-      ? cards.filter(c => c.nextReviewDate <= Date.now()).length
-      : cards.length;
-    
-    navigation.navigate('Match', { 
-      setId, 
+    const shuffled = getShuffledDueCardIds();
+
+    navigation.navigate('Match', {
+      setId,
       cardLimit: limit,
+      dueCardIds: shuffled,
       phaseId,
-      totalPhaseCards: totalCards,
+      totalPhaseCards: shuffled.length,
       studiedInPhase: 0,
       phaseOffset: 0,
     });
-  }, [navigation, setId, wordLimit, onlyHard, cards]);
+  }, [navigation, setId, wordLimit, getShuffledDueCardIds]);
 
   const handleStartMultipleChoice = useCallback(() => {
     const limit = wordLimit === 'all' ? undefined : Number(wordLimit);
     setShowStudySheet(false);
-    
+
     // Создаем новую фазу при каждом запуске
     const phaseId = `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const totalCards = onlyHard 
-      ? cards.filter(c => c.nextReviewDate <= Date.now()).length
-      : cards.length;
-    
+    const shuffled = getShuffledDueCardIds();
+
     navigation.navigate('MultipleChoice', {
       setId,
       cardLimit: limit,
+      dueCardIds: shuffled,
       questionIndex: 1,
-      totalQuestions: limit ?? cards.length,
+      totalQuestions: limit ?? shuffled.length,
       phaseId,
-      totalPhaseCards: totalCards,
+      totalPhaseCards: shuffled.length,
       studiedInPhase: 0,
       phaseOffset: 0,
     });
-  }, [navigation, setId, wordLimit, cards.length, onlyHard, cards]);
+  }, [navigation, setId, wordLimit, getShuffledDueCardIds]);
 
   const handleStartWordBuilder = useCallback(() => {
     const limit = wordLimit === 'all' ? undefined : Number(wordLimit);
@@ -198,19 +229,18 @@ export function SetDetailScreen({ navigation, route }: Props) {
 
     // Новая фаза
     const phaseId = `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const totalCards = onlyHard 
-      ? cards.filter(c => c.nextReviewDate <= Date.now()).length
-      : cards.length;
+    const shuffled = getShuffledDueCardIds();
 
     navigation.navigate('WordBuilder', {
       setId,
       cardLimit: limit,
+      dueCardIds: shuffled,
       phaseId,
-      totalPhaseCards: totalCards,
+      totalPhaseCards: shuffled.length,
       studiedInPhase: 0,
       phaseOffset: 0,
     });
-  }, [navigation, setId, wordLimit, onlyHard, cards]);
+  }, [navigation, setId, wordLimit, getShuffledDueCardIds]);
 
   const handleStartAudio = useCallback(() => {
     const limit = wordLimit === 'all' ? undefined : Number(wordLimit);
@@ -218,19 +248,18 @@ export function SetDetailScreen({ navigation, route }: Props) {
 
     // Новая фаза
     const phaseId = `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const totalCards = onlyHard 
-      ? cards.filter(c => c.nextReviewDate <= Date.now()).length
-      : cards.length;
+    const shuffled = getShuffledDueCardIds();
 
     navigation.navigate('AudioLearning', {
       setId,
       cardLimit: limit,
+      dueCardIds: shuffled,
       phaseId,
-      totalPhaseCards: totalCards,
+      totalPhaseCards: shuffled.length,
       studiedInPhase: 0,
       phaseOffset: 0,
     });
-  }, [navigation, setId, wordLimit, onlyHard, cards]);
+  }, [navigation, setId, wordLimit, getShuffledDueCardIds]);
 
   const handleSelectWordLimit = useCallback(
     (val: '10' | '20' | '30' | 'all') => {
@@ -547,6 +576,40 @@ export function SetDetailScreen({ navigation, route }: Props) {
     navigation.navigate('SetEditor', { setId });
   }, [navigation, setId]);
 
+  const handleSetMenu = useCallback(() => {
+    handleEditSet();
+  }, [handleEditSet]);
+
+  const handlePublish = useCallback(async () => {
+    if (!publishCategory) {
+      Alert.alert('Выберите категорию');
+      return;
+    }
+    setIsPublishing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) {
+        Alert.alert('Ошибка', 'Необходимо войти в аккаунт');
+        return;
+      }
+      const tags = publishTags.split(',').map(t => t.trim()).filter(Boolean);
+      const result = await LibraryService.publishSet(session.user.id, {
+        setId,
+        description: publishDescription.trim() || undefined,
+        category: publishCategory,
+        tags: tags.length > 0 ? tags : undefined,
+      });
+      setIsPublished(true);
+      setLibrarySetId(result.librarySetId);
+      setShowPublishModal(false);
+      Alert.alert('Успех', 'Набор успешно опубликован!');
+    } catch (e: any) {
+      Alert.alert('Ошибка', e.message || 'Не удалось опубликовать');
+    } finally {
+      setIsPublishing(false);
+    }
+  }, [setId, publishDescription, publishCategory, publishTags]);
+
   // Рендер карточки в списке
   const renderCard = useCallback(
     ({ item }: { item: Card }) => (
@@ -630,7 +693,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
           >
             {set?.title || 'Набор'}
           </Text>
-          <Pressable onPress={handleEditSet} hitSlop={10} style={styles.topIcon}>
+          <Pressable onPress={handleSetMenu} hitSlop={10} style={styles.topIcon}>
             <MoreHorizontal size={22} color={colors.textPrimary} />
           </Pressable>
         </View>
@@ -701,7 +764,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
         </View>
       </View>
     ),
-    [set, stats, colors, filteredCards.length, navigation, openAddCardSheet, handleEditSet, filter, search]
+    [set, stats, colors, filteredCards.length, navigation, openAddCardSheet, handleSetMenu, filter, search]
   );
 
   // Пустой список
@@ -1366,6 +1429,152 @@ export function SetDetailScreen({ navigation, route }: Props) {
           </View>
         </View>
       )}
+      {showPublishModal && (
+        <View style={[styles.importOverlay, { backgroundColor: backdropColor }]} pointerEvents="box-none">
+          <Pressable
+            style={[styles.sheetBackdrop, { backgroundColor: backdropColor }]}
+            onPress={() => !isPublishing && setShowPublishModal(false)}
+          />
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ width: '100%', maxWidth: 480, alignItems: 'center' }}
+          >
+            <View
+              style={[
+                styles.importCard,
+                { backgroundColor: modalSurface, borderColor: modalBorder },
+              ]}
+            >
+              <View style={styles.importTopBar}>
+                <Pressable onPress={() => !isPublishing && setShowPublishModal(false)} hitSlop={10} style={styles.topIcon}>
+                  <X size={20} color={modalTextPrimary} />
+                </Pressable>
+                <Text variant="body" style={[styles.importTitle, { color: modalTextPrimary }]}>
+                  Опубликовать в библиотеке
+                </Text>
+                <View style={styles.topIcon} />
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.m, paddingBottom: spacing.s }}>
+                <View style={styles.addField}>
+                  <Text variant="label" color="primary" style={styles.fieldLabel}>
+                    Описание (необязательно)
+                  </Text>
+                  <TextInput
+                    value={publishDescription}
+                    onChangeText={setPublishDescription}
+                    placeholder="Расскажите о наборе..."
+                    placeholderTextColor={modalPlaceholder}
+                    maxLength={500}
+                    multiline
+                    style={[
+                      styles.addInput,
+                      {
+                        color: modalTextPrimary,
+                        borderColor: modalBorder,
+                        backgroundColor: modalInputBg,
+                        minHeight: 80,
+                        textAlignVertical: 'top',
+                        ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
+                      },
+                    ]}
+                  />
+                  <Text variant="caption" color="secondary" style={{ alignSelf: 'flex-end' }}>
+                    {publishDescription.length}/500
+                  </Text>
+                </View>
+
+                <View style={styles.addField}>
+                  <Text variant="label" color="primary" style={styles.fieldLabel}>
+                    Категория *
+                  </Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
+                    {LIBRARY_CATEGORIES.map((cat) => (
+                      <Pressable
+                        key={cat.key}
+                        onPress={() => setPublishCategory(cat.key)}
+                        style={[
+                          styles.wordChip,
+                          {
+                            backgroundColor: publishCategory === cat.key ? colors.primary : 'transparent',
+                            borderColor: publishCategory === cat.key ? colors.primary : modalBorder,
+                          },
+                        ]}
+                      >
+                        <Text
+                          variant="caption"
+                          style={{
+                            color: publishCategory === cat.key ? colors.textInverse : modalTextSecondary,
+                            fontWeight: '700',
+                          }}
+                        >
+                          {cat.label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+
+                <View style={styles.addField}>
+                  <Text variant="label" color="primary" style={styles.fieldLabel}>
+                    Теги (через запятую)
+                  </Text>
+                  <TextInput
+                    value={publishTags}
+                    onChangeText={setPublishTags}
+                    placeholder="например: A1, начинающим, еда"
+                    placeholderTextColor={modalPlaceholder}
+                    style={[
+                      styles.addInput,
+                      {
+                        color: modalTextPrimary,
+                        borderColor: modalBorder,
+                        backgroundColor: modalInputBg,
+                        ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
+                      },
+                    ]}
+                  />
+                </View>
+              </ScrollView>
+
+              <View style={styles.addActions}>
+                <Pressable
+                  style={[styles.secondaryAction, { borderColor: modalBorder }]}
+                  onPress={() => !isPublishing && setShowPublishModal(false)}
+                >
+                  <Text variant="body" style={{ color: modalTextSecondary, fontWeight: '700' }}>
+                    Отмена
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.primaryAction,
+                    {
+                      backgroundColor: publishCategory && !isPublishing ? colors.primary : modalBorder,
+                      flexDirection: 'row',
+                      gap: spacing.xs,
+                    },
+                  ]}
+                  disabled={!publishCategory || isPublishing}
+                  onPress={handlePublish}
+                >
+                  {isPublishing ? (
+                    <ActivityIndicator size="small" color={colors.textInverse} />
+                  ) : (
+                    <>
+                      <Globe size={18} color={colors.textInverse} />
+                      <Text variant="body" style={{ color: colors.textInverse, fontWeight: '700' }}>
+                        Опубликовать
+                      </Text>
+                    </>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      )}
+
     </Container>
   );
 }

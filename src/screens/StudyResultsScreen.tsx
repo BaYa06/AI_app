@@ -5,7 +5,7 @@
 import React from 'react';
 import { View, StyleSheet, Pressable, ScrollView, Platform, Modal } from 'react-native';
 import { useThemeColors } from '@/store';
-import { Text } from '@/components/common';
+import { Text, StreakCelebrationModal } from '@/components/common';
 import { spacing } from '@/constants';
 import type { RootStackScreenProps } from '@/types/navigation';
 import { ArrowLeft, Settings, CheckCircle2, List, ArrowRight, RotateCcw, BookOpen, X } from 'lucide-react-native';
@@ -22,14 +22,18 @@ export function StudyResultsScreen({ navigation, route }: Props) {
     errorCards,
     modeTitle = 'Flashcards',
     cardLimit,
+    dueCardIds,
     phaseId,
     totalPhaseCards = 0,
     studiedInPhase = 0,
     phaseOffset = 0,
     phaseFailedIds = [],
+    streakIncreased,
+    newStreakCount,
   } = route.params;
   const colors = useThemeColors();
   const [showErrorsModal, setShowErrorsModal] = React.useState(false);
+  const [showStreakModal, setShowStreakModal] = React.useState(streakIncreased === true);
 
   // Логика фаз: проверяем завершена ли фаза
   // Фаза завершена только если все карточки просмотрены (phaseOffset >= totalPhaseCards) И нет ошибок
@@ -96,17 +100,22 @@ export function StudyResultsScreen({ navigation, route }: Props) {
       remainingInPhase
     });
     
-    // Если фаза завершена — возвращаем к набору
+    // Если фаза завершена — возвращаем к набору или на главную (если запущено из HomeScreen)
     if (isPhaseComplete) {
-      navigation.navigate('SetDetail', { setId });
+      if (dueCardIds && dueCardIds.length > 0) {
+        navigation.navigate('Main', { screen: 'Home' });
+      } else {
+        navigation.navigate('SetDetail', { setId });
+      }
       return;
     }
 
     // Продолжаем фазу - запускаем следующую порцию
     if (route.params.nextMode === 'match') {
-      navigation.push('Match', { 
-        setId, 
+      navigation.push('Match', {
+        setId,
         cardLimit,
+        dueCardIds,
         phaseId,
         totalPhaseCards,
         studiedInPhase,
@@ -117,9 +126,10 @@ export function StudyResultsScreen({ navigation, route }: Props) {
     }
 
     if (route.params.nextMode === 'multipleChoice') {
-      navigation.push('MultipleChoice', { 
-        setId, 
+      navigation.push('MultipleChoice', {
+        setId,
         cardLimit,
+        dueCardIds,
         phaseId,
         totalPhaseCards,
         studiedInPhase,
@@ -129,11 +139,13 @@ export function StudyResultsScreen({ navigation, route }: Props) {
       return;
     }
 
-    navigation.push('Study', { 
-      setId, 
-      mode: 'classic', 
-      studyAll: true, 
+    navigation.push('Study', {
+      setId,
+      mode: 'classic',
+      studyAll: true,
+      onlyHard: true,
       cardLimit,
+      dueCardIds,
       phaseId,
       totalPhaseCards,
       studiedInPhase,
@@ -146,10 +158,11 @@ export function StudyResultsScreen({ navigation, route }: Props) {
     // Передаем front текст ошибочных карточек для повторения
     const errorFronts = errorCards.map(card => card.front);
     // Продолжаем ту же фазу, не сбрасывая прогресс
-    navigation.push('Study', { 
-      setId, 
-      mode: 'classic', 
+    navigation.push('Study', {
+      setId,
+      mode: 'classic',
       errorCardsFronts: errorFronts,
+      dueCardIds,
       phaseId,
       totalPhaseCards,
       studiedInPhase,
@@ -157,6 +170,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
       phaseFailedIds,
       cardLimit,
       studyAll: true,
+      onlyHard: true,
     });
   };
 
@@ -484,6 +498,12 @@ export function StudyResultsScreen({ navigation, route }: Props) {
           </View>
         </View>
       </Modal>
+
+      <StreakCelebrationModal
+        visible={showStreakModal}
+        streakCount={newStreakCount ?? 0}
+        onClose={() => setShowStreakModal(false)}
+      />
     </View>
   );
 }

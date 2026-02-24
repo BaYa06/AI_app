@@ -12,7 +12,7 @@ import {
   Switch,
 } from 'react-native';
 import { useSettingsStore, useThemeColors } from '@/store';
-import { DatabaseService, supabase } from '@/services';
+import { DatabaseService, supabase, NeonService } from '@/services';
 import { Text } from '@/components/common';
 import { spacing, borderRadius } from '@/constants';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -55,6 +55,7 @@ export function ProfileScreen({ navigation }: any) {
   const isDark = resolvedTheme === 'dark';
 
   const [session, setSession] = useState<Session | null>(null);
+  const [userNameHandle, setUserNameHandle] = useState<string | null>(null);
 
   const cardBg = isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF';
   const cardBorder = isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9';
@@ -79,6 +80,18 @@ export function ProfileScreen({ navigation }: any) {
       data.subscription.unsubscribe();
     };
   }, []);
+
+  // Загружаем user_name из БД
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) {
+      setUserNameHandle(null);
+      return;
+    }
+    NeonService.getUserName(userId).then((name) => {
+      setUserNameHandle(name);
+    });
+  }, [session?.user?.id]);
 
   const userEmail = session?.user?.email;
   const userName = useMemo(() => {
@@ -171,6 +184,9 @@ export function ProfileScreen({ navigation }: any) {
             </View>
             <View style={st.userInfo}>
               <Text style={[st.userName, { color: colors.textPrimary }]}>{userName}</Text>
+              {userNameHandle && (
+                <Text style={[st.userHandle, { color: colors.primary }]}>{userNameHandle}</Text>
+              )}
               <Text style={[st.userEmail, { color: colors.textTertiary }]}>
                 {userEmail ?? 'Войдите, чтобы синхронизировать'}
               </Text>
@@ -248,6 +264,19 @@ export function ProfileScreen({ navigation }: any) {
               </Pressable>
             </React.Fragment>
           ))}
+        </View>
+
+        {/* ======== Library ======== */}
+        <Text style={[st.sectionLabel, { color: colors.textTertiary }]}>Библиотека</Text>
+        <View style={[st.settingsCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+          <Pressable
+            style={st.settingsItem}
+            onPress={() => navigation?.navigate('MyPublications')}
+          >
+            <Ionicons name="book-outline" size={22} color={colors.textTertiary} />
+            <Text style={[st.settingsItemText, { color: colors.textPrimary }]}>Мои публикации</Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.textTertiary + '60'} />
+          </Pressable>
         </View>
 
         {/* ======== Preferences ======== */}
@@ -447,6 +476,10 @@ const st = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     letterSpacing: -0.3,
+  },
+  userHandle: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   userEmail: {
     fontSize: 13,

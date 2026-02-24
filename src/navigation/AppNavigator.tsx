@@ -2,9 +2,9 @@
  * App Navigator
  * @description Главный навигатор приложения
  */
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Platform } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, type LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useThemeColors } from '@/store';
@@ -28,7 +28,8 @@ import { StudyScreen } from '@/screens/StudyScreen';
 import { StudyPlaceholderScreen } from '@/screens/StudyPlaceholderScreen';
 import { AchievementsScreen } from '@/screens/AchievementsScreen';
 import { NotificationSettingsScreen } from '@/screens/NotificationSettingsScreen';
-import { SharedSetDetailScreen } from '@/screens/SharedSetDetailScreen';
+import { LibrarySetDetailScreen } from '@/screens/LibrarySetDetailScreen';
+import { MyPublicationsScreen } from '@/screens/MyPublicationsScreen';
 import { PersonalInfoScreen } from '@/screens/PersonalInfoScreen';
 import { SecurityScreen } from '@/screens/SecurityScreen';
 import { SubscriptionScreen } from '@/screens/SubscriptionScreen';
@@ -121,11 +122,45 @@ function MainTabs() {
 
 // ==================== ROOT STACK ====================
 
+const linking: LinkingOptions<RootStackParamList> = {
+  prefixes: [],
+  config: {
+    screens: {
+      Main: {
+        path: '',
+        screens: {
+          Home: '',
+          Library: 'library',
+          Study: 'study-tab',
+          Statistics: 'statistics',
+          Profile: 'profile',
+        },
+      },
+      SetDetail: 'set/:setId',
+      Match: 'match',
+      MultipleChoice: 'multiple-choice',
+      WordBuilder: 'word-builder',
+      AudioLearning: 'audio-learning',
+      Study: 'study',
+      StudyResults: 'study-results',
+      CardEditor: 'card-editor',
+      Achievements: 'achievements',
+      NotificationSettings: 'notification-settings',
+      LibrarySetDetail: 'library-set/:setId',
+      MyPublications: 'my-publications',
+      PersonalInfo: 'personal-info',
+      Security: 'security',
+      Subscription: 'subscription',
+      SetEditor: 'set-editor',
+    },
+  },
+};
+
 export function AppNavigator() {
   const colors = useThemeColors();
 
   return (
-    <NavigationContainer>
+    <NavigationContainer linking={linking}>
       <Stack.Navigator
         screenOptions={{
           headerStyle: {
@@ -211,8 +246,13 @@ export function AppNavigator() {
           }}
         />
         <Stack.Screen
-          name="SharedSetDetail"
-          component={SharedSetDetailScreen}
+          name="LibrarySetDetail"
+          component={LibrarySetDetailScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="MyPublications"
+          component={MyPublicationsScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen
@@ -235,9 +275,13 @@ export function AppNavigator() {
           component={SetEditorScreen}
           options={{
             headerShown: false,
-            presentation: 'transparentModal',
-            animation: 'slide_from_bottom',
-            contentStyle: { backgroundColor: 'transparent' },
+            ...(Platform.OS === 'web'
+              ? { contentStyle: { backgroundColor: 'transparent' } }
+              : {
+                  presentation: 'transparentModal',
+                  animation: 'slide_from_bottom',
+                  contentStyle: { backgroundColor: 'transparent' },
+                }),
           }}
         />
       </Stack.Navigator>

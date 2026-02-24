@@ -11,13 +11,14 @@ import type { StudyMode } from './index';
 export type RootStackParamList = {
   Main: NavigatorScreenParams<MainTabParamList>;
   SetDetail: { setId: string };
-  Study: { 
-    setId: string; 
-    mode: StudyMode; 
-    errorCardsFronts?: string[]; 
-    studyAll?: boolean; 
-    cardLimit?: number; 
+  Study: {
+    setId: string;
+    mode: StudyMode;
+    errorCardsFronts?: string[];
+    studyAll?: boolean;
+    cardLimit?: number;
     onlyHard?: boolean;
+    dueCardIds?: string[];
     // Параметры фазы
     phaseId?: string;
     totalPhaseCards?: number;
@@ -25,7 +26,7 @@ export type RootStackParamList = {
     phaseOffset?: number;
     phaseFailedIds?: string[];
   };
-  StudyResults: { 
+  StudyResults: {
     setId: string;
     totalCards: number;
     learnedCards: number;
@@ -34,6 +35,7 @@ export type RootStackParamList = {
     errorCards: Array<{ id?: string; front: string; back: string; rating: number }>;
     modeTitle?: string;
     cardLimit?: number;
+    dueCardIds?: string[];
     nextMode?: 'study' | 'match' | 'multipleChoice';
     // Параметры фазы
     phaseId?: string;
@@ -41,12 +43,16 @@ export type RootStackParamList = {
     studiedInPhase?: number;
     phaseOffset?: number;
     phaseFailedIds?: string[];
+    // Streak celebration
+    streakIncreased?: boolean;
+    newStreakCount?: number;
   };
   CardEditor: { setId: string; cardId?: string };
   SetEditor: { setId?: string; autoFocusTitle?: boolean };
-  Match: { 
-    setId: string; 
+  Match: {
+    setId: string;
     cardLimit?: number;
+    dueCardIds?: string[];
     // Параметры фазы
     phaseId?: string;
     totalPhaseCards?: number;
@@ -54,11 +60,12 @@ export type RootStackParamList = {
     phaseOffset?: number;
     phaseFailedIds?: string[];
   };
-  MultipleChoice: { 
-    setId: string; 
-    cardLimit?: number; 
-    questionIndex?: number; 
+  MultipleChoice: {
+    setId: string;
+    cardLimit?: number;
+    questionIndex?: number;
     totalQuestions?: number;
+    dueCardIds?: string[];
     // Параметры фазы
     phaseId?: string;
     totalPhaseCards?: number;
@@ -69,7 +76,8 @@ export type RootStackParamList = {
   WordBuilder: {
     setId: string;
     cardLimit?: number;
-    // Параметры фазы (на будущее)
+    dueCardIds?: string[];
+    // Параметры фазы
     phaseId?: string;
     totalPhaseCards?: number;
     studiedInPhase?: number;
@@ -79,6 +87,7 @@ export type RootStackParamList = {
   AudioLearning: {
     setId: string;
     cardLimit?: number;
+    dueCardIds?: string[];
     // Параметры фазы
     phaseId?: string;
     totalPhaseCards?: number;
@@ -86,7 +95,8 @@ export type RootStackParamList = {
     phaseOffset?: number;
     phaseFailedIds?: string[];
   };
-  SharedSetDetail: { setId: string };
+  LibrarySetDetail: { setId: string };
+  MyPublications: undefined;
   PersonalInfo: undefined;
   Security: undefined;
   Subscription: undefined;

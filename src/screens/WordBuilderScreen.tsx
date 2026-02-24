@@ -40,6 +40,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
   const {
     setId,
     cardLimit,
+    dueCardIds,
     phaseId,
     totalPhaseCards,
     studiedInPhase = 0,
@@ -54,10 +55,13 @@ export function WordBuilderScreen({ navigation, route }: Props) {
   const { ids, map } = useCardsStore(
     useCallback((s) => ({ ids: s.cardsBySet[setId] || [], map: s.cards }), [setId]),
   );
-  const cards = useMemo(
-    () => ids.map((id) => map[id]).filter((c): c is Card => Boolean(c)),
-    [ids, map],
-  );
+  const cards = useMemo(() => {
+    if (dueCardIds && dueCardIds.length > 0) {
+      return dueCardIds.map((id) => map[id]).filter(Boolean) as Card[];
+    }
+    const now = Date.now();
+    return ids.map((id) => map[id]).filter((c): c is Card => Boolean(c) && c.nextReviewDate <= now);
+  }, [ids, map, dueCardIds]);
   const cardsKey = useMemo(() => ids.join('|'), [ids]);
   const [cardsQueue, setCardsQueue] = useState<Card[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -290,6 +294,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
         errorCards: errorList,
         modeTitle: 'Word Builder',
         cardLimit,
+        dueCardIds,
         // Параметры фазы
         phaseId: currentPhaseId.current,
         totalPhaseCards: phaseTotal,
@@ -304,6 +309,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
       setId,
       totalWords,
       cardLimit,
+      dueCardIds,
       studiedInPhase,
       phaseOffset,
       cardsQueue,

@@ -28,7 +28,7 @@ const CARD_HEIGHT = CARD_WIDTH * 1.25;
 type Props = RootStackScreenProps<'Study'>;
 
 export function StudyScreen({ navigation, route }: Props) {
-  const { setId, mode, errorCardsFronts, studyAll, cardLimit, onlyHard, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0, phaseFailedIds } = route.params;
+  const { setId, mode, errorCardsFronts, studyAll, cardLimit, onlyHard, dueCardIds, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0, phaseFailedIds } = route.params;
   const colors = useThemeColors();
   const settings = useSettingsStore((s) => s.settings);
   const theme = useSettingsStore((s) => s.resolvedTheme);
@@ -100,7 +100,14 @@ export function StudyScreen({ navigation, route }: Props) {
 
   // Инициализация сессии
   useEffect(() => {
-    let cards = getCardsBySet(setId);
+    let cards: Card[];
+    // If dueCardIds passed (cross-set mode from HomeScreen), load those specific cards
+    if (dueCardIds && dueCardIds.length > 0) {
+      const state = useCardsStore.getState();
+      cards = dueCardIds.map((id) => state.cards[id]).filter(Boolean) as Card[];
+    } else {
+      cards = getCardsBySet(setId);
+    }
     const onlyUnmastered = Boolean(onlyHard);
     
     if (phaseId) {
@@ -246,7 +253,7 @@ export function StudyScreen({ navigation, route }: Props) {
 
     setCurrentCard(queue[0]);
     updateLastStudied(setId);
-  }, [setId, errorCardsFronts, studyAll, cardLimit, onlyHard, phaseId, phaseOffset, phaseFailedList]);
+  }, [setId, errorCardsFronts, studyAll, cardLimit, onlyHard, dueCardIds, phaseId, phaseOffset, phaseFailedList]);
 
   // Получить текущую карточку из очереди
   useEffect(() => {
@@ -259,7 +266,7 @@ export function StudyScreen({ navigation, route }: Props) {
 
   // Обработка оценки
   const handleRate = useCallback(
-    (rating: Rating) => {
+    async (rating: Rating) => {
       if (!currentCard) return;
 
       // Логика: 1,2 = ошибка, 3,4 = правильно
@@ -377,6 +384,9 @@ export function StudyScreen({ navigation, route }: Props) {
           phaseTotal
         });
 
+        // Завершаем сессию и проверяем стрик
+        const streakResult = await finishStudySession();
+
         navigation.replace('StudyResults', {
           setId,
           totalCards,
@@ -386,6 +396,7 @@ export function StudyScreen({ navigation, route }: Props) {
           errorCards: errorCardsWithIds,
           modeTitle: 'Flashcards',
           cardLimit,
+          dueCardIds,
           nextMode: 'study',
           // Параметры фазы
           phaseId: currentPhaseId.current,
@@ -393,6 +404,9 @@ export function StudyScreen({ navigation, route }: Props) {
           studiedInPhase: newStudiedInPhase,
           phaseOffset: newPhaseOffset,
           phaseFailedIds: newPhaseFailedIds,
+          // Streak celebration
+          streakIncreased: streakResult.streakIncreased,
+          newStreakCount: streakResult.newStreakCount,
         });
       } else {
         useStudyStore.setState((s) => ({

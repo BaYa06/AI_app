@@ -19,3 +19,4 @@ export {
   isPushSupported,
 } from './pushNotifications';
 export type { PushStatus, ForegroundMessageHandler } from './pushNotifications';
+export { LibraryService } from './LibraryService';

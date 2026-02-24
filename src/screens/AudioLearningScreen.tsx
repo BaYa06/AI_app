@@ -43,7 +43,7 @@ type SessionState = 'idle' | 'listening' | 'correct' | 'incorrect';
 type Props = RootStackScreenProps<'AudioLearning'>;
 
 export function AudioLearningScreen({ navigation, route }: Props) {
-  const { setId, cardLimit, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0, phaseFailedIds } = route.params;
+  const { setId, cardLimit, dueCardIds, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0, phaseFailedIds } = route.params;
   const colors = useThemeColors();
   const theme = useSettingsStore((s) => s.resolvedTheme);
 
@@ -90,7 +90,14 @@ export function AudioLearningScreen({ navigation, route }: Props) {
 
   // Cards preparation
   const cards = useMemo(() => {
-    let allCards = getCardsBySet(setId);
+    let allCards: Card[];
+    if (dueCardIds && dueCardIds.length > 0) {
+      const state = useCardsStore.getState();
+      allCards = dueCardIds.map((id) => state.cards[id]).filter(Boolean) as Card[];
+    } else {
+      const now = Date.now();
+      allCards = getCardsBySet(setId).filter(c => c.nextReviewDate <= now);
+    }
 
     if (phaseId) {
       const phaseFailedList = phaseFailedIds || [];
@@ -120,7 +127,7 @@ export function AudioLearningScreen({ navigation, route }: Props) {
     }
 
     return limited;
-  }, [setId, cardLimit, phaseId, phaseOffset, phaseFailedIds, getCardsBySet]);
+  }, [setId, cardLimit, dueCardIds, phaseId, phaseOffset, phaseFailedIds, getCardsBySet]);
 
   const currentCard = cards[currentIndex] || null;
   const totalCards = cards.length;
@@ -173,13 +180,14 @@ export function AudioLearningScreen({ navigation, route }: Props) {
       }),
       modeTitle: 'Audio Session',
       cardLimit,
+      dueCardIds,
       phaseId: currentPhaseId.current,
       totalPhaseCards: currentTotalPhaseCards.current,
       studiedInPhase: studiedInPhase + learnedCards,
       phaseOffset: phaseOffset + cards.length,
       phaseFailedIds: errors,
     });
-  }, [cards, navigation, setId, cardLimit, studiedInPhase, phaseOffset]);
+  }, [cards, navigation, setId, cardLimit, dueCardIds, studiedInPhase, phaseOffset]);
 
   // Process one card then auto-continue (mic stays on between cards)
   const processCard = useCallback(async (idx: number) => {

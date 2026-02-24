@@ -2,7 +2,7 @@
  * Personal Info Screen
  * @description Экран редактирования личных данных пользователя
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -10,9 +10,12 @@ import {
   Pressable,
   TextInput,
   Platform,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Text, Container } from '@/components/common';
 import { useThemeColors, useSettingsStore } from '@/store';
+import { supabase, NeonService } from '@/services';
 import { spacing, borderRadius } from '@/constants';
 import {
   ArrowLeft,
@@ -50,6 +53,8 @@ export function PersonalInfoScreen({ navigation }: Props) {
 
   const [firstName, setFirstName] = useState('Ivan');
   const [lastName, setLastName] = useState('Petrov');
+  const [userName, setUserName] = useState('');
+  const [savingUserName, setSavingUserName] = useState(false);
   const [birthday, setBirthday] = useState('1995-05-15');
   const [nativeLang, setNativeLang] = useState('ru');
   const [learningLangs, setLearningLangs] = useState(['German', 'English']);
@@ -57,6 +62,17 @@ export function PersonalInfoScreen({ navigation }: Props) {
   const [timezone, setTimezone] = useState('cet');
   const [showNativeLangPicker, setShowNativeLangPicker] = useState(false);
   const [showTimezonePicker, setShowTimezonePicker] = useState(false);
+
+  // Загрузить user_name из БД
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      const userId = data.session?.user?.id;
+      if (!userId) return;
+      NeonService.getUserName(userId).then((name) => {
+        if (name) setUserName(name);
+      });
+    });
+  }, []);
 
   const inputBg = isDark ? 'rgba(255,255,255,0.04)' : '#F8FAFC';
   const inputBorder = isDark ? 'rgba(255,255,255,0.1)' : '#E2E8F0';
@@ -139,6 +155,27 @@ export function PersonalInfoScreen({ navigation }: Props) {
                     backgroundColor: inputBg,
                     borderColor: inputBorder,
                   },
+                  Platform.OS === 'web' && { outlineStyle: 'none' },
+                ]}
+              />
+            </View>
+          </View>
+
+          {/* Username */}
+          <View style={s.field}>
+            <Text style={[s.label, { color: colors.textTertiary }]}>Имя пользователя</Text>
+            <View style={[s.inputWrap, { backgroundColor: inputBg, borderColor: inputBorder }]}>
+              <Text variant="body" style={{ color: colors.textTertiary, fontWeight: '600' }}>@</Text>
+              <TextInput
+                value={userName.replace(/^@/, '')}
+                onChangeText={(text) => setUserName('@' + text.toLowerCase().replace(/[^a-z0-9._-]/g, ''))}
+                placeholder="username"
+                placeholderTextColor={colors.textTertiary}
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={[
+                  s.inputInner,
+                  { color: colors.textPrimary },
                   Platform.OS === 'web' && { outlineStyle: 'none' },
                 ]}
               />
@@ -319,8 +356,35 @@ export function PersonalInfoScreen({ navigation }: Props) {
           },
         ]}
       >
-        <Pressable style={[s.saveButton, { backgroundColor: colors.primary }]}>
-          <CheckCircle size={20} color="#FFFFFF" />
+        <Pressable
+          style={[s.saveButton, { backgroundColor: colors.primary, opacity: savingUserName ? 0.7 : 1 }]}
+          disabled={savingUserName}
+          onPress={async () => {
+            const { data } = await supabase.auth.getSession();
+            const userId = data.session?.user?.id;
+            if (!userId) {
+              Alert.alert('Ошибка', 'Необходимо войти в аккаунт');
+              return;
+            }
+            if (!userName || userName.length < 2) {
+              Alert.alert('Ошибка', 'Имя пользователя слишком короткое');
+              return;
+            }
+            setSavingUserName(true);
+            const success = await NeonService.updateUserName(userId, userName);
+            setSavingUserName(false);
+            if (success) {
+              Alert.alert('Готово', 'Данные сохранены');
+            } else {
+              Alert.alert('Ошибка', 'Не удалось сохранить. Возможно, имя уже занято.');
+            }
+          }}
+        >
+          {savingUserName ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <CheckCircle size={20} color="#FFFFFF" />
+          )}
           <Text variant="body" style={{ color: '#FFFFFF', fontWeight: '700' }}>
             Сохранить изменения
           </Text>

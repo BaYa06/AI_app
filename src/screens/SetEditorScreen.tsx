@@ -20,7 +20,10 @@ import { Text } from '@/components/common';
 import { spacing, borderRadius } from '@/constants';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { SetCategory } from '@/types';
-import { ArrowLeftRight, ChevronDown, Lock, Unlock } from 'lucide-react-native';
+import { ArrowLeftRight, ChevronDown, Globe } from 'lucide-react-native';
+import { LibraryService } from '@/services';
+import { supabase } from '@/services/supabaseClient';
+import { LIBRARY_CATEGORIES } from '@/constants/library';
 
 type Props = RootStackScreenProps<'SetEditor'>;
 
@@ -34,9 +37,25 @@ const CATEGORY_OPTIONS: { value: SetCategory; label: string; icon: string }[] = 
   { value: 'custom', label: 'Свой вариант…', icon: '✨' },
 ];
 
-const SOURCE_LANGUAGES = ['Немецкий (DE)', 'Английский (EN)'];
-const TARGET_LANGUAGES = ['Русский (RU)'];
+const SOURCE_LANGUAGES = ['Немецкий (DE)', 'Английский (EN)', 'Французский (FR)', 'Испанский (ES)'];
+const TARGET_LANGUAGES = ['Русский (RU)', 'Английский (EN)', 'Немецкий (DE)'];
 const DESCRIPTION_LIMIT = 200;
+
+const LANG_CODE_TO_LABEL: Record<string, string> = {
+  de: 'Немецкий (DE)',
+  en: 'Английский (EN)',
+  fr: 'Французский (FR)',
+  es: 'Испанский (ES)',
+  ru: 'Русский (RU)',
+};
+
+const LANG_LABEL_TO_CODE: Record<string, string> = {
+  'Немецкий (DE)': 'de',
+  'Английский (EN)': 'en',
+  'Французский (FR)': 'fr',
+  'Испанский (ES)': 'es',
+  'Русский (RU)': 'ru',
+};
 
 export function SetEditorScreen({ navigation, route }: Props) {
   const { setId, autoFocusTitle } = route.params || {};
@@ -64,7 +83,6 @@ export function SetEditorScreen({ navigation, route }: Props) {
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<SetCategory>('general');
   const [courseId, setCourseId] = useState<string | null>(activeCourseId ?? null);
-  const [isPublic, setIsPublic] = useState(false);
   const [sourceLanguage, setSourceLanguage] = useState(SOURCE_LANGUAGES[0]);
   const [targetLanguage, setTargetLanguage] = useState(TARGET_LANGUAGES[0]);
   const [sourcePickerOpen, setSourcePickerOpen] = useState(false);
@@ -75,6 +93,15 @@ export function SetEditorScreen({ navigation, route }: Props) {
   const [titleFocused, setTitleFocused] = useState(false);
   const [descriptionFocused, setDescriptionFocused] = useState(false);
 
+  // Publish states
+  const [isPublished, setIsPublished] = useState(false);
+  const [librarySetId, setLibrarySetId] = useState<string | null>(null);
+  const [showPublishForm, setShowPublishForm] = useState(false);
+  const [publishDescription, setPublishDescription] = useState('');
+  const [publishCategory, setPublishCategory] = useState('');
+  const [publishTags, setPublishTags] = useState('');
+  const [isPublishing, setIsPublishing] = useState(false);
+
   // Загрузка данных для редактирования
   useEffect(() => {
     if (setId) {
@@ -84,11 +111,33 @@ export function SetEditorScreen({ navigation, route }: Props) {
         setDescription(set.description || '');
         setCategory(set.category);
         setCourseId(set.courseId ?? null);
-        // Публичные наборы временно недоступны
-        setIsPublic(false);
+        if (set.languageFrom) {
+          const label = LANG_CODE_TO_LABEL[set.languageFrom];
+          if (label) setSourceLanguage(label);
+        }
+        if (set.languageTo) {
+          const label = LANG_CODE_TO_LABEL[set.languageTo];
+          if (label) setTargetLanguage(label);
+        }
       }
     }
   }, [setId, getSet]);
+
+  // Проверка статуса публикации
+  useEffect(() => {
+    if (!isEditing || !setId) return;
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user?.id) return;
+        const result = await LibraryService.checkPublished(setId, session.user.id);
+        if (result.isPublished) {
+          setIsPublished(true);
+          setLibrarySetId(result.librarySetId ?? null);
+        }
+      } catch {}
+    })();
+  }, [isEditing, setId]);
 
   // Автофокус на названии при открытии по запросу
   useEffect(() => {
@@ -176,6 +225,64 @@ export function SetEditorScreen({ navigation, route }: Props) {
     });
   }, [hiddenOffset, navigation, sheetTranslate]);
 
+  const getCardsBySet = useCardsStore((s) => s.getCardsBySet);
+
+  // Публикация в библиотеку
+  const handlePublish = useCallback(async () => {
+    if (!setId) return;
+
+    const cards = getCardsBySet(setId);
+    if (cards.length < 5) {
+      Alert.alert('Недостаточно карточек', 'Для публикации нужно минимум 5 карточек в наборе.');
+      return;
+    }
+
+    setIsPublishing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) {
+        Alert.alert('Ошибка', 'Необходимо войти в аккаунт');
+        return;
+      }
+
+      if (isPublished && librarySetId) {
+        await LibraryService.updatePublication(session.user.id, librarySetId);
+        Alert.alert('Готово', 'Публикация обновлена!');
+      } else {
+        const tags = publishTags.split(',').map(t => t.trim()).filter(Boolean);
+        await LibraryService.publishSet(session.user.id, {
+          setId,
+          description: publishDescription.trim() || undefined,
+          category: publishCategory || undefined,
+          tags: tags.length > 0 ? tags : undefined,
+        });
+        setIsPublished(true);
+        Alert.alert('Готово', 'Набор опубликован в библиотеке!');
+      }
+      setShowPublishForm(false);
+    } catch (error: any) {
+      Alert.alert('Ошибка', error?.message || 'Не удалось опубликовать');
+    } finally {
+      setIsPublishing(false);
+    }
+  }, [setId, isPublished, librarySetId, publishDescription, publishCategory, publishTags, getCardsBySet]);
+
+  // Снятие с публикации
+  const handleUnpublish = useCallback(async () => {
+    if (!librarySetId) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) return;
+      await LibraryService.unpublishSet(session.user.id, librarySetId);
+      setIsPublished(false);
+      setLibrarySetId(null);
+      setShowPublishForm(false);
+      Alert.alert('Готово', 'Публикация снята');
+    } catch (error: any) {
+      Alert.alert('Ошибка', error?.message || 'Не удалось снять публикацию');
+    }
+  }, [librarySetId]);
+
   // Сохранение
   const handleSave = useCallback(async () => {
     setShowValidation(true);
@@ -187,14 +294,18 @@ export function SetEditorScreen({ navigation, route }: Props) {
     try {
       const categoryData = CATEGORY_OPTIONS.find((c) => c.value === category);
       
+      const langFrom = LANG_LABEL_TO_CODE[sourceLanguage] || 'de';
+      const langTo = LANG_LABEL_TO_CODE[targetLanguage] || 'ru';
+
       if (isEditing && setId) {
         updateSet(setId, {
           title: title.trim(),
           description: description.trim() || undefined,
           category,
           icon: categoryData?.icon,
-          isPublic,
           courseId,
+          languageFrom: langFrom,
+          languageTo: langTo,
         });
       } else {
         // Создаем набор с courseId из активного курса
@@ -203,8 +314,9 @@ export function SetEditorScreen({ navigation, route }: Props) {
           description: description.trim() || undefined,
           category,
           icon: categoryData?.icon,
-          isPublic,
-          courseId, // выбранный курс (может быть null)
+          courseId,
+          languageFrom: langFrom,
+          languageTo: langTo,
         });
         
         // Переход к новому набору
@@ -218,7 +330,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
     } finally {
       setIsSaving(false);
     }
-  }, [title, description, category, isPublic, isEditing, setId, updateSet, addSet, navigation, closeSheet, courseId]);
+  }, [title, description, category, isEditing, setId, updateSet, addSet, navigation, closeSheet, courseId]);
 
   // Удаление
   const handleDelete = useCallback(() => {
@@ -457,61 +569,125 @@ export function SetEditorScreen({ navigation, route }: Props) {
               </Text>
             </View>
 
-            {/* Доступ */}
-            <View style={styles.field}>
-              <Text variant="label" color="primary" style={styles.fieldLabel}>
-                Доступ
-              </Text>
-              <View
-                style={[
-                  styles.segmented,
-                  { backgroundColor: colors.surfaceVariant, borderColor: colors.border },
-                ]}
-              >
-                <Pressable
-                  onPress={() => setIsPublic(false)}
-                  style={[
-                    styles.segmentButton,
-                    !isPublic && { backgroundColor: colors.surface },
-                  ]}
-                >
-                  <Lock size={16} color={isPublic ? colors.textSecondary : colors.textPrimary} />
-                  <Text
-                    variant="bodySmall"
-                    style={[
-                      styles.segmentLabel,
-                      { color: isPublic ? colors.textSecondary : colors.textPrimary },
-                    ]}
+            {/* Публикация в библиотеку */}
+            {isEditing && (
+              <View style={styles.field}>
+                <Text variant="label" color="primary" style={styles.fieldLabel}>
+                  Библиотека
+                </Text>
+
+                {isPublished && !showPublishForm ? (
+                  <View style={{ gap: spacing.s }}>
+                    <View style={[styles.publishedBadge, { backgroundColor: colors.success + '15', borderColor: colors.success + '30' }]}>
+                      <Globe size={16} color={colors.success} />
+                      <Text variant="bodySmall" style={{ color: colors.success, fontWeight: '600' }}>
+                        Опубликовано в библиотеке
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: spacing.s }}>
+                      <Pressable
+                        onPress={() => setShowPublishForm(true)}
+                        style={[styles.publishActionBtn, { borderColor: colors.primary }]}
+                      >
+                        <Text variant="bodySmall" style={{ color: colors.primary, fontWeight: '600' }}>
+                          Обновить
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={handleUnpublish}
+                        style={[styles.publishActionBtn, { borderColor: colors.error }]}
+                      >
+                        <Text variant="bodySmall" style={{ color: colors.error, fontWeight: '600' }}>
+                          Снять
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ) : !showPublishForm ? (
+                  <Pressable
+                    onPress={() => setShowPublishForm(true)}
+                    style={[styles.publishButton, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}
                   >
-                    Приватный
-                  </Text>
-                </Pressable>
-                <Pressable
-                  disabled
-                  style={[
-                    styles.segmentButton,
-                    { opacity: 0.45 },
-                  ]}
-                >
-                  <Unlock
-                    size={16}
-                    color={colors.textSecondary}
-                  />
-                  <Text
-                    variant="bodySmall"
-                    style={[
-                      styles.segmentLabel,
-                      { color: colors.textSecondary },
-                    ]}
-                  >
-                    Публичный
-                  </Text>
-                </Pressable>
+                    <Globe size={18} color={colors.primary} />
+                    <Text variant="body" style={{ color: colors.primary, fontWeight: '600' }}>
+                      Опубликовать в библиотеке
+                    </Text>
+                  </Pressable>
+                ) : null}
+
+                {showPublishForm && (
+                  <View style={[styles.publishForm, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    <TextInput
+                      value={publishDescription}
+                      onChangeText={setPublishDescription}
+                      placeholder="Описание для библиотеки (необязательно)"
+                      placeholderTextColor={colors.textTertiary}
+                      style={[styles.publishInput, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background }]}
+                      multiline
+                      maxLength={500}
+                    />
+
+                    <Text variant="caption" color="secondary" style={{ marginTop: spacing.xs }}>
+                      Категория
+                    </Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: spacing.xs }}>
+                      <View style={{ flexDirection: 'row', gap: spacing.xs }}>
+                        {LIBRARY_CATEGORIES.map((cat) => (
+                          <Pressable
+                            key={cat.key}
+                            onPress={() => setPublishCategory(publishCategory === cat.key ? '' : cat.key)}
+                            style={[
+                              styles.publishChip,
+                              {
+                                backgroundColor: publishCategory === cat.key ? colors.primary : colors.background,
+                                borderColor: publishCategory === cat.key ? colors.primary : colors.border,
+                              },
+                            ]}
+                          >
+                            <Text variant="caption" style={{ color: publishCategory === cat.key ? '#fff' : colors.textPrimary }}>
+                              {cat.icon} {cat.label}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </ScrollView>
+
+                    <TextInput
+                      value={publishTags}
+                      onChangeText={setPublishTags}
+                      placeholder="Теги через запятую (необязательно)"
+                      placeholderTextColor={colors.textTertiary}
+                      style={[styles.publishInput, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background, marginTop: spacing.s }]}
+                      maxLength={200}
+                    />
+
+                    <View style={{ flexDirection: 'row', gap: spacing.s, marginTop: spacing.m }}>
+                      <Pressable
+                        onPress={() => setShowPublishForm(false)}
+                        style={[styles.publishActionBtn, { borderColor: colors.border, flex: 1 }]}
+                      >
+                        <Text variant="bodySmall" style={{ color: colors.textSecondary, fontWeight: '600' }}>
+                          Отмена
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={handlePublish}
+                        disabled={isPublishing}
+                        style={[styles.publishSubmitBtn, { backgroundColor: colors.primary, flex: 1, opacity: isPublishing ? 0.6 : 1 }]}
+                      >
+                        <Text variant="bodySmall" style={{ color: '#fff', fontWeight: '700' }}>
+                          {isPublishing ? 'Публикация...' : isPublished ? 'Обновить' : 'Опубликовать'}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                )}
+
+                <Text variant="caption" color="tertiary" style={styles.helperText}>
+                  Опубликованные наборы доступны всем пользователям
+                </Text>
               </View>
-              <Text variant="caption" color="tertiary" style={styles.helperText}>
-                Публичные наборы видны другим и могут быть использованы в каталоге
-              </Text>
-            </View>
+            )}
 
             {isEditing && (
               <Pressable 
@@ -1054,23 +1230,56 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     paddingVertical: spacing.xs,
   },
-  segmented: {
-    flexDirection: 'row',
-    borderRadius: borderRadius.l,
-    padding: spacing.xs / 2,
-    borderWidth: 1,
-  },
-  segmentButton: {
-    flex: 1,
+  publishButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.s,
-    gap: spacing.xs,
-    borderRadius: borderRadius.m,
+    gap: spacing.s,
+    paddingVertical: spacing.m,
+    borderRadius: borderRadius.l,
+    borderWidth: 1,
   },
-  segmentLabel: {
-    fontWeight: '600',
+  publishedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.s,
+    paddingHorizontal: spacing.m,
+    borderRadius: borderRadius.l,
+    borderWidth: 1,
+  },
+  publishForm: {
+    borderRadius: borderRadius.l,
+    borderWidth: 1,
+    padding: spacing.m,
+    gap: spacing.xs,
+  },
+  publishInput: {
+    fontSize: 14,
+    borderWidth: 1,
+    borderRadius: borderRadius.m,
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.s,
+    minHeight: 40,
+  },
+  publishChip: {
+    paddingHorizontal: spacing.s,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+  },
+  publishActionBtn: {
+    borderWidth: 1,
+    borderRadius: borderRadius.m,
+    paddingVertical: spacing.s,
+    paddingHorizontal: spacing.m,
+    alignItems: 'center',
+  },
+  publishSubmitBtn: {
+    borderRadius: borderRadius.m,
+    paddingVertical: spacing.s,
+    paddingHorizontal: spacing.m,
+    alignItems: 'center',
   },
   actions: {
     flexDirection: 'row',

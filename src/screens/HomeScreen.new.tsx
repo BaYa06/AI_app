@@ -3,7 +3,7 @@
  * @description Главная страница с современным дизайном
  */
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { View, StyleSheet, ScrollView, Pressable, TextInput, useWindowDimensions, TextInput as RNTextInput, Modal, Platform, Animated } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable, TextInput, useWindowDimensions, TextInput as RNTextInput, Modal, Platform, Animated, Alert } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import type { PanGestureHandlerStateChangeEvent } from 'react-native-gesture-handler';
 import { useFocusEffect } from '@react-navigation/native';
@@ -31,6 +31,12 @@ import {
   FolderOpen,
   Trash2,
   Edit2,
+  Sparkles,
+  Puzzle,
+  Headphones,
+  ClipboardList,
+  Type,
+  ChevronRight,
 } from 'lucide-react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { StreakService, getLocalDateKey } from '@/services/StreakService';
@@ -42,6 +48,11 @@ export function HomeScreen({ navigation }: any) {
   const isDarkMode = resolvedTheme === 'dark';
   const headerBackground = isDarkMode ? 'rgba(0, 0, 0, 0)' : 'rgb(255, 255, 255)';
   const backdropColor = isDarkMode ? 'rgba(6, 8, 20, 0.65)' : 'rgba(0, 0, 0, 0.35)';
+  const modalSurface = isDarkMode ? 'rgb(32, 34, 44)' : colors.surface;
+  const modalBorder = isDarkMode ? 'rgba(255,255,255,0.08)' : colors.border;
+  const modalTextPrimary = isDarkMode ? '#F8FAFC' : colors.textPrimary;
+  const modalTextSecondary = isDarkMode ? '#A8B3C1' : colors.textSecondary;
+  const modalHandleColor = isDarkMode ? '#4b5563' : '#cbd5e1';
   const drawerBackground = isDarkMode ? '#15192f' : colors.surface;
   const drawerBorder = isDarkMode ? 'rgba(255,255,255,0.08)' : colors.border;
   const [searchVisible, setSearchVisible] = useState(false);
@@ -61,6 +72,8 @@ export function HomeScreen({ navigation }: any) {
   const [isCreatingCourse, setIsCreatingCourse] = useState(false);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [deleteModalCourseId, setDeleteModalCourseId] = useState<string | null>(null);
+  const [showStudyModeModal, setShowStudyModeModal] = useState(false);
+  const [wordLimit, setWordLimit] = useState<'10' | '20' | '30' | 'all'>('10');
   const editInputRef = useRef<RNTextInput>(null);
   const newCourseInputRef = useRef<RNTextInput>(null);
   const editModalInputRef = useRef<RNTextInput>(null);
@@ -442,6 +455,58 @@ export function HomeScreen({ navigation }: any) {
     setDeleteModalCourseId(null);
   }, [deleteModalCourseId, deleteCourse, getCourseStats]);
 
+  const handleStartStudyMode = useCallback((mode: 'classic' | 'match' | 'multipleChoice' | 'wordBuilder' | 'audio') => {
+    setShowStudyModeModal(false);
+
+    // Collect due cards across ALL sets in the active course
+    const now = Date.now();
+    const state = useCardsStore.getState();
+    const allDueCards: string[] = [];
+    for (const set of filteredSets) {
+      const cardIds = state.cardsBySet[set.id] || [];
+      for (const id of cardIds) {
+        const card = state.cards[id];
+        if (card && card.nextReviewDate <= now) {
+          allDueCards.push(id);
+        }
+      }
+    }
+
+    if (allDueCards.length === 0) return;
+
+    // Shuffle all due cards — pass ALL to dueCardIds, use cardLimit for batch size
+    const shuffled = [...allDueCards].sort(() => Math.random() - 0.5);
+    const dueCardIds = shuffled;
+    const limit = wordLimit === 'all' ? undefined : Number(wordLimit);
+
+    // Use the first card's setId for backward compatibility (results screen, etc.)
+    const firstCard = state.cards[dueCardIds[0]];
+    const setId = firstCard?.setId || filteredSets[0]?.id;
+    if (!setId) return;
+
+    const phaseId = `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const totalCards = dueCardIds.length;
+    const rootNav = navigation?.getParent?.() ?? navigation;
+
+    switch (mode) {
+      case 'classic':
+        rootNav?.navigate('Study', { setId, mode: 'classic', studyAll: true, onlyHard: true, cardLimit: limit, dueCardIds, phaseId, totalPhaseCards: totalCards, studiedInPhase: 0, phaseOffset: 0 });
+        break;
+      case 'match':
+        rootNav?.navigate('Match', { setId, cardLimit: limit, dueCardIds, phaseId, totalPhaseCards: totalCards, studiedInPhase: 0, phaseOffset: 0 });
+        break;
+      case 'multipleChoice':
+        rootNav?.navigate('MultipleChoice', { setId, cardLimit: limit, dueCardIds, questionIndex: 1, totalQuestions: totalCards, phaseId, totalPhaseCards: totalCards, studiedInPhase: 0, phaseOffset: 0 });
+        break;
+      case 'wordBuilder':
+        rootNav?.navigate('WordBuilder', { setId, cardLimit: limit, dueCardIds, phaseId, totalPhaseCards: totalCards, studiedInPhase: 0, phaseOffset: 0 });
+        break;
+      case 'audio':
+        rootNav?.navigate('AudioLearning', { setId, cardLimit: limit, dueCardIds, phaseId, totalPhaseCards: totalCards, studiedInPhase: 0, phaseOffset: 0 });
+        break;
+    }
+  }, [filteredSets, navigation, wordLimit]);
+
   const saveCourseTitle = useCallback(
     (courseId: string) => {
       const title = editingTitle.trim();
@@ -632,7 +697,13 @@ export function HomeScreen({ navigation }: any) {
                 </View>
               </View>
 
-              <Pressable style={styles.startButton}>
+              <Pressable style={styles.startButton} onPress={() => {
+                if (dueCards > 0) {
+                  setShowStudyModeModal(true);
+                } else {
+                  Alert.alert('Все выучено!', 'Нет карточек для изучения. Добавьте новые слова или дождитесь повторения.');
+                }
+              }}>
                 <Text style={styles.startButtonText}>Начать изучение</Text>
                 <ArrowRight size={20} color="#FFFFFF" />
               </Pressable>
@@ -702,7 +773,7 @@ export function HomeScreen({ navigation }: any) {
                     </View>
 
                     {/* More Menu */}
-                    <Pressable 
+                    <Pressable
                       style={styles.moreButton}
                       onPress={(e) => {
                         e.stopPropagation();
@@ -1367,6 +1438,217 @@ export function HomeScreen({ navigation }: any) {
           </View>
         </View>
       </Modal>
+
+      {/* Study Mode Selection Modal — 1:1 copy of SetDetailScreen study sheet */}
+      {showStudyModeModal && (
+        <View style={[styles.smSheetWrapper, { zIndex: 35 }]} pointerEvents="box-none">
+          <Pressable
+            style={[styles.smSheetBackdrop, { backgroundColor: backdropColor }]}
+            onPress={() => setShowStudyModeModal(false)}
+          />
+          <View
+            style={[
+              styles.smStudySheet,
+              {
+                backgroundColor: modalSurface,
+                borderColor: modalBorder,
+              },
+            ]}
+          >
+            <View style={[styles.smStudyHandle, { backgroundColor: modalHandleColor }]} />
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.smStudyContent}
+            >
+              <View style={styles.smStudyHeader}>
+                <Text variant="h3" style={{ color: modalTextPrimary }}>
+                  Выбор режима
+                </Text>
+                <Pressable onPress={() => setShowStudyModeModal(false)} hitSlop={8}>
+                  <Text variant="body" style={{ color: modalTextSecondary, fontWeight: '600' }}>
+                    Отмена
+                  </Text>
+                </Pressable>
+              </View>
+              <Text variant="caption" color="secondary">
+                {activeCourseTitle ? activeCourseTitle : 'Все наборы'} • {dueCards} карточек
+              </Text>
+
+              {/* Recommended: Flashcards */}
+              <Pressable
+                onPress={() => handleStartStudyMode('classic')}
+                style={[
+                  styles.smRecommendCard,
+                  { borderColor: colors.primary, backgroundColor: colors.surface },
+                ]}
+              >
+                <View style={styles.smRecommendBadge}>
+                  <Text variant="caption" style={{ color: '#fff', fontWeight: '700' }}>
+                    Recommended
+                  </Text>
+                </View>
+                <View style={styles.smRecommendHeader}>
+                  <View style={styles.smRecommendIcon}>
+                    <Sparkles size={20} color={colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
+                      Flashcards
+                    </Text>
+                    <Text variant="caption" color="secondary">
+                      Переворот 180° • Классический режим
+                    </Text>
+                  </View>
+                </View>
+                <View
+                  style={[
+                    styles.smFlashPreview,
+                    { borderColor: colors.border, backgroundColor: colors.background },
+                  ]}
+                >
+                  <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
+                    scharf
+                  </Text>
+                  <Text variant="caption" color="secondary">
+                    Нажми, чтобы перевернуть
+                  </Text>
+                </View>
+                <View style={styles.smRateRow}>
+                  {['Не знаю', 'Сомневаюсь', 'Почти', 'Уверенно'].map((label, idx) => {
+                    const rateColors = ['#EF4444', '#F97316', '#2563EB', '#10B981'];
+                    return (
+                      <View
+                        key={label}
+                        style={[
+                          styles.smRatePill,
+                          { borderColor: `${rateColors[idx]}33`, backgroundColor: `${rateColors[idx]}1A` },
+                        ]}
+                      >
+                        <Text variant="caption" style={{ color: rateColors[idx], fontWeight: '700' }}>
+                          {label}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </Pressable>
+
+              {/* Games section */}
+              <View style={styles.smSection}>
+                <Text variant="caption" color="secondary" style={styles.smSectionTitle}>
+                  Игры для закрепления
+                </Text>
+                <View style={styles.smGameList}>
+                  <Pressable
+                    onPress={() => handleStartStudyMode('match')}
+                    style={[styles.smGameRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  >
+                    <View style={styles.smGameIcon}>
+                      <Puzzle size={18} color={colors.textPrimary} />
+                    </View>
+                    <View style={styles.smGameInfo}>
+                      <View style={styles.smGameTitleRow}>
+                        <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>Match</Text>
+                        <Text variant="caption" style={{ color: colors.textSecondary, backgroundColor: colors.surface, borderColor: colors.border, paddingHorizontal: spacing.xs, paddingVertical: 2, borderRadius: borderRadius.s, borderWidth: 1 }}>Быстро</Text>
+                      </View>
+                      <Text variant="caption" color="secondary" numberOfLines={1}>Сопоставление слов и переводов</Text>
+                    </View>
+                    <ChevronRight size={18} color={colors.textSecondary} />
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => handleStartStudyMode('multipleChoice')}
+                    style={[styles.smGameRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  >
+                    <View style={styles.smGameIcon}>
+                      <ClipboardList size={18} color={colors.textPrimary} />
+                    </View>
+                    <View style={styles.smGameInfo}>
+                      <View style={styles.smGameTitleRow}>
+                        <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>Multiple Choice</Text>
+                        <Text variant="caption" style={{ color: colors.textSecondary, backgroundColor: colors.surface, borderColor: colors.border, paddingHorizontal: spacing.xs, paddingVertical: 2, borderRadius: borderRadius.s, borderWidth: 1 }}>Лёгко</Text>
+                      </View>
+                      <Text variant="caption" color="secondary" numberOfLines={1}>Выбери правильный из 4 вариантов</Text>
+                    </View>
+                    <ChevronRight size={18} color={colors.textSecondary} />
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => handleStartStudyMode('wordBuilder')}
+                    style={[styles.smGameRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  >
+                    <View style={styles.smGameIcon}>
+                      <Type size={18} color={colors.textPrimary} />
+                    </View>
+                    <View style={styles.smGameInfo}>
+                      <View style={styles.smGameTitleRow}>
+                        <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>Word Builder</Text>
+                        <Text variant="caption" style={{ color: colors.textSecondary, backgroundColor: colors.surface, borderColor: colors.border, paddingHorizontal: spacing.xs, paddingVertical: 2, borderRadius: borderRadius.s, borderWidth: 1 }}>Правописание</Text>
+                      </View>
+                      <Text variant="caption" color="secondary" numberOfLines={1}>Собери слово из букв</Text>
+                    </View>
+                    <ChevronRight size={18} color={colors.textSecondary} />
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => handleStartStudyMode('audio')}
+                    style={[styles.smGameRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  >
+                    <View style={styles.smGameIcon}>
+                      <Headphones size={18} color={colors.textPrimary} />
+                    </View>
+                    <View style={styles.smGameInfo}>
+                      <View style={styles.smGameTitleRow}>
+                        <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>Audio Tap</Text>
+                        <Text variant="caption" style={{ color: colors.textSecondary, backgroundColor: colors.surface, borderColor: colors.border, paddingHorizontal: spacing.xs, paddingVertical: 2, borderRadius: borderRadius.s, borderWidth: 1 }}>Аудирование</Text>
+                      </View>
+                      <Text variant="caption" color="secondary" numberOfLines={1}>Прослушай и выбери верное</Text>
+                    </View>
+                    <ChevronRight size={18} color={colors.textSecondary} />
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* Настройки — количество слов */}
+              <View style={styles.smSection}>
+                <Text variant="caption" color="secondary" style={styles.smSectionTitle}>
+                  Настройки
+                </Text>
+                <View style={styles.smSettingRow}>
+                  <Text variant="body" style={{ color: colors.textPrimary, flexShrink: 1 }}>
+                    Количество слов
+                  </Text>
+                  <View style={[styles.smWordChips, { flexShrink: 0 }]}>
+                    {(['10', '20', '30', 'all'] as const).map((val) => (
+                      <Pressable
+                        key={val}
+                        onPress={() => setWordLimit(val)}
+                        style={[
+                          styles.smWordChip,
+                          {
+                            backgroundColor: wordLimit === val ? colors.primary : colors.surface,
+                            borderColor: wordLimit === val ? colors.primary : colors.border,
+                          },
+                        ]}
+                      >
+                        <Text
+                          variant="caption"
+                          style={{
+                            color: wordLimit === val ? colors.textInverse : colors.textPrimary,
+                            fontWeight: '700',
+                          }}
+                        >
+                          {val === 'all' ? 'Все' : val}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      )}
     </View>
     </PanGestureHandler>
   );
@@ -2168,6 +2450,141 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     lineHeight: 18,
     marginHorizontal: spacing.m,
+  },
+
+  // Study Mode Sheet (1:1 from SetDetailScreen)
+  smSheetWrapper: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-end',
+    zIndex: 20,
+  },
+  smSheetBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  smStudySheet: {
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
+    borderWidth: 1,
+    paddingHorizontal: spacing.l,
+    paddingTop: spacing.m,
+    paddingBottom: spacing.xl,
+    gap: spacing.m,
+    maxHeight: '85%',
+  },
+  smStudyHandle: {
+    width: 48,
+    height: 6,
+    borderRadius: borderRadius.full,
+    backgroundColor: '#cbd5e1',
+    alignSelf: 'center',
+  },
+  smStudyContent: {
+    paddingBottom: spacing.l,
+    gap: spacing.l,
+  },
+  smStudyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  smRecommendCard: {
+    borderWidth: 2,
+    borderRadius: borderRadius.xl,
+    padding: spacing.m,
+    position: 'relative',
+  },
+  smRecommendBadge: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    backgroundColor: '#2d65e6',
+    paddingHorizontal: spacing.s,
+    paddingVertical: spacing.xs / 2,
+    borderBottomLeftRadius: borderRadius.l,
+    borderTopRightRadius: borderRadius.l,
+  },
+  smRecommendHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+    marginBottom: spacing.s,
+  },
+  smRecommendIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.l,
+    backgroundColor: 'rgba(45,101,230,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  smFlashPreview: {
+    borderWidth: 1,
+    borderRadius: borderRadius.l,
+    padding: spacing.m,
+    alignItems: 'center',
+    marginBottom: spacing.s,
+  },
+  smRateRow: {
+    flexDirection: 'row',
+    gap: spacing.s,
+    flexWrap: 'wrap',
+  },
+  smRatePill: {
+    paddingHorizontal: spacing.s,
+    paddingVertical: spacing.xs / 2,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+  },
+  smSection: {
+    gap: spacing.s,
+  },
+  smSectionTitle: {
+    letterSpacing: 1,
+  },
+  smGameList: {
+    gap: spacing.s,
+  },
+  smGameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: borderRadius.l,
+    padding: spacing.m,
+    gap: spacing.s,
+  },
+  smGameIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.m,
+    backgroundColor: 'rgba(148,163,184,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  smGameInfo: {
+    flex: 1,
+    gap: spacing.xs / 2,
+  },
+  smGameTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+  },
+  smSettingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing.s,
+  },
+  smWordChips: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  smWordChip: {
+    paddingHorizontal: spacing.s,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.m,
+    borderWidth: 1,
   },
 });
 

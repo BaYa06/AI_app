@@ -16,7 +16,7 @@ import type { Card } from '@/types';
 type Props = RootStackScreenProps<'Match'>;
 
 export function MatchScreen({ navigation, route }: Props) {
-  const { setId, cardLimit, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0 } = route.params;
+  const { setId, cardLimit, dueCardIds, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0 } = route.params;
   const colors = useThemeColors();
   const theme = useSettingsStore((s) => s.resolvedTheme);
 
@@ -29,10 +29,14 @@ export function MatchScreen({ navigation, route }: Props) {
     useCallback((s) => ({ ids: s.cardsBySet[setId] || [], map: s.cards }), [setId])
   );
 
-  const cards = useMemo(
-    () => ids.map((id) => map[id]).filter(Boolean) as Card[],
-    [ids, map]
-  );
+  const cards = useMemo(() => {
+    // Cross-set mode: use dueCardIds directly
+    if (dueCardIds && dueCardIds.length > 0) {
+      return dueCardIds.map((id) => map[id]).filter(Boolean) as Card[];
+    }
+    const now = Date.now();
+    return ids.map((id) => map[id]).filter((c): c is Card => Boolean(c) && c.nextReviewDate <= now);
+  }, [ids, map, dueCardIds]);
 
   const [leftCards, setLeftCards] = useState<Card[]>([]);
   const [rightCards, setRightCards] = useState<Card[]>([]);
@@ -211,6 +215,7 @@ export function MatchScreen({ navigation, route }: Props) {
       errorCards: [],
       modeTitle: 'Match',
       cardLimit,
+      dueCardIds,
       nextMode: 'match',
       // Параметры фазы
       phaseId: currentPhaseId.current,
@@ -218,7 +223,7 @@ export function MatchScreen({ navigation, route }: Props) {
       studiedInPhase: newStudiedInPhase,
       phaseOffset: newPhaseOffset,
     });
-  }, [isComplete, navigation, setId, totalPairs, mistakes, studiedInPhase, cardLimit, phaseOffset]);
+  }, [isComplete, navigation, setId, totalPairs, mistakes, studiedInPhase, cardLimit, dueCardIds, phaseOffset]);
 
   useEffect(() => {
     if (!isComplete && totalPairs > 0 && matchedPairs === totalPairs) {

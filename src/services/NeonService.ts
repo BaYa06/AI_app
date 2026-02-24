@@ -79,13 +79,57 @@ export const NeonService = {
         user.displayName ||
         (user.email ? user.email.split('@')[0] : null);
 
+      const defaultUserName = user.email
+        ? '@' + user.email.split('@')[0].toLowerCase()
+        : null;
+
       await sql`
-        INSERT INTO users (id, email, display_name, is_anonymous)
-        VALUES (${user.id}::uuid, ${user.email}, ${displayName}, false)
-        ON CONFLICT (id) DO NOTHING;
+        INSERT INTO users (id, email, display_name, is_anonymous, user_name)
+        VALUES (${user.id}::uuid, ${user.email}, ${displayName}, false, ${defaultUserName})
+        ON CONFLICT (id) DO UPDATE SET
+          user_name = COALESCE(users.user_name, EXCLUDED.user_name);
       `;
     } catch (error) {
       console.error('Failed to ensure user exists:', error);
+    }
+  },
+
+  /**
+   * Получить user_name пользователя
+   */
+  async getUserName(userId: string): Promise<string | null> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) return null;
+      const sql = neon(connectionString);
+      const rows = await sql`
+        SELECT user_name FROM users WHERE id = ${userId}::uuid
+      `;
+      return rows[0]?.user_name ?? null;
+    } catch (error) {
+      console.error('Failed to get user_name:', error);
+      return null;
+    }
+  },
+
+  /**
+   * Обновить user_name пользователя
+   */
+  async updateUserName(userId: string, userName: string): Promise<boolean> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) return false;
+      const sql = neon(connectionString);
+
+      const normalized = userName.startsWith('@') ? userName.toLowerCase() : '@' + userName.toLowerCase();
+
+      await sql`
+        UPDATE users SET user_name = ${normalized} WHERE id = ${userId}::uuid
+      `;
+      return true;
+    } catch (error) {
+      console.error('Failed to update user_name:', error);
+      return false;
     }
   },
 

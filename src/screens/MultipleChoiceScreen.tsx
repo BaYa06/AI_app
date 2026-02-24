@@ -20,7 +20,7 @@ type OptionState = 'neutral' | 'correct' | 'wrong';
 type Option = { id: string; label: string; text: string; isCorrect: boolean };
 
 export function MultipleChoiceScreen({ navigation, route }: Props) {
-  const { setId, cardLimit, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0, phaseFailedIds } = route.params;
+  const { setId, cardLimit, dueCardIds, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0, phaseFailedIds } = route.params;
   const colors = useThemeColors();
   const set = useSetsStore((s) => s.getSet(setId));
   const updateSetStats = useSetsStore((s) => s.updateSetStats);
@@ -99,8 +99,14 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
 
   useEffect(() => {
     const state = useCardsStore.getState();
-    const ids = state.cardsBySet[setId] || [];
-    const cards = ids.map((id) => state.cards[id]).filter(Boolean) as Card[];
+    let cards: Card[];
+    if (dueCardIds && dueCardIds.length > 0) {
+      cards = dueCardIds.map((id) => state.cards[id]).filter(Boolean) as Card[];
+    } else {
+      const ids = state.cardsBySet[setId] || [];
+      const now = Date.now();
+      cards = ids.map((id) => state.cards[id]).filter((c): c is Card => Boolean(c) && c.nextReviewDate <= now);
+    }
 
     let questionCards: Card[] = [];
     
@@ -159,7 +165,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [initKey, phaseFailedList, phaseId, phaseOffset, cardLimit, setId]);
+  }, [initKey, phaseFailedList, phaseId, phaseOffset, cardLimit, setId, dueCardIds]);
 
   // Обработчик озвучивания
   const handleSpeak = React.useCallback(
@@ -263,6 +269,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
         errorCards: errorList,
         modeTitle: 'Multiple Choice',
         cardLimit,
+        dueCardIds,
         nextMode: 'multipleChoice',
         // Параметры фазы
         phaseId: currentPhaseId.current,
@@ -272,7 +279,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
         phaseFailedIds: newPhaseFailedIds,
       });
     },
-    [finishStudySession, navigation, setId, totalQuestions, cardLimit, studiedInPhase, phaseOffset, phaseFailedList, questions]
+    [finishStudySession, navigation, setId, totalQuestions, cardLimit, dueCardIds, studiedInPhase, phaseOffset, phaseFailedList, questions]
   );
 
   const handleSelectOption = (option: Option) => {
@@ -317,6 +324,16 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
     }, 650);
   };
 
+  // Сохраняем активность при уходе в background
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'background' || state === 'inactive') {
+        finishStudySession();
+      }
+    });
+    return () => sub.remove();
+  }, [finishStudySession]);
+
   useEffect(() => {
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -357,16 +374,6 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
       </Container>
     );
   }
-
-  // Сохраняем активность при уходе в background
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'background' || state === 'inactive') {
-        finishStudySession();
-      }
-    });
-    return () => sub.remove();
-  }, [finishStudySession]);
 
   return (
     <Container padded={false}>

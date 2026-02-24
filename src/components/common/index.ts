@@ -9,3 +9,4 @@ export { Container } from './Container';
 export { ProgressBar } from './ProgressBar';
 export { Loading } from './Loading';
 export { LoadingSplash } from './LoadingSplash';
+export { StreakCelebrationModal } from './StreakCelebrationModal';
