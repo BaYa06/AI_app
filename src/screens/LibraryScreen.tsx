@@ -255,7 +255,7 @@ export function LibraryScreen() {
                 { color: colors.textPrimary },
                 Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
               ]}
-              placeholder="Поиск наборов..."
+              placeholder="Поиск наборов или @username..."
               placeholderTextColor={colors.textTertiary}
               value={searchText}
               onChangeText={onSearchChange}

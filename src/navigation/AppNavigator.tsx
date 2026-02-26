@@ -275,13 +275,12 @@ export function AppNavigator() {
           component={SetEditorScreen}
           options={{
             headerShown: false,
-            ...(Platform.OS === 'web'
-              ? { contentStyle: { backgroundColor: 'transparent' } }
-              : {
-                  presentation: 'transparentModal',
-                  animation: 'slide_from_bottom',
-                  contentStyle: { backgroundColor: 'transparent' },
-                }),
+            presentation: 'transparentModal',
+            animation: 'slide_from_bottom',
+            contentStyle: { backgroundColor: 'transparent' },
+            ...(Platform.OS === 'android' && {
+              animation: 'fade',
+            }),
           }}
         />
       </Stack.Navigator>

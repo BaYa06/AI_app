@@ -2,46 +2,56 @@
  * Statistics Screen
  * @description Full statistics page with hero card, goals, heatmap, charts, achievements
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   StyleSheet,
   ScrollView,
   Pressable,
+  ActivityIndicator,
 } from 'react-native';
 import { Text } from '@/components/common';
-import { useThemeColors, useSettingsStore } from '@/store';
+import { useThemeColors, useSettingsStore, useCardsStore, useSetsStore } from '@/store';
 import { spacing, borderRadius } from '@/constants';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { StreakService } from '@/services';
+import type { DailyActivity, UserStats } from '@/services';
+import { supabase } from '@/services/supabaseClient';
 
-// ---- Mock heatmap data (6 weeks x 7 days) ----
-const HEATMAP: number[] = [
-  0.6, 0.2, 1.0, 0.1, 0.8, 0.3, 0.9,
-  0.4, 0.1, 0.7, 0.5, 0.1, 1.0, 0.2,
-  0.8, 0.1, 0.4, 0.6, 0.9, 0.1, 0.3,
-  0.2, 0.5, 0.1, 0.8, 0.4, 0.7, 0.1,
-  0.1, 1.0, 0.6, 0.2, 0.9, 0.1, 0.4,
-  0.7, 0.3, 0.1, 0.8, 0.5, 0.1, 0.9,
-];
+// ---- Helpers ----
 
-const BAR_DATA = [
-  { label: 'Пн', value: 0.38 },
-  { label: 'Вт', value: 0.63 },
-  { label: 'Ср', value: 0.88 },
-  { label: 'Чт', value: 0.50 },
-  { label: 'Пт', value: 0.75 },
-  { label: 'Сб', value: 0.25 },
-  { label: 'Вс', value: 0.31 },
-];
+function formatNumber(n: number): string {
+  if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+  return String(n);
+}
 
-const QUICK_STATS = [
-  { icon: 'library-outline', color: '#3B82F6', value: '42', label: 'Total Sets' },
-  { icon: 'document-text-outline', color: '#F59E0B', value: '1.2k', label: 'Cards Studied' },
-  { icon: 'timer-outline', color: '#10B981', value: '48h', label: 'Total Time' },
-  { icon: 'sparkles-outline', color: '#8B5CF6', value: '156', label: 'New Cards' },
-  { icon: 'book-outline', color: '#F97316', value: '342', label: 'Learning' },
-  { icon: 'checkmark-circle-outline', color: '#22C55E', value: '702', label: 'Mastered' },
-];
+function formatHours(minutes: number): string {
+  if (minutes < 60) return `${minutes}м`;
+  const h = minutes / 60;
+  if (h >= 100) return `${Math.round(h)}ч`;
+  return h % 1 === 0 ? `${h}ч` : `${h.toFixed(1)}ч`;
+}
+
+function pluralizeDays(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 19) return `${n} дней`;
+  if (mod10 === 1) return `${n} день`;
+  if (mod10 >= 2 && mod10 <= 4) return `${n} дня`;
+  return `${n} дней`;
+}
+
+const DAY_LABELS_SHORT = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+const MONTH_LABELS = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
+
+function getDayLabel(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00');
+  const day = d.getDay(); // 0=Sun
+  return DAY_LABELS_SHORT[day === 0 ? 6 : day - 1];
+}
+
+// ---- Static data for sections we keep as-is ----
 
 const ACHIEVEMENTS = [
   {
@@ -85,17 +95,200 @@ const CHALLENGES = [
   },
 ];
 
+const DAILY_GOAL = 10;
+const XP_PER_LEVEL = 100;
+
 // ---- Main Screen ----
 
 export function StatisticsScreen({ navigation }: any) {
   const colors = useThemeColors();
   const resolvedTheme = useSettingsStore((s) => s.resolvedTheme);
   const isDark = resolvedTheme === 'dark';
+  const todayStatsLocal = useSettingsStore((s) => s.todayStats);
 
   const [chartTab, setChartTab] = useState<'week' | 'month' | 'year'>('week');
+  const [loading, setLoading] = useState(true);
+
+  // Data from backend
+  const [userStats, setUserStats] = useState<UserStats | null>(null);
+  const [todayActivity, setTodayActivity] = useState<DailyActivity | null>(null);
+  const [heatmapActivity, setHeatmapActivity] = useState<DailyActivity[]>([]);
+  const [weekActivity, setWeekActivity] = useState<DailyActivity[]>([]);
+  const [monthActivity, setMonthActivity] = useState<DailyActivity[] | null>(null);
+  const [yearActivity, setYearActivity] = useState<DailyActivity[] | null>(null);
+  const [userName, setUserName] = useState('');
 
   const cardBg = isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF';
   const cardBorder = isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9';
+
+  // Load data on mount
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      try {
+        // Get user name from session
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.email && mounted) {
+          setUserName(session.user.email.split('@')[0]);
+        }
+
+        // Fetch all stats in parallel
+        const [stats, today, heatmap, week] = await Promise.all([
+          StreakService.fetchUserStats(),
+          StreakService.fetchTodayActivity(),
+          StreakService.fetchWeekActivity(42),
+          StreakService.fetchWeekActivity(7),
+        ]);
+
+        if (!mounted) return;
+
+        setUserStats(stats);
+        setTodayActivity(today);
+        setHeatmapActivity(heatmap);
+        setWeekActivity(week);
+      } catch (e) {
+        console.error('StatisticsScreen: failed to load data', e);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+
+    return () => { mounted = false; };
+  }, []);
+
+  // Lazy load month/year data when tab changes
+  useEffect(() => {
+    let mounted = true;
+    if (chartTab === 'month' && !monthActivity) {
+      StreakService.fetchWeekActivity(30).then((data) => {
+        if (mounted) setMonthActivity(data);
+      });
+    }
+    if (chartTab === 'year' && !yearActivity) {
+      StreakService.fetchWeekActivity(365).then((data) => {
+        if (mounted) setYearActivity(data);
+      });
+    }
+    return () => { mounted = false; };
+  }, [chartTab, monthActivity, yearActivity]);
+
+  // ---- Computed values ----
+
+  const totalCardsStudied = userStats?.total_cards_studied ?? 0;
+  const level = Math.floor(totalCardsStudied / XP_PER_LEVEL) + 1;
+  const xpCurrent = totalCardsStudied % XP_PER_LEVEL;
+  const xpPercent = Math.round((xpCurrent / XP_PER_LEVEL) * 100);
+
+  const currentStreak = userStats?.current_streak ?? 0;
+
+  const todayCards = todayActivity?.cards_studied ?? todayStatsLocal.cardsStudied;
+  const goalProgress = Math.min(todayCards / DAILY_GOAL, 1);
+  const goalRotation = Math.round(goalProgress * 360);
+  const remaining = Math.max(DAILY_GOAL - todayCards, 0);
+
+  // Card stats from store
+  const allCards = useCardsStore((s) => s.cards);
+  const allSets = useSetsStore((s) => s.getAllSets());
+
+  const cardStats = useMemo(() => {
+    const now = Date.now();
+    let newCount = 0;
+    let learningCount = 0;
+    let masteredCount = 0;
+
+    const cards = Object.values(allCards);
+    for (const card of cards) {
+      if (card.status === 'new') {
+        newCount++;
+      } else if (card.nextReviewDate > now) {
+        masteredCount++;
+      } else {
+        learningCount++;
+      }
+    }
+    return { newCount, learningCount, masteredCount };
+  }, [allCards]);
+
+  const quickStats = useMemo(() => [
+    { icon: 'library-outline', color: '#3B82F6', value: formatNumber(allSets.length), label: 'Наборы' },
+    { icon: 'document-text-outline', color: '#F59E0B', value: formatNumber(totalCardsStudied), label: 'Изучено' },
+    { icon: 'timer-outline', color: '#10B981', value: formatHours(userStats?.total_minutes_learned ?? 0), label: 'Время' },
+    { icon: 'sparkles-outline', color: '#8B5CF6', value: formatNumber(cardStats.newCount), label: 'Новые' },
+    { icon: 'book-outline', color: '#F97316', value: formatNumber(cardStats.learningCount), label: 'Изучаются' },
+    { icon: 'checkmark-circle-outline', color: '#22C55E', value: formatNumber(cardStats.masteredCount), label: 'Выучены' },
+  ], [allSets.length, totalCardsStudied, userStats?.total_minutes_learned, cardStats]);
+
+  // ---- Heatmap data ----
+
+  const heatmapData = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const a of heatmapActivity) {
+      map.set(a.local_date, a.cards_studied);
+    }
+
+    // Build 42-day grid (6 weeks ending today)
+    const today = new Date();
+    const days: number[] = [];
+    for (let i = 41; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      days.push(map.get(key) ?? 0);
+    }
+
+    const maxVal = Math.max(...days, 1);
+    return days.map((v) => v / maxVal);
+  }, [heatmapActivity]);
+
+  // ---- Bar chart data ----
+
+  const barData = useMemo(() => {
+    if (chartTab === 'week') {
+      // 7 days
+      const map = new Map<string, number>();
+      for (const a of weekActivity) {
+        map.set(a.local_date, a.cards_studied);
+      }
+
+      const today = new Date();
+      const bars: { label: string; value: number; raw: number }[] = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        const key = d.toISOString().slice(0, 10);
+        const raw = map.get(key) ?? 0;
+        bars.push({ label: getDayLabel(key), value: 0, raw });
+      }
+      const maxVal = Math.max(...bars.map((b) => b.raw), 1);
+      return bars.map((b) => ({ label: b.label, value: b.raw / maxVal }));
+    }
+
+    if (chartTab === 'month') {
+      const data = monthActivity ?? [];
+      // Group by week (4 weeks)
+      const weeks: number[] = [0, 0, 0, 0];
+      const today = new Date();
+      for (const a of data) {
+        const d = new Date(a.local_date + 'T12:00:00');
+        const daysAgo = Math.floor((today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+        const weekIdx = Math.min(3, Math.floor(daysAgo / 7));
+        weeks[3 - weekIdx] += a.cards_studied;
+      }
+      const maxVal = Math.max(...weeks, 1);
+      return weeks.map((w, i) => ({ label: `Нед ${i + 1}`, value: w / maxVal }));
+    }
+
+    // Year
+    const data = yearActivity ?? [];
+    const months: number[] = new Array(12).fill(0);
+    for (const a of data) {
+      const month = parseInt(a.local_date.slice(5, 7), 10) - 1;
+      months[month] += a.cards_studied;
+    }
+    const maxVal = Math.max(...months, 1);
+    return months.map((m, i) => ({ label: MONTH_LABELS[i], value: m / maxVal }));
+  }, [chartTab, weekActivity, monthActivity, yearActivity]);
 
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
@@ -115,21 +308,26 @@ export function StatisticsScreen({ navigation }: any) {
                 </View>
               </View>
               <View style={[st.levelBadge, { backgroundColor: colors.primary, borderColor: isDark ? colors.background : '#FFFFFF' }]}>
-                <Text style={st.levelText}>LVL 12</Text>
+                <Text style={st.levelText}>LVL {level}</Text>
               </View>
             </View>
 
             {/* Name */}
             <View style={st.heroInfo}>
-              <Text style={[st.heroName, { color: colors.textPrimary }]}>Иван Петров</Text>
+              <Text style={[st.heroName, { color: colors.textPrimary }]}>
+                {userName || 'Гость'}
+              </Text>
               <View style={st.proBadgeRow}>
                 <Ionicons name="flash" size={14} color={colors.primary} />
-                <Text style={[st.proLabel, { color: colors.primary }]}>Flashly Pro Member</Text>
+                <Text style={[st.proLabel, { color: colors.primary }]}>Flashly Member</Text>
               </View>
             </View>
 
             {/* Settings */}
-            <Pressable style={[st.settingsBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9' }]}>
+            <Pressable
+              style={[st.settingsBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9' }]}
+              onPress={() => navigation?.navigate('Settings')}
+            >
               <Ionicons name="settings-outline" size={22} color={colors.textSecondary} />
             </Pressable>
           </View>
@@ -138,10 +336,12 @@ export function StatisticsScreen({ navigation }: any) {
           <View style={st.xpSection}>
             <View style={st.xpLabelRow}>
               <Text style={[st.xpLabel, { color: colors.textTertiary }]}>XP Progress</Text>
-              <Text style={[st.xpLabel, { color: colors.textTertiary }]}>1,340 / 2,000 XP</Text>
+              <Text style={[st.xpLabel, { color: colors.textTertiary }]}>
+                {xpCurrent} / {XP_PER_LEVEL} XP
+              </Text>
             </View>
             <View style={[st.xpBarBg, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9' }]}>
-              <View style={[st.xpBarFill, { backgroundColor: colors.primary, width: '67%' }]} />
+              <View style={[st.xpBarFill, { backgroundColor: colors.primary, width: `${xpPercent}%` }]} />
             </View>
           </View>
 
@@ -150,8 +350,10 @@ export function StatisticsScreen({ navigation }: any) {
             <View style={[st.heroBadgeCard, { backgroundColor: colors.primary + '0D' }]}>
               <Ionicons name="flame" size={22} color={colors.primary} />
               <View>
-                <Text style={[st.heroBadgeValue, { color: colors.textPrimary }]}>7 Days</Text>
-                <Text style={[st.heroBadgeMeta, { color: colors.textTertiary }]}>Current Streak</Text>
+                <Text style={[st.heroBadgeValue, { color: colors.textPrimary }]}>
+                  {pluralizeDays(currentStreak)}
+                </Text>
+                <Text style={[st.heroBadgeMeta, { color: colors.textTertiary }]}>Серия</Text>
               </View>
             </View>
             <Pressable
@@ -169,43 +371,53 @@ export function StatisticsScreen({ navigation }: any) {
 
         {/* ======== Daily Goal ======== */}
         <View style={[st.card, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-          <Text style={[st.cardTitle, { color: colors.textPrimary }]}>Daily Goal</Text>
+          <Text style={[st.cardTitle, { color: colors.textPrimary }]}>Дневная цель</Text>
 
           <View style={st.goalCenter}>
             {/* Circular progress */}
             <View style={st.circleWrap}>
               <View style={[st.circleTrack, { borderColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9' }]} />
-              <View style={[st.circleProgress, { borderColor: colors.primary, borderTopColor: 'transparent', borderRightColor: 'transparent', transform: [{ rotate: '216deg' }] }]} />
+              <View style={[st.circleProgress, {
+                borderColor: colors.primary,
+                borderTopColor: 'transparent',
+                borderRightColor: 'transparent',
+                transform: [{ rotate: `${Math.min(goalRotation, 360)}deg` }],
+              }]} />
               <View style={st.circleInner}>
-                <Text style={[st.circleValue, { color: colors.textPrimary }]}>16/20</Text>
-                <Text style={[st.circleLabel, { color: colors.textTertiary }]}>Cards</Text>
+                <Text style={[st.circleValue, { color: colors.textPrimary }]}>
+                  {todayCards}/{DAILY_GOAL}
+                </Text>
+                <Text style={[st.circleLabel, { color: colors.textTertiary }]}>Карточек</Text>
               </View>
             </View>
           </View>
 
           <Text style={[st.goalHint, { color: colors.textSecondary }]}>
-            Almost there! Only <Text style={{ color: colors.primary, fontWeight: '700' }}>4 more cards</Text> to hit your daily target.
+            {remaining > 0
+              ? <>Осталось <Text style={{ color: colors.primary, fontWeight: '700' }}>{remaining} карточек</Text> до дневной цели.</>
+              : <Text style={{ color: colors.primary, fontWeight: '700' }}>Цель выполнена! Отличная работа!</Text>
+            }
           </Text>
         </View>
 
         {/* ======== Activity Heatmap ======== */}
         <View style={[st.card, { backgroundColor: cardBg, borderColor: cardBorder }]}>
           <View style={st.heatmapHeader}>
-            <Text style={[st.cardTitle, { color: colors.textPrimary, marginBottom: 0 }]}>Activity Heatmap</Text>
+            <Text style={[st.cardTitle, { color: colors.textPrimary, marginBottom: 0 }]}>Активность</Text>
             <View style={st.heatmapLegend}>
-              <Text style={[st.legendLabel, { color: colors.textTertiary }]}>Less</Text>
+              <Text style={[st.legendLabel, { color: colors.textTertiary }]}>Мало</Text>
               {[0.1, 0.4, 0.7, 1.0].map((op) => (
                 <View
                   key={op}
                   style={[st.legendDot, { backgroundColor: colors.primary, opacity: op }]}
                 />
               ))}
-              <Text style={[st.legendLabel, { color: colors.textTertiary }]}>More</Text>
+              <Text style={[st.legendLabel, { color: colors.textTertiary }]}>Много</Text>
             </View>
           </View>
 
           <View style={st.heatmapGrid}>
-            {HEATMAP.map((intensity, i) => (
+            {heatmapData.map((intensity, i) => (
               <View
                 key={i}
                 style={[
@@ -218,9 +430,9 @@ export function StatisticsScreen({ navigation }: any) {
         </View>
 
         {/* ======== Quick Stats ======== */}
-        <Text style={[st.sectionTitle, { color: colors.textPrimary }]}>Quick Stats</Text>
+        <Text style={[st.sectionTitle, { color: colors.textPrimary }]}>Статистика</Text>
         <View style={st.quickGrid}>
-          {QUICK_STATS.map((stat) => (
+          {quickStats.map((stat) => (
             <View key={stat.label} style={[st.quickItem, { backgroundColor: cardBg, borderColor: cardBorder }]}>
               <Ionicons name={stat.icon as any} size={22} color={stat.color} style={{ marginBottom: 6 }} />
               <Text style={[st.quickValue, { color: colors.textPrimary }]}>{stat.value}</Text>
@@ -231,13 +443,13 @@ export function StatisticsScreen({ navigation }: any) {
 
         {/* ======== Cards Learned Chart ======== */}
         <View style={[st.card, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-          <Text style={[st.cardTitle, { color: colors.textPrimary }]}>Cards Learned</Text>
+          <Text style={[st.cardTitle, { color: colors.textPrimary }]}>Карточки</Text>
 
           {/* Tabs */}
           <View style={[st.tabRow, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9' }]}>
             {(['week', 'month', 'year'] as const).map((tab) => {
               const isActive = chartTab === tab;
-              const labels = { week: 'Week', month: 'Month', year: 'Year' };
+              const labels = { week: 'Неделя', month: 'Месяц', year: 'Год' };
               return (
                 <Pressable
                   key={tab}
@@ -257,7 +469,7 @@ export function StatisticsScreen({ navigation }: any) {
 
           {/* Bar Chart */}
           <View style={st.barChart}>
-            {BAR_DATA.map((bar) => (
+            {barData.map((bar) => (
               <View key={bar.label} style={st.barCol}>
                 <View style={st.barTrack}>
                   <View
@@ -333,7 +545,7 @@ export function StatisticsScreen({ navigation }: any) {
 
         {/* ======== Detailed Analytics Button ======== */}
         <Pressable style={[st.detailBtn, { backgroundColor: colors.primary }]}>
-          <Text style={st.detailBtnText}>Detailed Analytics</Text>
+          <Text style={st.detailBtnText}>Подробная аналитика</Text>
           <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
         </Pressable>
       </ScrollView>

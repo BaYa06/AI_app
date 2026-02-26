@@ -89,9 +89,16 @@ async function getLibrarySets(req, res, sql) {
   let paramIndex = 1;
 
   if (search) {
-    conditions.push(`(ls.title ILIKE $${paramIndex} OR ls.description ILIKE $${paramIndex})`);
-    params.push(`%${search}%`);
-    paramIndex++;
+    if (search.startsWith('@')) {
+      // Search by @username
+      conditions.push(`u.user_name ILIKE $${paramIndex}`);
+      params.push(`%${search}%`);
+      paramIndex++;
+    } else {
+      conditions.push(`(ls.title ILIKE $${paramIndex} OR ls.description ILIKE $${paramIndex})`);
+      params.push(`%${search}%`);
+      paramIndex++;
+    }
   }
 
   if (category) {

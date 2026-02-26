@@ -369,7 +369,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
   }, [setId, deleteCardsBySet, deleteSet, navigation]);
 
   return (
-    <View style={[styles.backdrop, { backgroundColor: Platform.OS === 'android' ? 'transparent' : colors.overlay }]}>
+    <View style={[styles.backdrop, { backgroundColor: 'transparent' }]}>
       <View style={styles.safeArea}>
         <Animated.View
           style={[
