@@ -101,6 +101,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
   const [publishCategory, setPublishCategory] = useState('');
   const [publishTags, setPublishTags] = useState('');
   const [isPublishing, setIsPublishing] = useState(false);
+  const [publishFormInitialized, setPublishFormInitialized] = useState(false);
 
   // Загрузка данных для редактирования
   useEffect(() => {
@@ -148,6 +149,28 @@ export function SetEditorScreen({ navigation, route }: Props) {
       return () => clearTimeout(timer);
     }
   }, [autoFocusTitle]);
+
+  // Предзаполнение формы публикации данными набора
+  useEffect(() => {
+    if (showPublishForm && !publishFormInitialized) {
+      setPublishDescription(description || '');
+      // Маппинг категории набора на категорию библиотеки
+      const categoryMap: Record<string, string> = {
+        grammar: 'grammar',
+        travel: 'travel',
+        work: 'business',
+        study: 'study',
+        food: 'vocab',
+        general: '',
+        custom: '',
+      };
+      setPublishCategory(categoryMap[category] || '');
+      setPublishFormInitialized(true);
+    }
+    if (!showPublishForm) {
+      setPublishFormInitialized(false);
+    }
+  }, [showPublishForm, publishFormInitialized, description, category]);
 
   const categoryOption = useMemo(
     () => CATEGORY_OPTIONS.find((c) => c.value === category),
@@ -245,8 +268,15 @@ export function SetEditorScreen({ navigation, route }: Props) {
         return;
       }
 
+      const categoryData = CATEGORY_OPTIONS.find((c) => c.value === category);
+      const coverEmoji = categoryData?.icon || undefined;
+
       if (isPublished && librarySetId) {
-        await LibraryService.updatePublication(session.user.id, librarySetId);
+        await LibraryService.updatePublication(session.user.id, librarySetId, {
+          description: publishDescription.trim() || undefined,
+          category: publishCategory || undefined,
+          coverEmoji,
+        });
         Alert.alert('Готово', 'Публикация обновлена!');
       } else {
         const tags = publishTags.split(',').map(t => t.trim()).filter(Boolean);
@@ -255,6 +285,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
           description: publishDescription.trim() || undefined,
           category: publishCategory || undefined,
           tags: tags.length > 0 ? tags : undefined,
+          coverEmoji,
         });
         setIsPublished(true);
         Alert.alert('Готово', 'Набор опубликован в библиотеке!');
@@ -265,7 +296,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
     } finally {
       setIsPublishing(false);
     }
-  }, [setId, isPublished, librarySetId, publishDescription, publishCategory, publishTags, getCardsBySet]);
+  }, [setId, isPublished, librarySetId, publishDescription, publishCategory, publishTags, category, getCardsBySet]);
 
   // Снятие с публикации
   const handleUnpublish = useCallback(async () => {

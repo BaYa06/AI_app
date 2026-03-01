@@ -23,10 +23,24 @@ module.exports = (env, argv) => {
     entry: './index.web.jsx',
     output: {
       path: path.resolve(__dirname, 'dist'),
-      filename: isDev ? 'bundle.js' : 'bundle.[contenthash].js',
+      filename: isDev ? 'bundle.js' : '[name].[contenthash].js',
+      chunkFilename: isDev ? '[name].chunk.js' : '[name].[contenthash].chunk.js',
       publicPath: '/',
       clean: true,
       globalObject: 'self',
+    },
+    optimization: isDev ? undefined : {
+      splitChunks: {
+        chunks: 'all',
+        cacheGroups: {
+          vendor: {
+            test: /[\\/]node_modules[\\/]/,
+            name: 'vendor',
+            chunks: 'all',
+            priority: 10,
+          },
+        },
+      },
     },
     resolve: {
       alias: {
@@ -113,7 +127,6 @@ module.exports = (env, argv) => {
           // Дублируем манифест как manifest.json для совместимости с клиентами, ожидающими json-расширение
           { from: 'public/manifest.webmanifest', to: 'manifest.json' },
           { from: 'public/sw.js', to: 'sw.js' },
-          { from: 'public/ios-pwa-fix.css', to: 'ios-pwa-fix.css' },
           { from: 'public/icons', to: 'icons' },
           // Аудио-файлы для звуковых эффектов викторин
           { from: 'public/correct.wav', to: 'correct.wav' },

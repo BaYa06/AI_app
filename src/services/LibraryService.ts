@@ -296,7 +296,7 @@ class LibraryServiceClass {
   async publishSet(userId: string, payload: PublishSetPayload): Promise<PublishResponse> {
     await ensureLibraryTables();
     const sql = getSql();
-    const { setId, description, tags, category } = payload;
+    const { setId, description, tags, category, coverEmoji } = payload;
 
     // Check set belongs to user
     const setRows = await sql.query(`
@@ -321,6 +321,11 @@ class LibraryServiceClass {
       throw new Error('Set is already published');
     }
 
+    // Format tags as PostgreSQL array literal
+    const tagsArr = tags && tags.length > 0
+      ? '{' + tags.map(t => '"' + t.replace(/"/g, '\\"') + '"').join(',') + '}'
+      : '{}';
+
     // Create library set
     const libSet = await sql.query(`
       INSERT INTO library_sets (
@@ -334,10 +339,10 @@ class LibraryServiceClass {
       userId, setId, cardSet.title,
       description || cardSet.description || null,
       category || cardSet.category || null,
-      JSON.stringify(tags || []),
+      tagsArr,
       cardSet.language_from || null, cardSet.language_to || null,
       parseInt(cardCount[0].cnt, 10),
-      null,
+      coverEmoji || null,
     ]);
 
     const librarySetId = libSet[0].id;
@@ -357,8 +362,8 @@ class LibraryServiceClass {
     return { librarySetId };
   }
 
-  /** Update published set cards from original */
-  async updatePublication(userId: string, librarySetId: string): Promise<{ success: boolean }> {
+  /** Update published set cards and metadata from original */
+  async updatePublication(userId: string, librarySetId: string, meta?: { description?: string; category?: string; coverEmoji?: string }): Promise<{ success: boolean }> {
     const sql = getSql();
 
     const libSet = await sql.query(`
@@ -372,6 +377,13 @@ class LibraryServiceClass {
     if (!originalSetId) {
       throw new Error('Original set reference is missing');
     }
+
+    // Get fresh data from the original set
+    const setRows = await sql.query(`SELECT * FROM card_sets WHERE id = $1`, [originalSetId]);
+    if (setRows.length === 0) {
+      throw new Error('Original set not found');
+    }
+    const cardSet = setRows[0];
 
     const cardCount = await sql.query(`SELECT COUNT(*) as cnt FROM cards WHERE set_id = $1`, [originalSetId]);
     if (parseInt(cardCount[0].cnt, 10) < 5) {
@@ -393,7 +405,23 @@ class LibraryServiceClass {
       `, [librarySetId, cards[i].front, cards[i].back, cards[i].example || null, i]);
     }
 
-    await sql.query(`UPDATE library_sets SET cards_count = $1 WHERE id = $2`, [cards.length, librarySetId]);
+    // Update metadata from original set
+    await sql.query(`
+      UPDATE library_sets
+      SET title = $1, description = $2, category = $3,
+          language_from = $4, language_to = $5,
+          cards_count = $6, cover_emoji = $7, updated_at = NOW()
+      WHERE id = $8
+    `, [
+      cardSet.title,
+      meta?.description || cardSet.description || null,
+      meta?.category || cardSet.category || null,
+      cardSet.language_from || null,
+      cardSet.language_to || null,
+      cards.length,
+      meta?.coverEmoji || null,
+      librarySetId,
+    ]);
 
     return { success: true };
   }

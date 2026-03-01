@@ -9,6 +9,7 @@ import { Button, Text } from '@/components/common';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius } from '@/constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { usePwaInstall } from '@/hooks/usePwaInstall';
 
 type Props = {
   onCreateAccount?: () => void;
@@ -18,6 +19,7 @@ type Props = {
 export function WelcomeScreen({ onCreateAccount, onSignIn }: Props) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const { canInstall, promptInstall } = usePwaInstall();
 
   const tiles = [
     { icon: 'sparkles', color: 'rgba(100, 103, 242, 0.55)', rotate: '-6deg', iconColor: '#fff', offset: 0 },
@@ -110,6 +112,16 @@ export function WelcomeScreen({ onCreateAccount, onSignIn }: Props) {
             fullWidth
             style={styles.actionButton}
           />
+          {canInstall && (
+            <Button
+              title="Скачать приложение"
+              variant="ghost"
+              onPress={promptInstall}
+              fullWidth
+              leftIcon={<Ionicons name="download-outline" size={20} color={colors.primary} />}
+              style={styles.actionButton}
+            />
+          )}
         </View>
 
         <View style={styles.footer}>

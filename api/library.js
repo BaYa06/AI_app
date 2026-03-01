@@ -372,7 +372,7 @@ async function importSet(req, res, sql) {
 
 // ── action=publish (POST/PUT/DELETE) ─────────────────────────────────────────
 async function publishSet(req, res, sql) {
-  const { userId, setId, description, tags, category } = req.body;
+  const { userId, setId, description, tags, category, coverEmoji } = req.body;
   if (!userId || !setId) return res.status(400).json({ error: 'userId and setId are required' });
 
   const setRows = await sql`SELECT * FROM card_sets WHERE id = ${setId} AND user_id = ${userId}`;
@@ -391,7 +391,7 @@ async function publishSet(req, res, sql) {
     VALUES (${userId}, ${setId}, ${cardSet.title}, ${description || cardSet.description || null},
             ${category || cardSet.category || null}, ${tags || []},
             ${cardSet.language_from || null}, ${cardSet.language_to || null},
-            ${parseInt(cardCount[0].cnt, 10)}, ${cardSet.icon || null}, 'published')
+            ${parseInt(cardCount[0].cnt, 10)}, ${coverEmoji || null}, 'published')
     RETURNING id
   `;
   const librarySetId = libSet[0].id;
@@ -405,7 +405,7 @@ async function publishSet(req, res, sql) {
 }
 
 async function updatePublication(req, res, sql) {
-  const { userId, librarySetId } = req.body;
+  const { userId, librarySetId, description, category, coverEmoji } = req.body;
   if (!userId || !librarySetId) return res.status(400).json({ error: 'userId and librarySetId are required' });
 
   const libSet = await sql`SELECT * FROM library_sets WHERE id = ${librarySetId} AND user_id = ${userId} AND status = 'published'`;
@@ -413,6 +413,11 @@ async function updatePublication(req, res, sql) {
 
   const originalSetId = libSet[0].original_set_id;
   if (!originalSetId) return res.status(400).json({ error: 'Original set reference is missing' });
+
+  // Get fresh data from original set
+  const setRows = await sql`SELECT * FROM card_sets WHERE id = ${originalSetId}`;
+  if (setRows.length === 0) return res.status(404).json({ error: 'Original set not found' });
+  const cardSet = setRows[0];
 
   const cardCount = await sql`SELECT COUNT(*) as cnt FROM cards WHERE set_id = ${originalSetId}`;
   if (parseInt(cardCount[0].cnt, 10) < 5) return res.status(400).json({ error: 'Original set must have at least 5 cards' });
@@ -424,7 +429,19 @@ async function updatePublication(req, res, sql) {
     await sql`INSERT INTO library_cards (library_set_id, front, back, hint, order_index) VALUES (${librarySetId}, ${cards[i].front}, ${cards[i].back}, ${cards[i].example || null}, ${i})`;
   }
 
-  await sql`UPDATE library_sets SET cards_count = ${cards.length} WHERE id = ${librarySetId}`;
+  // Update metadata from original set
+  await sql`
+    UPDATE library_sets
+    SET title = ${cardSet.title},
+        description = ${description || cardSet.description || null},
+        category = ${category || cardSet.category || null},
+        language_from = ${cardSet.language_from || null},
+        language_to = ${cardSet.language_to || null},
+        cards_count = ${cards.length},
+        cover_emoji = ${coverEmoji || null},
+        updated_at = NOW()
+    WHERE id = ${librarySetId}
+  `;
   return res.status(200).json({ success: true });
 }
 

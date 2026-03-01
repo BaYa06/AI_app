@@ -47,7 +47,7 @@ interface LibraryActions {
   rateSet: (userId: string, librarySetId: string, rating: number) => Promise<void>;
   fetchMyPublications: (userId: string) => Promise<void>;
   unpublishSet: (userId: string, librarySetId: string) => Promise<void>;
-  updatePublication: (userId: string, librarySetId: string) => Promise<void>;
+  updatePublication: (userId: string, librarySetId: string, meta?: { description?: string; category?: string; coverEmoji?: string }) => Promise<void>;
   clearLibrary: () => void;
 }
 
@@ -246,8 +246,8 @@ export const useLibraryStore = create<LibraryState & LibraryActions>()(
       });
     },
 
-    updatePublication: async (userId, librarySetId) => {
-      await LibraryService.updatePublication(userId, librarySetId);
+    updatePublication: async (userId, librarySetId, meta) => {
+      await LibraryService.updatePublication(userId, librarySetId, meta);
     },
 
     clearLibrary: () => {

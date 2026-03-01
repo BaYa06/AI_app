@@ -15,14 +15,18 @@
   
   <!-- PWA Manifest -->
   <link rel="manifest" href="/manifest.webmanifest">
-  
-  <!-- iOS PWA Scroll Fix -->
-  <link rel="stylesheet" href="/ios-pwa-fix.css">
-  
+
+  <!-- Preload critical resources -->
+  <link rel="preload" href="/fonts/Ionicons.ttf" as="font" type="font/ttf" crossorigin>
+
+  <!-- Preconnect to external domains -->
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="dns-prefetch" href="https://www.gstatic.com">
+
   <!-- Icons -->
   <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
-  
+
   <title>Flashly - Flashcards App</title>
   <style>
     /* Ionicons font for react-native-vector-icons */
@@ -31,6 +35,7 @@
       src: url('/fonts/Ionicons.ttf') format('truetype');
       font-weight: normal;
       font-style: normal;
+      font-display: swap;
     }
     
     * {

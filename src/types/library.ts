@@ -51,6 +51,7 @@ export interface PublishSetPayload {
   description?: string;
   tags?: string[];
   category?: string;
+  coverEmoji?: string;
 }
 
 export type LibrarySortType = 'popular' | 'newest' | 'top_rated' | 'featured';

@@ -65,11 +65,10 @@ self.addEventListener('notificationclick', (event) => {
 // ==================== PWA CACHE ====================
 
 const PRECACHE_URLS = [
+  '/',
   '/icons/icon-192.png',
-  '/icons/icon-512.png',
   '/icons/splash-illustration.svg',
-  '/correct.wav',
-  '/correct2.wav',
+  '/fonts/Ionicons.ttf',
 ];
 
 // ------ Install: precache + мгновенная активация ------
@@ -131,7 +130,27 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Статические ассеты — cache-first
+  // Hashed assets (bundle.[hash].js, vendor.[hash].js) — cache-first, long-lived
+  const url = new URL(request.url);
+  const isHashedAsset = /\.[a-f0-9]{8,}\.(js|css)$/.test(url.pathname);
+
+  if (isHashedAsset) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        if (cached) return cached;
+        return fetch(request).then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        });
+      })
+    );
+    return;
+  }
+
+  // Other static assets — cache-first
   event.respondWith(
     caches.match(request).then((cached) => {
       if (cached) return cached;
