@@ -4,7 +4,7 @@
 
 const API_BASE_URL = __DEV__
   ? 'http://localhost:3000/api'
-  : '/api';
+  : 'http://34.9.20.41:3001';
 
 class ApiService {
   /**

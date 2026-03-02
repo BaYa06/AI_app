@@ -160,10 +160,17 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
           minutesDelta: Math.max(1, Math.round(cardsStudied / 5)),
         });
 
-        if (success && !wasAlreadyActiveToday) {
-          const currentStreak = get().streakCache.currentStreak;
-          const newCount = currentStreak > 0 ? currentStreak : get().todayStats.streak + 1;
-          return { streakIncreased: true, newStreakCount: newCount };
+        if (success) {
+          // Обновляем lastActiveDate чтобы не показывать стрик-анимацию повторно
+          set((state) => {
+            state.streakCache.lastActiveDate = today;
+          });
+
+          if (!wasAlreadyActiveToday) {
+            const currentStreak = get().streakCache.currentStreak;
+            const newCount = currentStreak > 0 ? currentStreak : get().todayStats.streak + 1;
+            return { streakIncreased: true, newStreakCount: newCount };
+          }
         }
       } catch (e) {
         console.warn('Streak sync error:', e);
