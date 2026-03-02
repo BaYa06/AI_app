@@ -6,6 +6,8 @@ const API_BASE_URL = __DEV__
   ? 'http://localhost:3000/api'
   : 'http://34.9.20.41:3001';
 
+const AI_BASE_URL = 'https://type-potato-frequent-andrea.trycloudflare.com';
+
 class ApiService {
   /**
    * Проверить статус БД (автоматически создаст таблицы если их нет)
