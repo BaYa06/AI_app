@@ -7,8 +7,8 @@ const API_BASE_URL = __DEV__
   : '/api';
 
 const AI_BASE_URL = __DEV__
-  ? 'http://34.9.20.41:3001'  // временно для теста
-  : 'http://34.9.20.41:3001';
+  ? 'http://34.9.20.41:3001'
+  : '/ai';
 
 class ApiService {
   /**

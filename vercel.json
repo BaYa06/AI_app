@@ -104,6 +104,7 @@
     { "source": "/api/library/rate",               "destination": "/api/library?action=rate" },
     { "source": "/api/library/report",             "destination": "/api/library?action=report" },
     { "source": "/api/library/import",             "destination": "/api/library?action=import" },
+    { "source": "/ai/:path*", "destination": "http://34.9.20.41:3001/:path*" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/((?!.*\\.).*)", "destination": "/index.html" }
   ]
