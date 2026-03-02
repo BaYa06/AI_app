@@ -4,9 +4,11 @@
 
 const API_BASE_URL = __DEV__
   ? 'http://localhost:3000/api'
-  : 'http://34.9.20.41:3001';
+  : '/api';
 
-const AI_BASE_URL = 'https://type-potato-frequent-andrea.trycloudflare.com';
+const AI_BASE_URL = __DEV__
+  ? 'http://34.9.20.41:3001'  // временно для теста
+  : 'http://34.9.20.41:3001';
 
 class ApiService {
   /**
@@ -161,7 +163,7 @@ class ApiService {
    * Сгенерировать примеры для слов через Gemini
    */
   async generateExamples(words: Array<{ front: string; back: string }>): Promise<Array<{ front: string; back: string; example: string }>> {
-    const response = await fetch(`${API_BASE_URL}/generate-examples`, {
+    const response = await fetch(`${AI_BASE_URL}/generate-examples`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ words }),
@@ -177,7 +179,7 @@ class ApiService {
    * Извлечь карточки из PDF через Gemini
    */
   async extractPdfCards(base64: string): Promise<Array<{ front: string; back: string }>> {
-    const response = await fetch(`${API_BASE_URL}/extract-pdf`, {
+    const response = await fetch(`${AI_BASE_URL}/extract-pdf`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ base64 }),
