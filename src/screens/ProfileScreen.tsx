@@ -2,7 +2,7 @@
  * Profile Screen
  * @description Экран профиля и настроек
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -17,6 +17,7 @@ import { Text } from '@/components/common';
 import { spacing, borderRadius } from '@/constants';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import type { Session } from '@supabase/supabase-js';
+import { useFocusEffect } from '@react-navigation/native';
 
 // ==================== НАСТРОЙКИ СЕКЦИЙ ====================
 
@@ -27,9 +28,9 @@ const QUICK_ACTIONS = [
 ] as const;
 
 const ACCOUNT_ITEMS = [
-  { icon: 'person-outline', label: 'Личные данные', badge: null },
-  { icon: 'shield-checkmark-outline', label: 'Безопасность', badge: null },
-  { icon: 'card-outline', label: 'Подписка', badge: 'PRO' },
+  { icon: 'person-outline', label: 'Личные данные', badge: null, disabled: false },
+  { icon: 'lock-closed-outline', label: 'Безопасность', badge: null, disabled: true },
+  { icon: 'lock-closed-outline', label: 'Подписка', badge: 'PRO', disabled: true },
 ] as const;
 
 const PREFERENCES_ITEMS = [
@@ -81,17 +82,19 @@ export function ProfileScreen({ navigation }: any) {
     };
   }, []);
 
-  // Загружаем user_name из БД
-  useEffect(() => {
-    const userId = session?.user?.id;
-    if (!userId) {
-      setUserNameHandle(null);
-      return;
-    }
-    NeonService.getUserName(userId).then((name) => {
-      setUserNameHandle(name);
-    });
-  }, [session?.user?.id]);
+  // Загружаем user_name из БД (обновляем при каждом фокусе экрана)
+  const sessionUserId = session?.user?.id;
+  useFocusEffect(
+    useCallback(() => {
+      if (!sessionUserId) {
+        setUserNameHandle(null);
+        return;
+      }
+      NeonService.getUserName(sessionUserId).then((name) => {
+        setUserNameHandle(name);
+      });
+    }, [sessionUserId]),
+  );
 
   const userEmail = session?.user?.email;
   const userName = useMemo(() => {
@@ -246,11 +249,10 @@ export function ProfileScreen({ navigation }: any) {
             <React.Fragment key={i}>
               {i > 0 && <View style={[st.divider, { backgroundColor: dividerColor }]} />}
               <Pressable
-                style={st.settingsItem}
+                style={[st.settingsItem, item.disabled && { opacity: 0.4 }]}
+                disabled={item.disabled}
                 onPress={() => {
                   if (i === 0) navigation?.navigate('PersonalInfo');
-                  if (i === 1) navigation?.navigate('Security');
-                  if (i === 2) navigation?.navigate('Subscription');
                 }}
               >
                 <Ionicons name={item.icon as any} size={22} color={colors.textTertiary} />
