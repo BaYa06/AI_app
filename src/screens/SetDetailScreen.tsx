@@ -1489,7 +1489,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
 
                 <Pressable
                   onPress={triggerImageSelect}
-                  style={[styles.importSelectButton, { backgroundColor: colors.primary, marginTop: spacing.s }]}
+                  style={[styles.importSelectButton, { backgroundColor: colors.primary, marginTop: spacing.s, display: 'none' }]}
                 >
                   <ImageIcon size={20} color={colors.textInverse} />
                   <Text variant="body" style={{ color: colors.textInverse, fontWeight: '700' }}>
@@ -1525,12 +1525,12 @@ export function SetDetailScreen({ navigation, route }: Props) {
                       <Text style={{ fontWeight: '700', color: colors.textPrimary }}>.tsv</Text> — табличный формат (слово[TAB]перевод)
                     </Text>
                   </View>
-                  <View style={styles.tipRow}>
+                  {/* <View style={styles.tipRow}>
                     <CheckCircle size={16} color={colors.primary} style={styles.tipIcon} />
                     <Text variant="caption" color="secondary" style={styles.tipText}>
                       <Text style={{ fontWeight: '700', color: colors.textPrimary }}>.jpg / .png</Text> — фото страницы учебника (AI извлечение)
                     </Text>
-                  </View>
+                  </View> */}
                   <View style={styles.tipRow}>
                     <Info size={16} color={colors.primary} style={styles.tipIcon} />
                     <Text variant="caption" color="secondary" style={styles.tipText}>

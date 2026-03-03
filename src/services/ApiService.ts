@@ -201,7 +201,7 @@ class ApiService {
     languageFrom?: string,
     languageTo?: string,
   ): Promise<Array<{ front: string; back: string }>> {
-    const response = await fetch(`${AI_BASE_URL}/extract-image`, {
+    const response = await fetch(`${API_BASE_URL}/extract-image`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ base64, mimeType, languageFrom, languageTo }),

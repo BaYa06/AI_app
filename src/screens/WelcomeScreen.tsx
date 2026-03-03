@@ -149,7 +149,7 @@ export function WelcomeScreen({ onCreateAccount, onSignIn }: Props) {
           activeOpacity={1}
           onPress={() => setShowIosModal(false)}
         >
-          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
             <Text variant="h3" align="center" style={{ color: colors.textPrimary, marginBottom: spacing.m }}>
               Установить приложение
             </Text>
