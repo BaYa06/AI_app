@@ -74,7 +74,7 @@ export function HomeScreen({ navigation }: Props) {
 
   // Подсчет карточек на сегодня
   const totalDueCards = useMemo(() => {
-    return sets.reduce((sum, set) => sum + (set.reviewCount || 0) + (set.newCount || 0), 0);
+    return sets.reduce((sum, set) => sum + (set.reviewCount || 0), 0);
   }, [sets]);
 
   // Прогресс на сегодня (пример: 12/50)

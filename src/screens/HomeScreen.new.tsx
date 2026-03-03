@@ -375,8 +375,8 @@ export function HomeScreen({ navigation }: any) {
     }, [syncStreakFromServer])
   );
 
-  // Вычисляем карточки на сегодня
-  const dueCards = filteredSets.reduce((sum, set) => sum + (set.reviewCount || 0) + (set.newCount || 0), 0);
+  // Вычисляем карточки на сегодня (reviewCount и newCount — одно и то же значение dueCount)
+  const dueCards = filteredSets.reduce((sum, set) => sum + (set.reviewCount || 0), 0);
   
   // Подсчет наборов в каждом курсе
   const getCourseStats = useCallback(

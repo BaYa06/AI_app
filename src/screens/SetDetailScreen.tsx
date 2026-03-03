@@ -101,7 +101,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
     const progress = set.cardCount > 0 
       ? Math.round((set.masteredCount / set.cardCount) * 100) 
       : 0;
-    const dueCount = set.reviewCount + set.newCount;
+    const dueCount = set.reviewCount;
     return { progress, dueCount };
   }, [set]);
 
