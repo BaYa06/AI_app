@@ -8,6 +8,7 @@ interface BeforeInstallPromptEvent extends Event {
 
 export function usePwaInstall() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isIosSafari, setIsIosSafari] = useState(false);
 
   useEffect(() => {
     if (Platform.OS !== 'web') return;
@@ -17,6 +18,13 @@ export function usePwaInstall() {
       (navigator as any).standalone === true;
 
     if (isStandalone) return;
+
+    // Detect iOS Safari (beforeinstallprompt is not supported on iOS)
+    const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    if (isIos) {
+      setIsIosSafari(true);
+      return;
+    }
 
     const handler = (e: Event) => {
       e.preventDefault();
@@ -39,5 +47,6 @@ export function usePwaInstall() {
   return {
     canInstall: Platform.OS === 'web' && deferredPrompt !== null,
     promptInstall,
+    isIosSafari,
   };
 }

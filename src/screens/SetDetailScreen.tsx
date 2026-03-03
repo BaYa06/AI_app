@@ -5,6 +5,7 @@
 import React, { useCallback, useMemo, useState, useRef, useEffect } from 'react';
 import { View, FlatList, StyleSheet, Pressable, TextInput, ScrollView, ActivityIndicator, Platform, Alert, KeyboardAvoidingView } from 'react-native';
 import DocumentPicker from 'react-native-document-picker';
+import { launchImageLibrary } from 'react-native-image-picker';
 import { useSetsStore, useCardsStore, useThemeColors, selectSetStats, useSettingsStore } from '@/store';
 import { Container, Text, ProgressBar, Loading, Button } from '@/components/common';
 import { spacing, borderRadius } from '@/constants';
@@ -35,6 +36,7 @@ import {
   Info,
   Globe,
   X,
+  Image as ImageIcon,
 } from 'lucide-react-native';
 
 type Props = RootStackScreenProps<'SetDetail'>;
@@ -79,8 +81,10 @@ export function SetDetailScreen({ navigation, route }: Props) {
   const [importLoading, setImportLoading] = useState(false);
   const [importedCards, setImportedCards] = useState<Array<{ front: string; back: string; example?: string }>>([]);
   const [importError, setImportError] = useState<string | null>(null);
-  const [importStep, setImportStep] = useState<'select' | 'loading' | 'extracting' | 'preview' | 'generating'>('select');
+  const [importStep, setImportStep] = useState<'select' | 'loading' | 'extracting' | 'translating' | 'preview' | 'generating'>('select');
+  const [importSource, setImportSource] = useState<'file' | 'image'>('file');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   // Publish states
   const [isPublished, setIsPublished] = useState(false);
@@ -279,6 +283,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
 
   const openImportModal = useCallback(() => {
     setImportStep('select');
+    setImportSource('file');
     setImportedCards([]);
     setImportError(null);
     setShowImportModal(true);
@@ -287,6 +292,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
   const closeImportModal = useCallback(() => {
     setShowImportModal(false);
     setImportStep('select');
+    setImportSource('file');
     setImportedCards([]);
     setImportError(null);
   }, []);
@@ -464,6 +470,133 @@ export function SetDetailScreen({ navigation, route }: Props) {
       }
     }
   }, [parseTSV]);
+
+  // Handle image file select on web
+  // Process extracted image cards: translate empty backs, then show preview
+  const processImageCards = useCallback(async (parsedCards: Array<{ front: string; back: string }>) => {
+    if (parsedCards.length === 0) {
+      setImportError('Не удалось найти слова на фото. Попробуйте другое изображение.');
+      setImportStep('select');
+      setImportLoading(false);
+      return;
+    }
+
+    const emptyBacks = parsedCards.filter(c => !c.back);
+
+    if (emptyBacks.length > 0) {
+      setImportStep('translating');
+      try {
+        const translations = await apiService.translateWords(
+          emptyBacks.map(c => c.front),
+          set?.languageFrom,
+          set?.languageTo,
+        );
+        const translationMap = new Map(translations.map(t => [t.front, t.back]));
+        parsedCards = parsedCards.map(c => c.back ? c : { ...c, back: translationMap.get(c.front) || '' });
+      } catch {
+        // Non-fatal: continue with empty translations
+      }
+    }
+
+    setImportedCards(parsedCards);
+    setImportStep('preview');
+    setImportLoading(false);
+  }, [set?.languageFrom, set?.languageTo]);
+
+  const handleImageFileSelect = useCallback(async (event: any) => {
+    const file = event.target?.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+    if (!validTypes.includes(file.type)) {
+      setImportError('Поддерживаются только изображения (JPG, PNG, WebP, HEIC)');
+      return;
+    }
+
+    if (file.size > 4 * 1024 * 1024) {
+      setImportError('Изображение слишком большое. Максимум 4 МБ.');
+      return;
+    }
+
+    setImportLoading(true);
+    setImportError(null);
+    setImportSource('image');
+    setImportStep('extracting');
+
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          const base64Data = result.split(',')[1] || result;
+          resolve(base64Data);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const parsedCards = await apiService.extractImageCards(base64, file.type, set?.languageFrom, set?.languageTo);
+      await processImageCards(parsedCards);
+    } catch (error) {
+      setImportError('Ошибка при обработке фото. Попробуйте ещё раз.');
+      setImportStep('select');
+      setImportLoading(false);
+    } finally {
+      if (event.target) event.target.value = '';
+    }
+  }, [set?.languageFrom, set?.languageTo, processImageCards]);
+
+  // Trigger image picker
+  const triggerImageSelect = useCallback(async () => {
+    setImportError(null);
+    setImportSource('image');
+
+    if (Platform.OS === 'web') {
+      if (imageInputRef.current) {
+        (imageInputRef.current as any).click();
+      }
+      return;
+    }
+
+    // Native (Android / iOS)
+    try {
+      const result = await launchImageLibrary({
+        mediaType: 'photo',
+        includeBase64: true,
+        quality: 0.8,
+      });
+
+      if (result.didCancel || !result.assets?.[0]) return;
+
+      const asset = result.assets[0];
+      const base64 = asset.base64;
+      const mimeType = asset.type || 'image/jpeg';
+
+      if (!base64) {
+        setImportError('Не удалось прочитать изображение');
+        return;
+      }
+
+      if (asset.fileSize && asset.fileSize > 4 * 1024 * 1024) {
+        setImportError('Изображение слишком большое. Максимум 4 МБ.');
+        return;
+      }
+
+      setImportLoading(true);
+      setImportStep('extracting');
+
+      try {
+        const parsedCards = await apiService.extractImageCards(base64, mimeType, set?.languageFrom, set?.languageTo);
+        await processImageCards(parsedCards);
+      } catch (error) {
+        setImportError('Ошибка при обработке фото. Попробуйте ещё раз.');
+        setImportStep('select');
+        setImportLoading(false);
+      }
+    } catch (err: any) {
+      setImportError('Ошибка при выборе фото');
+    }
+  }, [set?.languageFrom, set?.languageTo, processImageCards]);
 
   // Generate examples via Gemini then import all cards
   const handleImportCards = useCallback(async () => {
@@ -1232,20 +1365,29 @@ export function SetDetailScreen({ navigation, route }: Props) {
                 <ArrowLeft size={20} color={modalTextPrimary} />
               </Pressable>
               <Text variant="body" style={[styles.importTitle, { color: modalTextPrimary }]}>
-                {importStep === 'preview' ? `Импорт (${importedCards.length} карточек)` : importStep === 'generating' ? 'Генерация примеров...' : importStep === 'extracting' ? 'Обработка PDF...' : 'Импорт из файла'}
+                {importStep === 'preview' ? `Импорт (${importedCards.length} карточек)` : importStep === 'generating' ? 'Генерация примеров...' : importStep === 'translating' ? 'Перевод слов...' : importStep === 'extracting' ? (importSource === 'image' ? 'Обработка фото...' : 'Обработка PDF...') : 'Импорт из файла'}
               </Text>
               <View style={styles.topIcon} />
             </View>
 
-            {/* Hidden file input for web */}
+            {/* Hidden file inputs for web */}
             {Platform.OS === 'web' && (
-              <input
-                ref={fileInputRef as any}
-                type="file"
-                accept=".tsv,.pdf"
-                onChange={handleFileSelect as any}
-                style={{ display: 'none' }}
-              />
+              <>
+                <input
+                  ref={fileInputRef as any}
+                  type="file"
+                  accept=".tsv,.pdf"
+                  onChange={handleFileSelect as any}
+                  style={{ display: 'none' }}
+                />
+                <input
+                  ref={imageInputRef as any}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/heic"
+                  onChange={handleImageFileSelect as any}
+                  style={{ display: 'none' }}
+                />
+              </>
             )}
 
             {/* Loading State */}
@@ -1278,13 +1420,29 @@ export function SetDetailScreen({ navigation, route }: Props) {
             {importStep === 'extracting' && (
               <View style={styles.importLoadingContainer}>
                 <View style={[styles.importHeroIcon, { backgroundColor: `${colors.primary}1A` }]}>
-                  <File size={36} color={colors.primary} />
+                  {importSource === 'image' ? <ImageIcon size={36} color={colors.primary} /> : <File size={36} color={colors.primary} />}
                 </View>
                 <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '600', marginTop: spacing.m }}>
-                  Обрабатываем PDF...
+                  {importSource === 'image' ? 'Обрабатываем фото...' : 'Обрабатываем PDF...'}
                 </Text>
                 <Text variant="bodySmall" color="secondary" style={{ marginTop: spacing.xs, textAlign: 'center', paddingHorizontal: spacing.l }}>
-                  AI извлекает слова и переводы из документа
+                  {importSource === 'image' ? 'AI извлекает слова и переводы из фото' : 'AI извлекает слова и переводы из документа'}
+                </Text>
+                <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: spacing.l }} />
+              </View>
+            )}
+
+            {/* Translating State */}
+            {importStep === 'translating' && (
+              <View style={styles.importLoadingContainer}>
+                <View style={[styles.importHeroIcon, { backgroundColor: `${colors.primary}1A` }]}>
+                  <Globe size={36} color={colors.primary} />
+                </View>
+                <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '600', marginTop: spacing.m }}>
+                  Переводим слова...
+                </Text>
+                <Text variant="bodySmall" color="secondary" style={{ marginTop: spacing.xs, textAlign: 'center', paddingHorizontal: spacing.l }}>
+                  AI переводит слова без перевода
                 </Text>
                 <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: spacing.l }} />
               </View>
@@ -1329,6 +1487,16 @@ export function SetDetailScreen({ navigation, route }: Props) {
                   </Text>
                 </Pressable>
 
+                <Pressable
+                  onPress={triggerImageSelect}
+                  style={[styles.importSelectButton, { backgroundColor: colors.primary, marginTop: spacing.s }]}
+                >
+                  <ImageIcon size={20} color={colors.textInverse} />
+                  <Text variant="body" style={{ color: colors.textInverse, fontWeight: '700' }}>
+                    Выбрать фото
+                  </Text>
+                </Pressable>
+
                 <View
                   style={[
                     styles.importTips,
@@ -1355,6 +1523,12 @@ export function SetDetailScreen({ navigation, route }: Props) {
                     <CheckCircle size={16} color={colors.primary} style={styles.tipIcon} />
                     <Text variant="caption" color="secondary" style={styles.tipText}>
                       <Text style={{ fontWeight: '700', color: colors.textPrimary }}>.tsv</Text> — табличный формат (слово[TAB]перевод)
+                    </Text>
+                  </View>
+                  <View style={styles.tipRow}>
+                    <CheckCircle size={16} color={colors.primary} style={styles.tipIcon} />
+                    <Text variant="caption" color="secondary" style={styles.tipText}>
+                      <Text style={{ fontWeight: '700', color: colors.textPrimary }}>.jpg / .png</Text> — фото страницы учебника (AI извлечение)
                     </Text>
                   </View>
                   <View style={styles.tipRow}>
@@ -1388,8 +1562,8 @@ export function SetDetailScreen({ navigation, route }: Props) {
                       <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '600' }}>
                         {card.front}
                       </Text>
-                      <Text variant="bodySmall" color="secondary">
-                        {card.back}
+                      <Text variant="bodySmall" color="secondary" style={!card.back ? { fontStyle: 'italic', opacity: 0.5 } : undefined}>
+                        {card.back || 'без перевода'}
                       </Text>
                     </View>
                   ))}

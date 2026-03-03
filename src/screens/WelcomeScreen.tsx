@@ -2,8 +2,8 @@
  * WelcomeScreen
  * @description Онбординг / заглушка авторизации. Показываем, если нет аккаунта.
  */
-import React from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, ScrollView, Modal, TouchableOpacity } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Button, Text } from '@/components/common';
 import { useThemeColors } from '@/store';
@@ -19,7 +19,8 @@ type Props = {
 export function WelcomeScreen({ onCreateAccount, onSignIn }: Props) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
-  const { canInstall, promptInstall } = usePwaInstall();
+  const { canInstall, promptInstall, isIosSafari } = usePwaInstall();
+  const [showIosModal, setShowIosModal] = useState(false);
 
   const tiles = [
     { icon: 'sparkles', color: 'rgba(100, 103, 242, 0.55)', rotate: '-6deg', iconColor: '#fff', offset: 0 },
@@ -112,11 +113,11 @@ export function WelcomeScreen({ onCreateAccount, onSignIn }: Props) {
             fullWidth
             style={styles.actionButton}
           />
-          {canInstall && (
+          {(canInstall || isIosSafari) && (
             <Button
               title="Скачать приложение"
               variant="ghost"
-              onPress={promptInstall}
+              onPress={canInstall ? promptInstall : () => setShowIosModal(true)}
               fullWidth
               leftIcon={<Ionicons name="download-outline" size={20} color={colors.primary} />}
               style={styles.actionButton}
@@ -136,6 +137,53 @@ export function WelcomeScreen({ onCreateAccount, onSignIn }: Props) {
         <View style={[styles.homeIndicator, { backgroundColor: colors.border }]} />
       </View>
       </ScrollView>
+
+      <Modal
+        visible={showIosModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowIosModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowIosModal(false)}
+        >
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <Text variant="h3" align="center" style={{ color: colors.textPrimary, marginBottom: spacing.m }}>
+              Установить приложение
+            </Text>
+
+            <View style={styles.modalStep}>
+              <Ionicons name="share-outline" size={24} color={colors.primary} />
+              <Text variant="body" style={{ color: colors.textPrimary, marginLeft: spacing.s, flex: 1 }}>
+                Нажмите кнопку «Поделиться»
+              </Text>
+            </View>
+
+            <View style={styles.modalStep}>
+              <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
+              <Text variant="body" style={{ color: colors.textPrimary, marginLeft: spacing.s, flex: 1 }}>
+                Выберите «На экран Домой»
+              </Text>
+            </View>
+
+            <View style={styles.modalStep}>
+              <Ionicons name="checkmark-circle-outline" size={24} color={colors.primary} />
+              <Text variant="body" style={{ color: colors.textPrimary, marginLeft: spacing.s, flex: 1 }}>
+                Нажмите «Добавить»
+              </Text>
+            </View>
+
+            <Button
+              title="Понятно"
+              onPress={() => setShowIosModal(false)}
+              fullWidth
+              style={{ marginTop: spacing.m }}
+            />
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -220,5 +268,23 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     opacity: 0.6,
     marginTop: spacing.s,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.l,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: borderRadius.l,
+    padding: spacing.l,
+  },
+  modalStep: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.m,
   },
 });

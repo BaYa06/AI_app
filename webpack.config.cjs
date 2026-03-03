@@ -50,6 +50,7 @@ module.exports = (env, argv) => {
         'react-native-document-picker': path.resolve(__dirname, 'src/polyfills/document-picker.web.ts'),
         'react-native-tts': path.resolve(__dirname, 'src/polyfills/tts.web.ts'),
         'react-native-fs': path.resolve(__dirname, 'src/polyfills/react-native-fs.web.ts'),
+        'react-native-image-picker': path.resolve(__dirname, 'src/polyfills/image-picker.web.ts'),
         'react-native-sound': path.resolve(__dirname, 'src/polyfills/react-native-sound.web.ts'),
         '@react-native-voice/voice': path.resolve(__dirname, 'src/polyfills/voice.web.ts'),
         '@': path.resolve(__dirname, 'src'),
@@ -233,6 +234,28 @@ module.exports = (env, argv) => {
             return mod.default(req, res);
           } catch (e) {
             console.error('[devServer] extract-pdf error', e);
+            return res.status(500).json({ error: 'dev-server error', message: e.message });
+          }
+        });
+
+        apiMiddleware.post('/api/extract-image', async (req, res) => {
+          console.log('[devServer] POST /api/extract-image called');
+          try {
+            const mod = await import('./api/extract-image.js');
+            return mod.default(req, res);
+          } catch (e) {
+            console.error('[devServer] extract-image error', e);
+            return res.status(500).json({ error: 'dev-server error', message: e.message });
+          }
+        });
+
+        apiMiddleware.post('/api/translate-words', async (req, res) => {
+          console.log('[devServer] POST /api/translate-words called');
+          try {
+            const mod = await import('./api/translate-words.js');
+            return mod.default(req, res);
+          } catch (e) {
+            console.error('[devServer] translate-words error', e);
             return res.status(500).json({ error: 'dev-server error', message: e.message });
           }
         });
