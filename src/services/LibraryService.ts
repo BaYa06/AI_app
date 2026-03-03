@@ -352,11 +352,10 @@ class LibraryServiceClass {
       SELECT front, back, example FROM cards WHERE set_id = $1 ORDER BY created_at ASC
     `, [setId]);
 
-    for (let i = 0; i < cards.length; i++) {
-      await sql.query(`
-        INSERT INTO library_cards (library_set_id, front, back, hint, order_index)
-        VALUES ($1, $2, $3, $4, $5)
-      `, [librarySetId, cards[i].front, cards[i].back, cards[i].example || null, i]);
+    if (cards.length > 0) {
+      const placeholders = cards.map((_, i) => `($${i * 5 + 1}, $${i * 5 + 2}, $${i * 5 + 3}, $${i * 5 + 4}, $${i * 5 + 5})`).join(', ');
+      const params = cards.flatMap((card, i) => [librarySetId, card.front, card.back, card.example || null, i]);
+      await sql.query(`INSERT INTO library_cards (library_set_id, front, back, hint, order_index) VALUES ${placeholders}`, params);
     }
 
     return { librarySetId };
@@ -398,11 +397,10 @@ class LibraryServiceClass {
       SELECT front, back, example FROM cards WHERE set_id = $1 ORDER BY created_at ASC
     `, [originalSetId]);
 
-    for (let i = 0; i < cards.length; i++) {
-      await sql.query(`
-        INSERT INTO library_cards (library_set_id, front, back, hint, order_index)
-        VALUES ($1, $2, $3, $4, $5)
-      `, [librarySetId, cards[i].front, cards[i].back, cards[i].example || null, i]);
+    if (cards.length > 0) {
+      const placeholders = cards.map((_, i) => `($${i * 5 + 1}, $${i * 5 + 2}, $${i * 5 + 3}, $${i * 5 + 4}, $${i * 5 + 5})`).join(', ');
+      const params = cards.flatMap((card, i) => [librarySetId, card.front, card.back, card.example || null, i]);
+      await sql.query(`INSERT INTO library_cards (library_set_id, front, back, hint, order_index) VALUES ${placeholders}`, params);
     }
 
     // Update metadata from original set
@@ -484,11 +482,10 @@ class LibraryServiceClass {
       WHERE library_set_id = $1 ORDER BY order_index ASC
     `, [librarySetId]);
 
-    for (const card of libCards) {
-      await sql.query(`
-        INSERT INTO cards (set_id, front, back, example)
-        VALUES ($1, $2, $3, $4)
-      `, [newSetId, card.front, card.back, card.hint || null]);
+    if (libCards.length > 0) {
+      const placeholders = libCards.map((_, i) => `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4})`).join(', ');
+      const params = libCards.flatMap(card => [newSetId, card.front, card.back, card.hint || null]);
+      await sql.query(`INSERT INTO cards (set_id, front, back, example) VALUES ${placeholders}`, params);
     }
 
     // Record import

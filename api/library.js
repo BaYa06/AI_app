@@ -360,8 +360,10 @@ async function importSet(req, res, sql) {
   const newSetId = newSet[0].id;
 
   const libCards = await sql`SELECT front, back, hint FROM library_cards WHERE library_set_id = ${librarySetId} ORDER BY order_index ASC`;
-  for (const card of libCards) {
-    await sql`INSERT INTO cards (set_id, front, back, example) VALUES (${newSetId}, ${card.front}, ${card.back}, ${card.hint || null})`;
+  if (libCards.length > 0) {
+    const placeholders = libCards.map((_, i) => `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4})`).join(', ');
+    const params = libCards.flatMap(card => [newSetId, card.front, card.back, card.hint || null]);
+    await sql(`INSERT INTO cards (set_id, front, back, example) VALUES ${placeholders}`, params);
   }
 
   await sql`INSERT INTO library_imports (user_id, library_set_id) VALUES (${userId}, ${librarySetId})`;
@@ -397,8 +399,10 @@ async function publishSet(req, res, sql) {
   const librarySetId = libSet[0].id;
 
   const cards = await sql`SELECT front, back, example FROM cards WHERE set_id = ${setId} ORDER BY created_at ASC`;
-  for (let i = 0; i < cards.length; i++) {
-    await sql`INSERT INTO library_cards (library_set_id, front, back, hint, order_index) VALUES (${librarySetId}, ${cards[i].front}, ${cards[i].back}, ${cards[i].example || null}, ${i})`;
+  if (cards.length > 0) {
+    const placeholders = cards.map((_, i) => `($${i * 5 + 1}, $${i * 5 + 2}, $${i * 5 + 3}, $${i * 5 + 4}, $${i * 5 + 5})`).join(', ');
+    const params = cards.flatMap((card, i) => [librarySetId, card.front, card.back, card.example || null, i]);
+    await sql(`INSERT INTO library_cards (library_set_id, front, back, hint, order_index) VALUES ${placeholders}`, params);
   }
 
   return res.status(201).json({ librarySetId });
@@ -425,8 +429,10 @@ async function updatePublication(req, res, sql) {
   await sql`DELETE FROM library_cards WHERE library_set_id = ${librarySetId}`;
 
   const cards = await sql`SELECT front, back, example FROM cards WHERE set_id = ${originalSetId} ORDER BY created_at ASC`;
-  for (let i = 0; i < cards.length; i++) {
-    await sql`INSERT INTO library_cards (library_set_id, front, back, hint, order_index) VALUES (${librarySetId}, ${cards[i].front}, ${cards[i].back}, ${cards[i].example || null}, ${i})`;
+  if (cards.length > 0) {
+    const placeholders = cards.map((_, i) => `($${i * 5 + 1}, $${i * 5 + 2}, $${i * 5 + 3}, $${i * 5 + 4}, $${i * 5 + 5})`).join(', ');
+    const params = cards.flatMap((card, i) => [librarySetId, card.front, card.back, card.example || null, i]);
+    await sql(`INSERT INTO library_cards (library_set_id, front, back, hint, order_index) VALUES ${placeholders}`, params);
   }
 
   // Update metadata from original set
