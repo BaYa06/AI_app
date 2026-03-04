@@ -27,13 +27,25 @@ jobs:
       - name: Install JS dependencies
         run: npm install
 
+      - name: Fix Xcode env for CI
+        run: |
+          echo "export NODE_BINARY=$(which node)" > ios/.xcode.env.local
+
       - name: Install CocoaPods
         run: |
           cd ios
           pod install
 
+      - name: Fix minimum deployment target for Pods
+        run: |
+          cd ios
+          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 9\.0/IPHONEOS_DEPLOYMENT_TARGET = 13.0/g' Pods/Pods.xcodeproj/project.pbxproj
+          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 10\.0/IPHONEOS_DEPLOYMENT_TARGET = 13.0/g' Pods/Pods.xcodeproj/project.pbxproj
+          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 11\.0/IPHONEOS_DEPLOYMENT_TARGET = 13.0/g' Pods/Pods.xcodeproj/project.pbxproj
+
       - name: Build iOS app (unsigned for AltStore)
         run: |
+          export FORCE_BUNDLING=1
           xcodebuild \
             -workspace ios/FlashcardsApp.xcworkspace \
             -scheme FlashcardsApp \
@@ -46,6 +58,7 @@ jobs:
             CODE_SIGN_IDENTITY=- \
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
             DEVELOPMENT_TEAM="" \
+            IPHONEOS_DEPLOYMENT_TARGET=13.0 \
             build
 
       - name: Package .app to .ipa
