@@ -196,4 +196,18 @@ index 749ea14..3316eab 100644
 +import com.facebook.react.modules.core.DeviceEventManagerModule.RCTDeviceEventEmitter
  import com.facebook.react.bridge.Callback
  import com.facebook.react.bridge.ReactApplicationContext
- 
+
+diff --git a/node_modules/react-native-sound/ios/RNSound.mm b/node_modules/react-native-sound/ios/RNSound.mm
+index 1234567..abcdefg 100644
+--- a/node_modules/react-native-sound/ios/RNSound.mm
++++ b/node_modules/react-native-sound/ios/RNSound.mm
+@@ -177,7 +177,7 @@ RCT_EXPORT_METHOD(enableInSilenceMode:(BOOL)enabled) {
+
+ #pragma mark - Audio Control Methods
+
+-RCT_EXPORT_METHOD(prepare:(NSString *)fileName key:(double)key options:(JS::NativeSoundIOS::SoundOptionTypes &)options callback:(RCTResponseSenderBlock)callback ) {
++RCT_EXPORT_METHOD(prepare:(NSString *)fileName key:(double)key options:(NSDictionary *)options callback:(RCTResponseSenderBlock)callback ) {
+     NSError *error;
+     NSURL *fileNameUrl;
+     AVAudioPlayer *player;
+
