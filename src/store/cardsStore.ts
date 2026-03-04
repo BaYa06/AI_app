@@ -8,6 +8,28 @@ import { v4 as uuid } from 'uuid';
 import type { Card, CreateCardInput, UpdateCardInput } from '@/types';
 import { NeonService } from '@/services/NeonService';
 import { DatabaseService } from '@/services/DatabaseService';
+import { SyncQueueService } from '@/services/SyncQueueService';
+
+// ==================== SYNC QUEUE EXECUTORS ====================
+
+SyncQueueService.registerExecutor('createCard', (p) =>
+  NeonService.createCard(p as Card));
+
+SyncQueueService.registerExecutor('createCardsBatch', (p) =>
+  NeonService.createCardsBatch(p as Card[]));
+
+SyncQueueService.registerExecutor('updateCard', (p) => {
+  const { cardId, input } = p as { cardId: string; input: UpdateCardInput };
+  return NeonService.updateCard(cardId, input);
+});
+
+SyncQueueService.registerExecutor('deleteCard', (p) =>
+  NeonService.deleteCard(p as string));
+
+SyncQueueService.registerExecutor('updateCardSRS', (p) => {
+  const { cardId, srsData } = p as { cardId: string; srsData: Record<string, unknown> };
+  return NeonService.updateCardSRS(cardId, srsData);
+});
 
 interface CardsState {
   // Данные - храним в объекте для O(1) доступа
@@ -85,12 +107,7 @@ export const useCardsStore = create<CardsState & CardsActions>()(
       DatabaseService.saveCards();
 
       if (NeonService.isEnabled()) {
-        (async () => {
-          const ok = await NeonService.createCard(card);
-          if (!ok) {
-            console.warn('Не удалось синхронизировать карточку с Neon');
-          }
-        })();
+        SyncQueueService.enqueue('createCard', card);
       }
 
       return card;
@@ -107,14 +124,9 @@ export const useCardsStore = create<CardsState & CardsActions>()(
       // Сохраняем изменения локально сразу
       DatabaseService.saveCards();
 
-      // Синхронизируем изменения с Neon (best-effort)
+      // Синхронизируем изменения с Neon (через очередь с retry)
       if (NeonService.isEnabled()) {
-        (async () => {
-          const ok = await NeonService.updateCard(cardId, input);
-          if (!ok) {
-            console.warn('Не удалось обновить карточку в Neon');
-          }
-        })();
+        SyncQueueService.enqueue('updateCard', { cardId, input });
       }
     },
 
@@ -143,14 +155,9 @@ export const useCardsStore = create<CardsState & CardsActions>()(
         DatabaseService.saveCards();
         console.log('✅ Карточка удалена локально:', cardId);
 
-        // Асинхронно удаляем из Neon
+        // Удаляем из Neon (через очередь с retry)
         if (NeonService.isEnabled()) {
-          (async () => {
-            const ok = await NeonService.deleteCard(cardId);
-            if (!ok) {
-              console.warn('⚠️  Не удалось удалить карточку из Neon:', cardId);
-            }
-          })();
+          SyncQueueService.enqueue('deleteCard', cardId);
         }
       }
     },
@@ -182,12 +189,7 @@ export const useCardsStore = create<CardsState & CardsActions>()(
       DatabaseService.saveCards();
 
       if (NeonService.isEnabled()) {
-        (async () => {
-          const ok = await NeonService.createCardsBatch(newCards);
-          if (!ok) {
-            console.warn('Не удалось синхронизировать импорт карточек с Neon');
-          }
-        })();
+        SyncQueueService.enqueue('createCardsBatch', newCards);
       }
 
       return newCards;
@@ -217,14 +219,10 @@ export const useCardsStore = create<CardsState & CardsActions>()(
         }
       });
 
-      // Синхронизируем SRS с базой (best-effort)
-      (async () => {
-        try {
-          await NeonService.updateCardSRS(cardId, srsData);
-        } catch (error) {
-          console.error('Failed to sync SRS to Neon:', error);
-        }
-      })();
+      // Синхронизируем SRS с базой (через очередь с retry)
+      if (NeonService.isEnabled()) {
+        SyncQueueService.enqueue('updateCardSRS', { cardId, srsData });
+      }
     },
 
     resetCardProgress: (cardId) => {

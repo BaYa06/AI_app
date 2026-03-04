@@ -56,6 +56,10 @@ const DEFAULT_FILTERS: LibraryFilters = {
   page: 1,
 };
 
+const LIBRARY_TTL_MS = 5 * 60 * 1000; // 5 минут
+let lastFetchedAt = 0;
+let lastFetchFiltersKey = '';
+
 export const useLibraryStore = create<LibraryState & LibraryActions>()(
   immer((set, get) => ({
     // Initial state
@@ -72,6 +76,17 @@ export const useLibraryStore = create<LibraryState & LibraryActions>()(
     myPublications: [],
 
     fetchAllSections: async (userId) => {
+      // TTL: не перезагружаем данные, если они свежие и фильтры не менялись
+      const currentFiltersKey = JSON.stringify(get().filters);
+      const now = Date.now();
+      if (
+        now - lastFetchedAt < LIBRARY_TTL_MS &&
+        currentFiltersKey === lastFetchFiltersKey &&
+        get().trendingSets.length > 0
+      ) {
+        return;
+      }
+
       set((s) => { s.isLoading = true; s.error = null; });
 
       try {
@@ -91,6 +106,9 @@ export const useLibraryStore = create<LibraryState & LibraryActions>()(
             userId
           ),
         ]);
+
+        lastFetchedAt = Date.now();
+        lastFetchFiltersKey = JSON.stringify(get().filters);
 
         set((s) => {
           s.trendingSets = trending.sets.slice(0, 10);

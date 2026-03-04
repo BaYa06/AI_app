@@ -8,7 +8,23 @@ import { v4 as uuid } from 'uuid';
 import type { CardSet, CreateSetInput, UpdateSetInput } from '@/types';
 import { NeonService } from '@/services/NeonService';
 import { DatabaseService } from '@/services/DatabaseService';
+import { SyncQueueService } from '@/services/SyncQueueService';
 import { supabase } from '@/services/supabaseClient';
+
+// ==================== SYNC QUEUE EXECUTORS ====================
+
+SyncQueueService.registerExecutor('createSet', (p) => {
+  const payload = p as Record<string, unknown>;
+  return NeonService.createSet(payload as Parameters<typeof NeonService.createSet>[0]);
+});
+
+SyncQueueService.registerExecutor('deleteSet', (p) =>
+  NeonService.deleteSet(p as string));
+
+SyncQueueService.registerExecutor('updateSetCourse', (p) => {
+  const { setId, courseId } = p as { setId: string; courseId: string | null };
+  return NeonService.updateSetCourse(setId, courseId);
+});
 
 interface SetsState {
   // Данные - объект для O(1) доступа
@@ -106,29 +122,21 @@ export const useSetsStore = create<SetsState & SetsActions>()(
       DatabaseService.saveSets();
       console.log('✅ Набор сохранен локально:', newSet.title);
 
-      // Асинхронно отправляем в Neon (best-effort)
+      // Синхронизируем с Neon (через очередь с retry)
       if (NeonService.isEnabled()) {
-        console.log('🔄 Отправка набора в Neon PostgreSQL...');
-        (async () => {
-          const ok = await NeonService.createSet({
-            id: newSet.id,
-            userId: newSet.userId,
-            courseId: newSet.courseId,
-            title: newSet.title,
-            description: newSet.description,
-            category: newSet.category,
-            isPublic: newSet.isPublic,
-            createdAt: newSet.createdAt,
-            updatedAt: newSet.updatedAt,
-          });
-          if (ok) {
-            console.log('✅ Набор сохранен в Neon PostgreSQL:', newSet.title);
-          } else {
-            console.warn('⚠️  Не удалось синхронизировать набор с Neon:', newSet.title);
-          }
-        })();
-      } else {
-        console.log('ℹ️  Neon PostgreSQL не настроен, набор сохранен только локально');
+        SyncQueueService.enqueue('createSet', {
+          id: newSet.id,
+          userId: newSet.userId,
+          courseId: newSet.courseId,
+          title: newSet.title,
+          description: newSet.description,
+          category: newSet.category,
+          isPublic: newSet.isPublic,
+          createdAt: newSet.createdAt,
+          updatedAt: newSet.updatedAt,
+          languageFrom: newSet.languageFrom,
+          languageTo: newSet.languageTo,
+        });
       }
 
       return newSet;
@@ -145,18 +153,10 @@ export const useSetsStore = create<SetsState & SetsActions>()(
       // Сохраняем локально
       DatabaseService.saveSets();
 
-      // Синхронизируем courseId в Neon, если задан и включён Neon
+      // Синхронизируем courseId в Neon (через очередь с retry)
       if (NeonService.isEnabled() && 'courseId' in input) {
         const courseId = (input as any).courseId ?? null;
-        console.log('🔄 Обновление course_id набора в Neon:', { setId, courseId });
-        (async () => {
-          const ok = await NeonService.updateSetCourse(setId, courseId);
-          if (ok) {
-            console.log('✅ Course_id обновлен в Neon PostgreSQL для набора:', setId);
-          } else {
-            console.warn('⚠️  Не удалось обновить course_id набора в Neon:', setId);
-          }
-        })();
+        SyncQueueService.enqueue('updateSetCourse', { setId, courseId });
       }
     },
 
@@ -173,15 +173,9 @@ export const useSetsStore = create<SetsState & SetsActions>()(
       DatabaseService.saveSets();
       console.log('✅ Набор удален локально:', setId);
 
-      // Асинхронно удаляем из Neon
+      // Удаляем из Neon (через очередь с retry)
       if (NeonService.isEnabled()) {
-        console.log('🔄 Удаление набора из Neon PostgreSQL...');
-        (async () => {
-          const ok = await NeonService.deleteSet(setId);
-          if (!ok) {
-            console.warn('⚠️  Не удалось удалить набор из Neon:', setId);
-          }
-        })();
+        SyncQueueService.enqueue('deleteSet', setId);
       }
     },
 

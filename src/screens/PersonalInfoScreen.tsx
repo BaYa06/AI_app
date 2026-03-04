@@ -51,10 +51,10 @@ export function PersonalInfoScreen({ navigation }: Props) {
   const theme = useSettingsStore((s) => s.resolvedTheme);
   const isDark = theme === 'dark';
 
-  const [firstName, setFirstName] = useState('Ivan');
-  const [lastName, setLastName] = useState('Petrov');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [userName, setUserName] = useState('');
-  const [savingUserName, setSavingUserName] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [birthday, setBirthday] = useState('1995-05-15');
   const [nativeLang, setNativeLang] = useState('ru');
   const [learningLangs, setLearningLangs] = useState(['German', 'English']);
@@ -63,13 +63,20 @@ export function PersonalInfoScreen({ navigation }: Props) {
   const [showNativeLangPicker, setShowNativeLangPicker] = useState(false);
   const [showTimezonePicker, setShowTimezonePicker] = useState(false);
 
-  // Загрузить user_name из БД
+  // Загрузить user_name и display_name из БД
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       const userId = data.session?.user?.id;
       if (!userId) return;
       NeonService.getUserName(userId).then((name) => {
         if (name) setUserName(name);
+      });
+      NeonService.getDisplayName(userId).then((displayName) => {
+        if (displayName) {
+          const parts = displayName.trim().split(' ');
+          setLastName(parts[0] || '');
+          setFirstName(parts.slice(1).join(' ') || '');
+        }
       });
     });
   }, []);
@@ -106,7 +113,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
         <View style={s.avatarSection}>
           <View style={s.avatarWrap}>
             <View style={[s.avatar, { backgroundColor: colors.primary }]}>
-              <Text style={s.avatarText}>IP</Text>
+              <Text style={s.avatarText}>{(firstName?.[0] || '').toUpperCase()}{(lastName?.[0] || '').toUpperCase()}</Text>
             </View>
             <Pressable style={[s.avatarEditBtn, { backgroundColor: colors.primary, borderColor: isDark ? colors.background : '#FFFFFF' }]}>
               <Pencil size={14} color="#FFFFFF" />
@@ -357,8 +364,8 @@ export function PersonalInfoScreen({ navigation }: Props) {
         ]}
       >
         <Pressable
-          style={[s.saveButton, { backgroundColor: colors.primary, opacity: savingUserName ? 0.7 : 1 }]}
-          disabled={savingUserName}
+          style={[s.saveButton, { backgroundColor: colors.primary, opacity: saving ? 0.7 : 1 }]}
+          disabled={saving}
           onPress={async () => {
             const { data } = await supabase.auth.getSession();
             const userId = data.session?.user?.id;
@@ -370,17 +377,21 @@ export function PersonalInfoScreen({ navigation }: Props) {
               Alert.alert('Ошибка', 'Имя пользователя слишком короткое');
               return;
             }
-            setSavingUserName(true);
-            const success = await NeonService.updateUserName(userId, userName);
-            setSavingUserName(false);
-            if (success) {
+            setSaving(true);
+            const displayName = `${lastName.trim()} ${firstName.trim()}`.trim();
+            const [nameOk, userNameOk] = await Promise.all([
+              displayName ? NeonService.updateDisplayName(userId, displayName) : Promise.resolve(true),
+              NeonService.updateUserName(userId, userName),
+            ]);
+            setSaving(false);
+            if (nameOk && userNameOk) {
               Alert.alert('Готово', 'Данные сохранены');
             } else {
               Alert.alert('Ошибка', 'Не удалось сохранить. Возможно, имя уже занято.');
             }
           }}
         >
-          {savingUserName ? (
+          {saving ? (
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
             <CheckCircle size={20} color="#FFFFFF" />

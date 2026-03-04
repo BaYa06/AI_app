@@ -28,6 +28,7 @@ interface PersistedData {
 }
 
 const CURRENT_VERSION = 1;
+const LOCAL_DATA_TTL_MS = 30 * 60 * 1000; // 30 минут — после этого локальные данные считаются устаревшими
 
 /**
  * Database Service для сохранения и загрузки данных
@@ -78,9 +79,15 @@ export const DatabaseService = {
       const localSetsData = StorageService.getObject<{
         sets: Record<string, CardSet>;
         setsOrder: string[];
+        savedAt?: number;
       }>(STORAGE_KEYS.SETS);
 
-      if (localSetsData) {
+      // TTL-проверка: используем локальные данные только если они свежие
+      const localSetsValid = localSetsData?.savedAt
+        ? (Date.now() - localSetsData.savedAt) < LOCAL_DATA_TTL_MS
+        : true; // Если savedAt нет — старый формат, используем
+
+      if (localSetsData && localSetsValid) {
         // Добавляем локальные наборы, которых нет в Neon (только для текущего пользователя или локальные)
         Object.entries(localSetsData.sets || {}).forEach(([id, set]) => {
           if (!setsMap[id]) {
@@ -142,9 +149,14 @@ export const DatabaseService = {
       const localCardsData = StorageService.getObject<{
         cards: Record<string, Card>;
         cardsBySet: Record<string, string[]>;
+        savedAt?: number;
       }>(STORAGE_KEYS.CARDS);
 
-      if (localCardsData) {
+      const localCardsValid = localCardsData?.savedAt
+        ? (Date.now() - localCardsData.savedAt) < LOCAL_DATA_TTL_MS
+        : true;
+
+      if (localCardsData && localCardsValid) {
         // Добавляем локальные карточки, которых нет в Neon (только для наборов текущего пользователя)
         Object.entries(localCardsData.cards || {}).forEach(([id, card]) => {
           if (!cardsMap[id]) {
@@ -251,6 +263,7 @@ export const DatabaseService = {
     StorageService.setObject(STORAGE_KEYS.CARDS, {
       cards: state.cards,
       cardsBySet: state.cardsBySet,
+      savedAt: Date.now(),
     });
   },
 
@@ -263,6 +276,7 @@ export const DatabaseService = {
     StorageService.setObject(STORAGE_KEYS.SETS, {
       sets: state.sets,
       setsOrder: state.setsOrder,
+      savedAt: Date.now(),
     });
   },
 
@@ -361,8 +375,15 @@ export const DatabaseService = {
 
 let saveTimeout: NodeJS.Timeout | null = null;
 
+// requestIdleCallback polyfill для Safari/iOS (не поддерживает нативно)
+const scheduleIdle: (cb: () => void) => void =
+  typeof requestIdleCallback === 'function'
+    ? (cb) => requestIdleCallback(cb, { timeout: 2000 })
+    : (cb) => setTimeout(cb, 50);
+
 /**
- * Запланировать сохранение с debounce
+ * Запланировать сохранение с debounce + requestIdleCallback
+ * чтобы не блокировать рендер на iOS/Safari
  */
 export function scheduleSave(saveType: 'cards' | 'sets' | 'settings' | 'all' = 'all'): void {
   if (saveTimeout) {
@@ -370,20 +391,22 @@ export function scheduleSave(saveType: 'cards' | 'sets' | 'settings' | 'all' = '
   }
 
   saveTimeout = setTimeout(() => {
-    switch (saveType) {
-      case 'cards':
-        DatabaseService.saveCards();
-        break;
-      case 'sets':
-        DatabaseService.saveSets();
-        break;
-      case 'settings':
-        DatabaseService.saveSettings();
-        break;
-      case 'all':
-        DatabaseService.saveAll();
-        break;
-    }
+    scheduleIdle(() => {
+      switch (saveType) {
+        case 'cards':
+          DatabaseService.saveCards();
+          break;
+        case 'sets':
+          DatabaseService.saveSets();
+          break;
+        case 'settings':
+          DatabaseService.saveSettings();
+          break;
+        case 'all':
+          DatabaseService.saveAll();
+          break;
+      }
+    });
   }, 3000); // 3 секунды debounce
 }
 

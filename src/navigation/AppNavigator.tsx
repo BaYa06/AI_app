@@ -2,9 +2,9 @@
  * App Navigator
  * @description Главный навигатор приложения
  */
-import React, { Suspense, useEffect, useMemo } from 'react';
+import React, { Suspense, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Platform, ActivityIndicator, View } from 'react-native';
-import { NavigationContainer, type LinkingOptions } from '@react-navigation/native';
+import { NavigationContainer, type LinkingOptions, useNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useThemeColors } from '@/store';
@@ -195,9 +195,29 @@ const linking: LinkingOptions<RootStackParamList> = {
 
 export function AppNavigator() {
   const colors = useThemeColors();
+  const navigationRef = useNavigationContainerRef<RootStackParamList>();
+
+  // iOS PWA: свайп-назад Safari вызывает history.back() → popstate,
+  // React Navigation linking при этом делает reset состояния (пересоздаёт экраны),
+  // вместо goBack (плавный возврат). Перехватываем popstate в capture-фазе,
+  // чтобы он не дошёл до React Navigation.
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+
+    const handlePopState = (e: PopStateEvent) => {
+      const nav = navigationRef.current;
+      if (nav?.canGoBack()) {
+        e.stopImmediatePropagation();
+        nav.goBack();
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState, true);
+    return () => window.removeEventListener('popstate', handlePopState, true);
+  }, [navigationRef]);
 
   return (
-    <NavigationContainer linking={linking}>
+    <NavigationContainer ref={navigationRef} linking={linking}>
       <Stack.Navigator
         screenOptions={{
           headerStyle: {

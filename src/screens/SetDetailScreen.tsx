@@ -1206,7 +1206,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                       Flashcards
                     </Text>
                     <Text variant="caption" color="secondary">
-                      Переворот 180° • Немецкий → Русский
+                      Переворот 180°
                     </Text>
                   </View>
                 </View>

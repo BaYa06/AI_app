@@ -113,6 +113,42 @@ export const NeonService = {
   },
 
   /**
+   * Получить display_name пользователя
+   */
+  async getDisplayName(userId: string): Promise<string | null> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) return null;
+      const sql = neon(connectionString);
+      const rows = await sql`
+        SELECT display_name FROM users WHERE id = ${userId}::uuid
+      `;
+      return rows[0]?.display_name ?? null;
+    } catch (error) {
+      console.error('Failed to get display_name:', error);
+      return null;
+    }
+  },
+
+  /**
+   * Обновить display_name пользователя
+   */
+  async updateDisplayName(userId: string, displayName: string): Promise<boolean> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) return false;
+      const sql = neon(connectionString);
+      await sql`
+        UPDATE users SET display_name = ${displayName} WHERE id = ${userId}::uuid
+      `;
+      return true;
+    } catch (error) {
+      console.error('Failed to update display_name:', error);
+      return false;
+    }
+  },
+
+  /**
    * Обновить user_name пользователя
    */
   async updateUserName(userId: string, userName: string): Promise<boolean> {
@@ -435,8 +471,8 @@ export const NeonService = {
           ${payload.title},
           ${payload.description || null},
           ${payload.category || 'custom'},
-          ${payload.languageFrom || 'de'},
-          ${payload.languageTo || 'ru'},
+          ${payload.languageFrom || null},
+          ${payload.languageTo || null},
           ${payload.isPublic ?? false},
           ${payload.createdAt ? new Date(payload.createdAt).toISOString() : now.toISOString()},
           ${payload.updatedAt ? new Date(payload.updatedAt).toISOString() : now.toISOString()},

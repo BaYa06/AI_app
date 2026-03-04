@@ -14,6 +14,7 @@ import { Text } from '@/components/common';
 import { useThemeColors, useSettingsStore, useCardsStore, useSetsStore } from '@/store';
 import { spacing, borderRadius } from '@/constants';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import Svg, { Circle } from 'react-native-svg';
 import { StreakService } from '@/services';
 import type { DailyActivity, UserStats } from '@/services';
 import { supabase } from '@/services/supabaseClient';
@@ -184,7 +185,6 @@ export function StatisticsScreen({ navigation }: any) {
 
   const todayCards = todayActivity?.cards_studied ?? todayStatsLocal.cardsStudied;
   const goalProgress = Math.min(todayCards / DAILY_GOAL, 1);
-  const goalRotation = Math.round(goalProgress * 360);
   const remaining = Math.max(DAILY_GOAL - todayCards, 0);
 
   // Card stats from store
@@ -376,13 +376,28 @@ export function StatisticsScreen({ navigation }: any) {
           <View style={st.goalCenter}>
             {/* Circular progress */}
             <View style={st.circleWrap}>
-              <View style={[st.circleTrack, { borderColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9' }]} />
-              <View style={[st.circleProgress, {
-                borderColor: colors.primary,
-                borderTopColor: 'transparent',
-                borderRightColor: 'transparent',
-                transform: [{ rotate: `${Math.min(goalRotation, 360)}deg` }],
-              }]} />
+              <Svg width={120} height={120} style={{ position: 'absolute' }}>
+                <Circle
+                  cx={60}
+                  cy={60}
+                  r={52}
+                  stroke={isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9'}
+                  strokeWidth={8}
+                  fill="none"
+                />
+                <Circle
+                  cx={60}
+                  cy={60}
+                  r={52}
+                  stroke={colors.primary}
+                  strokeWidth={8}
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeDasharray={`${2 * Math.PI * 52}`}
+                  strokeDashoffset={`${2 * Math.PI * 52 * (1 - goalProgress)}`}
+                  transform="rotate(-90 60 60)"
+                />
+              </Svg>
               <View style={st.circleInner}>
                 <Text style={[st.circleValue, { color: colors.textPrimary }]}>
                   {todayCards}/{DAILY_GOAL}
@@ -718,20 +733,6 @@ const st = StyleSheet.create({
     height: 120,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  circleTrack: {
-    position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    borderWidth: 8,
-  },
-  circleProgress: {
-    position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    borderWidth: 8,
   },
   circleInner: {
     alignItems: 'center',

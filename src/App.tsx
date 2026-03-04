@@ -8,7 +8,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AppNavigator } from '@/navigation';
 import { LoadingSplash } from '@/components/common';
-import { DatabaseService, setupAutoSave, supabase, NeonService, setAnalyticsUserId } from '@/services';
+import { DatabaseService, setupAutoSave, supabase, NeonService, setAnalyticsUserId, SyncQueueService } from '@/services';
 import { refreshPushToken, subscribeForegroundMessages } from '@/services/pushNotifications';
 import { useThemeColors, useSettingsStore } from '@/store';
 import { WelcomeScreen } from '@/screens/WelcomeScreen';
@@ -180,6 +180,7 @@ export default function App() {
         if (!isMounted) return;
         if (loaded) {
           unsubscribe = setupAutoSave();
+          SyncQueueService.init();
         }
       } catch (error) {
         console.error('Failed to initialize app:', error);
