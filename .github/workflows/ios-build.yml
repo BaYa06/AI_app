@@ -1,0 +1,57 @@
+name: iOS Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+
+      - name: Install JS dependencies
+        run: npm install
+
+      - name: Install CocoaPods
+        run: |
+          cd ios
+          pod install
+
+      - name: Build iOS app (unsigned for AltStore)
+        run: |
+          xcodebuild \
+            -workspace ios/FlashcardsApp.xcworkspace \
+            -scheme FlashcardsApp \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/FlashcardsApp.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            archive
+
+      - name: Package .app to .ipa
+        run: |
+          mkdir -p Payload
+          cp -r build/FlashcardsApp.xcarchive/Products/Applications/FlashcardsApp.app Payload/
+          zip -r FlashcardsApp.ipa Payload
+
+      - name: Upload .ipa artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FlashcardsApp-ipa
+          path: FlashcardsApp.ipa
+          retention-days: 14
