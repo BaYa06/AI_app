@@ -29,23 +29,19 @@ jobs:
 
       - name: Fix Xcode env for CI
         run: |
-          echo "export NODE_BINARY=$(which node)" > ios/.xcode.env.local
+          NODE_PATH=$(which node)
+          echo "export NODE_BINARY=${NODE_PATH}" > ios/.xcode.env
+          echo "export NODE_BINARY=${NODE_PATH}" > ios/.xcode.env.local
+          echo "Node path: ${NODE_PATH}"
 
       - name: Install CocoaPods
         run: |
           cd ios
           pod install
 
-      - name: Fix minimum deployment target for Pods
-        run: |
-          cd ios
-          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 9\.0/IPHONEOS_DEPLOYMENT_TARGET = 13.0/g' Pods/Pods.xcodeproj/project.pbxproj
-          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 10\.0/IPHONEOS_DEPLOYMENT_TARGET = 13.0/g' Pods/Pods.xcodeproj/project.pbxproj
-          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 11\.0/IPHONEOS_DEPLOYMENT_TARGET = 13.0/g' Pods/Pods.xcodeproj/project.pbxproj
-
       - name: Build iOS app (unsigned for AltStore)
         run: |
-          export FORCE_BUNDLING=1
+          set -o pipefail
           xcodebuild \
             -workspace ios/FlashcardsApp.xcworkspace \
             -scheme FlashcardsApp \
@@ -59,7 +55,18 @@ jobs:
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
             DEVELOPMENT_TEAM="" \
             IPHONEOS_DEPLOYMENT_TARGET=13.0 \
-            build
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            FORCE_BUNDLING=1 \
+            build 2>&1 | tee build.log | tail -100
+
+      - name: Show build errors on failure
+        if: failure()
+        run: |
+          echo "=== ERRORS ==="
+          grep -A 5 "error:" build.log | tail -60
+          echo ""
+          echo "=== FAILED COMMANDS ==="
+          grep -B 2 -A 5 "failed" build.log | tail -40
 
       - name: Package .app to .ipa
         run: |
