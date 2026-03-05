@@ -27,11 +27,22 @@ jobs:
       - name: Install JS dependencies
         run: npm install
 
+      - name: Create .env.local from secrets
+        env:
+          POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          echo "POSTGRES_URL=${POSTGRES_URL}" >> .env.local
+          echo "SUPABASE_URL=${SUPABASE_URL}" >> .env.local
+          echo "SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}" >> .env.local
+          echo "SUPABASE_REDIRECT_URI=flashly://auth-callback" >> .env.local
+
       - name: Fix Xcode env for CI
         run: |
           NODE_PATH=$(which node)
-          echo "export NODE_BINARY=${NODE_PATH}" > ios/.xcode.env
           echo "export NODE_BINARY=${NODE_PATH}" > ios/.xcode.env.local
+          echo 'if [ -f "$SRCROOT/../.env.local" ]; then set -a; source "$SRCROOT/../.env.local"; set +a; fi' >> ios/.xcode.env.local
           echo "Node path: ${NODE_PATH}"
 
       - name: Install CocoaPods
