@@ -53,6 +53,7 @@ export function SignInScreen({ onBack, onSendCode, onCreateAccount }: Props) {
     }
 
     // Native mobile: use InAppBrowser with PKCE
+    console.log('[auth] Redirect URI:', SUPABASE_OAUTH_REDIRECT);
     const { data, error: authError } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -60,6 +61,7 @@ export function SignInScreen({ onBack, onSendCode, onCreateAccount }: Props) {
         skipBrowserRedirect: true,
       },
     });
+    console.log('[auth] OAuth URL:', data?.url);
     if (authError) {
       setError(authError.message);
       setIsLoading(false);
@@ -73,17 +75,29 @@ export function SignInScreen({ onBack, onSendCode, onCreateAccount }: Props) {
             showTitle: false,
             enableUrlBarHiding: true,
             enableDefaultShare: false,
-            ephemeralWebSession: false,
+            ephemeralWebSession: true,
           });
           if (result.type === 'success' && result.url) {
-            const codeMatch = result.url.match(/[?&]code=([^&]+)/);
-            const code = codeMatch?.[1];
+            const url = new URL(result.url);
+            // Check both search params and hash params (Supabase may use either)
+            const code =
+              url.searchParams.get('code') ||
+              new URLSearchParams(url.hash.replace('#', '?')).get('code');
+
             if (code) {
-              const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+              const { error: exchangeError } =
+                await supabase.auth.exchangeCodeForSession(code);
               if (exchangeError) {
                 console.error('[auth] Code exchange failed:', exchangeError.message);
                 setError(exchangeError.message);
               }
+            } else {
+              // Check for error in callback
+              const errorDesc =
+                url.searchParams.get('error_description') ||
+                new URLSearchParams(url.hash.replace('#', '?')).get('error_description');
+              console.error('[auth] No code in callback URL:', result.url);
+              setError(errorDesc || 'Не удалось получить код авторизации');
             }
           }
         } else {
