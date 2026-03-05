@@ -24,9 +24,9 @@
 		3B4392A12AC88292D35C810B /* Pods-FlashcardsApp.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-FlashcardsApp.debug.xcconfig"; path = "Target Support Files/Pods-FlashcardsApp/Pods-FlashcardsApp.debug.xcconfig"; sourceTree = "<group>"; };
 		5709B34CF0A7D63546082F79 /* Pods-FlashcardsApp.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-FlashcardsApp.release.xcconfig"; path = "Target Support Files/Pods-FlashcardsApp/Pods-FlashcardsApp.release.xcconfig"; sourceTree = "<group>"; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-FlashcardsApp.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-FlashcardsApp.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		761780EC2CA45674006654EE /* AppDelegate.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = AppDelegate.mm; path = FlashcardsApp/AppDelegate.mm; sourceTree = "<group>"; };
-		761780EB2CA45674006654EF /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = main.m; path = FlashcardsApp/main.m; sourceTree = "<group>"; };
 		761780EA2CA45674006654EF /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AppDelegate.h; path = FlashcardsApp/AppDelegate.h; sourceTree = "<group>"; };
+		761780EB2CA45674006654EF /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = main.m; path = FlashcardsApp/main.m; sourceTree = "<group>"; };
+		761780EC2CA45674006654EE /* AppDelegate.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = AppDelegate.mm; path = FlashcardsApp/AppDelegate.mm; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = FlashcardsApp/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		AA000001AAAA000000000002 /* correct.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = correct.wav; path = FlashcardsApp/correct.wav; sourceTree = "<group>"; };
 		AA000001AAAA000000000004 /* correct2.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = correct2.wav; path = FlashcardsApp/correct2.wav; sourceTree = "<group>"; };
@@ -141,7 +141,6 @@
 				LastUpgradeCheck = 1210;
 				TargetAttributes = {
 					13B07F861A680F5B00A75B9A = {
-	
 					};
 				};
 			};
@@ -287,7 +286,6 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
 				PRODUCT_NAME = FlashcardsApp;
-
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Debug;
@@ -313,7 +311,6 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
 				PRODUCT_NAME = FlashcardsApp;
-
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Release;
