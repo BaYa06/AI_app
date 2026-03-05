@@ -2010,6 +2010,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     padding: spacing.m,
+    paddingBottom: spacing.m + 10,
     flexDirection: 'row',
     gap: spacing.m,
     borderTopWidth: 1,
