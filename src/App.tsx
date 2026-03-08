@@ -8,6 +8,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AppNavigator } from '@/navigation';
 import { LoadingSplash } from '@/components/common';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { DatabaseService, setupAutoSave, supabase, NeonService, setAnalyticsUserId, SyncQueueService } from '@/services';
 import { refreshPushToken, subscribeForegroundMessages } from '@/services/pushNotifications';
 import { useThemeColors, useSettingsStore } from '@/store';
@@ -375,6 +376,7 @@ export default function App() {
   } : undefined;
 
   return (
+    <ErrorBoundary>
     <SafeAreaProvider initialMetrics={webSafeAreaOverride}>
       <AppRoot
         isReady={appReady}
@@ -392,5 +394,6 @@ export default function App() {
         authStep={authStep}
       />
     </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }
