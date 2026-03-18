@@ -11,10 +11,9 @@ import {
   Pressable,
   Alert,
   Animated,
-  Easing,
-  Dimensions,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSetsStore, useCardsStore, useThemeColors, useSettingsStore, useCoursesStore } from '@/store';
 import { Text } from '@/components/common';
 import { spacing, borderRadius } from '@/constants';
@@ -62,10 +61,24 @@ export function SetEditorScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
   const theme = useSettingsStore((s) => s.resolvedTheme);
   const isEditing = !!setId;
-  const screenHeight = Dimensions.get('window').height;
-  const hiddenOffset = Math.min(screenHeight, 720);
-  const sheetTranslate = useRef(new Animated.Value(hiddenOffset)).current;
   const titleInputRef = useRef<TextInput>(null);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(16)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [fadeAnim, slideAnim]);
 
   // Store
   const getSet = useSetsStore((s) => s.getSet);
@@ -225,28 +238,9 @@ export function SetEditorScreen({ navigation, route }: Props) {
     setTargetPickerOpen(false);
   }, [targetLanguage]);
 
-  // Анимация появления/скрытия модального шита
-  useEffect(() => {
-    Animated.timing(sheetTranslate, {
-      toValue: 0,
-      duration: 220,
-      easing: Easing.out(Easing.ease),
-      useNativeDriver: true,
-    }).start();
-  }, [sheetTranslate]);
-
   const closeSheet = useCallback(() => {
-    Animated.timing(sheetTranslate, {
-      toValue: hiddenOffset,
-      duration: 180,
-      easing: Easing.in(Easing.ease),
-      useNativeDriver: true,
-    }).start(({ finished }) => {
-      if (finished) {
-        navigation.goBack();
-      }
-    });
-  }, [hiddenOffset, navigation, sheetTranslate]);
+    navigation.goBack();
+  }, [navigation]);
 
   const getCardsBySet = useCardsStore((s) => s.getCardsBySet);
 
@@ -400,35 +394,12 @@ export function SetEditorScreen({ navigation, route }: Props) {
   }, [setId, deleteCardsBySet, deleteSet, navigation]);
 
   return (
-    <View style={[styles.backdrop, { backgroundColor: 'transparent' }]}>
-      <View style={styles.safeArea}>
-        <Animated.View
-          style={[
-            styles.sheet,
-            {
-              backgroundColor: colors.background,
-              borderColor: colors.border,
-              shadowColor: colors.shadow,
-            },
-            { transform: [{ translateY: sheetTranslate }] },
-          ]}
-        >
-          <View style={styles.grabberContainer}>
-            <View style={[styles.grabber, { backgroundColor: colors.textTertiary }]} />
-          </View>
-
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <Animated.View style={[styles.animatedWrapper, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
           <View style={styles.headerRow}>
             <Text variant="h2" style={[styles.headerTitle, { color: colors.textPrimary }]}>
               {isEditing ? 'Редактировать набор' : 'Создать набор'}
             </Text>
-            <Pressable onPress={closeSheet} hitSlop={8}>
-              <Text
-                variant="body"
-                style={[styles.link, { color: colors.primary }]}
-              >
-                Отмена
-              </Text>
-            </Pressable>
           </View>
 
           <ScrollView
@@ -775,9 +746,8 @@ export function SetEditorScreen({ navigation, route }: Props) {
               </Text>
             </Pressable>
           </View>
-        </Animated.View>
-      </View>
-    </View>
+      </Animated.View>
+    </SafeAreaView>
   );
 }
 
@@ -1026,35 +996,12 @@ function CourseDropdown({
 // ==================== СТИЛИ ====================
 
 const styles = StyleSheet.create({
-  backdrop: {
+  container: {
     flex: 1,
-    justifyContent: 'flex-end',
   },
-  safeArea: {
+  animatedWrapper: {
     flex: 1,
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    height: '90%',
-    borderTopLeftRadius: borderRadius.xl,
-    borderTopRightRadius: borderRadius.xl,
     paddingHorizontal: spacing.l,
-    paddingTop: spacing.s,
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: -6 },
-    elevation: 10,
-    borderWidth: 1,
-  },
-  grabberContainer: {
-    alignItems: 'center',
-    paddingVertical: spacing.xs,
-  },
-  grabber: {
-    width: 50,
-    height: 5,
-    borderRadius: borderRadius.full,
-    opacity: 0.5,
   },
   headerRow: {
     flexDirection: 'row',

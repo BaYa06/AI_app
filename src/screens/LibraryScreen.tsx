@@ -30,8 +30,39 @@ import {
 } from '@/constants';
 import { Search, ArrowDownUp } from 'lucide-react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'react-native-svg';
 import { supabase } from '@/services/supabaseClient';
 import type { LibrarySet } from '@/types/library';
+
+// ---- Fade edge overlay for horizontal scroll ----
+const FADE_WIDTH = 24;
+
+function FadeEdge({ side, bgColor }: { side: 'left' | 'right'; bgColor: string }) {
+  const isLeft = side === 'left';
+  return (
+    <View
+      style={{
+        position: 'absolute',
+        [isLeft ? 'left' : 'right']: 0,
+        top: 0,
+        bottom: 0,
+        width: FADE_WIDTH,
+        zIndex: 1,
+      }}
+      pointerEvents="none"
+    >
+      <Svg width={FADE_WIDTH} height="100%">
+        <Defs>
+          <SvgLinearGradient id={`fade_${side}`} x1={isLeft ? '0' : '1'} y1="0" x2={isLeft ? '1' : '0'} y2="0">
+            <Stop offset="0" stopColor={bgColor} stopOpacity="1" />
+            <Stop offset="1" stopColor={bgColor} stopOpacity="0" />
+          </SvgLinearGradient>
+        </Defs>
+        <Rect x="0" y="0" width={FADE_WIDTH} height="100%" fill={`url(#fade_${side})`} />
+      </Svg>
+    </View>
+  );
+}
 
 // ---- Memoized Card Components ----
 
@@ -243,9 +274,8 @@ export function LibraryScreen() {
 
   return (
     <View style={[s.container, { backgroundColor: colors.background }]}>
-      {/* Sticky Header */}
-      <View style={[s.header, { backgroundColor: isDark ? colors.background : '#FFFFFF', borderBottomColor: colors.border }]}>
-        {/* Search Row */}
+      {/* Search Row */}
+      <View style={[s.header, { backgroundColor: isDark ? colors.background : '#FFFFFF', borderBottomColor: 'transparent' }]}>
         <View style={s.searchRow}>
           <View style={[s.searchWrap, { backgroundColor: colors.primary + '0A' }]}>
             <Search size={18} color={colors.primary} />
@@ -280,70 +310,81 @@ export function LibraryScreen() {
             <ArrowDownUp size={20} color={colors.primary} />
           </Pressable>
         </View>
+      </View>
 
+      {/* Filter Chips */}
+      <View style={[s.filtersContainer, { backgroundColor: isDark ? colors.background : '#FFFFFF', borderBottomColor: colors.border }]}>
         {/* Category Chips */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipsRow}>
-          {LIBRARY_CATEGORIES.map((cat) => {
-            const isActive = activeCategory === cat.key;
-            return (
-              <Pressable
-                key={cat.key}
-                style={[
-                  s.chip,
-                  isActive
-                    ? { backgroundColor: colors.primary }
-                    : { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 },
-                ]}
-                onPress={() => onCategoryPress(cat.key)}
-              >
-                <Text style={[s.chipText, { color: isActive ? '#FFFFFF' : colors.textPrimary }]}>
-                  {cat.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+        <View style={{ position: 'relative' }}>
+          <FadeEdge side="left" bgColor={isDark ? colors.background : '#FFFFFF'} />
+          <FadeEdge side="right" bgColor={isDark ? colors.background : '#FFFFFF'} />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipsRow}>
+            {LIBRARY_CATEGORIES.map((cat) => {
+              const isActive = activeCategory === cat.key;
+              return (
+                <Pressable
+                  key={cat.key}
+                  style={[
+                    s.chip,
+                    isActive
+                      ? { backgroundColor: colors.primary }
+                      : { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 },
+                  ]}
+                  onPress={() => onCategoryPress(cat.key)}
+                >
+                  <Text style={[s.chipText, { color: isActive ? '#FFFFFF' : colors.textPrimary }]}>
+                    {cat.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
 
         {/* Language + Card count Chips */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipsRow}>
-          {LIBRARY_LANGUAGES.map((lang) => {
-            const isActive = activeLang === lang.key;
-            return (
-              <Pressable
-                key={lang.key}
-                style={[
-                  s.langChip,
-                  isActive
-                    ? { backgroundColor: colors.primary + '15', borderColor: colors.primary }
-                    : { backgroundColor: colors.surface, borderColor: colors.border },
-                ]}
-                onPress={() => onLangPress(lang.key)}
-              >
-                <Text style={s.langFlag}>{lang.flag}</Text>
-                <Text style={[s.langLabel, { color: isActive ? colors.primary : colors.textPrimary }]}>{lang.label}</Text>
-              </Pressable>
-            );
-          })}
-          <View style={s.chipSeparator} />
-          {CARD_COUNT_RANGES.map((range) => {
-            const isActive = activeCardCount === range.key;
-            return (
-              <Pressable
-                key={range.key}
-                style={[
-                  s.langChip,
-                  isActive
-                    ? { backgroundColor: colors.primary + '15', borderColor: colors.primary }
-                    : { backgroundColor: colors.surface, borderColor: colors.border },
-                ]}
-                onPress={() => onCardCountPress(range.key)}
-              >
-                <Ionicons name="layers-outline" size={14} color={isActive ? colors.primary : colors.textSecondary} />
-                <Text style={[s.langLabel, { color: isActive ? colors.primary : colors.textPrimary }]}>{range.label}</Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+        <View style={{ position: 'relative' }}>
+          <FadeEdge side="left" bgColor={isDark ? colors.background : '#FFFFFF'} />
+          <FadeEdge side="right" bgColor={isDark ? colors.background : '#FFFFFF'} />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipsRow}>
+            {LIBRARY_LANGUAGES.map((lang) => {
+              const isActive = activeLang === lang.key;
+              return (
+                <Pressable
+                  key={lang.key}
+                  style={[
+                    s.langChip,
+                    isActive
+                      ? { backgroundColor: colors.primary + '15', borderColor: colors.primary }
+                      : { backgroundColor: colors.surface, borderColor: colors.border },
+                  ]}
+                  onPress={() => onLangPress(lang.key)}
+                >
+                  <Text style={s.langFlag}>{lang.flag}</Text>
+                  <Text style={[s.langLabel, { color: isActive ? colors.primary : colors.textPrimary }]}>{lang.label}</Text>
+                </Pressable>
+              );
+            })}
+            <View style={s.chipSeparator} />
+            {CARD_COUNT_RANGES.map((range) => {
+              const isActive = activeCardCount === range.key;
+              return (
+                <Pressable
+                  key={range.key}
+                  style={[
+                    s.langChip,
+                    isActive
+                      ? { backgroundColor: colors.primary + '15', borderColor: colors.primary }
+                      : { backgroundColor: colors.surface, borderColor: colors.border },
+                  ]}
+                  onPress={() => onCardCountPress(range.key)}
+                >
+                  <Ionicons name="layers-outline" size={14} color={isActive ? colors.primary : colors.textSecondary} />
+                  <Text style={[s.langLabel, { color: isActive ? colors.primary : colors.textPrimary }]}>{range.label}</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
       </View>
 
       {/* Content */}
@@ -448,7 +489,8 @@ export function LibraryScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1 },
-  header: { paddingHorizontal: spacing.m, paddingTop: spacing.m, paddingBottom: spacing.xs, borderBottomWidth: 1, gap: spacing.xs },
+  header: { paddingHorizontal: spacing.m, paddingTop: spacing.m, paddingBottom: spacing.xs, gap: spacing.xs },
+  filtersContainer: { paddingBottom: spacing.xs, borderBottomWidth: 1, gap: spacing.xs },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, marginBottom: spacing.xs },
   searchWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingHorizontal: spacing.s, paddingVertical: spacing.s, borderRadius: borderRadius.l },
   searchInput: { flex: 1, fontSize: 14, fontWeight: '500', padding: 0, margin: 0 },

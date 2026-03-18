@@ -19,3 +19,4 @@ export { SharedSetDetailScreen } from './SharedSetDetailScreen';
 export { PersonalInfoScreen } from './PersonalInfoScreen';
 export { SecurityScreen } from './SecurityScreen';
 export { SubscriptionScreen } from './SubscriptionScreen';
+export { TeacherStudentsScreen } from './TeacherStudentsScreen';

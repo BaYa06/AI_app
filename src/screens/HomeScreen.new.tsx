@@ -3,7 +3,7 @@
  * @description Главная страница с современным дизайном
  */
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { View, StyleSheet, ScrollView, Pressable, TextInput, useWindowDimensions, TextInput as RNTextInput, Modal, Platform, Animated, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable, TextInput, useWindowDimensions, TextInput as RNTextInput, Modal, Platform, Animated, Alert, Clipboard } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import type { PanGestureHandlerStateChangeEvent } from 'react-native-gesture-handler';
 import { useFocusEffect } from '@react-navigation/native';
@@ -37,9 +37,15 @@ import {
   ClipboardList,
   Type,
   ChevronRight,
+  UserPlus,
+  Sunrise,
+  Timer,
 } from 'lucide-react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import Svg, { Circle as SvgCircle } from 'react-native-svg';
 import { StreakService, getLocalDateKey } from '@/services/StreakService';
+import { supabase } from '@/services/supabaseClient';
+import { NeonService } from '@/services/NeonService';
 import type { DailyActivity } from '@/services/StreakService';
 
 export function HomeScreen({ navigation }: any) {
@@ -53,6 +59,7 @@ export function HomeScreen({ navigation }: any) {
   const modalTextPrimary = isDarkMode ? '#F8FAFC' : colors.textPrimary;
   const modalTextSecondary = isDarkMode ? '#A8B3C1' : colors.textSecondary;
   const modalHandleColor = isDarkMode ? '#4b5563' : '#cbd5e1';
+  const modalOverlayBg = isDarkMode ? 'rgba(0, 0, 0, 0.85)' : 'rgba(0, 0, 0, 0.5)';
   const drawerBackground = isDarkMode ? '#15192f' : colors.surface;
   const drawerBorder = isDarkMode ? 'rgba(255,255,255,0.08)' : colors.border;
   const [searchVisible, setSearchVisible] = useState(false);
@@ -74,6 +81,9 @@ export function HomeScreen({ navigation }: any) {
   const [deleteModalCourseId, setDeleteModalCourseId] = useState<string | null>(null);
   const [showStudyModeModal, setShowStudyModeModal] = useState(false);
   const [wordLimit, setWordLimit] = useState<'10' | '20' | '30' | 'all'>('10');
+  const [isTeacher, setIsTeacher] = useState<boolean | null>(null);
+  const [inviteModalCourseId, setInviteModalCourseId] = useState<string | null>(null);
+  const [inviteCopied, setInviteCopied] = useState(false);
   const editInputRef = useRef<RNTextInput>(null);
   const newCourseInputRef = useRef<RNTextInput>(null);
   const editModalInputRef = useRef<RNTextInput>(null);
@@ -99,6 +109,15 @@ export function HomeScreen({ navigation }: any) {
       });
     }
   }, [drawerOpen]);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      const userId = data.session?.user?.id;
+      if (userId) {
+        NeonService.getIsTeacher(userId).then(setIsTeacher);
+      }
+    });
+  }, []);
 
   const SWIPE_THRESHOLD = 50;
   const SWIPE_VELOCITY = 200;
@@ -435,6 +454,17 @@ export function HomeScreen({ navigation }: any) {
     return `Удалить курс "${deleteModalCourse.title}"?`;
   }, [deleteModalCourse, deleteModalHasSets, deleteModalStats, formatSetWord]);
 
+  const openInviteModal = useCallback((courseId: string) => {
+    setCourseMenuOpen(null);
+    setInviteCopied(false);
+    setInviteModalCourseId(courseId);
+  }, []);
+
+  const closeInviteModal = useCallback(() => {
+    setInviteModalCourseId(null);
+    setInviteCopied(false);
+  }, []);
+
   // Обработка удаления курса через модальное окно
   const openDeleteModal = useCallback((courseId: string) => {
     setCourseMenuOpen(null);
@@ -590,11 +620,11 @@ export function HomeScreen({ navigation }: any) {
           >
             <Search size={20} color={colors.textPrimary} />
           </Pressable>
-          <Pressable 
-            style={styles.iconButton}
+          <Pressable
+            style={styles.addButton}
             onPress={() => navigation?.navigate('SetEditor', {})}
           >
-            <Plus size={20} color={colors.textPrimary} />
+            <Plus size={18} color="#FFFFFF" strokeWidth={2.5} />
           </Pressable>
         </View>
       </View>
@@ -679,44 +709,125 @@ export function HomeScreen({ navigation }: any) {
           </View>
         ) : (
           <>
-            {/* Daily Summary Card */}
-            <View style={[styles.summaryCard, { backgroundColor: colors.primary }]}>
-              <View style={styles.summaryHeader}>
-                <Calendar size={24} color="#FFFFFF" style={{ marginRight: spacing.s }} />
-                <Text style={styles.summaryTitle}>Сегодня</Text>
+            {isTeacher === null ? null : isTeacher ? (
+              /* Teacher Mode Banner */
+              <View style={{ paddingHorizontal: spacing.m, paddingTop: spacing.m, paddingBottom: spacing.s }}>
+                <Pressable
+                  style={styles.teacherBanner}
+                  onPress={() => {
+                    if (activeCourseId) {
+                      navigation.navigate('TeacherCourseStats', {
+                        courseId: activeCourseId,
+                        courseTitle: activeCourseTitle || 'Курс',
+                      });
+                    }
+                  }}
+                >
+                  <View style={styles.teacherBannerLeft}>
+                    <View style={styles.teacherBannerIcon}>
+                      <Ionicons name="school-outline" size={22} color="#FFFFFF" />
+                    </View>
+                    <View>
+                      <Text style={styles.teacherBannerTitle}>Teacher Mode</Text>
+                      <Text style={styles.teacherBannerSubtitle}>Manage students & sets</Text>
+                    </View>
+                  </View>
+                  <View style={styles.teacherBannerButton}>
+                    <Text style={styles.teacherBannerButtonText}>My Classes →</Text>
+                  </View>
+                </Pressable>
               </View>
-              
-              <View style={styles.summaryStats}>
-                <View style={styles.statRow}>
-                  <BookOpen size={20} color="#FFFFFF" style={{ marginRight: spacing.s }} />
-                  <Text style={styles.statText}>Карточек на изучение: {dueCards}</Text>
-                </View>
-                <View style={styles.statRow}>
-                  <CheckCircle size={20} color="#FFFFFF" style={{ marginRight: spacing.s }} />
-                  <Text style={styles.statText}>Изучено сегодня: {cardsLearned}</Text>
-                </View>
-              </View>
+            ) : (
+              /* Challenges Section */
+              <View style={styles.challengesSection}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.challengesScrollContent}
+                  snapToInterval={136 + 12}
+                  decelerationRate="fast"
+                >
+                  {/* Challenge 1 */}
+                  <View style={[styles.challengeCard, { backgroundColor: '#7C3AED' }]}>
+                    <Text style={styles.challengeTitle}>Утреннее повторение</Text>
+                    <View style={styles.challengeBadge}>
+                      <Text style={styles.challengeBadgeText}>Новинка ⚡</Text>
+                    </View>
+                    <View style={styles.challengeProgressContainer}>
+                      <View style={styles.challengeRingWrapper}>
+                        <Svg width={64} height={64} style={{ transform: [{ rotate: '-90deg' }] }}>
+                          <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.2)" strokeWidth={4} fill="transparent" />
+                          <SvgCircle cx={32} cy={32} r={28} stroke="#FFFFFF" strokeWidth={4} fill="transparent" strokeDasharray={175.9} strokeDashoffset={175.9} strokeLinecap="round" />
+                        </Svg>
+                        <View style={styles.challengeIconOverlay}>
+                          <Sunrise size={28} color="#FFFFFF" />
+                        </View>
+                      </View>
+                      <Text style={styles.challengeProgressText}>0 из 3</Text>
+                    </View>
+                  </View>
 
-              <Pressable style={styles.startButton} onPress={() => {
-                if (dueCards > 0) {
-                  setShowStudyModeModal(true);
-                } else {
-                  Alert.alert('Все выучено!', 'Нет карточек для изучения. Добавьте новые слова или дождитесь повторения.');
-                }
-              }}>
-                <Text style={styles.startButtonText}>Начать изучение</Text>
-                <ArrowRight size={20} color="#FFFFFF" />
-              </Pressable>
-            </View>
+                  {/* Challenge 2 */}
+                  <View style={[styles.challengeCard, { backgroundColor: '#8B5CF6' }]}>
+                    <Text style={styles.challengeTitle}>Попробуй Match!</Text>
+                    <View style={styles.challengeBadge}>
+                      <Text style={styles.challengeBadgeText}>Новинка ⚡</Text>
+                    </View>
+                    <View style={styles.challengeProgressContainer}>
+                      <View style={styles.challengeRingWrapper}>
+                        <Svg width={64} height={64} style={{ transform: [{ rotate: '-90deg' }] }}>
+                          <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.2)" strokeWidth={4} fill="transparent" />
+                          <SvgCircle cx={32} cy={32} r={28} stroke="#FFFFFF" strokeWidth={4} fill="transparent" strokeDasharray={175.9} strokeDashoffset={140.7} strokeLinecap="round" />
+                        </Svg>
+                        <View style={styles.challengeIconOverlay}>
+                          <Puzzle size={28} color="#FFFFFF" />
+                        </View>
+                      </View>
+                      <Text style={styles.challengeProgressText}>1 из 5</Text>
+                    </View>
+                  </View>
+
+                  {/* Challenge 3 */}
+                  <View style={[styles.challengeCard, { backgroundColor: '#A78BFA' }]}>
+                    <Text style={styles.challengeTitle}>Марафон слов</Text>
+                    <View style={styles.challengeBadge}>
+                      <Text style={styles.challengeBadgeText}>Новинка ⚡</Text>
+                    </View>
+                    <View style={styles.challengeProgressContainer}>
+                      <View style={styles.challengeRingWrapper}>
+                        <Svg width={64} height={64} style={{ transform: [{ rotate: '-90deg' }] }}>
+                          <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.2)" strokeWidth={4} fill="transparent" />
+                          <SvgCircle cx={32} cy={32} r={28} stroke="#FFFFFF" strokeWidth={4} fill="transparent" strokeDasharray={175.9} strokeDashoffset={175.9} strokeLinecap="round" />
+                        </Svg>
+                        <View style={styles.challengeIconOverlay}>
+                          <Timer size={28} color="#FFFFFF" />
+                        </View>
+                      </View>
+                      <Text style={styles.challengeProgressText}>0 из 10</Text>
+                    </View>
+                  </View>
+                </ScrollView>
+
+                <View style={styles.allChallengesButtonContainer}>
+                  <Pressable style={styles.allChallengesButton}>
+                    <Text style={styles.allChallengesButtonText}>Учить все карточки</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
 
             {/* Section Header */}
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
                 {activeCourseId === null ? 'Мои наборы' : activeCourseTitle}
               </Text>
-              <Pressable>
-                <Text style={[styles.viewAllButton, { color: colors.primary }]}>Посмотреть все</Text>
-              </Pressable>
+              {!isTeacher && (
+                <Pressable>
+                  <Text style={[styles.viewAllButton, { color: colors.primary }]}>
+                    Посмотреть все
+                  </Text>
+                </Pressable>
+              )}
             </View>
 
           <View style={styles.setsList}>
@@ -1067,6 +1178,21 @@ export function HomeScreen({ navigation }: any) {
                             },
                           ]}
                         >
+                          {isTeacher && (
+                            <Pressable
+                              style={({ pressed }) => [
+                                styles.courseMenuItem,
+                                pressed && { backgroundColor: colors.border },
+                              ]}
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                openInviteModal(course.id);
+                              }}
+                            >
+                              <UserPlus size={16} color={colors.primary} style={{ marginRight: spacing.s }} />
+                              <Text style={[styles.courseMenuText, { color: colors.primary }]}>Добавить</Text>
+                            </Pressable>
+                          )}
                           <Pressable
                             style={({ pressed }) => [
                               styles.courseMenuItem,
@@ -1120,7 +1246,7 @@ export function HomeScreen({ navigation }: any) {
         onRequestClose={cancelCourseEdit}
       >
         <Pressable
-          style={styles.modalOverlay}
+          style={[styles.modalOverlay, { backgroundColor: modalOverlayBg }]}
           onPress={cancelCourseEdit}
         >
           <Pressable
@@ -1191,7 +1317,7 @@ export function HomeScreen({ navigation }: any) {
         animationType="fade"
         onRequestClose={closeDeleteModal}
       >
-        <Pressable style={styles.modalOverlay} onPress={closeDeleteModal}>
+        <Pressable style={[styles.modalOverlay, { backgroundColor: modalOverlayBg }]} onPress={closeDeleteModal}>
           <Pressable
             style={[
               styles.editModalContent,
@@ -1249,6 +1375,82 @@ export function HomeScreen({ navigation }: any) {
                 </Text>
               </Pressable>
             </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Invite Students Modal */}
+      <Modal
+        visible={inviteModalCourseId !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={closeInviteModal}
+      >
+        <Pressable style={[styles.modalOverlay, { backgroundColor: modalOverlayBg }]} onPress={closeInviteModal}>
+          <Pressable
+            style={[
+              styles.editModalContent,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.editModalHeader}>
+              <Text style={[styles.editModalTitle, { color: colors.textPrimary }]}>Пригласить учеников</Text>
+              <Pressable onPress={closeInviteModal}>
+                <X size={20} color={colors.textSecondary} />
+              </Pressable>
+            </View>
+
+            <Text style={[styles.inviteDescription, { color: colors.textSecondary }]}>
+              Отправьте эту ссылку своим ученикам — они смогут присоединиться к курсу и начать изучение.
+            </Text>
+
+            <Pressable
+              style={[
+                styles.inviteLinkBox,
+                { backgroundColor: colors.surfaceVariant || colors.border, borderColor: colors.border },
+              ]}
+              onLongPress={() => {
+                const link = `${typeof window !== 'undefined' ? window.location.origin : 'https://flashly.app'}/join/${inviteModalCourseId}`;
+                if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
+                  navigator.clipboard.writeText(link);
+                } else {
+                  Clipboard.setString(link);
+                }
+                setInviteCopied(true);
+              }}
+            >
+              <Text
+                style={[styles.inviteLinkText, { color: colors.primary }]}
+                numberOfLines={1}
+                selectable
+              >
+                {`${typeof window !== 'undefined' ? window.location.origin : 'https://flashly.app'}/join/${inviteModalCourseId}`}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={[
+                styles.editModalButton,
+                styles.editModalButtonPrimary,
+                inviteCopied
+                  ? { backgroundColor: colors.success ?? '#10B981', width: '100%' }
+                  : { backgroundColor: colors.primary, width: '100%' },
+              ]}
+              onPress={() => {
+                const link = `${typeof window !== 'undefined' ? window.location.origin : 'https://flashly.app'}/join/${inviteModalCourseId}`;
+                if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
+                  navigator.clipboard.writeText(link);
+                } else {
+                  Clipboard.setString(link);
+                }
+                setInviteCopied(true);
+              }}
+            >
+              <Text style={[styles.editModalButtonText, { color: '#FFFFFF' }]}>
+                {inviteCopied ? '✓ Скопировано' : 'Копировать'}
+              </Text>
+            </Pressable>
           </Pressable>
         </Pressable>
       </Modal>
@@ -1714,6 +1916,14 @@ const styles = StyleSheet.create({
   iconButton: {
     padding: spacing.xs,
   },
+  addButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgb(52, 56, 255)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   // Search
   searchBar: {
     paddingHorizontal: spacing.m,
@@ -1743,48 +1953,129 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl,
   },
 
-  // Summary Card
-  summaryCard: {
-    margin: spacing.m,
-    padding: spacing.l,
-    borderRadius: borderRadius.l,
+  // Challenges Section
+  challengesSection: {
+    paddingTop: spacing.m,
+    paddingBottom: spacing.s,
   },
-  summaryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  challengesSectionTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    paddingHorizontal: spacing.m,
     marginBottom: spacing.m,
   },
-
-  summaryTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#FFFFFF',
+  challengesScrollContent: {
+    paddingHorizontal: spacing.m,
+    gap: 12,
   },
-  summaryStats: {
-    marginBottom: spacing.l,
-  },
-  statRow: {
-    flexDirection: 'row',
+  challengeCard: {
+    width: 136,
+    height: 200,
+    borderRadius: 24,
+    padding: 16,
     alignItems: 'center',
-    marginBottom: spacing.s,
-  },
-
-  statText: {
-    fontSize: 16,
-    color: '#FFFFFF',
-  },
-  startButton: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    padding: spacing.m,
-    borderRadius: borderRadius.m,
   },
-  startButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+  challengeTitle: {
+    fontSize: 13,
+    fontWeight: '700',
     color: '#FFFFFF',
+    textAlign: 'center',
+    lineHeight: 17,
+  },
+  challengeBadge: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
+  challengeBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  challengeProgressContainer: {
+    alignItems: 'center',
+  },
+  challengeRingWrapper: {
+    width: 64,
+    height: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  challengeIconOverlay: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  challengeProgressText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#FFFFFF',
+    marginTop: 4,
+  },
+  allChallengesButtonContainer: {
+    paddingHorizontal: spacing.m,
+    marginTop: spacing.l,
+  },
+  allChallengesButton: {
+    width: '100%',
+    height: 48,
+    backgroundColor: '#7C3AED',
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 0,
+  },
+  allChallengesButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+
+  // Teacher Mode Banner
+  teacherBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: 20,
+    padding: 16,
+    backgroundColor: 'rgb(52, 56, 255)',
+    shadowColor: '#1317ec',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  teacherBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  teacherBannerIcon: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    padding: 8,
+    borderRadius: 10,
+  },
+  teacherBannerTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  teacherBannerSubtitle: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+  },
+  teacherBannerButton: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  teacherBannerButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: 'rgb(52, 56, 255)',
   },
 
   // Section Header
@@ -2312,6 +2603,23 @@ const styles = StyleSheet.create({
   editModalButtonText: {
     fontSize: 15,
     fontWeight: '700',
+  },
+  inviteDescription: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: spacing.m,
+  },
+  inviteLinkBox: {
+    borderRadius: borderRadius.m,
+    borderWidth: 1,
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.m,
+    marginBottom: spacing.l,
+  },
+  inviteLinkText: {
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
   deleteModalMessage: {
     fontSize: 15,

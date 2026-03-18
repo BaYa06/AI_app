@@ -104,6 +104,8 @@ export type RootStackParamList = {
   NotificationSettings: undefined;
   Settings: undefined;
   Search: undefined;
+  TeacherCourseStats: { courseId: string; courseTitle: string };
+  TeacherStudents: { courseId: string; courseTitle: string };
 };
 
 // ==================== MAIN TABS ====================

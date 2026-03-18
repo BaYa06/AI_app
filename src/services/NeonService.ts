@@ -95,6 +95,24 @@ export const NeonService = {
   },
 
   /**
+   * Проверить, является ли пользователь учителем
+   */
+  async getIsTeacher(userId: string): Promise<boolean> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) return false;
+      const sql = neon(connectionString);
+      const rows = await sql`
+        SELECT teacher FROM users WHERE id = ${userId}::uuid
+      `;
+      return rows[0]?.teacher === true;
+    } catch (error) {
+      console.error('Failed to get teacher status:', error);
+      return false;
+    }
+  },
+
+  /**
    * Получить user_name пользователя
    */
   async getUserName(userId: string): Promise<string | null> {

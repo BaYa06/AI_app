@@ -3,7 +3,9 @@
  * @description Экран детали набора карточек
  */
 import React, { useCallback, useMemo, useState, useRef, useEffect } from 'react';
-import { View, FlatList, StyleSheet, Pressable, TextInput, ScrollView, ActivityIndicator, Platform, Alert, KeyboardAvoidingView } from 'react-native';
+import { View, FlatList, StyleSheet, Pressable, TextInput, ScrollView, ActivityIndicator, Platform, Alert, KeyboardAvoidingView, Modal, Dimensions } from 'react-native';
+import { triggerHaptic } from '@/utils/haptic';
+import { BlurView } from '@/utils/BlurView';
 import DocumentPicker from 'react-native-document-picker';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useSetsStore, useCardsStore, useThemeColors, selectSetStats, useSettingsStore } from '@/store';
@@ -70,6 +72,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
   const [showStudySheet, setShowStudySheet] = useState(false);
   const [onlyHard, setOnlyHard] = useState(false);
   const [showMnemonic, setShowMnemonic] = useState(true);
+  const [previewCard, setPreviewCard] = useState<Card | null>(null);
   const [wordLimit, setWordLimit] = useState<'10' | '20' | '30' | 'all'>(() => {
     const limit = userSettings.studyCardLimit;
     if (limit === null) return 'all';
@@ -746,7 +749,12 @@ export function SetDetailScreen({ navigation, route }: Props) {
   // Рендер карточки в списке
   const renderCard = useCallback(
     ({ item }: { item: Card }) => (
-      <View
+      <Pressable
+        onLongPress={() => {
+          triggerHaptic('selection');
+          setPreviewCard(item);
+        }}
+        delayLongPress={300}
         style={[
           styles.cardItem,
           {
@@ -761,18 +769,16 @@ export function SetDetailScreen({ navigation, route }: Props) {
               styles.statusBadge,
               {
                 backgroundColor:
-                  // Галочка только если nextReview в будущем (выучено)
                   item.nextReviewDate > Date.now()
-                    ? 'rgba(16, 185, 129, 0.15)' 
+                    ? 'rgba(16, 185, 129, 0.15)'
                     : 'rgba(148, 163, 184, 0.15)',
                 borderColor:
                   item.nextReviewDate > Date.now()
-                    ? 'rgba(16, 185, 129, 0.3)' 
+                    ? 'rgba(16, 185, 129, 0.3)'
                     : colors.border,
               },
             ]}
           >
-            {/* Галочка показывается только если выучено (nextReview > сейчас) */}
             {item.nextReviewDate > Date.now() ? (
               <Check size={16} color={colors.success} strokeWidth={2.5} />
             ) : (
@@ -804,7 +810,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
         <Pressable hitSlop={8} style={styles.menuButton} onPress={() => setActionCardId(item.id)}>
           <MoreHorizontal size={18} color={colors.textTertiary} />
         </Pressable>
-      </View>
+      </Pressable>
     ),
     [colors, handleEditCard]
   );
@@ -1749,6 +1755,71 @@ export function SetDetailScreen({ navigation, route }: Props) {
         </View>
       )}
 
+      {/* Card Preview Modal */}
+      <Modal
+        visible={previewCard !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreviewCard(null)}
+      >
+        <Pressable style={styles.previewOverlay} onPress={() => setPreviewCard(null)}>
+          {Platform.OS === 'web' ? (
+            <View
+              style={[
+                styles.previewCard,
+                {
+                  backgroundColor: theme === 'dark' ? 'rgba(30,32,48,0.75)' : 'rgba(255,255,255,0.7)',
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <View style={styles.previewFrontSection}>
+                <Text style={[styles.previewFrontText, { color: colors.textPrimary }]}>
+                  {previewCard?.frontText ?? (previewCard as any)?.front}
+                </Text>
+              </View>
+              <View style={[styles.previewDivider, { backgroundColor: colors.border }]} />
+              <View style={styles.previewBackSection}>
+                <Text style={[styles.previewBackText, { color: colors.textSecondary }]}>
+                  {previewCard?.backText ?? (previewCard as any)?.back}
+                </Text>
+                {previewCard?.example ? (
+                  <Text style={[styles.previewExample, { color: colors.textTertiary }]}>
+                    {previewCard.example}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+          ) : (
+            <BlurView
+              blurType={theme === 'dark' ? 'dark' : 'xlight'}
+              blurAmount={24}
+              style={[
+                styles.previewCard,
+                { borderColor: colors.border },
+              ]}
+            >
+              <View style={styles.previewFrontSection}>
+                <Text style={[styles.previewFrontText, { color: colors.textPrimary }]}>
+                  {previewCard?.frontText ?? (previewCard as any)?.front}
+                </Text>
+              </View>
+              <View style={[styles.previewDivider, { backgroundColor: colors.border }]} />
+              <View style={styles.previewBackSection}>
+                <Text style={[styles.previewBackText, { color: colors.textSecondary }]}>
+                  {previewCard?.backText ?? (previewCard as any)?.back}
+                </Text>
+                {previewCard?.example ? (
+                  <Text style={[styles.previewExample, { color: colors.textTertiary }]}>
+                    {previewCard.example}
+                  </Text>
+                ) : null}
+              </View>
+            </BlurView>
+          )}
+        </Pressable>
+      </Modal>
+
     </Container>
   );
 }
@@ -2359,5 +2430,66 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xs,
+  },
+
+  // Card Preview Modal
+  previewOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+  previewCard: {
+    width: Math.min(340, Dimensions.get('window').width - 48),
+    borderRadius: 24,
+    borderWidth: 1,
+    overflow: 'hidden',
+    ...Platform.select({
+      web: {
+        boxShadow: '0 16px 48px rgba(0,0,0,0.25)',
+        backdropFilter: 'blur(40px)',
+        WebkitBackdropFilter: 'blur(40px)',
+      },
+    }) as any,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 12,
+  },
+  previewFrontSection: {
+    padding: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 140,
+  },
+  previewFrontText: {
+    fontSize: 28,
+    fontWeight: '700',
+    textAlign: 'center',
+    letterSpacing: -0.5,
+  },
+  previewDivider: {
+    height: 1,
+    marginHorizontal: 24,
+  },
+  previewBackSection: {
+    padding: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 120,
+    gap: 12,
+  },
+  previewBackText: {
+    fontSize: 22,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  previewExample: {
+    fontSize: 15,
+    fontWeight: '400',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 });

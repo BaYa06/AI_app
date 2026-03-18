@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
   email VARCHAR(255) UNIQUE,
   display_name VARCHAR(255),
   is_anonymous BOOLEAN DEFAULT true,
+  teacher BOOLEAN DEFAULT false,
   created_at TIMESTAMP DEFAULT NOW(),
   settings JSONB DEFAULT '{
     "dailyGoal": 20,

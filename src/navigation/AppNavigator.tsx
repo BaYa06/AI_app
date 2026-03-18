@@ -2,74 +2,38 @@
  * App Navigator
  * @description Главный навигатор приложения
  */
-import React, { Suspense, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Platform, ActivityIndicator, View } from 'react-native';
-import { NavigationContainer, type LinkingOptions, useNavigationContainerRef } from '@react-navigation/native';
+import React, { useEffect, useMemo } from 'react';
+import { Platform } from 'react-native';
+import { NavigationContainer, useNavigationContainerRef, type LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useThemeColors } from '@/store';
 import type { RootStackParamList, MainTabParamList } from '@/types/navigation';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
-// Eager — основные табы (нужны сразу)
+// Экраны
 import { HomeScreen } from '@/screens/HomeScreen.new';
 import { LibraryScreen } from '@/screens/LibraryScreen';
-import { StudyPlaceholderScreen } from '@/screens/StudyPlaceholderScreen';
+import { StatisticsScreen } from '@/screens/StatisticsScreen';
 import { ProfileScreen } from '@/screens/ProfileScreen';
 import { SetDetailScreen } from '@/screens/SetDetailScreen';
-
-// Lazy — вторичные экраны (загружаются по необходимости)
-const StatisticsScreen = React.lazy(() => import('@/screens/StatisticsScreen').then(m => ({ default: m.StatisticsScreen })));
-const StudyResultsScreen = React.lazy(() => import('@/screens/StudyResultsScreen').then(m => ({ default: m.StudyResultsScreen })));
-const CardEditorScreen = React.lazy(() => import('@/screens/CardEditorScreen').then(m => ({ default: m.CardEditorScreen })));
-const SetEditorScreen = React.lazy(() => import('@/screens/SetEditorScreen').then(m => ({ default: m.SetEditorScreen })));
-const MatchScreen = React.lazy(() => import('@/screens/MatchScreen').then(m => ({ default: m.MatchScreen })));
-const MultipleChoiceScreen = React.lazy(() => import('@/screens/MultipleChoiceScreen').then(m => ({ default: m.MultipleChoiceScreen })));
-const WordBuilderScreen = React.lazy(() => import('@/screens/WordBuilderScreen').then(m => ({ default: m.WordBuilderScreen })));
-const AudioLearningScreen = React.lazy(() => import('@/screens/AudioLearningScreen').then(m => ({ default: m.AudioLearningScreen })));
-const StudyScreen = React.lazy(() => import('@/screens/StudyScreen').then(m => ({ default: m.StudyScreen })));
-const AchievementsScreen = React.lazy(() => import('@/screens/AchievementsScreen').then(m => ({ default: m.AchievementsScreen })));
-const NotificationSettingsScreen = React.lazy(() => import('@/screens/NotificationSettingsScreen').then(m => ({ default: m.NotificationSettingsScreen })));
-const LibrarySetDetailScreen = React.lazy(() => import('@/screens/LibrarySetDetailScreen').then(m => ({ default: m.LibrarySetDetailScreen })));
-const MyPublicationsScreen = React.lazy(() => import('@/screens/MyPublicationsScreen').then(m => ({ default: m.MyPublicationsScreen })));
-const PersonalInfoScreen = React.lazy(() => import('@/screens/PersonalInfoScreen').then(m => ({ default: m.PersonalInfoScreen })));
-const SecurityScreen = React.lazy(() => import('@/screens/SecurityScreen').then(m => ({ default: m.SecurityScreen })));
-const SubscriptionScreen = React.lazy(() => import('@/screens/SubscriptionScreen').then(m => ({ default: m.SubscriptionScreen })));
-
-function LazyFallback() {
-  return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-      <ActivityIndicator size="small" />
-    </View>
-  );
-}
-
-function withSuspense<P extends object>(LazyComponent: React.LazyExoticComponent<React.ComponentType<P>>) {
-  return function SuspenseWrapper(props: P) {
-    return (
-      <Suspense fallback={<LazyFallback />}>
-        <LazyComponent {...props} />
-      </Suspense>
-    );
-  };
-}
-
-const LazyStatisticsScreen = withSuspense(StatisticsScreen);
-const LazyStudyResultsScreen = withSuspense(StudyResultsScreen);
-const LazyCardEditorScreen = withSuspense(CardEditorScreen);
-const LazySetEditorScreen = withSuspense(SetEditorScreen);
-const LazyMatchScreen = withSuspense(MatchScreen);
-const LazyMultipleChoiceScreen = withSuspense(MultipleChoiceScreen);
-const LazyWordBuilderScreen = withSuspense(WordBuilderScreen);
-const LazyAudioLearningScreen = withSuspense(AudioLearningScreen);
-const LazyStudyScreen = withSuspense(StudyScreen);
-const LazyAchievementsScreen = withSuspense(AchievementsScreen);
-const LazyNotificationSettingsScreen = withSuspense(NotificationSettingsScreen);
-const LazyLibrarySetDetailScreen = withSuspense(LibrarySetDetailScreen);
-const LazyMyPublicationsScreen = withSuspense(MyPublicationsScreen);
-const LazyPersonalInfoScreen = withSuspense(PersonalInfoScreen);
-const LazySecurityScreen = withSuspense(SecurityScreen);
-const LazySubscriptionScreen = withSuspense(SubscriptionScreen);
+import { StudyResultsScreen } from '@/screens/StudyResultsScreen';
+import { CardEditorScreen } from '@/screens/CardEditorScreen';
+import { SetEditorScreen } from '@/screens/SetEditorScreen';
+import { MatchScreen } from '@/screens/MatchScreen';
+import { MultipleChoiceScreen } from '@/screens/MultipleChoiceScreen';
+import { WordBuilderScreen } from '@/screens/WordBuilderScreen';
+import { StudyScreen } from '@/screens/StudyScreen';
+import { StudyPlaceholderScreen } from '@/screens/StudyPlaceholderScreen';
+import { AchievementsScreen } from '@/screens/AchievementsScreen';
+import { NotificationSettingsScreen } from '@/screens/NotificationSettingsScreen';
+import { LibrarySetDetailScreen } from '@/screens/LibrarySetDetailScreen';
+import { MyPublicationsScreen } from '@/screens/MyPublicationsScreen';
+import { PersonalInfoScreen } from '@/screens/PersonalInfoScreen';
+import { SecurityScreen } from '@/screens/SecurityScreen';
+import { SubscriptionScreen } from '@/screens/SubscriptionScreen';
+import { TeacherCourseStatsScreen } from '@/screens/TeacherCourseStatsScreen';
+import { TeacherStudentsScreen } from '@/screens/TeacherStudentsScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -142,7 +106,7 @@ function MainTabs() {
       />
       <Tab.Screen
         name="Statistics"
-        component={LazyStatisticsScreen}
+        component={StatisticsScreen}
         options={{
           tabBarIcon: ({ color }) => <Ionicons name="stats-chart" size={31} color={color} />,
         }}
@@ -248,27 +212,22 @@ export function AppNavigator() {
         />
         <Stack.Screen
           name="Match"
-          component={LazyMatchScreen}
+          component={MatchScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="MultipleChoice"
-          component={LazyMultipleChoiceScreen}
+          component={MultipleChoiceScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="WordBuilder"
-          component={LazyWordBuilderScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="AudioLearning"
-          component={LazyAudioLearningScreen}
+          component={WordBuilderScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="Study"
-          component={LazyStudyScreen}
+          component={StudyScreen}
           options={{
             title: 'Изучение',
             headerShown: false,
@@ -277,7 +236,7 @@ export function AppNavigator() {
         />
         <Stack.Screen
           name="StudyResults"
-          component={LazyStudyResultsScreen}
+          component={StudyResultsScreen}
           options={{
             title: 'Результаты',
             headerShown: false,
@@ -286,17 +245,17 @@ export function AppNavigator() {
         />
         <Stack.Screen
           name="CardEditor"
-          component={LazyCardEditorScreen}
+          component={CardEditorScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="Achievements"
-          component={LazyAchievementsScreen}
+          component={AchievementsScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="NotificationSettings"
-          component={LazyNotificationSettingsScreen}
+          component={NotificationSettingsScreen}
           options={{
             headerShown: false,
             animation: 'slide_from_right',
@@ -305,40 +264,44 @@ export function AppNavigator() {
         />
         <Stack.Screen
           name="LibrarySetDetail"
-          component={LazyLibrarySetDetailScreen}
+          component={LibrarySetDetailScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="MyPublications"
-          component={LazyMyPublicationsScreen}
+          component={MyPublicationsScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="PersonalInfo"
-          component={LazyPersonalInfoScreen}
+          component={PersonalInfoScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="Security"
-          component={LazySecurityScreen}
+          component={SecurityScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="Subscription"
-          component={LazySubscriptionScreen}
+          component={SubscriptionScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="TeacherCourseStats"
+          component={TeacherCourseStatsScreen}
+          options={{ headerShown: false, animation: 'slide_from_left', animationDuration: 280 }}
+        />
+        <Stack.Screen
+          name="TeacherStudents"
+          component={TeacherStudentsScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen
           name="SetEditor"
-          component={LazySetEditorScreen}
+          component={SetEditorScreen}
           options={{
             headerShown: false,
-            presentation: 'transparentModal',
-            animation: 'slide_from_bottom',
-            contentStyle: { backgroundColor: 'transparent' },
-            ...(Platform.OS === 'android' && {
-              animation: 'fade',
-            }),
           }}
         />
       </Stack.Navigator>
