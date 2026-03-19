@@ -30,6 +30,25 @@ export function SignInScreen({ onBack, onSendCode, onCreateAccount }: Props) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const getParamFromCallbackUrl = useCallback((rawUrl: string, name: string): string | null => {
+    if (!rawUrl || !name) {
+      return null;
+    }
+
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const queryOrHashPattern = new RegExp(`[?#&]${escapedName}=([^&#]*)`);
+    const match = rawUrl.match(queryOrHashPattern);
+    if (!match?.[1]) {
+      return null;
+    }
+
+    try {
+      return decodeURIComponent(match[1].replace(/\+/g, ' '));
+    } catch {
+      return match[1];
+    }
+  }, []);
+
   const signInWithGoogle = useCallback(async () => {
     setError(null);
     setIsLoading(true);
@@ -78,11 +97,9 @@ export function SignInScreen({ onBack, onSendCode, onCreateAccount }: Props) {
             ephemeralWebSession: true,
           });
           if (result.type === 'success' && result.url) {
-            const url = new URL(result.url);
-            // Check both search params and hash params (Supabase may use either)
-            const code =
-              url.searchParams.get('code') ||
-              new URLSearchParams(url.hash.replace('#', '?')).get('code');
+            // Use string-based parsing instead of URL API: some iOS callback URLs
+            // may be non-standard/relative and crash URL parsing in RN runtimes.
+            const code = getParamFromCallbackUrl(result.url, 'code');
 
             if (code) {
               const { error: exchangeError } =
@@ -93,9 +110,7 @@ export function SignInScreen({ onBack, onSendCode, onCreateAccount }: Props) {
               }
             } else {
               // Check for error in callback
-              const errorDesc =
-                url.searchParams.get('error_description') ||
-                new URLSearchParams(url.hash.replace('#', '?')).get('error_description');
+              const errorDesc = getParamFromCallbackUrl(result.url, 'error_description');
               console.error('[auth] No code in callback URL:', result.url);
               setError(errorDesc || 'Не удалось получить код авторизации');
             }
