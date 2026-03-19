@@ -35,6 +35,25 @@ export function EmailAuthScreen({ onBack }: Props) {
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
+  const getParamFromCallbackUrl = useCallback((rawUrl: string, name: string): string | null => {
+    if (!rawUrl || !name) {
+      return null;
+    }
+
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const queryOrHashPattern = new RegExp(`[?#&]${escapedName}=([^&#]*)`);
+    const match = rawUrl.match(queryOrHashPattern);
+    if (!match?.[1]) {
+      return null;
+    }
+
+    try {
+      return decodeURIComponent(match[1].replace(/\+/g, ' '));
+    } catch {
+      return match[1];
+    }
+  }, []);
+
   /**
    * Triggers the Supabase OAuth flow in the system browser.
    * Supabase handles PKCE + code exchange and will deliver the session back via the deep link redirect URI.
@@ -86,11 +105,19 @@ export function EmailAuthScreen({ onBack }: Props) {
             ephemeralWebSession: false,
           });
           if (result.type === 'success' && result.url) {
-            // OAuth code exchange is handled centrally in App.tsx deep-link listener.
-            const errorMatch = result.url.match(/[?&#]error_description=([^&#]+)/);
-            const errorDesc = errorMatch?.[1] ? decodeURIComponent(errorMatch[1].replace(/\+/g, ' ')) : null;
-            if (errorDesc) {
-              setAuthError(errorDesc);
+            // Some iOS flows do not emit a Linking event; exchange here as a fallback.
+            const code = getParamFromCallbackUrl(result.url, 'code');
+            if (code) {
+              const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+              if (exchangeError) {
+                console.error('[auth] Code exchange failed:', exchangeError.message);
+                setAuthError(exchangeError.message);
+              }
+            } else {
+              const errorDesc = getParamFromCallbackUrl(result.url, 'error_description');
+              if (errorDesc) {
+                setAuthError(errorDesc);
+              }
             }
           }
         } else {

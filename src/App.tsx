@@ -300,6 +300,12 @@ export default function App() {
 
     const handleUrl = async (url: string) => {
       try {
+        const existingSession = await supabase.auth.getSession();
+        if (existingSession.data.session) {
+          console.log('[auth] Session already established, skipping deep-link exchange');
+          return;
+        }
+
         // Parse the authorization code from query or hash.
         const code = getParamFromUrl(url, 'code');
 

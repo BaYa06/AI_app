@@ -97,11 +97,19 @@ export function SignInScreen({ onBack, onSendCode, onCreateAccount }: Props) {
             ephemeralWebSession: true,
           });
           if (result.type === 'success' && result.url) {
-            // OAuth code exchange is handled centrally in App.tsx deep-link listener.
-            // Here we only surface explicit callback errors.
-            const errorDesc = getParamFromCallbackUrl(result.url, 'error_description');
-            if (errorDesc) {
-              setError(errorDesc);
+            // Some iOS flows do not emit a Linking event; exchange here as a fallback.
+            const code = getParamFromCallbackUrl(result.url, 'code');
+            if (code) {
+              const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+              if (exchangeError) {
+                console.error('[auth] Code exchange failed:', exchangeError.message);
+                setError(exchangeError.message);
+              }
+            } else {
+              const errorDesc = getParamFromCallbackUrl(result.url, 'error_description');
+              if (errorDesc) {
+                setError(errorDesc);
+              }
             }
           }
         } else {
