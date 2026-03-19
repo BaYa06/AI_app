@@ -97,22 +97,11 @@ export function SignInScreen({ onBack, onSendCode, onCreateAccount }: Props) {
             ephemeralWebSession: true,
           });
           if (result.type === 'success' && result.url) {
-            // Use string-based parsing instead of URL API: some iOS callback URLs
-            // may be non-standard/relative and crash URL parsing in RN runtimes.
-            const code = getParamFromCallbackUrl(result.url, 'code');
-
-            if (code) {
-              const { error: exchangeError } =
-                await supabase.auth.exchangeCodeForSession(code);
-              if (exchangeError) {
-                console.error('[auth] Code exchange failed:', exchangeError.message);
-                setError(exchangeError.message);
-              }
-            } else {
-              // Check for error in callback
-              const errorDesc = getParamFromCallbackUrl(result.url, 'error_description');
-              console.error('[auth] No code in callback URL:', result.url);
-              setError(errorDesc || 'Не удалось получить код авторизации');
+            // OAuth code exchange is handled centrally in App.tsx deep-link listener.
+            // Here we only surface explicit callback errors.
+            const errorDesc = getParamFromCallbackUrl(result.url, 'error_description');
+            if (errorDesc) {
+              setError(errorDesc);
             }
           }
         } else {

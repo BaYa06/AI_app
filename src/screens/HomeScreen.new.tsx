@@ -84,6 +84,10 @@ export function HomeScreen({ navigation }: any) {
   const [isTeacher, setIsTeacher] = useState<boolean | null>(null);
   const [inviteModalCourseId, setInviteModalCourseId] = useState<string | null>(null);
   const [inviteCopied, setInviteCopied] = useState(false);
+  const inviteBaseUrl =
+    Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.origin
+      ? window.location.origin
+      : 'https://flashly.app';
   const editInputRef = useRef<RNTextInput>(null);
   const newCourseInputRef = useRef<RNTextInput>(null);
   const editModalInputRef = useRef<RNTextInput>(null);
@@ -1411,7 +1415,7 @@ export function HomeScreen({ navigation }: any) {
                 { backgroundColor: colors.surfaceVariant || colors.border, borderColor: colors.border },
               ]}
               onLongPress={() => {
-                const link = `${typeof window !== 'undefined' ? window.location.origin : 'https://flashly.app'}/join/${inviteModalCourseId}`;
+                const link = `${inviteBaseUrl}/join/${inviteModalCourseId}`;
                 if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
                   navigator.clipboard.writeText(link);
                 } else {
@@ -1425,7 +1429,7 @@ export function HomeScreen({ navigation }: any) {
                 numberOfLines={1}
                 selectable
               >
-                {`${typeof window !== 'undefined' ? window.location.origin : 'https://flashly.app'}/join/${inviteModalCourseId}`}
+                {`${inviteBaseUrl}/join/${inviteModalCourseId}`}
               </Text>
             </Pressable>
 
@@ -1438,7 +1442,7 @@ export function HomeScreen({ navigation }: any) {
                   : { backgroundColor: colors.primary, width: '100%' },
               ]}
               onPress={() => {
-                const link = `${typeof window !== 'undefined' ? window.location.origin : 'https://flashly.app'}/join/${inviteModalCourseId}`;
+                const link = `${inviteBaseUrl}/join/${inviteModalCourseId}`;
                 if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
                   navigator.clipboard.writeText(link);
                 } else {

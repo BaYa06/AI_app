@@ -86,14 +86,11 @@ export function EmailAuthScreen({ onBack }: Props) {
             ephemeralWebSession: false,
           });
           if (result.type === 'success' && result.url) {
-            const codeMatch = result.url.match(/[?&]code=([^&]+)/);
-            const code = codeMatch?.[1];
-            if (code) {
-              const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-              if (exchangeError) {
-                console.error('[auth] Code exchange failed:', exchangeError.message);
-                setAuthError(exchangeError.message);
-              }
+            // OAuth code exchange is handled centrally in App.tsx deep-link listener.
+            const errorMatch = result.url.match(/[?&#]error_description=([^&#]+)/);
+            const errorDesc = errorMatch?.[1] ? decodeURIComponent(errorMatch[1].replace(/\+/g, ' ')) : null;
+            if (errorDesc) {
+              setAuthError(errorDesc);
             }
           }
         } else {

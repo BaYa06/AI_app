@@ -170,6 +170,7 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authStep, setAuthStep] = useState<'welcome' | 'email' | 'otp' | 'name' | 'goal' | 'daily' | 'signin'>('welcome');
   const ensuredUserIdRef = useRef<string | null>(null);
+  const processedOAuthCodeRef = useRef<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -284,24 +285,43 @@ export default function App() {
       return;
     }
 
+    const getParamFromUrl = (rawUrl: string, name: string): string | null => {
+      if (!rawUrl || !name) return null;
+      const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const queryOrHashPattern = new RegExp(`[?#&]${escapedName}=([^&#]*)`);
+      const match = rawUrl.match(queryOrHashPattern);
+      if (!match?.[1]) return null;
+      try {
+        return decodeURIComponent(match[1].replace(/\+/g, ' '));
+      } catch {
+        return match[1];
+      }
+    };
+
     const handleUrl = async (url: string) => {
       try {
-        // Parse the authorization code from the deep link URL.
-        // URL format: flashly://auth-callback?code=AUTH_CODE
-        const codeMatch = url.match(/[?&]code=([^&]+)/);
-        const code = codeMatch?.[1];
+        // Parse the authorization code from query or hash.
+        const code = getParamFromUrl(url, 'code');
 
         if (!code) {
           console.warn('[auth] No code found in deep link URL:', url);
           return;
         }
 
+        if (processedOAuthCodeRef.current === code) {
+          console.log('[auth] Skipping duplicate OAuth code exchange');
+          return;
+        }
+        processedOAuthCodeRef.current = code;
+
         const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (error) {
           console.error('Supabase code exchange failed:', error.message);
+          processedOAuthCodeRef.current = null;
         }
       } catch (e) {
         console.error('[auth] Failed to handle deep link:', e);
+        processedOAuthCodeRef.current = null;
       }
     };
 
