@@ -86,7 +86,16 @@ export function SetEditorScreen({ navigation, route }: Props) {
   const updateSet = useSetsStore((s) => s.updateSet);
   const deleteSet = useSetsStore((s) => s.deleteSet);
   const deleteCardsBySet = useCardsStore((s) => s.deleteCardsBySet);
-  
+
+  // Блокируем редактирование read-only наборов (курсы учителя)
+  const existingSet = setId ? getSet(setId) : undefined;
+  useEffect(() => {
+    if (existingSet?.isReadOnly) {
+      Alert.alert('Только чтение', 'Этот набор создан учителем');
+      navigation.goBack();
+    }
+  }, [existingSet?.isReadOnly, navigation]);
+
   // Courses store - для назначения courseId при создании набора
   const activeCourseId = useCoursesStore((s) => s.activeCourseId);
   const courses = useCoursesStore((s) => s.courses);

@@ -154,6 +154,8 @@ const linking: LinkingOptions<RootStackParamList> = {
       Security: 'security',
       Subscription: 'subscription',
       SetEditor: 'set-editor',
+      TeacherCourseStats: 'teacher/:courseId',
+      TeacherStudents: 'teacher/:courseId/students',
     },
   },
 };
@@ -295,7 +297,7 @@ export function AppNavigator() {
         <Stack.Screen
           name="TeacherStudents"
           component={TeacherStudentsScreen}
-          options={{ headerShown: false }}
+          options={{ headerShown: false, gestureEnabled: true }}
         />
         <Stack.Screen
           name="SetEditor"

@@ -3,7 +3,7 @@
  * @description Главная страница с современным дизайном
  */
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { View, StyleSheet, ScrollView, Pressable, TextInput, useWindowDimensions, TextInput as RNTextInput, Modal, Platform, Animated, Alert, Clipboard } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable, TextInput, useWindowDimensions, TextInput as RNTextInput, Modal, Platform, Animated, Alert, Clipboard, Share, ActivityIndicator } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import type { PanGestureHandlerStateChangeEvent } from 'react-native-gesture-handler';
 import { useFocusEffect } from '@react-navigation/native';
@@ -84,10 +84,9 @@ export function HomeScreen({ navigation }: any) {
   const [isTeacher, setIsTeacher] = useState<boolean | null>(null);
   const [inviteModalCourseId, setInviteModalCourseId] = useState<string | null>(null);
   const [inviteCopied, setInviteCopied] = useState(false);
-  const inviteBaseUrl =
-    Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.origin
-      ? window.location.origin
-      : 'https://flashly.app';
+  const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const inviteBaseUrl = 'https://flashlyapp.com';
   const editInputRef = useRef<RNTextInput>(null);
   const newCourseInputRef = useRef<RNTextInput>(null);
   const editModalInputRef = useRef<RNTextInput>(null);
@@ -458,15 +457,30 @@ export function HomeScreen({ navigation }: any) {
     return `Удалить курс "${deleteModalCourse.title}"?`;
   }, [deleteModalCourse, deleteModalHasSets, deleteModalStats, formatSetWord]);
 
-  const openInviteModal = useCallback((courseId: string) => {
+  const openInviteModal = useCallback(async (courseId: string) => {
     setCourseMenuOpen(null);
     setInviteCopied(false);
+    setInviteToken(null);
     setInviteModalCourseId(courseId);
+    setInviteLoading(true);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const userId = data.session?.user?.id;
+      if (userId) {
+        const token = await NeonService.createCourseInvite(courseId, userId);
+        setInviteToken(token);
+      }
+    } catch (error) {
+      console.error('Failed to create invite:', error);
+    } finally {
+      setInviteLoading(false);
+    }
   }, []);
 
   const closeInviteModal = useCallback(() => {
     setInviteModalCourseId(null);
     setInviteCopied(false);
+    setInviteToken(null);
   }, []);
 
   // Обработка удаления курса через модальное окно
@@ -719,12 +733,19 @@ export function HomeScreen({ navigation }: any) {
                 <Pressable
                   style={styles.teacherBanner}
                   onPress={() => {
-                    if (activeCourseId) {
-                      navigation.navigate('TeacherCourseStats', {
-                        courseId: activeCourseId,
-                        courseTitle: activeCourseTitle || 'Курс',
-                      });
+                    const targetCourseId = activeCourseId ?? courses[0]?.id;
+                    const targetCourseTitle = activeCourseTitle || courses[0]?.title || 'Курс';
+
+                    if (!targetCourseId) {
+                      Alert.alert('Нет курсов', 'Сначала создайте курс, чтобы открыть статистику учителя.');
+                      return;
                     }
+
+                    const rootNav = navigation?.getParent?.() ?? navigation;
+                    rootNav?.navigate('TeacherCourseStats', {
+                      courseId: targetCourseId,
+                      courseTitle: targetCourseTitle,
+                    });
                   }}
                 >
                   <View style={styles.teacherBannerLeft}>
@@ -1087,6 +1108,7 @@ export function HomeScreen({ navigation }: any) {
                   const isMenuOpen = courseMenuOpen === course.id;
                   const isEditing = editingCourseId === course.id;
                   const stats = getCourseStats(course.id);
+                  const isStudent = course.isStudentCourse === true;
 
                   return (
                     <Pressable
@@ -1108,13 +1130,15 @@ export function HomeScreen({ navigation }: any) {
                     >
                       <View style={styles.courseItemHeader}>
                         <View style={styles.courseItemLeft}>
-                          {isActive ? (
+                          {isStudent ? (
+                            <BookOpen size={24} color={isActive ? colors.primary : colors.textPrimary} />
+                          ) : isActive ? (
                             <FolderOpen size={24} color={colors.primary} />
                           ) : (
                             <Folder size={24} color={colors.textPrimary} />
                           )}
                           <View style={{ flex: 1 }}>
-                            {isEditing ? (
+                            {isEditing && !isStudent ? (
                               <View style={styles.editRow}>
                                 <View
                                   style={[
@@ -1155,23 +1179,31 @@ export function HomeScreen({ navigation }: any) {
                                 {course.title}
                               </Text>
                             )}
-                            <Text style={[styles.courseMeta, { color: colors.textSecondary }]}>
-                              {stats.setCount} sets • {stats.cardCount} cards • {stats.masteredPercent}% mastered
-                            </Text>
+                            {isStudent && course.teacherName ? (
+                              <Text style={[styles.courseMeta, { color: colors.textSecondary }]}>
+                                {course.teacherName}
+                              </Text>
+                            ) : (
+                              <Text style={[styles.courseMeta, { color: colors.textSecondary }]}>
+                                {stats.setCount} sets • {stats.cardCount} cards • {stats.masteredPercent}% mastered
+                              </Text>
+                            )}
                           </View>
                         </View>
-                        <Pressable
-                          style={styles.courseMoreButton}
-                          onPress={(e) => {
-                            e.stopPropagation();
-                            setCourseMenuOpen(isMenuOpen ? null : course.id);
-                          }}
-                        >
-                          <MoreHorizontal size={18} color={colors.textSecondary} />
-                        </Pressable>
+                        {!isStudent && (
+                          <Pressable
+                            style={styles.courseMoreButton}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              setCourseMenuOpen(isMenuOpen ? null : course.id);
+                            }}
+                          >
+                            <MoreHorizontal size={18} color={colors.textSecondary} />
+                          </Pressable>
+                        )}
                       </View>
 
-                      {isMenuOpen && (
+                      {isMenuOpen && !isStudent && (
                         <View
                           style={[
                             styles.courseMenu,
@@ -1409,52 +1441,82 @@ export function HomeScreen({ navigation }: any) {
               Отправьте эту ссылку своим ученикам — они смогут присоединиться к курсу и начать изучение.
             </Text>
 
-            <Pressable
-              style={[
-                styles.inviteLinkBox,
-                { backgroundColor: colors.surfaceVariant || colors.border, borderColor: colors.border },
-              ]}
-              onLongPress={() => {
-                const link = `${inviteBaseUrl}/join/${inviteModalCourseId}`;
-                if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
-                  navigator.clipboard.writeText(link);
-                } else {
-                  Clipboard.setString(link);
-                }
-                setInviteCopied(true);
-              }}
-            >
-              <Text
-                style={[styles.inviteLinkText, { color: colors.primary }]}
-                numberOfLines={1}
-                selectable
-              >
-                {`${inviteBaseUrl}/join/${inviteModalCourseId}`}
-              </Text>
-            </Pressable>
+            {inviteLoading ? (
+              <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: spacing.m }} />
+            ) : inviteToken ? (
+              <>
+                <Pressable
+                  style={[
+                    styles.inviteLinkBox,
+                    { backgroundColor: colors.surfaceVariant || colors.border, borderColor: colors.border },
+                  ]}
+                  onLongPress={() => {
+                    const link = `${inviteBaseUrl}/join/${inviteToken}`;
+                    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
+                      navigator.clipboard.writeText(link);
+                    } else {
+                      Clipboard.setString(link);
+                    }
+                    setInviteCopied(true);
+                  }}
+                >
+                  <Text
+                    style={[styles.inviteLinkText, { color: colors.primary }]}
+                    numberOfLines={1}
+                    selectable
+                  >
+                    {`${inviteBaseUrl}/join/${inviteToken}`}
+                  </Text>
+                </Pressable>
 
-            <Pressable
-              style={[
-                styles.editModalButton,
-                styles.editModalButtonPrimary,
-                inviteCopied
-                  ? { backgroundColor: colors.success ?? '#10B981', width: '100%' }
-                  : { backgroundColor: colors.primary, width: '100%' },
-              ]}
-              onPress={() => {
-                const link = `${inviteBaseUrl}/join/${inviteModalCourseId}`;
-                if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
-                  navigator.clipboard.writeText(link);
-                } else {
-                  Clipboard.setString(link);
-                }
-                setInviteCopied(true);
-              }}
-            >
-              <Text style={[styles.editModalButtonText, { color: '#FFFFFF' }]}>
-                {inviteCopied ? '✓ Скопировано' : 'Копировать'}
+                <View style={{ flexDirection: 'row', gap: spacing.s, width: '100%' }}>
+                  <Pressable
+                    style={[
+                      styles.editModalButton,
+                      styles.editModalButtonPrimary,
+                      inviteCopied
+                        ? { backgroundColor: colors.success ?? '#10B981', flex: 1 }
+                        : { backgroundColor: colors.primary, flex: 1 },
+                    ]}
+                    onPress={() => {
+                      const link = `${inviteBaseUrl}/join/${inviteToken}`;
+                      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
+                        navigator.clipboard.writeText(link);
+                      } else {
+                        Clipboard.setString(link);
+                      }
+                      setInviteCopied(true);
+                    }}
+                  >
+                    <Text style={[styles.editModalButtonText, { color: '#FFFFFF' }]}>
+                      {inviteCopied ? '✓ Скопировано' : 'Копировать'}
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={[
+                      styles.editModalButton,
+                      styles.editModalButtonPrimary,
+                      { backgroundColor: colors.primary, flex: 1 },
+                    ]}
+                    onPress={async () => {
+                      const link = `${inviteBaseUrl}/join/${inviteToken}`;
+                      try {
+                        await Share.share({ message: link });
+                      } catch {}
+                    }}
+                  >
+                    <Text style={[styles.editModalButtonText, { color: '#FFFFFF' }]}>
+                      Поделиться
+                    </Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : (
+              <Text style={[styles.inviteDescription, { color: colors.error || '#EF4444' }]}>
+                Не удалось создать ссылку
               </Text>
-            </Pressable>
+            )}
           </Pressable>
         </Pressable>
       </Modal>

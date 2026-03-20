@@ -2,7 +2,7 @@
  * Teacher Students Screen
  * @description Список учеников курса для учителя
  */
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View,
   FlatList,
@@ -11,12 +11,16 @@ import {
   TextInput,
   ScrollView,
   Platform,
+  BackHandler,
+  ActivityIndicator,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, ChevronRight, Plus } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import { useThemeColors, useSettingsStore } from '@/store';
 import { spacing, borderRadius } from '@/constants';
+import { NeonService } from '@/services/NeonService';
 import type { RootStackParamList } from '@/types/navigation';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -28,39 +32,14 @@ type StudentStatus = 'online' | 'away' | 'offline' | 'inactive';
 
 interface Student {
   id: string;
-  firstName: string;
-  lastName: string;
+  name: string;
   initials: string;
   status: StudentStatus;
   streak: number;
   lastActivity: string;
-  avatarVariant: 'solid' | 'light' | 'gray';
 }
 
 type FilterKey = 'all' | 'active' | 'away3d' | 'away7d';
-
-// ==================== MOCK DATA ====================
-
-const MOCK_STUDENTS: Student[] = [
-  { id: '1',  firstName: 'Александр', lastName: 'Иванов',   initials: 'АИ', status: 'online',   streak: 7,  lastActivity: 'Вчера, 19:42',   avatarVariant: 'solid' },
-  { id: '2',  firstName: 'Екатерина', lastName: 'Петрова',  initials: 'ЕП', status: 'away',     streak: 12, lastActivity: 'Сегодня, 10:15',  avatarVariant: 'light' },
-  { id: '3',  firstName: 'Михаил',    lastName: 'Сидоров',  initials: 'МС', status: 'offline',  streak: 0,  lastActivity: '3 дня назад',     avatarVariant: 'solid' },
-  { id: '4',  firstName: 'Дмитрий',   lastName: 'Новиков',  initials: 'ДН', status: 'inactive', streak: 0,  lastActivity: '8 дней назад',    avatarVariant: 'gray' },
-  { id: '5',  firstName: 'Анна',       lastName: 'Смирнова', initials: 'АС', status: 'online',   streak: 5,  lastActivity: 'Сегодня, 08:30',  avatarVariant: 'light' },
-  { id: '6',  firstName: 'Павел',      lastName: 'Козлов',   initials: 'ПК', status: 'online',   streak: 3,  lastActivity: 'Сегодня, 09:55',  avatarVariant: 'solid' },
-  { id: '7',  firstName: 'Ольга',      lastName: 'Волкова',  initials: 'ОВ', status: 'away',     streak: 21, lastActivity: 'Вчера, 22:10',    avatarVariant: 'light' },
-  { id: '8',  firstName: 'Сергей',     lastName: 'Морозов',  initials: 'СМ', status: 'offline',  streak: 0,  lastActivity: '4 дня назад',     avatarVariant: 'solid' },
-  { id: '9',  firstName: 'Наталья',    lastName: 'Лебедева', initials: 'НЛ', status: 'inactive', streak: 0,  lastActivity: '10 дней назад',   avatarVariant: 'gray' },
-  { id: '10', firstName: 'Иван',       lastName: 'Попов',    initials: 'ИП', status: 'online',   streak: 9,  lastActivity: 'Сегодня, 11:00',  avatarVariant: 'solid' },
-  { id: '11', firstName: 'Мария',      lastName: 'Федорова', initials: 'МФ', status: 'away',     streak: 2,  lastActivity: 'Вчера, 17:30',    avatarVariant: 'light' },
-  { id: '12', firstName: 'Андрей',     lastName: 'Соколов',  initials: 'АС', status: 'offline',  streak: 0,  lastActivity: '2 дня назад',     avatarVariant: 'solid' },
-  { id: '13', firstName: 'Татьяна',    lastName: 'Михайлова',initials: 'ТМ', status: 'online',   streak: 14, lastActivity: 'Сегодня, 07:45',  avatarVariant: 'light' },
-  { id: '14', firstName: 'Николай',    lastName: 'Захаров',  initials: 'НЗ', status: 'inactive', streak: 0,  lastActivity: '12 дней назад',   avatarVariant: 'gray' },
-  { id: '15', firstName: 'Юлия',       lastName: 'Соловьёва',initials: 'ЮС', status: 'away',     streak: 6,  lastActivity: 'Вчера, 20:05',    avatarVariant: 'light' },
-  { id: '16', firstName: 'Виктор',     lastName: 'Васильев', initials: 'ВВ', status: 'offline',  streak: 0,  lastActivity: '5 дней назад',    avatarVariant: 'solid' },
-  { id: '17', firstName: 'Елена',      lastName: 'Кузнецова',initials: 'ЕК', status: 'online',   streak: 30, lastActivity: 'Сегодня, 12:20',  avatarVariant: 'solid' },
-  { id: '18', firstName: 'Алексей',    lastName: 'Орлов',    initials: 'АО', status: 'inactive', streak: 0,  lastActivity: '9 дней назад',    avatarVariant: 'gray' },
-];
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'all',    label: 'Все' },
@@ -68,6 +47,36 @@ const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'away3d', label: 'Не заходили 3д' },
   { key: 'away7d', label: 'Не заходили 7д+' },
 ];
+
+// ==================== HELPERS ====================
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
+
+function getStudentStatus(lastActiveDate: string | null): StudentStatus {
+  if (!lastActiveDate) return 'inactive';
+  const now = new Date();
+  const last = new Date(lastActiveDate + 'T12:00:00Z');
+  const diffDays = Math.round((now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays <= 1) return 'online';
+  if (diffDays <= 2) return 'away';
+  if (diffDays <= 6) return 'offline';
+  return 'inactive';
+}
+
+function formatLastActivity(lastActiveDate: string | null): string {
+  if (!lastActiveDate) return 'Нет активности';
+  const now = new Date();
+  const last = new Date(lastActiveDate + 'T12:00:00Z');
+  const diffDays = Math.round((now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return 'Сегодня';
+  if (diffDays === 1) return 'Вчера';
+  if (diffDays < 7) return `${diffDays} дн. назад`;
+  return `${diffDays} дн. назад`;
+}
 
 // ==================== STATUS DOT COLOR ====================
 
@@ -89,15 +98,12 @@ function StudentRow({ student, colors, isDark, onPress }: {
   const isInactive = student.status === 'inactive';
   const dotColor = STATUS_COLORS[student.status];
 
-  const avatarBg =
-    student.avatarVariant === 'solid'   ? colors.primary :
-    student.avatarVariant === 'light'   ? colors.primary + '33' :
-                                          isDark ? 'rgba(255,255,255,0.10)' : '#E5E7EB';
-
-  const avatarTextColor =
-    student.avatarVariant === 'solid'   ? '#FFFFFF' :
-    student.avatarVariant === 'light'   ? colors.primary :
-                                          isDark ? '#9CA3AF' : '#6B7280';
+  const avatarBg = isInactive
+    ? (isDark ? 'rgba(255,255,255,0.10)' : '#E5E7EB')
+    : colors.primary + '33';
+  const avatarTextColor = isInactive
+    ? (isDark ? '#9CA3AF' : '#6B7280')
+    : colors.primary;
 
   return (
     <Pressable
@@ -136,7 +142,7 @@ function StudentRow({ student, colors, isDark, onPress }: {
             ]}
             numberOfLines={1}
           >
-            {student.firstName} {student.lastName}
+            {student.name}
           </Text>
           {student.streak > 0 && (
             <View style={styles.streakBadge}>
@@ -157,7 +163,7 @@ function StudentRow({ student, colors, isDark, onPress }: {
 
 // ==================== SCREEN ====================
 
-export function TeacherStudentsScreen({ navigation }: Props) {
+export function TeacherStudentsScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
   const resolvedTheme = useSettingsStore((s) => s.resolvedTheme);
   const isDark = resolvedTheme === 'dark';
@@ -165,9 +171,37 @@ export function TeacherStudentsScreen({ navigation }: Props) {
 
   const [query, setQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
+  const [students, setStudents] = useState<Student[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Загрузка реальных участников
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    NeonService.loadCourseMembers(route.params.courseId)
+      .then((members) => {
+        if (!mounted) return;
+        setStudents(
+          members.map((m) => {
+            const status = getStudentStatus(m.lastActiveDate);
+            return {
+              id: m.id,
+              name: m.displayName,
+              initials: getInitials(m.displayName),
+              status,
+              streak: m.streak,
+              lastActivity: formatLastActivity(m.lastActiveDate),
+            };
+          }),
+        );
+      })
+      .catch((e) => console.error('Failed to load members:', e))
+      .finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
+  }, [route.params.courseId]);
 
   const filtered = useMemo(() => {
-    let list = MOCK_STUDENTS;
+    let list = students;
 
     // Filter by tab
     if (activeFilter === 'active') {
@@ -181,19 +215,54 @@ export function TeacherStudentsScreen({ navigation }: Props) {
     // Filter by search
     if (query.trim()) {
       const q = query.trim().toLowerCase();
-      list = list.filter(
-        (s) =>
-          s.firstName.toLowerCase().includes(q) ||
-          s.lastName.toLowerCase().includes(q),
-      );
+      list = list.filter((s) => s.name.toLowerCase().includes(q));
     }
 
     return list;
-  }, [query, activeFilter]);
+  }, [query, activeFilter, students]);
 
   const inputBg = isDark ? 'rgba(255,255,255,0.07)' : '#F3F4F6';
   const pillActiveBg = colors.primary;
   const pillInactiveBg = isDark ? 'rgba(255,255,255,0.07)' : '#F3F4F6';
+
+  const navigateBackToTeacher = useCallback(() => {
+    navigation.reset({
+      index: 1,
+      routes: [
+        { name: 'Main' },
+        {
+          name: 'TeacherCourseStats',
+          params: {
+            courseId: route.params.courseId,
+            courseTitle: route.params.courseTitle,
+          },
+        },
+      ],
+    });
+  }, [navigation, route.params.courseId, route.params.courseTitle]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS === 'android') {
+        const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+          navigateBackToTeacher();
+          return true;
+        });
+        return () => subscription.remove();
+      }
+
+      if (Platform.OS === 'web') {
+        const handler = (e: PopStateEvent) => {
+          e.stopImmediatePropagation();
+          navigateBackToTeacher();
+        };
+        window.addEventListener('popstate', handler, true);
+        return () => window.removeEventListener('popstate', handler, true);
+      }
+
+      return undefined;
+    }, [navigateBackToTeacher]),
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -212,7 +281,26 @@ export function TeacherStudentsScreen({ navigation }: Props) {
         {/* Left: back + title */}
         <View style={styles.headerLeft}>
           <Pressable
-            onPress={() => navigation.goBack()}
+            onPress={() => {
+              const target = {
+                name: 'TeacherCourseStats' as const,
+                params: {
+                  courseId: route.params.courseId,
+                  courseTitle: route.params.courseTitle,
+                },
+              };
+
+              if (Platform.OS === 'web') {
+                navigation.reset({ index: 1, routes: [{ name: 'Main' }, target] });
+                return;
+              }
+
+              if (navigation.canGoBack()) {
+                navigation.goBack();
+              } else {
+                navigation.reset({ index: 1, routes: [{ name: 'Main' }, target] });
+              }
+            }}
             style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
             hitSlop={8}
           >
@@ -286,27 +374,33 @@ export function TeacherStudentsScreen({ navigation }: Props) {
       </View>
 
       {/* ── Student List ── */}
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <StudentRow
-            student={item}
-            colors={colors}
-            isDark={isDark}
-            onPress={() => {}}
-          />
-        )}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              Ученики не найдены
-            </Text>
-          </View>
-        }
-      />
+      {loading ? (
+        <View style={styles.empty}>
+          <ActivityIndicator size="small" color={colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={filtered}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <StudentRow
+              student={item}
+              colors={colors}
+              isDark={isDark}
+              onPress={() => {}}
+            />
+          )}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                {students.length === 0 ? 'Пока нет учеников' : 'Ученики не найдены'}
+              </Text>
+            </View>
+          }
+        />
+      )}
     </View>
   );
 }

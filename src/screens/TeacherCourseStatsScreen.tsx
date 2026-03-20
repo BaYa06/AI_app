@@ -2,7 +2,7 @@
  * Teacher Course Stats Screen
  * @description Статистика курса для учителя
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   ScrollView,
@@ -10,28 +10,51 @@ import {
   Pressable,
   Platform,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, X } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import { useThemeColors, useSettingsStore } from '@/store';
 import { spacing, borderRadius } from '@/constants';
+import { NeonService } from '@/services/NeonService';
 import type { RootStackParamList } from '@/types/navigation';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TeacherCourseStats'>;
 
-// ==================== MOCK DATA ====================
+// ==================== TYPES ====================
 
-const MOCK_STUDENTS = [
-  { id: '1', name: 'Алексей',  online: true,  avatar: null, activeToday: true,  inactive7d: false },
-  { id: '2', name: 'Марина',   online: true,  avatar: null, activeToday: true,  inactive7d: false },
-  { id: '3', name: 'Игорь',    online: false, avatar: null, activeToday: false, inactive7d: true },
-  { id: '4', name: 'Светлана', online: true,  avatar: null, activeToday: true,  inactive7d: false },
-  { id: '5', name: 'Дмитрий',  online: false, avatar: null, activeToday: false, inactive7d: true },
-  { id: '6', name: 'Елена',    online: false, avatar: null, activeToday: true,  inactive7d: false },
-  { id: '7', name: 'Кирилл',   online: false, avatar: null, activeToday: true,  inactive7d: false },
-];
+type StudentStatus = 'online' | 'away' | 'offline' | 'inactive';
+
+interface CourseMember {
+  id: string;
+  name: string;
+  initials: string;
+  status: StudentStatus;
+  streak: number;
+}
+
+// ==================== HELPERS ====================
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
+
+function getStudentStatus(lastActiveDate: string | null): StudentStatus {
+  if (!lastActiveDate) return 'inactive';
+  const now = new Date();
+  const last = new Date(lastActiveDate + 'T12:00:00Z');
+  const diffDays = Math.round((now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays <= 1) return 'online';
+  if (diffDays <= 2) return 'away';
+  if (diffDays <= 6) return 'offline';
+  return 'inactive';
+}
+
+// ==================== MOCK DATA (charts & sets — пока не трогаем) ====================
 
 const MOCK_SETS = [
   {
@@ -53,40 +76,51 @@ const MOCK_SETS = [
 ];
 
 const CHART_DATA_7D = [
-  { day: 'Пн', pct: 0.40 },
-  { day: 'Вт', pct: 0.65 },
-  { day: 'Ср', pct: 0.50 },
-  { day: 'Чт', pct: 0.85 },
-  { day: 'Пт', pct: 0.70 },
-  { day: 'Сб', pct: 0.30 },
-  { day: 'Вс', pct: 0.45 },
+  { day: 'Пн', pct: 0.40, count: 12 },
+  { day: 'Вт', pct: 0.65, count: 19 },
+  { day: 'Ср', pct: 0.50, count: 15 },
+  { day: 'Чт', pct: 0.85, count: 26 },
+  { day: 'Пт', pct: 0.70, count: 21 },
+  { day: 'Сб', pct: 0.30, count: 9 },
+  { day: 'Вс', pct: 0.45, count: 14 },
 ];
 
 const CHART_DATA_30D = [
-  { day: '1', pct: 0.20 }, { day: '5', pct: 0.45 }, { day: '10', pct: 0.60 },
-  { day: '15', pct: 0.80 }, { day: '20', pct: 0.55 }, { day: '25', pct: 0.70 },
-  { day: '30', pct: 0.90 },
+  { day: '1', pct: 0.20, count: 6 },
+  { day: '5', pct: 0.45, count: 14 },
+  { day: '10', pct: 0.60, count: 18 },
+  { day: '15', pct: 0.80, count: 24 },
+  { day: '20', pct: 0.55, count: 16 },
+  { day: '25', pct: 0.70, count: 21 },
+  { day: '30', pct: 0.90, count: 27 },
 ];
 
 // ==================== COMPONENTS ====================
 
-function AvatarPlaceholder({ name, online, colors }: { name: string; online: boolean; colors: any }) {
-  const initials = name.slice(0, 1).toUpperCase();
+function AvatarPlaceholder({ member, colors }: { member: CourseMember; colors: any }) {
+  const isInactive = member.status === 'inactive';
+  const dotColor =
+    member.status === 'online'   ? '#22C55E' :
+    member.status === 'away'     ? '#F59E0B' :
+    member.status === 'offline'  ? '#EF4444' : '#D1D5DB';
+
   return (
     <View style={styles.studentItem}>
       <View style={styles.avatarWrap}>
-        <View style={[styles.avatar, { backgroundColor: colors.primary + '33' }]}>
-          <Text style={[styles.avatarInitials, { color: colors.primary }]}>{initials}</Text>
+        <View style={[styles.avatar, { backgroundColor: isInactive ? (colors.border) : colors.primary + '33' }]}>
+          <Text style={[styles.avatarInitials, { color: isInactive ? colors.textSecondary : colors.primary }]}>
+            {member.initials}
+          </Text>
         </View>
         <View
           style={[
             styles.onlineDot,
-            { backgroundColor: online ? '#22C55E' : colors.border, borderColor: colors.background },
+            { backgroundColor: dotColor, borderColor: colors.background },
           ]}
         />
       </View>
       <Text style={[styles.studentName, { color: colors.textPrimary }]} numberOfLines={1}>
-        {name}
+        {member.name}
       </Text>
     </View>
   );
@@ -103,9 +137,39 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
 
   const [chartPeriod, setChartPeriod] = useState<'7d' | '30d'>('7d');
   const [studentModal, setStudentModal] = useState<'active' | 'inactive' | null>(null);
+  const [chartTooltip, setChartTooltip] = useState<{
+    index: number;
+    day: string;
+    count: number;
+  } | null>(null);
 
-  const activeStudents = MOCK_STUDENTS.filter((s) => s.activeToday);
-  const inactiveStudents = MOCK_STUDENTS.filter((s) => s.inactive7d);
+  // Реальные участники
+  const [members, setMembers] = useState<CourseMember[]>([]);
+  const [membersLoading, setMembersLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    setMembersLoading(true);
+    NeonService.loadCourseMembers(route.params.courseId)
+      .then((raw) => {
+        if (!mounted) return;
+        setMembers(
+          raw.map((m) => ({
+            id: m.id,
+            name: m.displayName,
+            initials: getInitials(m.displayName),
+            status: getStudentStatus(m.lastActiveDate),
+            streak: m.streak,
+          })),
+        );
+      })
+      .catch((e) => console.error('Failed to load members:', e))
+      .finally(() => { if (mounted) setMembersLoading(false); });
+    return () => { mounted = false; };
+  }, [route.params.courseId]);
+
+  const activeStudents = members.filter((s) => s.status === 'online' || s.status === 'away');
+  const inactiveStudents = members.filter((s) => s.status === 'inactive');
   const modalStudents = studentModal === 'active' ? activeStudents : inactiveStudents;
   const modalTitle = studentModal === 'active' ? 'Активны сегодня' : 'Не заходили 7д+';
   const chartData = chartPeriod === '7d' ? CHART_DATA_7D : CHART_DATA_30D;
@@ -114,6 +178,9 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
   const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : '#E5E7EB';
 
   const CHART_HEIGHT = 96;
+  const handleBarPress = (index: number, day: string, count: number) => {
+    setChartTooltip({ index, day, count });
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -152,7 +219,11 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
             onPress={() => setStudentModal('active')}
           >
             <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>АКТИВНЫХ СЕГОДНЯ</Text>
-            <Text style={[styles.metricValue, { color: colors.primary }]}>{activeStudents.length}</Text>
+            {membersLoading ? (
+              <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 8 }} />
+            ) : (
+              <Text style={[styles.metricValue, { color: colors.primary }]}>{activeStudents.length}</Text>
+            )}
           </Pressable>
 
           {/* Inactive 7d+ */}
@@ -161,7 +232,11 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
             onPress={() => setStudentModal('inactive')}
           >
             <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>НЕ ЗАХОДИЛИ 7Д+</Text>
-            <Text style={[styles.metricValue, { color: colors.error }]}>{inactiveStudents.length}</Text>
+            {membersLoading ? (
+              <ActivityIndicator size="small" color={colors.error} style={{ marginTop: 8 }} />
+            ) : (
+              <Text style={[styles.metricValue, { color: colors.error }]}>{inactiveStudents.length}</Text>
+            )}
           </Pressable>
         </View>
 
@@ -203,16 +278,30 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
           <View style={[styles.chartWrap, { height: CHART_HEIGHT + 20 }]}>
             {chartData.map((item, idx) => (
               <View key={idx} style={styles.barCol}>
-                <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-                  <View
-                    style={[
-                      styles.bar,
-                      {
-                        height: item.pct * CHART_HEIGHT,
-                        backgroundColor: colors.primary,
-                      },
-                    ]}
-                  />
+                <View style={{ flex: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
+                  {chartTooltip?.index === idx && (
+                    <View style={[styles.chartTooltip, { backgroundColor: isDark ? '#1F2937' : '#111827' }]}
+                    >
+                      <Text style={styles.chartTooltipText}>
+                        {chartTooltip.day}: {chartTooltip.count}
+                      </Text>
+                      <View style={[styles.chartTooltipArrow, { borderTopColor: isDark ? '#1F2937' : '#111827' }]} />
+                    </View>
+                  )}
+                  <Pressable
+                    onPress={() => handleBarPress(idx, item.day, item.count)}
+                    hitSlop={8}
+                  >
+                    <View
+                      style={[
+                        styles.bar,
+                        {
+                          height: item.pct * CHART_HEIGHT,
+                          backgroundColor: colors.primary,
+                        },
+                      ]}
+                    />
+                  </Pressable>
                 </View>
                 <Text style={[styles.barLabel, { color: colors.textSecondary }]}>{item.day}</Text>
               </View>
@@ -223,20 +312,30 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
         {/* Students carousel */}
         <View style={styles.section}>
           <View style={styles.sectionRow}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Ученики</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+              Ученики{!membersLoading && ` (${members.length})`}
+            </Text>
             <Pressable onPress={() => navigation.navigate('TeacherStudents', { courseId: route.params.courseId, courseTitle: route.params.courseTitle })}>
               <Text style={[styles.viewAll, { color: colors.primary }]}>Все →</Text>
             </Pressable>
           </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.studentsRow}
-          >
-            {MOCK_STUDENTS.map((s) => (
-              <AvatarPlaceholder key={s.id} name={s.name} online={s.online} colors={colors} />
-            ))}
-          </ScrollView>
+          {membersLoading ? (
+            <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: spacing.m }} />
+          ) : members.length === 0 ? (
+            <Text style={[styles.emptyMembers, { color: colors.textSecondary }]}>
+              Пока нет учеников. Отправьте ссылку-приглашение.
+            </Text>
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.studentsRow}
+            >
+              {members.map((m) => (
+                <AvatarPlaceholder key={m.id} member={m} colors={colors} />
+              ))}
+            </ScrollView>
+          )}
         </View>
 
         {/* Sets list */}
@@ -301,27 +400,44 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
             </View>
 
             <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
-              {modalStudents.map((s) => (
-                <View key={s.id} style={[styles.modalStudentRow, { borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9' }]}>
-                  <View style={styles.modalAvatarWrap}>
-                    <View style={[styles.avatar, { backgroundColor: colors.primary + '33' }]}>
-                      <Text style={[styles.avatarInitials, { color: colors.primary }]}>
-                        {s.name.slice(0, 1).toUpperCase()}
-                      </Text>
+              {modalStudents.length === 0 ? (
+                <Text style={[styles.emptyMembers, { color: colors.textSecondary, paddingVertical: spacing.l }]}>
+                  Нет учеников
+                </Text>
+              ) : (
+                modalStudents.map((s) => {
+                  const dotColor =
+                    s.status === 'online'   ? '#22C55E' :
+                    s.status === 'away'     ? '#F59E0B' :
+                    s.status === 'offline'  ? '#EF4444' : '#D1D5DB';
+                  return (
+                    <View key={s.id} style={[styles.modalStudentRow, { borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9' }]}>
+                      <View style={styles.modalAvatarWrap}>
+                        <View style={[styles.avatar, { backgroundColor: colors.primary + '33' }]}>
+                          <Text style={[styles.avatarInitials, { color: colors.primary }]}>
+                            {s.initials}
+                          </Text>
+                        </View>
+                        <View
+                          style={[
+                            styles.onlineDot,
+                            {
+                              backgroundColor: dotColor,
+                              borderColor: isDark ? '#1E2030' : '#FFFFFF',
+                            },
+                          ]}
+                        />
+                      </View>
+                      <Text style={[styles.modalStudentName, { color: colors.textPrimary }]}>{s.name}</Text>
+                      {s.streak > 0 && (
+                        <View style={styles.modalStreakBadge}>
+                          <Text style={styles.modalStreakText}>🔥 {s.streak}</Text>
+                        </View>
+                      )}
                     </View>
-                    <View
-                      style={[
-                        styles.onlineDot,
-                        {
-                          backgroundColor: s.online ? '#22C55E' : studentModal === 'inactive' ? colors.error : colors.border,
-                          borderColor: isDark ? '#1E2030' : '#FFFFFF',
-                        },
-                      ]}
-                    />
-                  </View>
-                  <Text style={[styles.modalStudentName, { color: colors.textPrimary }]}>{s.name}</Text>
-                </View>
-              ))}
+                  );
+                })
+              )}
             </ScrollView>
           </Pressable>
         </Pressable>
@@ -448,6 +564,32 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '500',
   },
+  chartTooltip: {
+    position: 'absolute',
+    bottom: 22,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    zIndex: 5,
+  },
+  chartTooltipText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  chartTooltipArrow: {
+    position: 'absolute',
+    bottom: -6,
+    left: '50%',
+    marginLeft: -6,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 6,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+  },
 
   // Students
   studentsRow: {
@@ -487,6 +629,11 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
     maxWidth: 56,
+  },
+  emptyMembers: {
+    fontSize: 13,
+    fontWeight: '500',
+    textAlign: 'center',
   },
 
   // Sets
@@ -585,5 +732,17 @@ const styles = StyleSheet.create({
   modalStudentName: {
     fontSize: 15,
     fontWeight: '500',
+    flex: 1,
+  },
+  modalStreakBadge: {
+    backgroundColor: '#FFF7ED',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  modalStreakText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#EA580C',
   },
 });

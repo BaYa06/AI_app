@@ -1142,4 +1142,274 @@ export const NeonService = {
       return null;
     }
   },
+
+  // ==================== COURSE INVITES ====================
+
+  /**
+   * Создать или получить существующий инвайт-токен для курса
+   */
+  async createCourseInvite(courseId: string, userId: string): Promise<string | null> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) return null;
+
+      const sql = neon(connectionString);
+
+      // Проверить что пользователь — владелец курса
+      const course = await sql`
+        SELECT id FROM courses
+        WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid
+      `;
+      if (course.length === 0) {
+        console.error('createCourseInvite: not course owner');
+        return null;
+      }
+
+      // Проверить существующий токен
+      const existing = await sql`
+        SELECT token FROM course_invites
+        WHERE course_id = ${courseId}::uuid
+        LIMIT 1
+      `;
+      if (existing.length > 0) {
+        return existing[0].token;
+      }
+
+      // Сгенерировать токен на клиенте
+      const bytes = new Uint8Array(32);
+      if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+        crypto.getRandomValues(bytes);
+      } else {
+        for (let i = 0; i < 32; i++) bytes[i] = Math.floor(Math.random() * 256);
+      }
+      const token = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+
+      const tokenResult = await sql`
+        INSERT INTO course_invites (course_id, token, created_by)
+        VALUES (
+          ${courseId}::uuid,
+          ${token},
+          ${userId}::uuid
+        )
+        RETURNING token
+      `;
+
+      console.log('✅ Инвайт создан для курса:', courseId);
+      return tokenResult[0].token;
+    } catch (error) {
+      console.error('Failed to create course invite:', error);
+      return null;
+    }
+  },
+
+  /**
+   * Получить информацию о курсе по токену (для модалки у ученика)
+   */
+  async getCourseInviteInfo(token: string): Promise<{
+    courseId: string;
+    courseTitle: string;
+    teacherName: string;
+  } | null> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) return null;
+
+      const sql = neon(connectionString);
+
+      const result = await sql`
+        SELECT
+          c.id AS course_id,
+          c.title AS course_title,
+          COALESCE(u.display_name, u.user_name, u.email) AS teacher_name
+        FROM course_invites ci
+        JOIN courses c ON c.id = ci.course_id
+        JOIN users u ON u.id = ci.created_by
+        WHERE ci.token = ${token}
+          AND (ci.expires_at IS NULL OR ci.expires_at > NOW())
+      `;
+
+      if (result.length === 0) return null;
+
+      return {
+        courseId: result[0].course_id,
+        courseTitle: result[0].course_title,
+        teacherName: result[0].teacher_name,
+      };
+    } catch (error) {
+      console.error('Failed to get course invite info:', error);
+      return null;
+    }
+  },
+
+  /**
+   * Принять приглашение — добавить ученика в course_members
+   */
+  async joinCourseByToken(token: string, userId: string): Promise<{
+    courseId: string;
+    courseTitle: string;
+  } | null> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) return null;
+
+      const sql = neon(connectionString);
+
+      // Найти токен → получить courseId
+      const invite = await sql`
+        SELECT ci.course_id, c.title AS course_title, c.user_id AS owner_id
+        FROM course_invites ci
+        JOIN courses c ON c.id = ci.course_id
+        WHERE ci.token = ${token}
+          AND (ci.expires_at IS NULL OR ci.expires_at > NOW())
+      `;
+
+      if (invite.length === 0) return null;
+
+      const { course_id, course_title, owner_id } = invite[0];
+
+      // Нельзя присоединиться к своему курсу
+      if (owner_id === userId) {
+        console.warn('joinCourseByToken: cannot join own course');
+        return null;
+      }
+
+      // INSERT с ON CONFLICT — защита от двойного нажатия
+      await sql`
+        INSERT INTO course_members (course_id, user_id, role)
+        VALUES (${course_id}::uuid, ${userId}::uuid, 'student')
+        ON CONFLICT (course_id, user_id) DO NOTHING
+      `;
+
+      console.log('✅ Ученик присоединился к курсу:', course_title);
+      return { courseId: course_id, courseTitle: course_title };
+    } catch (error) {
+      console.error('Failed to join course by token:', error);
+      return null;
+    }
+  },
+
+  /**
+   * Загрузить курсы где пользователь — ученик
+   */
+  async loadStudentCourses(userId: string): Promise<Course[]> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) return [];
+
+      const sql = neon(connectionString);
+
+      const rows = await sql`
+        SELECT
+          c.id,
+          c.title,
+          c.user_id AS owner_id,
+          cm.joined_at,
+          COALESCE(u.display_name, u.user_name, u.email) AS teacher_name
+        FROM course_members cm
+        JOIN courses c ON c.id = cm.course_id
+        JOIN users u ON u.id = c.user_id
+        WHERE cm.user_id = ${userId}::uuid AND cm.role = 'student'
+        ORDER BY cm.joined_at DESC
+      `;
+
+      return rows.map((row: any) => ({
+        id: row.id,
+        title: row.title,
+        createdAt: new Date(row.joined_at).getTime(),
+        isStudentCourse: true,
+        teacherName: row.teacher_name,
+        ownerId: row.owner_id,
+      }));
+    } catch (error) {
+      console.error('Failed to load student courses:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Загрузить наборы курса учителя (для ученика, read-only)
+   */
+  async loadCourseSetsByMembership(courseId: string): Promise<CardSet[]> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) return [];
+
+      const sql = neon(connectionString);
+
+      const rows = await sql`
+        SELECT
+          cs.*,
+          (SELECT COUNT(*) FROM cards WHERE set_id = cs.id) AS total_cards
+        FROM card_sets cs
+        WHERE cs.course_id = ${courseId}::uuid
+        ORDER BY cs.created_at DESC
+      `;
+
+      return rows.map((row: any) => ({
+        id: row.id,
+        userId: row.user_id,
+        title: row.title,
+        description: row.description || '',
+        category: row.category || '',
+        icon: row.icon || null,
+        languageFrom: row.language_from || 'de',
+        languageTo: row.language_to || 'ru',
+        totalCards: parseInt(row.total_cards, 10) || 0,
+        createdAt: new Date(row.created_at).getTime(),
+        updatedAt: row.updated_at ? new Date(row.updated_at).getTime() : undefined,
+        courseId: row.course_id,
+        isReadOnly: true,
+        ownerCourseId: courseId,
+      }));
+    } catch (error) {
+      console.error('Failed to load course sets by membership:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Загрузить участников курса (для кабинета учителя)
+   */
+  async loadCourseMembers(courseId: string): Promise<Array<{
+    id: string;
+    displayName: string;
+    email: string | null;
+    streak: number;
+    lastActiveDate: string | null;
+    joinedAt: number;
+  }>> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) return [];
+
+      const sql = neon(connectionString);
+
+      const rows = await sql`
+        SELECT
+          u.id,
+          COALESCE(u.display_name, u.user_name, u.email) AS display_name,
+          u.email,
+          COALESCE(us.current_streak, 0) AS current_streak,
+          us.last_active_date,
+          cm.joined_at
+        FROM course_members cm
+        JOIN users u ON u.id = cm.user_id
+        LEFT JOIN user_stats us ON us.user_id = cm.user_id
+        WHERE cm.course_id = ${courseId}::uuid
+        ORDER BY cm.joined_at ASC
+      `;
+
+      return rows.map((row: any) => ({
+        id: row.id,
+        displayName: row.display_name || 'Ученик',
+        email: row.email || null,
+        streak: row.current_streak || 0,
+        lastActiveDate: row.last_active_date ? pgDateToString(row.last_active_date) : null,
+        joinedAt: new Date(row.joined_at).getTime(),
+      }));
+    } catch (error) {
+      console.error('Failed to load course members:', error);
+      return [];
+    }
+  },
 };

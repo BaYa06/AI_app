@@ -59,6 +59,8 @@ export function SetDetailScreen({ navigation, route }: Props) {
   const addCard = useCardsStore((s) => s.addCard);
   const deleteCard = useCardsStore((s) => s.deleteCard);
 
+  const isReadOnly = set?.isReadOnly === true;
+
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
   const [actionCardId, setActionCardId] = useState<string | null>(null);
@@ -786,13 +788,15 @@ export function SetDetailScreen({ navigation, route }: Props) {
             )}
           </View>
 
-          <Pressable
-            onPress={() => handleEditCard(item.id)}
-            hitSlop={8}
-            style={styles.iconButton}
-          >
-            <Edit3 size={18} color={colors.textSecondary} />
-          </Pressable>
+          {!isReadOnly && (
+            <Pressable
+              onPress={() => handleEditCard(item.id)}
+              hitSlop={8}
+              style={styles.iconButton}
+            >
+              <Edit3 size={18} color={colors.textSecondary} />
+            </Pressable>
+          )}
         </View>
 
         <Text variant="h3" style={[styles.cardFront, { color: colors.textPrimary }]} numberOfLines={2}>
@@ -807,12 +811,14 @@ export function SetDetailScreen({ navigation, route }: Props) {
           {item.backText ?? (item as any).back}
         </Text>
 
-        <Pressable hitSlop={8} style={styles.menuButton} onPress={() => setActionCardId(item.id)}>
-          <MoreHorizontal size={18} color={colors.textTertiary} />
-        </Pressable>
+        {!isReadOnly && (
+          <Pressable hitSlop={8} style={styles.menuButton} onPress={() => setActionCardId(item.id)}>
+            <MoreHorizontal size={18} color={colors.textTertiary} />
+          </Pressable>
+        )}
       </Pressable>
     ),
-    [colors, handleEditCard]
+    [colors, handleEditCard, isReadOnly]
   );
 
   const keyExtractor = useCallback((item: Card) => item.id, []);
@@ -832,9 +838,12 @@ export function SetDetailScreen({ navigation, route }: Props) {
           >
             {set?.title || 'Набор'}
           </Text>
-          <Pressable onPress={handleSetMenu} hitSlop={10} style={styles.topIcon}>
-            <MoreHorizontal size={22} color={colors.textPrimary} />
-          </Pressable>
+          {!isReadOnly && (
+            <Pressable onPress={handleSetMenu} hitSlop={10} style={styles.topIcon}>
+              <MoreHorizontal size={22} color={colors.textPrimary} />
+            </Pressable>
+          )}
+          {isReadOnly && <View style={styles.topIcon} />}
         </View>
 
         <View style={styles.progressBlock}>
@@ -895,11 +904,13 @@ export function SetDetailScreen({ navigation, route }: Props) {
           <Text variant="h3" style={{ color: colors.textPrimary }}>
             Карточки ({filteredCards.length})
           </Text>
-          <Pressable onPress={openAddCardSheet} hitSlop={8}>
-            <Text variant="bodySmall" style={{ color: colors.primary, fontWeight: '700' }}>
-              + Добавить
-            </Text>
-          </Pressable>
+          {!isReadOnly && (
+            <Pressable onPress={openAddCardSheet} hitSlop={8}>
+              <Text variant="bodySmall" style={{ color: colors.primary, fontWeight: '700' }}>
+                + Добавить
+              </Text>
+            </Pressable>
+          )}
         </View>
       </View>
     ),
@@ -912,17 +923,19 @@ export function SetDetailScreen({ navigation, route }: Props) {
       <View style={styles.emptyState}>
         <Text style={styles.emptyIcon}>🃏</Text>
         <Text variant="body" color="secondary" align="center">
-          Пока нет карточек
+          {isReadOnly ? 'Учитель пока не добавил карточки' : 'Пока нет карточек'}
         </Text>
-        <Button
-          title="Добавить карточку"
-          variant="outline"
-          onPress={openAddCardSheet}
-          style={styles.emptyButton}
-        />
+        {!isReadOnly && (
+          <Button
+            title="Добавить карточку"
+            variant="outline"
+            onPress={openAddCardSheet}
+            style={styles.emptyButton}
+          />
+        )}
       </View>
     ),
-    [openAddCardSheet]
+    [openAddCardSheet, isReadOnly]
   );
 
   if (!set) {
@@ -1774,13 +1787,25 @@ export function SetDetailScreen({ navigation, route }: Props) {
               ]}
             >
               <View style={styles.previewFrontSection}>
-                <Text style={[styles.previewFrontText, { color: colors.textPrimary }]}>
+                <Text
+                  style={[styles.previewFrontText, { color: colors.textPrimary }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.6}
+                  allowFontScaling={false}
+                >
                   {previewCard?.frontText ?? (previewCard as any)?.front}
                 </Text>
               </View>
               <View style={[styles.previewDivider, { backgroundColor: colors.border }]} />
               <View style={styles.previewBackSection}>
-                <Text style={[styles.previewBackText, { color: colors.textSecondary }]}>
+                <Text
+                  style={[styles.previewBackText, { color: colors.textSecondary }]}
+                  numberOfLines={2}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.7}
+                  allowFontScaling={false}
+                >
                   {previewCard?.backText ?? (previewCard as any)?.back}
                 </Text>
                 {previewCard?.example ? (
@@ -1800,13 +1825,25 @@ export function SetDetailScreen({ navigation, route }: Props) {
               ]}
             >
               <View style={styles.previewFrontSection}>
-                <Text style={[styles.previewFrontText, { color: colors.textPrimary }]}>
+                <Text
+                  style={[styles.previewFrontText, { color: colors.textPrimary }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.6}
+                  allowFontScaling={false}
+                >
                   {previewCard?.frontText ?? (previewCard as any)?.front}
                 </Text>
               </View>
               <View style={[styles.previewDivider, { backgroundColor: colors.border }]} />
               <View style={styles.previewBackSection}>
-                <Text style={[styles.previewBackText, { color: colors.textSecondary }]}>
+                <Text
+                  style={[styles.previewBackText, { color: colors.textSecondary }]}
+                  numberOfLines={2}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.7}
+                  allowFontScaling={false}
+                >
                   {previewCard?.backText ?? (previewCard as any)?.back}
                 </Text>
                 {previewCard?.example ? (

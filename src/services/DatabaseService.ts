@@ -110,6 +110,29 @@ export const DatabaseService = {
       const allCourses: Course[] =
         currentUserId ? courses : localCoursesData?.courses || courses;
 
+      // Загружаем курсы где пользователь — ученик
+      if (currentUserId) {
+        try {
+          const studentCourses = await NeonService.loadStudentCourses(currentUserId);
+          if (studentCourses.length > 0) {
+            allCourses.push(...studentCourses);
+            console.log(`🎓 Загружено курсов ученика: ${studentCourses.length}`);
+
+            // Загружаем наборы каждого курса учителя (read-only)
+            for (const sc of studentCourses) {
+              const teacherSets = await NeonService.loadCourseSetsByMembership(sc.id);
+              teacherSets.forEach(ts => {
+                setsMap[ts.id] = ts;
+                setsOrder.push(ts.id);
+              });
+              console.log(`  📚 Курс "${sc.title}": ${teacherSets.length} наборов`);
+            }
+          }
+        } catch (e) {
+          console.warn('⚠️ Не удалось загрузить курсы ученика:', e);
+        }
+      }
+
       const savedActiveCourseId = localCoursesData?.activeCourseId ?? null;
       const activeCourseId = allCourses.some((c) => c.id === savedActiveCourseId)
         ? savedActiveCourseId

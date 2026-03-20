@@ -5,15 +5,36 @@
  */
 
 import { Platform } from 'react-native';
-import Tts from 'react-native-tts';
-import RNFS from 'react-native-fs';
-import Sound from 'react-native-sound';
+
+let Tts: any | null = null;
+let RNFS: any | null = null;
+let Sound: any | null = null;
+if (Platform.OS !== 'web') {
+  try {
+    const ttsModule = require('react-native-tts');
+    Tts = ttsModule?.default ?? ttsModule;
+  } catch (error) {
+    console.warn('[speech] Failed to load react-native-tts:', error);
+  }
+  try {
+    const fsModule = require('react-native-fs');
+    RNFS = fsModule?.default ?? fsModule;
+  } catch (error) {
+    console.warn('[speech] Failed to load react-native-fs:', error);
+  }
+  try {
+    const soundModule = require('react-native-sound');
+    Sound = soundModule?.default ?? soundModule;
+  } catch (error) {
+    console.warn('[speech] Failed to load react-native-sound:', error);
+  }
+}
 
 const isNative = Platform.OS !== 'web';
 
 // Initialize native TTS
 let nativeTtsReady = false;
-if (isNative) {
+if (isNative && Tts && typeof Tts.getInitStatus === 'function') {
   Tts.getInitStatus()
     .then(() => {
       nativeTtsReady = true;
@@ -23,13 +44,17 @@ if (isNative) {
       // On some Android devices, TTS engine needs to be installed
       if (err?.code === 'no_engine') {
         console.warn('[speech] No TTS engine installed on device');
-        Tts.requestInstallEngine();
+        if (typeof Tts.requestInstallEngine === 'function') {
+          Tts.requestInstallEngine();
+        }
       } else {
         console.warn('[speech] Native TTS init error:', err);
         // Still mark as ready — speak() may work anyway
         nativeTtsReady = true;
       }
     });
+} else if (isNative) {
+  console.warn('[speech] Native TTS module unavailable');
 }
 
 type SpeechVoice = {
@@ -305,6 +330,9 @@ const toGooglePitch = (pitch = 1) => {
 };
 
 const playAudioNative = (audioBase64: string, volume = 1): Promise<void> => {
+  if (!RNFS || !Sound) {
+    return Promise.reject(new Error('Native audio dependencies unavailable'));
+  }
   const filePath = `${RNFS.CachesDirectoryPath}/tts_${Date.now()}.mp3`;
   return RNFS.writeFile(filePath, audioBase64, 'base64').then(
     () =>
@@ -448,14 +476,18 @@ const speakWithNativeTTS = async (
   lang: string,
   options?: { rate?: number; pitch?: number; volume?: number }
 ): Promise<boolean> => {
-  if (!isNative || !nativeTtsReady) return false;
+  if (!isNative || !nativeTtsReady || !Tts) return false;
 
   try {
-    await Tts.stop();
-    await Tts.setDefaultLanguage(lang);
-    await Tts.setDefaultRate(options?.rate ?? 0.5);
-    await Tts.setDefaultPitch(options?.pitch ?? 1);
-    Tts.speak(text);
+    if (typeof Tts.stop === 'function') await Tts.stop();
+    if (typeof Tts.setDefaultLanguage === 'function') await Tts.setDefaultLanguage(lang);
+    if (typeof Tts.setDefaultRate === 'function') await Tts.setDefaultRate(options?.rate ?? 0.5);
+    if (typeof Tts.setDefaultPitch === 'function') await Tts.setDefaultPitch(options?.pitch ?? 1);
+    if (typeof Tts.speak === 'function') {
+      Tts.speak(text);
+    } else {
+      throw new Error('TTS speak is unavailable');
+    }
     console.log('[speech] Native TTS speaking:', lang);
     return true;
   } catch (e) {

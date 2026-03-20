@@ -32,6 +32,14 @@ export function CardEditorScreen({ navigation, route }: Props) {
   const [isSaving, setIsSaving] = useState(false);
   const cardSet = getSet(setId);
 
+  // Блокируем редактирование read-only наборов (курсы учителя)
+  useEffect(() => {
+    if (cardSet?.isReadOnly) {
+      Alert.alert('Только чтение', 'Этот набор создан учителем');
+      navigation.goBack();
+    }
+  }, [cardSet?.isReadOnly, navigation]);
+
   // Загрузка данных для редактирования
   useEffect(() => {
     if (cardId) {

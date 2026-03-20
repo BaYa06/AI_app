@@ -120,6 +120,10 @@ export interface Course {
   title: string;
   createdAt: number;
   updatedAt?: number;
+  // Поля для курсов учителя (у ученика)
+  isStudentCourse?: boolean;
+  teacherName?: string;
+  ownerId?: string;
 }
 
 /**
@@ -156,6 +160,9 @@ export interface CardSet {
   isPublic: boolean;
   isFavorite: boolean;
   isArchived: boolean;
+  // Read-only набор учителя (для ученика)
+  isReadOnly?: boolean;
+  ownerCourseId?: string;
 }
 
 /**

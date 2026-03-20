@@ -5,13 +5,27 @@
  */
 
 import { Platform } from 'react-native';
-import Sound from 'react-native-sound';
+
+let Sound: any | null = null;
+if (Platform.OS !== 'web') {
+  try {
+    const soundModule = require('react-native-sound');
+    Sound = soundModule?.default ?? soundModule;
+  } catch (error) {
+    console.warn('[sound] Failed to load react-native-sound:', error);
+  }
+}
 
 const isNative = Platform.OS !== 'web';
+const canUseNativeSound = Boolean(Sound && typeof Sound.setCategory === 'function');
 
 // Enable playback in silence mode (iOS)
-if (isNative) {
-  Sound.setCategory('Playback');
+if (isNative && canUseNativeSound) {
+  try {
+    Sound.setCategory('Playback');
+  } catch (error) {
+    console.warn('[sound] Failed to set audio category:', error);
+  }
 }
 
 // Native sound cache
@@ -78,6 +92,12 @@ function playSynthesizedSound(): void {
 
 function playNativeSound(assetName: string, volume: number): Promise<void> {
   return new Promise((resolve) => {
+    if (!canUseNativeSound) {
+      console.warn('[sound] react-native-sound is unavailable, skipping playback:', assetName);
+      resolve();
+      return;
+    }
+
     // Check cache
     const cached = nativeSoundCache.get(assetName);
     if (cached) {
@@ -112,6 +132,10 @@ function playNativeSound(assetName: string, volume: number): Promise<void> {
 
 export function preloadSound(url: string): void {
   if (isNative) {
+    if (!canUseNativeSound) {
+      console.warn('[sound] react-native-sound is unavailable, skip preload:', url);
+      return;
+    }
     const assetName = urlToAssetName(url);
     if (nativeSoundCache.has(assetName)) return;
     const sound = new Sound(assetName, Sound.MAIN_BUNDLE, (err: any) => {
