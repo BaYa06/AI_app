@@ -50,7 +50,7 @@ function renderPage({ courseTitle, teacherName, token, error }) {
     ? `${teacherName} приглашает вас в курс «${courseTitle}»`
     : 'Присоединяйтесь к курсу на Flashly';
 
-  const pwaUrl = token ? `https://flashlyapp.com/join/${token}` : 'https://flashlyapp.com';
+  const pwaUrl = token ? `https://ai-app-seven-zeta.vercel.app/join/${token}` : 'https://ai-app-seven-zeta.vercel.app';
   const deepLink = token ? `flashly://join/${token}` : 'flashly://';
 
   return `<!DOCTYPE html>
@@ -162,41 +162,18 @@ function renderPage({ courseTitle, teacherName, token, error }) {
     ${error ? `
       <div class="icon">😔</div>
       <p class="error">${esc(error)}</p>
-      <a href="https://flashlyapp.com" class="btn btn-primary">Открыть Flashly</a>
+      <a href="https://ai-app-seven-zeta.vercel.app" class="btn btn-primary">Открыть Flashly</a>
     ` : `
       <div class="icon">🎓</div>
       <div class="badge">Приглашение в курс</div>
       <h1>${esc(courseTitle)}</h1>
       <p class="teacher">Учитель: ${esc(teacherName)}</p>
       <p class="desc">Присоединяйтесь к курсу, чтобы изучать материалы учителя с интервальным повторением</p>
-      <a href="${esc(deepLink)}" class="btn btn-primary" id="openBtn">Открыть в приложении</a>
-      <a href="https://flashlyapp.com/?join=${esc(token)}" class="btn btn-secondary">Открыть в браузере</a>
+      <a href="https://ai-app-seven-zeta.vercel.app/?join=${esc(token)}" class="btn btn-primary">Открыть Flashly</a>
     `}
     <p class="logo">Flashly — учи слова эффективно</p>
   </div>
 
-  ${!error && token ? `
-  <script>
-    // Попробовать открыть нативное приложение через deep link
-    (function() {
-      var deepLink = ${JSON.stringify(deepLink)};
-      var pwa = ${JSON.stringify(pwaUrl)};
-      var btn = document.getElementById('openBtn');
-
-      // На iOS пробуем Universal Link / custom scheme
-      var isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
-      if (isIOS) {
-        btn.href = deepLink;
-        // Fallback на PWA через таймаут
-        btn.addEventListener('click', function() {
-          setTimeout(function() {
-            window.location.href = pwa;
-          }, 1500);
-        });
-      }
-    })();
-  </script>
-  ` : ''}
 </body>
 </html>`;
 }

@@ -86,7 +86,7 @@ export function HomeScreen({ navigation }: any) {
   const [inviteCopied, setInviteCopied] = useState(false);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [inviteLoading, setInviteLoading] = useState(false);
-  const inviteBaseUrl = 'https://flashlyapp.com';
+  const inviteBaseUrl = 'https://ai-app-seven-zeta.vercel.app';
   const editInputRef = useRef<RNTextInput>(null);
   const newCourseInputRef = useRef<RNTextInput>(null);
   const editModalInputRef = useRef<RNTextInput>(null);

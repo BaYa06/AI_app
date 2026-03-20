@@ -69,7 +69,7 @@ async function createInvite(req, res, sql) {
   if (existing.length > 0) {
     return res.status(200).json({
       token: existing[0].token,
-      inviteUrl: `https://flashlyapp.com/join/${existing[0].token}`,
+      inviteUrl: `https://ai-app-seven-zeta.vercel.app/join/${existing[0].token}`,
     });
   }
 
@@ -83,7 +83,7 @@ async function createInvite(req, res, sql) {
 
   return res.status(201).json({
     token,
-    inviteUrl: `https://flashlyapp.com/join/${token}`,
+    inviteUrl: `https://ai-app-seven-zeta.vercel.app/join/${token}`,
   });
 }
 
