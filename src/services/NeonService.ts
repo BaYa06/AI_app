@@ -344,6 +344,10 @@ export const NeonService = {
         FROM cards c
         INNER JOIN card_sets s ON c.set_id = s.id
         WHERE s.user_id = ${userId}
+          OR s.course_id IN (
+            SELECT course_id FROM course_members
+            WHERE user_id = ${userId} AND role = 'student'
+          )
         ORDER BY c.created_at ASC
       `;
 
