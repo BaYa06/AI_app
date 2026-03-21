@@ -283,6 +283,8 @@ export default function App() {
       } else {
         setCurrentUserId(null);
         setAnalyticsUserId(null);
+        ensuredUserIdRef.current = null;
+        setAuthStep('welcome');
       }
     });
 

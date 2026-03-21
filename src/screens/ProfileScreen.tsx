@@ -148,7 +148,13 @@ export function ProfileScreen({ navigation }: any) {
       {
         text: 'Выйти',
         style: 'destructive',
-        onPress: () => supabase.auth.signOut(),
+        onPress: async () => {
+          try {
+            await supabase.auth.signOut();
+          } catch (e) {
+            console.error('Logout error:', e);
+          }
+        },
       },
     ]);
   }, []);

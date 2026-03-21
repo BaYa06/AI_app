@@ -86,7 +86,8 @@ export function SetDetailScreen({ navigation, route }: Props) {
   const [importLoading, setImportLoading] = useState(false);
   const [importedCards, setImportedCards] = useState<Array<{ front: string; back: string; example?: string }>>([]);
   const [importError, setImportError] = useState<string | null>(null);
-  const [importStep, setImportStep] = useState<'select' | 'loading' | 'extracting' | 'translating' | 'preview' | 'generating'>('select');
+  const [importStep, setImportStep] = useState<'select' | 'loading' | 'extracting' | 'translating' | 'preview' | 'generating' | 'done'>('select');
+  const [importedCount, setImportedCount] = useState(0);
   const [importSource, setImportSource] = useState<'file' | 'image'>('file');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -287,10 +288,12 @@ export function SetDetailScreen({ navigation, route }: Props) {
   }, []);
 
   const openImportModal = useCallback(() => {
+    setShowAddCard(false);
     setImportStep('select');
     setImportSource('file');
     setImportedCards([]);
     setImportError(null);
+    setImportedCount(0);
     setShowImportModal(true);
   }, []);
 
@@ -300,6 +303,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
     setImportSource('file');
     setImportedCards([]);
     setImportError(null);
+    setImportedCount(0);
   }, []);
 
   // Parse TSV file content
@@ -646,7 +650,8 @@ export function SetDetailScreen({ navigation, route }: Props) {
       await DatabaseService.saveCards();
       await DatabaseService.saveSets();
 
-      closeImportModal();
+      setImportedCount(cardsWithExamples.length);
+      setImportStep('done');
     } catch (error) {
       setImportError('Ошибка при создании карточек');
       setImportStep('preview');
@@ -838,12 +843,9 @@ export function SetDetailScreen({ navigation, route }: Props) {
           >
             {set?.title || 'Набор'}
           </Text>
-          {!isReadOnly && (
-            <Pressable onPress={handleSetMenu} hitSlop={10} style={styles.topIcon}>
-              <MoreHorizontal size={22} color={colors.textPrimary} />
-            </Pressable>
-          )}
-          {isReadOnly && <View style={styles.topIcon} />}
+          <Pressable onPress={handleSetMenu} hitSlop={10} style={styles.topIcon}>
+            <MoreHorizontal size={22} color={colors.textPrimary} />
+          </Pressable>
         </View>
 
         <View style={styles.progressBlock}>
@@ -1384,7 +1386,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                 <ArrowLeft size={20} color={modalTextPrimary} />
               </Pressable>
               <Text variant="body" style={[styles.importTitle, { color: modalTextPrimary }]}>
-                {importStep === 'preview' ? `Импорт (${importedCards.length} карточек)` : importStep === 'generating' ? 'Генерация примеров...' : importStep === 'translating' ? 'Перевод слов...' : importStep === 'extracting' ? (importSource === 'image' ? 'Обработка фото...' : 'Обработка PDF...') : 'Импорт из файла'}
+                {importStep === 'done' ? 'Готово!' : importStep === 'preview' ? `Импорт (${importedCards.length} карточек)` : importStep === 'generating' ? 'Генерация примеров...' : importStep === 'translating' ? 'Перевод слов...' : importStep === 'extracting' ? (importSource === 'image' ? 'Обработка фото...' : 'Обработка PDF...') : 'Импорт из файла'}
               </Text>
               <View style={styles.topIcon} />
             </View>
@@ -1464,6 +1466,29 @@ export function SetDetailScreen({ navigation, route }: Props) {
                   AI переводит слова без перевода
                 </Text>
                 <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: spacing.l }} />
+              </View>
+            )}
+
+            {/* Done State */}
+            {importStep === 'done' && (
+              <View style={styles.importLoadingContainer}>
+                <View style={[styles.importHeroIcon, { backgroundColor: 'rgba(34,197,94,0.15)' }]}>
+                  <CheckCircle size={36} color="#22C55E" />
+                </View>
+                <Text variant="h3" align="center" style={{ color: colors.textPrimary, marginTop: spacing.m }}>
+                  Импорт завершён
+                </Text>
+                <Text variant="body" color="secondary" align="center" style={{ marginTop: spacing.xs, paddingHorizontal: spacing.l }}>
+                  {importedCount === 1 ? 'Добавлена 1 карточка' : importedCount < 5 ? `Добавлено ${importedCount} карточки` : `Добавлено ${importedCount} карточек`}
+                </Text>
+                <Pressable
+                  onPress={closeImportModal}
+                  style={[styles.importSelectButton, { backgroundColor: colors.primary, marginTop: spacing.l }]}
+                >
+                  <Text variant="body" style={{ color: colors.textInverse, fontWeight: '700' }}>
+                    Отлично
+                  </Text>
+                </Pressable>
               </View>
             )}
 

@@ -87,14 +87,8 @@ export function SetEditorScreen({ navigation, route }: Props) {
   const deleteSet = useSetsStore((s) => s.deleteSet);
   const deleteCardsBySet = useCardsStore((s) => s.deleteCardsBySet);
 
-  // Блокируем редактирование read-only наборов (курсы учителя)
   const existingSet = setId ? getSet(setId) : undefined;
-  useEffect(() => {
-    if (existingSet?.isReadOnly) {
-      Alert.alert('Только чтение', 'Этот набор создан учителем');
-      navigation.goBack();
-    }
-  }, [existingSet?.isReadOnly, navigation]);
+  const isReadOnly = existingSet?.isReadOnly === true;
 
   // Courses store - для назначения courseId при создании набора
   const activeCourseId = useCoursesStore((s) => s.activeCourseId);
@@ -209,22 +203,25 @@ export function SetEditorScreen({ navigation, route }: Props) {
   const isSaveDisabled = !isFormValid || isSaving;
 
   const toggleCoursePicker = useCallback(() => {
+    if (isReadOnly) return;
     setCoursePickerOpen((open) => !open);
     setSourcePickerOpen(false);
     setTargetPickerOpen(false);
-  }, []);
+  }, [isReadOnly]);
 
   const toggleSourcePicker = useCallback(() => {
+    if (isReadOnly) return;
     setSourcePickerOpen((open) => !open);
     setTargetPickerOpen(false);
     setCoursePickerOpen(false);
-  }, []);
+  }, [isReadOnly]);
 
   const toggleTargetPicker = useCallback(() => {
+    if (isReadOnly) return;
     setTargetPickerOpen((open) => !open);
     setSourcePickerOpen(false);
     setCoursePickerOpen(false);
-  }, []);
+  }, [isReadOnly]);
 
   const handleSelectSourceLanguage = useCallback((lang: string) => {
     setSourceLanguage(lang);
@@ -237,6 +234,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
   }, []);
 
   const swapLanguages = useCallback(() => {
+    if (isReadOnly) return;
     setSourceLanguage((prevSource) => {
       // Переключаем, но целевой язык остаётся среди доступных целей
       const newTarget = prevSource;
@@ -245,7 +243,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
     });
     setSourcePickerOpen(false);
     setTargetPickerOpen(false);
-  }, [targetLanguage]);
+  }, [targetLanguage, isReadOnly]);
 
   const closeSheet = useCallback(() => {
     navigation.goBack();
@@ -407,7 +405,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
       <Animated.View style={[styles.animatedWrapper, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
           <View style={styles.headerRow}>
             <Text variant="h2" style={[styles.headerTitle, { color: colors.textPrimary }]}>
-              {isEditing ? 'Редактировать набор' : 'Создать набор'}
+              {isReadOnly ? 'Настройки набора' : isEditing ? 'Редактировать набор' : 'Создать набор'}
             </Text>
           </View>
 
@@ -446,6 +444,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
                   onFocus={() => setTitleFocused(true)}
                   onBlur={() => setTitleFocused(false)}
                   maxLength={100}
+                  editable={!isReadOnly}
                 />
               </View>
 
@@ -492,6 +491,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
                   onFocus={() => setDescriptionFocused(true)}
                   onBlur={() => setDescriptionFocused(false)}
                   textAlignVertical="top"
+                  editable={!isReadOnly}
                 />
               </View>
             </View>
@@ -581,7 +581,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
             </View>
 
             {/* Публикация в библиотеку */}
-            {isEditing && (
+            {isEditing && !isReadOnly && (
               <View style={styles.field}>
                 <Text variant="label" color="primary" style={styles.fieldLabel}>
                   Библиотека
@@ -700,10 +700,10 @@ export function SetEditorScreen({ navigation, route }: Props) {
               </View>
             )}
 
-            {isEditing && (
-              <Pressable 
-                onPress={handleDelete} 
-                style={styles.deleteLink} 
+            {isEditing && !isReadOnly && (
+              <Pressable
+                onPress={handleDelete}
+                style={styles.deleteLink}
                 disabled={isSaving}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
@@ -720,40 +720,56 @@ export function SetEditorScreen({ navigation, route }: Props) {
               { borderTopColor: colors.border, backgroundColor: 'transparent' },
             ]}
           >
-            <Pressable
-              style={[
-                styles.secondaryAction,
-                { borderColor: colors.border },
-              ]}
-              onPress={() => navigation.goBack()}
-              disabled={isSaving}
-            >
-              <Text variant="body" style={{ color: colors.textSecondary, fontWeight: '600' }}>
-                Отмена
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[
-                styles.primaryAction,
-                {
-                  backgroundColor: isFormValid ? colors.primary : colors.border,
-                  opacity: isSaveDisabled ? 0.75 : 1,
-                },
-              ]}
-              onPress={handleSave}
-              disabled={isSaveDisabled}
-            >
-              <Text
-                variant="body"
-                style={{
-                  color: isSaveDisabled ? colors.textSecondary : '#ffffff',
-                  fontWeight: '700',
-                }}
+            {isReadOnly ? (
+              <Pressable
+                style={[
+                  styles.primaryAction,
+                  { backgroundColor: colors.primary, flex: 1 },
+                ]}
+                onPress={() => navigation.goBack()}
               >
-                Сохранить
-              </Text>
-            </Pressable>
+                <Text variant="body" style={{ color: '#ffffff', fontWeight: '700' }}>
+                  Назад
+                </Text>
+              </Pressable>
+            ) : (
+              <>
+                <Pressable
+                  style={[
+                    styles.secondaryAction,
+                    { borderColor: colors.border },
+                  ]}
+                  onPress={() => navigation.goBack()}
+                  disabled={isSaving}
+                >
+                  <Text variant="body" style={{ color: colors.textSecondary, fontWeight: '600' }}>
+                    Отмена
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  style={[
+                    styles.primaryAction,
+                    {
+                      backgroundColor: isFormValid ? colors.primary : colors.border,
+                      opacity: isSaveDisabled ? 0.75 : 1,
+                    },
+                  ]}
+                  onPress={handleSave}
+                  disabled={isSaveDisabled}
+                >
+                  <Text
+                    variant="body"
+                    style={{
+                      color: isSaveDisabled ? colors.textSecondary : '#ffffff',
+                      fontWeight: '700',
+                    }}
+                  >
+                    Сохранить
+                  </Text>
+                </Pressable>
+              </>
+            )}
           </View>
       </Animated.View>
     </SafeAreaView>

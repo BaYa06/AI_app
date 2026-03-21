@@ -29,8 +29,9 @@ export default async function handler(req, res) {
     if (action === 'create') return await createInvite(req, res, sql);
     if (action === 'info')   return await getInviteInfo(req, res, sql);
     if (action === 'join')   return await joinCourse(req, res, sql);
+    if (action === 'remove') return await removeStudent(req, res, sql);
 
-    return res.status(400).json({ error: 'Unknown action. Use: create, info, join' });
+    return res.status(400).json({ error: 'Unknown action. Use: create, info, join, remove' });
   } catch (error) {
     console.error('Course invite API error:', error);
     return res.status(500).json({ error: error.message });
@@ -167,4 +168,34 @@ async function joinCourse(req, res, sql) {
     courseId: course_id,
     courseTitle: course_title,
   });
+}
+
+/**
+ * POST ?action=remove
+ * Body: { courseId, studentUserId, teacherUserId }
+ * Удалить ученика из курса
+ */
+async function removeStudent(req, res, sql) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const { courseId, studentUserId, teacherUserId } = req.body;
+  if (!courseId || !studentUserId || !teacherUserId) {
+    return res.status(400).json({ error: 'courseId, studentUserId and teacherUserId are required' });
+  }
+
+  // Проверить что teacherUserId — владелец курса
+  const course = await sql`
+    SELECT id FROM courses
+    WHERE id = ${courseId}::uuid AND user_id = ${teacherUserId}::uuid
+  `;
+  if (course.length === 0) {
+    return res.status(403).json({ error: 'Access denied: not course owner' });
+  }
+
+  await sql`
+    DELETE FROM course_members
+    WHERE course_id = ${courseId}::uuid AND user_id = ${studentUserId}::uuid
+  `;
+
+  return res.status(200).json({ success: true });
 }

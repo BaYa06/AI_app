@@ -1292,6 +1292,31 @@ export const NeonService = {
     }
   },
 
+  async removeStudentFromCourse(courseId: string, studentUserId: string, teacherUserId: string): Promise<boolean> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) return false;
+
+      const sql = neon(connectionString);
+
+      const course = await sql`
+        SELECT id FROM courses
+        WHERE id = ${courseId}::uuid AND user_id = ${teacherUserId}::uuid
+      `;
+      if (course.length === 0) return false;
+
+      await sql`
+        DELETE FROM course_members
+        WHERE course_id = ${courseId}::uuid AND user_id = ${studentUserId}::uuid
+      `;
+
+      return true;
+    } catch (error) {
+      console.error('Failed to remove student from course:', error);
+      return false;
+    }
+  },
+
   /**
    * Загрузить курсы где пользователь — ученик
    */
@@ -1380,6 +1405,7 @@ export const NeonService = {
     email: string | null;
     streak: number;
     lastActiveDate: string | null;
+    todayCards: number;
     joinedAt: number;
   }>> {
     try {
@@ -1388,18 +1414,28 @@ export const NeonService = {
 
       const sql = neon(connectionString);
 
+      try {
+        await sql`CREATE INDEX IF NOT EXISTS idx_daily_activity_date ON daily_activity(local_date, user_id)`;
+      } catch {}
+
       const rows = await sql`
         SELECT
           u.id,
           COALESCE(u.display_name, u.user_name, u.email) AS display_name,
           u.email,
           COALESCE(us.current_streak, 0) AS current_streak,
-          us.last_active_date,
+          MAX(da.local_date) AS last_active_date,
+          COALESCE(today_da.cards_studied, 0) AS today_cards,
           cm.joined_at
         FROM course_members cm
         JOIN users u ON u.id = cm.user_id
         LEFT JOIN user_stats us ON us.user_id = cm.user_id
+        LEFT JOIN daily_activity da ON da.user_id = cm.user_id
+        LEFT JOIN daily_activity today_da
+          ON today_da.user_id = cm.user_id
+          AND today_da.local_date = CURRENT_DATE
         WHERE cm.course_id = ${courseId}::uuid
+        GROUP BY u.id, u.display_name, u.user_name, u.email, us.current_streak, today_da.cards_studied, cm.joined_at
         ORDER BY cm.joined_at ASC
       `;
 
@@ -1409,10 +1445,46 @@ export const NeonService = {
         email: row.email || null,
         streak: row.current_streak || 0,
         lastActiveDate: row.last_active_date ? pgDateToString(row.last_active_date) : null,
+        todayCards: row.today_cards || 0,
         joinedAt: new Date(row.joined_at).getTime(),
       }));
     } catch (error) {
       console.error('Failed to load course members:', error);
+      return [];
+    }
+  },
+
+  async loadCourseActivityChart(
+    courseId: string,
+    days: number,
+  ): Promise<Array<{ date: string; count: number }>> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) return [];
+
+      const sql = neon(connectionString);
+
+      const rows = await sql`
+        SELECT
+          da.local_date::text AS date,
+          COUNT(DISTINCT da.user_id) AS count
+        FROM daily_activity da
+        JOIN course_members cm
+          ON cm.user_id = da.user_id
+          AND cm.course_id = ${courseId}::uuid
+        WHERE da.local_date >= CURRENT_DATE - ${days}::int
+          AND da.local_date <= CURRENT_DATE
+          AND da.cards_studied > 0
+        GROUP BY da.local_date
+        ORDER BY da.local_date ASC
+      `;
+
+      return rows.map((row: any) => ({
+        date: row.date,
+        count: Number(row.count),
+      }));
+    } catch (error) {
+      console.error('Failed to load course activity chart:', error);
       return [];
     }
   },

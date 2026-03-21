@@ -13,14 +13,17 @@ import {
   Platform,
   BackHandler,
   ActivityIndicator,
+  Alert,
+  TouchableOpacity,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, ChevronRight, Plus } from 'lucide-react-native';
+import { ArrowLeft, ChevronRight, Plus, Trash2 } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import { useThemeColors, useSettingsStore } from '@/store';
 import { spacing, borderRadius } from '@/constants';
 import { NeonService } from '@/services/NeonService';
+import { supabase } from '@/services/supabaseClient';
 import type { RootStackParamList } from '@/types/navigation';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -37,6 +40,7 @@ interface Student {
   status: StudentStatus;
   streak: number;
   lastActivity: string;
+  todayCards: number;
 }
 
 type FilterKey = 'all' | 'active' | 'away3d' | 'away7d';
@@ -75,8 +79,28 @@ function formatLastActivity(lastActiveDate: string | null): string {
   if (diffDays === 0) return 'Сегодня';
   if (diffDays === 1) return 'Вчера';
   if (diffDays < 7) return `${diffDays} дн. назад`;
-  return `${diffDays} дн. назад`;
+  if (diffDays < 30) return `${diffDays} дн. назад`;
+  const weeks = Math.floor(diffDays / 7);
+  if (weeks < 5) return `${weeks} нед. назад`;
+  const months = Math.floor(diffDays / 30);
+  return `${months} мес. назад`;
 }
+
+function pluralCards(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 19) return 'карточек';
+  if (mod10 === 1) return 'карточка';
+  if (mod10 >= 2 && mod10 <= 4) return 'карточки';
+  return 'карточек';
+}
+
+const ACTIVITY_COLORS: Record<StudentStatus, string> = {
+  online:   '#10B981',
+  away:     '#F59E0B',
+  offline:  '#EF4444',
+  inactive: '#9CA3AF',
+};
 
 // ==================== STATUS DOT COLOR ====================
 
@@ -89,11 +113,12 @@ const STATUS_COLORS: Record<StudentStatus, string> = {
 
 // ==================== STUDENT ROW ====================
 
-function StudentRow({ student, colors, isDark, onPress }: {
+function StudentRow({ student, colors, isDark, onPress, onRemove }: {
   student: Student;
   colors: any;
   isDark: boolean;
   onPress: () => void;
+  onRemove: () => void;
 }) {
   const isInactive = student.status === 'inactive';
   const dotColor = STATUS_COLORS[student.status];
@@ -106,14 +131,12 @@ function StudentRow({ student, colors, isDark, onPress }: {
     : colors.primary;
 
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
+    <View
+      style={[
         styles.row,
         {
           borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : '#F3F4F6',
           opacity: isInactive ? 0.7 : 1,
-          backgroundColor: pressed ? (isDark ? 'rgba(255,255,255,0.04)' : '#F9FAFB') : 'transparent',
         },
       ]}
     >
@@ -150,14 +173,33 @@ function StudentRow({ student, colors, isDark, onPress }: {
             </View>
           )}
         </View>
-        <Text style={[styles.rowMeta, { color: colors.textTertiary }]}>
-          {student.lastActivity}
-        </Text>
+        <View style={styles.rowMetaRow}>
+          <Text style={[styles.rowMeta, { color: ACTIVITY_COLORS[student.status] }]}>
+            {student.lastActivity}
+          </Text>
+          {student.todayCards > 0 && (
+            <View style={[styles.cardsBadge, { backgroundColor: isDark ? 'rgba(16,185,129,0.12)' : '#ECFDF5' }]}>
+              <Text style={styles.cardsBadgeText}>
+                {student.todayCards} {pluralCards(student.todayCards)}
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
 
-      {/* Chevron */}
-      <ChevronRight size={18} color={isDark ? 'rgba(255,255,255,0.2)' : '#D1D5DB'} />
-    </Pressable>
+      {/* Remove button */}
+      <TouchableOpacity
+        onPress={onRemove}
+        activeOpacity={0.6}
+        hitSlop={8}
+        style={[
+          styles.removeBtn,
+          { backgroundColor: isDark ? 'rgba(239,68,68,0.1)' : '#FEF2F2' },
+        ]}
+      >
+        <Trash2 size={16} color="#EF4444" />
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -191,6 +233,7 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
               status,
               streak: m.streak,
               lastActivity: formatLastActivity(m.lastActiveDate),
+              todayCards: m.todayCards,
             };
           }),
         );
@@ -220,6 +263,40 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
 
     return list;
   }, [query, activeFilter, students]);
+
+  const handleRemoveStudent = useCallback((student: Student) => {
+    Alert.alert(
+      'Удалить ученика?',
+      `${student.name} больше не будет иметь доступ к курсу`,
+      [
+        { text: 'Отмена', style: 'cancel' },
+        {
+          text: 'Удалить',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { data: { session } } = await supabase.auth.getSession();
+              if (!session?.user) return;
+
+              const success = await NeonService.removeStudentFromCourse(
+                route.params.courseId,
+                student.id,
+                session.user.id,
+              );
+
+              if (success) {
+                setStudents(prev => prev.filter(s => s.id !== student.id));
+              } else {
+                Alert.alert('Ошибка', 'Не удалось удалить ученика');
+              }
+            } catch {
+              Alert.alert('Ошибка', 'Не удалось удалить ученика');
+            }
+          },
+        },
+      ],
+    );
+  }, [route.params.courseId]);
 
   const inputBg = isDark ? 'rgba(255,255,255,0.07)' : '#F3F4F6';
   const pillActiveBg = colors.primary;
@@ -388,6 +465,7 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
               colors={colors}
               isDark={isDark}
               onPress={() => {}}
+              onRemove={() => handleRemoveStudent(item)}
             />
           )}
           contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
@@ -557,9 +635,32 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#EA580C',
   },
+  rowMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   rowMeta: {
     fontSize: 12,
-    fontWeight: '400',
+    fontWeight: '500',
+  },
+  cardsBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  cardsBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#059669',
+  },
+  removeBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: spacing.s,
   },
 
   // Empty

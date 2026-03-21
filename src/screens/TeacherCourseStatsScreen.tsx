@@ -15,7 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, X } from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { useThemeColors, useSettingsStore } from '@/store';
+import { useThemeColors, useSettingsStore, useSetsStore } from '@/store';
 import { spacing, borderRadius } from '@/constants';
 import { NeonService } from '@/services/NeonService';
 import type { RootStackParamList } from '@/types/navigation';
@@ -54,46 +54,65 @@ function getStudentStatus(lastActiveDate: string | null): StudentStatus {
   return 'inactive';
 }
 
-// ==================== MOCK DATA (charts & sets — пока не трогаем) ====================
+// ==================== CHART HELPER ====================
 
-const MOCK_SETS = [
-  {
-    id: '1',
-    title: 'Die Artikel (Der, Die, Das)',
-    totalWords: 40,
-    startedOf20: 15,
-    progress: 0.75,
-    accuracy: 72,
-  },
-  {
-    id: '2',
-    title: 'Verben im Präsens',
-    totalWords: 25,
-    startedOf20: 6,
-    progress: 0.30,
-    accuracy: 89,
-  },
-];
+const DAY_NAMES = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+const MONTH_NAMES = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
 
-const CHART_DATA_7D = [
-  { day: 'Пн', pct: 0.40, count: 12 },
-  { day: 'Вт', pct: 0.65, count: 19 },
-  { day: 'Ср', pct: 0.50, count: 15 },
-  { day: 'Чт', pct: 0.85, count: 26 },
-  { day: 'Пт', pct: 0.70, count: 21 },
-  { day: 'Сб', pct: 0.30, count: 9 },
-  { day: 'Вс', pct: 0.45, count: 14 },
-];
+function buildChartDays(
+  raw: { date: string; count: number }[],
+  days: number,
+  totalStudents: number,
+): { day: string; pct: number; count: number }[] {
+  const map = new Map(raw.map(r => [r.date, r.count]));
 
-const CHART_DATA_30D = [
-  { day: '1', pct: 0.20, count: 6 },
-  { day: '5', pct: 0.45, count: 14 },
-  { day: '10', pct: 0.60, count: 18 },
-  { day: '15', pct: 0.80, count: 24 },
-  { day: '20', pct: 0.55, count: 16 },
-  { day: '25', pct: 0.70, count: 21 },
-  { day: '30', pct: 0.90, count: 27 },
-];
+  if (days === 7) {
+    const result: { day: string; pct: number; count: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateKey = d.toISOString().split('T')[0];
+      const count = map.get(dateKey) ?? 0;
+      const pct = totalStudents > 0 ? count / totalStudents : 0;
+      result.push({ day: DAY_NAMES[d.getDay()], pct, count });
+    }
+    return result;
+  }
+
+  // 30д — группируем по 5 дней (6 столбцов)
+  const CHUNK = 5;
+  const chunks: { day: string; pct: number; count: number }[] = [];
+
+  for (let c = 0; c < 6; c++) {
+    const startOffset = 29 - c * CHUNK;
+    let total = 0;
+    let daysInChunk = 0;
+    let firstDate: Date | null = null;
+    let lastDate: Date | null = null;
+
+    for (let j = 0; j < CHUNK; j++) {
+      const offset = startOffset - j;
+      if (offset < 0) break;
+      const d = new Date();
+      d.setDate(d.getDate() - offset);
+      const dateKey = d.toISOString().split('T')[0];
+      total += map.get(dateKey) ?? 0;
+      daysInChunk++;
+      if (!firstDate) firstDate = d;
+      lastDate = d;
+    }
+
+    const avg = daysInChunk > 0 ? total / daysInChunk : 0;
+    const pct = totalStudents > 0 ? avg / totalStudents : 0;
+    const label = firstDate && lastDate
+      ? `${firstDate.getDate()}–${lastDate.getDate()} ${MONTH_NAMES[lastDate.getMonth()]}`
+      : '';
+
+    chunks.push({ day: label, pct: Math.min(pct, 1), count: Math.round(avg) });
+  }
+
+  return chunks;
+}
 
 // ==================== COMPONENTS ====================
 
@@ -143,9 +162,16 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
     count: number;
   } | null>(null);
 
+  // Реальные наборы курса
+  const courseSets = useSetsStore((s) => s.getSetsByCourse(route.params.courseId));
+
   // Реальные участники
   const [members, setMembers] = useState<CourseMember[]>([]);
   const [membersLoading, setMembersLoading] = useState(true);
+
+  // Chart data
+  const [chartData, setChartData] = useState<{ day: string; pct: number; count: number }[]>([]);
+  const [chartLoading, setChartLoading] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -172,7 +198,18 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
   const inactiveStudents = members.filter((s) => s.status === 'inactive');
   const modalStudents = studentModal === 'active' ? activeStudents : inactiveStudents;
   const modalTitle = studentModal === 'active' ? 'Активны сегодня' : 'Не заходили 7д+';
-  const chartData = chartPeriod === '7d' ? CHART_DATA_7D : CHART_DATA_30D;
+
+  useEffect(() => {
+    if (!route.params.courseId || members.length === 0) return;
+    setChartLoading(true);
+    const days = chartPeriod === '7d' ? 7 : 30;
+    NeonService.loadCourseActivityChart(route.params.courseId, days)
+      .then((raw) => {
+        setChartData(buildChartDays(raw, days, members.length));
+      })
+      .catch(() => setChartData([]))
+      .finally(() => setChartLoading(false));
+  }, [chartPeriod, members.length, route.params.courseId]);
 
   const cardBg = isDark ? 'rgba(255,255,255,0.06)' : '#FFFFFF';
   const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : '#E5E7EB';
@@ -275,6 +312,11 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
           </View>
 
           {/* Bar chart */}
+          {chartLoading ? (
+            <View style={{ height: CHART_HEIGHT + 20, justifyContent: 'center', alignItems: 'center' }}>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          ) : (
           <View style={[styles.chartWrap, { height: CHART_HEIGHT + 20 }]}>
             {chartData.map((item, idx) => (
               <View key={idx} style={styles.barCol}>
@@ -307,6 +349,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
               </View>
             ))}
           </View>
+          )}
         </View>
 
         {/* Students carousel */}
@@ -340,42 +383,50 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
 
         {/* Sets list */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Наборы</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+            Наборы{courseSets.length > 0 ? ` (${courseSets.length})` : ''}
+          </Text>
           <View style={styles.setsList}>
-            {MOCK_SETS.map((set) => (
-              <View
-                key={set.id}
-                style={[styles.setCard, { backgroundColor: cardBg, borderColor: cardBorder }]}
-              >
-                <View style={styles.setCardHeader}>
-                  <Text style={[styles.setCardTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-                    {set.title}
-                  </Text>
-                  <Text style={[styles.setCardWords, { color: colors.textSecondary }]}>
-                    {set.totalWords} слов
-                  </Text>
-                </View>
+            {courseSets.length === 0 ? (
+              <Text style={[styles.emptyMembers, { color: colors.textSecondary }]}>
+                Нет наборов в этом курсе
+              </Text>
+            ) : (
+              courseSets.map((set) => (
+                <View
+                  key={set.id}
+                  style={[styles.setCard, { backgroundColor: cardBg, borderColor: cardBorder }]}
+                >
+                  <View style={styles.setCardHeader}>
+                    <Text style={[styles.setCardTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                      {set.title}
+                    </Text>
+                    <Text style={[styles.setCardWords, { color: colors.textSecondary }]}>
+                      {set.cardCount} слов
+                    </Text>
+                  </View>
 
-                {/* Progress bar */}
-                <View style={[styles.progressBg, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F1F5F9' }]}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      { width: `${Math.round(set.progress * 100)}%` as any, backgroundColor: colors.primary },
-                    ]}
-                  />
-                </View>
+                  {/* Progress bar */}
+                  <View style={[styles.progressBg, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F1F5F9' }]}>
+                    <View
+                      style={[
+                        styles.progressFill,
+                        { width: '0%' as any, backgroundColor: colors.primary },
+                      ]}
+                    />
+                  </View>
 
-                <View style={styles.setCardMeta}>
-                  <Text style={[styles.setCardMetaText, { color: colors.textSecondary }]}>
-                    {set.startedOf20} из 20 начали
-                  </Text>
-                  <Text style={[styles.setCardAccuracy, { color: colors.primary }]}>
-                    {set.accuracy}% точность
-                  </Text>
+                  <View style={styles.setCardMeta}>
+                    <Text style={[styles.setCardMetaText, { color: colors.textSecondary }]}>
+                      0 из {members.length} начали
+                    </Text>
+                    <Text style={[styles.setCardAccuracy, { color: colors.primary }]}>
+                      0% точность
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            ))}
+              ))
+            )}
           </View>
         </View>
       </ScrollView>
