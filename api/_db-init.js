@@ -20,10 +20,27 @@ async function ensureDatabaseInitialized(sql) {
       await initDatabase(sql);
       console.log('Database initialized successfully!');
     }
+
+    // Миграции для существующих БД
+    await applyMigrations(sql);
   } catch (error) {
     console.error('Error checking database:', error);
     // Если произошла ошибка, пытаемся инициализировать
     await initDatabase(sql);
+  }
+}
+
+/**
+ * Миграции, которые применяются к уже существующей БД
+ */
+async function applyMigrations(sql) {
+  try {
+    await sql`
+      ALTER TABLE card_sets
+      ADD COLUMN IF NOT EXISTS is_hidden_from_students BOOLEAN NOT NULL DEFAULT false
+    `;
+  } catch (e) {
+    console.error('Migration is_hidden_from_students failed:', e);
   }
 }
 
@@ -115,6 +132,12 @@ async function initDatabase(sql) {
       updated_at    TIMESTAMP NOT NULL DEFAULT NOW(),
       PRIMARY KEY (user_id, card_id)
     )
+  `;
+
+  // Добавить поле скрытия набора от учеников
+  await sql`
+    ALTER TABLE card_sets
+    ADD COLUMN IF NOT EXISTS is_hidden_from_students BOOLEAN NOT NULL DEFAULT false
   `;
 
   // Создание индексов для оптимизации

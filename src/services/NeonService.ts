@@ -49,6 +49,24 @@ function pgDateToString(value: unknown): string {
   return String(value).split('T')[0];
 }
 
+let _migrationsApplied = false;
+
+async function applyClientMigrations() {
+  if (_migrationsApplied) return;
+  _migrationsApplied = true;
+  try {
+    const connectionString = getConnectionString();
+    if (!connectionString) return;
+    const sql = neon(connectionString);
+    await sql`
+      ALTER TABLE card_sets
+      ADD COLUMN IF NOT EXISTS is_hidden_from_students BOOLEAN NOT NULL DEFAULT false
+    `;
+  } catch (e) {
+    console.warn('Client migration is_hidden_from_students skipped:', e);
+  }
+}
+
 /**
  * Определяет статус карточки на основе learningStep
  */
@@ -1373,6 +1391,7 @@ export const NeonService = {
    */
   async loadCourseSetsByMembership(courseId: string): Promise<CardSet[]> {
     try {
+      await applyClientMigrations();
       const connectionString = getConnectionString();
       if (!connectionString) return [];
 
@@ -1384,6 +1403,7 @@ export const NeonService = {
           (SELECT COUNT(*) FROM cards WHERE set_id = cs.id) AS total_cards
         FROM card_sets cs
         WHERE cs.course_id = ${courseId}::uuid
+          AND cs.is_hidden_from_students = false
         ORDER BY cs.created_at DESC
       `;
 
@@ -1428,7 +1448,9 @@ export const NeonService = {
       const sql = neon(connectionString);
 
       try {
-        await sql`CREATE INDEX IF NOT EXISTS idx_daily_activity_date ON daily_activity(local_date, user_id)`;
+        await sql`CREATE INDEX IF NOT EXISTS idx_reviews_user_reviewed ON reviews(user_id, reviewed_at)`;
+        await sql`CREATE INDEX IF NOT EXISTS idx_cards_set_id ON cards(set_id)`;
+        await sql`CREATE INDEX IF NOT EXISTS idx_card_sets_course_id ON card_sets(course_id)`;
       } catch {}
 
       const rows = await sql`
@@ -1437,18 +1459,25 @@ export const NeonService = {
           COALESCE(u.display_name, u.user_name, u.email) AS display_name,
           u.email,
           COALESCE(us.current_streak, 0) AS current_streak,
-          MAX(da.local_date) AS last_active_date,
-          COALESCE(today_da.cards_studied, 0) AS today_cards,
-          cm.joined_at
+          cm.joined_at,
+          cr.last_active_date,
+          COALESCE(cr.today_cards, 0) AS today_cards
         FROM course_members cm
         JOIN users u ON u.id = cm.user_id
         LEFT JOIN user_stats us ON us.user_id = cm.user_id
-        LEFT JOIN daily_activity da ON da.user_id = cm.user_id
-        LEFT JOIN daily_activity today_da
-          ON today_da.user_id = cm.user_id
-          AND today_da.local_date = CURRENT_DATE
+        LEFT JOIN (
+          SELECT
+            r.user_id,
+            MAX(r.reviewed_at)::date AS last_active_date,
+            COUNT(DISTINCT CASE
+              WHEN r.reviewed_at::date = CURRENT_DATE THEN r.card_id
+            END) AS today_cards
+          FROM reviews r
+          JOIN cards c ON c.id = r.card_id
+          JOIN card_sets cs ON cs.id = c.set_id AND cs.course_id = ${courseId}::uuid
+          GROUP BY r.user_id
+        ) cr ON cr.user_id = cm.user_id
         WHERE cm.course_id = ${courseId}::uuid
-        GROUP BY u.id, u.display_name, u.user_name, u.email, us.current_streak, today_da.cards_studied, cm.joined_at
         ORDER BY cm.joined_at ASC
       `;
 
@@ -1458,7 +1487,7 @@ export const NeonService = {
         email: row.email || null,
         streak: row.current_streak || 0,
         lastActiveDate: row.last_active_date ? pgDateToString(row.last_active_date) : null,
-        todayCards: row.today_cards || 0,
+        todayCards: Number(row.today_cards) || 0,
         joinedAt: new Date(row.joined_at).getTime(),
       }));
     } catch (error) {
@@ -1479,17 +1508,20 @@ export const NeonService = {
 
       const rows = await sql`
         SELECT
-          da.local_date::text AS date,
-          COUNT(DISTINCT da.user_id) AS count
-        FROM daily_activity da
-        JOIN course_members cm
-          ON cm.user_id = da.user_id
-          AND cm.course_id = ${courseId}::uuid
-        WHERE da.local_date >= CURRENT_DATE - ${days}::int
-          AND da.local_date <= CURRENT_DATE
-          AND da.cards_studied > 0
-        GROUP BY da.local_date
-        ORDER BY da.local_date ASC
+          r.reviewed_at::date::text AS date,
+          COUNT(DISTINCT r.user_id) AS count
+        FROM reviews r
+        JOIN cards c ON c.id = r.card_id
+        JOIN card_sets cs
+          ON cs.id = c.set_id
+          AND cs.course_id = ${courseId}::uuid
+        WHERE r.user_id IN (
+          SELECT user_id FROM course_members WHERE course_id = ${courseId}::uuid
+        )
+          AND r.reviewed_at::date >= CURRENT_DATE - ${days}::int
+          AND r.reviewed_at::date <= CURRENT_DATE
+        GROUP BY r.reviewed_at::date
+        ORDER BY date ASC
       `;
 
       return rows.map((row: any) => ({
@@ -1583,6 +1615,7 @@ export const NeonService = {
     progressPct: number;
   }>> {
     try {
+      await applyClientMigrations();
       const connectionString = getConnectionString();
       if (!connectionString) return [];
 
@@ -1632,6 +1665,7 @@ export const NeonService = {
         FROM card_sets cs
         LEFT JOIN set_started ss ON ss.set_id = cs.id
         WHERE cs.course_id = ${courseId}::uuid
+          AND cs.is_hidden_from_students = false
         ORDER BY cs.created_at ASC
       `;
 
@@ -1687,6 +1721,72 @@ export const NeonService = {
     } catch (error) {
       console.error('Failed to load set hard cards:', error);
       return [];
+    }
+  },
+
+  async isCourseOwner(courseId: string, userId: string): Promise<boolean> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) return false;
+      const sql = neon(connectionString);
+      const rows = await sql`
+        SELECT id FROM courses
+        WHERE id = ${courseId}::uuid
+          AND user_id = ${userId}::uuid
+      `;
+      return rows.length > 0;
+    } catch (error) {
+      console.error('Failed to check course ownership:', error);
+      return false;
+    }
+  },
+
+  async leaveStudentCourse(courseId: string, userId: string): Promise<boolean> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) return false;
+      const sql = neon(connectionString);
+
+      const owner = await sql`
+        SELECT id FROM courses
+        WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid
+      `;
+      if (owner.length > 0) {
+        console.warn('leaveStudentCourse: owner cannot leave own course');
+        return false;
+      }
+
+      await sql`
+        DELETE FROM course_members
+        WHERE course_id = ${courseId}::uuid
+          AND user_id = ${userId}::uuid
+          AND role = 'student'
+      `;
+      return true;
+    } catch (error) {
+      console.error('Failed to leave student course:', error);
+      return false;
+    }
+  },
+
+  async toggleSetHiddenFromStudents(setId: string, hidden: boolean): Promise<boolean> {
+    try {
+      await applyClientMigrations();
+      const connectionString = getConnectionString();
+      if (!connectionString) return false;
+
+      const sql = neon(connectionString);
+
+      await sql`
+        UPDATE card_sets
+        SET is_hidden_from_students = ${hidden}, updated_at = NOW()
+        WHERE id = ${setId}::uuid
+      `;
+
+      return true;
+    } catch (error) {
+      console.error('Failed to toggle set hidden from students:', error);
+      return false;
     }
   },
 };

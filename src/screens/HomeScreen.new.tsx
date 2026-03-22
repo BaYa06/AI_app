@@ -26,6 +26,8 @@ import {
   MoreVertical,
   X,
   MoreHorizontal,
+  Eye,
+  EyeOff,
   File,
   Folder,
   FolderOpen,
@@ -40,6 +42,7 @@ import {
   UserPlus,
   Sunrise,
   Timer,
+  LogOut,
 } from 'lucide-react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Svg, { Circle as SvgCircle } from 'react-native-svg';
@@ -47,6 +50,7 @@ import { StreakService, getLocalDateKey } from '@/services/StreakService';
 import { supabase } from '@/services/supabaseClient';
 import { NeonService } from '@/services/NeonService';
 import type { DailyActivity } from '@/services/StreakService';
+import type { CardSet } from '@/types';
 
 export function HomeScreen({ navigation }: any) {
   const colors = useThemeColors();
@@ -79,6 +83,8 @@ export function HomeScreen({ navigation }: any) {
   const [isCreatingCourse, setIsCreatingCourse] = useState(false);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [deleteModalCourseId, setDeleteModalCourseId] = useState<string | null>(null);
+  const [leaveModalCourseId, setLeaveModalCourseId] = useState<string | null>(null);
+  const [leaveLoading, setLeaveLoading] = useState(false);
   const [showStudyModeModal, setShowStudyModeModal] = useState(false);
   const [wordLimit, setWordLimit] = useState<'10' | '20' | '30' | 'all'>('10');
   const [isTeacher, setIsTeacher] = useState<boolean | null>(null);
@@ -87,6 +93,7 @@ export function HomeScreen({ navigation }: any) {
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [inviteLoading, setInviteLoading] = useState(false);
   const inviteBaseUrl = 'https://ai-app-seven-zeta.vercel.app';
+  const [setMenuTarget, setSetMenuTarget] = useState<CardSet | null>(null);
   const editInputRef = useRef<RNTextInput>(null);
   const newCourseInputRef = useRef<RNTextInput>(null);
   const editModalInputRef = useRef<RNTextInput>(null);
@@ -349,6 +356,18 @@ export function HomeScreen({ navigation }: any) {
   const addSet = useSetsStore((s) => s.addSet);
   const deleteCardsBySet = useCardsStore((s) => s.deleteCardsBySet);
 
+  const handleToggleSetHidden = useCallback(async (set: CardSet) => {
+    const newHidden = !set.isHiddenFromStudents;
+    updateSet(set.id, { isHiddenFromStudents: newHidden });
+    setSetMenuTarget(null);
+    try {
+      await NeonService.toggleSetHiddenFromStudents(set.id, newHidden);
+    } catch {
+      updateSet(set.id, { isHiddenFromStudents: !newHidden });
+      Alert.alert('Ошибка', 'Не удалось изменить видимость набора');
+    }
+  }, [updateSet]);
+
   // Обновляем статистику всех наборов из БД при фокусе на экране
   useFocusEffect(
     React.useCallback(() => {
@@ -502,6 +521,30 @@ export function HomeScreen({ navigation }: any) {
     deleteCourse(deleteModalCourseId);
     setDeleteModalCourseId(null);
   }, [deleteModalCourseId, deleteCourse, getCourseStats]);
+
+  const removeLocalCourse = useCoursesStore((s) => s.removeLocalCourse);
+
+  const handleLeaveCourse = useCallback(async () => {
+    if (!leaveModalCourseId) return;
+    setLeaveLoading(true);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const userId = data.session?.user?.id;
+      if (!userId) return;
+
+      const success = await NeonService.leaveStudentCourse(leaveModalCourseId, userId);
+      if (success) {
+        removeLocalCourse(leaveModalCourseId);
+        setLeaveModalCourseId(null);
+      } else {
+        Alert.alert('Ошибка', 'Не удалось выйти из курса. Попробуйте ещё раз.');
+      }
+    } catch {
+      Alert.alert('Ошибка', 'Не удалось выйти из курса.');
+    } finally {
+      setLeaveLoading(false);
+    }
+  }, [leaveModalCourseId, removeLocalCourse]);
 
   const handleStartStudyMode = useCallback((mode: 'classic' | 'match' | 'multipleChoice' | 'wordBuilder' | 'audio') => {
     setShowStudyModeModal(false);
@@ -733,18 +776,18 @@ export function HomeScreen({ navigation }: any) {
                 <Pressable
                   style={styles.teacherBanner}
                   onPress={() => {
-                    const targetCourseId = activeCourseId ?? courses[0]?.id;
-                    const targetCourseTitle = activeCourseTitle || courses[0]?.title || 'Курс';
+                    const ownCourses = courses.filter(c => !c.isStudentCourse);
+                    const targetCourse = ownCourses.find(c => c.id === activeCourseId) ?? ownCourses[0];
 
-                    if (!targetCourseId) {
+                    if (!targetCourse) {
                       Alert.alert('Нет курсов', 'Сначала создайте курс, чтобы открыть статистику учителя.');
                       return;
                     }
 
                     const rootNav = navigation?.getParent?.() ?? navigation;
                     rootNav?.navigate('TeacherCourseStats', {
-                      courseId: targetCourseId,
-                      courseTitle: targetCourseTitle,
+                      courseId: targetCourse.id,
+                      courseTitle: targetCourse.title || 'Курс',
                     });
                   }}
                 >
@@ -905,6 +948,14 @@ export function HomeScreen({ navigation }: any) {
                         <Text style={[styles.setCardCount, { color: colors.textSecondary }]}>
                           {set.cardCount} cards • {progress}% Mastered
                         </Text>
+                        {set.isHiddenFromStudents && set.courseId && isTeacher && (
+                          <View style={styles.hiddenBadge}>
+                            <EyeOff size={12} color={colors.textSecondary} />
+                            <Text style={[styles.hiddenBadgeText, { color: colors.textSecondary }]}>
+                              Скрыто
+                            </Text>
+                          </View>
+                        )}
                       </View>
                     </View>
 
@@ -913,7 +964,11 @@ export function HomeScreen({ navigation }: any) {
                       style={styles.moreButton}
                       onPress={(e) => {
                         e.stopPropagation();
-                        navigation?.navigate('SetEditor', { setId: set.id, autoFocusTitle: true });
+                        if (set.courseId && isTeacher) {
+                          setSetMenuTarget(set);
+                        } else {
+                          navigation?.navigate('SetEditor', { setId: set.id, autoFocusTitle: true });
+                        }
                       }}
                     >
                       <MoreVertical size={20} color={colors.textSecondary} />
@@ -1190,20 +1245,18 @@ export function HomeScreen({ navigation }: any) {
                             )}
                           </View>
                         </View>
-                        {!isStudent && (
-                          <Pressable
-                            style={styles.courseMoreButton}
-                            onPress={(e) => {
-                              e.stopPropagation();
-                              setCourseMenuOpen(isMenuOpen ? null : course.id);
-                            }}
-                          >
-                            <MoreHorizontal size={18} color={colors.textSecondary} />
-                          </Pressable>
-                        )}
+                        <Pressable
+                          style={styles.courseMoreButton}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            setCourseMenuOpen(isMenuOpen ? null : course.id);
+                          }}
+                        >
+                          <MoreHorizontal size={18} color={colors.textSecondary} />
+                        </Pressable>
                       </View>
 
-                      {isMenuOpen && !isStudent && (
+                      {isMenuOpen && (
                         <View
                           style={[
                             styles.courseMenu,
@@ -1214,7 +1267,7 @@ export function HomeScreen({ navigation }: any) {
                             },
                           ]}
                         >
-                          {isTeacher && (
+                          {isStudent ? (
                             <Pressable
                               style={({ pressed }) => [
                                 styles.courseMenuItem,
@@ -1222,39 +1275,58 @@ export function HomeScreen({ navigation }: any) {
                               ]}
                               onPress={(e) => {
                                 e.stopPropagation();
-                                openInviteModal(course.id);
+                                setCourseMenuOpen(null);
+                                setLeaveModalCourseId(course.id);
                               }}
                             >
-                              <UserPlus size={16} color={colors.primary} style={{ marginRight: spacing.s }} />
-                              <Text style={[styles.courseMenuText, { color: colors.primary }]}>Добавить</Text>
+                              <LogOut size={16} color={colors.error} style={{ marginRight: spacing.s }} />
+                              <Text style={[styles.courseMenuText, { color: colors.error }]}>Выйти из курса</Text>
                             </Pressable>
+                          ) : (
+                            <>
+                              {isTeacher && (
+                                <Pressable
+                                  style={({ pressed }) => [
+                                    styles.courseMenuItem,
+                                    pressed && { backgroundColor: colors.border },
+                                  ]}
+                                  onPress={(e) => {
+                                    e.stopPropagation();
+                                    openInviteModal(course.id);
+                                  }}
+                                >
+                                  <UserPlus size={16} color={colors.primary} style={{ marginRight: spacing.s }} />
+                                  <Text style={[styles.courseMenuText, { color: colors.primary }]}>Добавить</Text>
+                                </Pressable>
+                              )}
+                              <Pressable
+                                style={({ pressed }) => [
+                                  styles.courseMenuItem,
+                                  pressed && { backgroundColor: colors.border },
+                                ]}
+                                onPress={(e) => {
+                                  e.stopPropagation();
+                                  openEditModal(course.id, course.title);
+                                }}
+                              >
+                                <Edit2 size={16} color={colors.textPrimary} style={{ marginRight: spacing.s }} />
+                                <Text style={[styles.courseMenuText, { color: colors.textPrimary }]}>Rename</Text>
+                              </Pressable>
+                              <Pressable
+                                style={({ pressed }) => [
+                                  styles.courseMenuItem,
+                                  pressed && { backgroundColor: colors.border },
+                                ]}
+                                onPress={(e) => {
+                                  e.stopPropagation();
+                                  openDeleteModal(course.id);
+                                }}
+                              >
+                                <Trash2 size={16} color={colors.error} style={{ marginRight: spacing.s }} />
+                                <Text style={[styles.courseMenuText, { color: colors.error }]}>Delete</Text>
+                              </Pressable>
+                            </>
                           )}
-                          <Pressable
-                            style={({ pressed }) => [
-                              styles.courseMenuItem,
-                              pressed && { backgroundColor: colors.border },
-                            ]}
-                            onPress={(e) => {
-                              e.stopPropagation();
-                              openEditModal(course.id, course.title);
-                            }}
-                          >
-                            <Edit2 size={16} color={colors.textPrimary} style={{ marginRight: spacing.s }} />
-                            <Text style={[styles.courseMenuText, { color: colors.textPrimary }]}>Rename</Text>
-                          </Pressable>
-                          <Pressable
-                            style={({ pressed }) => [
-                              styles.courseMenuItem,
-                              pressed && { backgroundColor: colors.border },
-                            ]}
-                            onPress={(e) => {
-                              e.stopPropagation();
-                              openDeleteModal(course.id);
-                            }}
-                          >
-                            <Trash2 size={16} color={colors.error} style={{ marginRight: spacing.s }} />
-                            <Text style={[styles.courseMenuText, { color: colors.error }]}>Delete</Text>
-                          </Pressable>
                         </View>
                       )}
                     </Pressable>
@@ -1409,6 +1481,60 @@ export function HomeScreen({ navigation }: any) {
                 >
                   Удалить
                 </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Leave Course Modal */}
+      <Modal
+        visible={leaveModalCourseId !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLeaveModalCourseId(null)}
+      >
+        <Pressable
+          style={[styles.modalOverlay, { backgroundColor: modalOverlayBg }]}
+          onPress={() => !leaveLoading && setLeaveModalCourseId(null)}
+        >
+          <Pressable
+            style={[styles.editModalContent, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.editModalHeader}>
+              <Text style={[styles.editModalTitle, { color: colors.textPrimary }]}>
+                Выйти из курса?
+              </Text>
+              <Pressable onPress={() => setLeaveModalCourseId(null)} disabled={leaveLoading}>
+                <X size={20} color={colors.textSecondary} />
+              </Pressable>
+            </View>
+
+            <Text style={[styles.deleteModalMessage, { color: colors.textPrimary }]}>
+              {(() => {
+                const c = courses.find(c => c.id === leaveModalCourseId);
+                return `Вы покинете курс "${c?.title ?? ''}" и потеряете доступ ко всем его материалам.`;
+              })()}
+            </Text>
+
+            <View style={styles.editModalButtons}>
+              <Pressable
+                style={[styles.editModalButton, { backgroundColor: colors.border }]}
+                onPress={() => setLeaveModalCourseId(null)}
+                disabled={leaveLoading}
+              >
+                <Text style={[styles.editModalButtonText, { color: colors.textSecondary }]}>Отмена</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.editModalButton, { backgroundColor: colors.error }]}
+                onPress={handleLeaveCourse}
+                disabled={leaveLoading}
+              >
+                {leaveLoading
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Text style={[styles.editModalButtonText, { color: '#FFFFFF' }]}>Выйти</Text>
+                }
               </Pressable>
             </View>
           </Pressable>
@@ -1917,6 +2043,54 @@ export function HomeScreen({ navigation }: any) {
           </View>
         </View>
       )}
+      {/* Set Action Sheet */}
+      <Modal
+        visible={!!setMenuTarget}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSetMenuTarget(null)}
+      >
+        <Pressable
+          style={[styles.modalOverlay, { backgroundColor: modalOverlayBg }]}
+          onPress={() => setSetMenuTarget(null)}
+        >
+          <View
+            style={[
+              styles.setActionSheet,
+              { backgroundColor: modalSurface, borderColor: modalBorder },
+            ]}
+          >
+            <View style={[styles.setActionSheetHandle, { backgroundColor: modalHandleColor }]} />
+            <Pressable
+              style={({ pressed }) => [styles.sheetAction, pressed && { opacity: 0.7 }]}
+              onPress={() => {
+                if (setMenuTarget) {
+                  navigation?.navigate('SetEditor', { setId: setMenuTarget.id, autoFocusTitle: true });
+                  setSetMenuTarget(null);
+                }
+              }}
+            >
+              <Edit2 size={18} color={modalTextPrimary} />
+              <Text style={{ color: modalTextPrimary, marginLeft: 8 }}>Редактировать</Text>
+            </Pressable>
+            {setMenuTarget?.courseId && isTeacher && (
+              <Pressable
+                style={({ pressed }) => [styles.sheetAction, pressed && { opacity: 0.7 }]}
+                onPress={() => setMenuTarget && handleToggleSetHidden(setMenuTarget)}
+              >
+                {setMenuTarget.isHiddenFromStudents ? (
+                  <Eye size={18} color={colors.primary} />
+                ) : (
+                  <EyeOff size={18} color={modalTextSecondary} />
+                )}
+                <Text style={{ color: setMenuTarget.isHiddenFromStudents ? colors.primary : modalTextPrimary, marginLeft: 8 }}>
+                  {setMenuTarget.isHiddenFromStudents ? 'Показать ученикам' : 'Скрыть от учеников'}
+                </Text>
+              </Pressable>
+            )}
+          </View>
+        </Pressable>
+      </Modal>
     </View>
     </PanGestureHandler>
   );
@@ -2366,6 +2540,51 @@ const styles = StyleSheet.create({
     padding: spacing.xs,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+
+  // Hidden Badge
+  hiddenBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: 'rgba(0,0,0,0.06)',
+    marginTop: 4,
+    alignSelf: 'flex-start',
+  },
+  hiddenBadgeText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+
+  // Set Action Sheet
+  setActionSheet: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    paddingHorizontal: spacing.m,
+    paddingBottom: 40,
+    paddingTop: spacing.s,
+  },
+  setActionSheetHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: spacing.m,
+  },
+  sheetAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: spacing.s,
   },
 
   // FAB

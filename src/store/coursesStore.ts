@@ -30,7 +30,8 @@ interface CoursesActions {
   createCourse: (title: string) => Course;
   renameCourse: (id: string, title: string) => void;
   deleteCourse: (id: string) => void;
-  
+  removeLocalCourse: (id: string) => void;
+
   // Выбор активного курса
   setActiveCourse: (id: string | null) => void;
   
@@ -171,8 +172,22 @@ export const useCoursesStore = create<CoursesState & CoursesActions>()(
       }
     },
 
+    removeLocalCourse: (id) => {
+      const state = get();
+      if (state.activeCourseId === id) {
+        set((s) => { s.activeCourseId = null; });
+      }
+      set((s) => {
+        const index = s.courses.findIndex((c) => c.id === id);
+        if (index > -1) s.courses.splice(index, 1);
+      });
+      const setsStore = getSetsStore().getState();
+      setsStore.moveSetsFromCourse(id);
+      get().saveCourses();
+    },
+
     // ==================== ВЫБОР КУРСА ====================
-    
+
     setActiveCourse: (id) => {
       set((state) => {
         state.activeCourseId = id;

@@ -163,6 +163,7 @@ export interface CardSet {
   // Read-only набор учителя (для ученика)
   isReadOnly?: boolean;
   ownerCourseId?: string;
+  isHiddenFromStudents?: boolean;
 }
 
 /**
@@ -197,6 +198,7 @@ export interface UpdateSetInput {
   languageFrom?: string;
   languageTo?: string;
   courseId?: string | null;
+  isHiddenFromStudents?: boolean;
 }
 
 // ==================== REVIEW TYPES ====================

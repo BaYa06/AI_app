@@ -40,6 +40,7 @@ interface Student {
   status: StudentStatus;
   streak: number;
   lastActivity: string;
+  lastActivityColor: string;
   todayCards: number;
 }
 
@@ -71,19 +72,19 @@ function getStudentStatus(lastActiveDate: string | null): StudentStatus {
   return 'inactive';
 }
 
-function formatLastActivity(lastActiveDate: string | null): string {
-  if (!lastActiveDate) return 'Нет активности';
+function formatLastActivity(lastActiveDate: string | null): { text: string; color: string } {
+  if (!lastActiveDate) return { text: 'Нет активности', color: '#9CA3AF' };
   const now = new Date();
   const last = new Date(lastActiveDate + 'T12:00:00Z');
   const diffDays = Math.round((now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
-  if (diffDays === 0) return 'Сегодня';
-  if (diffDays === 1) return 'Вчера';
-  if (diffDays < 7) return `${diffDays} дн. назад`;
-  if (diffDays < 30) return `${diffDays} дн. назад`;
+  if (diffDays <= 0) return { text: 'Сегодня', color: '#10B981' };
+  if (diffDays === 1) return { text: 'Вчера', color: '#F59E0B' };
+  if (diffDays <= 6) return { text: `${diffDays} дн. назад`, color: '#EF4444' };
+  if (diffDays < 30) return { text: `${diffDays} дн. назад`, color: '#9CA3AF' };
   const weeks = Math.floor(diffDays / 7);
-  if (weeks < 5) return `${weeks} нед. назад`;
+  if (weeks < 5) return { text: `${weeks} нед. назад`, color: '#9CA3AF' };
   const months = Math.floor(diffDays / 30);
-  return `${months} мес. назад`;
+  return { text: `${months} мес. назад`, color: '#9CA3AF' };
 }
 
 function pluralCards(n: number): string {
@@ -95,22 +96,6 @@ function pluralCards(n: number): string {
   return 'карточек';
 }
 
-const ACTIVITY_COLORS: Record<StudentStatus, string> = {
-  online:   '#10B981',
-  away:     '#F59E0B',
-  offline:  '#EF4444',
-  inactive: '#9CA3AF',
-};
-
-// ==================== STATUS DOT COLOR ====================
-
-const STATUS_COLORS: Record<StudentStatus, string> = {
-  online:   '#10B981',
-  away:     '#F59E0B',
-  offline:  '#EF4444',
-  inactive: '#D1D5DB',
-};
-
 // ==================== STUDENT ROW ====================
 
 function StudentRow({ student, colors, isDark, onPress, onRemove }: {
@@ -121,7 +106,7 @@ function StudentRow({ student, colors, isDark, onPress, onRemove }: {
   onRemove: () => void;
 }) {
   const isInactive = student.status === 'inactive';
-  const dotColor = STATUS_COLORS[student.status];
+  const dotColor = student.lastActivityColor;
 
   const avatarBg = isInactive
     ? (isDark ? 'rgba(255,255,255,0.10)' : '#E5E7EB')
@@ -174,7 +159,7 @@ function StudentRow({ student, colors, isDark, onPress, onRemove }: {
           )}
         </View>
         <View style={styles.rowMetaRow}>
-          <Text style={[styles.rowMeta, { color: ACTIVITY_COLORS[student.status] }]}>
+          <Text style={[styles.rowMeta, { color: student.lastActivityColor }]}>
             {student.lastActivity}
           </Text>
           {student.todayCards > 0 && (
@@ -226,13 +211,15 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
         setStudents(
           members.map((m) => {
             const status = getStudentStatus(m.lastActiveDate);
+            const activity = formatLastActivity(m.lastActiveDate);
             return {
               id: m.id,
               name: m.displayName,
               initials: getInitials(m.displayName),
               status,
               streak: m.streak,
-              lastActivity: formatLastActivity(m.lastActiveDate),
+              lastActivity: activity.text,
+              lastActivityColor: activity.color,
               todayCards: m.todayCards,
             };
           }),
@@ -240,6 +227,23 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
       })
       .catch((e) => console.error('Failed to load members:', e))
       .finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
+  }, [route.params.courseId]);
+
+  useEffect(() => {
+    let mounted = true;
+    const checkOwnership = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const userId = data.session?.user?.id;
+        if (!userId || !NeonService.isEnabled()) return;
+        const isOwner = await NeonService.isCourseOwner(route.params.courseId, userId);
+        if (mounted && !isOwner) navigation.goBack();
+      } catch {
+        if (mounted) navigation.goBack();
+      }
+    };
+    checkOwnership();
     return () => { mounted = false; };
   }, [route.params.courseId]);
 
@@ -264,38 +268,42 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
     return list;
   }, [query, activeFilter, students]);
 
-  const handleRemoveStudent = useCallback((student: Student) => {
-    Alert.alert(
-      'Удалить ученика?',
-      `${student.name} больше не будет иметь доступ к курсу`,
-      [
-        { text: 'Отмена', style: 'cancel' },
-        {
-          text: 'Удалить',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { data: { session } } = await supabase.auth.getSession();
-              if (!session?.user) return;
+  const handleRemoveStudent = useCallback(async (student: Student) => {
+    const confirmed = Platform.OS === 'web'
+      ? window.confirm(`Удалить ученика?\n${student.name} больше не будет иметь доступ к курсу`)
+      : await new Promise<boolean>((resolve) =>
+          Alert.alert(
+            'Удалить ученика?',
+            `${student.name} больше не будет иметь доступ к курсу`,
+            [
+              { text: 'Отмена', style: 'cancel', onPress: () => resolve(false) },
+              { text: 'Удалить', style: 'destructive', onPress: () => resolve(true) },
+            ],
+          ),
+        );
 
-              const success = await NeonService.removeStudentFromCourse(
-                route.params.courseId,
-                student.id,
-                session.user.id,
-              );
+    if (!confirmed) return;
 
-              if (success) {
-                setStudents(prev => prev.filter(s => s.id !== student.id));
-              } else {
-                Alert.alert('Ошибка', 'Не удалось удалить ученика');
-              }
-            } catch {
-              Alert.alert('Ошибка', 'Не удалось удалить ученика');
-            }
-          },
-        },
-      ],
-    );
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      const success = await NeonService.removeStudentFromCourse(
+        route.params.courseId,
+        student.id,
+        session.user.id,
+      );
+
+      if (success) {
+        setStudents(prev => prev.filter(s => s.id !== student.id));
+      } else {
+        if (Platform.OS === 'web') window.alert('Не удалось удалить ученика');
+        else Alert.alert('Ошибка', 'Не удалось удалить ученика');
+      }
+    } catch {
+      if (Platform.OS === 'web') window.alert('Не удалось удалить ученика');
+      else Alert.alert('Ошибка', 'Не удалось удалить ученика');
+    }
   }, [route.params.courseId]);
 
   const inputBg = isDark ? 'rgba(255,255,255,0.07)' : '#F3F4F6';

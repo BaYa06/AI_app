@@ -18,6 +18,7 @@ import { Text } from '@/components/common';
 import { useThemeColors, useSettingsStore } from '@/store';
 import { spacing, borderRadius } from '@/constants';
 import { NeonService } from '@/services/NeonService';
+import { supabase } from '@/services/supabaseClient';
 import type { RootStackParamList } from '@/types/navigation';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -33,6 +34,7 @@ interface CourseMember {
   initials: string;
   status: StudentStatus;
   streak: number;
+  lastActiveDate: string | null;
 }
 
 // ==================== HELPERS ====================
@@ -52,6 +54,17 @@ function getStudentStatus(lastActiveDate: string | null): StudentStatus {
   if (diffDays <= 2) return 'away';
   if (diffDays <= 6) return 'offline';
   return 'inactive';
+}
+
+function formatLastActive(lastActiveDate: string | null): { text: string; color: string } | null {
+  if (!lastActiveDate) return null;
+  const now = new Date();
+  const last = new Date(lastActiveDate + 'T12:00:00Z');
+  const diffDays = Math.round((now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays <= 0) return { text: 'Сегодня', color: '#22C55E' };
+  if (diffDays === 1) return { text: 'Вчера', color: '#F59E0B' };
+  if (diffDays <= 6) return { text: `${diffDays} дн. назад`, color: '#EF4444' };
+  return { text: `${diffDays} дн. назад`, color: '#9CA3AF' };
 }
 
 // ==================== CHART HELPER ====================
@@ -122,6 +135,7 @@ function AvatarPlaceholder({ member, colors }: { member: CourseMember; colors: a
     member.status === 'online'   ? '#22C55E' :
     member.status === 'away'     ? '#F59E0B' :
     member.status === 'offline'  ? '#EF4444' : '#D1D5DB';
+  const lastActive = formatLastActive(member.lastActiveDate);
 
   return (
     <View style={styles.studentItem}>
@@ -141,6 +155,11 @@ function AvatarPlaceholder({ member, colors }: { member: CourseMember; colors: a
       <Text style={[styles.studentName, { color: colors.textPrimary }]} numberOfLines={1}>
         {member.name}
       </Text>
+      {lastActive && (
+        <Text style={[styles.studentLastActive, { color: lastActive.color }]}>
+          {lastActive.text}
+        </Text>
+      )}
     </View>
   );
 }
@@ -203,6 +222,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
             initials: getInitials(m.displayName),
             status: getStudentStatus(m.lastActiveDate),
             streak: m.streak,
+            lastActiveDate: m.lastActiveDate,
           })),
         );
       })
@@ -227,6 +247,23 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
       .catch(() => setChartData([]))
       .finally(() => setChartLoading(false));
   }, [chartPeriod, members.length, route.params.courseId]);
+
+  useEffect(() => {
+    let mounted = true;
+    const checkOwnership = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const userId = data.session?.user?.id;
+        if (!userId || !NeonService.isEnabled()) return;
+        const isOwner = await NeonService.isCourseOwner(route.params.courseId, userId);
+        if (mounted && !isOwner) navigation.goBack();
+      } catch {
+        if (mounted) navigation.goBack();
+      }
+    };
+    checkOwnership();
+    return () => { mounted = false; };
+  }, [route.params.courseId]);
 
   const cardBg = isDark ? 'rgba(255,255,255,0.06)' : '#FFFFFF';
   const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : '#E5E7EB';
@@ -480,6 +517,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
                     s.status === 'online'   ? '#22C55E' :
                     s.status === 'away'     ? '#F59E0B' :
                     s.status === 'offline'  ? '#EF4444' : '#D1D5DB';
+                  const lastActive = formatLastActive(s.lastActiveDate);
                   return (
                     <View key={s.id} style={[styles.modalStudentRow, { borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9' }]}>
                       <View style={styles.modalAvatarWrap}>
@@ -498,7 +536,14 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
                           ]}
                         />
                       </View>
-                      <Text style={[styles.modalStudentName, { color: colors.textPrimary }]}>{s.name}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.modalStudentName, { color: colors.textPrimary }]}>{s.name}</Text>
+                        {lastActive && (
+                          <Text style={{ fontSize: 11, color: lastActive.color, marginTop: 1 }}>
+                            {lastActive.text}
+                          </Text>
+                        )}
+                      </View>
                       {s.streak > 0 && (
                         <View style={styles.modalStreakBadge}>
                           <Text style={styles.modalStreakText}>🔥 {s.streak}</Text>
@@ -700,6 +745,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     maxWidth: 56,
   },
+  studentLastActive: {
+    fontSize: 9,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginTop: 1,
+  },
   emptyMembers: {
     fontSize: 13,
     fontWeight: '500',
@@ -802,7 +853,6 @@ const styles = StyleSheet.create({
   modalStudentName: {
     fontSize: 15,
     fontWeight: '500',
-    flex: 1,
   },
   modalStreakBadge: {
     backgroundColor: '#FFF7ED',
