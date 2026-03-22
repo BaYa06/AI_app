@@ -108,9 +108,12 @@ export function HomeScreen({ navigation }: any) {
   const diamonds = useDiamondStore((s) => s.diamonds);
   const addDiamonds = useDiamondStore((s) => s.addDiamonds);
   const diamondCountScale = useReanimatedShared(1);
-  const diamondCountAnimStyle = useReanimatedStyle(() => ({
-    transform: [{ scale: diamondCountScale.value }],
-  }), [diamondCountScale]);
+  const diamondCountAnimStyle = useReanimatedStyle(() => {
+    'worklet';
+    return {
+      transform: [{ scale: diamondCountScale.value }],
+    };
+  });
 
   const handleClaimPress = useCallback(() => {
     if (!claimBtnRef.current) return;
@@ -941,7 +944,7 @@ export function HomeScreen({ navigation }: any) {
 
           <View style={styles.setsList}>
             {visibleSets.map((set) => {
-              const progress = set.cardCount > 0 ? Math.round((set.masteredCount / set.cardCount) * 100) : 0;
+              const progress = set.cardCount > 0 ? Math.round(((set.masteredCount || 0) / set.cardCount) * 100) : 0;
               const getStatusColor = () => {
                 if (progress === 100) return colors.success;
                 if (progress >= 60) return colors.success;

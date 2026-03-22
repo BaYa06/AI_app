@@ -78,22 +78,31 @@ export function StreakCelebrationModal({ visible, streakCount, onClose }: Props)
   const buttonOpacity = useSharedValue(0);
   const buttonTranslateY = useSharedValue(16);
 
-  const cardAnimStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: cardTranslateY.value },
-      { scale: cardScale.value },
-    ],
-    opacity: cardOpacity.value,
-  }));
+  const cardAnimStyle = useAnimatedStyle(() => {
+    'worklet';
+    return {
+      transform: [
+        { translateY: cardTranslateY.value },
+        { scale: cardScale.value },
+      ],
+      opacity: cardOpacity.value,
+    };
+  });
 
-  const medallionAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: medallionScale.value }],
-  }));
+  const medallionAnimStyle = useAnimatedStyle(() => {
+    'worklet';
+    return {
+      transform: [{ scale: medallionScale.value }],
+    };
+  });
 
-  const buttonAnimStyle = useAnimatedStyle(() => ({
-    opacity: buttonOpacity.value,
-    transform: [{ translateY: buttonTranslateY.value }],
-  }));
+  const buttonAnimStyle = useAnimatedStyle(() => {
+    'worklet';
+    return {
+      opacity: buttonOpacity.value,
+      transform: [{ translateY: buttonTranslateY.value }],
+    };
+  });
 
   useEffect(() => {
     if (visible) {

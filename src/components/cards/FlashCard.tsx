@@ -46,25 +46,27 @@ export const FlashCard = memo<FlashCardProps>(function FlashCard({
 
   // Стиль передней стороны
   const frontAnimatedStyle = useAnimatedStyle(() => {
+    'worklet';
     const rotateY = interpolate(flipProgress.value, [0, 1], [0, 180]);
     const opacity = interpolate(flipProgress.value, [0, 0.5, 0.5, 1], [1, 1, 0, 0]);
 
     return {
       transform: [{ perspective: 1000 }, { rotateY: `${rotateY}deg` }],
       opacity,
-      backfaceVisibility: 'hidden',
+      backfaceVisibility: 'hidden' as const,
     };
   });
 
   // Стиль задней стороны
   const backAnimatedStyle = useAnimatedStyle(() => {
+    'worklet';
     const rotateY = interpolate(flipProgress.value, [0, 1], [180, 360]);
     const opacity = interpolate(flipProgress.value, [0, 0.5, 0.5, 1], [0, 0, 1, 1]);
 
     return {
       transform: [{ perspective: 1000 }, { rotateY: `${rotateY}deg` }],
       opacity,
-      backfaceVisibility: 'hidden',
+      backfaceVisibility: 'hidden' as const,
     };
   });
 

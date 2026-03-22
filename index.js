@@ -1,6 +1,7 @@
 /**
  * Точка входа приложения
  */
+import 'react-native-reanimated';
 import 'text-encoding';
 import 'react-native-get-random-values';
 import './src/polyfills/crypto';

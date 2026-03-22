@@ -183,8 +183,8 @@ export function StatisticsScreen({ navigation }: any) {
 
   const currentStreak = userStats?.current_streak ?? 0;
 
-  const todayCards = todayActivity?.cards_studied ?? todayStatsLocal.cardsStudied;
-  const goalProgress = Math.min(todayCards / DAILY_GOAL, 1);
+  const todayCards = todayActivity?.cards_studied ?? todayStatsLocal.cardsStudied ?? 0;
+  const goalProgress = Math.min((todayCards || 0) / DAILY_GOAL, 1);
   const remaining = Math.max(DAILY_GOAL - todayCards, 0);
 
   // Card stats from store

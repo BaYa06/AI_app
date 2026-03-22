@@ -116,13 +116,16 @@ const SingleDiamond = ({
     return () => clearTimeout(hapticTimeout);
   }, []);
 
-  const animStyle = useAnimatedStyle(() => ({
-    position: 'absolute',
-    left: translateX.value - 14,
-    top: translateY.value - 14,
-    transform: [{ scale: scale.value }],
-    opacity: opacity.value,
-  }), [translateX, translateY, scale, opacity]);
+  const animStyle = useAnimatedStyle(() => {
+    'worklet';
+    return {
+      position: 'absolute' as const,
+      left: translateX.value - 14,
+      top: translateY.value - 14,
+      transform: [{ scale: scale.value }],
+      opacity: opacity.value,
+    };
+  });
 
   return (
     <Animated.View style={animStyle}>

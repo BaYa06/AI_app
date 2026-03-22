@@ -514,6 +514,7 @@ export function StudyScreen({ navigation, route }: Props) {
   }, [isFlipped]);
 
   const frontAnimStyle = useAnimatedStyle(() => {
+    'worklet';
     const rotateY = interpolate(flipProgress.value, [0, 1], [0, 180]);
     const opacity = interpolate(flipProgress.value, [0, 0.5, 0.5, 1], [1, 1, 0, 0]);
     return {
@@ -524,6 +525,7 @@ export function StudyScreen({ navigation, route }: Props) {
   });
 
   const backAnimStyle = useAnimatedStyle(() => {
+    'worklet';
     const rotateY = interpolate(flipProgress.value, [0, 1], [180, 360]);
     const opacity = interpolate(flipProgress.value, [0, 0.5, 0.5, 1], [0, 0, 1, 1]);
     return {
