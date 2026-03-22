@@ -8,3 +8,4 @@ export { useCoursesStore } from './coursesStore';
 export { useStudyStore } from './studyStore';
 export { useSettingsStore, useThemeColors } from './settingsStore';
 export { useLibraryStore } from './libraryStore';
+export { useDiamondStore } from './diamondStore';

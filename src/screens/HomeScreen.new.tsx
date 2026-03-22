@@ -7,9 +7,11 @@ import { View, StyleSheet, ScrollView, Pressable, TextInput, useWindowDimensions
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import type { PanGestureHandlerStateChangeEvent } from 'react-native-gesture-handler';
 import { useFocusEffect } from '@react-navigation/native';
-import { useSetsStore, useSettingsStore, useThemeColors, useCardsStore, useCoursesStore } from '@/store';
+import { useSetsStore, useSettingsStore, useThemeColors, useCardsStore, useCoursesStore, useDiamondStore } from '@/store';
 import { selectSetStats } from '@/store/cardsStore';
-import { Text } from '@/components/common';
+import { Text, DiamondReward } from '@/components/common';
+import type { DiamondRewardRef } from '@/components/common';
+import ReanimatedAnimated, { useSharedValue as useReanimatedShared, withTiming as reanimatedWithTiming, withSequence as reanimatedWithSequence, useAnimatedStyle as useReanimatedStyle, Easing as ReanimatedEasing } from 'react-native-reanimated';
 import { spacing, borderRadius } from '@/constants';
 import {
   Menu, 
@@ -97,6 +99,34 @@ export function HomeScreen({ navigation }: any) {
   const editInputRef = useRef<RNTextInput>(null);
   const newCourseInputRef = useRef<RNTextInput>(null);
   const editModalInputRef = useRef<RNTextInput>(null);
+
+  // Diamond reward animation
+  const diamondRewardRef = useRef<DiamondRewardRef>(null);
+  const diamondIconRef = useRef<View>(null);
+  const claimBtnRef = useRef<View>(null);
+  const [diamondTargetPos, setDiamondTargetPos] = useState<{ x: number; y: number } | null>(null);
+  const diamonds = useDiamondStore((s) => s.diamonds);
+  const addDiamonds = useDiamondStore((s) => s.addDiamonds);
+  const diamondCountScale = useReanimatedShared(1);
+  const diamondCountAnimStyle = useReanimatedStyle(() => ({
+    transform: [{ scale: diamondCountScale.value }],
+  }), [diamondCountScale]);
+
+  const handleClaimPress = useCallback(() => {
+    if (!claimBtnRef.current) return;
+    claimBtnRef.current.measureInWindow((x, y, w, h) => {
+      diamondRewardRef.current?.collect({ x: x + w / 2, y: y + h / 2 });
+    });
+  }, []);
+
+  const handleDiamondRewardComplete = useCallback(() => {
+    addDiamonds(10);
+    diamondCountScale.value = reanimatedWithSequence(
+      reanimatedWithTiming(1.3, { duration: 150, easing: ReanimatedEasing.out(ReanimatedEasing.back(2)) }),
+      reanimatedWithTiming(1, { duration: 150, easing: ReanimatedEasing.inOut(ReanimatedEasing.quad) }),
+    );
+  }, []);
+
   // Drawer slide animation
   const drawerAnim = useRef(new Animated.Value(0)).current;
   const [drawerVisible, setDrawerVisible] = useState(false);
@@ -665,11 +695,21 @@ export function HomeScreen({ navigation }: any) {
               </Text>
             </Pressable>
 
-            <View style={styles.badge}>
+            <View
+              ref={diamondIconRef}
+              style={styles.badge}
+              onLayout={() => {
+                diamondIconRef.current?.measureInWindow((x, y, w, h) => {
+                  setDiamondTargetPos({ x: x + w / 2, y: y + h / 2 });
+                });
+              }}
+            >
               <Ionicons name="diamond" size={24} color={isDarkMode ? '#A5B4FC' : '#4F46E5'} />
-              <Text style={[styles.badgeText, { color: isDarkMode ? '#E0E7FF' : '#312E81' }]}>
-                {totalMastered}
-              </Text>
+              <ReanimatedAnimated.View style={diamondCountAnimStyle}>
+                <Text style={[styles.badgeText, { color: isDarkMode ? '#E0E7FF' : '#312E81' }]}>
+                  {totalMastered + diamonds}
+                </Text>
+              </ReanimatedAnimated.View>
             </View>
           </View>
         </View>
@@ -835,49 +875,50 @@ export function HomeScreen({ navigation }: any) {
                     </View>
                   </View>
 
-                  {/* Challenge 2 */}
-                  <View style={[styles.challengeCard, { backgroundColor: '#8B5CF6' }]}>
-                    <Text style={styles.challengeTitle}>Попробуй Match!</Text>
-                    <View style={styles.challengeBadge}>
-                      <Text style={styles.challengeBadgeText}>Новинка ⚡</Text>
+                  {/* Challenge 2 — Claimed */}
+                  <View style={[styles.challengeCard, styles.challengeCardClaimed]}>
+                    <Text style={[styles.challengeTitle, { opacity: 0.5 }]}>Попробуй Match!</Text>
+                    <View style={styles.challengeBadgeClaimed}>
+                      <Text style={styles.challengeBadgeTextClaimed}>Получено ✓</Text>
                     </View>
                     <View style={styles.challengeProgressContainer}>
                       <View style={styles.challengeRingWrapper}>
                         <Svg width={64} height={64} style={{ transform: [{ rotate: '-90deg' }] }}>
-                          <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.2)" strokeWidth={4} fill="transparent" />
-                          <SvgCircle cx={32} cy={32} r={28} stroke="#FFFFFF" strokeWidth={4} fill="transparent" strokeDasharray={175.9} strokeDashoffset={140.7} strokeLinecap="round" />
+                          <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.1)" strokeWidth={4} fill="transparent" />
+                          <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.35)" strokeWidth={4} fill="transparent" strokeDasharray={175.9} strokeDashoffset={0} strokeLinecap="round" />
                         </Svg>
                         <View style={styles.challengeIconOverlay}>
-                          <Puzzle size={28} color="#FFFFFF" />
+                          <Ionicons name="checkmark-circle" size={32} color="rgba(255,255,255,0.4)" />
                         </View>
                       </View>
-                      <Text style={styles.challengeProgressText}>1 из 5</Text>
                     </View>
                   </View>
 
-                  {/* Challenge 3 */}
-                  <View style={[styles.challengeCard, { backgroundColor: '#A78BFA' }]}>
+                  {/* Challenge 3 — Completed */}
+                  <View style={[styles.challengeCard, styles.challengeCardCompleted]}>
                     <Text style={styles.challengeTitle}>Марафон слов</Text>
-                    <View style={styles.challengeBadge}>
-                      <Text style={styles.challengeBadgeText}>Новинка ⚡</Text>
+                    <View style={styles.challengeBadgeCompleted}>
+                      <Text style={styles.challengeBadgeTextCompleted}>Выполнено ✓</Text>
                     </View>
                     <View style={styles.challengeProgressContainer}>
                       <View style={styles.challengeRingWrapper}>
                         <Svg width={64} height={64} style={{ transform: [{ rotate: '-90deg' }] }}>
-                          <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.2)" strokeWidth={4} fill="transparent" />
-                          <SvgCircle cx={32} cy={32} r={28} stroke="#FFFFFF" strokeWidth={4} fill="transparent" strokeDasharray={175.9} strokeDashoffset={175.9} strokeLinecap="round" />
+                          <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.15)" strokeWidth={4} fill="transparent" />
+                          <SvgCircle cx={32} cy={32} r={28} stroke="#FFFFFF" strokeWidth={4} fill="transparent" strokeDasharray={175.9} strokeDashoffset={0} strokeLinecap="round" />
                         </Svg>
                         <View style={styles.challengeIconOverlay}>
-                          <Timer size={28} color="#FFFFFF" />
+                          <Ionicons name="checkmark-circle" size={32} color="#FFFFFF" />
                         </View>
                       </View>
-                      <Text style={styles.challengeProgressText}>0 из 10</Text>
                     </View>
+                    <Pressable ref={claimBtnRef} style={styles.challengeClaimButton} onPress={handleClaimPress}>
+                      <Text style={styles.challengeClaimText}>Забрать</Text>
+                    </Pressable>
                   </View>
                 </ScrollView>
 
                 <View style={styles.allChallengesButtonContainer}>
-                  <Pressable style={styles.allChallengesButton}>
+                  <Pressable style={styles.allChallengesButton} onPress={() => setShowStudyModeModal(true)}>
                     <Text style={styles.allChallengesButtonText}>Учить все карточки</Text>
                   </Pressable>
                 </View>
@@ -2091,6 +2132,11 @@ export function HomeScreen({ navigation }: any) {
           </View>
         </Pressable>
       </Modal>
+      <DiamondReward
+        ref={diamondRewardRef}
+        targetPosition={diamondTargetPos}
+        onComplete={handleDiamondRewardComplete}
+      />
     </View>
     </PanGestureHandler>
   );
@@ -2253,6 +2299,57 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#FFFFFF',
     marginTop: 4,
+  },
+  challengeCardClaimed: {
+    backgroundColor: '#9CA3AF',
+    opacity: 0.7,
+  },
+  challengeBadgeClaimed: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
+  challengeBadgeTextClaimed: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.7)',
+  },
+  challengeCardCompleted: {
+    backgroundColor: '#059669',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  challengeBadgeCompleted: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
+  challengeBadgeTextCompleted: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  challengeClaimButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 999,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  challengeClaimText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#7C3AED',
   },
   allChallengesButtonContainer: {
     paddingHorizontal: spacing.m,

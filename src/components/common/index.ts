@@ -10,3 +10,5 @@ export { ProgressBar } from './ProgressBar';
 export { Loading } from './Loading';
 export { LoadingSplash } from './LoadingSplash';
 export { StreakCelebrationModal } from './StreakCelebrationModal';
+export { DiamondReward } from './DiamondReward';
+export type { DiamondRewardRef } from './DiamondReward';
