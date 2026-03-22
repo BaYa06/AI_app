@@ -10,6 +10,9 @@ import { NeonService } from '@/services/NeonService';
 import { DatabaseService } from '@/services/DatabaseService';
 import { SyncQueueService } from '@/services/SyncQueueService';
 
+// Lazy import для useSetsStore чтобы избежать циклических зависимостей
+const getSetsStore = () => require('./setsStore').useSetsStore;
+
 // ==================== SYNC QUEUE EXECUTORS ====================
 
 SyncQueueService.registerExecutor('createCard', (p) =>
@@ -218,6 +221,14 @@ export const useCardsStore = create<CardsState & CardsActions>()(
           Object.assign(card, srsData, { updatedAt: Date.now() });
         }
       });
+
+      // Не синкаем SRS в таблицу cards для read-only наборов — они пишутся в card_progress
+      const card = get().cards[cardId];
+      if (card) {
+        const setsStore = getSetsStore();
+        const cardSet = setsStore.getState().getSet(card.setId);
+        if (cardSet?.isReadOnly) return;
+      }
 
       // Синхронизируем SRS с базой (через очередь с retry)
       if (NeonService.isEnabled()) {

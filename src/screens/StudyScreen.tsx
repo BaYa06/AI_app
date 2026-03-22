@@ -8,7 +8,7 @@ import { useCardsStore, useSetsStore, useStudyStore, useThemeColors, useSettings
 import { Text, Loading } from '@/components/common';
 import { calculateNextReview, buildStudyQueue } from '@/services/SRSService';
 import { spacing } from '@/constants';
-import { DatabaseService } from '@/services';
+import { DatabaseService, NeonService, supabase } from '@/services';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Rating, Card } from '@/types';
 import { ArrowLeft, Settings, Volume2, Check } from 'lucide-react-native';
@@ -305,6 +305,27 @@ export function StudyScreen({ navigation, route }: Props) {
       // Обновляем статистику только для правильных ответов (rating >= 3)
       if (isCorrect) {
         incrementTodayCards();
+      }
+
+      // Сохраняем review в Neon (fire-and-forget)
+      if (NeonService.isEnabled()) {
+        (async () => {
+          try {
+            const { data: sd } = await supabase.auth.getSession();
+            const uid = sd?.session?.user?.id;
+            if (uid) {
+              await NeonService.saveReview(uid, currentCard.id, rating, 0);
+
+              // Сохраняем прогресс в card_progress для статистики учителя
+              await NeonService.upsertCardProgress(uid, currentCard.id, {
+                status: result.newStatus,
+                learningStep: result.newLearningStep,
+                nextReview: result.nextReviewDate,
+                lastReviewed: Date.now(),
+              });
+            }
+          } catch {}
+        })();
       }
 
       // Переход к следующей карточке

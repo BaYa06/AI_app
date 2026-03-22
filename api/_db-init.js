@@ -100,11 +100,32 @@ async function initDatabase(sql) {
     )
   `;
 
+  // Персональный SRS-прогресс (отдельная строка на каждого пользователя по каждой карточке)
+  await sql`
+    CREATE TABLE IF NOT EXISTS card_progress (
+      user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      card_id       UUID NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+      status        VARCHAR(20) NOT NULL DEFAULT 'new',
+      learning_step INT NOT NULL DEFAULT 0,
+      next_review   TIMESTAMP NOT NULL DEFAULT NOW(),
+      last_reviewed TIMESTAMP,
+      interval      INTEGER NOT NULL DEFAULT 0,
+      ease_factor   DECIMAL(3,2) NOT NULL DEFAULT 2.5,
+      repetitions   INTEGER NOT NULL DEFAULT 0,
+      updated_at    TIMESTAMP NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (user_id, card_id)
+    )
+  `;
+
   // Создание индексов для оптимизации
   await sql`CREATE INDEX IF NOT EXISTS idx_cards_set_id ON cards(set_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_cards_next_review ON cards(next_review)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_card_sets_user_id ON card_sets(user_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_reviews_card_id ON reviews(card_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_card_progress_user ON card_progress(user_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_card_progress_user_card ON card_progress(user_id, card_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_reviews_user_id ON reviews(user_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_reviews_user_card ON reviews(user_id, card_id)`;
 }
 
 export { ensureDatabaseInitialized, initDatabase };

@@ -328,7 +328,7 @@ export const NeonService = {
       const sql = neon(connectionString);
       
       const cards = await sql`
-        SELECT 
+        SELECT
           c.id,
           c.set_id,
           c.front,
@@ -337,12 +337,25 @@ export const NeonService = {
           c.image_url,
           c.audio_url,
           c.created_at,
-          c.learning_step,
-          c.next_review,
-          c.last_reviewed,
-          c.status
+          CASE
+            WHEN s.user_id = ${userId} THEN COALESCE(cp.learning_step, c.learning_step)
+            ELSE COALESCE(cp.learning_step, 0)
+          END AS learning_step,
+          CASE
+            WHEN s.user_id = ${userId} THEN COALESCE(cp.next_review, c.next_review)
+            ELSE COALESCE(cp.next_review, NOW())
+          END AS next_review,
+          CASE
+            WHEN s.user_id = ${userId} THEN COALESCE(cp.last_reviewed, c.last_reviewed)
+            ELSE cp.last_reviewed
+          END AS last_reviewed,
+          CASE
+            WHEN s.user_id = ${userId} THEN COALESCE(cp.status, c.status)
+            ELSE COALESCE(cp.status, 'new')
+          END AS status
         FROM cards c
         INNER JOIN card_sets s ON c.set_id = s.id
+        LEFT JOIN card_progress cp ON cp.card_id = c.id AND cp.user_id = ${userId}::uuid
         WHERE s.user_id = ${userId}
           OR s.course_id IN (
             SELECT course_id FROM course_members
@@ -1485,6 +1498,194 @@ export const NeonService = {
       }));
     } catch (error) {
       console.error('Failed to load course activity chart:', error);
+      return [];
+    }
+  },
+
+  async saveReview(
+    userId: string,
+    cardId: string,
+    quality: number,
+    timeSpent: number,
+  ): Promise<boolean> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) return false;
+
+      const sql = neon(connectionString);
+
+      try {
+        await sql`CREATE INDEX IF NOT EXISTS idx_reviews_user_id ON reviews(user_id)`;
+        await sql`CREATE INDEX IF NOT EXISTS idx_reviews_user_card ON reviews(user_id, card_id)`;
+      } catch {}
+
+      await sql`
+        INSERT INTO reviews (card_id, user_id, quality, time_spent)
+        VALUES (${cardId}::uuid, ${userId}::uuid, ${quality}, ${timeSpent})
+      `;
+
+      return true;
+    } catch (error) {
+      console.error('Failed to save review:', error);
+      return false;
+    }
+  },
+
+  async upsertCardProgress(
+    userId: string,
+    cardId: string,
+    data: {
+      status: string;
+      learningStep: number;
+      nextReview: number;
+      lastReviewed: number;
+    }
+  ): Promise<boolean> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) return false;
+
+      const sql = neon(connectionString);
+
+      const nextReviewIso = data.nextReview ? new Date(data.nextReview).toISOString() : new Date().toISOString();
+      const lastReviewedIso = data.lastReviewed ? new Date(data.lastReviewed).toISOString() : null;
+
+      await sql`
+        INSERT INTO card_progress (
+          user_id, card_id, status, learning_step,
+          next_review, last_reviewed, updated_at
+        )
+        VALUES (
+          ${userId}::uuid, ${cardId}::uuid, ${data.status}, ${data.learningStep},
+          ${nextReviewIso}::timestamptz, ${lastReviewedIso}::timestamptz, NOW()
+        )
+        ON CONFLICT (user_id, card_id) DO UPDATE SET
+          status        = EXCLUDED.status,
+          learning_step = EXCLUDED.learning_step,
+          next_review   = EXCLUDED.next_review,
+          last_reviewed = EXCLUDED.last_reviewed,
+          updated_at    = NOW()
+      `;
+
+      return true;
+    } catch (error) {
+      console.error('Failed to upsert card progress:', error);
+      return false;
+    }
+  },
+
+  async loadCourseSetStats(courseId: string): Promise<Array<{
+    setId: string;
+    title: string;
+    totalCards: number;
+    studentsStarted: number;
+    studentsCompleted: number;
+    progressPct: number;
+  }>> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) return [];
+
+      const sql = neon(connectionString);
+
+      const rows = await sql`
+        WITH course_student_ids AS (
+          SELECT user_id FROM course_members WHERE course_id = ${courseId}::uuid
+        ),
+        total_members AS (
+          SELECT COUNT(*) AS cnt FROM course_student_ids
+        ),
+        set_started AS (
+          SELECT c.set_id, COUNT(DISTINCT r.user_id) AS started
+          FROM reviews r
+          JOIN cards c ON c.id = r.card_id
+          WHERE r.user_id IN (SELECT user_id FROM course_student_ids)
+          GROUP BY c.set_id
+        ),
+        student_set_progress AS (
+          SELECT c.set_id, cp.user_id, COUNT(DISTINCT cp.card_id) AS cards_seen
+          FROM card_progress cp
+          JOIN cards c ON c.id = cp.card_id
+          WHERE cp.user_id IN (SELECT user_id FROM course_student_ids)
+          GROUP BY c.set_id, cp.user_id
+        )
+        SELECT
+          cs.id AS set_id,
+          cs.title,
+          cs.total_cards,
+          COALESCE(ss.started, 0) AS students_started,
+          COALESCE(
+            (SELECT COUNT(*) FROM student_set_progress ssp
+             WHERE ssp.set_id = cs.id AND ssp.cards_seen >= cs.total_cards AND cs.total_cards > 0),
+            0
+          ) AS students_completed,
+          CASE
+            WHEN cs.total_cards = 0 OR (SELECT cnt FROM total_members) = 0 THEN 0
+            ELSE ROUND(
+              COALESCE(
+                (SELECT SUM(ssp.cards_seen) FROM student_set_progress ssp WHERE ssp.set_id = cs.id),
+                0
+              )::numeric
+              / (cs.total_cards * (SELECT cnt FROM total_members)) * 100
+            )
+          END AS progress_pct
+        FROM card_sets cs
+        LEFT JOIN set_started ss ON ss.set_id = cs.id
+        WHERE cs.course_id = ${courseId}::uuid
+        ORDER BY cs.created_at ASC
+      `;
+
+      return rows.map((row: any) => ({
+        setId: row.set_id,
+        title: row.title,
+        totalCards: Number(row.total_cards) || 0,
+        studentsStarted: Number(row.students_started) || 0,
+        studentsCompleted: Number(row.students_completed) || 0,
+        progressPct: Number(row.progress_pct) || 0,
+      }));
+    } catch (error) {
+      console.error('Failed to load course set stats:', error);
+      return [];
+    }
+  },
+
+  async loadSetHardCards(setId: string, courseId: string): Promise<Array<{
+    cardId: string;
+    front: string;
+    back: string;
+    attempts: number;
+  }>> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) return [];
+
+      const sql = neon(connectionString);
+
+      const rows = await sql`
+        SELECT
+          c.id AS card_id,
+          c.front,
+          c.back,
+          COUNT(r.id) AS attempts
+        FROM cards c
+        JOIN reviews r ON r.card_id = c.id
+        WHERE c.set_id = ${setId}::uuid
+          AND r.user_id IN (
+            SELECT user_id FROM course_members WHERE course_id = ${courseId}::uuid
+          )
+        GROUP BY c.id, c.front, c.back
+        ORDER BY attempts DESC
+        LIMIT 5
+      `;
+
+      return rows.map((row: any) => ({
+        cardId: row.card_id,
+        front: row.front,
+        back: row.back,
+        attempts: Number(row.attempts) || 0,
+      }));
+    } catch (error) {
+      console.error('Failed to load set hard cards:', error);
       return [];
     }
   },

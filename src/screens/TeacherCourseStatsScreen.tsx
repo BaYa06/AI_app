@@ -15,7 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, X } from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { useThemeColors, useSettingsStore, useSetsStore } from '@/store';
+import { useThemeColors, useSettingsStore } from '@/store';
 import { spacing, borderRadius } from '@/constants';
 import { NeonService } from '@/services/NeonService';
 import type { RootStackParamList } from '@/types/navigation';
@@ -162,9 +162,6 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
     count: number;
   } | null>(null);
 
-  // Реальные наборы курса
-  const courseSets = useSetsStore((s) => s.getSetsByCourse(route.params.courseId));
-
   // Реальные участники
   const [members, setMembers] = useState<CourseMember[]>([]);
   const [membersLoading, setMembersLoading] = useState(true);
@@ -172,6 +169,26 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
   // Chart data
   const [chartData, setChartData] = useState<{ day: string; pct: number; count: number }[]>([]);
   const [chartLoading, setChartLoading] = useState(false);
+
+  // Sets stats
+  const [setsStats, setSetsStats] = useState<Array<{
+    setId: string;
+    title: string;
+    totalCards: number;
+    studentsStarted: number;
+    studentsCompleted: number;
+    progressPct: number;
+  }>>([]);
+  const [setsLoading, setSetsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!route.params.courseId) return;
+    setSetsLoading(true);
+    NeonService.loadCourseSetStats(route.params.courseId)
+      .then(setSetsStats)
+      .catch(() => setSetsStats([]))
+      .finally(() => setSetsLoading(false));
+  }, [route.params.courseId]);
 
   useEffect(() => {
     let mounted = true;
@@ -384,17 +401,19 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
         {/* Sets list */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-            Наборы{courseSets.length > 0 ? ` (${courseSets.length})` : ''}
+            Наборы{setsStats.length > 0 ? ` (${setsStats.length})` : ''}
           </Text>
-          <View style={styles.setsList}>
-            {courseSets.length === 0 ? (
-              <Text style={[styles.emptyMembers, { color: colors.textSecondary }]}>
-                Нет наборов в этом курсе
-              </Text>
-            ) : (
-              courseSets.map((set) => (
+          {setsLoading ? (
+            <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: spacing.m }} />
+          ) : setsStats.length === 0 ? (
+            <Text style={[styles.emptyMembers, { color: colors.textSecondary }]}>
+              Нет данных — ученики ещё не начали учить
+            </Text>
+          ) : (
+            <View style={styles.setsList}>
+              {setsStats.map((set) => (
                 <View
-                  key={set.id}
+                  key={set.setId}
                   style={[styles.setCard, { backgroundColor: cardBg, borderColor: cardBorder }]}
                 >
                   <View style={styles.setCardHeader}>
@@ -402,7 +421,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
                       {set.title}
                     </Text>
                     <Text style={[styles.setCardWords, { color: colors.textSecondary }]}>
-                      {set.cardCount} слов
+                      {set.totalCards} слов
                     </Text>
                   </View>
 
@@ -411,23 +430,23 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
                     <View
                       style={[
                         styles.progressFill,
-                        { width: '0%' as any, backgroundColor: colors.primary },
+                        { width: `${Math.min(set.progressPct, 100)}%` as any, backgroundColor: colors.primary },
                       ]}
                     />
                   </View>
 
                   <View style={styles.setCardMeta}>
                     <Text style={[styles.setCardMetaText, { color: colors.textSecondary }]}>
-                      0 из {members.length} начали
+                      {set.studentsStarted} из {members.length} начали · {set.studentsCompleted} завершили
                     </Text>
                     <Text style={[styles.setCardAccuracy, { color: colors.primary }]}>
-                      0% точность
+                      {set.progressPct}%
                     </Text>
                   </View>
                 </View>
-              ))
-            )}
-          </View>
+              ))}
+            </View>
+          )}
         </View>
       </ScrollView>
 
