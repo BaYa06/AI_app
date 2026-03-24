@@ -71,7 +71,7 @@ function MainTabs() {
           paddingBottom: tabBarPaddingBottom,
           paddingTop: 6,
           height: tabBarHeight,
-          marginBottom: 20,
+          marginBottom: 0,
         },
         tabBarLabelStyle: {
           fontSize: 11,
