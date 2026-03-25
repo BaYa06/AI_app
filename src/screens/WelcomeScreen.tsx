@@ -1,26 +1,40 @@
 /**
  * WelcomeScreen
- * @description Онбординг / заглушка авторизации. Показываем, если нет аккаунта.
+ * @description Экран приветствия с Google OAuth авторизацией.
  */
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Modal, TouchableOpacity } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  Modal,
+  TouchableOpacity,
+  Platform,
+  Linking,
+  ActivityIndicator,
+} from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import InAppBrowser from 'react-native-inappbrowser-reborn';
 import { Button, Text } from '@/components/common';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius } from '@/constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePwaInstall } from '@/hooks/usePwaInstall';
+import { SUPABASE_OAUTH_REDIRECT, supabase } from '@/services/supabaseClient';
 
 type Props = {
-  onCreateAccount?: () => void;
-  onSignIn?: () => void;
+  isLoading?: boolean;
 };
 
-export function WelcomeScreen({ onCreateAccount, onSignIn }: Props) {
+export function WelcomeScreen({ isLoading: externalLoading }: Props) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const { canInstall, promptInstall, isIosSafari } = usePwaInstall();
   const [showIosModal, setShowIosModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  const loading = isLoading || externalLoading;
 
   const tiles = [
     { icon: 'sparkles', color: 'rgba(100, 103, 242, 0.55)', rotate: '-6deg', iconColor: '#fff', offset: 0 },
@@ -28,6 +42,91 @@ export function WelcomeScreen({ onCreateAccount, onSignIn }: Props) {
     { icon: 'flash', color: 'rgba(100, 103, 242, 0.70)', rotate: '5deg', iconColor: '#fff', offset: -10 },
     { icon: 'bulb-outline', color: 'rgba(100, 103, 242, 0.28)', rotate: '-8deg', iconColor: colors.primary, offset: 6 },
   ];
+
+  const getParamFromCallbackUrl = useCallback((rawUrl: string, name: string): string | null => {
+    if (!rawUrl || !name) return null;
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const queryOrHashPattern = new RegExp(`[?#&]${escapedName}=([^&#]*)`);
+    const match = rawUrl.match(queryOrHashPattern);
+    if (!match?.[1]) return null;
+    try {
+      return decodeURIComponent(match[1].replace(/\+/g, ' '));
+    } catch {
+      return match[1];
+    }
+  }, []);
+
+  const signInWithGoogle = useCallback(async () => {
+    setAuthError(null);
+    setIsLoading(true);
+
+    // Web/PWA: let Supabase handle the redirect natively
+    if (Platform.OS === 'web') {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: SUPABASE_OAUTH_REDIRECT,
+        },
+      });
+      if (error) {
+        console.error('[auth] Google sign-in error', error);
+        setAuthError(error.message);
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    // Native mobile: use InAppBrowser with PKCE
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: SUPABASE_OAUTH_REDIRECT,
+        skipBrowserRedirect: true,
+      },
+    });
+
+    if (error) {
+      console.error('[auth] Google sign-in error', error);
+      setAuthError(error.message);
+      setIsLoading(false);
+      return;
+    }
+
+    if (data?.url) {
+      try {
+        if (await InAppBrowser.isAvailable()) {
+          const result = await InAppBrowser.openAuth(data.url, SUPABASE_OAUTH_REDIRECT, {
+            showTitle: false,
+            enableUrlBarHiding: true,
+            enableDefaultShare: false,
+            ephemeralWebSession: false,
+          });
+          if (result.type === 'success' && result.url) {
+            const code = getParamFromCallbackUrl(result.url, 'code');
+            if (code) {
+              const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+              if (exchangeError) {
+                console.error('[auth] Code exchange failed:', exchangeError.message);
+                setAuthError(exchangeError.message);
+              }
+            } else {
+              const errorDesc = getParamFromCallbackUrl(result.url, 'error_description');
+              if (errorDesc) {
+                setAuthError(errorDesc);
+              }
+            }
+          }
+        } else {
+          await Linking.openURL(data.url);
+        }
+      } catch (e) {
+        console.error('[auth] Failed to open browser:', e);
+        setAuthError('Не удалось открыть браузер для входа через Google');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  }, [getParamFromCallbackUrl]);
 
   return (
     <View
@@ -100,19 +199,22 @@ export function WelcomeScreen({ onCreateAccount, onSignIn }: Props) {
         </View>
 
         <View style={styles.actions}>
-          <Button
-            title="Создать аккаунт"
-            onPress={onCreateAccount}
-            fullWidth
-            style={styles.actionButton}
-          />
-          <Button
-            title="Войти"
-            variant="outline"
-            onPress={onSignIn}
-            fullWidth
-            style={styles.actionButton}
-          />
+          {loading ? (
+            <ActivityIndicator size="large" color={colors.primary} style={{ marginVertical: spacing.m }} />
+          ) : (
+            <Button
+              title="Войти через Google"
+              onPress={signInWithGoogle}
+              fullWidth
+              leftIcon={<Ionicons name="logo-google" size={20} color={colors.textInverse} />}
+              style={styles.actionButton}
+            />
+          )}
+          {authError && (
+            <Text variant="bodySmall" align="center" style={{ color: colors.error, marginTop: spacing.s }}>
+              {authError}
+            </Text>
+          )}
           {(canInstall || isIosSafari) && (
             <Button
               title="Скачать приложение"

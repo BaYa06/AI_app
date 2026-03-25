@@ -1,38 +1,38 @@
 /**
- * DailyGoalScreen
- * @description Шаг 5: выбор дневной цели (сколько слов в день). Только UI, без сохранения.
+ * TeacherGroupSizeScreen
+ * @description Шаг 4 (учитель): выбор размера группы учеников.
  */
 import React, { useState } from 'react';
-import { View, StyleSheet, Platform, ScrollView, Pressable } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Button, Text } from '@/components/common';
 import { spacing, borderRadius } from '@/constants';
 import { useThemeColors } from '@/store';
 
-type DailyOption = {
+type SizeOption = {
   id: string;
-  words: number;
   label: string;
   icon: string;
   vibe: string;
 };
 
 type Props = {
-  onContinue?: (optionId: string) => void;
+  onContinue?: (sizeId: string) => void;
   onBack?: () => void;
 };
 
-const OPTIONS: DailyOption[] = [
-  { id: '5', words: 5, label: '5 слов в день', icon: 'leaf-outline', vibe: 'Неспешно' },
-  { id: '10', words: 10, label: '10 слов в день', icon: 'flash', vibe: 'В ритме' },
-  { id: '20', words: 20, label: '20 слов в день', icon: 'flame', vibe: 'Серьезно' },
+const OPTIONS: SizeOption[] = [
+  { id: '1-10', label: '1–10 учеников', icon: 'person-outline', vibe: 'Индивидуально' },
+  { id: '11-30', label: '11–30 учеников', icon: 'people-outline', vibe: 'Небольшая группа' },
+  { id: '30+', label: '30+ учеников', icon: 'people', vibe: 'Большая группа' },
+  { id: 'unknown', label: 'Пока не знаю', icon: 'help-circle-outline', vibe: 'Определюсь позже' },
 ];
 
-export function DailyGoalScreen({ onContinue, onBack }: Props) {
+export function TeacherGroupSizeScreen({ onContinue, onBack }: Props) {
   const colors = useThemeColors();
-  const [selected, setSelected] = useState<string>('10');
+  const [selected, setSelected] = useState<string>('1-10');
 
-  const renderOption = (opt: DailyOption) => {
+  const renderOption = (opt: SizeOption) => {
     const active = selected === opt.id;
     return (
       <Pressable
@@ -118,7 +118,7 @@ export function DailyGoalScreen({ onContinue, onBack }: Props) {
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.headlineBlock}>
             <Text variant="h1" style={[styles.headline, { color: colors.textPrimary }]}>
-              Установите дневную цель
+              Сколько у вас учеников?
             </Text>
             <Text
               variant="body"
@@ -126,7 +126,7 @@ export function DailyGoalScreen({ onContinue, onBack }: Props) {
               align="center"
               style={styles.bodyText}
             >
-              Сколько новых слов хотите учить каждый день?
+              Это поможет нам подобрать оптимальные инструменты.
             </Text>
           </View>
 
@@ -143,7 +143,7 @@ export function DailyGoalScreen({ onContinue, onBack }: Props) {
             Это можно изменить в настройках профиля.
           </Text>
           <Button
-            title="Начать обучение"
+            title="Начать работу"
             onPress={() => onContinue?.(selected)}
             fullWidth
             leftIcon={<Ionicons name="rocket-outline" size={20} color={colors.textInverse} />}

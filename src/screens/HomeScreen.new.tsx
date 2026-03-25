@@ -7,7 +7,7 @@ import { View, StyleSheet, ScrollView, Pressable, TextInput, useWindowDimensions
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import type { PanGestureHandlerStateChangeEvent } from 'react-native-gesture-handler';
 import { useFocusEffect } from '@react-navigation/native';
-import { useSetsStore, useSettingsStore, useThemeColors, useCardsStore, useCoursesStore, useDiamondStore } from '@/store';
+import { useSetsStore, useSettingsStore, useThemeColors, useCardsStore, useCoursesStore, useDiamondStore, useChallengeStore } from '@/store';
 import { selectSetStats } from '@/store/cardsStore';
 import { Text, DiamondReward } from '@/components/common';
 import type { DiamondRewardRef } from '@/components/common';
@@ -107,6 +107,8 @@ export function HomeScreen({ navigation }: any) {
   const [diamondTargetPos, setDiamondTargetPos] = useState<{ x: number; y: number } | null>(null);
   const diamonds = useDiamondStore((s) => s.diamonds);
   const addDiamonds = useDiamondStore((s) => s.addDiamonds);
+  const quickRoundStatus = useChallengeStore((s) => s.quickRoundStatus);
+  const claimQuickRound = useChallengeStore((s) => s.claimQuickRound);
   const diamondCountScale = useReanimatedShared(1);
   const diamondCountAnimStyle = useReanimatedStyle(() => {
     'worklet';
@@ -115,12 +117,120 @@ export function HomeScreen({ navigation }: any) {
     };
   });
 
-  const handleClaimPress = useCallback(() => {
+  const handleQuickRound = useCallback(() => {
+    const allSets = useSetsStore.getState().getAllSets();
+    if (allSets.length === 0) {
+      Alert.alert('Нет наборов', 'Сначала создай набор с карточками');
+      return;
+    }
+    const firstSetId = allSets[0].id;
+
+    const allCards = Object.values(useCardsStore.getState().cards);
+    if (allCards.length < 4) {
+      Alert.alert('Мало карточек', 'Добавь хотя бы 4 карточки чтобы играть в челлендж');
+      return;
+    }
+
+    // Fisher-Yates shuffle
+    const shuffled = [...allCards];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    const selected = shuffled.slice(0, 10);
+    const dueCardIds = selected.map((c) => c.id);
+
+    navigation.navigate('MultipleChoice', {
+      setId: firstSetId,
+      cardLimit: selected.length,
+      dueCardIds,
+      challengeMode: true,
+      timeLimit: 120,
+    });
+  }, [navigation]);
+
+  const handleQuickRoundClaim = useCallback(() => {
     if (!claimBtnRef.current) return;
     claimBtnRef.current.measureInWindow((x, y, w, h) => {
       diamondRewardRef.current?.collect({ x: x + w / 2, y: y + h / 2 });
     });
-  }, []);
+    setTimeout(() => {
+      claimQuickRound();
+    }, 900);
+  }, [claimQuickRound]);
+
+  const handleSniperChallenge = useCallback(() => {
+    const allSets = useSetsStore.getState().getAllSets();
+    if (allSets.length === 0) {
+      Alert.alert('Нет наборов', 'Сначала создай набор с карточками');
+      return;
+    }
+    const firstSetId = allSets[0].id;
+
+    const allCards = Object.values(useCardsStore.getState().cards);
+    if (allCards.length < 4) {
+      Alert.alert('Мало карточек', 'Добавь хотя бы 4 карточки');
+      return;
+    }
+
+    const shuffled = [...allCards];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    const selected = shuffled.slice(0, 5);
+    navigation.navigate('MultipleChoice', {
+      setId: firstSetId,
+      cardLimit: selected.length,
+      dueCardIds: selected.map((c) => c.id),
+      challengeMode: true,
+      sniperMode: true,
+    });
+  }, [navigation]);
+
+  const handleForgottenChallenge = useCallback(() => {
+    const allSets = useSetsStore.getState().getAllSets();
+    if (allSets.length === 0) {
+      Alert.alert('Нет наборов', 'Сначала создай набор с карточками');
+      return;
+    }
+    const firstSetId = allSets[0].id;
+
+    const now = Date.now();
+    const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+
+    const forgottenCards = Object.values(useCardsStore.getState().cards).filter((card) => {
+      const raw = (card as any).lastReviewed ?? card.updatedAt ?? 0;
+      const ms = typeof raw === 'string' ? new Date(raw).getTime() : Number(raw);
+      return (now - ms) >= SEVEN_DAYS;
+    });
+
+    if (forgottenCards.length === 0) {
+      Alert.alert('Всё свежо! \uD83C\uDF89', 'Нет забытых карточек — ты недавно всё повторил');
+      return;
+    }
+    if (forgottenCards.length < 4) {
+      Alert.alert('Мало карточек', 'Нужно минимум 4 забытых карточки для игры');
+      return;
+    }
+
+    const shuffled = [...forgottenCards];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    const selected = shuffled.slice(0, 3);
+    navigation.navigate('MultipleChoice', {
+      setId: firstSetId,
+      cardLimit: selected.length,
+      dueCardIds: selected.map((c) => c.id),
+      challengeMode: true,
+      forgottenMode: true,
+    });
+  }, [navigation]);
 
   const handleDiamondRewardComplete = useCallback(() => {
     addDiamonds(10);
@@ -858,11 +968,72 @@ export function HomeScreen({ navigation }: any) {
                   snapToInterval={136 + 12}
                   decelerationRate="fast"
                 >
-                  {/* Challenge 1 */}
-                  <View style={[styles.challengeCard, { backgroundColor: '#7C3AED' }]}>
-                    <Text style={styles.challengeTitle}>Утреннее повторение</Text>
+                  {/* Challenge 1 — Быстрый раунд */}
+                  {quickRoundStatus === 'pending' ? (
+                    <Pressable style={[styles.challengeCard, { backgroundColor: '#7C3AED' }]} onPress={handleQuickRound}>
+                      <Text style={styles.challengeTitle}>Быстрый раунд ⚡</Text>
+                      <View style={styles.challengeBadge}>
+                        <Text style={styles.challengeBadgeText}>Новинка ⚡</Text>
+                      </View>
+                      <View style={styles.challengeProgressContainer}>
+                        <View style={styles.challengeRingWrapper}>
+                          <Svg width={64} height={64} style={{ transform: [{ rotate: '-90deg' }] }}>
+                            <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.2)" strokeWidth={4} fill="transparent" />
+                            <SvgCircle cx={32} cy={32} r={28} stroke="#FFFFFF" strokeWidth={4} fill="transparent" strokeDasharray={175.9} strokeDashoffset={175.9} strokeLinecap="round" />
+                          </Svg>
+                          <View style={styles.challengeIconOverlay}>
+                            <Sunrise size={28} color="#FFFFFF" />
+                          </View>
+                        </View>
+                        <Text style={styles.challengeProgressText}>0 из 3</Text>
+                      </View>
+                    </Pressable>
+                  ) : quickRoundStatus === 'completed' ? (
+                    <View style={[styles.challengeCard, styles.challengeCardCompleted]}>
+                      <Text style={styles.challengeTitle}>Быстрый раунд ⚡</Text>
+                      <View style={styles.challengeBadgeCompleted}>
+                        <Text style={styles.challengeBadgeTextCompleted}>Выполнено ✓</Text>
+                      </View>
+                      <View style={styles.challengeProgressContainer}>
+                        <View style={styles.challengeRingWrapper}>
+                          <Svg width={64} height={64} style={{ transform: [{ rotate: '-90deg' }] }}>
+                            <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.15)" strokeWidth={4} fill="transparent" />
+                            <SvgCircle cx={32} cy={32} r={28} stroke="#FFFFFF" strokeWidth={4} fill="transparent" strokeDasharray={175.9} strokeDashoffset={0} strokeLinecap="round" />
+                          </Svg>
+                          <View style={styles.challengeIconOverlay}>
+                            <Ionicons name="checkmark-circle" size={32} color="#FFFFFF" />
+                          </View>
+                        </View>
+                      </View>
+                      <Pressable ref={claimBtnRef} style={styles.challengeClaimButton} onPress={handleQuickRoundClaim}>
+                        <Text style={styles.challengeClaimText}>Забрать</Text>
+                      </Pressable>
+                    </View>
+                  ) : (
+                    <View style={[styles.challengeCard, styles.challengeCardClaimed]}>
+                      <Text style={[styles.challengeTitle, { opacity: 0.5 }]}>Быстрый раунд ⚡</Text>
+                      <View style={styles.challengeBadgeClaimed}>
+                        <Text style={styles.challengeBadgeTextClaimed}>Получено ✓</Text>
+                      </View>
+                      <View style={styles.challengeProgressContainer}>
+                        <View style={styles.challengeRingWrapper}>
+                          <Svg width={64} height={64} style={{ transform: [{ rotate: '-90deg' }] }}>
+                            <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.1)" strokeWidth={4} fill="transparent" />
+                            <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.35)" strokeWidth={4} fill="transparent" strokeDasharray={175.9} strokeDashoffset={0} strokeLinecap="round" />
+                          </Svg>
+                          <View style={styles.challengeIconOverlay}>
+                            <Ionicons name="checkmark-circle" size={32} color="rgba(255,255,255,0.4)" />
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Challenge 2 — Снайпер */}
+                  <Pressable style={[styles.challengeCard, { backgroundColor: '#DC2626' }]} onPress={handleSniperChallenge}>
+                    <Text style={styles.challengeTitle}>Снайпер 🎯</Text>
                     <View style={styles.challengeBadge}>
-                      <Text style={styles.challengeBadgeText}>Новинка ⚡</Text>
+                      <Text style={styles.challengeBadgeText}>5 подряд</Text>
                     </View>
                     <View style={styles.challengeProgressContainer}>
                       <View style={styles.challengeRingWrapper}>
@@ -871,53 +1042,30 @@ export function HomeScreen({ navigation }: any) {
                           <SvgCircle cx={32} cy={32} r={28} stroke="#FFFFFF" strokeWidth={4} fill="transparent" strokeDasharray={175.9} strokeDashoffset={175.9} strokeLinecap="round" />
                         </Svg>
                         <View style={styles.challengeIconOverlay}>
-                          <Sunrise size={28} color="#FFFFFF" />
+                          <Ionicons name="flame-outline" size={28} color="#FFFFFF" />
                         </View>
                       </View>
-                      <Text style={styles.challengeProgressText}>0 из 3</Text>
                     </View>
-                  </View>
+                  </Pressable>
 
-                  {/* Challenge 2 — Claimed */}
-                  <View style={[styles.challengeCard, styles.challengeCardClaimed]}>
-                    <Text style={[styles.challengeTitle, { opacity: 0.5 }]}>Попробуй Match!</Text>
-                    <View style={styles.challengeBadgeClaimed}>
-                      <Text style={styles.challengeBadgeTextClaimed}>Получено ✓</Text>
+                  {/* Challenge 3 — Вспомни забытое */}
+                  <Pressable style={[styles.challengeCard, { backgroundColor: '#0891B2' }]} onPress={handleForgottenChallenge}>
+                    <Text style={styles.challengeTitle}>Вспомни забытое 🧠</Text>
+                    <View style={styles.challengeBadge}>
+                      <Text style={styles.challengeBadgeText}>7+ дней</Text>
                     </View>
                     <View style={styles.challengeProgressContainer}>
                       <View style={styles.challengeRingWrapper}>
                         <Svg width={64} height={64} style={{ transform: [{ rotate: '-90deg' }] }}>
-                          <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.1)" strokeWidth={4} fill="transparent" />
-                          <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.35)" strokeWidth={4} fill="transparent" strokeDasharray={175.9} strokeDashoffset={0} strokeLinecap="round" />
+                          <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.2)" strokeWidth={4} fill="transparent" />
+                          <SvgCircle cx={32} cy={32} r={28} stroke="#FFFFFF" strokeWidth={4} fill="transparent" strokeDasharray={175.9} strokeDashoffset={175.9} strokeLinecap="round" />
                         </Svg>
                         <View style={styles.challengeIconOverlay}>
-                          <Ionicons name="checkmark-circle" size={32} color="rgba(255,255,255,0.4)" />
+                          <Ionicons name="time-outline" size={28} color="#FFFFFF" />
                         </View>
                       </View>
                     </View>
-                  </View>
-
-                  {/* Challenge 3 — Completed */}
-                  <View style={[styles.challengeCard, styles.challengeCardCompleted]}>
-                    <Text style={styles.challengeTitle}>Марафон слов</Text>
-                    <View style={styles.challengeBadgeCompleted}>
-                      <Text style={styles.challengeBadgeTextCompleted}>Выполнено ✓</Text>
-                    </View>
-                    <View style={styles.challengeProgressContainer}>
-                      <View style={styles.challengeRingWrapper}>
-                        <Svg width={64} height={64} style={{ transform: [{ rotate: '-90deg' }] }}>
-                          <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.15)" strokeWidth={4} fill="transparent" />
-                          <SvgCircle cx={32} cy={32} r={28} stroke="#FFFFFF" strokeWidth={4} fill="transparent" strokeDasharray={175.9} strokeDashoffset={0} strokeLinecap="round" />
-                        </Svg>
-                        <View style={styles.challengeIconOverlay}>
-                          <Ionicons name="checkmark-circle" size={32} color="#FFFFFF" />
-                        </View>
-                      </View>
-                    </View>
-                    <Pressable ref={claimBtnRef} style={styles.challengeClaimButton} onPress={handleClaimPress}>
-                      <Text style={styles.challengeClaimText}>Забрать</Text>
-                    </Pressable>
-                  </View>
+                  </Pressable>
                 </ScrollView>
 
                 <View style={styles.allChallengesButtonContainer}>

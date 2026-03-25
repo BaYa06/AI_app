@@ -15,12 +15,12 @@ import { useThemeColors, useSettingsStore } from '@/store';
 import { CourseInviteModal } from '@/components/CourseInviteModal';
 import { useCoursesStore } from '@/store';
 import { WelcomeScreen } from '@/screens/WelcomeScreen';
-import { EmailAuthScreen } from '@/screens/EmailAuthScreen';
-import { OTPVerifyScreen } from '@/screens/OTPVerifyScreen';
 import { NameOnboardingScreen } from '@/screens/NameOnboardingScreen';
+import { RoleSelectionScreen } from '@/screens/RoleSelectionScreen';
 import { LearningGoalScreen } from '@/screens/LearningGoalScreen';
 import { DailyGoalScreen } from '@/screens/DailyGoalScreen';
-import { SignInScreen } from '@/screens/SignInScreen';
+import { TeacherSubjectScreen } from '@/screens/TeacherSubjectScreen';
+import { TeacherGroupSizeScreen } from '@/screens/TeacherGroupSizeScreen';
 
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -40,44 +40,52 @@ const webStyles = Platform.OS === 'web' ? StyleSheet.create({
   },
 }) : undefined;
 
+type AuthStep = 'welcome' | 'name' | 'role' | 'goal' | 'daily' | 'teacher_subject' | 'teacher_size';
+
 type AppRootProps = {
   isReady: boolean;
   isAuthenticated: boolean;
+  needsOnboarding: boolean;
   pendingInviteToken: string | null;
   onInviteAccepted: (courseId: string, courseTitle: string) => void;
   onInviteDismiss: () => void;
   currentUserId: string | null;
-  onRequestCode: (email?: string, password?: string) => void;
-  onStartEmail: () => void;
-  onStartSignIn: () => void;
   onBackToWelcome: () => void;
-  onBackToEmail: () => void;
+  onBackToName: () => void;
+  onBackToRole: () => void;
   onBackToGoal: () => void;
-  onSubmitOTP: (code: string) => void;
+  onBackToTeacherSubject: () => void;
   onSubmitName: (name?: string) => void;
+  onSubmitRole: (role: string) => void;
   onSubmitGoal: (goalId: string) => void;
   onSubmitDaily: (dailyId: string) => void;
-  authStep: 'welcome' | 'email' | 'otp' | 'name' | 'goal' | 'daily' | 'signin';
+  onSubmitTeacherSubject: (subjectId: string) => void;
+  onSubmitTeacherSize: (sizeId: string) => void;
+  authStep: AuthStep;
+  authLoading: boolean;
 };
 
 function AppRoot({
   isReady,
   isAuthenticated,
+  needsOnboarding,
   pendingInviteToken,
   onInviteAccepted,
   onInviteDismiss,
   currentUserId,
-  onRequestCode,
-  onStartEmail,
-  onStartSignIn,
   onBackToWelcome,
-  onBackToEmail,
+  onBackToName,
+  onBackToRole,
   onBackToGoal,
-  onSubmitOTP,
+  onBackToTeacherSubject,
   onSubmitName,
+  onSubmitRole,
   onSubmitGoal,
   onSubmitDaily,
+  onSubmitTeacherSubject,
+  onSubmitTeacherSize,
   authStep,
+  authLoading,
 }: AppRootProps) {
   const colors = useThemeColors();
   const resolvedTheme = useSettingsStore((state) => state.resolvedTheme);
@@ -112,43 +120,44 @@ function AppRoot({
     <>
       {!isReady ? (
         <LoadingSplash />
-      ) : isAuthenticated ? (
+      ) : isAuthenticated && !needsOnboarding ? (
         <AppNavigator />
       ) : (
         authStep === 'welcome' ? (
-          <WelcomeScreen onCreateAccount={onStartEmail} onSignIn={onStartSignIn} />
-        ) : authStep === 'email' ? (
-          <EmailAuthScreen
-            onBack={onBackToWelcome}
-            onRequestCode={onRequestCode}
-          />
-        ) : authStep === 'otp' ? (
-          <OTPVerifyScreen
-            onBack={onBackToEmail}
-            onSubmit={onSubmitOTP}
-          />
+          <WelcomeScreen isLoading={authLoading} />
         ) : authStep === 'name' ? (
           <NameOnboardingScreen
-            onBack={onBackToEmail}
+            onBack={onBackToWelcome}
             onContinue={onSubmitName}
             onSkip={onSubmitName}
           />
+        ) : authStep === 'role' ? (
+          <RoleSelectionScreen
+            onBack={onBackToName}
+            onContinue={onSubmitRole}
+          />
         ) : authStep === 'goal' ? (
           <LearningGoalScreen
-            onBack={onBackToEmail}
+            onBack={onBackToRole}
             onContinue={onSubmitGoal}
           />
-        ) : authStep === 'signin' ? (
-          <SignInScreen
-            onBack={onBackToWelcome}
-            onSendCode={(email) => onRequestCode(email)}
-            onCreateAccount={onStartEmail}
-          />
-        ) : (
+        ) : authStep === 'daily' ? (
           <DailyGoalScreen
             onBack={onBackToGoal}
             onContinue={onSubmitDaily}
           />
+        ) : authStep === 'teacher_subject' ? (
+          <TeacherSubjectScreen
+            onBack={onBackToRole}
+            onContinue={onSubmitTeacherSubject}
+          />
+        ) : authStep === 'teacher_size' ? (
+          <TeacherGroupSizeScreen
+            onBack={onBackToTeacherSubject}
+            onContinue={onSubmitTeacherSize}
+          />
+        ) : (
+          <WelcomeScreen isLoading={authLoading} />
         )
       )}
     </>
@@ -188,7 +197,17 @@ export default function App() {
   const [isReady, setIsReady] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authStep, setAuthStep] = useState<'welcome' | 'email' | 'otp' | 'name' | 'goal' | 'daily' | 'signin'>('welcome');
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authStep, setAuthStep] = useState<AuthStep>('welcome');
+  const [onboardingData, setOnboardingData] = useState<{
+    displayName?: string;
+    role?: 'student' | 'teacher';
+    learningGoal?: string;
+    dailyGoal?: string;
+    teacherSubject?: string;
+    teacherGroupSize?: string;
+  }>({});
   const [pendingInviteToken, setPendingInviteToken] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const ensuredUserIdRef = useRef<string | null>(null);
@@ -227,6 +246,36 @@ export default function App() {
     };
   }, []);
 
+  // Общая логика обработки сессии: определить новый/возвращающийся пользователь
+  const handleSession = useCallback(async (user: { id: string; email?: string; user_metadata?: any }) => {
+    setCurrentUserId(user.id);
+    if (ensuredUserIdRef.current !== user.id) {
+      ensuredUserIdRef.current = user.id;
+      await NeonService.ensureUserExists({
+        id: user.id,
+        email: user.email,
+        displayName: (user.user_metadata as any)?.full_name,
+      });
+    }
+
+    setAuthLoading(true);
+    const completed = await NeonService.checkOnboardingCompleted(user.id);
+    setAuthLoading(false);
+
+    if (completed) {
+      setIsAuthenticated(true);
+      setNeedsOnboarding(false);
+      DatabaseService.reloadRemoteDataForUser(user.id);
+      setAnalyticsUserId(user.id);
+      refreshPushToken(user.id).catch(() => {});
+    } else {
+      // Новый пользователь — начинаем онбординг
+      setIsAuthenticated(true);
+      setNeedsOnboarding(true);
+      setAuthStep('name');
+    }
+  }, []);
+
   // Синхронизация isAuthenticated с сессией Supabase
   useEffect(() => {
     let isMounted = true;
@@ -238,50 +287,30 @@ export default function App() {
 
     supabase.auth
       .getSession()
-      .then(({ data, error }) => {
+      .then(async ({ data, error }) => {
         if (!isMounted) return;
         if (error) {
           console.error('Supabase session error:', error.message);
         }
-        setIsAuthenticated(Boolean(data.session));
         const user = data.session?.user;
         if (user) {
-          setCurrentUserId(user.id);
-          if (ensuredUserIdRef.current !== user.id) {
-            ensuredUserIdRef.current = user.id;
-            NeonService.ensureUserExists({
-              id: user.id,
-              email: user.email,
-              displayName: (user.user_metadata as any)?.full_name,
-            });
-            DatabaseService.reloadRemoteDataForUser(user.id);
-            setAnalyticsUserId(user.id);
-            refreshPushToken(user.id).catch(() => {});
-          }
+          await handleSession(user);
+        } else {
+          setIsAuthenticated(false);
         }
       })
       .catch((error) => {
         console.error('⚠️ Ошибка получения сессии:', error);
       });
 
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!isMounted) return;
-      setIsAuthenticated(Boolean(session));
       if (session?.user) {
-        setCurrentUserId(session.user.id);
-        if (ensuredUserIdRef.current !== session.user.id) {
-          ensuredUserIdRef.current = session.user.id;
-          NeonService.ensureUserExists({
-            id: session.user.id,
-            email: session.user.email,
-            displayName: (session.user.user_metadata as any)?.full_name,
-          });
-          DatabaseService.reloadRemoteDataForUser(session.user.id);
-          setAnalyticsUserId(session.user.id);
-          refreshPushToken(session.user.id).catch(() => {});
-        }
+        await handleSession(session.user);
       } else {
         setCurrentUserId(null);
+        setIsAuthenticated(false);
+        setNeedsOnboarding(false);
         setAnalyticsUserId(null);
         ensuredUserIdRef.current = null;
         setAuthStep('welcome');
@@ -292,7 +321,7 @@ export default function App() {
       isMounted = false;
       data.subscription.unsubscribe();
     };
-  }, []);
+  }, [handleSession]);
 
   // Подписка на foreground push-сообщения (показываем alert, пока приложение открыто)
   useEffect(() => {
@@ -406,54 +435,82 @@ export default function App() {
     };
   }, []);
 
-  // Временная заглушка: не сохраняем токен и не авторизуем
-  const handleRequestCode = useCallback((email?: string, password?: string) => {
-    // Здесь позже будет вызов Supabase OTP
-    // Пока просто выводим в консоль для отладки
-    console.log('Request code clicked with:', { email, password });
-    setAuthStep('otp');
+  const handleBackToWelcome = useCallback(async () => {
+    setAuthStep('welcome');
+    setNeedsOnboarding(false);
+    setOnboardingData({});
+    // Выход из OAuth, т.к. пользователь уже авторизован
+    await supabase.auth.signOut();
   }, []);
 
-  const handleStartEmail = useCallback(() => {
-    setAuthStep('email');
+  const handleBackToName = useCallback(() => {
+    setAuthStep('name');
   }, []);
 
-  const handleStartSignIn = useCallback(() => {
-    setAuthStep('signin');
-  }, []);
-
-  const handleBackToEmail = useCallback(() => {
-    setAuthStep('email');
+  const handleBackToRole = useCallback(() => {
+    setAuthStep('role');
   }, []);
 
   const handleBackToGoal = useCallback(() => {
     setAuthStep('goal');
   }, []);
 
-  const handleBackToWelcome = useCallback(() => {
-    setAuthStep('welcome');
-  }, []);
-
-  const handleSubmitOTP = useCallback((code: string) => {
-    console.log('Submit OTP with code:', code);
-    // Здесь позже будет verify -> /api/me -> вход. Сейчас ведем на шаг имени.
-    setAuthStep('name');
+  const handleBackToTeacherSubject = useCallback(() => {
+    setAuthStep('teacher_subject');
   }, []);
 
   const handleSubmitName = useCallback((name?: string) => {
-    console.log('Submit name:', name);
-    setAuthStep('goal');
+    setOnboardingData((prev) => ({ ...prev, displayName: name }));
+    setAuthStep('role');
+  }, []);
+
+  const handleSubmitRole = useCallback((role: string) => {
+    const r = role as 'student' | 'teacher';
+    setOnboardingData((prev) => ({ ...prev, role: r }));
+    if (r === 'teacher') {
+      setAuthStep('teacher_subject');
+    } else {
+      setAuthStep('goal');
+    }
   }, []);
 
   const handleSubmitGoal = useCallback((goalId: string) => {
-    console.log('Submit goal:', goalId);
+    setOnboardingData((prev) => ({ ...prev, learningGoal: goalId }));
     setAuthStep('daily');
   }, []);
 
+  const finishOnboarding = useCallback(async (finalData: typeof onboardingData) => {
+    if (!currentUserId) return;
+    await NeonService.saveOnboardingData(currentUserId, {
+      displayName: finalData.displayName,
+      teacher: finalData.role === 'teacher',
+      learningGoal: finalData.learningGoal,
+      dailyGoal: finalData.dailyGoal,
+      teacherSubject: finalData.teacherSubject,
+      teacherGroupSize: finalData.teacherGroupSize,
+    });
+    setNeedsOnboarding(false);
+    DatabaseService.reloadRemoteDataForUser(currentUserId);
+    setAnalyticsUserId(currentUserId);
+    refreshPushToken(currentUserId).catch(() => {});
+  }, [currentUserId]);
+
   const handleSubmitDaily = useCallback((dailyId: string) => {
-    console.log('Submit daily goal:', dailyId);
-    // Здесь позже будет реальный вход / сохранение
+    const finalData = { ...onboardingData, dailyGoal: dailyId };
+    setOnboardingData(finalData);
+    finishOnboarding(finalData);
+  }, [onboardingData, finishOnboarding]);
+
+  const handleSubmitTeacherSubject = useCallback((subjectId: string) => {
+    setOnboardingData((prev) => ({ ...prev, teacherSubject: subjectId }));
+    setAuthStep('teacher_size');
   }, []);
+
+  const handleSubmitTeacherSize = useCallback((sizeId: string) => {
+    const finalData = { ...onboardingData, teacherGroupSize: sizeId };
+    setOnboardingData(finalData);
+    finishOnboarding(finalData);
+  }, [onboardingData, finishOnboarding]);
 
   const handleInviteAccepted = useCallback((courseId: string, courseTitle: string) => {
     setPendingInviteToken(null);
@@ -491,21 +548,24 @@ export default function App() {
       <AppRoot
         isReady={appReady}
         isAuthenticated={isAuthenticated}
+        needsOnboarding={needsOnboarding}
         pendingInviteToken={pendingInviteToken}
         onInviteAccepted={handleInviteAccepted}
         onInviteDismiss={handleInviteDismiss}
         currentUserId={currentUserId}
-        onRequestCode={handleRequestCode}
-        onStartEmail={handleStartEmail}
-        onStartSignIn={handleStartSignIn}
         onBackToWelcome={handleBackToWelcome}
-        onBackToEmail={handleBackToEmail}
+        onBackToName={handleBackToName}
+        onBackToRole={handleBackToRole}
         onBackToGoal={handleBackToGoal}
-        onSubmitOTP={handleSubmitOTP}
+        onBackToTeacherSubject={handleBackToTeacherSubject}
         onSubmitName={handleSubmitName}
+        onSubmitRole={handleSubmitRole}
         onSubmitGoal={handleSubmitGoal}
         onSubmitDaily={handleSubmitDaily}
+        onSubmitTeacherSubject={handleSubmitTeacherSubject}
+        onSubmitTeacherSize={handleSubmitTeacherSize}
         authStep={authStep}
+        authLoading={authLoading}
       />
     </SafeAreaProvider>
     </ErrorBoundary>

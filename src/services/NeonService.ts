@@ -206,6 +206,59 @@ export const NeonService = {
   },
 
   /**
+   * Проверить, завершил ли пользователь онбординг
+   */
+  async checkOnboardingCompleted(userId: string): Promise<boolean> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) return true;
+      const sql = neon(connectionString);
+      const rows = await sql`
+        SELECT onboarding_completed FROM users WHERE id = ${userId}::uuid
+      `;
+      if (rows.length === 0) return true;
+      return rows[0]?.onboarding_completed === true;
+    } catch (error) {
+      console.error('Failed to check onboarding status:', error);
+      return true;
+    }
+  },
+
+  /**
+   * Сохранить данные онбординга и отметить онбординг завершённым
+   */
+  async saveOnboardingData(
+    userId: string,
+    data: {
+      displayName?: string;
+      teacher?: boolean;
+      learningGoal?: string;
+      dailyGoal?: string;
+      teacherSubject?: string;
+      teacherGroupSize?: string;
+    },
+  ): Promise<void> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) return;
+      const sql = neon(connectionString);
+      await sql`
+        UPDATE users SET
+          display_name = COALESCE(${data.displayName ?? null}, display_name),
+          teacher = COALESCE(${data.teacher ?? null}, teacher),
+          learning_goal = COALESCE(${data.learningGoal ?? null}, learning_goal),
+          daily_goal = COALESCE(${data.dailyGoal ?? null}, daily_goal),
+          teacher_subject = COALESCE(${data.teacherSubject ?? null}, teacher_subject),
+          teacher_group_size = COALESCE(${data.teacherGroupSize ?? null}, teacher_group_size),
+          onboarding_completed = true
+        WHERE id = ${userId}::uuid
+      `;
+    } catch (error) {
+      console.error('Failed to save onboarding data:', error);
+    }
+  },
+
+  /**
    * Загрузить все наборы карточек
    */
   async loadSets(userId?: string): Promise<CardSet[]> {

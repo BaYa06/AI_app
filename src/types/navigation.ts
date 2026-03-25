@@ -72,6 +72,11 @@ export type RootStackParamList = {
     studiedInPhase?: number;
     phaseOffset?: number;
     phaseFailedIds?: string[];
+    // Challenge mode
+    challengeMode?: boolean;
+    timeLimit?: number;
+    sniperMode?: boolean;
+    forgottenMode?: boolean;
   };
   WordBuilder: {
     setId: string;

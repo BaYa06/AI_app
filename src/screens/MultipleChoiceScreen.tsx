@@ -3,24 +3,33 @@
  * @description Экран выбора перевода
  */
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { View, StyleSheet, Pressable, ScrollView, AppState } from 'react-native';
-import { ArrowLeft, Settings, Volume2 } from 'lucide-react-native';
+import { View, StyleSheet, Pressable, ScrollView, AppState, Text as RNText } from 'react-native';
+import { ArrowLeft, Volume2 } from 'lucide-react-native';
 import { Container, Text, ProgressBar, Loading } from '@/components/common';
 import { useCardsStore, useSetsStore, useThemeColors, useSettingsStore, selectSetStats } from '@/store';
 import { spacing, borderRadius } from '@/constants';
 import { calculateNextReview } from '@/services/SRSService';
 import { speak, detectLanguage } from '@/utils/speech';
 import { playCorrectSound, preloadSound } from '@/utils/sound';
+import { useChallengeStore } from '@/store';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card, Rating } from '@/types';
 
 type Props = RootStackScreenProps<'MultipleChoice'>;
 
+type ChallengeResult = {
+  finished: boolean;
+  timesUp: boolean;
+  correct?: number;
+  total?: number;
+  timeSpent?: number;
+} | null;
+
 type OptionState = 'neutral' | 'correct' | 'wrong';
 type Option = { id: string; label: string; text: string; isCorrect: boolean };
 
 export function MultipleChoiceScreen({ navigation, route }: Props) {
-  const { setId, cardLimit, dueCardIds, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0, phaseFailedIds } = route.params;
+  const { setId, cardLimit, dueCardIds, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0, phaseFailedIds, challengeMode, timeLimit: paramTimeLimit, sniperMode, forgottenMode } = route.params;
   const colors = useThemeColors();
   const set = useSetsStore((s) => s.getSet(setId));
   const updateSetStats = useSetsStore((s) => s.updateSetStats);
@@ -58,6 +67,15 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
   const [errorCards, setErrorCards] = useState<Array<{ id: string; front: string; back: string; rating: number }>>([]);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const startedAtRef = useRef<number>(Date.now());
+
+  // Challenge mode state
+  const [timeLeft, setTimeLeft] = useState(paramTimeLimit ?? 120);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const [challengeResult, setChallengeResult] = useState<ChallengeResult>(null);
+
+  // Sniper mode state
+  const [sniperStreak, setSniperStreak] = useState(0);
+  const TARGET_STREAK = 5;
 
   const getFront = (card: Card) => card.frontText ?? (card as any).front ?? '';
   const getBack = (card: Card) => card.backText ?? (card as any).back ?? '';
@@ -212,6 +230,55 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
     preloadSound('/correct.wav');
   }, []);
 
+  // Challenge timer
+  const formatTime = (s: number) =>
+    `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+
+  const handleTimeUp = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setChallengeResult({ finished: false, timesUp: true });
+  }, []);
+
+  useEffect(() => {
+    if (!challengeMode || sniperMode || forgottenMode) return;
+    timerRef.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current!);
+          handleTimeUp();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [challengeMode, sniperMode, forgottenMode, handleTimeUp]);
+
+  const restartChallenge = useCallback(() => {
+    setChallengeResult(null);
+    setCurrentIndex(0);
+    setErrors(0);
+    setErrorCards([]);
+    setSelectedOption(null);
+    setShowResult(false);
+    setTimeLeft(paramTimeLimit ?? 120);
+    startedAtRef.current = Date.now();
+    // Restart timer
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current!);
+          handleTimeUp();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, [paramTimeLimit, handleTimeUp]);
+
   const finishQuiz = React.useCallback(
     (errorsCount: number, errorList: Array<{ id: string; front: string; back: string; rating: number }>) => {
       const timeSpent = Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000));
@@ -300,7 +367,10 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
           },
         ];
 
-    applySrsUpdate(currentCard, rating);
+    // Skip SRS in challenge mode
+    if (!challengeMode) {
+      applySrsUpdate(currentCard, rating);
+    }
     if (isCorrect) {
       playCorrectSound();
     }
@@ -312,9 +382,99 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
       setErrorCards(updatedErrorCards);
     }
 
+    // ── Sniper mode ──
+    if (sniperMode) {
+      if (isCorrect) {
+        const newStreak = sniperStreak + 1;
+        setSniperStreak(newStreak);
+        if (newStreak >= TARGET_STREAK) {
+          timeoutRef.current = setTimeout(() => {
+            setChallengeResult({ finished: true, timesUp: false });
+          }, 650);
+          return;
+        }
+      } else {
+        setSniperStreak(0);
+      }
+
+      timeoutRef.current = setTimeout(() => {
+        if (isCorrect) {
+          // Advance to next card, or loop if at end
+          const isLast = currentIndex >= totalQuestions - 1;
+          if (isLast) {
+            // Reshuffle and restart from 0
+            setQuestions((prev) => {
+              const shuffled = [...prev];
+              for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+              }
+              return shuffled;
+            });
+            setCurrentIndex(0);
+          } else {
+            setCurrentIndex((idx) => idx + 1);
+          }
+        }
+        // Wrong answer: stay on same card (don't change currentIndex)
+        setSelectedOption(null);
+        setShowResult(false);
+      }, isCorrect ? 650 : 1000);
+      return;
+    }
+
+    // ── Forgotten mode ──
+    if (forgottenMode) {
+      const isLast = currentIndex >= totalQuestions - 1;
+      timeoutRef.current = setTimeout(() => {
+        if (isLast) {
+          const correctCount = totalQuestions - nextErrors;
+          setChallengeResult({
+            finished: true,
+            timesUp: false,
+            correct: correctCount,
+            total: totalQuestions,
+          });
+          return;
+        }
+        setCurrentIndex((idx) => idx + 1);
+        setSelectedOption(null);
+        setShowResult(false);
+      }, 1000);
+      return;
+    }
+
+    // ── Quick round challenge: fail immediately on first error ──
+    if (challengeMode && !isCorrect) {
+      timeoutRef.current = setTimeout(() => {
+        if (timerRef.current) clearInterval(timerRef.current);
+        setChallengeResult({
+          finished: false,
+          timesUp: false,
+          correct: currentIndex,
+          total: totalQuestions,
+          timeSpent: (paramTimeLimit ?? 120) - timeLeft,
+        });
+      }, 650);
+      return;
+    }
+
     const isLast = currentIndex >= totalQuestions - 1;
     timeoutRef.current = setTimeout(() => {
       if (isLast) {
+        if (challengeMode) {
+          // All correct — challenge won!
+          if (timerRef.current) clearInterval(timerRef.current);
+          useChallengeStore.getState().completeQuickRound();
+          setChallengeResult({
+            finished: true,
+            timesUp: false,
+            correct: totalQuestions,
+            total: totalQuestions,
+            timeSpent: (paramTimeLimit ?? 120) - timeLeft,
+          });
+          return;
+        }
         finishQuiz(nextErrors, updatedErrorCards);
         return;
       }
@@ -344,6 +504,20 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
     return <Loading fullScreen message="Загрузка..." />;
   }
 
+  const screenTitle = sniperMode
+    ? 'Снайпер \uD83C\uDFAF'
+    : forgottenMode
+      ? 'Вспомни забытое \uD83E\uDDE0'
+      : challengeMode
+        ? 'Быстрый раунд \u26A1'
+        : 'Multiple Choice';
+
+  const handleClose = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (!challengeMode) finishStudySession();
+    navigation.navigate('Main', { screen: 'Home' });
+  }, [challengeMode, finishStudySession, navigation]);
+
   if (!totalQuestions) {
     return (
       <Container padded={false}>
@@ -359,7 +533,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
             <ArrowLeft size={22} color={colors.textPrimary} />
           </Pressable>
           <Text variant="h3" style={{ color: colors.textPrimary }}>
-            Multiple Choice
+            {screenTitle}
           </Text>
           <View style={styles.iconButton} />
         </View>
@@ -375,12 +549,149 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
     );
   }
 
+  // Sniper result screen
+  if (sniperMode && challengeResult) {
+    const restartSniper = () => {
+      setSniperStreak(0);
+      setCurrentIndex(0);
+      setErrors(0);
+      setErrorCards([]);
+      setSelectedOption(null);
+      setShowResult(false);
+      setChallengeResult(null);
+    };
+
+    return (
+      <Container padded={false}>
+        <View style={styles.challengeResultContainer}>
+          <RNText style={styles.challengeResultEmoji}>{'\uD83C\uDFAF'}</RNText>
+          <RNText style={[styles.challengeResultTitle, { color: colors.textPrimary }]}>
+            Снайпер!
+          </RNText>
+          <RNText style={[styles.challengeResultSubtitle, { color: colors.textSecondary }]}>
+            5 правильных подряд без единой ошибки
+          </RNText>
+          <View style={styles.challengeResultButtons}>
+            <Pressable
+              style={[styles.challengeResultPrimary, { backgroundColor: colors.primary }]}
+              onPress={restartSniper}
+            >
+              <RNText style={styles.challengeResultPrimaryText}>Повторить</RNText>
+            </Pressable>
+            <Pressable
+              style={[styles.challengeResultSecondary, { borderColor: colors.border }]}
+              onPress={handleClose}
+            >
+              <RNText style={[styles.challengeResultSecondaryText, { color: colors.textPrimary }]}>Закрыть</RNText>
+            </Pressable>
+          </View>
+        </View>
+      </Container>
+    );
+  }
+
+  // Forgotten mode result screen
+  if (forgottenMode && challengeResult) {
+    const restartForgotten = () => {
+      setCurrentIndex(0);
+      setErrors(0);
+      setErrorCards([]);
+      setSelectedOption(null);
+      setShowResult(false);
+      setChallengeResult(null);
+    };
+
+    return (
+      <Container padded={false}>
+        <View style={styles.challengeResultContainer}>
+          <RNText style={styles.challengeResultEmoji}>{'\uD83E\uDDE0'}</RNText>
+          <RNText style={[styles.challengeResultTitle, { color: colors.textPrimary }]}>
+            Память освежена!
+          </RNText>
+          <RNText style={[styles.challengeResultSubtitle, { color: colors.textSecondary }]}>
+            {`Правильно: ${challengeResult.correct} из ${challengeResult.total}`}
+          </RNText>
+          <View style={styles.challengeResultButtons}>
+            <Pressable
+              style={[styles.challengeResultPrimary, { backgroundColor: colors.primary }]}
+              onPress={restartForgotten}
+            >
+              <RNText style={styles.challengeResultPrimaryText}>Повторить</RNText>
+            </Pressable>
+            <Pressable
+              style={[styles.challengeResultSecondary, { borderColor: colors.border }]}
+              onPress={handleClose}
+            >
+              <RNText style={[styles.challengeResultSecondaryText, { color: colors.textPrimary }]}>Закрыть</RNText>
+            </Pressable>
+          </View>
+        </View>
+      </Container>
+    );
+  }
+
+  // Quick round challenge result screen
+  if (challengeMode && challengeResult) {
+    const isSuccess = challengeResult.finished && challengeResult.correct === challengeResult.total;
+
+    return (
+      <Container padded={false}>
+        <View style={styles.challengeResultContainer}>
+          <RNText style={styles.challengeResultEmoji}>
+            {isSuccess ? '\uD83C\uDFC6' : challengeResult.timesUp ? '\u23F1\uFE0F' : '\uD83D\uDE14'}
+          </RNText>
+          <RNText style={[styles.challengeResultTitle, { color: colors.textPrimary }]}>
+            {isSuccess
+              ? 'Поздравляем!'
+              : challengeResult.timesUp
+                ? 'Время вышло!'
+                : 'Не получилось...'}
+          </RNText>
+          <RNText style={[styles.challengeResultSubtitle, { color: colors.textSecondary }]}>
+            {isSuccess
+              ? `Все ${challengeResult.total} слов угаданы без ошибок за ${formatTime(challengeResult.timeSpent ?? 0)}! Алмазы ждут тебя на главной.`
+              : challengeResult.timesUp
+                ? `Ты успел ответить на ${currentIndex} из ${totalQuestions}`
+                : 'Чтобы забрать алмазы, угадай все слова за 2 минуты без единой ошибки. Ты справишься! \uD83D\uDCAA'}
+          </RNText>
+
+          <View style={styles.challengeResultButtons}>
+            {!isSuccess && (
+              <Pressable
+                style={[styles.challengeResultPrimary, { backgroundColor: colors.primary }]}
+                onPress={restartChallenge}
+              >
+                <RNText style={styles.challengeResultPrimaryText}>Повторить</RNText>
+              </Pressable>
+            )}
+            <Pressable
+              style={isSuccess
+                ? [styles.challengeResultPrimary, { backgroundColor: '#059669' }]
+                : [styles.challengeResultSecondary, { borderColor: colors.border }]
+              }
+              onPress={handleClose}
+            >
+              <RNText style={isSuccess
+                ? styles.challengeResultPrimaryText
+                : [styles.challengeResultSecondaryText, { color: colors.textPrimary }]
+              }>Закрыть</RNText>
+            </Pressable>
+          </View>
+        </View>
+      </Container>
+    );
+  }
+
   return (
     <Container padded={false}>
       <View style={[styles.header, { backgroundColor: colors.background }]}>
         <Pressable
           aria-label="Назад"
-          onPress={() => { finishStudySession(); navigation.goBack(); }}
+          onPress={() => {
+            if (timerRef.current) clearInterval(timerRef.current);
+            if (!challengeMode) finishStudySession();
+            navigation.goBack();
+          }}
           style={({ pressed }) => [
             styles.iconButton,
             { backgroundColor: pressed ? colors.surface : 'transparent' },
@@ -389,26 +700,36 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
           <ArrowLeft size={22} color={colors.textPrimary} />
         </Pressable>
         <Text variant="h3" style={{ color: colors.textPrimary }}>
-          Multiple Choice
+          {screenTitle}
         </Text>
-        <Pressable
-          aria-label="Настройки"
-          style={({ pressed }) => [
-            styles.iconButton,
-            { backgroundColor: pressed ? colors.surface : 'transparent' },
-          ]}
-        >
-          <Settings size={20} color={colors.textPrimary} />
-        </Pressable>
+        {challengeMode && !sniperMode && !forgottenMode ? (
+          <View style={styles.timerContainer}>
+            <RNText style={[
+              styles.timerText,
+              { color: timeLeft <= 10 ? colors.error : colors.textPrimary },
+            ]}>
+              {formatTime(timeLeft)}
+            </RNText>
+          </View>
+        ) : (
+          <View style={styles.iconButton} />
+        )}
       </View>
 
       <View style={styles.progressSection}>
         <View style={styles.progressInfo}>
           <Text variant="bodySmall" style={{ color: colors.textPrimary, fontWeight: '700' }}>
-            Вопрос: {currentIndex + 1}/{totalQuestions}
+            {sniperMode
+              ? `Серия: ${sniperStreak}/${TARGET_STREAK}`
+              : `Вопрос: ${currentIndex + 1}/${totalQuestions}`}
           </Text>
         </View>
-        <ProgressBar progress={progressPercent} height={8} />
+        <ProgressBar
+          progress={sniperMode
+            ? Math.round((sniperStreak / TARGET_STREAK) * 100)
+            : progressPercent}
+          height={8}
+        />
       </View>
 
       <ScrollView
@@ -648,5 +969,64 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: spacing.l,
     gap: spacing.s,
+  },
+  // Timer
+  timerContainer: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timerText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  // Challenge result
+  challengeResultContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.l,
+  },
+  challengeResultEmoji: {
+    fontSize: 64,
+    marginBottom: spacing.m,
+  },
+  challengeResultTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: spacing.xs,
+  },
+  challengeResultSubtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: spacing.xl,
+  },
+  challengeResultButtons: {
+    width: '100%',
+    gap: spacing.s,
+  },
+  challengeResultPrimary: {
+    height: 52,
+    borderRadius: borderRadius.l,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  challengeResultPrimaryText: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  challengeResultSecondary: {
+    height: 52,
+    borderRadius: borderRadius.l,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  challengeResultSecondaryText: {
+    fontSize: 17,
+    fontWeight: '600',
   },
 });

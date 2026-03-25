@@ -9,6 +9,12 @@ CREATE TABLE IF NOT EXISTS users (
   display_name VARCHAR(255),
   is_anonymous BOOLEAN DEFAULT true,
   teacher BOOLEAN DEFAULT false,
+  diamond INTEGER DEFAULT 0,
+  onboarding_completed BOOLEAN DEFAULT false,
+  teacher_subject VARCHAR(50),
+  teacher_group_size VARCHAR(20),
+  learning_goal VARCHAR(50),
+  daily_goal VARCHAR(10),
   created_at TIMESTAMP DEFAULT NOW(),
   settings JSONB DEFAULT '{
     "dailyGoal": 20,

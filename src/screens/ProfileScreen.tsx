@@ -10,6 +10,7 @@ import {
   Pressable,
   Alert,
   Switch,
+  Platform,
 } from 'react-native';
 import { useSettingsStore, useThemeColors } from '@/store';
 import { DatabaseService, supabase, NeonService } from '@/services';
@@ -116,14 +117,29 @@ export function ProfileScreen({ navigation }: any) {
   const handleExport = useCallback(async () => {
     try {
       DatabaseService.exportData();
-      Alert.alert('Экспорт', 'Данные подготовлены для экспорта');
+      if (Platform.OS === 'web') {
+        window.alert('Данные подготовлены для экспорта');
+      } else {
+        Alert.alert('Экспорт', 'Данные подготовлены для экспорта');
+      }
     } catch (error) {
-      Alert.alert('Ошибка', 'Не удалось экспортировать данные');
+      if (Platform.OS === 'web') {
+        window.alert('Не удалось экспортировать данные');
+      } else {
+        Alert.alert('Ошибка', 'Не удалось экспортировать данные');
+      }
     }
   }, []);
 
   // Очистка данных
   const handleClearData = useCallback(() => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Удалить все данные?\nВсе наборы и карточки будут удалены. Это действие нельзя отменить.')) {
+        DatabaseService.clearAll();
+        window.alert('Все данные удалены');
+      }
+      return;
+    }
     Alert.alert(
       'Удалить все данные?',
       'Все наборы и карточки будут удалены. Это действие нельзя отменить.',
@@ -142,22 +158,26 @@ export function ProfileScreen({ navigation }: any) {
   }, []);
 
   // Logout
+  const doSignOut = useCallback(async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error('Logout error:', e);
+    }
+  }, []);
+
   const handleLogout = useCallback(() => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Выйти из аккаунта?')) {
+        doSignOut();
+      }
+      return;
+    }
     Alert.alert('Выйти из аккаунта?', '', [
       { text: 'Отмена', style: 'cancel' },
-      {
-        text: 'Выйти',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await supabase.auth.signOut();
-          } catch (e) {
-            console.error('Logout error:', e);
-          }
-        },
-      },
+      { text: 'Выйти', style: 'destructive', onPress: doSignOut },
     ]);
-  }, []);
+  }, [doSignOut]);
 
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>

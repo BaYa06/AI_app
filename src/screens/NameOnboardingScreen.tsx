@@ -49,17 +49,17 @@ export function NameOnboardingScreen({ onContinue, onSkip, onBack }: Props) {
           <View style={styles.progressBlock}>
             <View style={styles.progressHeader}>
               <Text variant="bodySmall" color="primary">
-                Шаг 3 из 5
+                Шаг 1 из 4
               </Text>
               <Text variant="bodySmall" color="secondary">
-                60% завершено
+                25% завершено
               </Text>
             </View>
             <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
               <View
                 style={[
                   styles.progressFill,
-                  { backgroundColor: colors.primary, width: '60%' },
+                  { backgroundColor: colors.primary, width: '25%' },
                 ]}
               />
             </View>

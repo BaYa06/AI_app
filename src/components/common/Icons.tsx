@@ -14,6 +14,7 @@ import {
   BookOpen,
   CheckCircle2,
   AlertCircle,
+  Bell,
 } from 'lucide-react-native';
 
 export {
@@ -25,4 +26,5 @@ export {
   BookOpen,
   CheckCircle2,
   AlertCircle,
+  Bell,
 };

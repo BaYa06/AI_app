@@ -1,79 +1,91 @@
 /**
- * DailyGoalScreen
- * @description Шаг 5: выбор дневной цели (сколько слов в день). Только UI, без сохранения.
+ * RoleSelectionScreen
+ * @description Шаг 2: выбор роли (ученик / учитель).
  */
 import React, { useState } from 'react';
-import { View, StyleSheet, Platform, ScrollView, Pressable } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Button, Text } from '@/components/common';
 import { spacing, borderRadius } from '@/constants';
 import { useThemeColors } from '@/store';
 
-type DailyOption = {
+type RoleOption = {
   id: string;
-  words: number;
-  label: string;
+  title: string;
+  description: string;
   icon: string;
-  vibe: string;
 };
 
 type Props = {
-  onContinue?: (optionId: string) => void;
+  onContinue?: (roleId: string) => void;
   onBack?: () => void;
 };
 
-const OPTIONS: DailyOption[] = [
-  { id: '5', words: 5, label: '5 слов в день', icon: 'leaf-outline', vibe: 'Неспешно' },
-  { id: '10', words: 10, label: '10 слов в день', icon: 'flash', vibe: 'В ритме' },
-  { id: '20', words: 20, label: '20 слов в день', icon: 'flame', vibe: 'Серьезно' },
+const OPTIONS: RoleOption[] = [
+  { id: 'student', title: 'Я учусь', description: 'Создавайте карточки и учите новое', icon: 'school' },
+  { id: 'teacher', title: 'Я преподаю', description: 'Создавайте курсы для учеников', icon: 'people' },
 ];
 
-export function DailyGoalScreen({ onContinue, onBack }: Props) {
+export function RoleSelectionScreen({ onContinue, onBack }: Props) {
   const colors = useThemeColors();
-  const [selected, setSelected] = useState<string>('10');
+  const [selected, setSelected] = useState<string>('student');
 
-  const renderOption = (opt: DailyOption) => {
-    const active = selected === opt.id;
+  const renderOption = (option: RoleOption) => {
+    const active = selected === option.id;
     return (
       <Pressable
-        key={opt.id}
-        onPress={() => setSelected(opt.id)}
+        key={option.id}
+        onPress={() => setSelected(option.id)}
         style={[
           styles.option,
           {
             borderColor: active ? colors.primary : colors.border,
             backgroundColor: active ? `${colors.primary}0D` : colors.surface,
-            flexDirection: 'row-reverse',
           },
         ]}
       >
-        <View style={styles.radioContainer}>
-          <View
-            style={[
-              styles.radioOuter,
-              { borderColor: active ? colors.primary : colors.border },
-            ]}
-          >
-            {active && <View style={[styles.radioInner, { backgroundColor: colors.primary }]} />}
-          </View>
+        <View
+          style={[
+            styles.optionIcon,
+            { backgroundColor: active ? colors.primary : `${colors.surface}99` },
+          ]}
+        >
+          <Ionicons
+            name={option.icon as any}
+            size={26}
+            color={active ? colors.textInverse : colors.primary}
+          />
         </View>
         <View style={styles.optionText}>
-          <Text variant="bodyLarge" style={{ color: colors.textPrimary, fontWeight: '700' }}>
-            {opt.label}
+          <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
+            {option.title}
           </Text>
-          <View style={styles.vibeRow}>
-            <Ionicons name={opt.icon as any} size={16} color={colors.primary} />
-            <Text variant="bodySmall" color="secondary">
-              {opt.vibe}
-            </Text>
-          </View>
+          <Text variant="bodySmall" color="secondary">
+            {option.description}
+          </Text>
+        </View>
+        <View
+          style={[
+            styles.optionRadio,
+            {
+              borderColor: active ? colors.primary : colors.border,
+              backgroundColor: active ? colors.primary : 'transparent',
+            },
+          ]}
+        >
+          {active && <Ionicons name="checkmark" size={14} color={colors.textInverse} />}
         </View>
       </Pressable>
     );
   };
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <View
+      style={[
+        styles.screen,
+        { backgroundColor: colors.background },
+      ]}
+    >
       <View
         style={[
           styles.shell,
@@ -90,7 +102,7 @@ export function DailyGoalScreen({ onContinue, onBack }: Props) {
             <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
           </Pressable>
           <Text variant="h3" align="center" style={{ flex: 1, color: colors.textPrimary }}>
-            Шаг 4 из 4
+            Flashly
           </Text>
           <View style={styles.backHit} />
         </View>
@@ -99,54 +111,42 @@ export function DailyGoalScreen({ onContinue, onBack }: Props) {
         <View style={styles.progressBlock}>
           <View style={styles.progressHeader}>
             <Text variant="bodySmall" color="primary">
-              Прогресс онбординга
+              Шаг 2 из 4
             </Text>
             <Text variant="bodySmall" color="secondary">
-              4 / 4
+              50%
             </Text>
           </View>
           <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
             <View
               style={[
                 styles.progressFill,
-                { backgroundColor: colors.primary, width: '100%' },
+                { backgroundColor: colors.primary, width: '50%' },
               ]}
             />
           </View>
         </View>
 
+        {/* Content */}
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.headlineBlock}>
             <Text variant="h1" style={[styles.headline, { color: colors.textPrimary }]}>
-              Установите дневную цель
+              Кто вы?
             </Text>
-            <Text
-              variant="body"
-              color="secondary"
-              align="center"
-              style={styles.bodyText}
-            >
-              Сколько новых слов хотите учить каждый день?
+            <Text variant="body" color="secondary" style={styles.bodyText}>
+              Это поможет нам настроить приложение под вас.
             </Text>
           </View>
 
           <View style={styles.options}>{OPTIONS.map(renderOption)}</View>
         </ScrollView>
 
+        {/* Footer */}
         <View style={styles.footer}>
-          <Text
-            variant="bodySmall"
-            color="tertiary"
-            align="center"
-            style={styles.footerNote}
-          >
-            Это можно изменить в настройках профиля.
-          </Text>
           <Button
-            title="Начать обучение"
+            title="Продолжить"
             onPress={() => onContinue?.(selected)}
             fullWidth
-            leftIcon={<Ionicons name="rocket-outline" size={20} color={colors.textInverse} />}
           />
         </View>
       </View>
@@ -213,11 +213,9 @@ const styles = StyleSheet.create({
   },
   headlineBlock: {
     gap: spacing.s,
-    alignItems: 'center',
   },
   headline: {
     letterSpacing: -0.4,
-    textAlign: 'center',
   },
   bodyText: {
     lineHeight: 22,
@@ -233,38 +231,28 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.l,
     padding: spacing.m,
   },
+  optionIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: borderRadius.m,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   optionText: {
     flex: 1,
-    gap: 4,
+    gap: 2,
   },
-  vibeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  radioContainer: {
-    width: 32,
-    alignItems: 'center',
-  },
-  radioOuter: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+  optionRadio: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
   footer: {
     paddingHorizontal: spacing.l,
     paddingVertical: spacing.xl,
-    gap: spacing.m,
-  },
-  footerNote: {
-    lineHeight: 18,
+    gap: spacing.s,
   },
 });

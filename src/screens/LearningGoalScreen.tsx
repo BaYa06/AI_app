@@ -115,17 +115,17 @@ export function LearningGoalScreen({ onContinue, onBack }: Props) {
         <View style={styles.progressBlock}>
           <View style={styles.progressHeader}>
             <Text variant="bodySmall" color="primary">
-              Шаг 4 из 5
+              Шаг 3 из 4
             </Text>
             <Text variant="bodySmall" color="secondary">
-              80%
+              75%
             </Text>
           </View>
           <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
             <View
               style={[
                 styles.progressFill,
-                { backgroundColor: colors.primary, width: '80%' },
+                { backgroundColor: colors.primary, width: '75%' },
               ]}
             />
           </View>
