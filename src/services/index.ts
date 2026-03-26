@@ -21,3 +21,4 @@ export {
 export type { PushStatus, ForegroundMessageHandler } from './pushNotifications';
 export { LibraryService } from './LibraryService';
 export { SyncQueueService } from './SyncQueueService';
+export { Analytics, setAnalyticsUserProperties } from './analytics';

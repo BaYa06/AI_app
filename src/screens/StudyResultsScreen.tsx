@@ -6,6 +6,7 @@ import React from 'react';
 import { View, StyleSheet, Pressable, ScrollView, Platform, Modal } from 'react-native';
 import { useThemeColors } from '@/store';
 import { Text, StreakCelebrationModal } from '@/components/common';
+import { Analytics } from '@/services/analytics';
 import { spacing } from '@/constants';
 import type { RootStackScreenProps } from '@/types/navigation';
 import { ArrowLeft, Settings, CheckCircle2, List, ArrowRight, RotateCcw, BookOpen, X } from 'lucide-react-native';
@@ -46,6 +47,23 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   const remainingFailedCards = phaseFailedIds?.length || 0;
   const remainingInPhase = remainingNewCards + remainingFailedCards;
   
+  // Analytics: study_session_complete
+  React.useEffect(() => {
+    const modeMap: Record<string, 'flashcard' | 'quiz' | 'match'> = {
+      'Flashcards': 'flashcard',
+      'Multiple Choice': 'quiz',
+      'Match': 'match',
+    };
+    Analytics.studySessionComplete({
+      setId,
+      mode: modeMap[modeTitle] ?? 'flashcard',
+      cardCount: totalCards,
+      correctAnswers: learnedCards,
+      timeSpentSec: timeSpent,
+      phaseComplete: Boolean(isPhaseComplete),
+    });
+  }, []);
+
   // Debug info
   console.log('[StudyResults] Параметры фазы:', {
     phaseId,

@@ -9,7 +9,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AppNavigator } from '@/navigation';
 import { LoadingSplash } from '@/components/common';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
-import { DatabaseService, setupAutoSave, supabase, NeonService, setAnalyticsUserId, SyncQueueService } from '@/services';
+import { DatabaseService, setupAutoSave, supabase, NeonService, setAnalyticsUserId, SyncQueueService, Analytics, setAnalyticsUserProperties } from '@/services';
 import { refreshPushToken, subscribeForegroundMessages } from '@/services/pushNotifications';
 import { useThemeColors, useSettingsStore } from '@/store';
 import { CourseInviteModal } from '@/components/CourseInviteModal';
@@ -267,6 +267,23 @@ export default function App() {
       setNeedsOnboarding(false);
       DatabaseService.reloadRemoteDataForUser(user.id);
       setAnalyticsUserId(user.id);
+
+      // Analytics: login + user properties
+      const provider = (user.user_metadata as any)?.iss?.includes('google') ? 'google' : 'email';
+      Analytics.login(provider as 'google' | 'email');
+      const createdAt = new Date((user as any).created_at ?? Date.now()).getTime();
+      const daysSince = Math.floor((Date.now() - createdAt) / 86400000);
+      setAnalyticsUserProperties({
+        subscription_tier: 'free',
+        language: 'ru',
+        days_since_registration:
+          daysSince <= 7 ? '0-7' :
+          daysSince <= 30 ? '8-30' :
+          daysSince <= 90 ? '31-90' : '90+',
+        total_sets_bucket: '0',
+        has_completed_onboarding: true,
+      });
+
       refreshPushToken(user.id).catch(() => {});
     } else {
       // Новый пользователь — начинаем онбординг
@@ -308,6 +325,7 @@ export default function App() {
       if (session?.user) {
         await handleSession(session.user);
       } else {
+        Analytics.logout();
         setCurrentUserId(null);
         setIsAuthenticated(false);
         setNeedsOnboarding(false);
@@ -492,6 +510,14 @@ export default function App() {
     setNeedsOnboarding(false);
     DatabaseService.reloadRemoteDataForUser(currentUserId);
     setAnalyticsUserId(currentUserId);
+    Analytics.onboardingComplete();
+    setAnalyticsUserProperties({
+      subscription_tier: 'free',
+      language: 'ru',
+      days_since_registration: '0-7',
+      total_sets_bucket: '0',
+      has_completed_onboarding: true,
+    });
     refreshPushToken(currentUserId).catch(() => {});
   }, [currentUserId]);
 

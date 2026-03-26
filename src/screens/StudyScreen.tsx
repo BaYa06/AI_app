@@ -8,7 +8,7 @@ import { useCardsStore, useSetsStore, useStudyStore, useThemeColors, useSettings
 import { Text, Loading } from '@/components/common';
 import { calculateNextReview, buildStudyQueue } from '@/services/SRSService';
 import { spacing } from '@/constants';
-import { DatabaseService, NeonService, supabase } from '@/services';
+import { DatabaseService, NeonService, supabase, Analytics } from '@/services';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Rating, Card } from '@/types';
 import { ArrowLeft, Settings, Volume2, Check } from 'lucide-react-native';
@@ -45,6 +45,8 @@ export function StudyScreen({ navigation, route }: Props) {
   const currentTotalPhaseCards = useRef(totalPhaseCards || 0);
   // Количество ошибочных карточек из прошлых порций в текущей очереди
   const pendingCardsInQueueRef = useRef(0);
+  // Analytics: момент показа текущей карточки
+  const cardShownAtRef = useRef(Date.now());
   
   // Store
   const updateLastStudied = useSetsStore((s) => s.updateLastStudied);
@@ -261,6 +263,7 @@ export function StudyScreen({ navigation, route }: Props) {
       const cardId = session.queue[session.currentIndex];
       const card = useCardsStore.getState().getCard(cardId);
       setCurrentCard(card || null);
+      cardShownAtRef.current = Date.now();
     }
   }, [session?.currentIndex]);
 
@@ -271,6 +274,15 @@ export function StudyScreen({ navigation, route }: Props) {
 
       // Логика: 1,2 = ошибка, 3,4 = правильно
       const isCorrect = rating >= 3;
+
+      // Analytics: card_answered
+      const ratingMap: Record<number, 'again' | 'hard' | 'good' | 'easy'> = { 1: 'again', 2: 'hard', 3: 'good', 4: 'easy' };
+      Analytics.cardAnswered({
+        correct: isCorrect,
+        rating: ratingMap[rating],
+        timeSpentMs: Date.now() - cardShownAtRef.current,
+        mode: 'flashcard',
+      });
       
       // Если ошибка, добавляем в список ошибочных карточек (с id для фаз)
       if (!isCorrect) {
@@ -483,12 +495,21 @@ export function StudyScreen({ navigation, route }: Props) {
     }
   }, [hideAnswer, isFlipped, showAnswer]);
 
-  // Завершить сессию
+  // Завершить сессию (досрочный выход)
   const handleFinish = useCallback(() => {
+    if (session) {
+      Analytics.studySessionAbandoned({
+        setId,
+        mode: 'flashcard',
+        cardsCompleted: session.currentIndex,
+        totalCards: session.queue.length,
+        timeSpentSec: Math.round((Date.now() - session.startedAt) / 1000),
+      });
+    }
     finishStudySession();
     endSession();
     navigation.goBack();
-  }, [finishStudySession, endSession, navigation]);
+  }, [finishStudySession, endSession, navigation, session, setId]);
 
   // Сохраняем активность при уходе в background
   useEffect(() => {

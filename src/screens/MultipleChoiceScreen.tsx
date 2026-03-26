@@ -11,6 +11,7 @@ import { spacing, borderRadius } from '@/constants';
 import { calculateNextReview } from '@/services/SRSService';
 import { speak, detectLanguage } from '@/utils/speech';
 import { playCorrectSound, preloadSound } from '@/utils/sound';
+import { Analytics } from '@/services/analytics';
 import { useChallengeStore } from '@/store';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card, Rating } from '@/types';
@@ -67,6 +68,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
   const [errorCards, setErrorCards] = useState<Array<{ id: string; front: string; back: string; rating: number }>>([]);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const startedAtRef = useRef<number>(Date.now());
+  const cardShownAtRef = useRef<number>(Date.now());
 
   // Challenge mode state
   const [timeLeft, setTimeLeft] = useState(paramTimeLimit ?? 120);
@@ -230,6 +232,11 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
     preloadSound('/correct.wav');
   }, []);
 
+  // Analytics: сбрасываем таймер при переходе к следующей карточке
+  useEffect(() => {
+    cardShownAtRef.current = Date.now();
+  }, [currentIndex]);
+
   // Challenge timer
   const formatTime = (s: number) =>
     `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -354,6 +361,12 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
 
     const isCorrect = option.isCorrect;
     const rating: Rating = isCorrect ? 3 : 2;
+
+    Analytics.cardAnswered({
+      correct: isCorrect,
+      timeSpentMs: Date.now() - cardShownAtRef.current,
+      mode: 'quiz',
+    });
     const nextErrors = errors + (isCorrect ? 0 : 1);
     const updatedErrorCards = isCorrect
       ? errorCards

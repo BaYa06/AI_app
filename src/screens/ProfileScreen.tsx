@@ -13,7 +13,7 @@ import {
   Platform,
 } from 'react-native';
 import { useSettingsStore, useThemeColors } from '@/store';
-import { DatabaseService, supabase, NeonService } from '@/services';
+import { DatabaseService, supabase, NeonService, Analytics } from '@/services';
 import { Text } from '@/components/common';
 import { spacing, borderRadius } from '@/constants';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -160,6 +160,7 @@ export function ProfileScreen({ navigation }: any) {
   // Logout
   const doSignOut = useCallback(async () => {
     try {
+      Analytics.logout();
       await supabase.auth.signOut();
     } catch (e) {
       console.error('Logout error:', e);

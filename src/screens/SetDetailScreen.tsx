@@ -13,7 +13,7 @@ import { Container, Text, ProgressBar, Loading, Button } from '@/components/comm
 import { spacing, borderRadius } from '@/constants';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card } from '@/types';
-import { DatabaseService, LibraryService } from '@/services';
+import { DatabaseService, LibraryService, Analytics } from '@/services';
 import { apiService } from '@/services/ApiService';
 import { supabase } from '@/services/supabaseClient';
 import { LIBRARY_CATEGORIES } from '@/constants/library';
@@ -148,6 +148,13 @@ export function SetDetailScreen({ navigation, route }: Props) {
     setWordLimit((prev) => (prev === next ? prev : next as '10' | '20' | '30' | 'all'));
   }, [userSettings.studyCardLimit]);
 
+  // Analytics: set_viewed
+  useEffect(() => {
+    if (set) {
+      Analytics.setViewed(setId, cards.length, stats.progress);
+    }
+  }, [setId]);
+
   // Check if set is published
   useEffect(() => {
     (async () => {
@@ -178,6 +185,16 @@ export function SetDetailScreen({ navigation, route }: Props) {
     // Создаем новую фазу при каждом запуске
     const phaseId = `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const shuffled = getShuffledDueCardIds();
+    const cardCount = limit ?? shuffled.length;
+
+    Analytics.studyModeSelected('flashcard', cardCount);
+    Analytics.studySessionStart({
+      setId,
+      mode: 'flashcard',
+      cardCount,
+      isReview: onlyHard,
+      phaseId,
+    });
 
     navigation.navigate('Study', {
       setId,
@@ -200,6 +217,16 @@ export function SetDetailScreen({ navigation, route }: Props) {
     // Создаем новую фазу при каждом запуске
     const phaseId = `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const shuffled = getShuffledDueCardIds();
+    const cardCount = limit ?? shuffled.length;
+
+    Analytics.studyModeSelected('match', cardCount);
+    Analytics.studySessionStart({
+      setId,
+      mode: 'match',
+      cardCount,
+      isReview: false,
+      phaseId,
+    });
 
     navigation.navigate('Match', {
       setId,
@@ -219,6 +246,16 @@ export function SetDetailScreen({ navigation, route }: Props) {
     // Создаем новую фазу при каждом запуске
     const phaseId = `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const shuffled = getShuffledDueCardIds();
+    const cardCount = limit ?? shuffled.length;
+
+    Analytics.studyModeSelected('quiz', cardCount);
+    Analytics.studySessionStart({
+      setId,
+      mode: 'quiz',
+      cardCount,
+      isReview: false,
+      phaseId,
+    });
 
     navigation.navigate('MultipleChoice', {
       setId,

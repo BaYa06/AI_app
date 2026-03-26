@@ -20,6 +20,7 @@ import type { Session } from '@supabase/supabase-js';
 import { Button, Text } from '@/components/common';
 import { borderRadius, spacing } from '@/constants';
 import { SUPABASE_OAUTH_REDIRECT, supabase } from '@/services/supabaseClient';
+import { Analytics } from '@/services/analytics';
 import { useThemeColors } from '@/store';
 
 type Props = {
@@ -159,6 +160,15 @@ export function EmailAuthScreen({ onBack }: Props) {
           id: newSession.user.id,
           email: newSession.user.email,
         });
+
+        // Analytics: определяем регистрация или вход
+        const isNewUser =
+          newSession.user.created_at === newSession.user.last_sign_in_at;
+        if (isNewUser) {
+          Analytics.signUp('google');
+        } else {
+          Analytics.login('google');
+        }
       }
     });
 

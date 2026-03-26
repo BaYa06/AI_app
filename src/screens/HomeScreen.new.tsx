@@ -1030,7 +1030,7 @@ export function HomeScreen({ navigation }: any) {
                   )}
 
                   {/* Challenge 2 — Снайпер */}
-                  <Pressable style={[styles.challengeCard, { backgroundColor: '#DC2626' }]} onPress={handleSniperChallenge}>
+                  <Pressable style={[styles.challengeCard, { backgroundColor: '#7C3AED' }]} onPress={handleSniperChallenge}>
                     <Text style={styles.challengeTitle}>Снайпер 🎯</Text>
                     <View style={styles.challengeBadge}>
                       <Text style={styles.challengeBadgeText}>5 подряд</Text>
@@ -1049,7 +1049,7 @@ export function HomeScreen({ navigation }: any) {
                   </Pressable>
 
                   {/* Challenge 3 — Вспомни забытое */}
-                  <Pressable style={[styles.challengeCard, { backgroundColor: '#0891B2' }]} onPress={handleForgottenChallenge}>
+                  <Pressable style={[styles.challengeCard, { backgroundColor: '#7C3AED' }]} onPress={handleForgottenChallenge}>
                     <Text style={styles.challengeTitle}>Вспомни забытое 🧠</Text>
                     <View style={styles.challengeBadge}>
                       <Text style={styles.challengeBadgeText}>7+ дней</Text>

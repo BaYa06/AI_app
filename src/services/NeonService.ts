@@ -206,6 +206,25 @@ export const NeonService = {
   },
 
   /**
+   * Добавить алмазы пользователю (increment)
+   */
+  async addDiamonds(userId: string, amount: number): Promise<boolean> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) return false;
+      const sql = neon(connectionString);
+
+      await sql`
+        UPDATE users SET diamond = COALESCE(diamond, 0) + ${amount} WHERE id = ${userId}::uuid
+      `;
+      return true;
+    } catch (error) {
+      console.error('Failed to add diamonds:', error);
+      return false;
+    }
+  },
+
+  /**
    * Проверить, завершил ли пользователь онбординг
    */
   async checkOnboardingCompleted(userId: string): Promise<boolean> {

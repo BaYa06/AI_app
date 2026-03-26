@@ -20,3 +20,8 @@ export { PersonalInfoScreen } from './PersonalInfoScreen';
 export { SecurityScreen } from './SecurityScreen';
 export { SubscriptionScreen } from './SubscriptionScreen';
 export { TeacherStudentsScreen } from './TeacherStudentsScreen';
+export { ExamLobbyScreen } from './ExamLobbyScreen';
+export { OralTestLobbyScreen } from './OralTestLobbyScreen';
+export { TestLobbyScreen } from './TestLobbyScreen';
+export { LiveTestScreen } from './LiveTestScreen';
+export { TestResultsTeacherScreen } from './TestResultsTeacherScreen';

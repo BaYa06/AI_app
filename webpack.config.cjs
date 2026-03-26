@@ -260,6 +260,18 @@ module.exports = (env, argv) => {
           }
         });
 
+        // Live test API (all methods — GET and POST)
+        apiMiddleware.all('/api/test', async (req, res) => {
+          console.log('[devServer] /api/test called, action:', req.query?.action || req.url);
+          try {
+            const mod = await import('./api/test.js');
+            return mod.default(req, res);
+          } catch (e) {
+            console.error('[devServer] test error', e);
+            return res.status(500).json({ error: 'dev-server error', message: e.message });
+          }
+        });
+
         // Debug: log all API requests
         apiMiddleware.use('/api', (req, res, next) => {
           console.log('[devServer] API request:', req.method, req.url);

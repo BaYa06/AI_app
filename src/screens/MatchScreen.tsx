@@ -9,6 +9,7 @@ import { Container, Text, ProgressBar, Loading } from '@/components/common';
 import { useCardsStore, useSetsStore, useThemeColors, useSettingsStore } from '@/store';
 import { spacing, borderRadius } from '@/constants';
 import { DatabaseService } from '@/services';
+import { Analytics } from '@/services/analytics';
 import { playCorrectSound2 as playCorrectSound, preloadSound } from '@/utils/sound';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card } from '@/types';
@@ -166,7 +167,15 @@ export function MatchScreen({ navigation, route }: Props) {
   useEffect(() => {
     if (!selectedLeft || !selectedRight) return;
 
-    if (selectedLeft === selectedRight) {
+    const isCorrect = selectedLeft === selectedRight;
+
+    Analytics.cardAnswered({
+      correct: isCorrect,
+      timeSpentMs: 0,
+      mode: 'match',
+    });
+
+    if (isCorrect) {
       const leftFade = getFadeValue(selectedLeft);
       const rightFade = getFadeValue(selectedRight);
       Animated.parallel([

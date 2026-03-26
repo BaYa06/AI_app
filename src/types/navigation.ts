@@ -111,6 +111,45 @@ export type RootStackParamList = {
   Search: undefined;
   TeacherCourseStats: { courseId: string; courseTitle: string };
   TeacherStudents: { courseId: string; courseTitle: string };
+  ExamLobby: { courseId: string; courseTitle: string };
+  OralTestLobby: { courseId: string; courseTitle: string };
+  TestLobby: {
+    courseId: string;
+    courseTitle: string;
+    sessionId: string;
+    code: string;
+    testMode: string;
+    questionCount: number;
+    timePerQuestion: number;
+  };
+  LiveTest: {
+    courseId: string;
+    courseTitle: string;
+    sessionId: string;
+  };
+  TestResultsTeacher: {
+    courseId: string;
+    courseTitle: string;
+    sessionId: string;
+  };
+  TestJoin: undefined;
+  TestWaiting: {
+    sessionId: string;
+    participantId: string;
+    setTitle: string;
+    teacherName: string;
+    testMode: string;
+    questionCount: number;
+    timePerQuestion: number;
+  };
+  TestExam: {
+    sessionId: string;
+    participantId: string;
+    testMode: string;
+    questionCount: number;
+    timePerQuestion: number;
+  };
+  TestDone: { correct: number; total: number };
 };
 
 // ==================== MAIN TABS ====================

@@ -13,7 +13,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, X } from 'lucide-react-native';
+import { ArrowLeft, X, GraduationCap, FileText, Mic } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import { useThemeColors, useSettingsStore } from '@/store';
 import { spacing, borderRadius } from '@/constants';
@@ -174,6 +174,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
 
   const [chartPeriod, setChartPeriod] = useState<'7d' | '30d'>('7d');
+  const [lobbyModal, setLobbyModal] = useState(false);
   const [studentModal, setStudentModal] = useState<'active' | 'inactive' | null>(null);
   const [chartTooltip, setChartTooltip] = useState<{
     index: number;
@@ -302,6 +303,31 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + spacing.xl }]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Test Lobby Button */}
+        <Pressable
+          style={({ pressed }) => [
+            styles.testLobbyBtn,
+            {
+              backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F8F7FF',
+              borderColor: isDark ? 'rgba(99,102,241,0.3)' : '#E0DDFB',
+            },
+            pressed && { opacity: 0.75, transform: [{ scale: 0.985 }] },
+          ]}
+          onPress={() => setLobbyModal(true)}
+        >
+          <View style={[styles.testLobbyIcon, { backgroundColor: isDark ? colors.primary : '#6366F1' }]}>
+            <GraduationCap size={18} color="#FFFFFF" />
+          </View>
+          <Text style={[styles.testLobbyText, { color: colors.textPrimary }]}>
+            Test Lobby
+          </Text>
+          <ArrowLeft
+            size={16}
+            color={colors.textSecondary}
+            style={{ transform: [{ rotate: '180deg' }] }}
+          />
+        </Pressable>
+
         {/* Metric tiles */}
         <View style={styles.metricsGrid}>
           {/* Active today */}
@@ -557,6 +583,98 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* Test Lobby Bottom Sheet */}
+      <Modal
+        visible={lobbyModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setLobbyModal(false)}
+      >
+        <Pressable style={styles.sheetOverlay} onPress={() => setLobbyModal(false)}>
+          <Pressable
+            style={[
+              styles.sheetContent,
+              {
+                backgroundColor: isDark ? '#1E2030' : '#FFFFFF',
+                paddingBottom: insets.bottom + 16,
+              },
+            ]}
+            onPress={() => {}}
+          >
+            <View style={styles.sheetHandle} />
+            <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>
+              Выберите тип теста
+            </Text>
+
+            {/* Exam option */}
+            <Pressable
+              style={({ pressed }) => [
+                styles.sheetOption,
+                {
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F8F7FF',
+                  borderColor: isDark ? 'rgba(99,102,241,0.2)' : '#E0DDFB',
+                },
+                pressed && { opacity: 0.7, transform: [{ scale: 0.98 }] },
+              ]}
+              onPress={() => {
+                setLobbyModal(false);
+                navigation.navigate('ExamLobby', { courseId: route.params.courseId, courseTitle: route.params.courseTitle });
+              }}
+            >
+              <View style={[styles.sheetOptionIcon, { backgroundColor: '#6366F1' }]}>
+                <FileText size={20} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.sheetOptionTitle, { color: colors.textPrimary }]}>
+                  Экзамен
+                </Text>
+                <Text style={[styles.sheetOptionDesc, { color: colors.textSecondary }]}>
+                  Письменный тест с вопросами
+                </Text>
+              </View>
+              <ArrowLeft
+                size={16}
+                color={colors.textSecondary}
+                style={{ transform: [{ rotate: '180deg' }] }}
+              />
+            </Pressable>
+
+            {/* Oral test option */}
+            <Pressable
+              style={({ pressed }) => [
+                styles.sheetOption,
+                {
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#FFF7ED',
+                  borderColor: isDark ? 'rgba(249,115,22,0.2)' : '#FED7AA',
+                },
+                pressed && { opacity: 0.7, transform: [{ scale: 0.98 }] },
+              ]}
+              onPress={() => {
+                setLobbyModal(false);
+                navigation.navigate('OralTestLobby', { courseId: route.params.courseId, courseTitle: route.params.courseTitle });
+              }}
+            >
+              <View style={[styles.sheetOptionIcon, { backgroundColor: '#F97316' }]}>
+                <Mic size={20} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.sheetOptionTitle, { color: colors.textPrimary }]}>
+                  Орал тест
+                </Text>
+                <Text style={[styles.sheetOptionDesc, { color: colors.textSecondary }]}>
+                  Устный опрос учеников
+                </Text>
+              </View>
+              <ArrowLeft
+                size={16}
+                color={colors.textSecondary}
+                style={{ transform: [{ rotate: '180deg' }] }}
+              />
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -591,6 +709,30 @@ const styles = StyleSheet.create({
   scroll: {
     padding: spacing.m,
     gap: spacing.xl,
+  },
+
+  // Test Lobby
+  testLobbyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: spacing.m,
+    borderRadius: borderRadius.l,
+    borderWidth: 1,
+    gap: 12,
+  },
+  testLobbyIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  testLobbyText: {
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: -0.2,
+    flex: 1,
   },
 
   // Metrics
@@ -864,5 +1006,66 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#EA580C',
+  },
+
+  // Bottom Sheet
+  sheetOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    justifyContent: 'flex-end',
+  },
+  sheetContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: spacing.l,
+    paddingTop: 12,
+    ...Platform.select({
+      web: { boxShadow: '0 -8px 40px rgba(0,0,0,0.18)' },
+    }) as any,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: -8 },
+    elevation: 16,
+  },
+  sheetHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#D1D5DB',
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+    marginBottom: 16,
+  },
+  sheetOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: borderRadius.l,
+    borderWidth: 1,
+    marginBottom: 10,
+    gap: 12,
+  },
+  sheetOptionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetOptionTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: -0.2,
+  },
+  sheetOptionDesc: {
+    fontSize: 12,
+    fontWeight: '400',
+    marginTop: 2,
   },
 });

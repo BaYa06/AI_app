@@ -34,6 +34,11 @@ import { SecurityScreen } from '@/screens/SecurityScreen';
 import { SubscriptionScreen } from '@/screens/SubscriptionScreen';
 import { TeacherCourseStatsScreen } from '@/screens/TeacherCourseStatsScreen';
 import { TeacherStudentsScreen } from '@/screens/TeacherStudentsScreen';
+import { ExamLobbyScreen } from '@/screens/ExamLobbyScreen';
+import { OralTestLobbyScreen } from '@/screens/OralTestLobbyScreen';
+import { TestLobbyScreen } from '@/screens/TestLobbyScreen';
+import { LiveTestScreen } from '@/screens/LiveTestScreen';
+import { TestResultsTeacherScreen } from '@/screens/TestResultsTeacherScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -298,6 +303,31 @@ export function AppNavigator() {
           name="TeacherStudents"
           component={TeacherStudentsScreen}
           options={{ headerShown: false, gestureEnabled: true }}
+        />
+        <Stack.Screen
+          name="ExamLobby"
+          component={ExamLobbyScreen}
+          options={{ headerShown: false, gestureEnabled: true }}
+        />
+        <Stack.Screen
+          name="OralTestLobby"
+          component={OralTestLobbyScreen}
+          options={{ headerShown: false, gestureEnabled: true }}
+        />
+        <Stack.Screen
+          name="TestLobby"
+          component={TestLobbyScreen}
+          options={{ headerShown: false, gestureEnabled: true }}
+        />
+        <Stack.Screen
+          name="LiveTest"
+          component={LiveTestScreen}
+          options={{ headerShown: false, gestureEnabled: true }}
+        />
+        <Stack.Screen
+          name="TestResultsTeacher"
+          component={TestResultsTeacherScreen}
+          options={{ headerShown: false, gestureEnabled: false }}
         />
         <Stack.Screen
           name="SetEditor"
