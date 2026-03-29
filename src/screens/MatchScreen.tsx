@@ -3,7 +3,8 @@
  * @description Экран игры Match с базовой логикой сопоставления
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, StyleSheet, ScrollView, Pressable, Vibration, Animated, Modal, Switch } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable, Animated, Modal, Switch } from 'react-native';
+import { triggerHaptic } from '@/utils/haptic';
 import { ArrowLeft, Settings } from 'lucide-react-native';
 import { Container, Text, ProgressBar, Loading } from '@/components/common';
 import { useCardsStore, useSetsStore, useThemeColors, useSettingsStore } from '@/store';
@@ -115,8 +116,7 @@ export function MatchScreen({ navigation, route }: Props) {
 
 
   const triggerSuccessHaptic = useCallback(() => {
-    // Lightweight vibration works on native and web (uses navigator.vibrate under the hood)
-    Vibration.vibrate(20);
+    triggerHaptic('notificationSuccess');
   }, []);
 
   const openSettings = useCallback(() => {
@@ -195,6 +195,7 @@ export function MatchScreen({ navigation, route }: Props) {
         return next;
       });
     } else {
+      triggerHaptic('notificationError');
       setMistakes((m) => m + 1);
       if (mismatchRef.current) clearTimeout(mismatchRef.current);
       mismatchRef.current = setTimeout(() => resetSelection(), 450);

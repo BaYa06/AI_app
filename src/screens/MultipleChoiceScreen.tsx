@@ -4,6 +4,7 @@
  */
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { View, StyleSheet, Pressable, ScrollView, AppState, Text as RNText } from 'react-native';
+import { triggerHaptic } from '@/utils/haptic';
 import { ArrowLeft, Volume2 } from 'lucide-react-native';
 import { Container, Text, ProgressBar, Loading } from '@/components/common';
 import { useCardsStore, useSetsStore, useThemeColors, useSettingsStore, selectSetStats } from '@/store';
@@ -385,7 +386,10 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
       applySrsUpdate(currentCard, rating);
     }
     if (isCorrect) {
+      triggerHaptic('notificationSuccess');
       playCorrectSound();
+    } else {
+      triggerHaptic('notificationError');
     }
 
     setSelectedOption(option.id);

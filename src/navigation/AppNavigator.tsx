@@ -43,6 +43,7 @@ import { TestJoinScreen } from '@/screens/TestJoinScreen';
 import { TestWaitingScreen } from '@/screens/TestWaitingScreen';
 import { TestExamScreen } from '@/screens/TestExamScreen';
 import { TestDoneScreen } from '@/screens/TestDoneScreen';
+import { ContextFillScreen } from '@/screens/ContextFillScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -352,6 +353,11 @@ export function AppNavigator() {
           name="TestDone"
           component={TestDoneScreen}
           options={{ headerShown: false, gestureEnabled: false }}
+        />
+        <Stack.Screen
+          name="ContextFill"
+          component={ContextFillScreen}
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="SetEditor"

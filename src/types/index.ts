@@ -38,6 +38,7 @@ export interface Card {
   backText: string;
   example?: string;
   mnemonic?: string;
+  wordType?: 'noun' | 'verb' | 'adjective' | 'adverb' | 'other';
   // Допустимы альтернативные поля для совместимости с API
   front?: string;
   back?: string;
@@ -66,6 +67,7 @@ export interface CreateCardInput {
   backText: string;
   example?: string;
   mnemonic?: string;
+  wordType?: 'noun' | 'verb' | 'adjective' | 'adverb' | 'other';
   frontImage?: string;
   backImage?: string;
   frontAudio?: string;
@@ -80,6 +82,7 @@ export interface UpdateCardInput {
   backText?: string;
   example?: string;
   mnemonic?: string;
+  wordType?: 'noun' | 'verb' | 'adjective' | 'adverb' | 'other';
   frontImage?: string;
   backImage?: string;
   frontAudio?: string;

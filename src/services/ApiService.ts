@@ -162,7 +162,7 @@ class ApiService {
   /**
    * Сгенерировать примеры для слов через Gemini
    */
-  async generateExamples(words: Array<{ front: string; back: string }>): Promise<Array<{ front: string; back: string; example: string }>> {
+  async generateExamples(words: Array<{ front: string; back: string }>): Promise<Array<{ front: string; back: string; example: string; wordType?: string }>> {
     const response = await fetch(`${AI_BASE_URL}/generate-examples`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

@@ -12,7 +12,7 @@ import { useSetsStore, useCardsStore, useThemeColors, selectSetStats, useSetting
 import { Container, Text, ProgressBar, Loading, Button } from '@/components/common';
 import { spacing, borderRadius } from '@/constants';
 import type { RootStackScreenProps } from '@/types/navigation';
-import type { Card } from '@/types';
+import type { Card, CreateCardInput } from '@/types';
 import { DatabaseService, LibraryService, Analytics } from '@/services';
 import { apiService } from '@/services/ApiService';
 import { supabase } from '@/services/supabaseClient';
@@ -39,6 +39,7 @@ import {
   Globe,
   X,
   Image as ImageIcon,
+  BookOpenCheck,
 } from 'lucide-react-native';
 
 type Props = RootStackScreenProps<'SetDetail'>;
@@ -269,6 +270,15 @@ export function SetDetailScreen({ navigation, route }: Props) {
       phaseOffset: 0,
     });
   }, [navigation, setId, wordLimit, getShuffledDueCardIds]);
+
+  const handleStartContextFill = useCallback(() => {
+    const limit = wordLimit === 'all' ? undefined : Number(wordLimit);
+    setShowStudySheet(false);
+    navigation.navigate('ContextFill', {
+      setId,
+      cardLimit: limit,
+    });
+  }, [navigation, setId, wordLimit]);
 
   const handleStartWordBuilder = useCallback(() => {
     const limit = wordLimit === 'all' ? undefined : Number(wordLimit);
@@ -662,6 +672,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
           cardsWithExamples = importedCards.map((card, i) => ({
             ...card,
             example: result[i]?.example || '',
+            wordType: result[i]?.wordType,
           }));
         }
       } catch (aiError) {
@@ -670,7 +681,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
       }
 
       for (const card of cardsWithExamples) {
-        addCard({ setId, frontText: card.front, backText: card.back, example: card.example });
+        addCard({ setId, frontText: card.front, backText: card.back, example: card.example, wordType: card.wordType as CreateCardInput['wordType'] });
       }
 
       // Update stats
@@ -1337,6 +1348,14 @@ export function SetDetailScreen({ navigation, route }: Props) {
                     description="Прослушай и выбери верное"
                     colors={colors}
                     onPress={handleStartAudio}
+                  />
+                  <GameRow
+                    icon={<BookOpenCheck size={18} color={colors.textPrimary} />}
+                    title="Fill in the Blank"
+                    tag="Контекст"
+                    description="Угадай слово по примеру"
+                    colors={colors}
+                    onPress={handleStartContextFill}
                   />
                 </View>
               </View>

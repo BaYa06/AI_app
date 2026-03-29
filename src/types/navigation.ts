@@ -159,6 +159,10 @@ export type RootStackParamList = {
       isCorrect: boolean;
     }>;
   };
+  ContextFill: {
+    setId: string;
+    cardLimit?: number;
+  };
 };
 
 // ==================== MAIN TABS ====================

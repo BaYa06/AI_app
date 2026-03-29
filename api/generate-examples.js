@@ -72,15 +72,26 @@ export default async function handler(req, res) {
 
     const prompt = `You are a language learning assistant. Below is a numbered list of words the user is studying. The LEFT side is the word in the language being learned, the RIGHT side is the translation in the user's native language.
 
-For each word, write ONE short example sentence (max 10 words) that uses the LEFT-side word in context. The example MUST be written in the same language as the LEFT side (the language being learned), NOT in the native language.
+For each word:
+1. Write ONE example sentence (8–12 words) in the SAME language as the LEFT-side word, following these rules:
+   - Use the word in its BASE FORM: infinitive for verbs, nominative singular for nouns, base form for adjectives
+   - The word must be KEY to the sentence — without knowing it, the meaning is unclear
+   - Do NOT place an article (der/die/das/ein/a/the/etc.) directly before the word
+   - The sentence must be everyday and realistic
+   - Do NOT use synonyms or paraphrases that would give away the meaning
+2. Identify the part of speech of the LEFT-side word. Use ONLY one of: "noun", "verb", "adjective", "adverb", "other".
 
 Words:
 ${wordList}
 
-IMPORTANT: Return EXACTLY ${batch.length} examples, one for each word, in the SAME order as the numbered list above.
-Reply ONLY with a JSON array of objects. Each object must have "word" (the exact LEFT-side word from the list) and "example" (the sentence). No extra text.
-Example format:
-[{"word": "dog", "example": "I saw a big dog in the park."}, {"word": "coffee", "example": "She drinks coffee every morning."}]`;
+IMPORTANT: Return EXACTLY ${batch.length} items, one for each word, in the SAME order as the numbered list above.
+Reply ONLY with a JSON array of objects. Each object must have:
+- "word": the exact LEFT-side word from the list
+- "example": the example sentence
+- "wordType": the part of speech ("noun", "verb", "adjective", "adverb", or "other")
+
+No extra text. Example format:
+[{"word": "gehen", "example": "Ich muss morgen früh zur Schule gehen.", "wordType": "verb"}, {"word": "Hund", "example": "Mein Nachbar hat einen kleinen Hund gekauft.", "wordType": "noun"}]`;
 
     const result = await generativeModel.generateContent(prompt);
     const response = result.response;
@@ -96,23 +107,24 @@ Example format:
       examples = [];
     }
 
+    const VALID_WORD_TYPES = ['noun', 'verb', 'adjective', 'adverb', 'other'];
+
     // Собираем результат — сопоставляем по слову, а не по индексу
     const result_words = batch.map((w, i) => {
       let example = '';
+      let wordType = null;
 
       if (Array.isArray(examples) && examples.length > 0) {
         if (typeof examples[0] === 'object' && examples[0] !== null) {
-          // Новый формат: массив объектов {word, example}
-          // Сначала ищем точное совпадение по слову
+          // Формат: массив объектов {word, example, wordType}
           const frontLower = w.front.toLowerCase().trim();
           const match = examples.find(
             e => e.word && e.word.toLowerCase().trim() === frontLower
           );
-          if (match) {
-            example = match.example || '';
-          } else {
-            // Фоллбэк: по индексу
-            example = examples[i]?.example || '';
+          const entry = match || examples[i];
+          if (entry) {
+            example = entry.example || '';
+            wordType = VALID_WORD_TYPES.includes(entry.wordType) ? entry.wordType : null;
           }
         } else {
           // Старый формат: массив строк — по индексу
@@ -124,6 +136,7 @@ Example format:
         front: w.front,
         back: w.back,
         example,
+        wordType,
       };
     });
 

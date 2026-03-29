@@ -10,3 +10,4 @@ export { useSettingsStore, useThemeColors } from './settingsStore';
 export { useLibraryStore } from './libraryStore';
 export { useDiamondStore } from './diamondStore';
 export { useChallengeStore } from './challengeStore';
+export { useContextFillStore } from './contextFillStore';

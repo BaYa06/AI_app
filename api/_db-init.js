@@ -43,6 +43,16 @@ async function applyMigrations(sql) {
     console.error('Migration is_hidden_from_students failed:', e);
   }
 
+  // Migration: word_type for context fill mode distractors
+  try {
+    await sql`
+      ALTER TABLE cards
+      ADD COLUMN IF NOT EXISTS word_type VARCHAR(20)
+    `;
+  } catch (e) {
+    console.error('Migration word_type failed:', e);
+  }
+
   // Migration 011: Live test system
   try {
     await sql`

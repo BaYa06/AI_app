@@ -13,6 +13,7 @@ import type { RootStackScreenProps } from '@/types/navigation';
 import type { Rating, Card } from '@/types';
 import { ArrowLeft, Settings, Volume2, Check } from 'lucide-react-native';
 import { speak, detectLanguage } from '@/utils/speech';
+import { triggerHaptic } from '@/utils/haptic';
 import ReAnimated, {
   useSharedValue,
   useAnimatedStyle,
@@ -271,6 +272,7 @@ export function StudyScreen({ navigation, route }: Props) {
   const handleRate = useCallback(
     async (rating: Rating) => {
       if (!currentCard) return;
+      triggerHaptic('selection');
 
       // Логика: 1,2 = ошибка, 3,4 = правильно
       const isCorrect = rating >= 3;
@@ -488,6 +490,7 @@ export function StudyScreen({ navigation, route }: Props) {
 
   // Переворот карточки (переключение туда-обратно)
   const handleToggleCard = useCallback(() => {
+    triggerHaptic('selection');
     if (isFlipped) {
       hideAnswer();
     } else {

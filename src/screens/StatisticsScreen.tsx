@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Text } from '@/components/common';
-import { useThemeColors, useSettingsStore, useCardsStore, useSetsStore } from '@/store';
+import { useThemeColors, useSettingsStore, useCardsStore, useSetsStore, useContextFillStore } from '@/store';
 import { spacing, borderRadius } from '@/constants';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Svg, { Circle } from 'react-native-svg';
@@ -190,6 +190,12 @@ export function StatisticsScreen({ navigation }: any) {
   // Card stats from store
   const allCards = useCardsStore((s) => s.cards);
   const allSets = useSetsStore((s) => s.getAllSets());
+
+  const contextFill = useContextFillStore((s) => ({
+    totalAnswered: s.totalAnswered,
+    totalCorrect: s.totalCorrect,
+    uniqueCorrect: s.correctCardIds.length,
+  }));
 
   const cardStats = useMemo(() => {
     const now = Date.now();
@@ -503,6 +509,39 @@ export function StatisticsScreen({ navigation }: any) {
             ))}
           </View>
         </View>
+
+        {/* ======== Context Fill Stats ======== */}
+        {contextFill.totalAnswered > 0 && (
+          <>
+            <Text style={[st.sectionTitle, { color: colors.textPrimary }]}>Fill in the Blank</Text>
+            <View style={[st.card, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <View style={{ alignItems: 'center', flex: 1 }}>
+                  <Text style={[st.quickValue, { color: colors.primary }]}>
+                    {contextFill.uniqueCorrect}
+                  </Text>
+                  <Text style={[st.quickLabel, { color: colors.textTertiary }]}>Угадано слов</Text>
+                </View>
+                <View style={{ width: 1, backgroundColor: cardBorder }} />
+                <View style={{ alignItems: 'center', flex: 1 }}>
+                  <Text style={[st.quickValue, { color: '#22C55E' }]}>
+                    {contextFill.totalAnswered > 0
+                      ? Math.round((contextFill.totalCorrect / contextFill.totalAnswered) * 100)
+                      : 0}%
+                  </Text>
+                  <Text style={[st.quickLabel, { color: colors.textTertiary }]}>Точность</Text>
+                </View>
+                <View style={{ width: 1, backgroundColor: cardBorder }} />
+                <View style={{ alignItems: 'center', flex: 1 }}>
+                  <Text style={[st.quickValue, { color: colors.textPrimary }]}>
+                    {contextFill.totalAnswered}
+                  </Text>
+                  <Text style={[st.quickLabel, { color: colors.textTertiary }]}>Всего ответов</Text>
+                </View>
+              </View>
+            </View>
+          </>
+        )}
 
         {/* ======== Recent Achievements ======== */}
         <Text style={[st.sectionTitle, { color: colors.textPrimary }]}>Recent Achievements</Text>

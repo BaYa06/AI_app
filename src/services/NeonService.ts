@@ -357,12 +357,13 @@ export const NeonService = {
       const sql = neon(connectionString);
       
       const cards = await sql`
-        SELECT 
+        SELECT
           id,
           set_id,
           front,
           back,
           example,
+          word_type,
           image_url,
           audio_url,
           created_at,
@@ -381,6 +382,7 @@ export const NeonService = {
         frontText: card.front,
         backText: card.back,
         example: card.example || '',
+        wordType: card.word_type || undefined,
         frontImage: card.image_url,
         backImage: undefined,
         frontAudio: card.audio_url,
@@ -416,7 +418,12 @@ export const NeonService = {
       }
 
       const sql = neon(connectionString);
-      
+
+      // Миграция: добавить word_type если ещё нет (идемпотентна)
+      try {
+        await sql`ALTER TABLE cards ADD COLUMN IF NOT EXISTS word_type VARCHAR(20)`;
+      } catch {}
+
       const cards = await sql`
         SELECT
           c.id,
@@ -424,6 +431,7 @@ export const NeonService = {
           c.front,
           c.back,
           c.example,
+          c.word_type,
           c.image_url,
           c.audio_url,
           c.created_at,
@@ -460,6 +468,7 @@ export const NeonService = {
         frontText: card.front,
         backText: card.back,
         example: card.example || '',
+        wordType: card.word_type || undefined,
         frontImage: card.image_url,
         backImage: undefined,
         frontAudio: card.audio_url,
@@ -535,6 +544,7 @@ export const NeonService = {
           front = COALESCE(${data.frontText ?? null}, front),
           back = COALESCE(${data.backText ?? null}, back),
           example = COALESCE(${data.example ?? null}, example),
+          word_type = COALESCE(${data.wordType ?? null}, word_type),
           image_url = COALESCE(${data.frontImage ?? null}, image_url),
           audio_url = COALESCE(${data.frontAudio ?? null}, audio_url)
         WHERE id = ${cardId}
@@ -635,6 +645,7 @@ export const NeonService = {
           front,
           back,
           example,
+          word_type,
           image_url,
           audio_url,
           created_at,
@@ -647,6 +658,7 @@ export const NeonService = {
           ${card.frontText},
           ${card.backText},
           ${card.example || null},
+          ${card.wordType || null},
           ${card.frontImage || null},
           ${card.frontAudio || null},
           ${new Date(card.createdAt).toISOString()},
@@ -691,6 +703,7 @@ export const NeonService = {
          ${card.frontText},
          ${card.backText},
          ${card.example || null},
+         ${card.wordType || null},
          ${card.frontImage || null},
          ${card.frontAudio || null},
          ${new Date(card.createdAt).toISOString()},
@@ -706,6 +719,7 @@ export const NeonService = {
           front,
           back,
           example,
+          word_type,
           image_url,
           audio_url,
           created_at,
