@@ -25,3 +25,7 @@ export { OralTestLobbyScreen } from './OralTestLobbyScreen';
 export { TestLobbyScreen } from './TestLobbyScreen';
 export { LiveTestScreen } from './LiveTestScreen';
 export { TestResultsTeacherScreen } from './TestResultsTeacherScreen';
+export { TestJoinScreen } from './TestJoinScreen';
+export { TestWaitingScreen } from './TestWaitingScreen';
+export { TestExamScreen } from './TestExamScreen';
+export { TestDoneScreen } from './TestDoneScreen';

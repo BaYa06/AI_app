@@ -211,6 +211,7 @@ export default function App() {
   const [pendingInviteToken, setPendingInviteToken] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const ensuredUserIdRef = useRef<string | null>(null);
+  const loadedUserIdRef = useRef<string | null>(null);
   const processedOAuthCodeRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -222,6 +223,13 @@ export default function App() {
         const loaded = await DatabaseService.loadAll();
         if (!isMounted) return;
         if (loaded) {
+          // Запоминаем, для какого пользователя загружены данные, чтобы handleSession не перезагружал повторно
+          try {
+            const { data: sess } = await supabase.auth.getSession();
+            if (sess.session?.user?.id) {
+              loadedUserIdRef.current = sess.session.user.id;
+            }
+          } catch {}
           unsubscribe = setupAutoSave();
           SyncQueueService.init();
         }
@@ -265,7 +273,11 @@ export default function App() {
     if (completed) {
       setIsAuthenticated(true);
       setNeedsOnboarding(false);
-      DatabaseService.reloadRemoteDataForUser(user.id);
+      // Перезагружаем данные только если это новый пользователь (не тот, чьи данные уже загружены)
+      if (loadedUserIdRef.current !== user.id) {
+        loadedUserIdRef.current = user.id;
+        DatabaseService.reloadRemoteDataForUser(user.id);
+      }
       setAnalyticsUserId(user.id);
 
       // Analytics: login + user properties
@@ -320,8 +332,10 @@ export default function App() {
         console.error('⚠️ Ошибка получения сессии:', error);
       });
 
-    const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!isMounted) return;
+      // TOKEN_REFRESHED не требует перезагрузки данных — только обновление токена
+      if (event === 'TOKEN_REFRESHED') return;
       if (session?.user) {
         await handleSession(session.user);
       } else {

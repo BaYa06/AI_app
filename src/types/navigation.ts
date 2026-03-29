@@ -149,7 +149,16 @@ export type RootStackParamList = {
     questionCount: number;
     timePerQuestion: number;
   };
-  TestDone: { correct: number; total: number };
+  TestDone: {
+    correct: number;
+    total: number;
+    answers?: Array<{
+      word: string;
+      yourAnswer: string;
+      correctAnswer: string;
+      isCorrect: boolean;
+    }>;
+  };
 };
 
 // ==================== MAIN TABS ====================

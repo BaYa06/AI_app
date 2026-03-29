@@ -1082,9 +1082,9 @@ export function HomeScreen({ navigation }: any) {
                 {activeCourseId === null ? 'Мои наборы' : activeCourseTitle}
               </Text>
               {!isTeacher && (
-                <Pressable>
+                <Pressable onPress={() => navigation.navigate('TestJoin')}>
                   <Text style={[styles.viewAllButton, { color: colors.primary }]}>
-                    Посмотреть все
+                    Подключиться к тесту
                   </Text>
                 </Pressable>
               )}

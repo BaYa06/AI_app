@@ -2,13 +2,16 @@
  * Test Results Teacher Screen
  * @description Результаты теста для учителя — подиум, лидерборд, сложные карточки
  */
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   ScrollView,
   StyleSheet,
   Pressable,
   Platform,
+  ActivityIndicator,
+  Share,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -16,6 +19,7 @@ import {
   AlertTriangle,
   Download,
   Crown,
+  X,
 } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import { useThemeColors, useSettingsStore } from '@/store';
@@ -23,21 +27,34 @@ import { spacing, borderRadius } from '@/constants';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 
+const API_BASE = __DEV__ ? 'http://localhost:3000/api' : '/api';
+
 type Props = NativeStackScreenProps<RootStackParamList, 'TestResultsTeacher'>;
 
-// Mock data
-const LEADERBOARD = [
-  { id: '1', name: 'Alex Wong', initial: 'A', score: 95 },
-  { id: '2', name: 'Sarah J.', initial: 'S', score: 88 },
-  { id: '3', name: 'M. Chen', initial: 'M', score: 82 },
-  { id: '4', name: 'Lucas P.', initial: 'L', score: 64 },
-  { id: '5', name: 'Nina Rose', initial: 'N', score: 51 },
-];
+type Participant = {
+  name: string;
+  initial: string;
+  score: number;
+  correct: number;
+  total: number;
+  finished: boolean;
+};
 
-const HARDEST_CARDS = [
-  { word: 'Ambivalent', hint: 'Having mixed feelings...', missed: 4, total: 5 },
-  { word: 'Ephemeral', hint: 'Lasting for a short time...', missed: 3, total: 5 },
-];
+type HardCard = {
+  word: string;
+  hint: string;
+  missed: number;
+  total: number;
+};
+
+type ResultsData = {
+  setTitle: string;
+  date: string;
+  totalQuestions: number;
+  avgScore: number;
+  participants: Participant[];
+  hardestCards: HardCard[];
+};
 
 const PODIUM_COLORS = {
   first: '#F59E0B',
@@ -47,30 +64,136 @@ const PODIUM_COLORS = {
 
 const AVATAR_COLORS = ['#6366F1', '#EC4899', '#10B981', '#F59E0B', '#F97316'];
 
-export function TestResultsTeacherScreen({ navigation }: Props) {
+export function TestResultsTeacherScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
   const isDark = useSettingsStore((s) => s.resolvedTheme) === 'dark';
   const insets = useSafeAreaInsets();
+  const { sessionId, courseId, courseTitle } = route.params;
+
+  const [data, setData] = useState<ResultsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchResults = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await fetch(`${API_BASE}/test?action=results&sessionId=${sessionId}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      const json: ResultsData = await res.json();
+      setData(json);
+    } catch (e: any) {
+      setError(e.message || 'Failed to load results');
+    } finally {
+      setLoading(false);
+    }
+  }, [sessionId]);
+
+  useEffect(() => {
+    fetchResults();
+  }, [fetchResults]);
+
+  const handleExportCSV = useCallback(async () => {
+    if (!data) return;
+
+    const header = 'Rank,Name,Score (%),Correct,Total,Finished';
+    const rows = data.participants.map((p, idx) =>
+      `${idx + 1},"${p.name}",${p.score},${p.correct},${p.total},${p.finished ? 'Yes' : 'No'}`
+    );
+    const hardHeader = '\n\nHardest Cards\nWord,Hint,Missed,Total';
+    const hardRows = data.hardestCards.map(c =>
+      `"${c.word}","${c.hint}",${c.missed},${c.total}`
+    );
+
+    const csv = [
+      `Test Results: ${data.setTitle}`,
+      `Date: ${new Date(data.date).toLocaleDateString()}`,
+      `Average Score: ${data.avgScore}%`,
+      `Total Questions: ${data.totalQuestions}`,
+      '',
+      header,
+      ...rows,
+      hardHeader,
+      ...hardRows,
+    ].join('\n');
+
+    try {
+      await Share.share({
+        message: csv,
+        title: `Test Results - ${data.setTitle}`,
+      });
+    } catch {
+      Alert.alert('Export Error', 'Could not export results');
+    }
+  }, [data]);
 
   const cardBg = isDark ? 'rgba(255,255,255,0.06)' : '#FFFFFF';
   const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : '#F1F5F9';
 
-  const avgScore = Math.round(LEADERBOARD.reduce((s, l) => s + l.score, 0) / LEADERBOARD.length);
+  // Loading state
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+          Loading results...
+        </Text>
+      </View>
+    );
+  }
 
-  const podium = [LEADERBOARD[1], LEADERBOARD[0], LEADERBOARD[2]]; // 2nd, 1st, 3rd order
+  // Error state
+  if (error || !data) {
+    return (
+      <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
+        <AlertTriangle size={40} color="#F43F5E" />
+        <Text style={[styles.errorText, { color: colors.textPrimary }]}>
+          {error || 'No data'}
+        </Text>
+        <Pressable
+          style={({ pressed }) => [
+            styles.retryBtn,
+            { backgroundColor: colors.primary },
+            pressed && { opacity: 0.8 },
+          ]}
+          onPress={fetchResults}
+        >
+          <Text style={styles.retryText}>Retry</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  const { participants, hardestCards, setTitle, avgScore, totalQuestions } = data;
+
+  // Podium: 2nd, 1st, 3rd
+  const podium = [participants[1] || null, participants[0] || null, participants[2] || null];
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={{ height: insets.top }} />
       {/* Header */}
       <View
         style={[
           styles.header,
           {
             backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.85)',
-            paddingTop: insets.top + 8,
           },
         ]}
       >
+        <Pressable
+          style={({ pressed }) => [
+            styles.closeBtn,
+            { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F1F5F9' },
+            pressed && { opacity: 0.7 },
+          ]}
+          onPress={() => navigation.navigate('TeacherCourseStats', { courseId, courseTitle })}
+        >
+          <X size={18} color={colors.textPrimary} />
+        </Pressable>
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
           Test Results
         </Text>
@@ -80,6 +203,7 @@ export function TestResultsTeacherScreen({ navigation }: Props) {
             { borderColor: colors.primary },
             pressed && { opacity: 0.7 },
           ]}
+          onPress={handleExportCSV}
         >
           <Text style={[styles.exportHeaderText, { color: colors.primary }]}>Export</Text>
         </Pressable>
@@ -94,7 +218,7 @@ export function TestResultsTeacherScreen({ navigation }: Props) {
           <View style={styles.summaryTop}>
             <View style={{ flex: 1 }}>
               <Text style={styles.summaryLabel}>LIVE SESSION COMPLETE</Text>
-              <Text style={styles.summaryTitle}>English Vocabulary A2</Text>
+              <Text style={styles.summaryTitle}>{setTitle}</Text>
             </View>
           </View>
           <View style={styles.summaryBottom}>
@@ -103,100 +227,103 @@ export function TestResultsTeacherScreen({ navigation }: Props) {
               <Text style={styles.summaryScoreLabel}>Average score</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={styles.summaryStudents}>{LEADERBOARD.length} students</Text>
-              <Text style={styles.summaryQuestions}>20 questions total</Text>
+              <Text style={styles.summaryStudents}>{participants.length} students</Text>
+              <Text style={styles.summaryQuestions}>{totalQuestions} questions total</Text>
             </View>
           </View>
         </View>
 
         {/* Podium */}
-        <View style={styles.section}>
-          <View style={styles.sectionTitleRow}>
-            <Trophy size={20} color="#F59E0B" />
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Podium</Text>
-          </View>
+        {participants.length >= 2 && (
+          <View style={styles.section}>
+            <View style={styles.sectionTitleRow}>
+              <Trophy size={20} color="#F59E0B" />
+              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Podium</Text>
+            </View>
 
-          <View style={styles.podiumRow}>
-            {podium.map((student, idx) => {
-              if (!student) return null;
-              const place = idx === 0 ? 2 : idx === 1 ? 1 : 3;
-              const isFirst = place === 1;
-              const avatarSize = isFirst ? 68 : 56;
-              const pedestalHeight = isFirst ? 88 : place === 2 ? 56 : 40;
-              const borderColor = place === 1
-                ? PODIUM_COLORS.first
-                : place === 2 ? PODIUM_COLORS.second : PODIUM_COLORS.third + '80';
-              const pedestalBg = isFirst
-                ? (isDark ? colors.primary + '25' : colors.primary + '15')
-                : (isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9');
-              const placeLabel = place === 1 ? 'Winner' : `${place}nd`;
+            <View style={styles.podiumRow}>
+              {podium.map((student, idx) => {
+                if (!student) return <View key={idx} style={styles.podiumCol} />;
+                const place = idx === 0 ? 2 : idx === 1 ? 1 : 3;
+                const isFirst = place === 1;
+                const avatarSize = isFirst ? 68 : 56;
+                const pedestalHeight = isFirst ? 88 : place === 2 ? 56 : 40;
+                const borderColor = place === 1
+                  ? PODIUM_COLORS.first
+                  : place === 2 ? PODIUM_COLORS.second : PODIUM_COLORS.third + '80';
+                const pedestalBg = isFirst
+                  ? (isDark ? colors.primary + '25' : colors.primary + '15')
+                  : (isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9');
+                const placeLabel = place === 1 ? 'Winner' : place === 2 ? '2nd' : '3rd';
+                const globalIdx = participants.indexOf(student);
 
-              return (
-                <View key={student.id} style={styles.podiumCol}>
-                  {isFirst && (
-                    <Crown
-                      size={24}
-                      color="#F59E0B"
-                      fill="#F59E0B"
-                      style={{ marginBottom: -4 }}
-                    />
-                  )}
-                  <View
-                    style={[
-                      styles.podiumAvatar,
-                      {
-                        width: avatarSize,
-                        height: avatarSize,
-                        borderRadius: avatarSize / 2,
-                        borderColor,
-                        backgroundColor: AVATAR_COLORS[LEADERBOARD.indexOf(student) % AVATAR_COLORS.length] + '25',
-                      },
-                    ]}
-                  >
-                    <Text
+                return (
+                  <View key={student.name + place} style={styles.podiumCol}>
+                    {isFirst && (
+                      <Crown
+                        size={24}
+                        color="#F59E0B"
+                        fill="#F59E0B"
+                        style={{ marginBottom: -4 }}
+                      />
+                    )}
+                    <View
                       style={[
-                        styles.podiumInitial,
+                        styles.podiumAvatar,
                         {
-                          fontSize: isFirst ? 22 : 18,
-                          color: AVATAR_COLORS[LEADERBOARD.indexOf(student) % AVATAR_COLORS.length],
+                          width: avatarSize,
+                          height: avatarSize,
+                          borderRadius: avatarSize / 2,
+                          borderColor,
+                          backgroundColor: AVATAR_COLORS[globalIdx % AVATAR_COLORS.length] + '25',
                         },
                       ]}
                     >
-                      {student.initial}
-                    </Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.pedestal,
-                      {
-                        height: pedestalHeight,
-                        backgroundColor: pedestalBg,
-                        borderTopColor: isFirst ? colors.primary : 'transparent',
-                        borderTopWidth: isFirst ? 2 : 0,
-                      },
-                    ]}
-                  >
-                    <Text
+                      <Text
+                        style={[
+                          styles.podiumInitial,
+                          {
+                            fontSize: isFirst ? 22 : 18,
+                            color: AVATAR_COLORS[globalIdx % AVATAR_COLORS.length],
+                          },
+                        ]}
+                      >
+                        {student.initial}
+                      </Text>
+                    </View>
+                    <View
                       style={[
-                        styles.pedestalName,
+                        styles.pedestal,
                         {
-                          color: colors.textPrimary,
-                          fontSize: isFirst ? 13 : 11,
+                          height: pedestalHeight,
+                          backgroundColor: pedestalBg,
+                          borderTopColor: isFirst ? colors.primary : 'transparent',
+                          borderTopWidth: isFirst ? 2 : 0,
                         },
                       ]}
-                      numberOfLines={1}
                     >
-                      {student.name}
-                    </Text>
-                    <Text style={[styles.pedestalPlace, { color: colors.primary }]}>
-                      {placeLabel}
-                    </Text>
+                      <Text
+                        style={[
+                          styles.pedestalName,
+                          {
+                            color: colors.textPrimary,
+                            fontSize: isFirst ? 13 : 11,
+                          },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {student.name}
+                      </Text>
+                      <Text style={[styles.pedestalPlace, { color: colors.primary }]}>
+                        {placeLabel}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-              );
-            })}
+                );
+              })}
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Leaderboard */}
         <View style={styles.section}>
@@ -204,9 +331,9 @@ export function TestResultsTeacherScreen({ navigation }: Props) {
             Leaderboard
           </Text>
           <View style={styles.leaderList}>
-            {LEADERBOARD.map((student, idx) => (
+            {participants.map((student, idx) => (
               <View
-                key={student.id}
+                key={student.name + idx}
                 style={[styles.leaderRow, { backgroundColor: cardBg, borderColor: cardBorder }]}
               >
                 <Text style={[styles.leaderRank, { color: colors.textSecondary }]}>
@@ -239,49 +366,51 @@ export function TestResultsTeacherScreen({ navigation }: Props) {
         </View>
 
         {/* Hardest Cards */}
-        <View style={styles.section}>
-          <View style={styles.sectionTitleRow}>
-            <AlertTriangle size={20} color="#F43F5E" />
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-              Hardest Cards
-            </Text>
-          </View>
-          <View style={styles.hardList}>
-            {HARDEST_CARDS.map((card, idx) => (
-              <View
-                key={idx}
-                style={[
-                  styles.hardCard,
-                  {
-                    backgroundColor: isDark ? 'rgba(244,63,94,0.08)' : '#FFF1F2',
-                    borderColor: isDark ? 'rgba(244,63,94,0.15)' : '#FECDD3',
-                  },
-                ]}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.hardWord, { color: colors.textPrimary }]}>
-                    {card.word}
-                  </Text>
-                  <Text style={[styles.hardHint, { color: colors.textSecondary }]}>
-                    "{card.hint}"
-                  </Text>
-                </View>
+        {hardestCards.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionTitleRow}>
+              <AlertTriangle size={20} color="#F43F5E" />
+              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+                Hardest Cards
+              </Text>
+            </View>
+            <View style={styles.hardList}>
+              {hardestCards.map((card, idx) => (
                 <View
+                  key={idx}
                   style={[
-                    styles.missedBadge,
+                    styles.hardCard,
                     {
-                      backgroundColor: isDark ? 'rgba(244,63,94,0.15)' : '#FFE4E6',
+                      backgroundColor: isDark ? 'rgba(244,63,94,0.08)' : '#FFF1F2',
+                      borderColor: isDark ? 'rgba(244,63,94,0.15)' : '#FECDD3',
                     },
                   ]}
                 >
-                  <Text style={styles.missedText}>
-                    {card.missed}/{card.total} Missed
-                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.hardWord, { color: colors.textPrimary }]}>
+                      {card.word}
+                    </Text>
+                    <Text style={[styles.hardHint, { color: colors.textSecondary }]}>
+                      "{card.hint}"
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.missedBadge,
+                      {
+                        backgroundColor: isDark ? 'rgba(244,63,94,0.15)' : '#FFE4E6',
+                      },
+                    ]}
+                  >
+                    <Text style={styles.missedText}>
+                      {card.missed}/{card.total} Missed
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            ))}
+              ))}
+            </View>
           </View>
-        </View>
+        )}
       </ScrollView>
 
       {/* Footer CTA */}
@@ -302,17 +431,29 @@ export function TestResultsTeacherScreen({ navigation }: Props) {
           },
         ]}
       >
-        <Pressable
-          style={({ pressed }) => [
-            styles.ctaBtn,
-            { backgroundColor: colors.primary },
-            pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
-          ]}
-          onPress={() => {/* TODO: export */}}
-        >
-          <Download size={20} color="#FFFFFF" />
-          <Text style={styles.ctaText}>Export All Results</Text>
-        </Pressable>
+        <View style={styles.footerRow}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.backBtn,
+              { borderColor: isDark ? 'rgba(255,255,255,0.15)' : '#E2E8F0' },
+              pressed && { opacity: 0.7 },
+            ]}
+            onPress={() => navigation.navigate('TeacherCourseStats', { courseId, courseTitle })}
+          >
+            <Text style={[styles.backBtnText, { color: colors.textPrimary }]}>Back to Course</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [
+              styles.ctaBtn,
+              { backgroundColor: colors.primary },
+              pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
+            ]}
+            onPress={handleExportCSV}
+          >
+            <Download size={18} color="#FFFFFF" />
+            <Text style={styles.ctaText}>Export</Text>
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -321,6 +462,33 @@ export function TestResultsTeacherScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  centered: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+  },
+  loadingText: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop: 8,
+  },
+  errorText: {
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  retryBtn: {
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: borderRadius.m,
+    marginTop: 8,
+  },
+  retryText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
   },
 
   // Header
@@ -555,6 +723,15 @@ const styles = StyleSheet.create({
     color: '#F43F5E',
   },
 
+  // Header close button
+  closeBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
   // Footer
   footer: {
     position: 'absolute',
@@ -564,7 +741,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.m,
     paddingTop: spacing.l,
   },
+  footerRow: {
+    flexDirection: 'row',
+    gap: spacing.s,
+    alignItems: 'center',
+  },
+  backBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: borderRadius.l,
+    borderWidth: 1,
+  },
+  backBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
   ctaBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -582,7 +777,7 @@ const styles = StyleSheet.create({
   },
   ctaText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
   },
 });

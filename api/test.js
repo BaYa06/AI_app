@@ -71,19 +71,39 @@ async function generateUniqueCode(sql) {
 
 /** Отправить broadcast-событие в Supabase Realtime */
 async function broadcast(sessionId, event, payload) {
-  try {
-    const supabase = getSupabase();
-    const channel = supabase.channel(`test:${sessionId}`);
-    await channel.subscribe();
-    await channel.send({
-      type: 'broadcast',
-      event,
-      payload,
-    });
-    await supabase.removeChannel(channel);
-  } catch (e) {
-    console.error(`Broadcast ${event} failed:`, e);
-  }
+  return new Promise((resolve) => {
+    try {
+      const supabase = getSupabase();
+      const channel = supabase.channel(`test:${sessionId}`);
+
+      const timeout = setTimeout(() => {
+        console.error(`Broadcast ${event} timed out`);
+        supabase.removeChannel(channel).catch(() => {});
+        resolve();
+      }, 5000);
+
+      channel.subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          clearTimeout(timeout);
+          try {
+            await channel.send({ type: 'broadcast', event, payload });
+          } catch (e) {
+            console.error(`Broadcast send ${event} failed:`, e);
+          }
+          await supabase.removeChannel(channel).catch(() => {});
+          resolve();
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          clearTimeout(timeout);
+          console.error(`Broadcast channel error for ${event}: ${status}`);
+          await supabase.removeChannel(channel).catch(() => {});
+          resolve();
+        }
+      });
+    } catch (e) {
+      console.error(`Broadcast ${event} failed:`, e);
+      resolve();
+    }
+  });
 }
 
 /** Перемешать массив (Fisher-Yates) */

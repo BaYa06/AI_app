@@ -84,10 +84,10 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
   const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : '#E5E7EB';
   const pillBg = isDark ? 'rgba(255,255,255,0.08)' : '#F1F5F9';
 
-  const modes: { key: TestMode; label: string; icon: typeof ListChecks }[] = [
+  const modes: { key: TestMode; label: string; icon: typeof ListChecks; disabled?: boolean }[] = [
     { key: 'multiple', label: 'Тест', icon: ListChecks },
-    { key: 'writing', label: 'Письменный', icon: PenLine },
-    { key: 'mixed', label: 'Смешанный', icon: Layers },
+    { key: 'writing', label: 'Письменный', icon: PenLine, disabled: true },
+    { key: 'mixed', label: 'Смешанный', icon: Layers, disabled: true },
   ];
 
   return (
@@ -239,14 +239,20 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
                       shadowRadius: 8,
                       shadowOffset: { width: 0, height: 0 },
                     },
-                    !active && { opacity: 0.6 },
-                    pressed && { opacity: 0.5 },
+                    m.disabled && { opacity: 0.45 },
+                    !active && !m.disabled && { opacity: 0.6 },
+                    pressed && !m.disabled && { opacity: 0.5 },
                   ]}
-                  onPress={() => setTestMode(m.key)}
+                  onPress={() => !m.disabled && setTestMode(m.key)}
                 >
                   {active && (
                     <View style={[styles.modeCheck, { backgroundColor: colors.primary }]}>
                       <Check size={12} color="#FFFFFF" strokeWidth={3} />
+                    </View>
+                  )}
+                  {m.disabled && (
+                    <View style={[styles.modeSoon, { backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : '#F1F5F9' }]}>
+                      <Text style={[styles.modeSoonText, { color: colors.textSecondary }]}>Скоро</Text>
                     </View>
                   )}
                   <View
@@ -556,6 +562,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1,
+  },
+  modeSoon: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    zIndex: 1,
+  },
+  modeSoonText: {
+    fontSize: 9,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
   modeIcon: {
     width: 40,

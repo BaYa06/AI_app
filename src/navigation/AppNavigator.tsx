@@ -39,6 +39,10 @@ import { OralTestLobbyScreen } from '@/screens/OralTestLobbyScreen';
 import { TestLobbyScreen } from '@/screens/TestLobbyScreen';
 import { LiveTestScreen } from '@/screens/LiveTestScreen';
 import { TestResultsTeacherScreen } from '@/screens/TestResultsTeacherScreen';
+import { TestJoinScreen } from '@/screens/TestJoinScreen';
+import { TestWaitingScreen } from '@/screens/TestWaitingScreen';
+import { TestExamScreen } from '@/screens/TestExamScreen';
+import { TestDoneScreen } from '@/screens/TestDoneScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -327,6 +331,26 @@ export function AppNavigator() {
         <Stack.Screen
           name="TestResultsTeacher"
           component={TestResultsTeacherScreen}
+          options={{ headerShown: false, gestureEnabled: false }}
+        />
+        <Stack.Screen
+          name="TestJoin"
+          component={TestJoinScreen}
+          options={{ headerShown: false, gestureEnabled: true }}
+        />
+        <Stack.Screen
+          name="TestWaiting"
+          component={TestWaitingScreen}
+          options={{ headerShown: false, gestureEnabled: false }}
+        />
+        <Stack.Screen
+          name="TestExam"
+          component={TestExamScreen}
+          options={{ headerShown: false, gestureEnabled: false }}
+        />
+        <Stack.Screen
+          name="TestDone"
+          component={TestDoneScreen}
           options={{ headerShown: false, gestureEnabled: false }}
         />
         <Stack.Screen
