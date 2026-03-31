@@ -101,3 +101,27 @@ export const colors = {
 
 export type ColorScheme = typeof colors.light;
 export type ThemeMode = 'light' | 'dark';
+
+// Accent colors for deck icons — consistently assigned by deck ID
+export const DECK_ACCENT_COLORS = [
+  '#FF6B6B', // coral
+  '#F97316', // orange
+  '#F59E0B', // amber
+  '#10B981', // emerald
+  '#0EA5E9', // sky
+  '#8B5CF6', // violet
+  '#EC4899', // pink
+  '#14B8A6', // teal
+] as const;
+
+/** Returns a stable accent color for a given deck id or index */
+export function getDeckAccentColor(idOrIndex: string | number): string {
+  if (typeof idOrIndex === 'number') {
+    return DECK_ACCENT_COLORS[idOrIndex % DECK_ACCENT_COLORS.length];
+  }
+  let hash = 0;
+  for (let i = 0; i < idOrIndex.length; i++) {
+    hash = (hash * 31 + idOrIndex.charCodeAt(i)) >>> 0;
+  }
+  return DECK_ACCENT_COLORS[hash % DECK_ACCENT_COLORS.length];
+}

@@ -26,7 +26,7 @@ import { NotificationPrompt } from '@/components/common/NotificationPrompt';
 import { useSetsStore, useSettingsStore } from '@/store';
 import { getPushStatus } from '@/services/pushNotifications';
 import { StorageService } from '@/services/StorageService';
-import { spacing, borderRadius } from '@/constants';
+import { spacing, borderRadius, getDeckAccentColor } from '@/constants';
 import type { MainTabScreenProps } from '@/types/navigation';
 import type { CardSet } from '@/types';
 
@@ -330,9 +330,10 @@ export function HomeScreen({ navigation }: Props) {
                 </RNText>
               </View>
             ) : (
-              filteredSets.slice(0, 3).map((set) => {
+              filteredSets.slice(0, 3).map((set, index) => {
                 const progress = getProgress(set);
                 const statusColor = getStatusColor(progress);
+                const accentColor = getDeckAccentColor(set.id || index);
 
                 return (
                   <View
@@ -350,10 +351,10 @@ export function HomeScreen({ navigation }: Props) {
                         <View
                           style={[
                             styles.deckIconContainer,
-                            { backgroundColor: colors.surfaceVariant || colors.border },
+                            { backgroundColor: accentColor },
                           ]}
                         >
-                          <BookOpen size={24} color={colors.textPrimary} />
+                          <BookOpen size={24} color="#FFFFFF" />
                         </View>
                         <View style={styles.deckInfo}>
                           <View style={styles.deckTitleRow}>

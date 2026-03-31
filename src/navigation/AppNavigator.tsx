@@ -4,6 +4,7 @@
  */
 import React, { useEffect, useMemo } from 'react';
 import { Platform } from 'react-native';
+import { triggerHaptic } from '@/utils/haptic';
 import { NavigationContainer, useNavigationContainerRef, type LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -96,37 +97,32 @@ function MainTabs() {
       <Tab.Screen
         name="Home"
         component={HomeScreen}
-        options={{
-          tabBarIcon: ({ color }) => <Ionicons name="home" size={31} color={color} />,
-        }}
+        options={{ tabBarIcon: ({ color }) => <Ionicons name="home" size={31} color={color} /> }}
+        listeners={{ tabPress: () => triggerHaptic('selection') }}
       />
       <Tab.Screen
         name="Library"
         component={LibraryScreen}
-        options={{
-          tabBarIcon: ({ color }) => <Ionicons name="albums" size={31} color={color} />,
-        }}
+        options={{ tabBarIcon: ({ color }) => <Ionicons name="albums" size={31} color={color} /> }}
+        listeners={{ tabPress: () => triggerHaptic('selection') }}
       />
       <Tab.Screen
         name="Study"
         component={StudyPlaceholderScreen}
-        options={{
-          tabBarIcon: ({ color }) => <Ionicons name="school" size={31} color={color} />,
-        }}
+        options={{ tabBarIcon: ({ color }) => <Ionicons name="school" size={31} color={color} /> }}
+        listeners={{ tabPress: () => triggerHaptic('selection') }}
       />
       <Tab.Screen
         name="Statistics"
         component={StatisticsScreen}
-        options={{
-          tabBarIcon: ({ color }) => <Ionicons name="stats-chart" size={31} color={color} />,
-        }}
+        options={{ tabBarIcon: ({ color }) => <Ionicons name="stats-chart" size={31} color={color} /> }}
+        listeners={{ tabPress: () => triggerHaptic('selection') }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
-        options={{
-          tabBarIcon: ({ color }) => <Ionicons name="person" size={31} color={color} />,
-        }}
+        options={{ tabBarIcon: ({ color }) => <Ionicons name="person" size={31} color={color} /> }}
+        listeners={{ tabPress: () => triggerHaptic('selection') }}
       />
     </Tab.Navigator>
   );

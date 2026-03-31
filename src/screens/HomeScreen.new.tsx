@@ -12,7 +12,8 @@ import { selectSetStats } from '@/store/cardsStore';
 import { Text, DiamondReward } from '@/components/common';
 import type { DiamondRewardRef } from '@/components/common';
 import ReanimatedAnimated, { useSharedValue as useReanimatedShared, withTiming as reanimatedWithTiming, withSequence as reanimatedWithSequence, useAnimatedStyle as useReanimatedStyle, Easing as ReanimatedEasing } from 'react-native-reanimated';
-import { spacing, borderRadius } from '@/constants';
+import { spacing, borderRadius, getDeckAccentColor } from '@/constants';
+import { triggerHaptic } from '@/utils/haptic';
 import {
   Menu, 
   Search, 
@@ -118,6 +119,7 @@ export function HomeScreen({ navigation }: any) {
   });
 
   const handleQuickRound = useCallback(() => {
+    triggerHaptic('selection');
     const allSets = useSetsStore.getState().getAllSets();
     if (allSets.length === 0) {
       Alert.alert('Нет наборов', 'Сначала создай набор с карточками');
@@ -161,6 +163,7 @@ export function HomeScreen({ navigation }: any) {
   }, [claimQuickRound]);
 
   const handleSniperChallenge = useCallback(() => {
+    triggerHaptic('selection');
     const allSets = useSetsStore.getState().getAllSets();
     if (allSets.length === 0) {
       Alert.alert('Нет наборов', 'Сначала создай набор с карточками');
@@ -191,6 +194,7 @@ export function HomeScreen({ navigation }: any) {
   }, [navigation]);
 
   const handleForgottenChallenge = useCallback(() => {
+    triggerHaptic('selection');
     const allSets = useSetsStore.getState().getAllSets();
     if (allSets.length === 0) {
       Alert.alert('Нет наборов', 'Сначала создай набор с карточками');
@@ -836,7 +840,7 @@ export function HomeScreen({ navigation }: any) {
           </Pressable>
           <Pressable
             style={styles.addButton}
-            onPress={() => navigation?.navigate('SetEditor', {})}
+            onPress={() => { triggerHaptic('selection'); navigation?.navigate('SetEditor', {}); }}
           >
             <Plus size={18} color="#FFFFFF" strokeWidth={2.5} />
           </Pressable>
@@ -1091,8 +1095,9 @@ export function HomeScreen({ navigation }: any) {
             </View>
 
           <View style={styles.setsList}>
-            {visibleSets.map((set) => {
+            {visibleSets.map((set, index) => {
               const progress = set.cardCount > 0 ? Math.round(((set.masteredCount || 0) / set.cardCount) * 100) : 0;
+              const accentColor = getDeckAccentColor(set.id || index);
               const getStatusColor = () => {
                 if (progress === 100) return colors.success;
                 if (progress >= 60) return colors.success;
@@ -1118,15 +1123,15 @@ export function HomeScreen({ navigation }: any) {
                     styles.setCard,
                     { backgroundColor: colors.surface, borderColor: colors.border },
                   ]}
-                  onPress={() => navigation?.navigate('SetDetail', { setId: set.id })}
+                  onPress={() => { triggerHaptic('selection'); navigation?.navigate('SetDetail', { setId: set.id }); }}
                 >
                   {/* Header with icon, title, status dot, and button */}
                   <View style={styles.setCardHeader}>
                     <View style={styles.setCardLeft}>
                       {/* Date Icon */}
-                      <View style={[styles.dateIcon, { backgroundColor: colors.border }]}>
-                        <Text style={[styles.dateMonth, { color: colors.textSecondary }]}>{dateDisplay.month}</Text>
-                        <Text style={[styles.dateDay, { color: colors.textPrimary }]}>{dateDisplay.day}</Text>
+                      <View style={[styles.dateIcon, { backgroundColor: accentColor }]}>
+                        <Text style={[styles.dateMonth, { color: 'rgba(255,255,255,0.8)' }]}>{dateDisplay.month}</Text>
+                        <Text style={[styles.dateDay, { color: '#FFFFFF' }]}>{dateDisplay.day}</Text>
                       </View>
                       
                       {/* Title and Stats */}
@@ -1179,14 +1184,14 @@ export function HomeScreen({ navigation }: any) {
                         { backgroundColor: colors.border },
                       ]}
                     >
-                      <View 
+                      <View
                         style={[
-                          styles.progressFill, 
-                          { 
-                            backgroundColor: progress === 100 ? colors.success : colors.primary,
-                            width: `${progress}%` 
+                          styles.progressFill,
+                          {
+                            backgroundColor: getStatusColor(),
+                            width: `${progress}%`
                           }
-                        ]} 
+                        ]}
                       />
                     </View>
                   </View>
@@ -1202,7 +1207,7 @@ export function HomeScreen({ navigation }: any) {
       {allSets.length > 0 && (
         <Pressable 
           style={[styles.fab, styles.fabHidden, { backgroundColor: colors.primary }]}
-          onPress={() => navigation?.navigate('SetEditor', {})}
+          onPress={() => { triggerHaptic('selection'); navigation?.navigate('SetEditor', {}); }}
         >
           <Plus size={28} color="#FFFFFF" />
         </Pressable>
@@ -1350,12 +1355,13 @@ export function HomeScreen({ navigation }: any) {
                 </Pressable>
 
                 {/* Course list */}
-                {courses.map((course) => {
+                {courses.map((course, courseIndex) => {
                   const isActive = activeCourseId === course.id;
                   const isMenuOpen = courseMenuOpen === course.id;
                   const isEditing = editingCourseId === course.id;
                   const stats = getCourseStats(course.id);
                   const isStudent = course.isStudentCourse === true;
+                  const courseAccent = getDeckAccentColor(course.id || courseIndex);
 
                   return (
                     <Pressable
@@ -1363,12 +1369,13 @@ export function HomeScreen({ navigation }: any) {
                       style={[
                         styles.courseItem,
                         isActive
-                          ? { borderLeftColor: colors.primary, backgroundColor: colors.primary + '0D' }
+                          ? { borderLeftColor: courseAccent, backgroundColor: courseAccent + '1A' }
                           : { borderLeftColor: colors.border },
                         { borderColor: colors.border, position: 'relative' },
                       ]}
                       onPress={() => {
                         if (!isEditing) {
+                          triggerHaptic('selection');
                           setActiveCourse(course.id);
                           setDrawerOpen(false);
                           setCourseMenuOpen(null);
@@ -1378,9 +1385,9 @@ export function HomeScreen({ navigation }: any) {
                       <View style={styles.courseItemHeader}>
                         <View style={styles.courseItemLeft}>
                           {isStudent ? (
-                            <BookOpen size={24} color={isActive ? colors.primary : colors.textPrimary} />
+                            <BookOpen size={24} color={isActive ? courseAccent : colors.textPrimary} />
                           ) : isActive ? (
-                            <FolderOpen size={24} color={colors.primary} />
+                            <FolderOpen size={24} color={courseAccent} />
                           ) : (
                             <Folder size={24} color={colors.textPrimary} />
                           )}
@@ -1422,7 +1429,7 @@ export function HomeScreen({ navigation }: any) {
                                 </View>
                               </View>
                             ) : (
-                              <Text style={[styles.courseTitle, { color: isActive ? colors.primary : colors.textPrimary }]}>
+                              <Text style={[styles.courseTitle, { color: isActive ? courseAccent : colors.textPrimary }]}>
                                 {course.title}
                               </Text>
                             )}

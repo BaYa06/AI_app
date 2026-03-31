@@ -13,6 +13,7 @@ import {
   Clipboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { triggerHaptic } from '@/utils/haptic';
 import {
   GraduationCap,
   Copy,
@@ -326,7 +327,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
             pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
           ]}
           disabled={students.length === 0 || starting}
-          onPress={handleStart}
+          onPress={() => { triggerHaptic('selection'); handleStart(); }}
         >
           {starting ? (
             <ActivityIndicator color="#FFFFFF" />

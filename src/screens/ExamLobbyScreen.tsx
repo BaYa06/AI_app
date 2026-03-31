@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { triggerHaptic } from '@/utils/haptic';
 import {
   ArrowLeft,
   ArrowRight,
@@ -243,7 +244,7 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
                     !active && !m.disabled && { opacity: 0.6 },
                     pressed && !m.disabled && { opacity: 0.5 },
                   ]}
-                  onPress={() => !m.disabled && setTestMode(m.key)}
+                  onPress={() => { if (!m.disabled) { triggerHaptic('selection'); setTestMode(m.key); } }}
                 >
                   {active && (
                     <View style={[styles.modeCheck, { backgroundColor: colors.primary }]}>
@@ -395,6 +396,7 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
           disabled={!selectedSetId || creating}
           onPress={async () => {
             if (!selectedSetId || creating) return;
+            triggerHaptic('selection');
             setCreating(true);
             try {
               const { data } = await supabase.auth.getSession();

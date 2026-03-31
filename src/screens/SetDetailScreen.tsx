@@ -1021,7 +1021,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
         ]}
       >
         <Pressable
-          onPress={openAddCardSheet}
+          onPress={() => { triggerHaptic('selection'); openAddCardSheet(); }}
           style={[styles.secondaryAction, { borderColor: colors.border }]}
         >
           <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
@@ -1029,7 +1029,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
           </Text>
         </Pressable>
         <Pressable
-          onPress={() => setShowStudySheet(true)}
+          onPress={() => { triggerHaptic('selection'); setShowStudySheet(true); }}
           style={[styles.primaryAction, { backgroundColor: colors.primary }]}
         >
           <Text variant="body" style={{ color: colors.textInverse, fontWeight: '700' }}>
@@ -1955,7 +1955,7 @@ function FilterPill({
 }) {
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => { triggerHaptic('selection'); onPress(); }}
       style={[
         styles.filterPill,
         {
