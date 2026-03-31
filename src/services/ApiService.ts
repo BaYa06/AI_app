@@ -7,7 +7,7 @@ const API_BASE_URL = __DEV__
   : '/api';
 
 const AI_BASE_URL = __DEV__
-  ? 'http://34.9.20.41:3001'
+  ? 'http://localhost:3000/api'
   : '/ai';
 
 class ApiService {
@@ -162,7 +162,7 @@ class ApiService {
   /**
    * Сгенерировать примеры для слов через Gemini
    */
-  async generateExamples(words: Array<{ front: string; back: string }>): Promise<Array<{ front: string; back: string; example: string; wordType?: string }>> {
+  async generateExamples(words: Array<{ front: string; back: string }>): Promise<Array<{ front: string; back: string; example: string; wordForm?: string; wordType?: string }>> {
     const response = await fetch(`${AI_BASE_URL}/generate-examples`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

@@ -74,12 +74,14 @@ export default async function handler(req, res) {
 
 For each word:
 1. Write ONE example sentence (8–12 words) in the SAME language as the LEFT-side word, following these rules:
-   - Use the word in its BASE FORM: infinitive for verbs, nominative singular for nouns, base form for adjectives
    - The word must be KEY to the sentence — without knowing it, the meaning is unclear
    - Do NOT place an article (der/die/das/ein/a/the/etc.) directly before the word
    - The sentence must be everyday and realistic
    - Do NOT use synonyms or paraphrases that would give away the meaning
-2. Identify the part of speech of the LEFT-side word. Use ONLY one of: "noun", "verb", "adjective", "adverb", "other".
+   - For German separable verbs (trennbare Verben like "anrufen", "aufstehen", etc.): use a subordinate clause (Nebensatz) so the verb appears unseparated in infinitive form at the end (e.g. "Ich weiß, dass ich dich morgen anrufen werde.")
+   - For all other words: you may use any natural inflected form that fits the sentence
+2. Identify the EXACT form of the word as it appears in the sentence (e.g. if word is "run" but sentence uses "running", return "running"; if word is "Hund" but sentence uses "Hunde", return "Hunde").
+3. Identify the part of speech of the LEFT-side word. Use ONLY one of: "noun", "verb", "adjective", "adverb", "other".
 
 Words:
 ${wordList}
@@ -88,10 +90,11 @@ IMPORTANT: Return EXACTLY ${batch.length} items, one for each word, in the SAME 
 Reply ONLY with a JSON array of objects. Each object must have:
 - "word": the exact LEFT-side word from the list
 - "example": the example sentence
+- "wordForm": the exact form of the word as it appears in the sentence
 - "wordType": the part of speech ("noun", "verb", "adjective", "adverb", or "other")
 
 No extra text. Example format:
-[{"word": "gehen", "example": "Ich muss morgen früh zur Schule gehen.", "wordType": "verb"}, {"word": "Hund", "example": "Mein Nachbar hat einen kleinen Hund gekauft.", "wordType": "noun"}]`;
+[{"word": "gehen", "example": "Ich muss morgen früh zur Schule gehen.", "wordForm": "gehen", "wordType": "verb"}, {"word": "Hund", "example": "Mein Nachbar hat zwei kleine Hunde gekauft.", "wordForm": "Hunde", "wordType": "noun"}]`;
 
     const result = await generativeModel.generateContent(prompt);
     const response = result.response;
@@ -112,6 +115,7 @@ No extra text. Example format:
     // Собираем результат — сопоставляем по слову, а не по индексу
     const result_words = batch.map((w, i) => {
       let example = '';
+      let wordForm = null;
       let wordType = null;
 
       if (Array.isArray(examples) && examples.length > 0) {
@@ -124,6 +128,7 @@ No extra text. Example format:
           const entry = match || examples[i];
           if (entry) {
             example = entry.example || '';
+            wordForm = entry.wordForm || null;
             wordType = VALID_WORD_TYPES.includes(entry.wordType) ? entry.wordType : null;
           }
         } else {
@@ -136,6 +141,7 @@ No extra text. Example format:
         front: w.front,
         back: w.back,
         example,
+        wordForm,
         wordType,
       };
     });

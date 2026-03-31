@@ -363,6 +363,7 @@ export const NeonService = {
           front,
           back,
           example,
+          word_form,
           word_type,
           image_url,
           audio_url,
@@ -382,6 +383,7 @@ export const NeonService = {
         frontText: card.front,
         backText: card.back,
         example: card.example || '',
+        wordForm: card.word_form || undefined,
         wordType: card.word_type || undefined,
         frontImage: card.image_url,
         backImage: undefined,
@@ -419,9 +421,10 @@ export const NeonService = {
 
       const sql = neon(connectionString);
 
-      // Миграция: добавить word_type если ещё нет (идемпотентна)
+      // Миграция: добавить word_type и word_form если ещё нет (идемпотентна)
       try {
         await sql`ALTER TABLE cards ADD COLUMN IF NOT EXISTS word_type VARCHAR(20)`;
+        await sql`ALTER TABLE cards ADD COLUMN IF NOT EXISTS word_form VARCHAR(100)`;
       } catch {}
 
       const cards = await sql`
@@ -431,6 +434,7 @@ export const NeonService = {
           c.front,
           c.back,
           c.example,
+          c.word_form,
           c.word_type,
           c.image_url,
           c.audio_url,
@@ -468,6 +472,7 @@ export const NeonService = {
         frontText: card.front,
         backText: card.back,
         example: card.example || '',
+        wordForm: card.word_form || undefined,
         wordType: card.word_type || undefined,
         frontImage: card.image_url,
         backImage: undefined,
@@ -544,6 +549,7 @@ export const NeonService = {
           front = COALESCE(${data.frontText ?? null}, front),
           back = COALESCE(${data.backText ?? null}, back),
           example = COALESCE(${data.example ?? null}, example),
+          word_form = COALESCE(${data.wordForm ?? null}, word_form),
           word_type = COALESCE(${data.wordType ?? null}, word_type),
           image_url = COALESCE(${data.frontImage ?? null}, image_url),
           audio_url = COALESCE(${data.frontAudio ?? null}, audio_url)

@@ -40,15 +40,26 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 /** Заменить слово в предложении на _____ */
-function blankWord(example: string, word: string): string {
+function blankWord(example: string, word: string, wordForm?: string): string {
   const lower = example.toLowerCase();
-  const wordLower = word.toLowerCase();
-  const idx = lower.indexOf(wordLower);
+
+  // Сначала пробуем точную форму из wordForm (если AI вернул её)
+  const searchTerm = wordForm || word;
+  const termLower = searchTerm.toLowerCase();
+  const idx = lower.indexOf(termLower);
   if (idx !== -1) {
-    return example.slice(0, idx) + '_____' + example.slice(idx + word.length);
+    return example.slice(0, idx) + '_____' + example.slice(idx + searchTerm.length);
   }
-  // Слово не найдено дословно (Gemini мог поставить другую форму) —
-  // показываем пример с явным маркером пропуска в конце
+
+  // Fallback: пробуем базовое слово (на случай если wordForm не совпал)
+  if (wordForm) {
+    const wordLower = word.toLowerCase();
+    const idx2 = lower.indexOf(wordLower);
+    if (idx2 !== -1) {
+      return example.slice(0, idx2) + '_____' + example.slice(idx2 + word.length);
+    }
+  }
+
   return example.replace(/[.!?]$/, '') + ' _____.';
 }
 
@@ -115,10 +126,12 @@ export function ContextFillScreen({ navigation, route }: Props) {
             // Обновить стор и БД
             updateCard(noExample[i].id, {
               example: gen.example,
+              wordForm: gen.wordForm,
               wordType: gen.wordType as Card['wordType'],
             });
             NeonService.updateCard(noExample[i].id, {
               example: gen.example,
+              wordForm: gen.wordForm,
               wordType: gen.wordType as Card['wordType'],
             });
           }
@@ -130,7 +143,7 @@ export function ContextFillScreen({ navigation, route }: Props) {
           if (c.example) return c;
           const gen = genMap.get(c.frontText);
           return gen?.example
-            ? { ...c, example: gen.example, wordType: (gen.wordType as Card['wordType']) || c.wordType }
+            ? { ...c, example: gen.example, wordForm: gen.wordForm || c.wordForm, wordType: (gen.wordType as Card['wordType']) || c.wordType }
             : c;
         });
       } catch {
@@ -314,7 +327,7 @@ export function ContextFillScreen({ navigation, route }: Props) {
   // ── Экран: игра ──────────────────────────────────────────────────────────
 
   const sentenceWithBlank = currentCard
-    ? blankWord(currentCard.example || '', currentCard.frontText)
+    ? blankWord(currentCard.example || '', currentCard.frontText, currentCard.wordForm)
     : '';
 
   return (
@@ -386,14 +399,6 @@ export function ContextFillScreen({ navigation, route }: Props) {
           <Text style={styles.questionLabel}>ЗАПОЛНИ ПРОПУСК</Text>
           <Text style={styles.sentenceText}>{sentenceWithBlank}</Text>
 
-          {/* Hint: translation as anchor */}
-          {currentCard?.backText ? (
-            <View style={styles.hintBox}>
-              <Text style={styles.hintText}>
-                💡 {currentCard.backText}
-              </Text>
-            </View>
-          ) : null}
         </View>
 
         {/* Options */}
@@ -555,19 +560,6 @@ const styles = StyleSheet.create({
     lineHeight: 32,
     letterSpacing: -0.3,
   },
-  hintBox: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: borderRadius.m,
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.s,
-    alignSelf: 'flex-start',
-  },
-  hintText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.9)',
-  },
-
   optionsLoading: {
     paddingVertical: spacing.xl,
     alignItems: 'center',
