@@ -14,6 +14,7 @@
 import { neon } from '@neondatabase/serverless';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
+import { ensureDatabaseInitialized } from './_db-init.js';
 
 function initFirebase() {
   if (!getApps().length) {
@@ -42,6 +43,7 @@ function buildMessage(type, name, streak, longest, data = {}) {
 export default async function handler(req, res) {
   const { action } = req.query;
   const sql = neon(process.env.POSTGRES_URL);
+  await ensureDatabaseInitialized(sql);
 
   try {
     // ── subscribe ──────────────────────────────────────────────
