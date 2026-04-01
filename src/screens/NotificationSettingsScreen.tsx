@@ -69,7 +69,7 @@ export function NotificationSettingsScreen({ navigation }: any) {
       const uid = data.session?.user?.id;
       setUserId(uid);
       if (uid) {
-        fetch(`/api/user-settings?userId=${uid}`)
+        fetch(`/api/push?action=settings?userId=${uid}`)
           .then((r) => r.json())
           .then((d) => {
             setReminderEnabled(d.notifEnabled ?? true);
@@ -322,7 +322,7 @@ export function NotificationSettingsScreen({ navigation }: any) {
             if (!userId || saving) return;
             setSaving(true);
             try {
-              await fetch('/api/user-settings', {
+              await fetch('/api/push?action=settings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

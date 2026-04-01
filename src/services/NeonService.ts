@@ -1066,7 +1066,7 @@ export const NeonService = {
         // Пропустили день(и) - начинаем заново
         currentStreak = 1;
         console.log('🔄 Streak: начинаем серию заново', { currentStreak });
-        fetch('/api/notify', {
+        fetch('/api/push?action=notify', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

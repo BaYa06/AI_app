@@ -179,7 +179,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
           const milestones = [7, 14, 30, 60, 100];
           if (milestones.includes(newCount)) {
             supabase.auth.getSession().then(({ data }) => {
-              fetch('/api/notify', {
+              fetch('/api/push?action=notify', {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
