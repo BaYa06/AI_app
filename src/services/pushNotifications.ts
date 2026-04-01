@@ -232,13 +232,10 @@ export async function refreshPushToken(userId?: string | null): Promise<string |
     if (!token) return null;
 
     currentToken = token;
-    const storedToken = getStoredToken();
-
     storeToken(token);
-    if (token !== storedToken) {
-      console.log('[Push] Token changed, updating backend');
-      sendTokenToBackend(token, userId); // fire-and-forget
-    }
+
+    // Always send to backend on refresh to ensure Neon DB is in sync
+    sendTokenToBackend(token, userId); // fire-and-forget
 
     return token;
   } catch (error) {
