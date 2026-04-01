@@ -12,10 +12,7 @@
     "api/generate-examples.js": {
       "maxDuration": 60
     },
-    "api/cron/streak-reminder.js": {
-      "maxDuration": 60
-    },
-    "api/cron/reactivation.js": {
+    "api/push.js": {
       "maxDuration": 60
     }
   },
