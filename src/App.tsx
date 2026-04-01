@@ -3,14 +3,14 @@
  * @description Главный компонент приложения
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Linking, Platform, View, StyleSheet, Alert } from 'react-native';
+import { Linking, Platform, View, StyleSheet, Alert, Text } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AppNavigator } from '@/navigation';
 import { LoadingSplash } from '@/components/common';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { DatabaseService, setupAutoSave, supabase, NeonService, setAnalyticsUserId, SyncQueueService, Analytics, setAnalyticsUserProperties } from '@/services';
-import { refreshPushToken, subscribeForegroundMessages } from '@/services/pushNotifications';
+import { refreshPushToken, subscribeForegroundMessages, requestPushPermission, isPushSupported } from '@/services/pushNotifications';
 import { useThemeColors, useSettingsStore } from '@/store';
 import { CourseInviteModal } from '@/components/CourseInviteModal';
 import { useCoursesStore } from '@/store';
@@ -23,6 +23,7 @@ import { TeacherSubjectScreen } from '@/screens/TeacherSubjectScreen';
 import { TeacherGroupSizeScreen } from '@/screens/TeacherGroupSizeScreen';
 
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TouchableOpacity } from 'react-native';
 
 // Стили для веб-платформы (iOS PWA scroll fix)
 const webStyles = Platform.OS === 'web' ? StyleSheet.create({
@@ -90,6 +91,19 @@ function AppRoot({
   const colors = useThemeColors();
   const resolvedTheme = useSettingsStore((state) => state.resolvedTheme);
   const insets = useSafeAreaInsets();
+  const [showPushBanner, setShowPushBanner] = useState(false);
+  const [pushBannerLoading, setPushBannerLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated || needsOnboarding || Platform.OS !== 'web') return;
+    const dismissed = localStorage.getItem('flashly_push_banner_dismissed');
+    if (dismissed) return;
+    isPushSupported().then((supported) => {
+      if (supported && Notification.permission === 'default') {
+        setTimeout(() => setShowPushBanner(true), 2000);
+      }
+    });
+  }, [isAuthenticated, needsOnboarding]);
 
   // ✅ уменьшаем safe-area сверху на 15px
   const top = insets.top > 0 ? Math.max(insets.top - 15, 0) : 0;
@@ -179,6 +193,55 @@ function AppRoot({
           appContent
         )}
       </GestureHandlerRootView>
+
+      {/* Push notification banner */}
+      {showPushBanner && (
+        <View style={{
+          position: 'absolute' as any,
+          bottom: 90,
+          left: 16,
+          right: 16,
+          backgroundColor: colors.primary,
+          borderRadius: 16,
+          padding: 16,
+          flexDirection: 'row',
+          alignItems: 'center',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.2,
+          shadowRadius: 12,
+          elevation: 8,
+          gap: 12,
+        }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Включи уведомления</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12, marginTop: 2 }}>Напомним когда пора заниматься и сохранить серию</Text>
+          </View>
+          <TouchableOpacity
+            onPress={async () => {
+              setPushBannerLoading(true);
+              const status = await requestPushPermission(currentUserId);
+              setPushBannerLoading(false);
+              setShowPushBanner(false);
+              localStorage.setItem('flashly_push_banner_dismissed', '1');
+            }}
+            style={{ backgroundColor: '#fff', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 }}
+          >
+            <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>
+              {pushBannerLoading ? '...' : 'Разрешить'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              setShowPushBanner(false);
+              localStorage.setItem('flashly_push_banner_dismissed', '1');
+            }}
+            style={{ padding: 4 }}
+          >
+            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 18, lineHeight: 18 }}>×</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Модалка принятия приглашения в курс */}
       {isAuthenticated && pendingInviteToken && (
