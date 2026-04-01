@@ -11,6 +11,12 @@
     },
     "api/generate-examples.js": {
       "maxDuration": 60
+    },
+    "api/cron/streak-reminder.js": {
+      "maxDuration": 60
+    },
+    "api/cron/reactivation.js": {
+      "maxDuration": 60
     }
   },
   "headers": [

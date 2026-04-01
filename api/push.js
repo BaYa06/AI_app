@@ -3,64 +3,64 @@
  *
  * POST /api/push?action=subscribe   – store FCM token
  * POST /api/push?action=unsubscribe – remove FCM token
+ * GET  /api/push?action=get-by-user&userId=xxx – get tokens by userId
  *
  * Legacy URLs /api/push/subscribe and /api/push/unsubscribe are rewritten
  * to this handler via vercel.json rewrites.
  */
 
-import { loadTokens, saveTokens } from './push/_push-store.js';
+import { neon } from '@neondatabase/serverless';
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
   const { action } = req.query;
+  const sql = neon(process.env.POSTGRES_URL);
 
   try {
-    if (action === 'subscribe') {
+    if (action === 'subscribe' && req.method === 'POST') {
       const { token, platform, userId } = req.body || {};
 
       if (!token || typeof token !== 'string') {
         return res.status(400).json({ error: 'Missing or invalid token' });
       }
 
-      const tokens = loadTokens();
-      const existingIndex = tokens.findIndex((t) => t.token === token);
-      const entry = {
-        token,
-        platform: platform || 'web',
-        userId: userId || null,
-        createdAt: existingIndex >= 0 ? tokens[existingIndex].createdAt : new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+      await sql`
+        INSERT INTO push_tokens (token, user_id, platform, updated_at)
+        VALUES (${token}, ${userId || null}, ${platform || 'web'}, NOW())
+        ON CONFLICT (token) DO UPDATE SET
+          user_id    = EXCLUDED.user_id,
+          updated_at = NOW()
+      `;
 
-      if (existingIndex >= 0) {
-        tokens[existingIndex] = entry;
-      } else {
-        tokens.push(entry);
-      }
-
-      saveTokens(tokens);
-      return res.status(200).json({ ok: true, total: tokens.length });
+      return res.status(200).json({ ok: true });
     }
 
-    if (action === 'unsubscribe') {
+    if (action === 'unsubscribe' && req.method === 'POST') {
       const { token } = req.body || {};
 
       if (!token || typeof token !== 'string') {
         return res.status(400).json({ error: 'Missing or invalid token' });
       }
 
-      const tokens = loadTokens();
-      const filtered = tokens.filter((t) => t.token !== token);
-      saveTokens(filtered);
+      await sql`DELETE FROM push_tokens WHERE token = ${token}`;
 
-      const removed = tokens.length - filtered.length;
-      return res.status(200).json({ ok: true, removed, total: filtered.length });
+      return res.status(200).json({ ok: true });
     }
 
-    return res.status(400).json({ error: 'Unknown action. Use ?action=subscribe or ?action=unsubscribe' });
+    if (action === 'get-by-user' && req.method === 'GET') {
+      const { userId } = req.query;
+
+      if (!userId) {
+        return res.status(400).json({ error: 'Missing userId' });
+      }
+
+      const rows = await sql`
+        SELECT token FROM push_tokens WHERE user_id = ${userId}
+      `;
+
+      return res.status(200).json({ tokens: rows.map((r) => r.token) });
+    }
+
+    return res.status(400).json({ error: 'Unknown action' });
   } catch (error) {
     console.error('[push] Error:', error);
     return res.status(500).json({ error: 'Internal server error' });

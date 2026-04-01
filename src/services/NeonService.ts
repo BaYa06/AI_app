@@ -1066,6 +1066,18 @@ export const NeonService = {
         // Пропустили день(и) - начинаем заново
         currentStreak = 1;
         console.log('🔄 Streak: начинаем серию заново', { currentStreak });
+        fetch('/api/notify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + (process.env.EXPO_PUBLIC_NOTIFY_SECRET || ''),
+          },
+          body: JSON.stringify({
+            userId,
+            type: 'streak_lost',
+            data: { prevStreak: existing[0].current_streak },
+          }),
+        }).catch(() => {});
       }
 
       // Обновляем longest_streak если нужно

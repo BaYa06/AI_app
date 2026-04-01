@@ -61,11 +61,36 @@ export function NotificationSettingsScreen({ navigation }: any) {
   const [pushStatus, setPushStatus] = useState<PushStatus | null>(null);
   const [pushLoading, setPushLoading] = useState(false);
   const [userId, setUserId] = useState<string | undefined>();
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     getPushStatus().then(setPushStatus);
     supabase.auth.getSession().then(({ data }) => {
-      setUserId(data.session?.user?.id);
+      const uid = data.session?.user?.id;
+      setUserId(uid);
+      if (uid) {
+        fetch(`/api/user-settings?userId=${uid}`)
+          .then((r) => r.json())
+          .then((d) => {
+            setReminderEnabled(d.notifEnabled ?? true);
+            setHours(d.notifHour ?? 19);
+            setMinutes(d.notifMinute ?? 0);
+            setStreakReminders(d.notifStreak ?? true);
+            if (d.notifDays) {
+              const active = d.notifDays.split(',');
+              setSelectedDays({
+                mon: active.includes('mon'),
+                tue: active.includes('tue'),
+                wed: active.includes('wed'),
+                thu: active.includes('thu'),
+                fri: active.includes('fri'),
+                sat: active.includes('sat'),
+                sun: active.includes('sun'),
+              });
+            }
+          })
+          .catch(() => {});
+      }
     });
   }, []);
 
@@ -292,10 +317,35 @@ export function NotificationSettingsScreen({ navigation }: any) {
 
         {/* ======== Save Button ======== */}
         <Pressable
-          style={[st.saveBtn, { backgroundColor: colors.primary }]}
-          onPress={() => navigation.goBack()}
+          style={[st.saveBtn, { backgroundColor: colors.primary, opacity: saving ? 0.7 : 1 }]}
+          onPress={async () => {
+            if (!userId || saving) return;
+            setSaving(true);
+            try {
+              await fetch('/api/user-settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId,
+                  notifEnabled: reminderEnabled,
+                  notifHour: hours,
+                  notifMinute: minutes,
+                  notifDays: Object.entries(selectedDays)
+                    .filter(([, v]) => v)
+                    .map(([k]) => k)
+                    .join(','),
+                  notifStreak: streakReminders,
+                }),
+              });
+            } catch (e) {
+              console.error('[NotificationSettings] Save error:', e);
+            } finally {
+              setSaving(false);
+              navigation.goBack();
+            }
+          }}
         >
-          <Text style={st.saveBtnText}>Сохранить настройки</Text>
+          <Text style={st.saveBtnText}>{saving ? 'Сохранение...' : 'Сохранить настройки'}</Text>
         </Pressable>
       </ScrollView>
     </View>

@@ -53,6 +53,32 @@ async function applyMigrations(sql) {
     console.error('Migration word_type failed:', e);
   }
 
+  // Migration: push_tokens table
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS push_tokens (
+        token       TEXT PRIMARY KEY,
+        user_id     UUID,
+        platform    VARCHAR(20) DEFAULT 'web',
+        created_at  TIMESTAMPTZ DEFAULT NOW(),
+        updated_at  TIMESTAMPTZ DEFAULT NOW()
+      )
+    `;
+  } catch (e) {
+    console.error('Migration push_tokens failed:', e);
+  }
+
+  // Migration: notif columns for user_stats
+  try {
+    await sql`ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS notif_enabled BOOLEAN DEFAULT true`;
+    await sql`ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS notif_hour INTEGER DEFAULT 19`;
+    await sql`ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS notif_minute INTEGER DEFAULT 0`;
+    await sql`ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS notif_days TEXT DEFAULT 'mon,tue,wed,thu,fri'`;
+    await sql`ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS notif_streak BOOLEAN DEFAULT true`;
+  } catch (e) {
+    console.error('Migration notif columns failed:', e);
+  }
+
   // Migration 011: Live test system
   try {
     await sql`

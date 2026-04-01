@@ -72,6 +72,7 @@ text-to-speech.json
 speech-to-text.json
 .push-tokens.json
 *.json.bak
+FIREBASE_SERVICE_ACCOUNT.json
 
 # Temporary
 tmp/

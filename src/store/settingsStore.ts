@@ -6,6 +6,7 @@ import { immer } from 'zustand/middleware/immer';
 import type { UserSettings, ThemeMode } from '@/types';
 import { colors, ColorScheme } from '@/constants';
 import { StreakService } from '@/services/StreakService';
+import { supabase } from '@/services';
 
 interface SettingsState {
   // Настройки пользователя
@@ -174,6 +175,24 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
             }
             state.todayStats.streak = newCount;
           });
+
+          const milestones = [7, 14, 30, 60, 100];
+          if (milestones.includes(newCount)) {
+            supabase.auth.getSession().then(({ data }) => {
+              fetch('/api/notify', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': 'Bearer ' + (process.env.EXPO_PUBLIC_NOTIFY_SECRET || ''),
+                },
+                body: JSON.stringify({
+                  userId: data.session?.user?.id,
+                  type: 'streak_milestone',
+                  data: { days: newCount },
+                }),
+              }).catch(() => {});
+            });
+          }
 
           return { streakIncreased: true, newStreakCount: newCount };
         } else if (success) {
