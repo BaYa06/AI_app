@@ -13,7 +13,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, X, GraduationCap, FileText, Mic } from 'lucide-react-native';
+import { ArrowLeft, X, GraduationCap, FileText, Mic, Clock } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import { useThemeColors, useSettingsStore } from '@/store';
 import { spacing, borderRadius } from '@/constants';
@@ -320,6 +320,34 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
           </View>
           <Text style={[styles.testLobbyText, { color: colors.textPrimary }]}>
             Test Lobby
+          </Text>
+          <ArrowLeft
+            size={16}
+            color={colors.textSecondary}
+            style={{ transform: [{ rotate: '180deg' }] }}
+          />
+        </Pressable>
+
+        {/* История тестов */}
+        <Pressable
+          style={({ pressed }) => [
+            styles.testLobbyBtn,
+            {
+              backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F8F7FF',
+              borderColor: isDark ? 'rgba(99,102,241,0.3)' : '#E0DDFB',
+            },
+            pressed && { opacity: 0.75, transform: [{ scale: 0.985 }] },
+          ]}
+          onPress={() => navigation.navigate('TestHistory', {
+            courseId: route.params.courseId,
+            courseTitle: route.params.courseTitle,
+          })}
+        >
+          <View style={[styles.testLobbyIcon, { backgroundColor: isDark ? colors.primary : '#6366F1' }]}>
+            <Clock size={18} color="#FFFFFF" />
+          </View>
+          <Text style={[styles.testLobbyText, { color: colors.textPrimary }]}>
+            История тестов
           </Text>
           <ArrowLeft
             size={16}

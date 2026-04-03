@@ -46,8 +46,9 @@ export default async function handler(req, res) {
     if (action === 'finish')       return await finishTest(req, res, sql);
     if (action === 'results')      return await getResults(req, res, sql);
     if (action === 'get-question') return await getQuestion(req, res, sql);
+    if (action === 'history')      return await getHistory(req, res, sql);
 
-    return res.status(400).json({ error: 'Unknown action. Use: create, join, start, answer, monitor, finish, results, get-question' });
+    return res.status(400).json({ error: 'Unknown action. Use: create, join, start, answer, monitor, finish, results, get-question, history' });
   } catch (error) {
     console.error('Test API error:', error);
     return res.status(500).json({ error: error.message });
@@ -582,4 +583,34 @@ async function getQuestion(req, res, sql) {
     questionIndex,
     totalQuestions: questionOrder.length,
   });
+}
+
+async function getHistory(req, res, sql) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
+  const { courseId, teacherId } = req.query;
+  if (!courseId || !teacherId) {
+    return res.status(400).json({ error: 'courseId and teacherId are required' });
+  }
+
+  const rows = await sql`
+    SELECT
+      ts.id            AS "sessionId",
+      cs.title         AS "setTitle",
+      ts.finished_at   AS "finishedAt",
+      ts.question_count AS "questionCount",
+      ts.test_mode     AS "testMode",
+      COUNT(tp.id)::int                                   AS "participantCount",
+      COALESCE(ROUND(AVG(tp.score))::int, 0)              AS "avgScore"
+    FROM test_sessions ts
+    LEFT JOIN card_sets cs ON cs.id = ts.set_id
+    LEFT JOIN test_participants tp ON tp.session_id = ts.id
+    WHERE ts.course_id  = ${courseId}::uuid
+      AND ts.teacher_id = ${teacherId}::uuid
+      AND ts.status     = 'finished'
+    GROUP BY ts.id, cs.title
+    ORDER BY ts.finished_at DESC
+  `;
+
+  return res.status(200).json(rows);
 }

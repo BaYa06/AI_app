@@ -194,9 +194,9 @@ module.exports = (env, argv) => {
         
         apiMiddleware.post('/api/push/subscribe', async (req, res) => {
           console.log('[devServer] POST /api/push/subscribe called');
-          console.log('[devServer] Body:', JSON.stringify(req.body));
           try {
-            const mod = await import('./api/push/subscribe.js');
+            const mod = await import('./api/push.js');
+            req.query = { ...req.query, action: 'subscribe' };
             return mod.default(req, res);
           } catch (e) {
             console.error('[devServer] push/subscribe error', e);
@@ -206,9 +206,9 @@ module.exports = (env, argv) => {
 
         apiMiddleware.post('/api/push/unsubscribe', async (req, res) => {
           console.log('[devServer] POST /api/push/unsubscribe called');
-          console.log('[devServer] Body:', JSON.stringify(req.body));
           try {
-            const mod = await import('./api/push/unsubscribe.js');
+            const mod = await import('./api/push.js');
+            req.query = { ...req.query, action: 'unsubscribe' };
             return mod.default(req, res);
           } catch (e) {
             console.error('[devServer] push/unsubscribe error', e);

@@ -91,7 +91,7 @@ export function AudioLearningScreen({ navigation, route }: Props) {
   // Cards preparation
   const cards = useMemo(() => {
     let allCards: Card[];
-    if (dueCardIds && dueCardIds.length > 0) {
+    if (Array.isArray(dueCardIds) && dueCardIds.length > 0) {
       const state = useCardsStore.getState();
       allCards = dueCardIds.map((id) => state.cards[id]).filter(Boolean) as Card[];
     } else {

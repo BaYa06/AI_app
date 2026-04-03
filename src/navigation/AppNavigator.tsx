@@ -36,7 +36,10 @@ import { SubscriptionScreen } from '@/screens/SubscriptionScreen';
 import { TeacherCourseStatsScreen } from '@/screens/TeacherCourseStatsScreen';
 import { TeacherStudentsScreen } from '@/screens/TeacherStudentsScreen';
 import { ExamLobbyScreen } from '@/screens/ExamLobbyScreen';
+import { TestHistoryScreen } from '@/screens/TestHistoryScreen';
 import { OralTestLobbyScreen } from '@/screens/OralTestLobbyScreen';
+import { OralTestSessionScreen } from '@/screens/OralTestSessionScreen';
+import { OralTestResultsScreen } from '@/screens/OralTestResultsScreen';
 import { TestLobbyScreen } from '@/screens/TestLobbyScreen';
 import { LiveTestScreen } from '@/screens/LiveTestScreen';
 import { TestResultsTeacherScreen } from '@/screens/TestResultsTeacherScreen';
@@ -45,6 +48,7 @@ import { TestWaitingScreen } from '@/screens/TestWaitingScreen';
 import { TestExamScreen } from '@/screens/TestExamScreen';
 import { TestDoneScreen } from '@/screens/TestDoneScreen';
 import { ContextFillScreen } from '@/screens/ContextFillScreen';
+import { AudioLearningScreen } from '@/screens/AudioLearningScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -234,6 +238,11 @@ export function AppNavigator() {
           options={{ headerShown: false }}
         />
         <Stack.Screen
+          name="AudioLearning"
+          component={AudioLearningScreen}
+          options={{ headerShown: false, gestureEnabled: false }}
+        />
+        <Stack.Screen
           name="Study"
           component={StudyScreen}
           options={{
@@ -311,9 +320,24 @@ export function AppNavigator() {
           options={{ headerShown: false, gestureEnabled: true }}
         />
         <Stack.Screen
+          name="TestHistory"
+          component={TestHistoryScreen}
+          options={{ headerShown: false, gestureEnabled: true }}
+        />
+        <Stack.Screen
           name="OralTestLobby"
           component={OralTestLobbyScreen}
           options={{ headerShown: false, gestureEnabled: true }}
+        />
+        <Stack.Screen
+          name="OralTestSession"
+          component={OralTestSessionScreen}
+          options={{ headerShown: false, gestureEnabled: false }}
+        />
+        <Stack.Screen
+          name="OralTestResults"
+          component={OralTestResultsScreen}
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="TestLobby"

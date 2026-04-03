@@ -32,6 +32,41 @@ function normalizeText(text: string): string {
     .replace(/\s+/g, ' ');
 }
 
+/** Levenshtein distance between two strings */
+function levenshtein(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  const dp: number[] = Array.from({ length: n + 1 }, (_, i) => i);
+  for (let i = 1; i <= m; i++) {
+    let prev = i;
+    for (let j = 1; j <= n; j++) {
+      const val = a[i - 1] === b[j - 1] ? dp[j - 1] : Math.min(dp[j - 1], dp[j], prev) + 1;
+      dp[j - 1] = prev;
+      prev = val;
+    }
+    dp[n] = prev;
+  }
+  return dp[n];
+}
+
+/** Allow 1 error per 6 chars (min length 4 to apply fuzzy) */
+function isFuzzyMatch(a: string, b: string): boolean {
+  const maxLen = Math.max(a.length, b.length);
+  if (maxLen < 4) return a === b;
+  const allowed = Math.floor(maxLen / 6) + 1;
+  return levenshtein(a, b) <= allowed;
+}
+
+/** Fraction of expected words found (fuzzily) in recognized */
+function wordOverlap(recognized: string, expected: string): number {
+  const expWords = expected.split(' ');
+  const recWords = recognized.split(' ');
+  let matched = 0;
+  for (const ew of expWords) {
+    if (recWords.some((rw) => isFuzzyMatch(rw, ew))) matched++;
+  }
+  return matched / expWords.length;
+}
+
 export function isAnswerCorrect(
   recognizedAlternatives: string[],
   expectedAnswer: string,
@@ -41,9 +76,17 @@ export function isAnswerCorrect(
 
   for (const alt of recognizedAlternatives) {
     const normalized = normalizeText(alt);
+
+    // Exact / substring match
     if (normalized === expected) return true;
     if (normalized.includes(expected)) return true;
-    if (expected.includes(normalized) && normalized.length >= expected.length * 0.6) return true;
+    if (expected.includes(normalized) && normalized.length >= expected.length * 0.5) return true;
+
+    // Fuzzy single-token match
+    if (isFuzzyMatch(normalized, expected)) return true;
+
+    // Word-level overlap: ≥ 80% of expected words heard
+    if (wordOverlap(normalized, expected) >= 0.8) return true;
   }
   return false;
 }
