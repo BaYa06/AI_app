@@ -276,6 +276,8 @@ export default function App() {
   const ensuredUserIdRef = useRef<string | null>(null);
   const loadedUserIdRef = useRef<string | null>(null);
   const processedOAuthCodeRef = useRef<string | null>(null);
+  // Guard: не отправляем push токен повторно для того же userId
+  const pushedTokenForUserRef = useRef<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -359,7 +361,10 @@ export default function App() {
         has_completed_onboarding: true,
       });
 
-      refreshPushToken(user.id).catch(() => {});
+      if (pushedTokenForUserRef.current !== user.id) {
+        pushedTokenForUserRef.current = user.id;
+        refreshPushToken(user.id).catch(() => {});
+      }
     } else {
       // Новый пользователь — начинаем онбординг
       setIsAuthenticated(true);
@@ -595,7 +600,10 @@ export default function App() {
       total_sets_bucket: '0',
       has_completed_onboarding: true,
     });
-    refreshPushToken(currentUserId).catch(() => {});
+    if (currentUserId && pushedTokenForUserRef.current !== currentUserId) {
+      pushedTokenForUserRef.current = currentUserId;
+      refreshPushToken(currentUserId).catch(() => {});
+    }
   }, [currentUserId]);
 
   const handleSubmitDaily = useCallback((dailyId: string) => {

@@ -232,10 +232,13 @@ export async function refreshPushToken(userId?: string | null): Promise<string |
     if (!token) return null;
 
     currentToken = token;
-    storeToken(token);
 
-    // Always send to backend on refresh to ensure Neon DB is in sync
-    sendTokenToBackend(token, userId); // fire-and-forget
+    // Отправляем на backend только если токен изменился
+    const storedToken = getStoredToken();
+    storeToken(token);
+    if (token !== storedToken) {
+      sendTokenToBackend(token, userId); // fire-and-forget
+    }
 
     return token;
   } catch (error) {
@@ -310,72 +313,38 @@ export async function getPushStatus(): Promise<PushStatus> {
 const API_BASE = '/api/push';
 
 /**
- * POST /api/push/subscribe — отправляет токен на backend.
- * Защита от дублей — backend должен делать upsert.
+ * POST /api/push?action=subscribe — отправляет токен на backend.
+ * Защита от дублей — backend делает upsert + выше проверяем token !== storedToken.
  */
 async function sendTokenToBackend(token: string, userId?: string | null): Promise<void> {
-  const url = `${API_BASE}/subscribe`;
-  const payload = {
-    token,
-    platform: 'web',
-    userId: userId || null,
-  };
-  
-  console.log('[Push] Sending token to backend...');
-  console.log('[Push] URL:', url);
-  console.log('[Push] Payload:', JSON.stringify(payload, null, 2));
-  
   try {
-    const res = await fetch(url, {
+    const res = await fetch(`${API_BASE}?action=subscribe`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ token, platform: 'web', userId: userId || null }),
     });
-    
-    console.log('[Push] Response status:', res.status);
-    console.log('[Push] Response headers:', Object.fromEntries(res.headers.entries()));
-    
-    const text = await res.text();
-    console.log('[Push] Response body:', text);
-    
     if (!res.ok) {
-      console.warn('[Push] Backend subscribe failed:', res.status, text);
-    } else {
-      console.log('[Push] ✅ Token sent to backend successfully');
+      console.warn('[Push] Backend subscribe failed:', res.status);
     }
   } catch (error) {
-    console.error('[Push] ❌ Failed to send token to backend:', error);
+    console.error('[Push] Failed to send token to backend:', error);
   }
 }
 
 /**
- * POST /api/push/unsubscribe — удаляет токен с backend.
+ * POST /api/push?action=unsubscribe — удаляет токен с backend.
  */
 async function removeTokenFromBackend(token: string): Promise<void> {
-  const url = `${API_BASE}/unsubscribe`;
-  const payload = { token };
-  
-  console.log('[Push] Removing token from backend...');
-  console.log('[Push] URL:', url);
-  console.log('[Push] Payload:', JSON.stringify(payload, null, 2));
-  
   try {
-    const res = await fetch(url, {
+    const res = await fetch(`${API_BASE}?action=unsubscribe`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ token }),
     });
-    
-    console.log('[Push] Response status:', res.status);
-    const text = await res.text();
-    console.log('[Push] Response body:', text);
-    
     if (!res.ok) {
-      console.warn('[Push] Backend unsubscribe failed:', res.status, text);
-    } else {
-      console.log('[Push] ✅ Token removed from backend successfully');
+      console.warn('[Push] Backend unsubscribe failed:', res.status);
     }
   } catch (error) {
-    console.error('[Push] ❌ Failed to remove token from backend:', error);
+    console.error('[Push] Failed to remove token from backend:', error);
   }
 }

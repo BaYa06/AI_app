@@ -2,7 +2,7 @@
  * App Navigator
  * @description Главный навигатор приложения
  */
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { triggerHaptic } from '@/utils/haptic';
 import { NavigationContainer, useNavigationContainerRef, type LinkingOptions } from '@react-navigation/native';
@@ -134,7 +134,12 @@ function MainTabs() {
 
 // ==================== ROOT STACK ====================
 
-const linking: LinkingOptions<RootStackParamList> = {
+// Native-only linking: deep links для iOS/Android.
+// На вебе НЕ используется — React Navigation работает как memory router
+// (не пишет в window.history, не привязывается к URL).
+// Это ключевое решение проблемы с кнопкой "назад": без linking нет URL-based
+// сброса стека. Приглашения (/join/TOKEN) обрабатываются отдельно в App.tsx.
+const NATIVE_LINKING: LinkingOptions<RootStackParamList> = {
   prefixes: [],
   config: {
     screens: {
@@ -174,27 +179,35 @@ export function AppNavigator() {
   const colors = useThemeColors();
   const navigationRef = useNavigationContainerRef<RootStackParamList>();
 
-  // iOS PWA: свайп-назад Safari вызывает history.back() → popstate,
-  // React Navigation linking при этом делает reset состояния (пересоздаёт экраны),
-  // вместо goBack (плавный возврат). Перехватываем popstate в capture-фазе,
-  // чтобы он не дошёл до React Navigation.
   useEffect(() => {
     if (Platform.OS !== 'web') return;
 
-    const handlePopState = (e: PopStateEvent) => {
+    // Sentinel: добавляем запись поверх текущей позиции в history.
+    // Это нужно чтобы кнопка "назад" вызывала popstate (мы перехватываем),
+    // а не уводила пользователя с приложения сразу.
+    // URL не меняется — мы явно передаём window.location.href.
+    window.history.pushState({ __sentinel: true }, '', window.location.href);
+
+    const handlePopState = () => {
       const nav = navigationRef.current;
       if (nav?.canGoBack()) {
-        e.stopImmediatePropagation();
+        // Восстанавливаем sentinel для следующего нажатия назад
+        window.history.pushState({ __sentinel: true }, '', window.location.href);
         nav.goBack();
       }
+      // canGoBack() === false: sentinel не восстанавливаем.
+      // Следующий back button выйдет из PWA или уйдёт на предыдущий сайт — это правильно.
     };
 
-    window.addEventListener('popstate', handlePopState, true);
-    return () => window.removeEventListener('popstate', handlePopState, true);
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, [navigationRef]);
 
   return (
-    <NavigationContainer ref={navigationRef} linking={linking}>
+    <NavigationContainer
+      ref={navigationRef}
+      linking={Platform.OS !== 'web' ? NATIVE_LINKING : undefined}
+    >
       <Stack.Navigator
         screenOptions={{
           headerStyle: {
