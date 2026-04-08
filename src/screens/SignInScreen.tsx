@@ -49,6 +49,20 @@ export function SignInScreen({ onBack, onSendCode, onCreateAccount }: Props) {
     }
   }, []);
 
+  // Guest login
+  const handleGuestLogin = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const { error: authError } = await supabase.auth.signInAnonymously();
+      if (authError) throw authError;
+    } catch (e: any) {
+      setError('Не удалось войти. Попробуйте ещё раз.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const signInWithGoogle = useCallback(async () => {
     setError(null);
     setIsLoading(true);
@@ -172,6 +186,17 @@ export function SignInScreen({ onBack, onSendCode, onCreateAccount }: Props) {
                   {error}
                 </Text>
               )}
+              {/* Guest login */}
+              <View style={styles.dividerRow}>
+                <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+                <Text variant="bodySmall" color="tertiary">или</Text>
+                <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+              </View>
+              <Pressable onPress={handleGuestLogin} disabled={isLoading} style={styles.guestButton}>
+                <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
+                  Попробовать без регистрации
+                </Text>
+              </Pressable>
             </View>
           </ScrollView>
 
@@ -244,6 +269,20 @@ const styles = StyleSheet.create({
   },
   ctaBlock: {
     gap: spacing.s,
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+    marginTop: spacing.xs,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+  },
+  guestButton: {
+    alignItems: 'center',
+    paddingVertical: spacing.s,
   },
   hint: {
     lineHeight: 16,

@@ -322,6 +322,16 @@ export default function App() {
   // Общая логика обработки сессии: определить новый/возвращающийся пользователь
   const handleSession = useCallback(async (user: { id: string; email?: string; user_metadata?: any }) => {
     setCurrentUserId(user.id);
+
+    // Guest login — пропускаем NeonDB и онбординг
+    const isAnonymous = (user as any).is_anonymous === true;
+    if (isAnonymous) {
+      setIsAuthenticated(true);
+      setNeedsOnboarding(false);
+      Analytics.login('anonymous');
+      return;
+    }
+
     if (ensuredUserIdRef.current !== user.id) {
       ensuredUserIdRef.current = user.id;
       await NeonService.ensureUserExists({

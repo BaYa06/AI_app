@@ -497,6 +497,16 @@ class LibraryServiceClass {
     return { newSetId };
   }
 
+  /** Fetch all cards for a library set (READ only, used for guest import) */
+  async getLibraryCards(librarySetId: string): Promise<{ front: string; back: string; hint: string | null }[]> {
+    const sql = getSql();
+    const rows = await sql.query(`
+      SELECT front, back, hint FROM library_cards
+      WHERE library_set_id = $1 ORDER BY order_index ASC
+    `, [librarySetId]);
+    return rows as { front: string; back: string; hint: string | null }[];
+  }
+
   /** Toggle like on a library set */
   async toggleLike(userId: string, librarySetId: string): Promise<ToggleLikeResponse> {
     const sql = getSql();

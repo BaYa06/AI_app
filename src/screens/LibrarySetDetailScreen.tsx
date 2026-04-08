@@ -12,8 +12,11 @@ import {
   Alert,
 } from 'react-native';
 import { Text, Container } from '@/components/common';
-import { useThemeColors, useSettingsStore, useLibraryStore } from '@/store';
+import { useThemeColors, useSettingsStore, useLibraryStore, useSetsStore, useCardsStore } from '@/store';
 import { spacing, borderRadius, getCategoryLabel, getLanguageDef, formatCount, formatRelativeTime } from '@/constants';
+import { v4 as uuid } from 'uuid';
+import { LibraryService } from '@/services/LibraryService';
+import type { CardSet } from '@/types';
 import {
   ArrowLeft,
   MoreHorizontal,
@@ -42,6 +45,7 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
   const { currentSet, isLoading, fetchSetDetail, toggleLike, rateSet, importSet } = useLibraryStore();
 
   const [userId, setUserId] = useState<string | undefined>();
+  const [isAnonymous, setIsAnonymous] = useState(false);
   const [importing, setImporting] = useState(false);
 
   const surfaceBg = isDark ? 'rgb(24, 26, 38)' : colors.surface;
@@ -51,6 +55,7 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
     supabase.auth.getSession().then(({ data }) => {
       const uid = data.session?.user?.id;
       setUserId(uid);
+      setIsAnonymous((data.session?.user as any)?.is_anonymous === true);
       fetchSetDetail(setId, uid);
     });
   }, [setId]);
@@ -71,11 +76,88 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
     });
   }, [userId, currentSet, rateSet]);
 
-  const handleImport = useCallback(async () => {
+  // Guest login — сохраняем набор локально, без записи в NeonDB
+  const handleImportGuest = useCallback(async () => {
     if (!userId || !currentSet) return;
     setImporting(true);
     try {
-      const newSetId = await importSet(userId, currentSet.id);
+      const libCards = await LibraryService.getLibraryCards(currentSet.id);
+      const now = Date.now();
+      const newSetId = uuid();
+
+      const newSet: CardSet = {
+        id: newSetId,
+        userId,
+        courseId: null,
+        title: currentSet.title + ' (из библиотеки)',
+        description: currentSet.description || '',
+        category: (currentSet as any).category || 'general',
+        tags: [],
+        icon: undefined,
+        color: undefined,
+        languageFrom: (currentSet as any).language_from || 'en',
+        languageTo: (currentSet as any).language_to || 'ru',
+        isPublic: false,
+        createdAt: now,
+        updatedAt: now,
+        lastStudiedAt: undefined,
+        cardCount: libCards.length,
+        newCount: libCards.length,
+        learningCount: 0,
+        reviewCount: 0,
+        masteredCount: 0,
+        isFavorite: false,
+        isArchived: false,
+      };
+
+      // Пишем в store напрямую, минуя SyncQueue (гость не имеет записи в NeonDB)
+      const setsState = useSetsStore.getState();
+      useSetsStore.setState({
+        sets: { ...setsState.sets, [newSetId]: newSet },
+        setsOrder: [newSetId, ...setsState.setsOrder],
+      });
+      DatabaseService.saveSets();
+
+      const newCards = libCards.map(c => ({
+        id: uuid(),
+        setId: newSetId,
+        front: c.front,
+        back: c.back,
+        example: c.hint ?? undefined,
+        createdAt: now,
+        updatedAt: now,
+        learningStep: 0,
+        nextReviewDate: now,
+        lastReviewDate: 0,
+        status: 'new' as const,
+      }));
+
+      const cardsState = useCardsStore.getState();
+      const newCardsMap = { ...cardsState.cards };
+      const newCardsBySet = { ...cardsState.cardsBySet, [newSetId]: [] as string[] };
+      for (const card of newCards) {
+        newCardsMap[card.id] = card;
+        newCardsBySet[newSetId].push(card.id);
+      }
+      useCardsStore.setState({ cards: newCardsMap, cardsBySet: newCardsBySet });
+      DatabaseService.saveCards();
+
+      Alert.alert('Готово!', 'Набор сохранён на устройстве', [{ text: 'OK' }]);
+    } catch (err) {
+      Alert.alert('Ошибка', err instanceof Error ? err.message : 'Не удалось импортировать набор');
+    } finally {
+      setImporting(false);
+    }
+  }, [userId, currentSet]);
+
+  const handleImport = useCallback(async () => {
+    if (!userId || !currentSet) return;
+    if (isAnonymous) {
+      return handleImportGuest();
+    }
+    setImporting(true);
+    try {
+      await importSet(userId, currentSet.id);
       Alert.alert('Готово!', 'Набор добавлен на главный экран', [
         { text: 'OK' },
       ]);
@@ -86,7 +168,7 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
     } finally {
       setImporting(false);
     }
-  }, [userId, currentSet, importSet]);
+  }, [userId, currentSet, importSet, isAnonymous, handleImportGuest]);
 
   const handleOpenMySet = useCallback(() => {
     // Navigate to Home — user will see the imported set there

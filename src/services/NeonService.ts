@@ -32,6 +32,7 @@ type EnsureUserArgs = {
   id: string;
   email?: string | null;
   displayName?: string | null;
+  isAnonymous?: boolean; // Guest login
 };
 
 /**
@@ -103,7 +104,7 @@ export const NeonService = {
 
       await sql`
         INSERT INTO users (id, email, display_name, is_anonymous, user_name)
-        VALUES (${user.id}::uuid, ${user.email}, ${displayName}, false, ${defaultUserName})
+        VALUES (${user.id}::uuid, ${user.email ?? null}, ${displayName ?? 'Гость'}, ${user.isAnonymous ?? false}, ${defaultUserName ?? null})
         ON CONFLICT (id) DO UPDATE SET
           user_name = COALESCE(users.user_name, EXCLUDED.user_name);
       `;
