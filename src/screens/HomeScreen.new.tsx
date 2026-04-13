@@ -52,6 +52,8 @@ import Svg, { Circle as SvgCircle } from 'react-native-svg';
 import { StreakService, getLocalDateKey } from '@/services/StreakService';
 import { supabase } from '@/services/supabaseClient';
 import { NeonService } from '@/services/NeonService';
+import { DatabaseService } from '@/services/DatabaseService';
+import { JoinByCodeModal } from '@/components/JoinByCodeModal';
 import type { DailyActivity } from '@/services/StreakService';
 import type { CardSet } from '@/types';
 
@@ -94,7 +96,9 @@ export function HomeScreen({ navigation }: any) {
   const [inviteModalCourseId, setInviteModalCourseId] = useState<string | null>(null);
   const [inviteCopied, setInviteCopied] = useState(false);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const [inviteJoinCode, setInviteJoinCode] = useState<string | null>(null);
   const [inviteLoading, setInviteLoading] = useState(false);
+  const [joinByCodeVisible, setJoinByCodeVisible] = useState(false);
   const inviteBaseUrl = 'https://ai-app-seven-zeta.vercel.app';
   const [setMenuTarget, setSetMenuTarget] = useState<CardSet | null>(null);
   const editInputRef = useRef<RNTextInput>(null);
@@ -267,9 +271,12 @@ export function HomeScreen({ navigation }: any) {
     }
   }, [drawerOpen]);
 
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      const userId = data.session?.user?.id;
+      const userId = data.session?.user?.id ?? null;
+      setCurrentUserId(userId);
       if (userId) {
         NeonService.getIsTeacher(userId).then(setIsTeacher);
       }
@@ -627,14 +634,16 @@ export function HomeScreen({ navigation }: any) {
     setCourseMenuOpen(null);
     setInviteCopied(false);
     setInviteToken(null);
+    setInviteJoinCode(null);
     setInviteModalCourseId(courseId);
     setInviteLoading(true);
     try {
       const { data } = await supabase.auth.getSession();
       const userId = data.session?.user?.id;
       if (userId) {
-        const token = await NeonService.createCourseInvite(courseId, userId);
-        setInviteToken(token);
+        const result = await NeonService.createCourseInvite(courseId, userId);
+        setInviteToken(result?.token ?? null);
+        setInviteJoinCode(result?.joinCode ?? null);
       }
     } catch (error) {
       console.error('Failed to create invite:', error);
@@ -647,6 +656,7 @@ export function HomeScreen({ navigation }: any) {
     setInviteModalCourseId(null);
     setInviteCopied(false);
     setInviteToken(null);
+    setInviteJoinCode(null);
   }, []);
 
   // Обработка удаления курса через модальное окно
@@ -1298,19 +1308,35 @@ export function HomeScreen({ navigation }: any) {
                   />
                 </View>
               ) : (
-                <Pressable
-                  style={[
-                    styles.newCourseButton,
-                    { backgroundColor: colors.primary + '1A', borderColor: colors.primary + '33' },
-                  ]}
-                  onPress={() => {
-                    setCourseMenuOpen(null);
-                    setIsCreatingCourse(true);
-                  }}
-                >
-                  <Plus size={18} color={colors.primary} />
-                  <Text style={[styles.newCourseText, { color: colors.primary }]}>New course</Text>
-                </Pressable>
+                <View style={{ gap: spacing.xs }}>
+                  <Pressable
+                    style={[
+                      styles.newCourseButton,
+                      { backgroundColor: colors.primary + '1A', borderColor: colors.primary + '33' },
+                    ]}
+                    onPress={() => {
+                      setCourseMenuOpen(null);
+                      setIsCreatingCourse(true);
+                    }}
+                  >
+                    <Plus size={18} color={colors.primary} />
+                    <Text style={[styles.newCourseText, { color: colors.primary }]}>New course</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[
+                      styles.newCourseButton,
+                      { backgroundColor: colors.primary + '1A', borderColor: colors.primary + '33' },
+                    ]}
+                    onPress={() => {
+                      setCourseMenuOpen(null);
+                      setDrawerOpen(false);
+                      setJoinByCodeVisible(true);
+                    }}
+                  >
+                    <UserPlus size={18} color={colors.primary} />
+                    <Text style={[styles.newCourseText, { color: colors.primary }]}>Войти по коду</Text>
+                  </Pressable>
+                </View>
               )}
 
               <ScrollView
@@ -1763,13 +1789,39 @@ export function HomeScreen({ navigation }: any) {
             </View>
 
             <Text style={[styles.inviteDescription, { color: colors.textSecondary }]}>
-              Отправьте эту ссылку своим ученикам — они смогут присоединиться к курсу и начать изучение.
+              Поделитесь ссылкой или кодом — ученики смогут присоединиться к курсу.
             </Text>
 
             {inviteLoading ? (
               <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: spacing.m }} />
             ) : inviteToken ? (
               <>
+                {/* Код курса */}
+                {inviteJoinCode && (
+                  <View style={{ marginBottom: spacing.m }}>
+                    <Text style={[styles.inviteDescription, { color: colors.textSecondary, marginBottom: spacing.xs }]}>
+                      Код курса
+                    </Text>
+                    <Pressable
+                      style={[
+                        styles.inviteLinkBox,
+                        { backgroundColor: colors.surfaceVariant || colors.border, borderColor: colors.primary + '55', alignItems: 'center' },
+                      ]}
+                      onPress={() => {
+                        if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
+                          navigator.clipboard.writeText(inviteJoinCode);
+                        } else {
+                          Clipboard.setString(inviteJoinCode);
+                        }
+                      }}
+                    >
+                      <Text style={{ fontSize: 32, fontWeight: '800', letterSpacing: 8, color: colors.primary }}>
+                        {inviteJoinCode}
+                      </Text>
+                    </Pressable>
+                  </View>
+                )}
+
                 <Pressable
                   style={[
                     styles.inviteLinkBox,
@@ -1845,6 +1897,27 @@ export function HomeScreen({ navigation }: any) {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* Join by Code Modal */}
+      <JoinByCodeModal
+        visible={joinByCodeVisible}
+        userId={currentUserId}
+        onAccepted={(courseId, courseTitle) => {
+          setJoinByCodeVisible(false);
+          useCoursesStore.getState().courses.push({
+            id: courseId,
+            title: courseTitle,
+            createdAt: Date.now(),
+            isStudentCourse: true,
+          });
+          if (currentUserId) {
+            DatabaseService.reloadRemoteDataForUser(currentUserId);
+          }
+          setActiveCourse(courseId);
+          setDrawerOpen(false);
+        }}
+        onDismiss={() => setJoinByCodeVisible(false)}
+      />
 
       {/* Streak Modal */}
       <Modal

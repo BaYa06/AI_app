@@ -36,8 +36,14 @@ const CATEGORY_OPTIONS: { value: SetCategory; label: string; icon: string }[] = 
   { value: 'custom', label: 'Свой вариант…', icon: '✨' },
 ];
 
-const SOURCE_LANGUAGES = ['Немецкий (DE)', 'Английский (EN)', 'Французский (FR)', 'Испанский (ES)'];
-const TARGET_LANGUAGES = ['Русский (RU)', 'Английский (EN)', 'Немецкий (DE)'];
+const ALL_LANGUAGES = [
+  'Немецкий (DE)',
+  'Английский (EN)',
+  'Русский (RU)',
+  'Турецкий (TR)',
+];
+const SOURCE_LANGUAGES = ALL_LANGUAGES;
+const TARGET_LANGUAGES = ALL_LANGUAGES;
 const DESCRIPTION_LIMIT = 200;
 
 const LANG_CODE_TO_LABEL: Record<string, string> = {
@@ -46,6 +52,7 @@ const LANG_CODE_TO_LABEL: Record<string, string> = {
   fr: 'Французский (FR)',
   es: 'Испанский (ES)',
   ru: 'Русский (RU)',
+  tr: 'Турецкий (TR)',
 };
 
 const LANG_LABEL_TO_CODE: Record<string, string> = {
@@ -54,6 +61,7 @@ const LANG_LABEL_TO_CODE: Record<string, string> = {
   'Французский (FR)': 'fr',
   'Испанский (ES)': 'es',
   'Русский (RU)': 'ru',
+  'Турецкий (TR)': 'tr',
 };
 
 export function SetEditorScreen({ navigation, route }: Props) {
@@ -236,9 +244,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
   const swapLanguages = useCallback(() => {
     if (isReadOnly) return;
     setSourceLanguage((prevSource) => {
-      // Переключаем, но целевой язык остаётся среди доступных целей
-      const newTarget = prevSource;
-      setTargetLanguage(TARGET_LANGUAGES.includes(newTarget) ? newTarget : TARGET_LANGUAGES[0]);
+      setTargetLanguage(prevSource);
       return targetLanguage;
     });
     setSourcePickerOpen(false);
@@ -362,7 +368,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
     } finally {
       setIsSaving(false);
     }
-  }, [title, description, category, isEditing, setId, updateSet, addSet, navigation, closeSheet, courseId]);
+  }, [title, description, category, sourceLanguage, targetLanguage, isEditing, setId, updateSet, addSet, navigation, closeSheet, courseId]);
 
   // Удаление
   const handleDelete = useCallback(() => {

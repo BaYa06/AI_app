@@ -26,6 +26,11 @@ SyncQueueService.registerExecutor('updateSetCourse', (p) => {
   return NeonService.updateSetCourse(setId, courseId);
 });
 
+SyncQueueService.registerExecutor('updateSetMeta', (p) => {
+  const { setId, ...fields } = p as { setId: string; title?: string; description?: string; category?: string; languageFrom?: string; languageTo?: string };
+  return NeonService.updateSetMeta(setId, fields);
+});
+
 interface SetsState {
   // Данные - объект для O(1) доступа
   sets: Record<string, CardSet>;
@@ -157,6 +162,17 @@ export const useSetsStore = create<SetsState & SetsActions>()(
       if (NeonService.isEnabled() && 'courseId' in input) {
         const courseId = (input as any).courseId ?? null;
         SyncQueueService.enqueue('updateSetCourse', { setId, courseId });
+      }
+
+      // Синхронизируем мета-поля набора в Neon
+      const metaKeys = ['title', 'description', 'category', 'languageFrom', 'languageTo'] as const;
+      const hasMeta = metaKeys.some((k) => k in input);
+      if (NeonService.isEnabled() && hasMeta) {
+        const fields: Record<string, string | undefined> = {};
+        for (const k of metaKeys) {
+          if (k in input) fields[k] = (input as any)[k];
+        }
+        SyncQueueService.enqueue('updateSetMeta', { setId, ...fields });
       }
     },
 

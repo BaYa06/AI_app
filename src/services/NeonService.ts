@@ -939,6 +939,40 @@ export const NeonService = {
   },
 
   /**
+   * Обновить мета-данные набора (title, description, category, languageFrom, languageTo)
+   */
+  async updateSetMeta(setId: string, fields: {
+    title?: string;
+    description?: string;
+    category?: string;
+    languageFrom?: string;
+    languageTo?: string;
+  }): Promise<boolean> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) return false;
+
+      const sql = neon(connectionString);
+      await sql`
+        UPDATE card_sets
+        SET
+          title        = COALESCE(${fields.title ?? null}, title),
+          description  = COALESCE(${fields.description ?? null}, description),
+          category     = COALESCE(${fields.category ?? null}, category),
+          language_from = COALESCE(${fields.languageFrom ?? null}, language_from),
+          language_to  = COALESCE(${fields.languageTo ?? null}, language_to),
+          updated_at   = NOW()
+        WHERE id = ${setId}::uuid
+      `;
+      console.log('✅ updateSetMeta выполнен:', { setId, fields });
+      return true;
+    } catch (error) {
+      console.error('Failed to updateSetMeta in Neon:', error);
+      return false;
+    }
+  },
+
+  /**
    * Обновить course_id у набора
    */
   async updateSetCourse(setId: string, courseId: string | null): Promise<boolean> {
@@ -1288,7 +1322,7 @@ export const NeonService = {
   /**
    * Создать или получить существующий инвайт-токен для курса
    */
-  async createCourseInvite(courseId: string, userId: string): Promise<string | null> {
+  async createCourseInvite(courseId: string, userId: string): Promise<{ token: string; joinCode: string } | null> {
     try {
       const connectionString = getConnectionString();
       if (!connectionString) return null;
@@ -1305,14 +1339,23 @@ export const NeonService = {
         return null;
       }
 
-      // Проверить существующий токен
+      // Проверить существующий инвайт
       const existing = await sql`
-        SELECT token FROM course_invites
+        SELECT token, join_code FROM course_invites
         WHERE course_id = ${courseId}::uuid
         LIMIT 1
       `;
       if (existing.length > 0) {
-        return existing[0].token;
+        // Если join_code ещё нет (старая запись) — заполнить
+        if (!existing[0].join_code) {
+          const code = String(Math.floor(100000 + Math.random() * 900000));
+          await sql`
+            UPDATE course_invites SET join_code = ${code}
+            WHERE token = ${existing[0].token}
+          `;
+          return { token: existing[0].token, joinCode: code };
+        }
+        return { token: existing[0].token, joinCode: existing[0].join_code };
       }
 
       // Сгенерировать токен на клиенте
@@ -1323,21 +1366,106 @@ export const NeonService = {
         for (let i = 0; i < 32; i++) bytes[i] = Math.floor(Math.random() * 256);
       }
       const token = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+      const joinCode = String(Math.floor(100000 + Math.random() * 900000));
 
-      const tokenResult = await sql`
-        INSERT INTO course_invites (course_id, token, created_by)
+      const result = await sql`
+        INSERT INTO course_invites (course_id, token, created_by, join_code)
         VALUES (
           ${courseId}::uuid,
           ${token},
-          ${userId}::uuid
+          ${userId}::uuid,
+          ${joinCode}
         )
-        RETURNING token
+        RETURNING token, join_code
       `;
 
       console.log('✅ Инвайт создан для курса:', courseId);
-      return tokenResult[0].token;
+      return { token: result[0].token, joinCode: result[0].join_code };
     } catch (error) {
       console.error('Failed to create course invite:', error);
+      return null;
+    }
+  },
+
+  /**
+   * Получить информацию о курсе по короткому коду (для ученика)
+   */
+  async getCourseInviteInfoByCode(code: string): Promise<{
+    courseId: string;
+    courseTitle: string;
+    teacherName: string;
+  } | null> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) return null;
+
+      const sql = neon(connectionString);
+
+      const result = await sql`
+        SELECT
+          c.id AS course_id,
+          c.title AS course_title,
+          COALESCE(u.display_name, u.user_name, u.email) AS teacher_name
+        FROM course_invites ci
+        JOIN courses c ON c.id = ci.course_id
+        JOIN users u ON u.id = ci.created_by
+        WHERE ci.join_code = ${code}
+          AND (ci.expires_at IS NULL OR ci.expires_at > NOW())
+      `;
+
+      if (result.length === 0) return null;
+
+      return {
+        courseId: result[0].course_id,
+        courseTitle: result[0].course_title,
+        teacherName: result[0].teacher_name,
+      };
+    } catch (error) {
+      console.error('Failed to get course invite info by code:', error);
+      return null;
+    }
+  },
+
+  /**
+   * Присоединиться к курсу по короткому коду
+   */
+  async joinCourseByCode(code: string, userId: string): Promise<{
+    courseId: string;
+    courseTitle: string;
+  } | null> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) return null;
+
+      const sql = neon(connectionString);
+
+      const invite = await sql`
+        SELECT ci.course_id, c.title AS course_title, c.user_id AS owner_id
+        FROM course_invites ci
+        JOIN courses c ON c.id = ci.course_id
+        WHERE ci.join_code = ${code}
+          AND (ci.expires_at IS NULL OR ci.expires_at > NOW())
+      `;
+
+      if (invite.length === 0) return null;
+
+      const { course_id, course_title, owner_id } = invite[0];
+
+      if (owner_id === userId) {
+        console.warn('joinCourseByCode: cannot join own course');
+        return null;
+      }
+
+      await sql`
+        INSERT INTO course_members (course_id, user_id, role)
+        VALUES (${course_id}::uuid, ${userId}::uuid, 'student')
+        ON CONFLICT (course_id, user_id) DO NOTHING
+      `;
+
+      console.log('✅ Ученик присоединился по коду к курсу:', course_title);
+      return { courseId: course_id, courseTitle: course_title };
+    } catch (error) {
+      console.error('Failed to join course by code:', error);
       return null;
     }
   },

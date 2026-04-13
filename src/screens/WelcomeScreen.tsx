@@ -9,7 +9,6 @@ import {
   ScrollView,
   Modal,
   TouchableOpacity,
-  Pressable,
   Platform,
   Linking,
   ActivityIndicator,
@@ -34,20 +33,6 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
   const [showIosModal, setShowIosModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-
-  // Guest login
-  const handleGuestLogin = async () => {
-    setAuthError(null);
-    setIsLoading(true);
-    try {
-      const { error } = await supabase.auth.signInAnonymously();
-      if (error) throw error;
-    } catch (e: any) {
-      setAuthError('Не удалось войти. Попробуйте ещё раз.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const loading = isLoading || externalLoading;
 
@@ -225,12 +210,6 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
                 leftIcon={<Ionicons name="logo-google" size={20} color={colors.textInverse} />}
                 style={styles.actionButton}
               />
-              {/* Guest login */}
-              <Pressable onPress={handleGuestLogin} style={styles.guestButton}>
-                <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
-                  Попробовать без регистрации
-                </Text>
-              </Pressable>
             </>
           )}
           {authError && (
@@ -379,10 +358,6 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     marginBottom: spacing.s,
-  },
-  guestButton: {
-    alignItems: 'center',
-    paddingVertical: spacing.s,
   },
   footer: {
     marginBottom: spacing.m,
