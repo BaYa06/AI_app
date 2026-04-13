@@ -91,7 +91,13 @@ export function JoinByCodeModal({ visible, userId, onAccepted, onDismiss }: Join
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleDismiss}>
       <Pressable style={[styles.overlay, { backgroundColor: 'rgba(0,0,0,0.6)' }]} onPress={handleDismiss}>
         <Pressable
-          style={[styles.content, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          style={[
+            styles.content,
+            {
+              backgroundColor: colors.background,
+              borderColor: colors.border,
+            },
+          ]}
           onPress={(e) => e.stopPropagation()}
         >
           {/* Header */}
