@@ -53,7 +53,37 @@ export function TestLobbyScreen({ navigation, route }: Props) {
   const [copied, setCopied] = useState(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
 
-  // Подписка на Supabase Realtime — student_joined
+  // Polling — синхронизация списка студентов каждые 3 сек
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchParticipants = async () => {
+      if (cancelled) return;
+      try {
+        const resp = await fetch(`${API_BASE}/test?action=monitor&sessionId=${sessionId}`);
+        if (!resp.ok || cancelled) return;
+        const data = await resp.json();
+        if (cancelled) return;
+        setStudents(
+          (data.participants || []).map((p: any) => ({
+            id: p.userId,
+            name: p.name || 'Student',
+            initials: p.initials || (p.name?.[0] ?? 'S').toUpperCase(),
+          }))
+        );
+      } catch {}
+    };
+
+    fetchParticipants();
+    const interval = setInterval(fetchParticipants, 3000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [sessionId]);
+
+  // Realtime — мгновенное добавление студента (без ожидания следующего polling)
   useEffect(() => {
     const channel = supabase.channel(`test:${sessionId}`);
     channelRef.current = channel;

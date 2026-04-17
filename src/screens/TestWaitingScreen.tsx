@@ -78,7 +78,40 @@ export function TestWaitingScreen({ navigation, route }: Props) {
   const dot2 = useRef(new Animated.Value(0)).current;
   const dot3 = useRef(new Animated.Value(0)).current;
 
-  // Realtime: ждём старта теста
+  // Polling: проверяем статус каждые 2 сек (надёжный fallback)
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkStatus = async () => {
+      if (cancelled) return;
+      try {
+        const resp = await fetch(`${API_BASE}/test?action=monitor&sessionId=${sessionId}`);
+        if (!resp.ok || cancelled) return;
+        const data = await resp.json();
+        if (cancelled) return;
+        if (data.status === 'active') {
+          navigation.replace('TestExam', {
+            sessionId,
+            participantId,
+            testMode,
+            questionCount,
+            timePerQuestion,
+          });
+        } else if (data.status === 'finished') {
+          navigation.navigate('Main' as any);
+        }
+      } catch {}
+    };
+
+    const interval = setInterval(checkStatus, 2000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [sessionId, participantId, testMode, questionCount, timePerQuestion]);
+
+  // Realtime: мгновенный старт (без ожидания следующего polling)
   useEffect(() => {
     const channel = supabase.channel(`test:${sessionId}`);
 

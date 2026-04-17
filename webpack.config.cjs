@@ -168,7 +168,7 @@ module.exports = (env, argv) => {
       }),
     ],
     devServer: isDev ? {
-      port: 3000,
+      port: process.env.PORT ? parseInt(process.env.PORT) : 3000,
       host: '0.0.0.0',
       allowedHosts: 'all',
       hot: true,
@@ -269,6 +269,21 @@ module.exports = (env, argv) => {
           } catch (e) {
             console.error('[devServer] test error', e);
             return res.status(500).json({ error: 'dev-server error', message: e.message });
+          }
+        });
+
+        // Admin stats (local only — api/admin.js is gitignored)
+        // Uses /admin-api path to bypass vercel dev function interception
+        apiMiddleware.get('/admin-api', async (req, res) => {
+          try {
+            const mod = await import('./api/admin.js');
+            return mod.default(req, res);
+          } catch (e) {
+            if (e.code === 'ERR_MODULE_NOT_FOUND') {
+              return res.status(404).json({ error: 'Admin API not available locally' });
+            }
+            console.error('[devServer] admin error', e);
+            return res.status(500).json({ error: e.message });
           }
         });
 

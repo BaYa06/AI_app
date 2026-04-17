@@ -77,3 +77,9 @@ FIREBASE_SERVICE_ACCOUNT.json
 # Temporary
 tmp/
 temp/
+
+# Admin dashboard (local only, never push)
+api/admin.js
+public/admin.html
+admin-server.mjs
+.vercel

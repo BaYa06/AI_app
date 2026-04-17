@@ -386,7 +386,7 @@ async function monitorTest(req, res, sql) {
   }
 
   const participants = await sql`
-    SELECT display_name, answer_count, question_order, finished_at IS NOT NULL AS done
+    SELECT user_id, display_name, answer_count, question_order, finished_at IS NOT NULL AS done
     FROM test_participants
     WHERE session_id = ${sessionId}::uuid
     ORDER BY joined_at ASC
@@ -397,13 +397,18 @@ async function monitorTest(req, res, sql) {
     startedAt: session[0].started_at,
     timePerQuestion: session[0].time_per_question,
     questionCount: session[0].question_count,
-    participants: participants.map(p => ({
-      name: p.display_name,
-      initial: (p.display_name || '?')[0].toUpperCase(),
-      answered: p.answer_count,
-      total: p.question_order?.length || 0,
-      done: p.done,
-    })),
+    participants: participants.map(p => {
+      const initials = (p.display_name || 'S').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+      return {
+        userId: p.user_id,
+        name: p.display_name,
+        initials,
+        initial: (p.display_name || '?')[0].toUpperCase(),
+        answered: p.answer_count,
+        total: p.question_order?.length || 0,
+        done: p.done,
+      };
+    }),
   });
 }
 
