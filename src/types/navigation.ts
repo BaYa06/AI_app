@@ -179,6 +179,11 @@ export type RootStackParamList = {
     setId: string;
     cardLimit?: number;
   };
+  ImportFiles: undefined;
+  PreviewImport: {
+    cards: Array<{ front: string; back: string }>;
+    suggestedTitle?: string;
+  };
 };
 
 // ==================== MAIN TABS ====================

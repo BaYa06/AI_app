@@ -49,6 +49,8 @@ import { TestExamScreen } from '@/screens/TestExamScreen';
 import { TestDoneScreen } from '@/screens/TestDoneScreen';
 import { ContextFillScreen } from '@/screens/ContextFillScreen';
 import { AudioLearningScreen } from '@/screens/AudioLearningScreen';
+import { ImportFilesScreen } from '@/screens/ImportFilesScreen';
+import { PreviewImportScreen } from '@/screens/PreviewImportScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -398,6 +400,16 @@ export function AppNavigator() {
           options={{
             headerShown: false,
           }}
+        />
+        <Stack.Screen
+          name="ImportFiles"
+          component={ImportFilesScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="PreviewImport"
+          component={PreviewImportScreen}
+          options={{ headerShown: false }}
         />
       </Stack.Navigator>
     </NavigationContainer>

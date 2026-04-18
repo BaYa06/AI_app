@@ -79,6 +79,22 @@ async function applyMigrations(sql) {
     console.error('Migration notif columns failed:', e);
   }
 
+  // Migration 012: Streak events log
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS streak_events (
+        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        streak_day INTEGER NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_streak_events_user ON streak_events(user_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_streak_events_created ON streak_events(created_at DESC)`;
+  } catch (e) {
+    console.error('Migration 012_streak_events failed:', e);
+  }
+
   // Migration 011: Live test system
   try {
     await sql`

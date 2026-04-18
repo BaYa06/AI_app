@@ -842,12 +842,20 @@ export function HomeScreen({ navigation }: any) {
         </View>
         
         <View style={styles.headerRight}>
-          <Pressable 
+          <Pressable
             style={styles.iconButton}
             onPress={() => setSearchVisible(!searchVisible)}
           >
             <Search size={20} color={colors.textPrimary} />
           </Pressable>
+          {Platform.OS !== 'web' && (
+            <Pressable
+              style={styles.iconButton}
+              onPress={() => { triggerHaptic('selection'); navigation?.navigate('ImportFiles'); }}
+            >
+              <Upload size={20} color={colors.textPrimary} />
+            </Pressable>
+          )}
           <Pressable
             style={styles.addButton}
             onPress={() => { triggerHaptic('selection'); navigation?.navigate('SetEditor', {}); }}
@@ -922,6 +930,14 @@ export function HomeScreen({ navigation }: any) {
               >
                 <Plus size={20} color="#fff" />
                 <Text style={styles.primaryButtonText}>Создать набор</Text>
+              </Pressable>
+
+              <Pressable
+                style={[styles.primaryButton, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]}
+                onPress={() => { triggerHaptic('selection'); navigation?.navigate('ImportFiles'); }}
+              >
+                <Upload size={20} color={colors.primary} />
+                <Text style={[styles.primaryButtonText, { color: colors.primary }]}>Из файлов (AI)</Text>
               </Pressable>
 
               <View style={[styles.tipCard, { borderColor: colors.border, backgroundColor: colors.primary + '0D' }]}>

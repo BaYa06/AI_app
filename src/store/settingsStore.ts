@@ -6,6 +6,7 @@ import { immer } from 'zustand/middleware/immer';
 import type { UserSettings, ThemeMode } from '@/types';
 import { colors, ColorScheme } from '@/constants';
 import { StreakService } from '@/services/StreakService';
+import { NeonService } from '@/services/NeonService';
 import { supabase } from '@/services';
 
 interface SettingsState {
@@ -193,6 +194,12 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
               }).catch(() => {});
             });
           }
+
+          // Логируем событие стрика для админ-панели
+          supabase.auth.getSession().then(({ data }) => {
+            const userId = data.session?.user?.id;
+            if (userId) NeonService.logStreakEvent(userId, newCount).catch(() => {});
+          });
 
           return { streakIncreased: true, newStreakCount: newCount };
         } else if (success) {

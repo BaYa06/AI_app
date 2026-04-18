@@ -1151,6 +1151,23 @@ export const NeonService = {
   },
 
   /**
+   * Записать событие получения/продления стрика (для админ-панели)
+   */
+  async logStreakEvent(userId: string, streakDay: number): Promise<void> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) return;
+      const sql = neon(connectionString);
+      await sql`
+        INSERT INTO streak_events (user_id, streak_day)
+        VALUES (${userId}::uuid, ${streakDay})
+      `;
+    } catch (error) {
+      console.warn('logStreakEvent failed:', error);
+    }
+  },
+
+  /**
    * Получить активность за последние N дней
    */
   async getWeekActivity(userId: string, days: number = 7): Promise<{
