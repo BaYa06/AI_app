@@ -187,7 +187,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
           styles.header,
           {
             backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.85)',
-            paddingTop: insets.top + 8,
+            paddingTop: Platform.OS === 'web' ? 12 : insets.top + 8,
           },
         ]}
       >

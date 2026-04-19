@@ -1708,10 +1708,25 @@ export const NeonService = {
           u.id,
           COALESCE(u.display_name, u.user_name, u.email) AS display_name,
           u.email,
-          COALESCE(us.current_streak, 0) AS current_streak,
           cm.joined_at,
           cr.last_active_date,
-          COALESCE(cr.today_cards, 0) AS today_cards
+          COALESCE(cr.today_cards, 0) AS today_cards,
+          GREATEST(
+            COALESCE(us.current_streak, 0),
+            COALESCE((
+              SELECT COUNT(*)::int
+              FROM (
+                SELECT
+                  local_date,
+                  (CURRENT_DATE - local_date)::int
+                    - (ROW_NUMBER() OVER (ORDER BY local_date DESC))::int AS grp
+                FROM daily_activity da2
+                WHERE da2.user_id = cm.user_id
+                  AND da2.local_date >= CURRENT_DATE - 365
+              ) t
+              WHERE grp = 0
+            ), 0)
+          ) AS current_streak
         FROM course_members cm
         JOIN users u ON u.id = cm.user_id
         LEFT JOIN user_stats us ON us.user_id = cm.user_id
@@ -2016,6 +2031,84 @@ export const NeonService = {
     } catch (error) {
       console.error('Failed to leave student course:', error);
       return false;
+    }
+  },
+
+  /**
+   * Загрузить детальную статистику ученика по курсу (для карточки детального просмотра).
+   * Возвращает прогресс по каждому набору и суммарные выученные/не выученные карточки.
+   * "Выученная" карточка — learning_step >= 3 (young / mature).
+   */
+  async loadStudentCourseStats(courseId: string, studentId: string): Promise<{
+    learnedCards: number;
+    unlearnedCards: number;
+    sets: Array<{
+      setId: string;
+      title: string;
+      totalCards: number;
+      learnedCards: number;
+      seenCards: number;
+    }>;
+  }> {
+    const empty = { learnedCards: 0, unlearnedCards: 0, sets: [] };
+    try {
+      await applyClientMigrations();
+      const connectionString = getConnectionString();
+      if (!connectionString) return empty;
+
+      const sql = neon(connectionString);
+
+      const rows = await sql`
+        WITH course_sets AS (
+          SELECT id, title, created_at
+          FROM card_sets
+          WHERE course_id = ${courseId}::uuid
+        ),
+        student_progress AS (
+          SELECT
+            c.set_id,
+            -- cards_seen: любой отзыв в reviews (то же что общая статистика курса)
+            COUNT(DISTINCT r.card_id)                                        AS cards_seen,
+            -- cards_learned: learning_step >= 3 из card_progress
+            COUNT(DISTINCT cp.card_id) FILTER (WHERE cp.learning_step >= 3) AS cards_learned
+          FROM cards c
+          INNER JOIN course_sets cs ON cs.id = c.set_id
+          LEFT JOIN reviews r       ON r.card_id  = c.id AND r.user_id  = ${studentId}::uuid
+          LEFT JOIN card_progress cp ON cp.card_id = c.id AND cp.user_id = ${studentId}::uuid
+          GROUP BY c.set_id
+        )
+        SELECT
+          cs.id   AS set_id,
+          cs.title,
+          (SELECT COUNT(*) FROM cards WHERE set_id = cs.id) AS total_cards,
+          COALESCE(sp.cards_seen,    0) AS cards_seen,
+          COALESCE(sp.cards_learned, 0) AS cards_learned
+        FROM course_sets cs
+        LEFT JOIN student_progress sp ON sp.set_id = cs.id
+        ORDER BY cs.created_at ASC
+      `;
+
+      const sets = rows.map((row: any) => ({
+        setId: row.set_id,
+        title: row.title,
+        totalCards: Number(row.total_cards) || 0,
+        learnedCards: Number(row.cards_learned) || 0,
+        seenCards: Number(row.cards_seen) || 0,
+      }));
+
+      const totalCards   = sets.reduce((s, r) => s + r.totalCards, 0);
+      const seenCards    = sets.reduce((s, r) => s + r.seenCards, 0);
+      const learnedCards = sets.reduce((s, r) => s + r.learnedCards, 0);
+
+      return {
+        seenCards,
+        learnedCards,
+        unlearnedCards: Math.max(0, totalCards - seenCards),
+        sets,
+      };
+    } catch (error) {
+      console.error('Failed to load student course stats:', error);
+      return empty;
     }
   },
 

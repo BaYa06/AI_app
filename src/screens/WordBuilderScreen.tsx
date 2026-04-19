@@ -17,6 +17,8 @@ import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card, Rating } from '@/types';
 import { spacing, borderRadius } from '@/constants';
 import { calculateNextReview } from '@/services/SRSService';
+import { NeonService } from '@/services/NeonService';
+import { supabase } from '@/services/supabaseClient';
 import { speak, detectLanguage } from '@/utils/speech';
 import { playCorrectSound2 as playCorrectSound, preloadSound } from '@/utils/sound';
 
@@ -239,7 +241,6 @@ export function WordBuilderScreen({ navigation, route }: Props) {
         status: result.newStatus,
       });
 
-      // Считаем только правильные ответы (rating >= 3 - "почти" и "уверен")
       if (rating >= 3) {
         incrementTodayCards();
       }
@@ -252,6 +253,24 @@ export function WordBuilderScreen({ navigation, route }: Props) {
         reviewCount: statsSnapshot.reviewCount,
         masteredCount: statsSnapshot.masteredCount,
       });
+
+      if (NeonService.isEnabled()) {
+        (async () => {
+          try {
+            const { data: sd } = await supabase.auth.getSession();
+            const uid = sd?.session?.user?.id;
+            if (uid) {
+              await NeonService.saveReview(uid, card.id, rating, 0);
+              await NeonService.upsertCardProgress(uid, card.id, {
+                status: result.newStatus,
+                learningStep: result.newLearningStep,
+                nextReview: result.nextReviewDate,
+                lastReviewed: Date.now(),
+              });
+            }
+          } catch {}
+        })();
+      }
     },
     [updateCardSRS, updateSetStats, incrementTodayCards],
   );

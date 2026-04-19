@@ -121,8 +121,6 @@ export function TestExamScreen({ navigation, route }: Props) {
       setTimeLeft((t) => {
         if (t <= 1) {
           clearInterval(interval);
-          // Время вышло — отправить пустой ответ
-          handleSelect('');
           return 0;
         }
         return t - 1;
@@ -132,7 +130,14 @@ export function TestExamScreen({ navigation, route }: Props) {
     return () => clearInterval(interval);
   }, [questionIndex, loadingQuestion, submitting, timePerQuestion]);
 
-  const handleSelect = useCallback(async (option: string) => {
+  // Время вышло — автоматически отправить выбранный или пустой ответ
+  useEffect(() => {
+    if (timePerQuestion > 0 && timeLeft === 0 && !submitting && !loadingQuestion) {
+      handleSubmit(selectedOption ?? '');
+    }
+  }, [timeLeft]);
+
+  const handleSubmit = useCallback(async (option: string) => {
     if (submitting || !question) return;
 
     setSelectedOption(option);
@@ -143,7 +148,6 @@ export function TestExamScreen({ navigation, route }: Props) {
     const isLastQuestion = nextIdx >= questionCount;
 
     try {
-      // Запускаем оба запроса параллельно: отправка ответа + загрузка следующего вопроса
       const answerPromise = fetch(`${API_BASE}/test?action=answer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -165,7 +169,6 @@ export function TestExamScreen({ navigation, route }: Props) {
 
       const [json, nextQuestion] = await Promise.all([answerPromise, nextQuestionPromise]);
 
-      // Сохранить результат
       answersRef.current = [
         ...answersRef.current,
         {
@@ -180,7 +183,6 @@ export function TestExamScreen({ navigation, route }: Props) {
       if (json.done || isLastQuestion) {
         finishExam();
       } else {
-        // Следующий вопрос уже загружен — показываем мгновенно
         setQuestion(nextQuestion);
         setQuestionIndex(nextIdx);
         setSelectedOption(null);
@@ -290,7 +292,7 @@ export function TestExamScreen({ navigation, route }: Props) {
                     submitting && !isSelected && { opacity: 0.5 },
                     pressed && !submitting && { opacity: 0.85, transform: [{ scale: 0.99 }] },
                   ]}
-                  onPress={() => handleSelect(option)}
+                  onPress={() => !submitting && setSelectedOption(option)}
                   disabled={submitting}
                 >
                   <View
@@ -328,6 +330,29 @@ export function TestExamScreen({ navigation, route }: Props) {
               );
             })}
           </View>
+
+          {/* Confirm button */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.confirmBtn,
+              {
+                backgroundColor: selectedOption
+                  ? colors.primary
+                  : isDark ? 'rgba(255,255,255,0.08)' : '#E5E7EB',
+                opacity: pressed && selectedOption ? 0.85 : 1,
+              },
+            ]}
+            onPress={() => selectedOption && handleSubmit(selectedOption)}
+            disabled={!selectedOption || submitting}
+          >
+            {submitting ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={[styles.confirmBtnText, { color: selectedOption ? '#FFFFFF' : colors.textSecondary }]}>
+                Подтвердить
+              </Text>
+            )}
+          </Pressable>
         </ScrollView>
       ) : null}
     </View>
@@ -449,5 +474,16 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     lineHeight: 21,
+  },
+  confirmBtn: {
+    marginTop: spacing.s,
+    paddingVertical: 16,
+    borderRadius: borderRadius.l,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

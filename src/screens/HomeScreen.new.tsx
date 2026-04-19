@@ -932,13 +932,15 @@ export function HomeScreen({ navigation }: any) {
                 <Text style={styles.primaryButtonText}>Создать набор</Text>
               </Pressable>
 
-              <Pressable
-                style={[styles.primaryButton, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]}
-                onPress={() => { triggerHaptic('selection'); navigation?.navigate('ImportFiles'); }}
-              >
-                <Upload size={20} color={colors.primary} />
-                <Text style={[styles.primaryButtonText, { color: colors.primary }]}>Из файлов (AI)</Text>
-              </Pressable>
+              {Platform.OS !== 'web' && (
+                <Pressable
+                  style={[styles.primaryButton, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]}
+                  onPress={() => { triggerHaptic('selection'); navigation?.navigate('ImportFiles'); }}
+                >
+                  <Upload size={20} color={colors.primary} />
+                  <Text style={[styles.primaryButtonText, { color: colors.primary }]}>Из файлов (AI)</Text>
+                </Pressable>
+              )}
 
               <View style={[styles.tipCard, { borderColor: colors.border, backgroundColor: colors.primary + '0D' }]}>
                 <Lightbulb size={18} color={colors.primary} />

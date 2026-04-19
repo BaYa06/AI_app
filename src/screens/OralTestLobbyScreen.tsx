@@ -59,7 +59,7 @@ export function OralTestLobbyScreen({ navigation, route }: Props) {
           {
             backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.85)',
             borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
-            paddingTop: insets.top + 8,
+            paddingTop: Platform.OS === 'web' ? 12 : insets.top + 8,
           },
         ]}
       >

@@ -174,7 +174,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={{ height: insets.top }} />
+      <View style={{ height: Platform.OS === 'web' ? 12 : insets.top }} />
       {/* Header */}
       <View
         style={[

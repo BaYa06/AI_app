@@ -111,6 +111,16 @@ export type RootStackParamList = {
   Search: undefined;
   TeacherCourseStats: { courseId: string; courseTitle: string };
   TeacherStudents: { courseId: string; courseTitle: string };
+  StudentDetail: {
+    courseId: string;
+    courseTitle: string;
+    studentId: string;
+    studentName: string;
+    studentInitials: string;
+    streak: number;
+    todayCards: number;
+    lastActivity: string;
+  };
   ExamLobby: { courseId: string; courseTitle: string };
   TestHistory: { courseId: string; courseTitle: string };
   OralTestLobby: { courseId: string; courseTitle: string };

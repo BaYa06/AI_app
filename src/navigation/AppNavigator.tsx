@@ -35,6 +35,7 @@ import { SecurityScreen } from '@/screens/SecurityScreen';
 import { SubscriptionScreen } from '@/screens/SubscriptionScreen';
 import { TeacherCourseStatsScreen } from '@/screens/TeacherCourseStatsScreen';
 import { TeacherStudentsScreen } from '@/screens/TeacherStudentsScreen';
+import { StudentDetailScreen } from '@/screens/StudentDetailScreen';
 import { ExamLobbyScreen } from '@/screens/ExamLobbyScreen';
 import { TestHistoryScreen } from '@/screens/TestHistoryScreen';
 import { OralTestLobbyScreen } from '@/screens/OralTestLobbyScreen';
@@ -327,6 +328,11 @@ export function AppNavigator() {
         <Stack.Screen
           name="TeacherStudents"
           component={TeacherStudentsScreen}
+          options={{ headerShown: false, gestureEnabled: true }}
+        />
+        <Stack.Screen
+          name="StudentDetail"
+          component={StudentDetailScreen}
           options={{ headerShown: false, gestureEnabled: true }}
         />
         <Stack.Screen

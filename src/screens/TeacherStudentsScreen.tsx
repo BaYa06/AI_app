@@ -116,12 +116,13 @@ function StudentRow({ student, colors, isDark, onPress, onRemove }: {
     : colors.primary;
 
   return (
-    <View
-      style={[
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
         styles.row,
         {
           borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : '#F3F4F6',
-          opacity: isInactive ? 0.7 : 1,
+          opacity: pressed ? 0.7 : isInactive ? 0.7 : 1,
         },
       ]}
     >
@@ -184,7 +185,7 @@ function StudentRow({ student, colors, isDark, onPress, onRemove }: {
       >
         <Trash2 size={16} color="#EF4444" />
       </TouchableOpacity>
-    </View>
+    </Pressable>
   );
 }
 
@@ -356,7 +357,7 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
         style={[
           styles.header,
           {
-            paddingTop: insets.top + 8,
+            paddingTop: Platform.OS === 'web' ? 12 : insets.top + 8,
             backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.92)',
             borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
             ...Platform.select({ web: { backdropFilter: 'blur(12px)' } }) as any,
@@ -472,7 +473,18 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
               student={item}
               colors={colors}
               isDark={isDark}
-              onPress={() => {}}
+              onPress={() =>
+                navigation.navigate('StudentDetail', {
+                  courseId: route.params.courseId,
+                  courseTitle: route.params.courseTitle,
+                  studentId: item.id,
+                  studentName: item.name,
+                  studentInitials: item.initials,
+                  streak: item.streak,
+                  todayCards: item.todayCards,
+                  lastActivity: item.lastActivity,
+                })
+              }
               onRemove={() => handleRemoveStudent(item)}
             />
           )}
