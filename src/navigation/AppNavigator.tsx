@@ -2,12 +2,13 @@
  * App Navigator
  * @description Главный навигатор приложения
  */
-import React, { useEffect } from 'react';
-import { Platform } from 'react-native';
+import React, { useCallback, useEffect, useRef } from 'react';
+import { Animated, Platform } from 'react-native';
 import { triggerHaptic } from '@/utils/haptic';
 import { NavigationContainer, useNavigationContainerRef, type LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useFocusEffect } from '@react-navigation/native';
 import { useThemeColors } from '@/store';
 import type { RootStackParamList, MainTabParamList } from '@/types/navigation';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -35,12 +36,42 @@ function BounceIcon({ name, color, focused }: { name: string; color: string; foc
 
   const animStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
-  }), [scale]);
+  }));
 
   return (
     <ReAnimated.View style={animStyle}>
       <Ionicons name={name} size={31} color={color} />
     </ReAnimated.View>
+  );
+}
+
+function FadeScreen({ children }: { children: React.ReactNode }) {
+  const colors = useThemeColors();
+  const opacity = useRef(new Animated.Value(0.4)).current;
+  const translateY = useRef(new Animated.Value(6)).current;
+
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS === 'web') return;
+      Animated.parallel([
+        Animated.timing(opacity, { toValue: 1, duration: 220, useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: 0, duration: 220, useNativeDriver: true }),
+      ]).start();
+      return () => {
+        opacity.setValue(0.4);
+        translateY.setValue(6);
+      };
+    }, [])
+  );
+
+  if (Platform.OS === 'web') {
+    return <>{children}</>;
+  }
+
+  return (
+    <Animated.View style={{ flex: 1, backgroundColor: colors.background, opacity, transform: [{ translateY }] }}>
+      {children}
+    </Animated.View>
   );
 }
 
@@ -135,34 +166,39 @@ function MainTabs() {
     >
       <Tab.Screen
         name="Home"
-        component={HomeScreen}
         options={{ tabBarIcon: ({ color, focused }) => <BounceIcon name="home" color={color} focused={focused} /> }}
         listeners={{ tabPress: () => triggerHaptic('selection') }}
-      />
+      >
+        {(props) => <FadeScreen><HomeScreen {...props} /></FadeScreen>}
+      </Tab.Screen>
       <Tab.Screen
         name="Library"
-        component={LibraryScreen}
         options={{ tabBarIcon: ({ color, focused }) => <BounceIcon name="albums" color={color} focused={focused} /> }}
         listeners={{ tabPress: () => triggerHaptic('selection') }}
-      />
+      >
+        {(props) => <FadeScreen><LibraryScreen {...props} /></FadeScreen>}
+      </Tab.Screen>
       <Tab.Screen
         name="Study"
-        component={StudyPlaceholderScreen}
         options={{ tabBarIcon: ({ color, focused }) => <BounceIcon name="school" color={color} focused={focused} /> }}
         listeners={{ tabPress: () => triggerHaptic('selection') }}
-      />
+      >
+        {(props) => <FadeScreen><StudyPlaceholderScreen {...props} /></FadeScreen>}
+      </Tab.Screen>
       <Tab.Screen
         name="Statistics"
-        component={StatisticsScreen}
         options={{ tabBarIcon: ({ color, focused }) => <BounceIcon name="stats-chart" color={color} focused={focused} /> }}
         listeners={{ tabPress: () => triggerHaptic('selection') }}
-      />
+      >
+        {(props) => <FadeScreen><StatisticsScreen {...props} /></FadeScreen>}
+      </Tab.Screen>
       <Tab.Screen
         name="Profile"
-        component={ProfileScreen}
         options={{ tabBarIcon: ({ color, focused }) => <BounceIcon name="person" color={color} focused={focused} /> }}
         listeners={{ tabPress: () => triggerHaptic('selection') }}
-      />
+      >
+        {(props) => <FadeScreen><ProfileScreen {...props} /></FadeScreen>}
+      </Tab.Screen>
     </Tab.Navigator>
   );
 }

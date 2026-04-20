@@ -43,6 +43,7 @@ export type RootStackParamList = {
     studiedInPhase?: number;
     phaseOffset?: number;
     phaseFailedIds?: string[];
+    onlyHard?: boolean;
     // Streak celebration
     streakIncreased?: boolean;
     newStreakCount?: number;

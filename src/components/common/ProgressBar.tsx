@@ -60,7 +60,7 @@ export const ProgressBar = memo<ProgressBarProps>(function ProgressBar({
         { scaleX: scaleX.value },
       ],
     };
-  }, [containerW, scaleX]);
+  });
 
   if (Platform.OS === 'web') {
     const clampedProgress = Math.min(100, Math.max(0, progress));

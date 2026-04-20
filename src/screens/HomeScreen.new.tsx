@@ -11,7 +11,7 @@ import { useSetsStore, useSettingsStore, useThemeColors, useCardsStore, useCours
 import { selectSetStats } from '@/store/cardsStore';
 import { Text, DiamondReward } from '@/components/common';
 import type { DiamondRewardRef } from '@/components/common';
-import ReanimatedAnimated, { useSharedValue as useReanimatedShared, withTiming as reanimatedWithTiming, withSequence as reanimatedWithSequence, useAnimatedStyle as useReanimatedStyle, Easing as ReanimatedEasing, withDelay } from 'react-native-reanimated';
+import ReanimatedAnimated, { useSharedValue, withTiming, withSequence, useAnimatedStyle, Easing, withDelay } from 'react-native-reanimated';
 import { spacing, borderRadius, getDeckAccentColor } from '@/constants';
 import { triggerHaptic } from '@/utils/haptic';
 import {
@@ -64,19 +64,19 @@ const StaggerCard = React.memo(function StaggerCard({
   index: number;
   children: React.ReactNode;
 }) {
-  const opacity = useReanimatedShared(0);
-  const translateY = useReanimatedShared(14);
+  const opacity = useSharedValue(0);
+  const translateY = useSharedValue(14);
 
   useEffect(() => {
     const delay = Math.min(index, 7) * 70;
-    opacity.value = withDelay(delay, reanimatedWithTiming(1, { duration: 300 }));
-    translateY.value = withDelay(delay, reanimatedWithTiming(0, { duration: 300 }));
+    opacity.value = withDelay(delay, withTiming(1, { duration: 300 }));
+    translateY.value = withDelay(delay, withTiming(0, { duration: 300 }));
   }, []);
 
-  const animStyle = useReanimatedStyle(() => ({
+  const animStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
     transform: [{ translateY: translateY.value }],
-  }), [opacity, translateY]);
+  }));
 
   return <ReanimatedAnimated.View style={animStyle}>{children}</ReanimatedAnimated.View>;
 });
@@ -138,13 +138,13 @@ export function HomeScreen({ navigation }: any) {
   const addDiamonds = useDiamondStore((s) => s.addDiamonds);
   const quickRoundStatus = useChallengeStore((s) => s.quickRoundStatus);
   const claimQuickRound = useChallengeStore((s) => s.claimQuickRound);
-  const diamondCountScale = useReanimatedShared(1);
-  const diamondCountAnimStyle = useReanimatedStyle(() => {
+  const diamondCountScale = useSharedValue(1);
+  const diamondCountAnimStyle = useAnimatedStyle(() => {
     'worklet';
     return {
       transform: [{ scale: diamondCountScale.value }],
     };
-  }, [diamondCountScale]);
+  });
 
   const handleQuickRound = useCallback(() => {
     triggerHaptic('selection');
@@ -266,9 +266,9 @@ export function HomeScreen({ navigation }: any) {
 
   const handleDiamondRewardComplete = useCallback(() => {
     addDiamonds(10);
-    diamondCountScale.value = reanimatedWithSequence(
-      reanimatedWithTiming(1.3, { duration: 150, easing: ReanimatedEasing.out(ReanimatedEasing.back(2)) }),
-      reanimatedWithTiming(1, { duration: 150, easing: ReanimatedEasing.inOut(ReanimatedEasing.quad) }),
+    diamondCountScale.value = withSequence(
+      withTiming(1.3, { duration: 150, easing: Easing.out(Easing.back(2)) }),
+      withTiming(1, { duration: 150, easing: Easing.inOut(Easing.quad) }),
     );
   }, []);
 

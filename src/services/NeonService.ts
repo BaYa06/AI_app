@@ -704,39 +704,39 @@ export const NeonService = {
 
       const sql = neon(connectionString);
 
-      const values = cards.map((card) => sql`
-        (${card.id},
-         ${card.setId},
-         ${card.frontText},
-         ${card.backText},
-         ${card.example || null},
-         ${card.wordType || null},
-         ${card.frontImage || null},
-         ${card.frontAudio || null},
-         ${new Date(card.createdAt).toISOString()},
-         ${new Date(card.nextReviewDate).toISOString()},
-         ${card.lastReviewDate ? new Date(card.lastReviewDate).toISOString() : null},
-         ${card.status})
-      `);
-
-      await sql`
-        INSERT INTO cards (
-          id,
-          set_id,
-          front,
-          back,
-          example,
-          word_type,
-          image_url,
-          audio_url,
-          created_at,
-          next_review,
-          last_reviewed,
-          status
-        )
-        VALUES ${sql.join(values, sql`, `)}
-        ON CONFLICT (id) DO NOTHING
-      `;
+      for (const card of cards) {
+        await sql`
+          INSERT INTO cards (
+            id,
+            set_id,
+            front,
+            back,
+            example,
+            word_type,
+            image_url,
+            audio_url,
+            created_at,
+            next_review,
+            last_reviewed,
+            status
+          )
+          VALUES (
+            ${card.id},
+            ${card.setId},
+            ${card.frontText},
+            ${card.backText},
+            ${card.example || null},
+            ${card.wordType || null},
+            ${card.frontImage || null},
+            ${card.frontAudio || null},
+            ${new Date(card.createdAt).toISOString()},
+            ${new Date(card.nextReviewDate).toISOString()},
+            ${card.lastReviewDate ? new Date(card.lastReviewDate).toISOString() : null},
+            ${card.status}
+          )
+          ON CONFLICT (id) DO NOTHING
+        `;
+      }
 
       // Обновляем total_cards по каждому набору
       const countsBySet: Record<string, number> = {};

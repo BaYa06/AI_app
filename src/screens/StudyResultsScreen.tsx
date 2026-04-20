@@ -29,6 +29,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
     studiedInPhase = 0,
     phaseOffset = 0,
     phaseFailedIds = [],
+    onlyHard,
     streakIncreased,
     newStreakCount,
   } = route.params;
@@ -161,7 +162,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
       setId,
       mode: 'classic',
       studyAll: true,
-      onlyHard: true,
+      onlyHard,
       cardLimit,
       dueCardIds,
       phaseId,
@@ -193,7 +194,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   };
 
   const handleReviewWords = () => {
-    navigation.push('Study', { setId, mode: 'classic' });
+    navigation.push('Study', { setId, mode: 'classic', studyAll: true });
   };
 
   return (
