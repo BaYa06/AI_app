@@ -11,6 +11,38 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useThemeColors } from '@/store';
 import type { RootStackParamList, MainTabParamList } from '@/types/navigation';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import ReAnimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
+
+function BounceIcon({ name, color, focused }: { name: string; color: string; focused: boolean }) {
+  const scale = useSharedValue(1);
+  const prevFocused = React.useRef(false);
+
+  useEffect(() => {
+    if (focused && !prevFocused.current) {
+      scale.value = withSequence(
+        withTiming(1.35, { duration: 140 }),
+        withTiming(0.88, { duration: 105 }),
+        withTiming(1.0, { duration: 105 }),
+      );
+    }
+    prevFocused.current = focused;
+  }, [focused]);
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }), [scale]);
+
+  return (
+    <ReAnimated.View style={animStyle}>
+      <Ionicons name={name} size={31} color={color} />
+    </ReAnimated.View>
+  );
+}
 
 // Экраны
 import { HomeScreen } from '@/screens/HomeScreen.new';
@@ -104,31 +136,31 @@ function MainTabs() {
       <Tab.Screen
         name="Home"
         component={HomeScreen}
-        options={{ tabBarIcon: ({ color }) => <Ionicons name="home" size={31} color={color} /> }}
+        options={{ tabBarIcon: ({ color, focused }) => <BounceIcon name="home" color={color} focused={focused} /> }}
         listeners={{ tabPress: () => triggerHaptic('selection') }}
       />
       <Tab.Screen
         name="Library"
         component={LibraryScreen}
-        options={{ tabBarIcon: ({ color }) => <Ionicons name="albums" size={31} color={color} /> }}
+        options={{ tabBarIcon: ({ color, focused }) => <BounceIcon name="albums" color={color} focused={focused} /> }}
         listeners={{ tabPress: () => triggerHaptic('selection') }}
       />
       <Tab.Screen
         name="Study"
         component={StudyPlaceholderScreen}
-        options={{ tabBarIcon: ({ color }) => <Ionicons name="school" size={31} color={color} /> }}
+        options={{ tabBarIcon: ({ color, focused }) => <BounceIcon name="school" color={color} focused={focused} /> }}
         listeners={{ tabPress: () => triggerHaptic('selection') }}
       />
       <Tab.Screen
         name="Statistics"
         component={StatisticsScreen}
-        options={{ tabBarIcon: ({ color }) => <Ionicons name="stats-chart" size={31} color={color} /> }}
+        options={{ tabBarIcon: ({ color, focused }) => <BounceIcon name="stats-chart" color={color} focused={focused} /> }}
         listeners={{ tabPress: () => triggerHaptic('selection') }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
-        options={{ tabBarIcon: ({ color }) => <Ionicons name="person" size={31} color={color} /> }}
+        options={{ tabBarIcon: ({ color, focused }) => <BounceIcon name="person" color={color} focused={focused} /> }}
         listeners={{ tabPress: () => triggerHaptic('selection') }}
       />
     </Tab.Navigator>
@@ -225,6 +257,7 @@ export function AppNavigator() {
             backgroundColor: colors.background,
           },
           animation: Platform.OS === 'android' ? 'fade' : 'slide_from_right',
+          animationDuration: 280,
           gestureEnabled: Platform.OS === 'ios',
         }}
       >

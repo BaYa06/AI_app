@@ -11,7 +11,7 @@ import { useSetsStore, useSettingsStore, useThemeColors, useCardsStore, useCours
 import { selectSetStats } from '@/store/cardsStore';
 import { Text, DiamondReward } from '@/components/common';
 import type { DiamondRewardRef } from '@/components/common';
-import ReanimatedAnimated, { useSharedValue as useReanimatedShared, withTiming as reanimatedWithTiming, withSequence as reanimatedWithSequence, useAnimatedStyle as useReanimatedStyle, Easing as ReanimatedEasing } from 'react-native-reanimated';
+import ReanimatedAnimated, { useSharedValue as useReanimatedShared, withTiming as reanimatedWithTiming, withSequence as reanimatedWithSequence, useAnimatedStyle as useReanimatedStyle, Easing as ReanimatedEasing, withDelay } from 'react-native-reanimated';
 import { spacing, borderRadius, getDeckAccentColor } from '@/constants';
 import { triggerHaptic } from '@/utils/haptic';
 import {
@@ -56,6 +56,30 @@ import { DatabaseService } from '@/services/DatabaseService';
 import { JoinByCodeModal } from '@/components/JoinByCodeModal';
 import type { DailyActivity } from '@/services/StreakService';
 import type { CardSet } from '@/types';
+
+const StaggerCard = React.memo(function StaggerCard({
+  index,
+  children,
+}: {
+  index: number;
+  children: React.ReactNode;
+}) {
+  const opacity = useReanimatedShared(0);
+  const translateY = useReanimatedShared(14);
+
+  useEffect(() => {
+    const delay = Math.min(index, 7) * 70;
+    opacity.value = withDelay(delay, reanimatedWithTiming(1, { duration: 300 }));
+    translateY.value = withDelay(delay, reanimatedWithTiming(0, { duration: 300 }));
+  }, []);
+
+  const animStyle = useReanimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }],
+  }), [opacity, translateY]);
+
+  return <ReanimatedAnimated.View style={animStyle}>{children}</ReanimatedAnimated.View>;
+});
 
 export function HomeScreen({ navigation }: any) {
   const colors = useThemeColors();
@@ -120,7 +144,7 @@ export function HomeScreen({ navigation }: any) {
     return {
       transform: [{ scale: diamondCountScale.value }],
     };
-  });
+  }, [diamondCountScale]);
 
   const handleQuickRound = useCallback(() => {
     triggerHaptic('selection');
@@ -848,14 +872,6 @@ export function HomeScreen({ navigation }: any) {
           >
             <Search size={20} color={colors.textPrimary} />
           </Pressable>
-          {Platform.OS !== 'web' && (
-            <Pressable
-              style={styles.iconButton}
-              onPress={() => { triggerHaptic('selection'); navigation?.navigate('ImportFiles'); }}
-            >
-              <Upload size={20} color={colors.textPrimary} />
-            </Pressable>
-          )}
           <Pressable
             style={styles.addButton}
             onPress={() => { triggerHaptic('selection'); navigation?.navigate('SetEditor', {}); }}
@@ -932,15 +948,6 @@ export function HomeScreen({ navigation }: any) {
                 <Text style={styles.primaryButtonText}>Создать набор</Text>
               </Pressable>
 
-              {Platform.OS !== 'web' && (
-                <Pressable
-                  style={[styles.primaryButton, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]}
-                  onPress={() => { triggerHaptic('selection'); navigation?.navigate('ImportFiles'); }}
-                >
-                  <Upload size={20} color={colors.primary} />
-                  <Text style={[styles.primaryButtonText, { color: colors.primary }]}>Из файлов (AI)</Text>
-                </Pressable>
-              )}
 
               <View style={[styles.tipCard, { borderColor: colors.border, backgroundColor: colors.primary + '0D' }]}>
                 <Lightbulb size={18} color={colors.primary} />
@@ -1145,8 +1152,8 @@ export function HomeScreen({ navigation }: any) {
               const dateDisplay = getDateDisplay();
 
               return (
+                <StaggerCard key={set.id} index={index}>
                 <Pressable
-                  key={set.id}
                   style={[
                     styles.setCard,
                     { backgroundColor: colors.surface, borderColor: colors.border },
@@ -1224,6 +1231,7 @@ export function HomeScreen({ navigation }: any) {
                     </View>
                   </View>
                 </Pressable>
+                </StaggerCard>
               );
             })}
           </View>

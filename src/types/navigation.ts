@@ -189,10 +189,11 @@ export type RootStackParamList = {
     setId: string;
     cardLimit?: number;
   };
-  ImportFiles: undefined;
+  ImportFiles: { setId: string };
   PreviewImport: {
     cards: Array<{ front: string; back: string }>;
     suggestedTitle?: string;
+    setId: string;
   };
 };
 

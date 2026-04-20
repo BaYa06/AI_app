@@ -3,7 +3,7 @@
  * @description Экран детали набора карточек
  */
 import React, { useCallback, useMemo, useState, useRef, useEffect } from 'react';
-import { View, FlatList, StyleSheet, Pressable, TextInput, ScrollView, ActivityIndicator, Platform, Alert, KeyboardAvoidingView, Modal, Dimensions } from 'react-native';
+import { View, FlatList, StyleSheet, Pressable, TextInput, ScrollView, ActivityIndicator, Platform, Alert, KeyboardAvoidingView, Modal, Dimensions, Animated } from 'react-native';
 import { triggerHaptic } from '@/utils/haptic';
 import { BlurView } from '@/utils/BlurView';
 import DocumentPicker from 'react-native-document-picker';
@@ -92,6 +92,8 @@ export function SetDetailScreen({ navigation, route }: Props) {
   const [importSource, setImportSource] = useState<'file' | 'image'>('file');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const studySheetTranslate = useRef(new Animated.Value(700)).current;
+  const studyBackdropOpacity = useRef(new Animated.Value(0)).current;
 
   // Publish states
   const [isPublished, setIsPublished] = useState(false);
@@ -177,6 +179,25 @@ export function SetDetailScreen({ navigation, route }: Props) {
       : cards.map(c => c.id);
     return [...dueCards].sort(() => Math.random() - 0.5);
   }, [onlyHard, cards]);
+
+  const openStudySheet = useCallback(() => {
+    studySheetTranslate.setValue(700);
+    studyBackdropOpacity.setValue(0);
+    setShowStudySheet(true);
+    requestAnimationFrame(() => {
+      Animated.parallel([
+        Animated.timing(studySheetTranslate, { toValue: 0, duration: 340, useNativeDriver: true }),
+        Animated.timing(studyBackdropOpacity, { toValue: 1, duration: 280, useNativeDriver: true }),
+      ]).start();
+    });
+  }, [studySheetTranslate, studyBackdropOpacity]);
+
+  const closeStudySheet = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(studySheetTranslate, { toValue: 700, duration: 280, useNativeDriver: true }),
+      Animated.timing(studyBackdropOpacity, { toValue: 0, duration: 220, useNativeDriver: true }),
+    ]).start(() => setShowStudySheet(false));
+  }, [studySheetTranslate, studyBackdropOpacity]);
 
   const handleStartStudy = useCallback(() => {
     // "Учить всё" — запускаем тренировку по выбранному количеству карточек
@@ -955,16 +976,30 @@ export function SetDetailScreen({ navigation, route }: Props) {
             Карточки ({filteredCards.length})
           </Text>
           {!isReadOnly && (
-            <Pressable onPress={openAddCardSheet} hitSlop={8}>
-              <Text variant="bodySmall" style={{ color: colors.primary, fontWeight: '700' }}>
-                + Добавить
-              </Text>
-            </Pressable>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.m }}>
+              {Platform.OS !== 'web' && (
+                <Pressable
+                  onPress={() => { triggerHaptic('selection'); navigation.navigate('ImportFiles', { setId }); }}
+                  hitSlop={8}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                >
+                  <Upload size={14} color={colors.primary} />
+                  <Text variant="bodySmall" style={{ color: colors.primary, fontWeight: '700' }}>
+                    AI
+                  </Text>
+                </Pressable>
+              )}
+              <Pressable onPress={openAddCardSheet} hitSlop={8}>
+                <Text variant="bodySmall" style={{ color: colors.primary, fontWeight: '700' }}>
+                  + Добавить
+                </Text>
+              </Pressable>
+            </View>
           )}
         </View>
       </View>
     ),
-    [set, stats, colors, filteredCards.length, navigation, openAddCardSheet, handleSetMenu, filter, search]
+    [set, stats, colors, filteredCards.length, navigation, openAddCardSheet, handleSetMenu, filter, search, setId]
   );
 
   // Пустой список
@@ -1029,7 +1064,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
           </Text>
         </Pressable>
         <Pressable
-          onPress={() => { triggerHaptic('selection'); setShowStudySheet(true); }}
+          onPress={() => { triggerHaptic('selection'); openStudySheet(); }}
           style={[styles.primaryAction, { backgroundColor: colors.primary }]}
         >
           <Text variant="body" style={{ color: colors.textInverse, fontWeight: '700' }}>
@@ -1220,18 +1255,27 @@ export function SetDetailScreen({ navigation, route }: Props) {
         </KeyboardAvoidingView>
       )}
 
-      {showStudySheet && (
-        <View style={[styles.sheetWrapper, { zIndex: 35 }]} pointerEvents="box-none">
-          <Pressable
-            style={[styles.sheetBackdrop, { backgroundColor: backdropColor }]}
-            onPress={() => setShowStudySheet(false)}
-          />
-          <View
+      <Modal
+        visible={showStudySheet}
+        transparent
+        animationType="none"
+        statusBarTranslucent
+        onRequestClose={closeStudySheet}
+      >
+        <View style={styles.sheetWrapper} pointerEvents="box-none">
+          <Pressable style={styles.sheetBackdrop} onPress={closeStudySheet}>
+            <Animated.View
+              pointerEvents="none"
+              style={[StyleSheet.absoluteFillObject, { opacity: studyBackdropOpacity, backgroundColor: backdropColor }]}
+            />
+          </Pressable>
+          <Animated.View
             style={[
               styles.studySheet,
               {
                 backgroundColor: modalSurface,
                 borderColor: modalBorder,
+                transform: [{ translateY: studySheetTranslate }],
               },
             ]}
           >
@@ -1244,7 +1288,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                 <Text variant="h3" style={{ color: modalTextPrimary }}>
                   Выбор режима
                 </Text>
-                <Pressable onPress={() => setShowStudySheet(false)} hitSlop={8}>
+                <Pressable onPress={closeStudySheet} hitSlop={8}>
                   <Text variant="body" style={{ color: modalTextSecondary, fontWeight: '600' }}>
                     Отмена
                   </Text>
@@ -1417,9 +1461,9 @@ export function SetDetailScreen({ navigation, route }: Props) {
                 </View>
               </View>
             </ScrollView>
-          </View>
+          </Animated.View>
         </View>
-      )}
+      </Modal>
 
       {showImportModal && (
         <View style={[styles.importOverlay, { backgroundColor: backdropColor }]} pointerEvents="box-none">

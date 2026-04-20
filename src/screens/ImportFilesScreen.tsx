@@ -118,7 +118,8 @@ function FileChip({
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
-export function ImportFilesScreen({ navigation }: Props) {
+export function ImportFilesScreen({ navigation, route }: Props) {
+  const { setId } = route.params;
   const colors = useThemeColors();
   const [files, setFiles] = useState<AttachedFile[]>([]);
   const [prompt, setPrompt] = useState('');
@@ -334,6 +335,7 @@ export function ImportFilesScreen({ navigation }: Props) {
       navigation.navigate('PreviewImport', {
         cards: data2.cards,
         suggestedTitle: data2.suggestedTitle,
+        setId,
       });
     } catch (e: any) {
       Alert.alert('Ошибка', e.message || 'Не удалось создать карточки');

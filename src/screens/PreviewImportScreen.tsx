@@ -139,7 +139,7 @@ function CardRow({
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export function PreviewImportScreen({ navigation, route }: Props) {
-  const { cards, suggestedTitle = '' } = route.params;
+  const { cards, suggestedTitle = '', setId } = route.params;
   const colors = useThemeColors();
 
   const addSet = useSetsStore(s => s.addSet);
@@ -149,30 +149,31 @@ export function PreviewImportScreen({ navigation, route }: Props) {
   const [modalVisible, setModalVisible] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // ── save ──────────────────────────────────────────────────────────────────
+  // ── save to existing set ──────────────────────────────────────────────────
+
+  const handleSaveToExisting = useCallback(async () => {
+    setSaving(true);
+    try {
+      addCards(cards.map(c => ({ setId, frontText: c.front, backText: c.back })));
+      updateSetStats(setId, { cardCount: cards.length, newCount: cards.length });
+      navigation.replace('SetDetail', { setId });
+    } catch (e: any) {
+      Alert.alert('Ошибка', e.message || 'Не удалось сохранить карточки');
+    } finally {
+      setSaving(false);
+    }
+  }, [cards, setId, addCards, updateSetStats, navigation]);
+
+  // ── save as new set ───────────────────────────────────────────────────────
 
   const handleSaveConfirm = useCallback(async (title: string) => {
     const trimmed = title.trim() || 'Импорт';
     setSaving(true);
     try {
       const newSet = await addSet({ title: trimmed });
-
-      addCards(
-        cards.map(c => ({
-          setId: newSet.id,
-          frontText: c.front,
-          backText: c.back,
-        })),
-      );
-
-      updateSetStats(newSet.id, {
-        cardCount: cards.length,
-        newCount: cards.length,
-      });
-
+      addCards(cards.map(c => ({ setId: newSet.id, frontText: c.front, backText: c.back })));
+      updateSetStats(newSet.id, { cardCount: cards.length, newCount: cards.length });
       setModalVisible(false);
-
-      // Переходим на набор — пользователь сразу видит результат
       navigation.replace('SetDetail', { setId: newSet.id });
     } catch (e: any) {
       Alert.alert('Ошибка', e.message || 'Не удалось сохранить набор');
@@ -234,25 +235,32 @@ export function PreviewImportScreen({ navigation, route }: Props) {
           style={{ flex: 1 }}
         />
         <TouchableOpacity
-          onPress={() => setModalVisible(true)}
-          style={[styles.saveBtn, { backgroundColor: colors.primary }]}
+          onPress={setId ? handleSaveToExisting : () => setModalVisible(true)}
+          disabled={saving}
+          style={[styles.saveBtn, { backgroundColor: saving ? colors.border : colors.primary }]}
           activeOpacity={0.85}
         >
-          <Text variant="body" style={{ color: '#fff', fontWeight: '600' }}>
-            Сохранить набор
-          </Text>
+          {saving ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text variant="body" style={{ color: '#fff', fontWeight: '600' }}>
+              {setId ? 'Добавить в набор' : 'Сохранить набор'}
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
 
-      {/* Modal */}
-      <SaveModal
-        visible={modalVisible}
-        defaultTitle={suggestedTitle}
-        saving={saving}
-        colors={colors}
-        onConfirm={handleSaveConfirm}
-        onCancel={() => !saving && setModalVisible(false)}
-      />
+      {/* Modal — only for new set flow */}
+      {!setId && (
+        <SaveModal
+          visible={modalVisible}
+          defaultTitle={suggestedTitle}
+          saving={saving}
+          colors={colors}
+          onConfirm={handleSaveConfirm}
+          onCancel={() => !saving && setModalVisible(false)}
+        />
+      )}
     </SafeAreaView>
   );
 }

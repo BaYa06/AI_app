@@ -616,6 +616,24 @@ export function StudyScreen({ navigation, route }: Props) {
 
       {/* Основной контент */}
       <View style={styles.mainContent}>
+        {/* Card stack wrapper */}
+        <View style={styles.stackWrapper}>
+          {/* Карточка +2 (самая дальняя) */}
+          <View
+            style={[
+              styles.stackCard,
+              styles.stackCardFar,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          />
+          {/* Карточка +1 */}
+          <View
+            style={[
+              styles.stackCard,
+              styles.stackCardNear,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          />
         {/* Флеш-карточка */}
         <Pressable
           onPress={handleToggleCard}
@@ -710,6 +728,7 @@ export function StudyScreen({ navigation, route }: Props) {
             </View>
           </ReAnimated.View>
         </Pressable>
+        </View>{/* end stackWrapper */}
       </View>
 
       <Modal
@@ -847,11 +866,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
 
+  // Card stack
+  stackWrapper: {
+    width: CARD_WIDTH,
+    height: Math.min(CARD_HEIGHT, 420),
+    position: 'relative',
+  },
+  stackCard: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    borderRadius: 24,
+    borderWidth: 1,
+  },
+  stackCardFar: {
+    transform: [{ translateY: 10 }, { scale: 0.92 }],
+    opacity: 0.40,
+  },
+  stackCardNear: {
+    transform: [{ translateY: 5 }, { scale: 0.96 }],
+    opacity: 0.65,
+  },
+
   // Card
   cardWrapper: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
-    maxHeight: 420,
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    zIndex: 2,
   },
   cardAnim: {
     position: 'absolute',
