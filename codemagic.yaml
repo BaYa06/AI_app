@@ -29,6 +29,7 @@ workflows:
           xcode-project use-profiles \
             --project ios/FlashcardsApp.xcodeproj \
             --archive-method app-store \
+            --code-signing-setup-verbose-logging \
             --warn-only
       - name: Build IPA
         script: |
