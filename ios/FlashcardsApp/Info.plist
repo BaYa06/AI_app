@@ -52,10 +52,12 @@
 			</dict>
 		</dict>
 	</dict>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<key>NSCameraUsageDescription</key>
+	<string>Flashly needs camera access to let you take photos for your flashcards</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Flashly needs microphone access for audio learning mode</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Flashly needs access to your photo library to let you pick images for your flashcards</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Flashly uses speech recognition to check your pronunciation</string>
 	<key>UIAppFonts</key>
