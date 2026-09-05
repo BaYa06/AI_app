@@ -26,7 +26,7 @@ workflows:
             --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
             --create
           keychain add-certificates
-          xcode-project use-profiles
+          xcode-project use-profiles --warn-only
       - name: Build IPA
         script: |
           xcode-project build-ipa \
