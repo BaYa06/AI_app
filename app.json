@@ -1,4 +1,24 @@
 {
-  "name": "FlashcardsApp",
-  "displayName": "Flashly"
+  "expo": {
+    "name": "FlashcardsApp",
+    "slug": "flashcardsapp",
+    "displayName": "Flashly: Flashcards",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "ios": {
+      "bundleIdentifier": "com.baiirbek.flashly",
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.baiirbek.flashly"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "49044af0-78f4-4f5f-8fd8-a5e22bda9305"
+      }
+    }
+  }
 }

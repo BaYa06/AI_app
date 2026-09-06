@@ -504,6 +504,7 @@ export function HomeScreen({ navigation }: any) {
       paddingBottom: safeBottomPad,
       paddingTop: 6,
       height: TAB_BAR_HEIGHT,
+      marginBottom: 20,
     }),
     [colors, safeBottomPad, TAB_BAR_HEIGHT]
   );
