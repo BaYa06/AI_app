@@ -54,6 +54,8 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>Flashly needs camera access to let you take photos for your flashcards</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Flashly uses your local network to connect to the development server while debugging</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Flashly needs microphone access for audio learning mode</string>
 	<key>NSPhotoLibraryUsageDescription</key>

@@ -1,4 +1,6 @@
 {
+  "name": "FlashcardsApp",
+  "displayName": "Flashly",
   "expo": {
     "name": "FlashcardsApp",
     "slug": "flashcardsapp",
