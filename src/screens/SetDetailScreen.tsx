@@ -3,13 +3,15 @@
  * @description Экран детали набора карточек
  */
 import React, { useCallback, useMemo, useState, useRef, useEffect } from 'react';
-import { View, FlatList, StyleSheet, Pressable, TextInput, ScrollView, ActivityIndicator, Platform, Alert, KeyboardAvoidingView, Modal, Dimensions, Animated } from 'react-native';
+import { shallow } from 'zustand/shallow';
+import { View, FlatList, StyleSheet, Pressable, TextInput, ScrollView, ActivityIndicator, Platform, Alert, KeyboardAvoidingView, Modal, Dimensions } from 'react-native';
 import { triggerHaptic } from '@/utils/haptic';
 import { BlurView } from '@/utils/BlurView';
 import DocumentPicker from 'react-native-document-picker';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useSetsStore, useCardsStore, useThemeColors, selectSetStats, useSettingsStore } from '@/store';
 import { Container, Text, ProgressBar, Loading, Button } from '@/components/common';
+import { StudyModeSheet, type StudyMode } from '@/components/study/StudyModeSheet';
 import { spacing, borderRadius } from '@/constants';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card, CreateCardInput } from '@/types';
@@ -25,12 +27,7 @@ import {
   Edit3,
   Check,
   Circle,
-  ChevronRight,
   Sparkles,
-  Puzzle,
-  Headphones,
-  ClipboardList,
-  Type,
   File,
   Upload,
   Lightbulb,
@@ -39,7 +36,6 @@ import {
   Globe,
   X,
   Image as ImageIcon,
-  BookOpenCheck,
 } from 'lucide-react-native';
 
 type Props = RootStackScreenProps<'SetDetail'>;
@@ -56,7 +52,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
   const set = useSetsStore((s) => s.getSet(setId));
   const updateSetStats = useSetsStore((s) => s.updateSetStats);
   const decrementCardCount = useSetsStore((s) => s.decrementCardCount);
-  const cards = useCardsStore((s) => s.getCardsBySet(setId));
+  const cards = useCardsStore((s) => s.getCardsBySet(setId), shallow);
   const addCard = useCardsStore((s) => s.addCard);
   const deleteCard = useCardsStore((s) => s.deleteCard);
 
@@ -92,8 +88,6 @@ export function SetDetailScreen({ navigation, route }: Props) {
   const [importSource, setImportSource] = useState<'file' | 'image'>('file');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
-  const studySheetTranslate = useRef(new Animated.Value(700)).current;
-  const studyBackdropOpacity = useRef(new Animated.Value(0)).current;
 
   // Publish states
   const [isPublished, setIsPublished] = useState(false);
@@ -121,7 +115,6 @@ export function SetDetailScreen({ navigation, route }: Props) {
   const modalTextSecondary = theme === 'dark' ? '#A8B3C1' : colors.textSecondary;
   const modalPlaceholder = theme === 'dark' ? '#94A3B8' : colors.textTertiary;
   const modalInputBg = theme === 'dark' ? 'rgba(255,255,255,0.04)' : colors.surface;
-  const modalHandleColor = theme === 'dark' ? '#4b5563' : '#cbd5e1';
 
   const filteredCards = useMemo(() => {
     const getFront = (card: Card) => card.frontText ?? (card as any).front ?? '';
@@ -179,25 +172,6 @@ export function SetDetailScreen({ navigation, route }: Props) {
       : cards.map(c => c.id);
     return [...dueCards].sort(() => Math.random() - 0.5);
   }, [onlyHard, cards]);
-
-  const openStudySheet = useCallback(() => {
-    studySheetTranslate.setValue(700);
-    studyBackdropOpacity.setValue(0);
-    setShowStudySheet(true);
-    requestAnimationFrame(() => {
-      Animated.parallel([
-        Animated.timing(studySheetTranslate, { toValue: 0, duration: 340, useNativeDriver: true }),
-        Animated.timing(studyBackdropOpacity, { toValue: 1, duration: 280, useNativeDriver: true }),
-      ]).start();
-    });
-  }, [studySheetTranslate, studyBackdropOpacity]);
-
-  const closeStudySheet = useCallback(() => {
-    Animated.parallel([
-      Animated.timing(studySheetTranslate, { toValue: 700, duration: 280, useNativeDriver: true }),
-      Animated.timing(studyBackdropOpacity, { toValue: 0, duration: 220, useNativeDriver: true }),
-    ]).start(() => setShowStudySheet(false));
-  }, [studySheetTranslate, studyBackdropOpacity]);
 
   const handleStartStudy = useCallback(() => {
     // "Учить всё" — запускаем тренировку по выбранному количеству карточек
@@ -338,6 +312,20 @@ export function SetDetailScreen({ navigation, route }: Props) {
       phaseOffset: 0,
     });
   }, [navigation, setId, wordLimit, getShuffledDueCardIds]);
+
+  const handleSelectStudyMode = useCallback(
+    (mode: StudyMode) => {
+      switch (mode) {
+        case 'classic': handleStartStudy(); break;
+        case 'match': handleStartMatch(); break;
+        case 'multipleChoice': handleStartMultipleChoice(); break;
+        case 'wordBuilder': handleStartWordBuilder(); break;
+        case 'audio': handleStartAudio(); break;
+        case 'contextFill': handleStartContextFill(); break;
+      }
+    },
+    [handleStartStudy, handleStartMatch, handleStartMultipleChoice, handleStartWordBuilder, handleStartAudio, handleStartContextFill]
+  );
 
   const handleSelectWordLimit = useCallback(
     (val: '10' | '20' | '30' | 'all') => {
@@ -1064,7 +1052,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
           </Text>
         </Pressable>
         <Pressable
-          onPress={() => { triggerHaptic('selection'); openStudySheet(); }}
+          onPress={() => { triggerHaptic('selection'); setShowStudySheet(true); }}
           style={[styles.primaryAction, { backgroundColor: colors.primary }]}
         >
           <Text variant="body" style={{ color: colors.textInverse, fontWeight: '700' }}>
@@ -1255,215 +1243,20 @@ export function SetDetailScreen({ navigation, route }: Props) {
         </KeyboardAvoidingView>
       )}
 
-      <Modal
+      <StudyModeSheet
         visible={showStudySheet}
-        transparent
-        animationType="none"
-        statusBarTranslucent
-        onRequestClose={closeStudySheet}
-      >
-        <View style={styles.sheetWrapper} pointerEvents="box-none">
-          <Pressable style={styles.sheetBackdrop} onPress={closeStudySheet}>
-            <Animated.View
-              pointerEvents="none"
-              style={[StyleSheet.absoluteFillObject, { opacity: studyBackdropOpacity, backgroundColor: backdropColor }]}
-            />
-          </Pressable>
-          <Animated.View
-            style={[
-              styles.studySheet,
-              {
-                backgroundColor: modalSurface,
-                borderColor: modalBorder,
-                transform: [{ translateY: studySheetTranslate }],
-              },
-            ]}
-          >
-            <View style={[styles.studyHandle, { backgroundColor: modalHandleColor }]} />
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.studyContent}
-            >
-              <View style={styles.studyHeader}>
-                <Text variant="h3" style={{ color: modalTextPrimary }}>
-                  Выбор режима
-                </Text>
-                <Pressable onPress={closeStudySheet} hitSlop={8}>
-                  <Text variant="body" style={{ color: modalTextSecondary, fontWeight: '600' }}>
-                    Отмена
-                  </Text>
-                </Pressable>
-              </View>
-              <Text variant="caption" color="secondary">
-                Набор: {set?.title || 'Набор'} • {set?.cardCount || 0} слов
-              </Text>
-
-                <Pressable
-                  onPress={handleStartStudy}
-                  style={[
-                    styles.recommendCard,
-                    { borderColor: colors.primary, backgroundColor: colors.surface },
-                  ]}
-                >
-                  <View style={styles.recommendBadge}>
-                    <Text variant="caption" style={{ color: '#fff', fontWeight: '700' }}>
-                      Recommended
-                    </Text>
-                  </View>
-                <View style={styles.recommendHeader}>
-                  <View style={styles.recommendIcon}>
-                    <Sparkles size={20} color={colors.primary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
-                      Flashcards
-                    </Text>
-                    <Text variant="caption" color="secondary">
-                      Переворот 180°
-                    </Text>
-                  </View>
-                </View>
-                <View
-                  style={[
-                    styles.flashPreview,
-                    { borderColor: colors.border, backgroundColor: colors.background },
-                  ]}
-                >
-                  <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
-                    scharf
-                  </Text>
-                  <Text variant="caption" color="secondary">
-                    Нажми, чтобы перевернуть
-                  </Text>
-                </View>
-                <View style={styles.rateRow}>
-                  {['Не знаю', 'Сомневаюсь', 'Почти', 'Уверенно'].map((label, idx) => {
-                    const colorsMap = ['#EF4444', '#F97316', '#2563EB', '#10B981'];
-                    return (
-                      <View
-                        key={label}
-                        style={[
-                          styles.ratePill,
-                          { borderColor: `${colorsMap[idx]}33`, backgroundColor: `${colorsMap[idx]}1A` },
-                        ]}
-                      >
-                        <Text variant="caption" style={{ color: colorsMap[idx], fontWeight: '700' }}>
-                          {label}
-                        </Text>
-                      </View>
-                    );
-                  })}
-                </View>
-              </Pressable>
-
-              <View style={styles.section}>
-                <Text variant="caption" color="secondary" style={styles.sectionTitle}>
-                  Игры для закрепления
-                </Text>
-                <View style={styles.gameList}>
-                  <GameRow
-                    icon={<Puzzle size={18} color={colors.textPrimary} />}
-                    title="Match"
-                    tag="Быстро"
-                    description="Сопоставление слов и переводов"
-                    colors={colors}
-                    onPress={handleStartMatch}
-                  />
-                  <GameRow
-                    icon={<ClipboardList size={18} color={colors.textPrimary} />}
-                    title="Multiple Choice"
-                    tag="Лёгко"
-                    description="Выбери правильный из 4 вариантов"
-                    colors={colors}
-                    onPress={handleStartMultipleChoice}
-                  />
-                <GameRow
-                  icon={<Type size={18} color={colors.textPrimary} />}
-                  title="Word Builder"
-                  tag="Правописание"
-                  description="Собери слово из букв"
-                  colors={colors}
-                  onPress={handleStartWordBuilder}
-                />
-                  <GameRow
-                    icon={<Headphones size={18} color={colors.textPrimary} />}
-                    title="Audio Tap"
-                    tag="Аудирование"
-                    description="Прослушай и выбери верное"
-                    colors={colors}
-                    onPress={handleStartAudio}
-                  />
-                  <GameRow
-                    icon={<BookOpenCheck size={18} color={colors.textPrimary} />}
-                    title="Fill in the Blank"
-                    tag="Контекст"
-                    description="Угадай слово по примеру"
-                    colors={colors}
-                    onPress={handleStartContextFill}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.section}>
-                <Text variant="caption" color="secondary" style={styles.sectionTitle}>
-                  Настройки
-                </Text>
-                <View style={styles.settingRow}>
-                  <Text variant="body" style={{ color: colors.textPrimary, flexShrink: 1 }}>
-                    Только «Не запомнил»
-                  </Text>
-                  <ToggleSwitch
-                    value={onlyHard}
-                    onToggle={() => setOnlyHard((v) => !v)}
-                    colors={colors}
-                  />
-                </View>
-                <View style={styles.settingRow}>
-                  <Text variant="body" style={{ color: colors.textPrimary, flexShrink: 1 }}>
-                    Показывать мнемонику после ошибки
-                  </Text>
-                  <ToggleSwitch
-                    value={showMnemonic}
-                    onToggle={() => setShowMnemonic((v) => !v)}
-                    colors={colors}
-                  />
-                </View>
-                <View style={styles.settingRow}>
-                  <Text variant="body" style={{ color: colors.textPrimary, flexShrink: 1 }}>
-                    Количество слов
-                  </Text>
-                  <View style={[styles.wordChips, { flexShrink: 0 }]}>
-                    {(['10', '20', '30', 'all'] as const).map((val) => (
-                      <Pressable
-                        key={val}
-                        onPress={() => handleSelectWordLimit(val)}
-                        style={[
-                          styles.wordChip,
-                          {
-                            backgroundColor:
-                              wordLimit === val ? colors.primary : colors.surface,
-                            borderColor: wordLimit === val ? colors.primary : colors.border,
-                          },
-                        ]}
-                      >
-                        <Text
-                          variant="caption"
-                          style={{
-                            color: wordLimit === val ? colors.textInverse : colors.textPrimary,
-                            fontWeight: '700',
-                          }}
-                        >
-                          {val === 'all' ? 'Все' : val}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
-              </View>
-            </ScrollView>
-          </Animated.View>
-        </View>
-      </Modal>
+        onClose={() => setShowStudySheet(false)}
+        subtitle={`Набор: ${set?.title || 'Набор'} • ${set?.cardCount || 0} слов`}
+        onSelectMode={handleSelectStudyMode}
+        settings={{
+          onlyHard,
+          onToggleOnlyHard: () => setOnlyHard((v) => !v),
+          showMnemonic,
+          onToggleShowMnemonic: () => setShowMnemonic((v) => !v),
+          wordLimit,
+          onSelectWordLimit: handleSelectWordLimit,
+        }}
+      />
 
       {showImportModal && (
         <View style={[styles.importOverlay, { backgroundColor: backdropColor }]} pointerEvents="box-none">
@@ -2018,91 +1811,6 @@ function FilterPill({
   );
 }
 
-function GameRow({
-  icon,
-  title,
-  tag,
-  description,
-  colors,
-  onPress,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  tag: string;
-  description: string;
-  colors: ReturnType<typeof useThemeColors>;
-  onPress?: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[
-        styles.gameRow,
-        { backgroundColor: colors.surface, borderColor: colors.border },
-      ]}
-    >
-      <View style={styles.gameIcon}>{icon}</View>
-      <View style={styles.gameInfo}>
-        <View style={styles.gameTitleRow}>
-          <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
-            {title}
-          </Text>
-          <Text
-            variant="caption"
-            style={{
-              color: colors.textSecondary,
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-              paddingHorizontal: spacing.xs,
-              paddingVertical: 2,
-              borderRadius: borderRadius.s,
-              borderWidth: 1,
-            }}
-          >
-            {tag}
-          </Text>
-        </View>
-        <Text variant="caption" color="secondary" numberOfLines={1}>
-          {description}
-        </Text>
-      </View>
-      <ChevronRight size={18} color={colors.textTertiary} />
-    </Pressable>
-  );
-}
-
-function ToggleSwitch({
-  value,
-  onToggle,
-  colors,
-}: {
-  value: boolean;
-  onToggle: () => void;
-  colors: ReturnType<typeof useThemeColors>;
-}) {
-  return (
-    <Pressable
-      onPress={onToggle}
-      style={[
-        styles.toggle,
-        {
-          backgroundColor: value ? colors.primary : colors.border,
-        },
-      ]}
-    >
-      <View
-        style={[
-          styles.toggleThumb,
-          {
-            backgroundColor: colors.surface,
-            transform: [{ translateX: value ? 18 : 0 }],
-          },
-        ]}
-      />
-    </Pressable>
-  );
-}
-
 // ==================== СТИЛИ ====================
 
 const styles = StyleSheet.create({
@@ -2285,124 +1993,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.m,
     alignItems: 'center',
   },
-  studySheet: {
-    borderTopLeftRadius: borderRadius.xl,
-    borderTopRightRadius: borderRadius.xl,
-    borderWidth: 1,
-    paddingHorizontal: spacing.l,
-    paddingTop: spacing.m,
-    paddingBottom: spacing.xl,
-    gap: spacing.m,
-    maxHeight: '85%',
-  },
-  studyHandle: {
-    width: 48,
-    height: 6,
-    borderRadius: borderRadius.full,
-    backgroundColor: '#cbd5e1',
-    alignSelf: 'center',
-  },
-  studyContent: {
-    paddingBottom: spacing.l,
-    gap: spacing.l,
-  },
-  studyHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  recommendCard: {
-    borderWidth: 2,
-    borderRadius: borderRadius.xl,
-    padding: spacing.m,
-    position: 'relative',
-  },
-  recommendBadge: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    backgroundColor: '#2d65e6',
-    paddingHorizontal: spacing.s,
-    paddingVertical: spacing.xs / 2,
-    borderBottomLeftRadius: borderRadius.l,
-    borderTopRightRadius: borderRadius.l,
-  },
-  recommendHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.s,
-    marginBottom: spacing.s,
-  },
-  recommendIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.l,
-    backgroundColor: 'rgba(45,101,230,0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  flashPreview: {
-    borderWidth: 1,
-    borderRadius: borderRadius.l,
-    padding: spacing.m,
-    alignItems: 'center',
-    marginBottom: spacing.s,
-  },
-  rateRow: {
-    flexDirection: 'row',
-    gap: spacing.s,
-    flexWrap: 'wrap',
-  },
-  ratePill: {
-    paddingHorizontal: spacing.s,
-    paddingVertical: spacing.xs / 2,
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-  },
-  section: {
-    gap: spacing.s,
-  },
-  sectionTitle: {
-    letterSpacing: 1,
-  },
-  gameList: {
-    gap: spacing.s,
-  },
-  gameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: borderRadius.l,
-    padding: spacing.m,
-    gap: spacing.s,
-  },
-  gameIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.m,
-    backgroundColor: 'rgba(148,163,184,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  gameInfo: {
-    flex: 1,
-    gap: spacing.xs / 2,
-  },
-  gameTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.s,
-  },
-  settingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing.s,
-  },
-  wordChips: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-  },
   wordChip: {
     paddingHorizontal: spacing.s,
     paddingVertical: spacing.xs,
@@ -2416,17 +2006,6 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.l,
     paddingVertical: spacing.m,
     alignItems: 'center',
-  },
-  toggle: {
-    width: 42,
-    height: 24,
-    borderRadius: borderRadius.full,
-    padding: 2,
-  },
-  toggleThumb: {
-    width: 20,
-    height: 20,
-    borderRadius: borderRadius.full,
   },
   addSheet: {
     borderTopLeftRadius: borderRadius.xl,

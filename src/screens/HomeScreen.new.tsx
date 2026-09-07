@@ -3,49 +3,39 @@
  * @description Главная страница с современным дизайном
  */
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { View, StyleSheet, ScrollView, Pressable, TextInput, useWindowDimensions, TextInput as RNTextInput, Modal, Platform, Animated, Alert, Clipboard, Share, ActivityIndicator } from 'react-native';
-import { PanGestureHandler, State } from 'react-native-gesture-handler';
-import type { PanGestureHandlerStateChangeEvent } from 'react-native-gesture-handler';
+import { View, StyleSheet, ScrollView, Pressable, TextInput, useWindowDimensions, TextInput as RNTextInput, Modal, Platform, Alert, Clipboard, Share, ActivityIndicator } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSetsStore, useSettingsStore, useThemeColors, useCardsStore, useCoursesStore, useDiamondStore, useChallengeStore } from '@/store';
 import { selectSetStats } from '@/store/cardsStore';
 import { Text, DiamondReward } from '@/components/common';
 import type { DiamondRewardRef } from '@/components/common';
-import ReanimatedAnimated, { useSharedValue, withTiming, withSequence, useAnimatedStyle, Easing, withDelay } from 'react-native-reanimated';
+import { StudyModeSheet, DEFAULT_STUDY_MODE_GAMES, type StudyMode } from '@/components/study/StudyModeSheet';
+import { CoursesDrawer } from '@/components/home/CoursesDrawer';
+import { animateDrawerTo, clampTranslateX, resolveDrawerOpen } from '@/components/home/drawerAnimation';
+import ReanimatedAnimated, { useSharedValue, withTiming, withSequence, useAnimatedStyle, Easing, withDelay, runOnJS } from 'react-native-reanimated';
 import { spacing, borderRadius, getDeckAccentColor } from '@/constants';
 import { triggerHaptic } from '@/utils/haptic';
 import {
-  Menu, 
-  Search, 
-  Plus, 
-  Calendar, 
-  BookOpen, 
-  CheckCircle, 
-  ArrowRight, 
+  Menu,
+  Search,
+  Plus,
+  Calendar,
+  ArrowRight,
   Library,
   Star,
   Lightbulb,
   Upload,
   MoreVertical,
   X,
-  MoreHorizontal,
   Eye,
   EyeOff,
   File,
   Folder,
-  FolderOpen,
-  Trash2,
   Edit2,
-  Sparkles,
-  Puzzle,
-  Headphones,
-  ClipboardList,
-  Type,
-  ChevronRight,
-  UserPlus,
   Sunrise,
   Timer,
-  LogOut,
 } from 'lucide-react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Svg, { Circle as SvgCircle } from 'react-native-svg';
@@ -97,10 +87,10 @@ export function HomeScreen({ navigation }: any) {
   const drawerBorder = isDarkMode ? 'rgba(255,255,255,0.08)' : colors.border;
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
-  const [headerHeight, setHeaderHeight] = useState(0);
+  const { width: windowWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const drawerWidth = useMemo(() => Math.min(windowWidth * 0.8, 320), [windowWidth]);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [searchBarHeight, setSearchBarHeight] = useState(0);
   const [streakModalVisible, setStreakModalVisible] = useState(false);
   const [todayBackendCards, setTodayBackendCards] = useState<number | null>(null);
   const [weekActivity, setWeekActivity] = useState<DailyActivity[]>([]);
@@ -116,6 +106,8 @@ export function HomeScreen({ navigation }: any) {
   const [leaveLoading, setLeaveLoading] = useState(false);
   const [showStudyModeModal, setShowStudyModeModal] = useState(false);
   const [wordLimit, setWordLimit] = useState<'10' | '20' | '30' | 'all'>('10');
+  const [onlyHard, setOnlyHard] = useState(false);
+  const [showMnemonic, setShowMnemonic] = useState(true);
   const [isTeacher, setIsTeacher] = useState<boolean | null>(null);
   const [inviteModalCourseId, setInviteModalCourseId] = useState<string | null>(null);
   const [inviteCopied, setInviteCopied] = useState(false);
@@ -272,28 +264,37 @@ export function HomeScreen({ navigation }: any) {
     );
   }, []);
 
-  // Drawer slide animation
-  const drawerAnim = useRef(new Animated.Value(0)).current;
-  const [drawerVisible, setDrawerVisible] = useState(false);
+  // Drawer slide — translateX это единственный источник правды для позиции панели.
+  // Пишется либо жестом напрямую на UI-потоке (edge-swipe открытия здесь, drag-to-close
+  // внутри CoursesDrawer), либо этим эффектом при программном открытии/закрытии (таб по
+  // гамбургеру, крестик, тап по подложке, выбор курса и т.д. — все они просто меняют
+  // drawerOpen как раньше, эффект ниже лишь переводит это в пружинную анимацию).
+  const drawerTranslateX = useSharedValue(-drawerWidth);
+  const drawerGestureStartX = useSharedValue(-drawerWidth);
+  const [drawerMounted, setDrawerMounted] = useState(false);
+  const isGestureDrivenDrawerChange = useRef(false);
+
+  const handleDrawerGestureSettled = useCallback((open: boolean) => {
+    isGestureDrivenDrawerChange.current = true;
+    setDrawerOpen(open);
+    if (!open) setDrawerMounted(false);
+  }, []);
 
   useEffect(() => {
+    if (isGestureDrivenDrawerChange.current) {
+      // Уже анимировано и доведено самим жестом — эффекту делать нечего.
+      isGestureDrivenDrawerChange.current = false;
+      return;
+    }
     if (drawerOpen) {
-      setDrawerVisible(true);
-      Animated.timing(drawerAnim, {
-        toValue: 1,
-        duration: 280,
-        useNativeDriver: true,
-      }).start();
+      setDrawerMounted(true);
+      animateDrawerTo(drawerTranslateX, true, drawerWidth, () => {});
     } else {
-      Animated.timing(drawerAnim, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: true,
-      }).start(({ finished }) => {
-        if (finished) setDrawerVisible(false);
+      animateDrawerTo(drawerTranslateX, false, drawerWidth, (open) => {
+        if (!open) setDrawerMounted(false);
       });
     }
-  }, [drawerOpen]);
+  }, [drawerOpen, drawerWidth, drawerTranslateX]);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
@@ -454,22 +455,47 @@ export function HomeScreen({ navigation }: any) {
     [activeCourseId, courseOrder, drawerOpen, setActiveCourse]
   );
 
-  const handleSwipeStateChange = useCallback(
-    (event: PanGestureHandlerStateChangeEvent) => {
-      const { state, translationX, velocityX } = event.nativeEvent;
-      if (state === State.END) {
-        if (Math.abs(translationX) > SWIPE_THRESHOLD && Math.abs(velocityX) > SWIPE_VELOCITY) {
-          if (translationX < 0) {
-            switchCourseByStep(1); // swipe left -> next course
-          } else {
-            switchCourseByStep(-1); // swipe right -> previous course
-          }
+  // Свайп по всему экрану влево/вправо — переключение курса (не связано с drawer).
+  // Отключается, пока открыт drawer, и уступает приоритет edgeOpenGesture у левого края
+  // экрана (см. Gesture.Exclusive ниже) — иначе свайп вправо от самого края одновременно
+  // и открывал бы панель, и листал курс.
+  const courseSwitchGesture = Gesture.Pan()
+    .enabled(!drawerOpen)
+    .activeOffsetX([-20, 20])
+    .failOffsetY([-10, 10])
+    .onEnd((e) => {
+      if (Math.abs(e.translationX) > SWIPE_THRESHOLD && Math.abs(e.velocityX) > SWIPE_VELOCITY) {
+        if (e.translationX < 0) {
+          runOnJS(switchCourseByStep)(1); // swipe left -> next course
+        } else {
+          runOnJS(switchCourseByStep)(-1); // swipe right -> previous course
         }
       }
-    },
-    [SWIPE_THRESHOLD, SWIPE_VELOCITY, switchCourseByStep]
-  );
-  
+    });
+
+  // Edge-swipe открытия drawer: жест ловится только у левых ~20px экрана (hitSlop),
+  // работает с любого места по вертикали. translateX двигается 1:1 с пальцем на UI-потоке —
+  // ни одного React re-render за время перетаскивания.
+  const EDGE_WIDTH = 20;
+  const edgeOpenGesture = Gesture.Pan()
+    .enabled(!drawerOpen)
+    .hitSlop({ left: 0, width: EDGE_WIDTH })
+    .activeOffsetX(10)
+    .failOffsetY([-15, 15])
+    .onBegin(() => {
+      drawerGestureStartX.value = drawerTranslateX.value;
+      runOnJS(setDrawerMounted)(true);
+    })
+    .onUpdate((e) => {
+      drawerTranslateX.value = clampTranslateX(drawerGestureStartX.value + e.translationX, drawerWidth);
+    })
+    .onEnd((e) => {
+      const open = resolveDrawerOpen(drawerTranslateX.value, e.velocityX, drawerWidth);
+      animateDrawerTo(drawerTranslateX, open, drawerWidth, handleDrawerGestureSettled);
+    });
+
+  const rootGesture = Gesture.Exclusive(edgeOpenGesture, courseSwitchGesture);
+
   // Фокус на input при начале редактирования
   useEffect(() => {
     if (editingCourseId) {
@@ -490,10 +516,8 @@ export function HomeScreen({ navigation }: any) {
     }
   }, [isCreatingCourse]);
   
-  // Вычисляем высоту контента: экран - header - tab bar
   const safeBottomPad = 0; // убираем нижний safe-area/паддинг
   const TAB_BAR_HEIGHT = 46;
-  const contentMinHeight = windowHeight - headerHeight - TAB_BAR_HEIGHT;
 
   // Базовый стиль нижней навигации (должен совпадать с AppNavigator)
   const baseTabBarStyle = useMemo(
@@ -524,10 +548,6 @@ export function HomeScreen({ navigation }: any) {
       parent.setOptions({ tabBarStyle: baseTabBarStyle });
     };
   }, [drawerOpen, navigation, baseTabBarStyle]);
-  
-  const onHeaderLayout = useCallback((e: any) => {
-    setHeaderHeight(e.nativeEvent.layout.height);
-  }, []);
   
   const updateSetStats = useSetsStore((s) => s.updateSetStats);
   const updateSet = useSetsStore((s) => s.updateSet);
@@ -619,7 +639,53 @@ export function HomeScreen({ navigation }: any) {
     if (count >= 2 && count <= 4) return 'набора';
     return 'наборов';
   }, []);
-  
+
+  // Colбэки для CoursesDrawer — логика 1:1 перенесена из прежних инлайн-обработчиков,
+  // трогать поведение не нужно, меняется только то, что оно теперь живёт в пропсах.
+  const handleToggleCourseMenu = useCallback((id: string) => {
+    setCourseMenuOpen((prev) => (prev === id ? null : id));
+  }, []);
+
+  const handleDismissCourseMenu = useCallback(() => setCourseMenuOpen(null), []);
+
+  const handleSelectCourse = useCallback(
+    (id: string | null) => {
+      setActiveCourse(id);
+      setDrawerOpen(false);
+      setCourseMenuOpen(null);
+    },
+    [setActiveCourse]
+  );
+
+  const handleStartCreatingCourse = useCallback(() => {
+    setCourseMenuOpen(null);
+    setIsCreatingCourse(true);
+  }, []);
+
+  const handleJoinByCodePress = useCallback(() => {
+    setCourseMenuOpen(null);
+    setDrawerOpen(false);
+    setJoinByCodeVisible(true);
+  }, []);
+
+  const handleDrawerBackdropPress = useCallback(() => {
+    if (courseMenuOpen) {
+      setCourseMenuOpen(null);
+    } else {
+      setCourseMenuOpen(null);
+      setEditingCourseId(null);
+      setIsCreatingCourse(false);
+      setDrawerOpen(false);
+    }
+  }, [courseMenuOpen]);
+
+  const handleDrawerRequestClose = useCallback(() => {
+    setCourseMenuOpen(null);
+    setEditingCourseId(null);
+    setIsCreatingCourse(false);
+    setDrawerOpen(false);
+  }, []);
+
   // Обработка создания нового курса
   const handleCreateCourse = useCallback(() => {
     const title = newCourseTitle.trim();
@@ -731,24 +797,25 @@ export function HomeScreen({ navigation }: any) {
   const handleStartStudyMode = useCallback((mode: 'classic' | 'match' | 'multipleChoice' | 'wordBuilder' | 'audio') => {
     setShowStudyModeModal(false);
 
-    // Collect due cards across ALL sets in the active course
+    // Collect cards across ALL sets in the active course — due-only when "Только «Не запомнил»"
+    // is on, otherwise every card in the course (mirrors SetDetailScreen's getShuffledDueCardIds)
     const now = Date.now();
     const state = useCardsStore.getState();
-    const allDueCards: string[] = [];
+    const allCardIds: string[] = [];
     for (const set of filteredSets) {
       const cardIds = state.cardsBySet[set.id] || [];
       for (const id of cardIds) {
         const card = state.cards[id];
-        if (card && card.nextReviewDate <= now) {
-          allDueCards.push(id);
+        if (card && (!onlyHard || card.nextReviewDate <= now)) {
+          allCardIds.push(id);
         }
       }
     }
 
-    if (allDueCards.length === 0) return;
+    if (allCardIds.length === 0) return;
 
-    // Shuffle all due cards — pass ALL to dueCardIds, use cardLimit for batch size
-    const shuffled = [...allDueCards].sort(() => Math.random() - 0.5);
+    // Shuffle all cards — pass ALL to dueCardIds, use cardLimit for batch size
+    const shuffled = [...allCardIds].sort(() => Math.random() - 0.5);
     const dueCardIds = shuffled;
     const limit = wordLimit === 'all' ? undefined : Number(wordLimit);
 
@@ -763,7 +830,7 @@ export function HomeScreen({ navigation }: any) {
 
     switch (mode) {
       case 'classic':
-        rootNav?.navigate('Study', { setId, mode: 'classic', studyAll: true, onlyHard: true, cardLimit: limit, dueCardIds, phaseId, totalPhaseCards: totalCards, studiedInPhase: 0, phaseOffset: 0 });
+        rootNav?.navigate('Study', { setId, mode: 'classic', studyAll: true, onlyHard, cardLimit: limit, dueCardIds, phaseId, totalPhaseCards: totalCards, studiedInPhase: 0, phaseOffset: 0 });
         break;
       case 'match':
         rootNav?.navigate('Match', { setId, cardLimit: limit, dueCardIds, phaseId, totalPhaseCards: totalCards, studiedInPhase: 0, phaseOffset: 0 });
@@ -778,7 +845,22 @@ export function HomeScreen({ navigation }: any) {
         rootNav?.navigate('AudioLearning', { setId, cardLimit: limit, dueCardIds, phaseId, totalPhaseCards: totalCards, studiedInPhase: 0, phaseOffset: 0 });
         break;
     }
-  }, [filteredSets, navigation, wordLimit]);
+  }, [filteredSets, navigation, wordLimit, onlyHard]);
+
+  // Fill in the Blank требует одного конкретного набора (setId), а Home агрегирует карточки
+  // сразу по всем наборам курса — поэтому этот режим здесь не предлагается (см. games ниже).
+  const handleSelectStudyMode = useCallback(
+    (mode: StudyMode) => {
+      if (mode === 'contextFill') return;
+      handleStartStudyMode(mode);
+    },
+    [handleStartStudyMode]
+  );
+
+  const homeStudyModeGames = useMemo(
+    () => DEFAULT_STUDY_MODE_GAMES.filter((game) => game.mode !== 'contextFill'),
+    []
+  );
 
   const saveCourseTitle = useCallback(
     (courseId: string) => {
@@ -812,12 +894,7 @@ export function HomeScreen({ navigation }: any) {
   }, []);
 
   return (
-    <PanGestureHandler
-      enabled={!drawerOpen}
-      onHandlerStateChange={handleSwipeStateChange}
-      activeOffsetX={[-20, 20]}
-      failOffsetY={[-10, 10]}
-    >
+    <GestureDetector gesture={rootGesture}>
       <View
         style={[
           styles.container,
@@ -826,7 +903,6 @@ export function HomeScreen({ navigation }: any) {
       >
       {/* Header */}
       <View
-        onLayout={onHeaderLayout}
         style={[
           styles.header,
           { backgroundColor: headerBackground, borderBottomColor: colors.border },
@@ -884,10 +960,7 @@ export function HomeScreen({ navigation }: any) {
 
       {/* Search Bar */}
       {searchVisible && (
-        <View
-          style={[styles.searchBar, { backgroundColor: colors.surface }]}
-          onLayout={(e) => setSearchBarHeight(e.nativeEvent.layout.height)}
-        >
+        <View style={[styles.searchBar, { backgroundColor: colors.surface }]}>
           <TextInput
             style={[styles.searchInput, { color: colors.textPrimary }, Platform.OS === 'web' && { outlineStyle: 'none' }]}
             placeholder="Поиск по наборам..."
@@ -899,25 +972,26 @@ export function HomeScreen({ navigation }: any) {
         </View>
       )}
 
-      {/* Overlay to close search when tapping outside */}
-      {searchVisible && (
-        <Pressable
-          style={[
-            styles.searchOverlay,
-            { top: headerHeight + searchBarHeight },
-          ]}
-          onPress={() => setSearchVisible(false)}
-        />
-      )}
+      {/*
+        Обёртка занимает всё оставшееся место под header/searchBar через обычный flex —
+        оверлей закрытия поиска покрывает именно и только эту область (StyleSheet.absoluteFillObject
+        относительно неё), без ручного вычисления пиксельных отступов через onLayout/useState
+        (это раньше вызывало заметный "прыжок" контента после первого измерения).
+      */}
+      <View style={styles.body}>
+        {/* Overlay to close search when tapping outside */}
+        {searchVisible && (
+          <Pressable style={styles.searchOverlay} onPress={() => setSearchVisible(false)} />
+        )}
 
-      <ScrollView 
-        style={styles.content}
-        contentContainerStyle={[styles.scrollContent, { minHeight: contentMinHeight }]}
-        showsVerticalScrollIndicator={false}
-        bounces={false}
-      >
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
         {visibleSets.length === 0 ? (
-          <View style={[styles.emptyStateModern, { minHeight: contentMinHeight }]}>
+          <View style={styles.emptyStateModern}>
             <View style={styles.illustrationWrap}>
               <View style={[styles.illustrationGlow, { backgroundColor: colors.primary + '22' }]} />
               <View style={[styles.illustrationCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -1238,7 +1312,8 @@ export function HomeScreen({ navigation }: any) {
           </View>
           </>
         )}
-      </ScrollView>
+        </ScrollView>
+      </View>
 
       {/* FAB */}
       {allSets.length > 0 && (
@@ -1250,353 +1325,45 @@ export function HomeScreen({ navigation }: any) {
         </Pressable>
       )}
 
-      {/* Courses Drawer - render in Modal so it stays above tab bar on all platforms */}
-      <Modal
-        visible={drawerVisible}
-        transparent
-        animationType="none"
-        onRequestClose={() => {
-          setCourseMenuOpen(null);
-          setEditingCourseId(null);
-          setIsCreatingCourse(false);
-          setDrawerOpen(false);
-        }}
-      >
-        <View style={styles.modalContainer}>
-          <Animated.View
-            style={[
-              styles.backdrop,
-              {
-                backgroundColor: backdropColor,
-                opacity: drawerAnim,
-              },
-            ]}
-          >
-            <Pressable
-              style={StyleSheet.absoluteFill}
-              onPress={() => {
-                if (courseMenuOpen) {
-                  setCourseMenuOpen(null);
-                } else {
-                  setCourseMenuOpen(null);
-                  setEditingCourseId(null);
-                  setIsCreatingCourse(false);
-                  setDrawerOpen(false);
-                }
-              }}
-            />
-          </Animated.View>
-          <Animated.View
-            style={[
-              styles.drawer,
-              {
-                backgroundColor: drawerBackground,
-                borderColor: drawerBorder,
-                width: Math.min(windowWidth * 0.8, 320),
-                shadowOpacity: isDarkMode ? 0.35 : 0.2,
-                transform: [
-                  {
-                    translateX: drawerAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [-Math.min(windowWidth * 0.8, 320), 0],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          >
-            <View style={styles.drawerHeader}>
-              <Text style={[styles.drawerTitle, { color: colors.textPrimary }]}>Courses</Text>
-              <Pressable style={styles.drawerIconButton} onPress={() => setDrawerOpen(false)}>
-                <X size={20} color={colors.textSecondary} />
-              </Pressable>
-            </View>
-
-            <View style={styles.drawerBody}>
-              {/* New Course Button or Input */}
-              {isCreatingCourse ? (
-                <View
-                  style={[
-                    styles.newCourseInputContainer,
-                    { backgroundColor: colors.surfaceVariant || colors.border, borderColor: colors.primary },
-                  ]}
-                >
-                  <Folder size={18} color={colors.primary} />
-                  <TextInput
-                    ref={newCourseInputRef}
-                    style={[styles.newCourseInput, { color: colors.textPrimary }]}
-                    placeholder="Course name..."
-                    placeholderTextColor={colors.textSecondary}
-                    value={newCourseTitle}
-                    onChangeText={setNewCourseTitle}
-                    onBlur={handleCreateCourse}
-                    onSubmitEditing={handleCreateCourse}
-                    autoFocus
-                  />
-                </View>
-              ) : (
-                <View style={{ gap: spacing.xs }}>
-                  <Pressable
-                    style={[
-                      styles.newCourseButton,
-                      { backgroundColor: colors.primary + '1A', borderColor: colors.primary + '33' },
-                    ]}
-                    onPress={() => {
-                      setCourseMenuOpen(null);
-                      setIsCreatingCourse(true);
-                    }}
-                  >
-                    <Plus size={18} color={colors.primary} />
-                    <Text style={[styles.newCourseText, { color: colors.primary }]}>New course</Text>
-                  </Pressable>
-                  <Pressable
-                    style={[
-                      styles.newCourseButton,
-                      { backgroundColor: colors.primary + '1A', borderColor: colors.primary + '33' },
-                    ]}
-                    onPress={() => {
-                      setCourseMenuOpen(null);
-                      setDrawerOpen(false);
-                      setJoinByCodeVisible(true);
-                    }}
-                  >
-                    <UserPlus size={18} color={colors.primary} />
-                    <Text style={[styles.newCourseText, { color: colors.primary }]}>Войти по коду</Text>
-                  </Pressable>
-                </View>
-              )}
-
-              <ScrollView
-                style={styles.drawerList}
-                contentContainerStyle={styles.drawerListContent}
-                showsVerticalScrollIndicator={false}
-                onScrollBeginDrag={() => setCourseMenuOpen(null)}
-              >
-                {/* "All" item - always shown first */}
-                <Pressable
-                  style={[
-                    styles.courseItem,
-                    activeCourseId === null
-                      ? { borderLeftColor: colors.primary, backgroundColor: colors.primary + '0D' }
-                      : { borderLeftColor: colors.border },
-                    { borderColor: colors.border },
-                  ]}
-                  onPress={() => {
-                    setActiveCourse(null);
-                    setDrawerOpen(false);
-                    setCourseMenuOpen(null);
-                  }}
-                >
-                  <View style={styles.courseItemHeader}>
-                    <View style={styles.courseItemLeft}>
-                      <Library size={24} color={activeCourseId === null ? colors.primary : colors.textPrimary} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.courseTitle, { color: activeCourseId === null ? colors.primary : colors.textPrimary }]}>
-                          All
-                        </Text>
-                        {(() => {
-                          const stats = getCourseStats(null);
-                          return (
-                            <Text style={[styles.courseMeta, { color: colors.textSecondary }]}>
-                              {stats.setCount} sets • {stats.cardCount} cards • {stats.masteredPercent}% mastered
-                            </Text>
-                          );
-                        })()}
-                      </View>
-                    </View>
-                  </View>
-                </Pressable>
-
-                {/* Course list */}
-                {courses.map((course, courseIndex) => {
-                  const isActive = activeCourseId === course.id;
-                  const isMenuOpen = courseMenuOpen === course.id;
-                  const isEditing = editingCourseId === course.id;
-                  const stats = getCourseStats(course.id);
-                  const isStudent = course.isStudentCourse === true;
-                  const courseAccent = getDeckAccentColor(course.id || courseIndex);
-
-                  return (
-                    <Pressable
-                      key={course.id}
-                      style={[
-                        styles.courseItem,
-                        isActive
-                          ? { borderLeftColor: courseAccent, backgroundColor: courseAccent + '1A' }
-                          : { borderLeftColor: colors.border },
-                        { borderColor: colors.border, position: 'relative' },
-                      ]}
-                      onPress={() => {
-                        if (!isEditing) {
-                          triggerHaptic('selection');
-                          setActiveCourse(course.id);
-                          setDrawerOpen(false);
-                          setCourseMenuOpen(null);
-                        }
-                      }}
-                    >
-                      <View style={styles.courseItemHeader}>
-                        <View style={styles.courseItemLeft}>
-                          {isStudent ? (
-                            <BookOpen size={24} color={isActive ? courseAccent : colors.textPrimary} />
-                          ) : isActive ? (
-                            <FolderOpen size={24} color={courseAccent} />
-                          ) : (
-                            <Folder size={24} color={colors.textPrimary} />
-                          )}
-                          <View style={{ flex: 1 }}>
-                            {isEditing && !isStudent ? (
-                              <View style={styles.editRow}>
-                                <View
-                                  style={[
-                                    styles.editCourseInputContainer,
-                                    { backgroundColor: colors.surfaceVariant || colors.border, borderColor: colors.primary },
-                                  ]}
-                                >
-                                  <Folder size={18} color={colors.primary} />
-                                  <TextInput
-                                    ref={editInputRef}
-                                    style={[styles.editCourseInput, { color: colors.textPrimary }]}
-                                    placeholder="Course name..."
-                                    placeholderTextColor={colors.textSecondary}
-                                    value={editingTitle}
-                                    onChangeText={setEditingTitle}
-                                    autoFocus
-                                    selectTextOnFocus
-                                    onSubmitEditing={() => saveCourseTitle(course.id)}
-                                  />
-                                </View>
-                                <View style={styles.editActions}>
-                                  <Pressable
-                                    style={styles.iconCircle}
-                                    onPress={() => saveCourseTitle(course.id)}
-                                  >
-                                    <CheckCircle size={18} color={colors.success} />
-                                  </Pressable>
-                                  <Pressable
-                                    style={styles.iconCircle}
-                                    onPress={cancelCourseEdit}
-                                  >
-                                    <X size={18} color={colors.textSecondary} />
-                                  </Pressable>
-                                </View>
-                              </View>
-                            ) : (
-                              <Text style={[styles.courseTitle, { color: isActive ? courseAccent : colors.textPrimary }]}>
-                                {course.title}
-                              </Text>
-                            )}
-                            {isStudent && course.teacherName ? (
-                              <Text style={[styles.courseMeta, { color: colors.textSecondary }]}>
-                                {course.teacherName}
-                              </Text>
-                            ) : (
-                              <Text style={[styles.courseMeta, { color: colors.textSecondary }]}>
-                                {stats.setCount} sets • {stats.cardCount} cards • {stats.masteredPercent}% mastered
-                              </Text>
-                            )}
-                          </View>
-                        </View>
-                        <Pressable
-                          style={styles.courseMoreButton}
-                          onPress={(e) => {
-                            e.stopPropagation();
-                            setCourseMenuOpen(isMenuOpen ? null : course.id);
-                          }}
-                        >
-                          <MoreHorizontal size={18} color={colors.textSecondary} />
-                        </Pressable>
-                      </View>
-
-                      {isMenuOpen && (
-                        <View
-                          style={[
-                            styles.courseMenu,
-                            {
-                              backgroundColor: colors.surface,
-                              borderColor: colors.border,
-                              shadowColor: colors.textPrimary,
-                            },
-                          ]}
-                        >
-                          {isStudent ? (
-                            <Pressable
-                              style={({ pressed }) => [
-                                styles.courseMenuItem,
-                                pressed && { backgroundColor: colors.border },
-                              ]}
-                              onPress={(e) => {
-                                e.stopPropagation();
-                                setCourseMenuOpen(null);
-                                setLeaveModalCourseId(course.id);
-                              }}
-                            >
-                              <LogOut size={16} color={colors.error} style={{ marginRight: spacing.s }} />
-                              <Text style={[styles.courseMenuText, { color: colors.error }]}>Выйти из курса</Text>
-                            </Pressable>
-                          ) : (
-                            <>
-                              {isTeacher && (
-                                <Pressable
-                                  style={({ pressed }) => [
-                                    styles.courseMenuItem,
-                                    pressed && { backgroundColor: colors.border },
-                                  ]}
-                                  onPress={(e) => {
-                                    e.stopPropagation();
-                                    openInviteModal(course.id);
-                                  }}
-                                >
-                                  <UserPlus size={16} color={colors.primary} style={{ marginRight: spacing.s }} />
-                                  <Text style={[styles.courseMenuText, { color: colors.primary }]}>Добавить</Text>
-                                </Pressable>
-                              )}
-                              <Pressable
-                                style={({ pressed }) => [
-                                  styles.courseMenuItem,
-                                  pressed && { backgroundColor: colors.border },
-                                ]}
-                                onPress={(e) => {
-                                  e.stopPropagation();
-                                  openEditModal(course.id, course.title);
-                                }}
-                              >
-                                <Edit2 size={16} color={colors.textPrimary} style={{ marginRight: spacing.s }} />
-                                <Text style={[styles.courseMenuText, { color: colors.textPrimary }]}>Rename</Text>
-                              </Pressable>
-                              <Pressable
-                                style={({ pressed }) => [
-                                  styles.courseMenuItem,
-                                  pressed && { backgroundColor: colors.border },
-                                ]}
-                                onPress={(e) => {
-                                  e.stopPropagation();
-                                  openDeleteModal(course.id);
-                                }}
-                              >
-                                <Trash2 size={16} color={colors.error} style={{ marginRight: spacing.s }} />
-                                <Text style={[styles.courseMenuText, { color: colors.error }]}>Delete</Text>
-                              </Pressable>
-                            </>
-                          )}
-                        </View>
-                      )}
-                    </Pressable>
-                  );
-                })}
-
-                {courses.length === 0 && (
-                  <View style={styles.drawerEmpty}>
-                    <Text style={[styles.drawerEmptyText, { color: colors.textSecondary }]}>
-                      Create a course to organize your sets
-                    </Text>
-                  </View>
-                )}
-              </ScrollView>
-            </View>
-          </Animated.View>
-        </View>
-      </Modal>
+      <CoursesDrawer
+        mounted={drawerMounted}
+        translateX={drawerTranslateX}
+        drawerWidth={drawerWidth}
+        onGestureSettled={handleDrawerGestureSettled}
+        colors={colors}
+        isDarkMode={isDarkMode}
+        drawerBackground={drawerBackground}
+        drawerBorder={drawerBorder}
+        backdropColor={backdropColor}
+        insets={insets}
+        courses={courses}
+        activeCourseId={activeCourseId}
+        isTeacher={isTeacher}
+        getCourseStats={getCourseStats}
+        courseMenuOpen={courseMenuOpen}
+        onToggleCourseMenu={handleToggleCourseMenu}
+        onDismissCourseMenu={handleDismissCourseMenu}
+        editingCourseId={editingCourseId}
+        editingTitle={editingTitle}
+        onChangeEditingTitle={setEditingTitle}
+        onSaveEditingTitle={saveCourseTitle}
+        onCancelEditingTitle={cancelCourseEdit}
+        editInputRef={editInputRef}
+        isCreatingCourse={isCreatingCourse}
+        newCourseTitle={newCourseTitle}
+        onChangeNewCourseTitle={setNewCourseTitle}
+        onStartCreatingCourse={handleStartCreatingCourse}
+        onSubmitNewCourse={handleCreateCourse}
+        newCourseInputRef={newCourseInputRef}
+        onSelectCourse={handleSelectCourse}
+        onJoinByCode={handleJoinByCodePress}
+        onOpenInvite={openInviteModal}
+        onOpenEditModal={openEditModal}
+        onOpenDeleteModal={openDeleteModal}
+        onOpenLeaveModal={setLeaveModalCourseId}
+        onBackdropPress={handleDrawerBackdropPress}
+        onRequestClose={handleDrawerRequestClose}
+      />
 
       {/* Edit Course Modal */}
       <Modal
@@ -1953,7 +1720,7 @@ export function HomeScreen({ navigation }: any) {
         animationType="fade"
         onRequestClose={closeStreakModal}
       >
-        <View style={[styles.streakOverlay, { paddingTop: headerHeight + spacing.xl }]}>
+        <View style={[styles.streakOverlay, { paddingTop: insets.top + spacing.xl }]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeStreakModal} />
 
           <View
@@ -2132,216 +1899,21 @@ export function HomeScreen({ navigation }: any) {
         </View>
       </Modal>
 
-      {/* Study Mode Selection Modal — 1:1 copy of SetDetailScreen study sheet */}
-      {showStudyModeModal && (
-        <View style={[styles.smSheetWrapper, { zIndex: 35 }]} pointerEvents="box-none">
-          <Pressable
-            style={[styles.smSheetBackdrop, { backgroundColor: backdropColor }]}
-            onPress={() => setShowStudyModeModal(false)}
-          />
-          <View
-            style={[
-              styles.smStudySheet,
-              {
-                backgroundColor: modalSurface,
-                borderColor: modalBorder,
-              },
-            ]}
-          >
-            <View style={[styles.smStudyHandle, { backgroundColor: modalHandleColor }]} />
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.smStudyContent}
-            >
-              <View style={styles.smStudyHeader}>
-                <Text variant="h3" style={{ color: modalTextPrimary }}>
-                  Выбор режима
-                </Text>
-                <Pressable onPress={() => setShowStudyModeModal(false)} hitSlop={8}>
-                  <Text variant="body" style={{ color: modalTextSecondary, fontWeight: '600' }}>
-                    Отмена
-                  </Text>
-                </Pressable>
-              </View>
-              <Text variant="caption" color="secondary">
-                {activeCourseTitle ? activeCourseTitle : 'Все наборы'} • {dueCards} карточек
-              </Text>
-
-              {/* Recommended: Flashcards */}
-              <Pressable
-                onPress={() => handleStartStudyMode('classic')}
-                style={[
-                  styles.smRecommendCard,
-                  { borderColor: colors.primary, backgroundColor: colors.surface },
-                ]}
-              >
-                <View style={styles.smRecommendBadge}>
-                  <Text variant="caption" style={{ color: '#fff', fontWeight: '700' }}>
-                    Recommended
-                  </Text>
-                </View>
-                <View style={styles.smRecommendHeader}>
-                  <View style={styles.smRecommendIcon}>
-                    <Sparkles size={20} color={colors.primary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
-                      Flashcards
-                    </Text>
-                    <Text variant="caption" color="secondary">
-                      Переворот 180° • Классический режим
-                    </Text>
-                  </View>
-                </View>
-                <View
-                  style={[
-                    styles.smFlashPreview,
-                    { borderColor: colors.border, backgroundColor: colors.background },
-                  ]}
-                >
-                  <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
-                    scharf
-                  </Text>
-                  <Text variant="caption" color="secondary">
-                    Нажми, чтобы перевернуть
-                  </Text>
-                </View>
-                <View style={styles.smRateRow}>
-                  {['Не знаю', 'Сомневаюсь', 'Почти', 'Уверенно'].map((label, idx) => {
-                    const rateColors = ['#EF4444', '#F97316', '#2563EB', '#10B981'];
-                    return (
-                      <View
-                        key={label}
-                        style={[
-                          styles.smRatePill,
-                          { borderColor: `${rateColors[idx]}33`, backgroundColor: `${rateColors[idx]}1A` },
-                        ]}
-                      >
-                        <Text variant="caption" style={{ color: rateColors[idx], fontWeight: '700' }}>
-                          {label}
-                        </Text>
-                      </View>
-                    );
-                  })}
-                </View>
-              </Pressable>
-
-              {/* Games section */}
-              <View style={styles.smSection}>
-                <Text variant="caption" color="secondary" style={styles.smSectionTitle}>
-                  Игры для закрепления
-                </Text>
-                <View style={styles.smGameList}>
-                  <Pressable
-                    onPress={() => handleStartStudyMode('match')}
-                    style={[styles.smGameRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                  >
-                    <View style={styles.smGameIcon}>
-                      <Puzzle size={18} color={colors.textPrimary} />
-                    </View>
-                    <View style={styles.smGameInfo}>
-                      <View style={styles.smGameTitleRow}>
-                        <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>Match</Text>
-                        <Text variant="caption" style={{ color: colors.textSecondary, backgroundColor: colors.surface, borderColor: colors.border, paddingHorizontal: spacing.xs, paddingVertical: 2, borderRadius: borderRadius.s, borderWidth: 1 }}>Быстро</Text>
-                      </View>
-                      <Text variant="caption" color="secondary" numberOfLines={1}>Сопоставление слов и переводов</Text>
-                    </View>
-                    <ChevronRight size={18} color={colors.textSecondary} />
-                  </Pressable>
-
-                  <Pressable
-                    onPress={() => handleStartStudyMode('multipleChoice')}
-                    style={[styles.smGameRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                  >
-                    <View style={styles.smGameIcon}>
-                      <ClipboardList size={18} color={colors.textPrimary} />
-                    </View>
-                    <View style={styles.smGameInfo}>
-                      <View style={styles.smGameTitleRow}>
-                        <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>Multiple Choice</Text>
-                        <Text variant="caption" style={{ color: colors.textSecondary, backgroundColor: colors.surface, borderColor: colors.border, paddingHorizontal: spacing.xs, paddingVertical: 2, borderRadius: borderRadius.s, borderWidth: 1 }}>Лёгко</Text>
-                      </View>
-                      <Text variant="caption" color="secondary" numberOfLines={1}>Выбери правильный из 4 вариантов</Text>
-                    </View>
-                    <ChevronRight size={18} color={colors.textSecondary} />
-                  </Pressable>
-
-                  <Pressable
-                    onPress={() => handleStartStudyMode('wordBuilder')}
-                    style={[styles.smGameRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                  >
-                    <View style={styles.smGameIcon}>
-                      <Type size={18} color={colors.textPrimary} />
-                    </View>
-                    <View style={styles.smGameInfo}>
-                      <View style={styles.smGameTitleRow}>
-                        <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>Word Builder</Text>
-                        <Text variant="caption" style={{ color: colors.textSecondary, backgroundColor: colors.surface, borderColor: colors.border, paddingHorizontal: spacing.xs, paddingVertical: 2, borderRadius: borderRadius.s, borderWidth: 1 }}>Правописание</Text>
-                      </View>
-                      <Text variant="caption" color="secondary" numberOfLines={1}>Собери слово из букв</Text>
-                    </View>
-                    <ChevronRight size={18} color={colors.textSecondary} />
-                  </Pressable>
-
-                  <Pressable
-                    onPress={() => handleStartStudyMode('audio')}
-                    style={[styles.smGameRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                  >
-                    <View style={styles.smGameIcon}>
-                      <Headphones size={18} color={colors.textPrimary} />
-                    </View>
-                    <View style={styles.smGameInfo}>
-                      <View style={styles.smGameTitleRow}>
-                        <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>Audio Tap</Text>
-                        <Text variant="caption" style={{ color: colors.textSecondary, backgroundColor: colors.surface, borderColor: colors.border, paddingHorizontal: spacing.xs, paddingVertical: 2, borderRadius: borderRadius.s, borderWidth: 1 }}>Аудирование</Text>
-                      </View>
-                      <Text variant="caption" color="secondary" numberOfLines={1}>Прослушай и выбери верное</Text>
-                    </View>
-                    <ChevronRight size={18} color={colors.textSecondary} />
-                  </Pressable>
-                </View>
-              </View>
-
-              {/* Настройки — количество слов */}
-              <View style={styles.smSection}>
-                <Text variant="caption" color="secondary" style={styles.smSectionTitle}>
-                  Настройки
-                </Text>
-                <View style={styles.smSettingRow}>
-                  <Text variant="body" style={{ color: colors.textPrimary, flexShrink: 1 }}>
-                    Количество слов
-                  </Text>
-                  <View style={[styles.smWordChips, { flexShrink: 0 }]}>
-                    {(['10', '20', '30', 'all'] as const).map((val) => (
-                      <Pressable
-                        key={val}
-                        onPress={() => setWordLimit(val)}
-                        style={[
-                          styles.smWordChip,
-                          {
-                            backgroundColor: wordLimit === val ? colors.primary : colors.surface,
-                            borderColor: wordLimit === val ? colors.primary : colors.border,
-                          },
-                        ]}
-                      >
-                        <Text
-                          variant="caption"
-                          style={{
-                            color: wordLimit === val ? colors.textInverse : colors.textPrimary,
-                            fontWeight: '700',
-                          }}
-                        >
-                          {val === 'all' ? 'Все' : val}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      )}
+      <StudyModeSheet
+        visible={showStudyModeModal}
+        onClose={() => setShowStudyModeModal(false)}
+        subtitle={`${activeCourseTitle ? activeCourseTitle : 'Все наборы'} • ${dueCards} карточек`}
+        onSelectMode={handleSelectStudyMode}
+        games={homeStudyModeGames}
+        settings={{
+          onlyHard,
+          onToggleOnlyHard: () => setOnlyHard((v) => !v),
+          showMnemonic,
+          onToggleShowMnemonic: () => setShowMnemonic((v) => !v),
+          wordLimit,
+          onSelectWordLimit: setWordLimit,
+        }}
+      />
       {/* Set Action Sheet */}
       <Modal
         visible={!!setMenuTarget}
@@ -2396,7 +1968,7 @@ export function HomeScreen({ navigation }: any) {
         onComplete={handleDiamondRewardComplete}
       />
     </View>
-    </PanGestureHandler>
+    </GestureDetector>
   );
 }
 
@@ -2477,12 +2049,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     padding: spacing.s,
   },
+  body: {
+    flex: 1,
+  },
   searchOverlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    // top задаётся динамически
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'transparent',
     zIndex: 5,
   },
@@ -2960,131 +2531,6 @@ const styles = StyleSheet.create({
     display: 'none',
   },
 
-  // Drawer
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-  backdrop: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    // Dimmed overlay under drawer; exact opacity set dynamically per theme
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
-    zIndex: 30,
-  },
-  drawer: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    zIndex: 40,
-    borderRightWidth: 1,
-    paddingHorizontal: spacing.m,
-    paddingTop: 40,
-    paddingBottom: spacing.l,
-    shadowColor: '#000',
-    shadowOffset: { width: 2, height: 0 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 12,
-  },
-  drawerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.l,
-  },
-  drawerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  drawerIconButton: {
-    padding: spacing.xs,
-    borderRadius: borderRadius.s,
-  },
-  drawerBody: {
-    gap: spacing.m,
-    flex: 1,
-  },
-  newCourseButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.m,
-    borderRadius: borderRadius.l,
-    borderWidth: 1,
-  },
-  newCourseText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  newCourseInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.s,
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.m,
-    borderRadius: borderRadius.l,
-    borderWidth: 1,
-  },
-  newCourseInput: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '600',
-    paddingVertical: 0,
-    ...Platform.select({ web: { outlineStyle: 'none' } }),
-  },
-  editCourseInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.s,
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.s,
-    borderRadius: borderRadius.l,
-    borderWidth: 1,
-  },
-  editCourseInput: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '700',
-    paddingVertical: 0,
-    ...Platform.select({ web: { outlineStyle: 'none' } }),
-  },
-  editRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.s,
-  },
-  editActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  iconCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#00000009',
-  },
-  drawerSearch: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.s,
-    borderRadius: borderRadius.l,
-  },
-  drawerSearchInput: {
-    flex: 1,
-    fontSize: 14,
-    paddingVertical: 0,
-  },
   pillRow: {
     gap: spacing.xs,
     paddingVertical: spacing.xs,
@@ -3098,85 +2544,6 @@ const styles = StyleSheet.create({
   pillText: {
     fontSize: 11,
     fontWeight: '700',
-  },
-  drawerList: {
-    flex: 1,
-  },
-  drawerListContent: {
-    paddingBottom: spacing.xl,
-    gap: spacing.xs,
-  },
-  courseItem: {
-    padding: spacing.m,
-    borderRadius: borderRadius.m,
-    borderWidth: 1,
-    borderLeftWidth: 4,
-  },
-  courseItemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  courseItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.s,
-    flex: 1,
-  },
-  courseEmoji: {
-    fontSize: 22,
-  },
-  courseTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  courseTitleInput: {
-    padding: 0,
-    margin: 0,
-    borderBottomWidth: 1,
-    minWidth: 100,
-    ...Platform.select({ web: { outlineStyle: 'none' } }),
-  },
-  courseMeta: {
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  courseMoreButton: {
-    padding: spacing.xs,
-  },
-  courseMenu: {
-    position: 'absolute',
-    top: spacing.s,
-    right: spacing.s,
-    borderWidth: 1,
-    borderRadius: borderRadius.m,
-    overflow: 'hidden',
-    // @ts-ignore web shadow
-    boxShadow: '0px 8px 20px rgba(0,0,0,0.12)',
-    elevation: 6,
-    zIndex: 10,
-  },
-  courseMenuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.s,
-    minWidth: 140,
-    zIndex: 11,
-  },
-  courseMenuText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  drawerEmpty: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.xl,
-    gap: spacing.s,
-  },
-  drawerEmptyText: {
-    fontSize: 13,
-    fontWeight: '600',
   },
   // Edit Course Modal
   modalOverlay: {
@@ -3401,139 +2768,6 @@ const styles = StyleSheet.create({
   },
 
   // Study Mode Sheet (1:1 from SetDetailScreen)
-  smSheetWrapper: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
-    zIndex: 20,
-  },
-  smSheetBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-  },
-  smStudySheet: {
-    borderTopLeftRadius: borderRadius.xl,
-    borderTopRightRadius: borderRadius.xl,
-    borderWidth: 1,
-    paddingHorizontal: spacing.l,
-    paddingTop: spacing.m,
-    paddingBottom: spacing.xl,
-    gap: spacing.m,
-    maxHeight: '85%',
-  },
-  smStudyHandle: {
-    width: 48,
-    height: 6,
-    borderRadius: borderRadius.full,
-    backgroundColor: '#cbd5e1',
-    alignSelf: 'center',
-  },
-  smStudyContent: {
-    paddingBottom: spacing.l,
-    gap: spacing.l,
-  },
-  smStudyHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  smRecommendCard: {
-    borderWidth: 2,
-    borderRadius: borderRadius.xl,
-    padding: spacing.m,
-    position: 'relative',
-  },
-  smRecommendBadge: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    backgroundColor: '#2d65e6',
-    paddingHorizontal: spacing.s,
-    paddingVertical: spacing.xs / 2,
-    borderBottomLeftRadius: borderRadius.l,
-    borderTopRightRadius: borderRadius.l,
-  },
-  smRecommendHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.s,
-    marginBottom: spacing.s,
-  },
-  smRecommendIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.l,
-    backgroundColor: 'rgba(45,101,230,0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  smFlashPreview: {
-    borderWidth: 1,
-    borderRadius: borderRadius.l,
-    padding: spacing.m,
-    alignItems: 'center',
-    marginBottom: spacing.s,
-  },
-  smRateRow: {
-    flexDirection: 'row',
-    gap: spacing.s,
-    flexWrap: 'wrap',
-  },
-  smRatePill: {
-    paddingHorizontal: spacing.s,
-    paddingVertical: spacing.xs / 2,
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-  },
-  smSection: {
-    gap: spacing.s,
-  },
-  smSectionTitle: {
-    letterSpacing: 1,
-  },
-  smGameList: {
-    gap: spacing.s,
-  },
-  smGameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: borderRadius.l,
-    padding: spacing.m,
-    gap: spacing.s,
-  },
-  smGameIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.m,
-    backgroundColor: 'rgba(148,163,184,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  smGameInfo: {
-    flex: 1,
-    gap: spacing.xs / 2,
-  },
-  smGameTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.s,
-  },
-  smSettingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing.s,
-  },
-  smWordChips: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-  },
-  smWordChip: {
-    paddingHorizontal: spacing.s,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.m,
-    borderWidth: 1,
-  },
 });
 
 /* Debug colors for layout inspection (disabled)

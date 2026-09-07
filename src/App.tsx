@@ -22,7 +22,7 @@ import { DailyGoalScreen } from '@/screens/DailyGoalScreen';
 import { TeacherSubjectScreen } from '@/screens/TeacherSubjectScreen';
 import { TeacherGroupSizeScreen } from '@/screens/TeacherGroupSizeScreen';
 
-import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaProvider, initialWindowMetrics, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TouchableOpacity } from 'react-native';
 
 // Стили для веб-платформы (iOS PWA scroll fix)
@@ -658,10 +658,12 @@ export default function App() {
 
   // На вебе (PWA) урезаем safe-area, чтобы на iPhone не было лишнего отступа.
   // Вместо полного обнуления используем урезание в AppRoot компоненте.
+  // На нативе передаём initialWindowMetrics — значение доступно синхронно ещё до первого
+  // рендера, поэтому экраны с useSafeAreaInsets() не мигают "0 → реальный отступ" при старте.
   const webSafeAreaOverride = Platform.OS === 'web' ? {
     frame: { x: 0, y: 0, width: 0, height: 0 },
     insets: { top: 0, right: 0, bottom: 0, left: 0 },
-  } : undefined;
+  } : initialWindowMetrics;
 
   return (
     <ErrorBoundary>

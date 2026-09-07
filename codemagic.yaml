@@ -7,11 +7,29 @@ workflows:
       node: 18
       groups:
         - ios_credentials
+        - app_secrets
       vars:
         BUNDLE_ID: "com.baiirbek.flashly"
     scripts:
       - name: Install dependencies
         script: npm ci
+      - name: Create .env.local from secrets
+        # POSTGRES_URL/SUPABASE_URL/SUPABASE_ANON_KEY must come from the "app_secrets"
+        # environment variable group (create it in Codemagic: Team settings -> Environment
+        # variables -> add group "app_secrets" with these as Secure variables). Without this,
+        # NeonService/LibraryService get an empty connection string and every DB call
+        # ("Мои наборы", "Магазин наборов") fails after the app is installed via TestFlight —
+        # this is the same fix ios-build.yml already does for the (non-TestFlight) AltStore build.
+        script: |
+          if [ -z "$POSTGRES_URL" ]; then
+            echo "WARNING: POSTGRES_URL is empty — add the 'app_secrets' group in Codemagic with POSTGRES_URL set, otherwise the DB will not work in this build."
+          fi
+          {
+            echo "POSTGRES_URL=${POSTGRES_URL}"
+            echo "SUPABASE_URL=${SUPABASE_URL}"
+            echo "SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}"
+            echo "SUPABASE_REDIRECT_URI=flashly://auth-callback"
+          } > .env.local
       - name: Install CocoaPods
         script: |
           cd ios
