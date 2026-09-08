@@ -23,7 +23,6 @@ import { useFocusEffect } from '@react-navigation/native';
 // ==================== НАСТРОЙКИ СЕКЦИЙ ====================
 
 const QUICK_ACTIONS = [
-  { icon: 'bar-chart-outline', label: 'Статистика' },
   { icon: 'trophy-outline', label: 'Награды' },
   { icon: 'settings-outline', label: 'Настройки' },
 ] as const;
@@ -259,8 +258,7 @@ export function ProfileScreen({ navigation }: any) {
               key={i}
               style={[st.quickActionBtn, { backgroundColor: cardBg, borderColor: cardBorder }]}
               onPress={() => {
-                if (i === 0) navigation?.navigate('Statistics');
-                if (i === 1) navigation?.navigate('Achievements');
+                if (i === 0) navigation?.navigate('Achievements');
               }}
             >
               <Ionicons name={action.icon as any} size={28} color={colors.primary} />

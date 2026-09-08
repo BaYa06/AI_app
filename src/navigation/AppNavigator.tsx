@@ -26,9 +26,9 @@ function BounceIcon({ name, color, focused }: { name: string; color: string; foc
   useEffect(() => {
     if (focused && !prevFocused.current) {
       scale.value = withSequence(
-        withTiming(1.35, { duration: 140 }),
-        withTiming(0.88, { duration: 105 }),
-        withTiming(1.0, { duration: 105 }),
+        withTiming(1.15, { duration: 130 }),
+        withTiming(0.95, { duration: 100 }),
+        withTiming(1.0, { duration: 100 }),
       );
     }
     prevFocused.current = focused;
@@ -151,6 +151,7 @@ function MainTabs() {
           shadowOpacity: 0,
           paddingBottom: tabBarPaddingBottom,
           paddingTop: 6,
+          paddingHorizontal: 64,
           height: tabBarHeight,
           marginBottom: 20,
         },
@@ -180,14 +181,22 @@ function MainTabs() {
       </Tab.Screen>
       <Tab.Screen
         name="Study"
-        options={{ tabBarIcon: ({ color, focused }) => <BounceIcon name="school" color={color} focused={focused} /> }}
+        options={{
+          tabBarIcon: ({ color, focused }) => <BounceIcon name="school" color={color} focused={focused} />,
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: 'none' },
+        }}
         listeners={{ tabPress: () => triggerHaptic('selection') }}
       >
         {(props) => <FadeScreen><StudyPlaceholderScreen {...props} /></FadeScreen>}
       </Tab.Screen>
       <Tab.Screen
         name="Statistics"
-        options={{ tabBarIcon: ({ color, focused }) => <BounceIcon name="stats-chart" color={color} focused={focused} /> }}
+        options={{
+          tabBarIcon: ({ color, focused }) => <BounceIcon name="stats-chart" color={color} focused={focused} />,
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: 'none' },
+        }}
         listeners={{ tabPress: () => triggerHaptic('selection') }}
       >
         {(props) => <FadeScreen><StatisticsScreen {...props} /></FadeScreen>}

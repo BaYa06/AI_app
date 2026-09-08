@@ -45,6 +45,7 @@ module.exports = (env, argv) => {
     resolve: {
       alias: {
         'react-native$': 'react-native-web',
+        '@invertase/react-native-apple-authentication': path.resolve(__dirname, 'src/polyfills/apple-authentication.web.ts'),
         'react-native-gesture-handler': path.resolve(__dirname, 'src/polyfills/gesture-handler.web.ts'),
         'react-native-mmkv': path.resolve(__dirname, 'src/polyfills/mmkv.web.ts'),
         'react-native-document-picker': path.resolve(__dirname, 'src/polyfills/document-picker.web.ts'),

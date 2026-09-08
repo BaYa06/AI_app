@@ -14,6 +14,7 @@ import type { Rating, Card } from '@/types';
 import { ArrowLeft, Settings, Volume2, Check } from 'lucide-react-native';
 import { speak, detectLanguage } from '@/utils/speech';
 import { triggerHaptic } from '@/utils/haptic';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ReAnimated, {
   useSharedValue,
   useAnimatedStyle,
@@ -31,6 +32,7 @@ type Props = RootStackScreenProps<'Study'>;
 export function StudyScreen({ navigation, route }: Props) {
   const { setId, mode, errorCardsFronts, studyAll, cardLimit, onlyHard, dueCardIds, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0, phaseFailedIds } = route.params;
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const settings = useSettingsStore((s) => s.settings);
   const theme = useSettingsStore((s) => s.resolvedTheme);
   const incrementTodayCards = useSettingsStore((s) => s.incrementTodayCards);
@@ -626,7 +628,7 @@ export function StudyScreen({ navigation, route }: Props) {
           ]}
         >
           {/* Передняя сторона (вопрос) */}
-          <ReAnimated.View style={[styles.cardAnim, frontAnimStyle]}>
+          <ReAnimated.View style={[styles.cardAnim, frontAnimStyle]} pointerEvents={isFlipped ? 'none' : 'auto'}>
             <View
               style={[
                 styles.cardInner,
@@ -647,7 +649,7 @@ export function StudyScreen({ navigation, route }: Props) {
                 <Pressable
                   style={[styles.audioButton, { backgroundColor: '#f1f5f9' }]}
                   hitSlop={10}
-                  onPress={(e) => { e.stopPropagation(); handleSpeak(questionText, questionLang, answerText); }}
+                  onPress={(e) => { e.stopPropagation(); triggerHaptic('selection'); handleSpeak(questionText, questionLang, answerText); }}
                 >
                   <Volume2 size={20} color={colors.primary} />
                 </Pressable>
@@ -668,7 +670,7 @@ export function StudyScreen({ navigation, route }: Props) {
           </ReAnimated.View>
 
           {/* Задняя сторона (ответ) */}
-          <ReAnimated.View style={[styles.cardAnim, backAnimStyle]}>
+          <ReAnimated.View style={[styles.cardAnim, backAnimStyle]} pointerEvents={isFlipped ? 'auto' : 'none'}>
             <View
               style={[
                 styles.cardInner,
@@ -689,7 +691,7 @@ export function StudyScreen({ navigation, route }: Props) {
                 <Pressable
                   style={[styles.audioButton, { backgroundColor: '#f1f5f9' }]}
                   hitSlop={10}
-                  onPress={(e) => { e.stopPropagation(); handleSpeak(answerText, answerLang, questionText); }}
+                  onPress={(e) => { e.stopPropagation(); triggerHaptic('selection'); handleSpeak(answerText, answerLang, questionText); }}
                 >
                   <Volume2 size={20} color={colors.primary} />
                 </Pressable>
@@ -732,6 +734,7 @@ export function StudyScreen({ navigation, route }: Props) {
             style={[
               styles.settingsSheet,
               {
+                top: insets.top + 18,
                 backgroundColor: settingsSheetBackground,
                 borderColor: settingsSheetBorder,
                 transform: [{ translateY: sheetTranslate }],
@@ -739,7 +742,15 @@ export function StudyScreen({ navigation, route }: Props) {
             ]}
           >
             <View style={styles.settingsRow}>
-              <Text style={[styles.settingsLabel, { color: colors.textPrimary }]}>Реверс</Text>
+              <View style={[styles.settingsIconWrap, { backgroundColor: colors.primary + '1A' }]}>
+                <Settings size={18} color={colors.primary} />
+              </View>
+              <View style={styles.settingsTexts}>
+                <Text style={[styles.settingsTitle, { color: colors.textPrimary }]}>Реверс карточек</Text>
+                <Text style={[styles.settingsSubtitle, { color: colors.textSecondary }]}>
+                  Сначала показывать обратную сторону
+                </Text>
+              </View>
               <Switch
                 value={reverseEnabled}
                 onValueChange={handleToggleReverse}
@@ -1008,29 +1019,40 @@ const styles = StyleSheet.create({
   },
   settingsSheet: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: spacing.m,
-    paddingTop: 50,
-    paddingBottom: spacing.m,
-    borderBottomWidth: 1,
-    borderBottomLeftRadius: 18,
-    borderBottomRightRadius: 18,
+    left: spacing.m,
+    right: spacing.m,
+    padding: spacing.m,
+    borderRadius: 20,
+    borderWidth: 1,
     shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowOffset: { width: 0, height: 8 },
-    shadowRadius: 12,
-    elevation: 6,
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 10 },
+    shadowRadius: 20,
+    elevation: 10,
   },
   settingsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
   },
-  settingsLabel: {
-    fontSize: 16,
+  settingsIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.s,
+  },
+  settingsTexts: {
+    flex: 1,
+    marginRight: spacing.s,
+  },
+  settingsTitle: {
+    fontSize: 15,
     fontWeight: '700',
+  },
+  settingsSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
   },
 
   // Complete screen

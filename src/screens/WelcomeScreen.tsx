@@ -2,7 +2,7 @@
  * WelcomeScreen
  * @description Экран приветствия с Google OAuth авторизацией.
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import InAppBrowser from 'react-native-inappbrowser-reborn';
+import appleAuth, { AppleButton } from '@invertase/react-native-apple-authentication';
 import { Button, Text } from '@/components/common';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius } from '@/constants';
@@ -35,6 +36,7 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
   const [authError, setAuthError] = useState<string | null>(null);
 
   const loading = isLoading || externalLoading;
+  const canUseAppleSignIn = Platform.OS === 'ios' && appleAuth.isSupported;
 
   const tiles = [
     { icon: 'sparkles', color: 'rgba(100, 103, 242, 0.55)', rotate: '-6deg', iconColor: '#fff', offset: 0 },
@@ -128,6 +130,49 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
     }
   }, [getParamFromCallbackUrl]);
 
+  const signInWithApple = useCallback(async () => {
+    setAuthError(null);
+    setIsLoading(true);
+
+    try {
+      const response = await appleAuth.performRequest({
+        requestedOperation: appleAuth.Operation.LOGIN,
+        requestedScopes: [appleAuth.Scope.EMAIL, appleAuth.Scope.FULL_NAME],
+      });
+
+      const { identityToken, nonce } = response;
+      if (!identityToken) {
+        setAuthError('Apple не вернул токен авторизации');
+        return;
+      }
+
+      const { error } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: identityToken,
+        nonce,
+      });
+
+      if (error) {
+        console.error('[auth] Apple sign-in error', error);
+        setAuthError(error.message);
+      }
+    } catch (e: any) {
+      if (e?.code !== appleAuth.Error.CANCELED) {
+        console.error('[auth] Apple sign-in failed:', e);
+        setAuthError('Не удалось войти через Apple');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!canUseAppleSignIn) return;
+    return appleAuth.onCredentialRevoked(() => {
+      supabase.auth.signOut();
+    });
+  }, [canUseAppleSignIn]);
+
   return (
     <View
       style={[
@@ -210,6 +255,14 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
                 leftIcon={<Ionicons name="logo-google" size={20} color={colors.textInverse} />}
                 style={styles.actionButton}
               />
+              {canUseAppleSignIn && (
+                <AppleButton
+                  buttonStyle={AppleButton.Style.BLACK}
+                  buttonType={AppleButton.Type.SIGN_IN}
+                  style={styles.appleButton}
+                  onPress={signInWithApple}
+                />
+              )}
             </>
           )}
           {authError && (
@@ -357,6 +410,11 @@ const styles = StyleSheet.create({
     marginBottom: spacing.l,
   },
   actionButton: {
+    marginBottom: spacing.s,
+  },
+  appleButton: {
+    width: '100%',
+    height: 48,
     marginBottom: spacing.s,
   },
   footer: {
