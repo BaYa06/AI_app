@@ -89,6 +89,11 @@ const HorizontalCard = memo(function HorizontalCard({
       <View style={s.hCardTop}>
         <View style={[s.hCardIcon, { backgroundColor: colors.primary + '15' }]}>
           <Text style={s.hCardEmoji}>{item.cover_emoji || '📚'}</Text>
+          {item.is_featured && (
+            <View style={[s.verifiedBadge, { backgroundColor: colors.primary, borderColor: colors.surface }]}>
+              <Ionicons name="star" size={9} color="#FFFFFF" />
+            </View>
+          )}
         </View>
         {avgRating !== null && (
           <View style={s.ratingBadge}>
@@ -145,6 +150,11 @@ const RecentCard = memo(function RecentCard({
     <Pressable onPress={onPress} style={[s.rCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={[s.rCardIcon, { backgroundColor: colors.primary + '15' }]}>
         <Text style={s.rCardEmoji}>{item.cover_emoji || '📚'}</Text>
+        {item.is_featured && (
+          <View style={[s.verifiedBadge, { backgroundColor: colors.primary, borderColor: colors.surface }]}>
+            <Ionicons name="star" size={9} color="#FFFFFF" />
+          </View>
+        )}
       </View>
       <View style={s.rCardBody}>
         <Text style={[s.rCardTitle, { color: colors.textPrimary }]} numberOfLines={1}>
@@ -512,7 +522,7 @@ const s = StyleSheet.create({
   searchCount: { fontSize: 14, fontWeight: '600' },
   hCard: { width: 260, padding: spacing.m, borderRadius: borderRadius.xl, borderWidth: 1, gap: spacing.s },
   hCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  hCardIcon: { width: 48, height: 48, borderRadius: borderRadius.l, alignItems: 'center', justifyContent: 'center' },
+  hCardIcon: { width: 48, height: 48, borderRadius: borderRadius.l, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   hCardEmoji: { fontSize: 24 },
   ratingBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(250, 204, 21, 0.1)', paddingHorizontal: spacing.xs, paddingVertical: 3, borderRadius: borderRadius.s },
   ratingText: { fontSize: 11, fontWeight: '800', color: '#CA8A04' },
@@ -522,10 +532,11 @@ const s = StyleSheet.create({
   statItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   statText: { fontSize: 11, fontWeight: '500' },
   importedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: borderRadius.s },
+  verifiedBadge: { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5 },
   importedText: { fontSize: 10, fontWeight: '700' },
   recentList: { paddingHorizontal: spacing.m, gap: spacing.s },
   rCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, padding: spacing.m, borderRadius: borderRadius.xl, borderWidth: 1 },
-  rCardIcon: { width: 52, height: 52, borderRadius: borderRadius.l, alignItems: 'center', justifyContent: 'center' },
+  rCardIcon: { width: 52, height: 52, borderRadius: borderRadius.l, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   rCardEmoji: { fontSize: 24 },
   rCardBody: { flex: 1, gap: 4 },
   rCardTitle: { fontSize: 15, fontWeight: '700' },

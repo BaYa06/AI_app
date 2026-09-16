@@ -111,17 +111,17 @@ export function RoleSelectionScreen({ onContinue, onBack }: Props) {
         <View style={styles.progressBlock}>
           <View style={styles.progressHeader}>
             <Text variant="bodySmall" color="primary">
-              Шаг 2 из 4
+              Шаг 2 из 6
             </Text>
             <Text variant="bodySmall" color="secondary">
-              50%
+              33%
             </Text>
           </View>
           <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
             <View
               style={[
                 styles.progressFill,
-                { backgroundColor: colors.primary, width: '50%' },
+                { backgroundColor: colors.primary, width: '33%' },
               ]}
             />
           </View>

@@ -16,7 +16,7 @@ import {
 import { Text, Container } from '@/components/common';
 import { useThemeColors, useSettingsStore } from '@/store';
 import { supabase, NeonService } from '@/services';
-import { spacing, borderRadius } from '@/constants';
+import { spacing, borderRadius, TOP_LANGUAGES, MAX_TARGET_LANGUAGES, getLanguageLabel, getLanguageFlag } from '@/constants';
 import {
   ArrowLeft,
   Calendar,
@@ -31,13 +31,6 @@ import {
 import type { RootStackScreenProps } from '@/types/navigation';
 
 type Props = RootStackScreenProps<'PersonalInfo'>;
-
-const NATIVE_LANGUAGES = [
-  { value: 'ru', label: 'Русский' },
-  { value: 'en', label: 'English' },
-  { value: 'de', label: 'Deutsch' },
-  { value: 'es', label: 'Español' },
-];
 
 const TIMEZONES = [
   { value: 'cet', label: '(GMT+01:00) Central European Time' },
@@ -57,13 +50,14 @@ export function PersonalInfoScreen({ navigation }: Props) {
   const [saving, setSaving] = useState(false);
   const [birthday, setBirthday] = useState('1995-05-15');
   const [nativeLang, setNativeLang] = useState('ru');
-  const [learningLangs, setLearningLangs] = useState(['German', 'English']);
+  const [learningLangs, setLearningLangs] = useState<string[]>([]);
   const [location, setLocation] = useState('Berlin, Germany');
   const [timezone, setTimezone] = useState('cet');
   const [showNativeLangPicker, setShowNativeLangPicker] = useState(false);
+  const [showLearningLangPicker, setShowLearningLangPicker] = useState(false);
   const [showTimezonePicker, setShowTimezonePicker] = useState(false);
 
-  // Загрузить user_name и display_name из БД
+  // Загрузить user_name, display_name и языковые предпочтения из БД
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       const userId = data.session?.user?.id;
@@ -78,6 +72,10 @@ export function PersonalInfoScreen({ navigation }: Props) {
           setFirstName(parts.slice(1).join(' ') || '');
         }
       });
+      NeonService.getLanguagePreferences(userId).then(({ nativeLanguage, targetLanguages }) => {
+        if (nativeLanguage) setNativeLang(nativeLanguage);
+        setLearningLangs(targetLanguages);
+      });
     });
   }, []);
 
@@ -87,8 +85,21 @@ export function PersonalInfoScreen({ navigation }: Props) {
   const chipBorder = colors.primary + '30';
   const addChipBg = isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0';
 
-  const removeLang = (lang: string) => {
-    setLearningLangs((prev) => prev.filter((l) => l !== lang));
+  const removeLang = (code: string) => {
+    setLearningLangs((prev) => prev.filter((l) => l !== code));
+  };
+
+  const toggleLearningLang = (code: string) => {
+    setLearningLangs((prev) => {
+      if (prev.includes(code)) {
+        return prev.filter((l) => l !== code);
+      }
+      if (prev.length >= MAX_TARGET_LANGUAGES) {
+        Alert.alert('Можно выбрать до 3 языков', 'Сначала уберите один из выбранных, чтобы добавить другой.');
+        return prev;
+      }
+      return [...prev, code];
+    });
   };
 
   return (
@@ -216,34 +227,36 @@ export function PersonalInfoScreen({ navigation }: Props) {
               style={[s.inputWrap, { backgroundColor: inputBg, borderColor: inputBorder }]}
             >
               <Text variant="body" style={{ color: colors.textPrimary, flex: 1 }}>
-                {NATIVE_LANGUAGES.find((l) => l.value === nativeLang)?.label ?? ''}
+                {getLanguageFlag(nativeLang)} {getLanguageLabel(nativeLang)}
               </Text>
               <ChevronDown size={20} color={colors.textTertiary} />
             </Pressable>
             {showNativeLangPicker && (
               <View style={[s.picker, { backgroundColor: isDark ? 'rgb(32, 34, 44)' : '#FFFFFF', borderColor: inputBorder }]}>
-                {NATIVE_LANGUAGES.map((lang) => (
+                {TOP_LANGUAGES.map((lang) => (
                   <Pressable
-                    key={lang.value}
+                    key={lang.code}
                     style={[
                       s.pickerItem,
-                      nativeLang === lang.value && { backgroundColor: colors.primary + '10' },
+                      nativeLang === lang.code && { backgroundColor: colors.primary + '10' },
                     ]}
                     onPress={() => {
-                      setNativeLang(lang.value);
+                      setNativeLang(lang.code);
+                      // Учить свой же родной язык бессмысленно — убираем его из изучаемых, если он там есть.
+                      setLearningLangs((prev) => prev.filter((l) => l !== lang.code));
                       setShowNativeLangPicker(false);
                     }}
                   >
                     <Text
                       variant="bodySmall"
                       style={{
-                        color: nativeLang === lang.value ? colors.primary : colors.textPrimary,
-                        fontWeight: nativeLang === lang.value ? '700' : '500',
+                        color: nativeLang === lang.code ? colors.primary : colors.textPrimary,
+                        fontWeight: nativeLang === lang.code ? '700' : '500',
                       }}
                     >
-                      {lang.label}
+                      {lang.flag} {lang.label}
                     </Text>
-                    {nativeLang === lang.value && (
+                    {nativeLang === lang.code && (
                       <CheckCircle size={18} color={colors.primary} />
                     )}
                   </Pressable>
@@ -256,23 +269,53 @@ export function PersonalInfoScreen({ navigation }: Props) {
           <View style={s.field}>
             <Text style={[s.label, { color: colors.textTertiary }]}>Изучаемые языки</Text>
             <View style={[s.chipsWrap, { backgroundColor: inputBg, borderColor: inputBorder }]}>
-              {learningLangs.map((lang) => (
-                <View key={lang} style={[s.chip, { backgroundColor: chipBg, borderColor: chipBorder }]}>
+              {learningLangs.map((code) => (
+                <View key={code} style={[s.chip, { backgroundColor: chipBg, borderColor: chipBorder }]}>
                   <Text variant="bodySmall" style={{ color: colors.primary, fontWeight: '600' }}>
-                    {lang}
+                    {getLanguageFlag(code)} {getLanguageLabel(code)}
                   </Text>
-                  <Pressable onPress={() => removeLang(lang)} hitSlop={6}>
+                  <Pressable onPress={() => removeLang(code)} hitSlop={6}>
                     <X size={16} color={colors.primary} />
                   </Pressable>
                 </View>
               ))}
-              <Pressable style={[s.addChip, { backgroundColor: addChipBg }]}>
-                <Plus size={16} color={colors.textSecondary} />
-                <Text variant="bodySmall" style={{ color: colors.textSecondary, fontWeight: '600' }}>
-                  Добавить
-                </Text>
-              </Pressable>
+              {learningLangs.length < MAX_TARGET_LANGUAGES && (
+                <Pressable
+                  style={[s.addChip, { backgroundColor: addChipBg }]}
+                  onPress={() => setShowLearningLangPicker((v) => !v)}
+                >
+                  <Plus size={16} color={colors.textSecondary} />
+                  <Text variant="bodySmall" style={{ color: colors.textSecondary, fontWeight: '600' }}>
+                    Добавить
+                  </Text>
+                </Pressable>
+              )}
             </View>
+            {showLearningLangPicker && (
+              <View style={[s.picker, { backgroundColor: isDark ? 'rgb(32, 34, 44)' : '#FFFFFF', borderColor: inputBorder }]}>
+                {TOP_LANGUAGES.filter((l) => l.code !== nativeLang).map((lang) => {
+                  const active = learningLangs.includes(lang.code);
+                  return (
+                    <Pressable
+                      key={lang.code}
+                      style={[s.pickerItem, active && { backgroundColor: colors.primary + '10' }]}
+                      onPress={() => toggleLearningLang(lang.code)}
+                    >
+                      <Text
+                        variant="bodySmall"
+                        style={{
+                          color: active ? colors.primary : colors.textPrimary,
+                          fontWeight: active ? '700' : '500',
+                        }}
+                      >
+                        {lang.flag} {lang.label}
+                      </Text>
+                      {active && <CheckCircle size={18} color={colors.primary} />}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
           </View>
 
           {/* Location */}
@@ -379,12 +422,16 @@ export function PersonalInfoScreen({ navigation }: Props) {
             }
             setSaving(true);
             const displayName = `${lastName.trim()} ${firstName.trim()}`.trim();
-            const [nameOk, userNameOk] = await Promise.all([
+            const [nameOk, userNameOk, langOk] = await Promise.all([
               displayName ? NeonService.updateDisplayName(userId, displayName) : Promise.resolve(true),
               NeonService.updateUserName(userId, userName),
+              NeonService.updateLanguagePreferences(userId, {
+                nativeLanguage: nativeLang,
+                targetLanguages: learningLangs,
+              }),
             ]);
             setSaving(false);
-            if (nameOk && userNameOk) {
+            if (nameOk && userNameOk && langOk) {
               Alert.alert('Готово', 'Данные сохранены');
             } else {
               Alert.alert('Ошибка', 'Не удалось сохранить. Возможно, имя уже занято.');

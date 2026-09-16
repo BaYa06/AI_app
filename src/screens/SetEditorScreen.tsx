@@ -16,7 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSetsStore, useCardsStore, useThemeColors, useSettingsStore, useCoursesStore } from '@/store';
 import { Text } from '@/components/common';
-import { spacing, borderRadius } from '@/constants';
+import { spacing, borderRadius, TOP_LANGUAGES } from '@/constants';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { SetCategory } from '@/types';
 import { ArrowLeftRight, ChevronDown, Globe } from 'lucide-react-native';
@@ -36,33 +36,20 @@ const CATEGORY_OPTIONS: { value: SetCategory; label: string; icon: string }[] = 
   { value: 'custom', label: 'Свой вариант…', icon: '✨' },
 ];
 
-const ALL_LANGUAGES = [
-  'Немецкий (DE)',
-  'Английский (EN)',
-  'Русский (RU)',
-  'Турецкий (TR)',
-];
+// Единый источник — тот же список из 10 языков, что и в онбординге/настройках
+// (см. constants/languages.ts), чтобы не расходиться друг с другом.
+const ALL_LANGUAGES = TOP_LANGUAGES.map((l) => `${l.flag} ${l.label} (${l.code.toUpperCase()})`);
 const SOURCE_LANGUAGES = ALL_LANGUAGES;
 const TARGET_LANGUAGES = ALL_LANGUAGES;
 const DESCRIPTION_LIMIT = 200;
 
-const LANG_CODE_TO_LABEL: Record<string, string> = {
-  de: 'Немецкий (DE)',
-  en: 'Английский (EN)',
-  fr: 'Французский (FR)',
-  es: 'Испанский (ES)',
-  ru: 'Русский (RU)',
-  tr: 'Турецкий (TR)',
-};
+const LANG_CODE_TO_LABEL: Record<string, string> = Object.fromEntries(
+  TOP_LANGUAGES.map((l) => [l.code, `${l.flag} ${l.label} (${l.code.toUpperCase()})`])
+);
 
-const LANG_LABEL_TO_CODE: Record<string, string> = {
-  'Немецкий (DE)': 'de',
-  'Английский (EN)': 'en',
-  'Французский (FR)': 'fr',
-  'Испанский (ES)': 'es',
-  'Русский (RU)': 'ru',
-  'Турецкий (TR)': 'tr',
-};
+const LANG_LABEL_TO_CODE: Record<string, string> = Object.fromEntries(
+  TOP_LANGUAGES.map((l) => [`${l.flag} ${l.label} (${l.code.toUpperCase()})`, l.code])
+);
 
 export function SetEditorScreen({ navigation, route }: Props) {
   const { setId, autoFocusTitle } = route.params || {};

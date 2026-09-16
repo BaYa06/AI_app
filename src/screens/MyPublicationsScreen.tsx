@@ -94,6 +94,11 @@ export function MyPublicationsScreen({ navigation }: Props) {
         <View style={s.cardHeader}>
           <View style={[s.emojiBox, { backgroundColor: colors.primary + '15' }]}>
             <Text style={s.emoji}>{item.cover_emoji || '📚'}</Text>
+            {item.is_featured && (
+              <View style={[s.verifiedBadge, { backgroundColor: colors.primary, borderColor: colors.surface }]}>
+                <Ionicons name="star" size={9} color="#FFFFFF" />
+              </View>
+            )}
           </View>
           <View style={s.cardInfo}>
             <Text style={[s.cardTitle, { color: colors.textPrimary }]} numberOfLines={1}>
@@ -225,7 +230,8 @@ const s = StyleSheet.create({
   list: { padding: spacing.m, gap: spacing.m, paddingBottom: spacing.xxl },
   card: { borderRadius: borderRadius.xl, borderWidth: 1, padding: spacing.m, gap: spacing.m },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.m },
-  emojiBox: { width: 48, height: 48, borderRadius: borderRadius.l, alignItems: 'center', justifyContent: 'center' },
+  emojiBox: { width: 48, height: 48, borderRadius: borderRadius.l, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  verifiedBadge: { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5 },
   emoji: { fontSize: 24 },
   cardInfo: { flex: 1, gap: 4 },
   cardTitle: { fontSize: 16, fontWeight: '700' },

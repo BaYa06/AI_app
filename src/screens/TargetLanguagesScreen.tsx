@@ -1,72 +1,80 @@
 /**
- * TeacherGroupSizeScreen
- * @description Шаг 4 (учитель): выбор размера группы учеников.
+ * TargetLanguagesScreen
+ * @description Шаг 4: выбор изучаемых языков (1-3). Только UI, без сохранения.
  */
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, StyleSheet, ScrollView, Pressable, Alert } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Button, Text } from '@/components/common';
-import { spacing, borderRadius } from '@/constants';
+import { spacing, borderRadius, TOP_LANGUAGES, MAX_TARGET_LANGUAGES } from '@/constants';
 import { useThemeColors } from '@/store';
 
-type SizeOption = {
-  id: string;
-  label: string;
-  icon: string;
-  vibe: string;
-};
-
 type Props = {
-  onContinue?: (sizeId: string) => void;
+  nativeLanguage?: string;
+  onContinue?: (codes: string[]) => void;
   onBack?: () => void;
 };
 
-const OPTIONS: SizeOption[] = [
-  { id: '1-10', label: '1–10 учеников', icon: 'person-outline', vibe: 'Индивидуально' },
-  { id: '11-30', label: '11–30 учеников', icon: 'people-outline', vibe: 'Небольшая группа' },
-  { id: '30+', label: '30+ учеников', icon: 'people', vibe: 'Большая группа' },
-  { id: 'unknown', label: 'Пока не знаю', icon: 'help-circle-outline', vibe: 'Определюсь позже' },
-];
-
-export function TeacherGroupSizeScreen({ onContinue, onBack }: Props) {
+export function TargetLanguagesScreen({ nativeLanguage, onContinue, onBack }: Props) {
   const colors = useThemeColors();
-  const [selected, setSelected] = useState<string>('1-10');
+  const [selected, setSelected] = useState<string[]>(['en']);
 
-  const renderOption = (opt: SizeOption) => {
-    const active = selected === opt.id;
+  // Изучать свой же родной язык бессмысленно — убираем его из списка выбора.
+  const options = useMemo(
+    () => TOP_LANGUAGES.filter((l) => l.code !== nativeLanguage),
+    [nativeLanguage]
+  );
+
+  const toggle = (code: string) => {
+    setSelected((prev) => {
+      if (prev.includes(code)) {
+        return prev.filter((c) => c !== code);
+      }
+      if (prev.length >= MAX_TARGET_LANGUAGES) {
+        Alert.alert('Можно выбрать до 3 языков', 'Сначала уберите один из выбранных, чтобы добавить другой.');
+        return prev;
+      }
+      return [...prev, code];
+    });
+  };
+
+  const renderOption = (lang: (typeof TOP_LANGUAGES)[number]) => {
+    const active = selected.includes(lang.code);
     return (
       <Pressable
-        key={opt.id}
-        onPress={() => setSelected(opt.id)}
+        key={lang.code}
+        onPress={() => toggle(lang.code)}
         style={[
           styles.option,
           {
             borderColor: active ? colors.primary : colors.border,
             backgroundColor: active ? `${colors.primary}0D` : colors.surface,
-            flexDirection: 'row-reverse',
           },
         ]}
       >
-        <View style={styles.radioContainer}>
-          <View
-            style={[
-              styles.radioOuter,
-              { borderColor: active ? colors.primary : colors.border },
-            ]}
-          >
-            {active && <View style={[styles.radioInner, { backgroundColor: colors.primary }]} />}
-          </View>
+        <View
+          style={[
+            styles.optionIcon,
+            { backgroundColor: active ? colors.primary : `${colors.surface}99` },
+          ]}
+        >
+          <Text style={styles.optionFlag}>{lang.flag}</Text>
         </View>
         <View style={styles.optionText}>
-          <Text variant="bodyLarge" style={{ color: colors.textPrimary, fontWeight: '700' }}>
-            {opt.label}
+          <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
+            {lang.label}
           </Text>
-          <View style={styles.vibeRow}>
-            <Ionicons name={opt.icon as any} size={16} color={colors.primary} />
-            <Text variant="bodySmall" color="secondary">
-              {opt.vibe}
-            </Text>
-          </View>
+        </View>
+        <View
+          style={[
+            styles.optionRadio,
+            {
+              borderColor: active ? colors.primary : colors.border,
+              backgroundColor: active ? colors.primary : 'transparent',
+            },
+          ]}
+        >
+          {active && <Ionicons name="checkmark" size={14} color={colors.textInverse} />}
         </View>
       </Pressable>
     );
@@ -77,11 +85,7 @@ export function TeacherGroupSizeScreen({ onContinue, onBack }: Props) {
       <View
         style={[
           styles.shell,
-          {
-            backgroundColor: colors.background,
-            shadowColor: colors.shadow,
-            borderColor: colors.border,
-          },
+          { backgroundColor: colors.background, shadowColor: colors.shadow, borderColor: colors.border },
         ]}
       >
         {/* Top bar */}
@@ -90,7 +94,7 @@ export function TeacherGroupSizeScreen({ onContinue, onBack }: Props) {
             <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
           </Pressable>
           <Text variant="h3" align="center" style={{ flex: 1, color: colors.textPrimary }}>
-            Шаг 6 из 6
+            Flashly
           </Text>
           <View style={styles.backHit} />
         </View>
@@ -99,54 +103,38 @@ export function TeacherGroupSizeScreen({ onContinue, onBack }: Props) {
         <View style={styles.progressBlock}>
           <View style={styles.progressHeader}>
             <Text variant="bodySmall" color="primary">
-              Прогресс онбординга
+              Шаг 4 из 6
             </Text>
             <Text variant="bodySmall" color="secondary">
-              4 / 4
+              67%
             </Text>
           </View>
           <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-            <View
-              style={[
-                styles.progressFill,
-                { backgroundColor: colors.primary, width: '100%' },
-              ]}
-            />
+            <View style={[styles.progressFill, { backgroundColor: colors.primary, width: '67%' }]} />
           </View>
         </View>
 
+        {/* Content */}
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.headlineBlock}>
             <Text variant="h1" style={[styles.headline, { color: colors.textPrimary }]}>
-              Сколько у вас учеников?
+              Какие языки хотите учить?
             </Text>
-            <Text
-              variant="body"
-              color="secondary"
-              align="center"
-              style={styles.bodyText}
-            >
-              Это поможет нам подобрать оптимальные инструменты.
+            <Text variant="body" color="secondary" style={styles.bodyText}>
+              Выберите от 1 до 3 языков — можно изменить позже в настройках.
             </Text>
           </View>
 
-          <View style={styles.options}>{OPTIONS.map(renderOption)}</View>
+          <View style={styles.options}>{options.map(renderOption)}</View>
         </ScrollView>
 
+        {/* Footer */}
         <View style={styles.footer}>
-          <Text
-            variant="bodySmall"
-            color="tertiary"
-            align="center"
-            style={styles.footerNote}
-          >
-            Это можно изменить в настройках профиля.
-          </Text>
           <Button
-            title="Начать работу"
+            title="Продолжить"
             onPress={() => onContinue?.(selected)}
+            disabled={selected.length === 0}
             fullWidth
-            leftIcon={<Ionicons name="rocket-outline" size={20} color={colors.textInverse} />}
           />
         </View>
       </View>
@@ -213,17 +201,15 @@ const styles = StyleSheet.create({
   },
   headlineBlock: {
     gap: spacing.s,
-    alignItems: 'center',
   },
   headline: {
     letterSpacing: -0.4,
-    textAlign: 'center',
   },
   bodyText: {
     lineHeight: 22,
   },
   options: {
-    gap: spacing.m,
+    gap: spacing.s,
   },
   option: {
     flexDirection: 'row',
@@ -233,38 +219,31 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.l,
     padding: spacing.m,
   },
+  optionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: borderRadius.m,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionFlag: {
+    fontSize: 22,
+  },
   optionText: {
     flex: 1,
-    gap: 4,
+    gap: 2,
   },
-  vibeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  radioContainer: {
-    width: 32,
-    alignItems: 'center',
-  },
-  radioOuter: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+  optionRadio: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
   footer: {
     paddingHorizontal: spacing.l,
     paddingVertical: spacing.xl,
-    gap: spacing.m,
-  },
-  footerNote: {
-    lineHeight: 18,
+    gap: spacing.s,
   },
 });

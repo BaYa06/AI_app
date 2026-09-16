@@ -1,6 +1,6 @@
 /**
  * NameOnboardingScreen
- * @description Шаг 3: ввод имени. Только UI, без сохранения.
+ * @description Шаг 1: ввод имени. Только UI, без сохранения.
  */
 import React, { useState } from 'react';
 import { View, StyleSheet, Platform, KeyboardAvoidingView, ScrollView } from 'react-native';
@@ -49,17 +49,17 @@ export function NameOnboardingScreen({ onContinue, onSkip, onBack }: Props) {
           <View style={styles.progressBlock}>
             <View style={styles.progressHeader}>
               <Text variant="bodySmall" color="primary">
-                Шаг 1 из 4
+                Шаг 1 из 6
               </Text>
               <Text variant="bodySmall" color="secondary">
-                25% завершено
+                17% завершено
               </Text>
             </View>
             <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
               <View
                 style={[
                   styles.progressFill,
-                  { backgroundColor: colors.primary, width: '25%' },
+                  { backgroundColor: colors.primary, width: '17%' },
                 ]}
               />
             </View>

@@ -143,6 +143,11 @@ function MainTabs() {
         tabBarInactiveTintColor: colors.textTertiary,
         tabBarShowLabel: false,
         safeAreaInsets: { bottom: 0 },
+        // Без этого фона каждый экран-вкладка сидит прямо на нативном (белом по умолчанию)
+        // фоне окна. FadeScreen анимирует прозрачность через нативный драйвер, так что во
+        // время фейда сквозь неё реально просвечивает то, что позади — без этой подложки это
+        // белый цвет ОС, что особенно режет глаза в тёмной теме.
+        sceneContainerStyle: { backgroundColor: colors.background },
         tabBarStyle: {
           backgroundColor: colors.background,
           borderTopWidth: 1,

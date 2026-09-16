@@ -240,6 +240,11 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
         <View style={[s.heroSection, { backgroundColor: surfaceBg }]}>
           <View style={[s.heroEmoji, { backgroundColor: colors.primary + '15' }]}>
             <Text style={s.heroEmojiText}>{currentSet.cover_emoji || '📚'}</Text>
+            {currentSet.is_featured && (
+              <View style={[s.verifiedBadge, { backgroundColor: colors.primary, borderColor: surfaceBg }]}>
+                <Ionicons name="star" size={13} color="#FFFFFF" />
+              </View>
+            )}
           </View>
           <Text variant="h1" style={[s.heroTitle, { color: colors.textPrimary }]}>
             {currentSet.title}
@@ -453,7 +458,8 @@ const s = StyleSheet.create({
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.xxs },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   heroSection: { alignItems: 'center', paddingHorizontal: spacing.l, paddingTop: spacing.xl, paddingBottom: spacing.l },
-  heroEmoji: { width: 96, height: 96, borderRadius: borderRadius.xl, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.l },
+  heroEmoji: { width: 96, height: 96, borderRadius: borderRadius.xl, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.l, position: 'relative' },
+  verifiedBadge: { position: 'absolute', top: -4, right: -4, width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
   heroEmojiText: { fontSize: 48 },
   heroTitle: { textAlign: 'center', marginBottom: spacing.s },
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, marginBottom: spacing.l },

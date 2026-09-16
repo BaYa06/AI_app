@@ -90,7 +90,7 @@ export function DailyGoalScreen({ onContinue, onBack }: Props) {
             <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
           </Pressable>
           <Text variant="h3" align="center" style={{ flex: 1, color: colors.textPrimary }}>
-            Шаг 4 из 4
+            Шаг 6 из 6
           </Text>
           <View style={styles.backHit} />
         </View>

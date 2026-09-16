@@ -56,6 +56,12 @@ const DEFAULT_FILTERS: LibraryFilters = {
   page: 1,
 };
 
+// Browsing (no active search/filter) shows only team-curated sets; the moment the user
+// searches or applies a filter, every published set becomes eligible — including ones
+// published by students, which should be findable but not surfaced on the discover sections.
+const isBrowsingMode = (filters: LibraryFilters): boolean =>
+  !filters.search && !filters.category && !filters.language && !filters.cardsMin && !filters.cardsMax;
+
 const LIBRARY_TTL_MS = 5 * 60 * 1000; // 5 минут
 let lastFetchedAt = 0;
 let lastFetchFiltersKey = '';
@@ -91,18 +97,19 @@ export const useLibraryStore = create<LibraryState & LibraryActions>()(
 
       try {
         const baseFilters = get().filters;
+        const curatedOnly = isBrowsingMode(baseFilters);
 
         const [trending, topRated, recent] = await Promise.all([
           LibraryService.getLibrarySets(
-            { ...baseFilters, sort: 'popular', page: 1 },
+            { ...baseFilters, sort: 'popular', page: 1, curatedOnly },
             userId
           ),
           LibraryService.getLibrarySets(
-            { ...baseFilters, sort: 'top_rated', page: 1 },
+            { ...baseFilters, sort: 'top_rated', page: 1, curatedOnly },
             userId
           ),
           LibraryService.getLibrarySets(
-            { ...baseFilters, sort: 'newest', page: 1 },
+            { ...baseFilters, sort: 'newest', page: 1, curatedOnly },
             userId
           ),
         ]);
@@ -135,7 +142,7 @@ export const useLibraryStore = create<LibraryState & LibraryActions>()(
       try {
         const nextPage = recentPage + 1;
         const result = await LibraryService.getLibrarySets(
-          { ...filters, sort: 'newest', page: nextPage },
+          { ...filters, sort: 'newest', page: nextPage, curatedOnly: isBrowsingMode(filters) },
           userId
         );
 

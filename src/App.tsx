@@ -17,6 +17,8 @@ import { useCoursesStore } from '@/store';
 import { WelcomeScreen } from '@/screens/WelcomeScreen';
 import { NameOnboardingScreen } from '@/screens/NameOnboardingScreen';
 import { RoleSelectionScreen } from '@/screens/RoleSelectionScreen';
+import { NativeLanguageScreen } from '@/screens/NativeLanguageScreen';
+import { TargetLanguagesScreen } from '@/screens/TargetLanguagesScreen';
 import { LearningGoalScreen } from '@/screens/LearningGoalScreen';
 import { DailyGoalScreen } from '@/screens/DailyGoalScreen';
 import { TeacherSubjectScreen } from '@/screens/TeacherSubjectScreen';
@@ -41,7 +43,7 @@ const webStyles = Platform.OS === 'web' ? StyleSheet.create({
   },
 }) : undefined;
 
-type AuthStep = 'welcome' | 'name' | 'role' | 'goal' | 'daily' | 'teacher_subject' | 'teacher_size';
+type AuthStep = 'welcome' | 'name' | 'role' | 'native_language' | 'target_languages' | 'goal' | 'daily' | 'teacher_subject' | 'teacher_size';
 
 type AppRootProps = {
   isReady: boolean;
@@ -54,16 +56,21 @@ type AppRootProps = {
   onBackToWelcome: () => void;
   onBackToName: () => void;
   onBackToRole: () => void;
+  onBackToNativeLanguage: () => void;
+  onBackToTargetLanguages: () => void;
   onBackToGoal: () => void;
   onBackToTeacherSubject: () => void;
   onSubmitName: (name?: string) => void;
   onSubmitRole: (role: string) => void;
+  onSubmitNativeLanguage: (code: string) => void;
+  onSubmitTargetLanguages: (codes: string[]) => void;
   onSubmitGoal: (goalId: string) => void;
   onSubmitDaily: (dailyId: string) => void;
   onSubmitTeacherSubject: (subjectId: string) => void;
   onSubmitTeacherSize: (sizeId: string) => void;
   authStep: AuthStep;
   authLoading: boolean;
+  nativeLanguage?: string;
 };
 
 function AppRoot({
@@ -77,16 +84,21 @@ function AppRoot({
   onBackToWelcome,
   onBackToName,
   onBackToRole,
+  onBackToNativeLanguage,
+  onBackToTargetLanguages,
   onBackToGoal,
   onBackToTeacherSubject,
   onSubmitName,
   onSubmitRole,
+  onSubmitNativeLanguage,
+  onSubmitTargetLanguages,
   onSubmitGoal,
   onSubmitDaily,
   onSubmitTeacherSubject,
   onSubmitTeacherSize,
   authStep,
   authLoading,
+  nativeLanguage,
 }: AppRootProps) {
   const colors = useThemeColors();
   const resolvedTheme = useSettingsStore((state) => state.resolvedTheme);
@@ -150,9 +162,20 @@ function AppRoot({
             onBack={onBackToName}
             onContinue={onSubmitRole}
           />
+        ) : authStep === 'native_language' ? (
+          <NativeLanguageScreen
+            onBack={onBackToRole}
+            onContinue={onSubmitNativeLanguage}
+          />
+        ) : authStep === 'target_languages' ? (
+          <TargetLanguagesScreen
+            nativeLanguage={nativeLanguage}
+            onBack={onBackToNativeLanguage}
+            onContinue={onSubmitTargetLanguages}
+          />
         ) : authStep === 'goal' ? (
           <LearningGoalScreen
-            onBack={onBackToRole}
+            onBack={onBackToTargetLanguages}
             onContinue={onSubmitGoal}
           />
         ) : authStep === 'daily' ? (
@@ -162,7 +185,7 @@ function AppRoot({
           />
         ) : authStep === 'teacher_subject' ? (
           <TeacherSubjectScreen
-            onBack={onBackToRole}
+            onBack={onBackToTargetLanguages}
             onContinue={onSubmitTeacherSubject}
           />
         ) : authStep === 'teacher_size' ? (
@@ -266,6 +289,8 @@ export default function App() {
   const [onboardingData, setOnboardingData] = useState<{
     displayName?: string;
     role?: 'student' | 'teacher';
+    nativeLanguage?: string;
+    targetLanguages?: string[];
     learningGoal?: string;
     dailyGoal?: string;
     teacherSubject?: string;
@@ -561,6 +586,14 @@ export default function App() {
     setAuthStep('role');
   }, []);
 
+  const handleBackToNativeLanguage = useCallback(() => {
+    setAuthStep('native_language');
+  }, []);
+
+  const handleBackToTargetLanguages = useCallback(() => {
+    setAuthStep('target_languages');
+  }, []);
+
   const handleBackToGoal = useCallback(() => {
     setAuthStep('goal');
   }, []);
@@ -577,12 +610,18 @@ export default function App() {
   const handleSubmitRole = useCallback((role: string) => {
     const r = role as 'student' | 'teacher';
     setOnboardingData((prev) => ({ ...prev, role: r }));
-    if (r === 'teacher') {
-      setAuthStep('teacher_subject');
-    } else {
-      setAuthStep('goal');
-    }
+    setAuthStep('native_language');
   }, []);
+
+  const handleSubmitNativeLanguage = useCallback((code: string) => {
+    setOnboardingData((prev) => ({ ...prev, nativeLanguage: code }));
+    setAuthStep('target_languages');
+  }, []);
+
+  const handleSubmitTargetLanguages = useCallback((codes: string[]) => {
+    setOnboardingData((prev) => ({ ...prev, targetLanguages: codes }));
+    setAuthStep(onboardingData.role === 'teacher' ? 'teacher_subject' : 'goal');
+  }, [onboardingData.role]);
 
   const handleSubmitGoal = useCallback((goalId: string) => {
     setOnboardingData((prev) => ({ ...prev, learningGoal: goalId }));
@@ -594,6 +633,8 @@ export default function App() {
     await NeonService.saveOnboardingData(currentUserId, {
       displayName: finalData.displayName,
       teacher: finalData.role === 'teacher',
+      nativeLanguage: finalData.nativeLanguage,
+      targetLanguages: finalData.targetLanguages,
       learningGoal: finalData.learningGoal,
       dailyGoal: finalData.dailyGoal,
       teacherSubject: finalData.teacherSubject,
@@ -679,16 +720,21 @@ export default function App() {
         onBackToWelcome={handleBackToWelcome}
         onBackToName={handleBackToName}
         onBackToRole={handleBackToRole}
+        onBackToNativeLanguage={handleBackToNativeLanguage}
+        onBackToTargetLanguages={handleBackToTargetLanguages}
         onBackToGoal={handleBackToGoal}
         onBackToTeacherSubject={handleBackToTeacherSubject}
         onSubmitName={handleSubmitName}
         onSubmitRole={handleSubmitRole}
+        onSubmitNativeLanguage={handleSubmitNativeLanguage}
+        onSubmitTargetLanguages={handleSubmitTargetLanguages}
         onSubmitGoal={handleSubmitGoal}
         onSubmitDaily={handleSubmitDaily}
         onSubmitTeacherSubject={handleSubmitTeacherSubject}
         onSubmitTeacherSize={handleSubmitTeacherSize}
         authStep={authStep}
         authLoading={authLoading}
+        nativeLanguage={onboardingData.nativeLanguage}
       />
     </SafeAreaProvider>
     </ErrorBoundary>

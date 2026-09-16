@@ -207,6 +207,53 @@ export const NeonService = {
   },
 
   /**
+   * Получить родной язык и изучаемые языки пользователя
+   */
+  async getLanguagePreferences(
+    userId: string,
+  ): Promise<{ nativeLanguage: string | null; targetLanguages: string[] }> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) return { nativeLanguage: null, targetLanguages: [] };
+      const sql = neon(connectionString);
+      const rows = await sql`
+        SELECT native_language, target_languages FROM users WHERE id = ${userId}::uuid
+      `;
+      return {
+        nativeLanguage: rows[0]?.native_language ?? null,
+        targetLanguages: rows[0]?.target_languages ?? [],
+      };
+    } catch (error) {
+      console.error('Failed to get language preferences:', error);
+      return { nativeLanguage: null, targetLanguages: [] };
+    }
+  },
+
+  /**
+   * Обновить родной язык и/или изучаемые языки пользователя
+   */
+  async updateLanguagePreferences(
+    userId: string,
+    data: { nativeLanguage?: string; targetLanguages?: string[] },
+  ): Promise<boolean> {
+    try {
+      const connectionString = getConnectionString();
+      if (!connectionString) return false;
+      const sql = neon(connectionString);
+      await sql`
+        UPDATE users SET
+          native_language = COALESCE(${data.nativeLanguage ?? null}, native_language),
+          target_languages = COALESCE(${data.targetLanguages ?? null}, target_languages)
+        WHERE id = ${userId}::uuid
+      `;
+      return true;
+    } catch (error) {
+      console.error('Failed to update language preferences:', error);
+      return false;
+    }
+  },
+
+  /**
    * Добавить алмазы пользователю (increment)
    */
   async addDiamonds(userId: string, amount: number): Promise<boolean> {
@@ -252,6 +299,8 @@ export const NeonService = {
     data: {
       displayName?: string;
       teacher?: boolean;
+      nativeLanguage?: string;
+      targetLanguages?: string[];
       learningGoal?: string;
       dailyGoal?: string;
       teacherSubject?: string;
@@ -266,6 +315,8 @@ export const NeonService = {
         UPDATE users SET
           display_name = COALESCE(${data.displayName ?? null}, display_name),
           teacher = COALESCE(${data.teacher ?? null}, teacher),
+          native_language = COALESCE(${data.nativeLanguage ?? null}, native_language),
+          target_languages = COALESCE(${data.targetLanguages ?? null}, target_languages),
           learning_goal = COALESCE(${data.learningGoal ?? null}, learning_goal),
           daily_goal = COALESCE(${data.dailyGoal ?? null}, daily_goal),
           teacher_subject = COALESCE(${data.teacherSubject ?? null}, teacher_subject),

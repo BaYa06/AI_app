@@ -138,6 +138,7 @@ class LibraryServiceClass {
       cardsMin,
       cardsMax,
       page = 1,
+      curatedOnly,
     } = filters;
     const limitNum = 20;
     const offset = (page - 1) * limitNum;
@@ -146,6 +147,10 @@ class LibraryServiceClass {
     const conditions: string[] = [`ls.status = 'published'`];
     const params: any[] = [];
     let paramIndex = 1;
+
+    if (curatedOnly) {
+      conditions.push(`ls.is_featured = true`);
+    }
 
     if (search) {
       if (search.startsWith('@')) {
