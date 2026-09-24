@@ -311,19 +311,16 @@ export default function App() {
   // Guard: не отправляем push токен повторно для того же userId
   const pushedTokenForUserRef = useRef<string | null>(null);
 
-  // Каталог книг: при возврате в приложение подтягиваем юниты, которые учитель открыл/закрыл
-  // в курсах ученика (полная загрузка данных идёт только при старте). Не чаще раза в минуту.
+  // Каталог книг: при возврате в приложение подтягиваем юниты, которые открыли/закрыли в курсах
+  // пользователя (полная загрузка данных идёт только при старте). Не чаще раза в минуту.
   useEffect(() => {
     if (!currentUserId) return;
     let lastRefreshAt = Date.now();
     const subscription = AppState.addEventListener('change', (state) => {
       if (state !== 'active' || Date.now() - lastRefreshAt < 60_000) return;
-      const studentCourseIds = useCoursesStore.getState().courses
-        .filter((c) => c.isStudentCourse)
-        .map((c) => c.id);
-      if (studentCourseIds.length === 0) return;
+      if (useCoursesStore.getState().courses.length === 0) return;
       lastRefreshAt = Date.now();
-      BookService.refreshStudentCourseUnits(studentCourseIds).catch(() => {});
+      BookService.syncOfficialSets().catch(() => {});
     });
     return () => subscription.remove();
   }, [currentUserId]);

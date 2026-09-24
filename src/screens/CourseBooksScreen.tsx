@@ -76,6 +76,8 @@ export function CourseBooksScreen({ navigation, route }: Props) {
       return;
     }
     updateUnit(unit.id, { isOpen: result.data.isOpen, openedAt: result.data.openedAt });
+    // Открытый юнит появляется в курсе и у самого учителя (как у учеников), закрытый — пропадает.
+    BookService.syncOfficialSets().catch(() => {});
   }, [courseId, pendingUnitIds, updateUnit]);
 
   const openUnitSet = useCallback(async (unit: CoursePlanUnit) => {
@@ -104,6 +106,7 @@ export function CourseBooksScreen({ navigation, route }: Props) {
       return;
     }
     setPlan((prev) => (prev ? { ...prev, books: prev.books.filter((b) => b.id !== book.id) } : prev));
+    BookService.syncOfficialSets().catch(() => {});
   }, [courseId, courseTitle]);
 
   const goToLibrary = useCallback(() => {

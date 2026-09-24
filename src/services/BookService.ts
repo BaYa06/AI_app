@@ -55,6 +55,8 @@ interface OfficialSetsResponse {
     id: string; title: string; description: string; category: string;
     languageFrom: string; languageTo: string; createdAt: string; updatedAt: string | null;
     unitId: string; unitNumber: number; unitTitle: string; bookId: string; bookTitle: string;
+    /** Мои курсы (учитель или ученик), где юнит сейчас открыт. */
+    courseIds: string[];
   }>;
   cards: Array<{
     id: string; setId: string; front: string; back: string; example: string;
@@ -130,11 +132,14 @@ export const BookService = {
 
     const sets: CardSet[] = result.data.sets.map((row) => {
       const cards = cardsBySet[row.id] || [];
+      const courseIds = row.courseIds || [];
+      const courseId = courseIdBySet[row.id] ?? courseIds[0] ?? null;
       return {
         id: row.id,
         userId: '',
-        courseId: courseIdBySet[row.id] ?? null,
-        ownerCourseId: courseIdBySet[row.id],
+        courseId,
+        ownerCourseId: courseId ?? undefined,
+        officialCourseIds: courseIds,
         title: row.title,
         description: row.description,
         category: row.category as CardSet['category'],
@@ -195,39 +200,17 @@ export const BookService = {
   },
 
   /**
-   * Обновить открытые юниты курсов ученика без полной перезагрузки данных (при возврате в приложение):
-   * новые открытые юниты появляются в курсе, закрытые — пропадают из него. Если ученик уже учил
-   * закрытый юнит, набор остаётся в «Все» вместе с прогрессом.
+   * Синхронизировать официальные наборы с сервером без полной перезагрузки данных — после того,
+   * как учитель открыл/закрыл юнит, и при возврате в приложение. Сервер сам знает, где юниты
+   * открыты (в своих курсах и в курсах, где пользователь ученик):
+   * - открытый юнит появляется в курсе — и у учеников, и у самого учителя;
+   * - закрытый пропадает из курса; если его уже учили — остаётся в «Все» вместе с прогрессом;
+   * - без сети ничего не меняется; юниты, открытые из каталога без курса, не трогаются.
    */
-  async refreshStudentCourseUnits(studentCourseIds: string[]): Promise<void> {
-    const plans = await Promise.all(studentCourseIds.map(async (courseId) => ({ courseId, plan: await BookService.getCoursePlan(courseId) })));
-    // Если хоть один план не загрузился (нет сети) — ничего не трогаем, чтобы не убрать юниты по ошибке.
-    if (plans.some((p) => p.plan === null)) return;
-
-    const courseIdBySet: Record<string, string> = {};
-    for (const { courseId, plan } of plans) {
-      for (const book of plan!.books) {
-        for (const unit of book.units) {
-          if (unit.isOpen && unit.set) courseIdBySet[unit.set.id] = courseId;
-        }
-      }
-    }
-
-    const bundle = await BookService.loadOfficialSets(Object.keys(courseIdBySet), courseIdBySet);
-    if (!bundle) return;
-
-    const { useSetsStore, useCardsStore } = getStores();
-    const keep = new Set(bundle.sets.map((x) => x.id));
-    // Убираем только юниты, показанные под курсами ученика, которые учитель закрыл (и которые ученик
-    // не начинал). Юниты, открытые из каталога без курса, не трогаем — их экран может быть открыт.
-    const stale = Object.values(useSetsStore.getState().sets).filter(
-      (x) => x.isOfficial && !!x.courseId && studentCourseIds.includes(x.courseId) && !keep.has(x.id),
-    );
-    for (const cardSet of stale) {
-      useCardsStore.getState().replaceSetCards(cardSet.id, []);
-      useSetsStore.getState().deleteSet(cardSet.id); // read-only: удаляется только локально
-    }
-    BookService.applyOfficialSets(bundle, { preserveCourse: false });
+  syncOfficialSets(): Promise<void> {
+    // По очереди: при быстрых переключениях юнитов ответы не должны применяться не по порядку.
+    syncQueue = syncQueue.then(runSyncOfficialSets, runSyncOfficialSets);
+    return syncQueue;
   },
 
   // ─── Учитель: книги в курсах ───────────────────────────────
@@ -266,3 +249,21 @@ export const BookService = {
     return true;
   },
 };
+
+let syncQueue: Promise<void> = Promise.resolve();
+
+async function runSyncOfficialSets(): Promise<void> {
+  const bundle = await BookService.loadOfficialSets();
+  if (!bundle) return;
+
+  const { useSetsStore, useCardsStore } = getStores();
+  const keep = new Set(bundle.sets.map((x) => x.id));
+  const stale = Object.values(useSetsStore.getState().sets).filter(
+    (x) => x.isOfficial && (!!x.courseId || (x.officialCourseIds?.length ?? 0) > 0) && !keep.has(x.id),
+  );
+  for (const cardSet of stale) {
+    useCardsStore.getState().replaceSetCards(cardSet.id, []);
+    useSetsStore.getState().deleteSet(cardSet.id); // read-only: удаляется только локально
+  }
+  BookService.applyOfficialSets(bundle, { preserveCourse: false });
+}

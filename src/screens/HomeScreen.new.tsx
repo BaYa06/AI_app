@@ -4,10 +4,11 @@
  */
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { View, StyleSheet, ScrollView, Pressable, TextInput, useWindowDimensions, TextInput as RNTextInput, Modal, Platform, Alert, Clipboard, Share, ActivityIndicator } from 'react-native';
+import { showMessage } from '@/utils/dialogs';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { useSetsStore, useSettingsStore, useThemeColors, useCardsStore, useCoursesStore, useDiamondStore, useChallengeStore } from '@/store';
+import { useSetsStore, useSettingsStore, useThemeColors, useCardsStore, useCoursesStore, useDiamondStore, useChallengeStore, isSetInCourse } from '@/store';
 import { selectSetStats } from '@/store/cardsStore';
 import { Text, DiamondReward } from '@/components/common';
 import type { DiamondRewardRef } from '@/components/common';
@@ -503,7 +504,7 @@ export function HomeScreen({ navigation }: any) {
     if (activeCourseId === null) {
       return allSets; // "All" - показываем все наборы
     }
-    return allSets.filter((set) => set.courseId === activeCourseId);
+    return allSets.filter((set) => isSetInCourse(set, activeCourseId));
   }, [allSets, activeCourseId]);
 
   // Поиск и сортировка по текущему списку наборов
@@ -703,7 +704,7 @@ export function HomeScreen({ navigation }: any) {
   // Подсчет наборов в каждом курсе
   const getCourseStats = useCallback(
     (courseId: string | null) => {
-      const sets = courseId === null ? allSets : allSets.filter((s) => s.courseId === courseId);
+      const sets = courseId === null ? allSets : allSets.filter((s) => isSetInCourse(s, courseId));
       const cards = sets.reduce((sum, s) => sum + (s.cardCount || 0), 0);
       const mastered = sets.reduce((sum, s) => sum + (s.masteredCount || 0), 0);
       const percent = cards > 0 ? Math.round((mastered / cards) * 100) : 0;
@@ -999,6 +1000,44 @@ export function HomeScreen({ navigation }: any) {
     runAfterDrawerClosed(() => setIsEditModalVisible(true));
   }, [runAfterDrawerClosed]);
 
+  // Баннер учителя — вход в курс (ученики, приглашения, тесты, «Учебники курса»). Показывается и
+  // когда в курсе ещё нет наборов: иначе в новом пустом курсе до него было не добраться.
+  const teacherBanner = (
+    <View style={{ paddingHorizontal: spacing.m, paddingTop: spacing.m, paddingBottom: spacing.s }}>
+      <Pressable
+        style={styles.teacherBanner}
+        onPress={() => {
+          const ownCourses = courses.filter(c => !c.isStudentCourse);
+          const targetCourse = ownCourses.find(c => c.id === activeCourseId) ?? ownCourses[0];
+
+          if (!targetCourse) {
+            showMessage('Нет курсов', 'Сначала создайте курс, чтобы открыть статистику учителя.');
+            return;
+          }
+
+          const rootNav = navigation?.getParent?.() ?? navigation;
+          rootNav?.navigate('TeacherCourseStats', {
+            courseId: targetCourse.id,
+            courseTitle: targetCourse.title || 'Курс',
+          });
+        }}
+      >
+        <View style={styles.teacherBannerLeft}>
+          <View style={styles.teacherBannerIcon}>
+            <Ionicons name="school-outline" size={22} color="#FFFFFF" />
+          </View>
+          <View>
+            <Text style={styles.teacherBannerTitle}>Teacher Mode</Text>
+            <Text style={styles.teacherBannerSubtitle}>Manage students & sets</Text>
+          </View>
+        </View>
+        <View style={styles.teacherBannerButton}>
+          <Text style={styles.teacherBannerButtonText}>My Classes →</Text>
+        </View>
+      </Pressable>
+    </View>
+  );
+
   return (
     <GestureDetector gesture={rootGesture}>
       <View
@@ -1097,6 +1136,8 @@ export function HomeScreen({ navigation }: any) {
           bounces
         >
         {visibleSets.length === 0 ? (
+          <>
+          {isTeacher === true && teacherBanner}
           <View style={styles.emptyStateModern}>
             <View style={styles.illustrationWrap}>
               <View style={[styles.illustrationGlow, { backgroundColor: colors.primary + '22' }]} />
@@ -1135,49 +1176,19 @@ export function HomeScreen({ navigation }: any) {
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.tipTitle, { color: colors.textPrimary }]}>Подсказка</Text>
                   <Text style={[styles.tipText, { color: colors.textSecondary }]}>
-                    Объединяйте несколько наборов в курс — так проще учиться по теме или семестру.
+                    {isTeacher
+                      ? 'Курс пустой? Через Teacher Mode выше можно пригласить учеников и подключить учебник — наборы для этого не нужны.'
+                      : 'Объединяйте несколько наборов в курс — так проще учиться по теме или семестру.'}
                   </Text>
                 </View>
               </View>
             </View>
           </View>
+          </>
         ) : (
           <>
             {isTeacher === null ? null : isTeacher ? (
-              /* Teacher Mode Banner */
-              <View style={{ paddingHorizontal: spacing.m, paddingTop: spacing.m, paddingBottom: spacing.s }}>
-                <Pressable
-                  style={styles.teacherBanner}
-                  onPress={() => {
-                    const ownCourses = courses.filter(c => !c.isStudentCourse);
-                    const targetCourse = ownCourses.find(c => c.id === activeCourseId) ?? ownCourses[0];
-
-                    if (!targetCourse) {
-                      Alert.alert('Нет курсов', 'Сначала создайте курс, чтобы открыть статистику учителя.');
-                      return;
-                    }
-
-                    const rootNav = navigation?.getParent?.() ?? navigation;
-                    rootNav?.navigate('TeacherCourseStats', {
-                      courseId: targetCourse.id,
-                      courseTitle: targetCourse.title || 'Курс',
-                    });
-                  }}
-                >
-                  <View style={styles.teacherBannerLeft}>
-                    <View style={styles.teacherBannerIcon}>
-                      <Ionicons name="school-outline" size={22} color="#FFFFFF" />
-                    </View>
-                    <View>
-                      <Text style={styles.teacherBannerTitle}>Teacher Mode</Text>
-                      <Text style={styles.teacherBannerSubtitle}>Manage students & sets</Text>
-                    </View>
-                  </View>
-                  <View style={styles.teacherBannerButton}>
-                    <Text style={styles.teacherBannerButtonText}>My Classes →</Text>
-                  </View>
-                </Pressable>
-              </View>
+              teacherBanner
             ) : (
               /* Challenges Section */
               <View style={styles.challengesSection}>
@@ -1388,7 +1399,11 @@ export function HomeScreen({ navigation }: any) {
                       style={styles.moreButton}
                       onPress={(e) => {
                         e.stopPropagation();
-                        if (set.courseId && isTeacher) {
+                        // Юнит учебника нельзя редактировать/скрывать — открываем сам набор
+                        // (там у учителя есть «Сделать копию себе»).
+                        if (set.isOfficial) {
+                          navigation?.navigate('SetDetail', { setId: set.id });
+                        } else if (set.courseId && isTeacher) {
                           setSetMenuTarget(set);
                         } else {
                           navigation?.navigate('SetEditor', { setId: set.id, autoFocusTitle: true });
@@ -1496,13 +1511,13 @@ export function HomeScreen({ navigation }: any) {
           <Pressable
             style={[
               styles.editModalContent,
-              { backgroundColor: colors.surface, borderColor: colors.border },
+              { backgroundColor: modalSurface, borderColor: modalBorder },
             ]}
             onPress={(e) => e.stopPropagation()}
           >
             <View style={styles.editModalHeader}>
               <Text style={[styles.editModalTitle, { color: colors.textPrimary }]}>
-                Rename Course
+                Переименовать курс
               </Text>
               <Pressable onPress={cancelCourseEdit}>
                 <X size={20} color={colors.textSecondary} />
@@ -1519,7 +1534,7 @@ export function HomeScreen({ navigation }: any) {
               <TextInput
                 ref={editModalInputRef}
                 style={[styles.editModalInput, { color: colors.textPrimary }]}
-                placeholder="Course name..."
+                placeholder="Название курса..."
                 placeholderTextColor={colors.textSecondary}
                 value={editingTitle}
                 onChangeText={setEditingTitle}
@@ -1534,7 +1549,7 @@ export function HomeScreen({ navigation }: any) {
                 onPress={cancelCourseEdit}
               >
                 <Text style={[styles.editModalButtonText, { color: colors.textSecondary }]}>
-                  Cancel
+                  Отмена
                 </Text>
               </Pressable>
               <Pressable
@@ -1546,7 +1561,7 @@ export function HomeScreen({ navigation }: any) {
                 onPress={() => editingCourseId && saveCourseTitle(editingCourseId)}
               >
                 <Text style={[styles.editModalButtonText, { color: '#FFFFFF' }]}>
-                  Save
+                  Сохранить
                 </Text>
               </Pressable>
             </View>
@@ -1565,7 +1580,7 @@ export function HomeScreen({ navigation }: any) {
           <Pressable
             style={[
               styles.editModalContent,
-              { backgroundColor: colors.surface, borderColor: colors.border },
+              { backgroundColor: modalSurface, borderColor: modalBorder },
             ]}
             onPress={(e) => e.stopPropagation()}
           >
@@ -1635,7 +1650,7 @@ export function HomeScreen({ navigation }: any) {
           onPress={() => !leaveLoading && setLeaveModalCourseId(null)}
         >
           <Pressable
-            style={[styles.editModalContent, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            style={[styles.editModalContent, { backgroundColor: modalSurface, borderColor: modalBorder }]}
             onPress={(e) => e.stopPropagation()}
           >
             <View style={styles.editModalHeader}>
@@ -1830,14 +1845,23 @@ export function HomeScreen({ navigation }: any) {
         animationType="fade"
         onRequestClose={() => setSortSheetVisible(false)}
       >
-        <Pressable style={styles.sortSheetBackdrop} onPress={() => setSortSheetVisible(false)}>
+        <Pressable
+          style={[styles.sortSheetBackdrop, { backgroundColor: modalOverlayBg }]}
+          onPress={() => setSortSheetVisible(false)}
+        >
+          {/* В тёмной теме colors.surface полупрозрачный (rgba 0.05) — окно просвечивало,
+              текст сливался с экраном. Берём непрозрачный фон модалок, как у меню набора. */}
           <Pressable
             style={[
               styles.sortSheet,
-              { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.m },
+              {
+                backgroundColor: modalSurface,
+                borderColor: modalBorder,
+                paddingBottom: insets.bottom + spacing.m,
+              },
             ]}
           >
-            <View style={[styles.sortSheetHandle, { backgroundColor: colors.border }]} />
+            <View style={[styles.sortSheetHandle, { backgroundColor: modalHandleColor }]} />
             <Text style={[styles.sortSheetTitle, { color: colors.textPrimary }]}>Сортировка</Text>
             {SETS_SORT_OPTIONS.map((option) => {
               const selected = option.key === setsSort;
@@ -1847,7 +1871,7 @@ export function HomeScreen({ navigation }: any) {
                   onPress={() => selectSetsSort(option.key)}
                   style={({ pressed }) => [
                     styles.sortOption,
-                    pressed && { backgroundColor: colors.border + '55' },
+                    pressed && { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : colors.border + '55' },
                   ]}
                 >
                   <Text
@@ -2447,6 +2471,8 @@ const styles = StyleSheet.create({
   sortSheet: {
     borderTopLeftRadius: borderRadius.xl,
     borderTopRightRadius: borderRadius.xl,
+    borderWidth: 1,
+    borderBottomWidth: 0,
     paddingTop: spacing.s,
     paddingHorizontal: spacing.m,
   },

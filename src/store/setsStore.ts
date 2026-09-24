@@ -78,6 +78,11 @@ interface SetsActions {
   clearSets: () => void;
 }
 
+/** Набор относится к курсу: свой набор курса или юнит книги, открытый в этом курсе. */
+export function isSetInCourse(cardSet: CardSet, courseId: string): boolean {
+  return cardSet.courseId === courseId || cardSet.officialCourseIds?.includes(courseId) === true;
+}
+
 const LOCAL_USER_ID = 'local'; // Для локального хранения
 const REMOTE_USER_ID = process.env.POSTGRES_DEFAULT_USER_ID || '00000000-0000-0000-0000-000000000001';
 
@@ -356,7 +361,7 @@ export const useSetsStore = create<SetsState & SetsActions>()(
           if (!s || s.isArchived) return false;
           if (courseId === null) return true; // "All" показывает все
           // Учитываем, что courseId может быть undefined для старых наборов
-          return s.courseId === courseId;
+          return isSetInCourse(s, courseId);
         });
     },
 

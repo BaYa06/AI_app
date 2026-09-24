@@ -176,6 +176,9 @@ export interface CardSet {
   unitNumber?: number;
   bookId?: string;
   bookTitle?: string;
+  // Все курсы пользователя (свои и где он ученик), где этот юнит сейчас открыт — набор
+  // показывается в каждом из них (courseId — только первый из них).
+  officialCourseIds?: string[];
 }
 
 /**

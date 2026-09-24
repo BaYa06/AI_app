@@ -44,14 +44,24 @@ import {
   Trash2,
   LogOut,
 } from 'lucide-react-native';
-import { useThemeColors } from '@/store';
+import { useThemeColors, useSettingsStore } from '@/store';
 import { spacing, borderRadius, getDeckAccentColor } from '@/constants';
 import { triggerHaptic } from '@/utils/haptic';
+import { pluralize } from '@/utils';
 import type { Course } from '@/types';
 import { animateDrawerTo, clampTranslateX, resolveDrawerOpen } from './drawerAnimation';
 
 type ThemeColors = ReturnType<typeof useThemeColors>;
 type CourseStats = { setCount: number; cardCount: number; masteredPercent: number };
+
+/** «3 набора • 42 карточки • 15% выучено» */
+function formatCourseStats(stats: CourseStats): string {
+  return [
+    `${stats.setCount} ${pluralize(stats.setCount, 'набор', 'набора', 'наборов')}`,
+    `${stats.cardCount} ${pluralize(stats.cardCount, 'карточка', 'карточки', 'карточек')}`,
+    `${stats.masteredPercent}% выучено`,
+  ].join(' • ');
+}
 type Insets = { top: number; bottom: number; left: number; right: number };
 
 interface CourseRowProps {
@@ -99,6 +109,10 @@ const CourseRow = memo(function CourseRow({
 }: CourseRowProps) {
   const isStudent = course.isStudentCourse === true;
   const courseAccent = getDeckAccentColor(course.id || index);
+  // В тёмной теме colors.surface полупрозрачный — меню просвечивало. Непрозрачный фон, как у модалок главной.
+  const isDark = useSettingsStore((s) => s.resolvedTheme) === 'dark';
+  const menuBg = isDark ? 'rgb(32, 34, 44)' : colors.surface;
+  const menuBorder = isDark ? 'rgba(255,255,255,0.08)' : colors.border;
 
   return (
     <Pressable
@@ -108,6 +122,9 @@ const CourseRow = memo(function CourseRow({
           ? { borderLeftColor: courseAccent, backgroundColor: courseAccent + '1A' }
           : { borderLeftColor: colors.border },
         { borderColor: colors.border, position: 'relative' },
+        // Меню выше карточки и накрывает следующий курс. Без этого следующая карточка (более поздний
+        // соседний элемент) оказывалась поверх и перехватывала нажатия — «Delete» не нажимался.
+        isMenuOpen && styles.courseItemMenuOpen,
       ]}
       onPress={() => {
         if (!isEditing) {
@@ -138,7 +155,7 @@ const CourseRow = memo(function CourseRow({
                   <TextInput
                     ref={editInputRef}
                     style={[styles.editCourseInput, { color: colors.textPrimary }]}
-                    placeholder="Course name..."
+                    placeholder="Название курса..."
                     placeholderTextColor={colors.textSecondary}
                     value={editingTitle}
                     onChangeText={onChangeEditingTitle}
@@ -166,7 +183,7 @@ const CourseRow = memo(function CourseRow({
               <Text style={[styles.courseMeta, { color: colors.textSecondary }]}>{course.teacherName}</Text>
             ) : (
               <Text style={[styles.courseMeta, { color: colors.textSecondary }]}>
-                {stats.setCount} sets • {stats.cardCount} cards • {stats.masteredPercent}% mastered
+                {formatCourseStats(stats)}
               </Text>
             )}
           </View>
@@ -186,7 +203,7 @@ const CourseRow = memo(function CourseRow({
         <View
           style={[
             styles.courseMenu,
-            { backgroundColor: colors.surface, borderColor: colors.border, shadowColor: colors.textPrimary },
+            { backgroundColor: menuBg, borderColor: menuBorder, shadowColor: '#000' },
           ]}
         >
           {isStudent ? (
@@ -222,7 +239,7 @@ const CourseRow = memo(function CourseRow({
                 }}
               >
                 <Edit2 size={16} color={colors.textPrimary} style={{ marginRight: spacing.s }} />
-                <Text style={[styles.courseMenuText, { color: colors.textPrimary }]}>Rename</Text>
+                <Text style={[styles.courseMenuText, { color: colors.textPrimary }]}>Переименовать</Text>
               </Pressable>
               <Pressable
                 style={({ pressed }) => [styles.courseMenuItem, pressed && { backgroundColor: colors.border }]}
@@ -232,7 +249,7 @@ const CourseRow = memo(function CourseRow({
                 }}
               >
                 <Trash2 size={16} color={colors.error} style={{ marginRight: spacing.s }} />
-                <Text style={[styles.courseMenuText, { color: colors.error }]}>Delete</Text>
+                <Text style={[styles.courseMenuText, { color: colors.error }]}>Удалить</Text>
               </Pressable>
             </>
           )}
@@ -416,7 +433,7 @@ export const CoursesDrawer = memo(function CoursesDrawer(props: CoursesDrawerPro
           <TextInput
             ref={newCourseInputRef}
             style={[styles.newCourseInput, { color: colors.textPrimary }]}
-            placeholder="Course name..."
+            placeholder="Название курса..."
             placeholderTextColor={colors.textSecondary}
             value={newCourseTitle}
             onChangeText={onChangeNewCourseTitle}
@@ -433,7 +450,7 @@ export const CoursesDrawer = memo(function CoursesDrawer(props: CoursesDrawerPro
             onPress={onStartCreatingCourse}
           >
             <Plus size={18} color={colors.primary} />
-            <Text style={[styles.newCourseText, { color: colors.primary }]}>New course</Text>
+            <Text style={[styles.newCourseText, { color: colors.primary }]}>Новый курс</Text>
           </Pressable>
           <Pressable
             style={[styles.newCourseButton, { backgroundColor: colors.primary + '1A', borderColor: colors.primary + '33' }]}
@@ -461,10 +478,10 @@ export const CoursesDrawer = memo(function CoursesDrawer(props: CoursesDrawerPro
             <Library size={24} color={activeCourseId === null ? colors.primary : colors.textPrimary} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.courseTitle, { color: activeCourseId === null ? colors.primary : colors.textPrimary }]}>
-                All
+                Все наборы
               </Text>
               <Text style={[styles.courseMeta, { color: colors.textSecondary }]}>
-                {allStats.setCount} sets • {allStats.cardCount} cards • {allStats.masteredPercent}% mastered
+                {formatCourseStats(allStats)}
               </Text>
             </View>
           </View>
@@ -509,7 +526,7 @@ export const CoursesDrawer = memo(function CoursesDrawer(props: CoursesDrawerPro
               ]}
             >
               <View style={styles.drawerHeader}>
-                <Text style={[styles.drawerTitle, { color: colors.textPrimary }]}>Courses</Text>
+                <Text style={[styles.drawerTitle, { color: colors.textPrimary }]}>Курсы</Text>
               </View>
 
               <View style={styles.drawerBody}>
@@ -675,6 +692,10 @@ const styles = StyleSheet.create({
   },
   courseMoreButton: {
     padding: spacing.xs,
+  },
+  courseItemMenuOpen: {
+    zIndex: 50,
+    elevation: 12,
   },
   courseMenu: {
     position: 'absolute',

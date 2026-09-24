@@ -18,7 +18,8 @@ import { getAuthedUserId } from './_auth.js';
  * POST /api/books?action=set-unit-open       { courseId, unitId, isOpen }
  * POST /api/books?action=fork-set            { setId, courseId? }  копия официального набора в свой обычный набор
  * GET  /api/books?action=official-sets       ?setIds=a,b           официальные наборы + карточки с моим прогрессом:
- *                                                                   запрошенные + те, что я уже начинал учить
+ *                                                                   запрошенные + открытые в моих курсах (я учитель
+ *                                                                   или ученик) + те, что я уже начинал учить
  *
  * План юнитов: строка в course_units есть только у юнитов, которые хоть раз переключали.
  * Нет строки = юнит закрыт. Поэтому юниты, добавленные в книгу позже, в уже подключённых
@@ -397,9 +398,11 @@ async function forkSet(req, res, sql, userId) {
 // ─── Официальные наборы с карточками для учёбы ──────────────
 
 /**
- * Наборы: запрошенные по setIds (например, открытые юниты курса или юнит, который открыли в каталоге)
- * плюс все официальные наборы, по карточкам которых у вызывающего уже есть прогресс, — чтобы начатые
- * юниты книг оставались в «Моих наборах» между запусками. Только опубликованные книги (админу — все).
+ * Наборы: запрошенные по setIds (например, юнит, который открыли в каталоге) + юниты, открытые
+ * в курсах вызывающего — своих (учитель видит у себя то же, что ученики) и тех, где он ученик —
+ * + все официальные наборы, по карточкам которых у него уже есть прогресс (начатые юниты остаются
+ * в «Моих наборах» между запусками). Только опубликованные книги (админу — все).
+ * courseIds — курсы вызывающего, где юнит сейчас открыт: под ними набор показывается в приложении.
  * Прогресс в карточках — личный, из card_progress; общие SRS-колонки cards не используются.
  */
 async function officialSets(req, res, sql, userId) {
@@ -411,15 +414,30 @@ async function officialSets(req, res, sql, userId) {
   const admin = await isAdmin(sql, userId);
 
   const sets = await sql`
+    WITH my_open_units AS (
+      SELECT cu.unit_id, cu.course_id
+      FROM course_units cu
+      JOIN courses c ON c.id = cu.course_id
+      JOIN book_units bu ON bu.id = cu.unit_id
+      JOIN course_books cb ON cb.course_id = cu.course_id AND cb.book_id = bu.book_id
+      WHERE cu.is_open = true
+        AND (
+          c.user_id = ${userId}::uuid
+          OR EXISTS (SELECT 1 FROM course_members m WHERE m.course_id = c.id AND m.user_id = ${userId}::uuid)
+        )
+    )
     SELECT cs.id, cs.title, cs.description, cs.category, cs.language_from, cs.language_to,
            cs.created_at, cs.updated_at, cs.unit_id,
-           u.number AS unit_number, u.title AS unit_title, b.id AS book_id, b.title AS book_title
+           u.number AS unit_number, u.title AS unit_title, b.id AS book_id, b.title AS book_title,
+           COALESCE((SELECT array_agg(mou.course_id::text ORDER BY mou.course_id)
+                       FROM my_open_units mou WHERE mou.unit_id = u.id), '{}') AS course_ids
     FROM card_sets cs
     JOIN book_units u ON u.id = cs.unit_id
     JOIN books b ON b.id = u.book_id AND (b.is_published = true OR ${admin}::boolean)
     WHERE cs.is_official = true
       AND (
         cs.id = ANY(${requested}::uuid[])
+        OR u.id IN (SELECT unit_id FROM my_open_units)
         OR EXISTS (
           SELECT 1 FROM cards c JOIN card_progress p ON p.card_id = c.id AND p.user_id = ${userId}::uuid
           WHERE c.set_id = cs.id
@@ -460,6 +478,7 @@ async function officialSets(req, res, sql, userId) {
       unitTitle: row.unit_title,
       bookId: row.book_id,
       bookTitle: row.book_title,
+      courseIds: row.course_ids || [],
     })),
     cards: cards.map((row) => ({
       id: row.id,
