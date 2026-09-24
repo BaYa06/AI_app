@@ -388,7 +388,6 @@ const styles = StyleSheet.create({
     gap: 20,
     minHeight: 260,
     position: 'relative',
-    overflow: 'hidden',
   },
   overlay: {
     position: 'absolute',
@@ -416,8 +415,12 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     color: '#FFFFFF',
   },
+  // Явный lineHeight + paddingTop дают запас сверху: без него на iOS обрезаются
+  // заглавные с диакритикой (Ä, É, Й) — как на обычной карточке.
   frontText: {
     fontSize: 36,
+    lineHeight: 46,
+    paddingTop: 4,
     fontWeight: '700',
     textAlign: 'center',
   },
@@ -427,6 +430,8 @@ const styles = StyleSheet.create({
   },
   backText: {
     fontSize: 22,
+    lineHeight: 30,
+    paddingTop: 2,
     fontWeight: '400',
     textAlign: 'center',
   },

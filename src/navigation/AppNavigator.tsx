@@ -8,7 +8,7 @@ import { triggerHaptic } from '@/utils/haptic';
 import { NavigationContainer, useNavigationContainerRef, type LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { useThemeColors } from '@/store';
 import type { RootStackParamList, MainTabParamList } from '@/types/navigation';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -45,23 +45,25 @@ function BounceIcon({ name, color, focused }: { name: string; color: string; foc
   );
 }
 
+// Лёгкое проявление вкладки при переключении табов — без сдвига. Сбрасываем прозрачность
+// только когда ушли на другую вкладку: при открытии stack-экрана поверх вкладка остаётся
+// видимой под анимацией push/свайпа назад и не должна бледнеть.
 function FadeScreen({ children }: { children: React.ReactNode }) {
   const colors = useThemeColors();
+  const navigation = useNavigation();
+  const route = useRoute();
   const opacity = useRef(new Animated.Value(0.4)).current;
-  const translateY = useRef(new Animated.Value(6)).current;
 
   useFocusEffect(
     useCallback(() => {
       if (Platform.OS === 'web') return;
-      Animated.parallel([
-        Animated.timing(opacity, { toValue: 1, duration: 220, useNativeDriver: true }),
-        Animated.timing(translateY, { toValue: 0, duration: 220, useNativeDriver: true }),
-      ]).start();
+      Animated.timing(opacity, { toValue: 1, duration: 220, useNativeDriver: true }).start();
       return () => {
-        opacity.setValue(0.4);
-        translateY.setValue(6);
+        const tabState = navigation.getState();
+        const stillActiveTab = tabState?.routes[tabState.index]?.key === route.key;
+        if (!stillActiveTab) opacity.setValue(0.4);
       };
-    }, [])
+    }, [navigation, route.key])
   );
 
   if (Platform.OS === 'web') {
@@ -69,7 +71,7 @@ function FadeScreen({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <Animated.View style={{ flex: 1, backgroundColor: colors.background, opacity, transform: [{ translateY }] }}>
+    <Animated.View style={{ flex: 1, backgroundColor: colors.background, opacity }}>
       {children}
     </Animated.View>
   );

@@ -298,6 +298,29 @@ export function HomeScreen({ navigation }: any) {
     }
   }, [drawerOpen, drawerWidth, drawerTranslateX]);
 
+  // Шторка — это отдельный <Modal>. Если открыть другой Modal, пока она ещё закрывается,
+  // iOS презентует его поверх шторки, а при её размонтировании новое окно пропадает вместе
+  // с ней, оставляя невидимый слой, который глотает все нажатия. Поэтому окна, открываемые
+  // из шторки, показываем только после её полного размонтирования.
+  const afterDrawerClosedRef = useRef<(() => void) | null>(null);
+  const runAfterDrawerClosed = useCallback((fn: () => void) => {
+    if (!drawerMounted) {
+      fn();
+      return;
+    }
+    afterDrawerClosedRef.current = fn;
+    setDrawerOpen(false);
+  }, [drawerMounted]);
+
+  useEffect(() => {
+    if (drawerMounted || !afterDrawerClosedRef.current) return;
+    const fn = afterDrawerClosedRef.current;
+    afterDrawerClosedRef.current = null;
+    // Кадр запаса, чтобы iOS успел закончить dismiss контроллера шторки
+    const t = setTimeout(fn, 50);
+    return () => clearTimeout(t);
+  }, [drawerMounted]);
+
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -672,9 +695,8 @@ export function HomeScreen({ navigation }: any) {
 
   const handleJoinByCodePress = useCallback(() => {
     setCourseMenuOpen(null);
-    setDrawerOpen(false);
-    setJoinByCodeVisible(true);
-  }, []);
+    runAfterDrawerClosed(() => setJoinByCodeVisible(true));
+  }, [runAfterDrawerClosed]);
 
   const handleDrawerBackdropPress = useCallback(() => {
     if (courseMenuOpen) {
@@ -791,9 +813,8 @@ export function HomeScreen({ navigation }: any) {
   // Обработка удаления курса через модальное окно
   const openDeleteModal = useCallback((courseId: string) => {
     setCourseMenuOpen(null);
-    setDeleteModalCourseId(courseId);
-    setDrawerOpen(false);
-  }, []);
+    runAfterDrawerClosed(() => setDeleteModalCourseId(courseId));
+  }, [runAfterDrawerClosed]);
 
   const closeDeleteModal = useCallback(() => {
     setDeleteModalCourseId(null);
@@ -924,12 +945,8 @@ export function HomeScreen({ navigation }: any) {
     setEditingCourseId(courseId);
     setEditingTitle(currentTitle);
     setCourseMenuOpen(null);
-    setDrawerOpen(false); // Закрываем drawer перед открытием модального окна
-    // Небольшая задержка чтобы drawer успел закрыться
-    setTimeout(() => {
-      setIsEditModalVisible(true);
-    }, 100);
-  }, []);
+    runAfterDrawerClosed(() => setIsEditModalVisible(true));
+  }, [runAfterDrawerClosed]);
 
   return (
     <GestureDetector gesture={rootGesture}>
@@ -1026,7 +1043,7 @@ export function HomeScreen({ navigation }: any) {
           style={styles.content}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
-          bounces={false}
+          bounces
         >
         {visibleSets.length === 0 ? (
           <View style={styles.emptyStateModern}>
