@@ -6,8 +6,7 @@
   "framework": null,
   "functions": {
     "api/extract-pdf.js": {
-      "maxDuration": 60,
-      "memory": 1024
+      "maxDuration": 60
     },
     "api/generate-examples.js": {
       "maxDuration": 60
