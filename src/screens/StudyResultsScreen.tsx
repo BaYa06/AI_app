@@ -4,6 +4,7 @@
  */
 import React from 'react';
 import { View, StyleSheet, Pressable, ScrollView, Platform, Modal } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '@/store';
 import { Text, StreakCelebrationModal } from '@/components/common';
 import { Analytics } from '@/services/analytics';
@@ -34,6 +35,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
     newStreakCount,
   } = route.params;
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const [showErrorsModal, setShowErrorsModal] = React.useState(false);
   const [showStreakModal, setShowStreakModal] = React.useState(streakIncreased === true);
 
@@ -132,6 +134,34 @@ export function StudyResultsScreen({ navigation, route }: Props) {
     // Продолжаем фазу - запускаем следующую порцию
     if (route.params.nextMode === 'match') {
       navigation.push('Match', {
+        setId,
+        cardLimit,
+        dueCardIds,
+        phaseId,
+        totalPhaseCards,
+        studiedInPhase,
+        phaseOffset,
+        phaseFailedIds,
+      });
+      return;
+    }
+
+    if (route.params.nextMode === 'audio') {
+      navigation.push('AudioLearning', {
+        setId,
+        cardLimit,
+        dueCardIds,
+        phaseId,
+        totalPhaseCards,
+        studiedInPhase,
+        phaseOffset,
+        phaseFailedIds,
+      });
+      return;
+    }
+
+    if (route.params.nextMode === 'wordBuilder') {
+      navigation.push('WordBuilder', {
         setId,
         cardLimit,
         dueCardIds,
@@ -438,12 +468,21 @@ export function StudyResultsScreen({ navigation, route }: Props) {
         onRequestClose={() => setShowErrorsModal(false)}
       >
         <View style={styles.modalOverlay}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setShowErrorsModal(false)} />
           <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+            <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
+
             {/* Modal Header */}
             <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-              <Text variant="h3">Ошибки ({errorCards.length})</Text>
+              <View style={{ flex: 1 }}>
+                <Text variant="h3">Ошибки</Text>
+                <Text variant="caption" color="secondary">
+                  {errorCards.length} {errorCards.length === 1 ? 'слово' : errorCards.length < 5 ? 'слова' : 'слов'} — повторите их ещё раз
+                </Text>
+              </View>
               <Pressable
                 onPress={() => setShowErrorsModal(false)}
+                hitSlop={8}
                 style={({ pressed }) => [
                   styles.closeButton,
                   { backgroundColor: pressed ? colors.surfaceVariant : 'transparent' }
@@ -454,53 +493,34 @@ export function StudyResultsScreen({ navigation, route }: Props) {
             </View>
 
             {/* Error Cards List */}
-            <ScrollView 
+            <ScrollView
               style={styles.errorList}
+              contentContainerStyle={styles.errorListContent}
               showsVerticalScrollIndicator={false}
             >
               {errorCards.map((card, index) => (
-                <View 
-                  key={index} 
-                  style={[styles.errorCard, { 
-                    backgroundColor: colors.surface,
-                    borderColor: colors.borderLight,
-                  }]}
+                <View
+                  key={card.id ?? index}
+                  style={[styles.errorRow, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
                 >
-                  <View style={styles.errorCardHeader}>
-                    <View style={[styles.errorBadge, { backgroundColor: colors.error + '1A' }]}>
-                      <Text variant="caption" style={{ color: colors.error, fontWeight: '600' }}>
-                        {card.rating === 1 ? 'Не знаю' : 'Сомневаюсь'}
-                      </Text>
-                    </View>
+                  <View style={[styles.errorIndex, { backgroundColor: colors.error + '1A' }]}>
+                    <Text style={[styles.errorIndexText, { color: colors.error }]}>{index + 1}</Text>
                   </View>
-                  
-                  <View style={styles.errorCardContent}>
-                    <View style={styles.errorCardSide}>
-                      <Text variant="caption" color="secondary" style={styles.errorCardLabel}>
-                        Вопрос:
-                      </Text>
-                      <Text variant="body" style={styles.errorCardText}>
-                        {card.front}
-                      </Text>
-                    </View>
-                    
-                    <View style={[styles.errorCardDivider, { backgroundColor: colors.borderLight }]} />
-                    
-                    <View style={styles.errorCardSide}>
-                      <Text variant="caption" color="secondary" style={styles.errorCardLabel}>
-                        Ответ:
-                      </Text>
-                      <Text variant="body" style={styles.errorCardText}>
-                        {card.back}
-                      </Text>
-                    </View>
+                  <View style={styles.errorBody}>
+                    <Text style={[styles.errorFront, { color: colors.textPrimary }]}>{card.front}</Text>
+                    <Text style={[styles.errorBack, { color: colors.textSecondary }]}>{card.back}</Text>
                   </View>
+                  {card.rating === 2 && (
+                    <View style={[styles.errorBadge, { backgroundColor: colors.warning + '1A' }]}>
+                      <Text style={[styles.errorBadgeText, { color: colors.warning }]}>Сомневаюсь</Text>
+                    </View>
+                  )}
                 </View>
               ))}
             </ScrollView>
 
-            {/* Close Button */}
-            <View style={styles.modalFooter}>
+            {/* Footer */}
+            <View style={[styles.modalFooter, { paddingBottom: Math.max(insets.bottom, 16), borderTopColor: colors.border }]}>
               <Pressable
                 onPress={() => setShowErrorsModal(false)}
                 style={({ pressed }) => [
@@ -691,11 +711,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
+  modalBackdrop: {
+    flex: 1,
+  },
+  // Фиксированная высота: с одним maxHeight ScrollView (flex: 1) внутри схлопывался до нуля,
+  // и в окне были видны только заголовок и кнопка — без слов.
   modalContent: {
+    height: '85%',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '85%',
-    ...Platform.select({
+    overflow: 'hidden',
+    ...(Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: -4 },
@@ -706,15 +732,24 @@ const styles = StyleSheet.create({
         elevation: 8,
       },
       web: {
-        boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.1)',
-      }
-    }),
+        boxShadow: '0 -8px 40px rgba(0,0,0,0.18)',
+      },
+    }) as object),
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 10,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 20,
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 16,
     borderBottomWidth: 1,
   },
   closeButton: {
@@ -726,49 +761,56 @@ const styles = StyleSheet.create({
   },
   errorList: {
     flex: 1,
-    padding: 16,
   },
-  errorCard: {
+  errorListContent: {
+    padding: 16,
+    gap: 10,
+  },
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
     borderRadius: 16,
     borderWidth: 1,
-    marginBottom: 12,
-    overflow: 'hidden',
   },
-  errorCardHeader: {
-    padding: 12,
-    paddingBottom: 8,
+  errorIndex: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  errorIndexText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  errorBody: {
+    flex: 1,
+    gap: 4,
+  },
+  errorFront: {
+    fontSize: 17,
+    fontWeight: '700',
+    lineHeight: 22,
+  },
+  errorBack: {
+    fontSize: 15,
+    lineHeight: 20,
   },
   errorBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
-  errorCardContent: {
-    padding: 12,
-    paddingTop: 0,
-  },
-  errorCardSide: {
-    marginBottom: 12,
-  },
-  errorCardLabel: {
-    marginBottom: 4,
+  errorBadgeText: {
     fontSize: 11,
-    textTransform: 'uppercase',
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-  errorCardText: {
-    fontSize: 16,
-    lineHeight: 24,
-  },
-  errorCardDivider: {
-    height: 1,
-    marginVertical: 12,
+    fontWeight: '700',
   },
   modalFooter: {
-    padding: 16,
-    paddingBottom: 24,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
   },
   modalCloseButton: {
     height: 52,

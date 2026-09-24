@@ -312,6 +312,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
         errors: errorsCount,
         errorCards: errorList,
         modeTitle: 'Word Builder',
+        nextMode: 'wordBuilder',
         cardLimit,
         dueCardIds,
         // Параметры фазы

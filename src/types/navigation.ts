@@ -36,7 +36,7 @@ export type RootStackParamList = {
     modeTitle?: string;
     cardLimit?: number;
     dueCardIds?: string[];
-    nextMode?: 'study' | 'match' | 'multipleChoice';
+    nextMode?: 'study' | 'match' | 'multipleChoice' | 'audio' | 'wordBuilder';
     // Параметры фазы
     phaseId?: string;
     totalPhaseCards?: number;

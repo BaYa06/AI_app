@@ -163,6 +163,10 @@ export function AudioLearningScreen({ navigation, route }: Props) {
     setIsRunning(false);
     const errors = errorCardIdsRef.current;
     const learnedCards = cards.length - errors.length;
+    // phaseOffset сдвигаем только на НОВЫЕ карточки порции: повторы ошибок прошлой порции
+    // идут первыми и к смещению не относятся (как в MultipleChoice/WordBuilder).
+    const failedBefore = new Set(phaseFailedIds || []);
+    const newCardsInBatch = cards.filter((c) => !failedBefore.has(c.id)).length;
     const timeSpent = Math.round((Date.now() - sessionStartTime.current) / 1000);
 
     navigation.replace('StudyResults', {
@@ -180,16 +184,17 @@ export function AudioLearningScreen({ navigation, route }: Props) {
           rating: 1,
         };
       }),
-      modeTitle: 'Audio Session',
+      modeTitle: 'Audio Tap',
+      nextMode: 'audio',
       cardLimit,
       dueCardIds,
       phaseId: currentPhaseId.current,
       totalPhaseCards: currentTotalPhaseCards.current,
       studiedInPhase: studiedInPhase + learnedCards,
-      phaseOffset: phaseOffset + cards.length,
+      phaseOffset: phaseOffset + newCardsInBatch,
       phaseFailedIds: errors,
     });
-  }, [cards, navigation, setId, cardLimit, dueCardIds, studiedInPhase, phaseOffset]);
+  }, [cards, navigation, setId, cardLimit, dueCardIds, studiedInPhase, phaseOffset, phaseFailedIds]);
 
   // Process one card then auto-continue (mic stays on between cards)
   const processCard = useCallback(async (idx: number, technicalRetries = 0) => {
