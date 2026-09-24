@@ -5,7 +5,7 @@
     "name": "FlashcardsApp",
     "slug": "flashcardsapp",
     "displayName": "Flashly: Flashcards",
-    "version": "1.0.12",
+    "version": "1.0.13",
     "orientation": "portrait",
     "ios": {
       "bundleIdentifier": "com.baiirbek.flashly",
