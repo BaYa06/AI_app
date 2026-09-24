@@ -52,6 +52,8 @@ interface CardsActions {
   
   // Пакетные операции
   addCards: (inputs: CreateCardInput[]) => Card[];
+  // Заменить карточки read-only набора данными с сервера (официальные наборы), без синка в Neon
+  replaceSetCards: (setId: string, cards: Card[]) => void;
   deleteCardsBySet: (setId: string) => void;
   
   // SRS обновления
@@ -287,6 +289,18 @@ export const useCardsStore = create<CardsState & CardsActions>()(
     setError: (error) => {
       set((state) => {
         state.error = error;
+      });
+    },
+
+    replaceSetCards: (setId, cards) => {
+      set((state) => {
+        (state.cardsBySet[setId] || []).forEach((id) => {
+          delete state.cards[id];
+        });
+        cards.forEach((card) => {
+          state.cards[card.id] = card;
+        });
+        state.cardsBySet[setId] = cards.map((card) => card.id);
       });
     },
 

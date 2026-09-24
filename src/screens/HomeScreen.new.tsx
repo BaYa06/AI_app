@@ -31,6 +31,7 @@ import {
   X,
   Eye,
   EyeOff,
+  BookOpen,
   File,
   Folder,
   Edit2,
@@ -1368,6 +1369,14 @@ export function HomeScreen({ navigation }: any) {
                             <EyeOff size={12} color={colors.textSecondary} />
                             <Text style={[styles.hiddenBadgeText, { color: colors.textSecondary }]}>
                               Скрыто
+                            </Text>
+                          </View>
+                        )}
+                        {set.isOfficial && (
+                          <View style={styles.hiddenBadge}>
+                            <BookOpen size={12} color={colors.primary} />
+                            <Text style={[styles.hiddenBadgeText, { color: colors.primary }]}>
+                              По учебнику
                             </Text>
                           </View>
                         )}

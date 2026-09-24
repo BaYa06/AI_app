@@ -4,6 +4,8 @@
  */
 
 import { neon } from '@neondatabase/serverless';
+import { supabase } from './supabaseClient';
+import { API_BASE } from '@/config/apiBase';
 import type {
   LibraryFilters,
   LibraryListResponse,
@@ -446,60 +448,27 @@ class LibraryServiceClass {
     return { success: true };
   }
 
-  /** Import a library set into personal collection */
-  async importSet(userId: string, librarySetId: string): Promise<ImportResponse> {
-    const sql = getSql();
+  /**
+   * Import a library set into personal collection (optionally into one of the user's own courses).
+   * Идёт через backend (api/library.js) с Supabase JWT: сервер сам определяет пользователя,
+   * проверяет, что курс принадлежит ему, и создаёт набор с карточками одним атомарным запросом.
+   */
+  async importSet(_userId: string, librarySetId: string, courseId: string | null = null): Promise<ImportResponse> {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) throw new Error('Необходимо войти в аккаунт');
 
-    // Check not already imported
-    const existingImport = await sql.query(`
-      SELECT id FROM library_imports WHERE user_id = $1 AND library_set_id = $2
-    `, [userId, librarySetId]);
-    if (existingImport.length > 0) {
-      throw new Error('Set already imported');
+    const resp = await fetch(`${API_BASE}/library?action=import`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ librarySetId, courseId }),
+    });
+    const json = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      if (resp.status === 403) throw new Error('Можно добавлять только в свои курсы');
+      throw new Error(json?.error || `HTTP ${resp.status}`);
     }
-
-    // Get library set
-    const libSet = await sql.query(`
-      SELECT * FROM library_sets WHERE id = $1 AND status = 'published'
-    `, [librarySetId]);
-    if (libSet.length === 0) {
-      throw new Error('Library set not found');
-    }
-    const set = libSet[0];
-
-    // Create personal card_set
-    const newSet = await sql.query(`
-      INSERT INTO card_sets (
-        user_id, title, description, category,
-        language_from, language_to, total_cards
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING id
-    `, [
-      userId, set.title + ' (из библиотеки)', set.description || '',
-      set.category || 'general', set.language_from || 'en', set.language_to || 'ru',
-      set.cards_count,
-    ]);
-    const newSetId = newSet[0].id;
-
-    // Copy all library_cards → cards
-    const libCards = await sql.query(`
-      SELECT front, back, hint FROM library_cards
-      WHERE library_set_id = $1 ORDER BY order_index ASC
-    `, [librarySetId]);
-
-    if (libCards.length > 0) {
-      const placeholders = libCards.map((_, i) => `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4})`).join(', ');
-      const params = libCards.flatMap(card => [newSetId, card.front, card.back, card.hint || null]);
-      await sql.query(`INSERT INTO cards (set_id, front, back, example) VALUES ${placeholders}`, params);
-    }
-
-    // Record import
-    await sql.query(`INSERT INTO library_imports (user_id, library_set_id) VALUES ($1, $2)`, [userId, librarySetId]);
-
-    // Increment imports_count
-    await sql.query(`UPDATE library_sets SET imports_count = imports_count + 1 WHERE id = $1`, [librarySetId]);
-
-    return { newSetId };
+    return { newSetId: json.newSetId };
   }
 
   /** Fetch all cards for a library set (READ only, used for guest import) */

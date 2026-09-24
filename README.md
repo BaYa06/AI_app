@@ -106,6 +106,64 @@ src/
 - **MMKV** - локальное хранилище
 - **Reanimated** 3 - анимации
 
+## 📚 Каталог книг: импорт из Excel
+
+Готовые наборы по учебникам: **Книга → Юнит → Набор**. Книги загружаются локальными скриптами из `scripts/` напрямую в Neon. Скрипты не входят в приложение. План: `plan/book_catalog_plan.md`.
+
+### Настройка (один раз)
+
+В `.env.local` должны быть:
+- `DATABASE_URL_UNPOOLED` — строка подключения к Neon.
+- `ADMIN_USER_ID` — UUID пользователя с `users.is_admin = true`. Он будет владельцем официальных наборов.
+
+### 1. Шаблон
+
+```bash
+npx tsx scripts/create-book-template.ts   # → templates/book_template.xlsx
+```
+
+Один файл = одна книга. В шаблоне есть лист «Инструкция».
+
+**Лист «Книга»** — одна строка:
+
+| title | edition | level | subject | language_from | language_to | publisher |
+|---|---|---|---|---|---|---|
+| Solutions Pre-Intermediate | 3rd | A2 | English | en | ru | Oxford |
+
+Обязательные поля: `title`, `language_from` (язык изучения) и `language_to` (язык перевода: `ru`, `ky`).
+
+**Лист «Карточки»** — одна строка на одно слово:
+
+| unit | unit_title | pages | term | translation | example |
+|---|---|---|---|---|---|
+| 1 | Feelings | 8–17 | happy | счастливый | I'm happy to see you. |
+
+- `unit`, `unit_title` и `pages` повторяйте в каждой строке юнита одинаково.
+- `term` и `translation` обязательны.
+- Порядок строк = порядок карточек в приложении.
+- Несколько значений перевода пишите через запятую в одной ячейке.
+- `translation` и `example` можно менять когда угодно, прогресс учеников сохранится. Если исправить `term`, получится **новая** карточка.
+
+### 2. Проверка и импорт
+
+```bash
+npx tsx scripts/import-book.ts book.xlsx --dry-run   # проверка + отчёт, база не меняется
+npx tsx scripts/import-book.ts book.xlsx             # импорт (новая книга — черновик)
+```
+
+- При ошибках в файле скрипт выводит их список с номерами строк и ничего не записывает.
+- Импорт выполняется одной транзакцией, повторный запуск не создаёт дублей.
+- Карточки, которых больше нет в Excel, по умолчанию не удаляются, скрипт только выводит их список. `--prune` удаляет их после подтверждения `y`. Вместе с карточками удаляется прогресс учеников по ним.
+
+### 3. Публикация
+
+```bash
+npx tsx scripts/publish-book.ts "Solutions Pre-Intermediate" "3rd"              # видна всем
+npx tsx scripts/publish-book.ts "Solutions Pre-Intermediate" "3rd" --unpublish  # снова черновик
+```
+
+Опубликовать можно и сразу при импорте, флагом `--publish`.
+
 ## 🤖 Сборка APK в Codemagic
 
 1. Добавьте в Codemagic group `keystore_credentials` переменные: `CM_KEYSTORE_BASE64` (base64 от release keystore), `CM_KEYSTORE_PASSWORD`, `CM_KEY_ALIAS`, `CM_KEY_PASSWORD`.

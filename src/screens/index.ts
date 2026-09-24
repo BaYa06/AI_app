@@ -4,6 +4,8 @@
 
 export { HomeScreen } from './HomeScreen';
 export { LibraryScreen } from './LibraryScreen';
+export { BookDetailScreen } from './BookDetailScreen';
+export { CourseBooksScreen } from './CourseBooksScreen';
 export { StatisticsScreen } from './StatisticsScreen';
 export { ProfileScreen } from './ProfileScreen';
 export { SetDetailScreen } from './SetDetailScreen';

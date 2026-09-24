@@ -4,6 +4,7 @@
  */
 import { StorageService, STORAGE_KEYS } from './StorageService';
 import { NeonService } from './NeonService';
+import { BookService } from './BookService';
 import { supabase } from './supabaseClient';
 import type { Card, CardSet, Course, UserSettings } from '@/types';
 
@@ -113,6 +114,9 @@ export const DatabaseService = {
       const allCourses: Course[] =
         currentUserId ? courses : localCoursesData?.courses || courses;
 
+      // Официальный набор (юнит книги) → курс, под которым его показывать
+      const officialCourseIdBySet: Record<string, string> = {};
+
       // Загружаем курсы где пользователь — ученик
       if (currentUserId) {
         try {
@@ -127,6 +131,8 @@ export const DatabaseService = {
               teacherSets.forEach(ts => {
                 setsMap[ts.id] = ts;
                 setsOrder.push(ts.id);
+                // Официальные наборы открытых юнитов: карточки подгружаются ниже через BookService.
+                if (ts.isOfficial) officialCourseIdBySet[ts.id] = sc.id;
               });
               devLog(`  📚 Курс "${sc.title}": ${teacherSets.length} наборов`);
             }
@@ -206,6 +212,23 @@ export const DatabaseService = {
       });
 
       devLog('✅ Карточки загружены в store (Neon + локальные)');
+
+      // Официальные наборы каталога книг: открытые юниты курсов ученика + юниты, которые
+      // пользователь уже начал учить сам. Карточки — с личным прогрессом из card_progress.
+      if (currentUserId) {
+        try {
+          const bundle = await BookService.loadOfficialSets(
+            Object.keys(officialCourseIdBySet),
+            officialCourseIdBySet,
+          );
+          if (bundle) {
+            BookService.applyOfficialSets(bundle);
+            devLog(`📖 Загружено официальных наборов: ${bundle.sets.length}`);
+          }
+        } catch (e) {
+          console.warn('⚠️ Не удалось загрузить официальные наборы:', e);
+        }
+      }
 
       // Загружаем настройки из локального хранилища
       const settings = StorageService.getObject<UserSettings>(STORAGE_KEYS.SETTINGS);

@@ -12,7 +12,9 @@ import {
   Alert,
 } from 'react-native';
 import { Text, Container } from '@/components/common';
-import { useThemeColors, useSettingsStore, useLibraryStore, useSetsStore, useCardsStore } from '@/store';
+import { useThemeColors, useSettingsStore, useLibraryStore, useSetsStore, useCardsStore, useCoursesStore } from '@/store';
+import { ChooseCourseSheet } from '@/components/library/ChooseCourseSheet';
+import { showMessage } from '@/utils/dialogs';
 import { spacing, borderRadius, getCategoryLabel, getLanguageDef, formatCount, formatRelativeTime } from '@/constants';
 import { v4 as uuid } from 'uuid';
 import { LibraryService } from '@/services/LibraryService';
@@ -47,6 +49,13 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
   const [userId, setUserId] = useState<string | undefined>();
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [chooseCourseVisible, setChooseCourseVisible] = useState(false);
+  const isTeacher = useSettingsStore((s) => s.isTeacher) === true;
+  const allCourses = useCoursesStore((s) => s.courses);
+  const activeCourseId = useCoursesStore((s) => s.activeCourseId);
+  // Добавить набор можно только в свой курс (не в курс, где пользователь ученик).
+  const ownCourses = React.useMemo(() => allCourses.filter((c) => !c.isStudentCourse), [allCourses]);
+  const defaultCourseId = ownCourses.some((c) => c.id === activeCourseId) ? activeCourseId : null;
 
   const surfaceBg = isDark ? 'rgb(24, 26, 38)' : colors.surface;
   const sectionBorder = isDark ? 'rgba(255,255,255,0.06)' : colors.borderLight;
@@ -77,7 +86,7 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
   }, [userId, currentSet, rateSet]);
 
   // Guest login — сохраняем набор локально, без записи в NeonDB
-  const handleImportGuest = useCallback(async () => {
+  const handleImportGuest = useCallback(async (courseId: string | null) => {
     if (!userId || !currentSet) return;
     setImporting(true);
     try {
@@ -88,7 +97,7 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
       const newSet: CardSet = {
         id: newSetId,
         userId,
-        courseId: null,
+        courseId,
         title: currentSet.title + ' (из библиотеки)',
         description: currentSet.description || '',
         category: (currentSet as any).category || 'general',
@@ -142,33 +151,43 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
       useCardsStore.setState({ cards: newCardsMap, cardsBySet: newCardsBySet });
       DatabaseService.saveCards();
 
-      Alert.alert('Готово!', 'Набор сохранён на устройстве', [{ text: 'OK' }]);
+      setChooseCourseVisible(false);
+      showMessage('Готово!', 'Набор сохранён на устройстве');
     } catch (err) {
-      Alert.alert('Ошибка', err instanceof Error ? err.message : 'Не удалось импортировать набор');
+      showMessage('Ошибка', err instanceof Error ? err.message : 'Не удалось импортировать набор');
     } finally {
       setImporting(false);
     }
   }, [userId, currentSet]);
 
-  const handleImport = useCallback(async () => {
+  const importInto = useCallback(async (courseId: string | null) => {
     if (!userId || !currentSet) return;
     if (isAnonymous) {
-      return handleImportGuest();
+      return handleImportGuest(courseId);
     }
     setImporting(true);
     try {
-      await importSet(userId, currentSet.id);
-      Alert.alert('Готово!', 'Набор добавлен на главный экран', [
-        { text: 'OK' },
-      ]);
+      await importSet(userId, currentSet.id, courseId);
+      setChooseCourseVisible(false);
+      const course = courseId ? ownCourses.find((c) => c.id === courseId) : undefined;
+      showMessage('Готово!', course ? `Набор добавлен в «${course.title}»` : 'Набор добавлен на главный экран');
       // Reload user data so the set appears
       DatabaseService.loadAll().catch(() => {});
     } catch (err) {
-      Alert.alert('Ошибка', err instanceof Error ? err.message : 'Не удалось импортировать набор');
+      showMessage('Ошибка', err instanceof Error ? err.message : 'Не удалось импортировать набор');
     } finally {
       setImporting(false);
     }
-  }, [userId, currentSet, importSet, isAnonymous, handleImportGuest]);
+  }, [userId, currentSet, importSet, isAnonymous, handleImportGuest, ownCourses]);
+
+  // Своих курсов нет — добавляем сразу, как раньше. Есть — спрашиваем, в какой (один).
+  const handleImport = useCallback(() => {
+    if (ownCourses.length === 0) {
+      importInto(null);
+      return;
+    }
+    setChooseCourseVisible(true);
+  }, [ownCourses.length, importInto]);
 
   const handleOpenMySet = useCallback(() => {
     // Navigate to Home — user will see the imported set there
@@ -446,6 +465,17 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
           />
         </Pressable>
       </View>
+
+      <ChooseCourseSheet
+        visible={chooseCourseVisible}
+        setTitle={currentSet.title}
+        courses={ownCourses}
+        initialCourseId={defaultCourseId}
+        isSubmitting={importing}
+        showStudentsHint={isTeacher}
+        onClose={() => setChooseCourseVisible(false)}
+        onSubmit={importInto}
+      />
     </Container>
   );
 }

@@ -3,13 +3,13 @@
  * @description Главный компонент приложения
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Linking, Platform, View, StyleSheet, Alert, Text } from 'react-native';
+import { AppState, Linking, Platform, View, StyleSheet, Alert, Text } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AppNavigator } from '@/navigation';
 import { LoadingSplash } from '@/components/common';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
-import { DatabaseService, setupAutoSave, supabase, NeonService, setAnalyticsUserId, SyncQueueService, Analytics, setAnalyticsUserProperties } from '@/services';
+import { DatabaseService, setupAutoSave, supabase, NeonService, setAnalyticsUserId, SyncQueueService, Analytics, setAnalyticsUserProperties, BookService } from '@/services';
 import { refreshPushToken, subscribeForegroundMessages, requestPushPermission, isPushSupported } from '@/services/pushNotifications';
 import { useThemeColors, useSettingsStore } from '@/store';
 import { CourseInviteModal } from '@/components/CourseInviteModal';
@@ -310,6 +310,23 @@ export default function App() {
   const processedOAuthCodeRef = useRef<string | null>(null);
   // Guard: не отправляем push токен повторно для того же userId
   const pushedTokenForUserRef = useRef<string | null>(null);
+
+  // Каталог книг: при возврате в приложение подтягиваем юниты, которые учитель открыл/закрыл
+  // в курсах ученика (полная загрузка данных идёт только при старте). Не чаще раза в минуту.
+  useEffect(() => {
+    if (!currentUserId) return;
+    let lastRefreshAt = Date.now();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' || Date.now() - lastRefreshAt < 60_000) return;
+      const studentCourseIds = useCoursesStore.getState().courses
+        .filter((c) => c.isStudentCourse)
+        .map((c) => c.id);
+      if (studentCourseIds.length === 0) return;
+      lastRefreshAt = Date.now();
+      BookService.refreshStudentCourseUnits(studentCourseIds).catch(() => {});
+    });
+    return () => subscription.remove();
+  }, [currentUserId]);
 
   useEffect(() => {
     let isMounted = true;

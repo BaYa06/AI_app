@@ -464,7 +464,9 @@ export const NeonService = {
           status
         FROM cards
         WHERE set_id = ${setId}
-        ORDER BY created_at ASC
+        -- sort_order задан только у карточек официальных наборов (порядок из Excel);
+        -- у обычных он NULL, и порядок остаётся по created_at, как раньше.
+        ORDER BY sort_order NULLS LAST, created_at ASC
       `;
 
       return cards.map(card => ({
@@ -553,7 +555,9 @@ export const NeonService = {
             SELECT course_id FROM course_members
             WHERE user_id = ${userId} AND role = 'student'
           )
-        ORDER BY c.created_at ASC
+        -- sort_order — порядок карточек, вставленных одним запросом (импорт из библиотеки, копия
+        -- юнита): у них одинаковый created_at. У остальных карточек он NULL и ничего не меняет.
+        ORDER BY c.created_at ASC, c.sort_order NULLS LAST
       `;
 
       return cards.map(card => ({
@@ -1573,6 +1577,8 @@ export const NeonService = {
         id: string; userId: string; title: string; description: string; category: string;
         icon: string | null; languageFrom: string; languageTo: string; totalCards: number;
         createdAt: string; updatedAt: string | null; courseId: string;
+        isOfficial?: boolean; unitId?: string | null; bookId?: string | null;
+        bookTitle?: string | null; unitNumber?: number | null;
       }>;
     }>('course-sets-by-membership', { method: 'GET', params: { courseId } });
     if (!result.ok) {
@@ -1594,6 +1600,11 @@ export const NeonService = {
       courseId: row.courseId,
       isReadOnly: true,
       ownerCourseId: courseId,
+      isOfficial: row.isOfficial === true,
+      unitId: row.unitId || undefined,
+      bookId: row.bookId || undefined,
+      bookTitle: row.bookTitle || undefined,
+      unitNumber: row.unitNumber ?? undefined,
     }));
   },
 
@@ -1726,6 +1737,11 @@ export const NeonService = {
     studentsStarted: number;
     studentsCompleted: number;
     progressPct: number;
+    // Юнит книги (каталог книг): есть в статистике, если учитель хоть раз его открывал
+    isOfficial?: boolean;
+    bookTitle?: string | null;
+    unitNumber?: number | null;
+    unitOpen?: boolean | null;
   }>> {
     // Идёт через backend — раньше шло напрямую в Neon с клиента без проверки владения
     // курсом (см. план, пункт 23).
@@ -1733,6 +1749,7 @@ export const NeonService = {
       sets: Array<{
         setId: string; title: string; totalCards: number;
         studentsStarted: number; studentsCompleted: number; progressPct: number;
+        isOfficial?: boolean; bookTitle?: string | null; unitNumber?: number | null; unitOpen?: boolean | null;
       }>;
     }>('course-set-stats', { method: 'GET', params: { courseId } });
     if (!result.ok) {

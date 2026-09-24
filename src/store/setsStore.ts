@@ -54,6 +54,9 @@ interface SetsActions {
   unarchiveSet: (setId: string) => void;
   updateLastStudied: (setId: string) => void;
   
+  // Read-only наборы с сервера (официальные наборы каталога книг): добавить/обновить без синка в Neon
+  mergeSets: (sets: CardSet[]) => void;
+
   // Курсы
   moveSetsFromCourse: (courseId: string) => void; // Перемещает наборы из курса в "All"
   getSetsByCourse: (courseId: string | null) => CardSet[]; // Получить наборы по курсу
@@ -178,6 +181,8 @@ export const useSetsStore = create<SetsState & SetsActions>()(
     },
 
     deleteSet: (setId) => {
+      // Read-only набор (учителя или официальный) — не наш: убираем только локально.
+      const isReadOnly = get().sets[setId]?.isReadOnly === true;
       set((state) => {
         delete state.sets[setId];
         const index = state.setsOrder.indexOf(setId);
@@ -191,9 +196,19 @@ export const useSetsStore = create<SetsState & SetsActions>()(
       console.log('✅ Набор удален локально:', setId);
 
       // Удаляем из Neon (через очередь с retry)
-      if (NeonService.isEnabled()) {
+      if (NeonService.isEnabled() && !isReadOnly) {
         SyncQueueService.enqueue('deleteSet', setId);
       }
+    },
+
+    mergeSets: (sets) => {
+      set((state) => {
+        sets.forEach((cardSet) => {
+          if (!state.sets[cardSet.id]) state.setsOrder.push(cardSet.id);
+          // Сохраняем локальные поля (избранное, статистику, дату последнего изучения).
+          state.sets[cardSet.id] = { ...state.sets[cardSet.id], ...cardSet };
+        });
+      });
     },
 
     // ==================== ДЕЙСТВИЯ ====================

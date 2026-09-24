@@ -1,5 +1,5 @@
 import { neon } from '@neondatabase/serverless';
-import { createClient } from '@supabase/supabase-js';
+import { getAuthedUserId } from './_auth.js';
 import crypto from 'crypto';
 
 /**
@@ -30,22 +30,23 @@ import crypto from 'crypto';
  * GET  /api/teacher?action=course-sets-by-membership ?courseId= (ученик — курс, в котором состоит)
  */
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://yiwsmjbeirgomkrckoju.supabase.co';
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
-
-/** Достаёт userId из Supabase JWT в заголовке Authorization. Возвращает null, если токен отсутствует/невалиден. */
-async function getAuthedUserId(req) {
-  const header = req.headers.authorization || req.headers.Authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
-  if (!token || !SUPABASE_ANON_KEY) return null;
-  try {
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    const { data, error } = await supabase.auth.getUser(token);
-    if (error || !data?.user) return null;
-    return data.user.id;
-  } catch {
-    return null;
-  }
+/**
+ * id наборов курса для статистики: собственные наборы курса (card_sets.course_id) + официальные
+ * наборы юнитов книг (каталог книг), которые учитель хоть раз открывал в этом курсе. Закрытый
+ * после прохождения юнит остаётся в статистике. Вкладывается в другие запросы (композиция
+ * шаблонов @neondatabase/serverless 1.x).
+ */
+function courseSetIdsSql(sql, courseId) {
+  return sql`
+    SELECT id FROM card_sets WHERE course_id = ${courseId}::uuid
+    UNION
+    SELECT ocs.id
+    FROM course_units cu
+    JOIN book_units u ON u.id = cu.unit_id
+    JOIN course_books cb ON cb.course_id = cu.course_id AND cb.book_id = u.book_id
+    JOIN card_sets ocs ON ocs.unit_id = u.id AND ocs.is_official = true
+    WHERE cu.course_id = ${courseId}::uuid AND cu.opened_at IS NOT NULL
+  `;
 }
 
 export default async function handler(req, res) {
@@ -423,7 +424,7 @@ async function listMembers(req, res, sql, userId) {
         COUNT(DISTINCT CASE WHEN r.reviewed_at::date = CURRENT_DATE THEN r.card_id END) AS today_cards
       FROM reviews r
       JOIN cards c ON c.id = r.card_id
-      JOIN card_sets cs ON cs.id = c.set_id AND cs.course_id = ${courseId}::uuid
+      WHERE c.set_id IN (${courseSetIdsSql(sql, courseId)})
       GROUP BY r.user_id
     ) cr ON cr.user_id = cm.user_id
     WHERE cm.course_id = ${courseId}::uuid
@@ -462,7 +463,7 @@ async function studentStats(req, res, sql, userId) {
 
   const rows = await sql`
     WITH course_sets AS (
-      SELECT id, title, created_at FROM card_sets WHERE course_id = ${courseId}::uuid
+      SELECT id, title, created_at FROM card_sets WHERE id IN (${courseSetIdsSql(sql, courseId)})
     ),
     student_progress AS (
       SELECT
@@ -579,13 +580,11 @@ async function courseActivityChart(req, res, sql, userId) {
       COUNT(DISTINCT r.user_id) AS count
     FROM reviews r
     JOIN cards c ON c.id = r.card_id
-    JOIN card_sets cs
-      ON cs.id = c.set_id
-      AND cs.course_id = ${courseId}::uuid
-    WHERE r.user_id IN (
+    WHERE c.set_id IN (${courseSetIdsSql(sql, courseId)})
+      AND r.user_id IN (
       SELECT user_id FROM course_members WHERE course_id = ${courseId}::uuid
     )
-      AND r.reviewed_at::date >= CURRENT_DATE - ${daysInt}::int
+    AND r.reviewed_at::date >= CURRENT_DATE - ${daysInt}::int
       AND r.reviewed_at::date <= CURRENT_DATE
     GROUP BY r.reviewed_at::date
     ORDER BY date ASC
@@ -613,11 +612,28 @@ async function courseSetStats(req, res, sql, userId) {
     total_members AS (
       SELECT COUNT(*) AS cnt FROM course_student_ids
     ),
+    -- Свои наборы курса + официальные наборы юнитов, которые учитель хоть раз открывал (каталог книг).
+    course_sets AS (
+      SELECT cs.id, cs.title, cs.total_cards, 0 AS kind, cs.created_at,
+             NULL::text AS book_title, NULL::int AS unit_number, NULL::int AS unit_sort, NULL::boolean AS unit_open
+      FROM card_sets cs
+      WHERE cs.course_id = ${courseId}::uuid AND cs.is_hidden_from_students = false
+      UNION ALL
+      SELECT ocs.id, ocs.title, ocs.total_cards, 1 AS kind, cb.created_at,
+             b.title, u.number, u.sort_order, cu.is_open
+      FROM course_units cu
+      JOIN book_units u ON u.id = cu.unit_id
+      JOIN books b ON b.id = u.book_id
+      JOIN course_books cb ON cb.course_id = cu.course_id AND cb.book_id = b.id
+      JOIN card_sets ocs ON ocs.unit_id = u.id AND ocs.is_official = true
+      WHERE cu.course_id = ${courseId}::uuid AND cu.opened_at IS NOT NULL
+    ),
     set_started AS (
       SELECT c.set_id, COUNT(DISTINCT r.user_id) AS started
       FROM reviews r
       JOIN cards c ON c.id = r.card_id
       WHERE r.user_id IN (SELECT user_id FROM course_student_ids)
+        AND c.set_id IN (SELECT id FROM course_sets)
       GROUP BY c.set_id
     ),
     student_set_progress AS (
@@ -625,12 +641,17 @@ async function courseSetStats(req, res, sql, userId) {
       FROM card_progress cp
       JOIN cards c ON c.id = cp.card_id
       WHERE cp.user_id IN (SELECT user_id FROM course_student_ids)
+        AND c.set_id IN (SELECT id FROM course_sets)
       GROUP BY c.set_id, cp.user_id
     )
     SELECT
       cs.id AS set_id,
       cs.title,
       cs.total_cards,
+      cs.kind,
+      cs.book_title,
+      cs.unit_number,
+      cs.unit_open,
       COALESCE(ss.started, 0) AS students_started,
       COALESCE(
         (SELECT COUNT(*) FROM student_set_progress ssp
@@ -647,11 +668,9 @@ async function courseSetStats(req, res, sql, userId) {
           / (cs.total_cards * (SELECT cnt FROM total_members)) * 100
         )
       END AS progress_pct
-    FROM card_sets cs
+    FROM course_sets cs
     LEFT JOIN set_started ss ON ss.set_id = cs.id
-    WHERE cs.course_id = ${courseId}::uuid
-      AND cs.is_hidden_from_students = false
-    ORDER BY cs.created_at ASC
+    ORDER BY cs.kind, cs.created_at, cs.unit_sort, cs.unit_number
   `;
 
   return res.status(200).json({
@@ -663,6 +682,10 @@ async function courseSetStats(req, res, sql, userId) {
       studentsStarted: Number(row.students_started) || 0,
       studentsCompleted: Number(row.students_completed) || 0,
       progressPct: Number(row.progress_pct) || 0,
+      isOfficial: row.kind === 1,
+      bookTitle: row.book_title || null,
+      unitNumber: row.unit_number ?? null,
+      unitOpen: row.unit_open ?? null,
     })),
   });
 }
@@ -679,7 +702,7 @@ async function setHardCards(req, res, sql, userId) {
   // Раньше не проверялось даже, что setId реально принадлежит courseId — учитель мог
   // передать произвольный чужой setId и увидеть пересечение с ним по своим ученикам.
   const set = await sql`
-    SELECT id FROM card_sets WHERE id = ${setId}::uuid AND course_id = ${courseId}::uuid
+    SELECT 1 WHERE ${setId}::uuid IN (${courseSetIdsSql(sql, courseId)})
   `;
   if (set.length === 0) return res.status(404).json({ error: 'Set not found in this course' });
 
@@ -732,9 +755,23 @@ async function courseSetsByMembership(req, res, sql, userId) {
     ORDER BY cs.created_at DESC
   `;
 
+  // Официальные наборы книг курса (каталог книг): только открытые учителем юниты опубликованных книг.
+  // У таких наборов course_id = NULL — к курсу они привязаны через course_books/course_units.
+  const officialRows = await sql`
+    SELECT cs.*, b.id AS book_id, b.title AS book_title, u.number AS unit_number,
+      (SELECT COUNT(*) FROM cards WHERE set_id = cs.id) AS total_cards
+    FROM course_units cu
+    JOIN book_units u ON u.id = cu.unit_id
+    JOIN books b ON b.id = u.book_id AND b.is_published = true
+    JOIN course_books cb ON cb.course_id = cu.course_id AND cb.book_id = b.id
+    JOIN card_sets cs ON cs.unit_id = u.id AND cs.is_official = true
+    WHERE cu.course_id = ${courseId}::uuid AND cu.is_open = true
+    ORDER BY b.title, u.sort_order, u.number, cs.created_at
+  `;
+
   return res.status(200).json({
     ok: true,
-    sets: rows.map((row) => ({
+    sets: [...rows, ...officialRows].map((row) => ({
       id: row.id,
       userId: row.user_id,
       title: row.title,
@@ -746,7 +783,13 @@ async function courseSetsByMembership(req, res, sql, userId) {
       totalCards: parseInt(row.total_cards, 10) || 0,
       createdAt: row.created_at,
       updatedAt: row.updated_at || null,
-      courseId: row.course_id,
+      // Официальный набор в курс попадает через план юнитов — отдаём его под этим курсом.
+      courseId: row.is_official ? courseId : row.course_id,
+      isOfficial: row.is_official === true,
+      unitId: row.unit_id || null,
+      bookId: row.book_id || null,
+      bookTitle: row.book_title || null,
+      unitNumber: row.unit_number ?? null,
     })),
   });
 }

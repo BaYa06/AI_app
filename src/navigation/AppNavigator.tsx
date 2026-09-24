@@ -61,6 +61,8 @@ import { StudyPlaceholderScreen } from '@/screens/StudyPlaceholderScreen';
 import { AchievementsScreen } from '@/screens/AchievementsScreen';
 import { NotificationSettingsScreen } from '@/screens/NotificationSettingsScreen';
 import { LibrarySetDetailScreen } from '@/screens/LibrarySetDetailScreen';
+import { BookDetailScreen } from '@/screens/BookDetailScreen';
+import { CourseBooksScreen } from '@/screens/CourseBooksScreen';
 import { MyPublicationsScreen } from '@/screens/MyPublicationsScreen';
 import { PersonalInfoScreen } from '@/screens/PersonalInfoScreen';
 import { SecurityScreen } from '@/screens/SecurityScreen';
@@ -228,6 +230,8 @@ const NATIVE_LINKING: LinkingOptions<RootStackParamList> = {
       Achievements: 'achievements',
       NotificationSettings: 'notification-settings',
       LibrarySetDetail: 'library-set/:setId',
+      BookDetail: 'book/:bookId',
+      CourseBooks: 'course-books/:courseId',
       MyPublications: 'my-publications',
       PersonalInfo: 'personal-info',
       Security: 'security',
@@ -360,6 +364,16 @@ export function AppNavigator() {
         <Stack.Screen
           name="LibrarySetDetail"
           component={LibrarySetDetailScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="BookDetail"
+          component={BookDetailScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="CourseBooks"
+          component={CourseBooksScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen

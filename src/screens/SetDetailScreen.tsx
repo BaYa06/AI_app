@@ -15,7 +15,8 @@ import { StudyModeSheet, type StudyMode } from '@/components/study/StudyModeShee
 import { spacing, borderRadius } from '@/constants';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card, CreateCardInput } from '@/types';
-import { DatabaseService, LibraryService, Analytics } from '@/services';
+import { DatabaseService, LibraryService, Analytics, NeonService, BookService } from '@/services';
+import { confirmAction, showMessage } from '@/utils/dialogs';
 import { apiService } from '@/services/ApiService';
 import { supabase } from '@/services/supabaseClient';
 import { LIBRARY_CATEGORIES } from '@/constants/library';
@@ -36,6 +37,7 @@ import {
   Globe,
   X,
   Image as ImageIcon,
+  BookOpen,
 } from 'lucide-react-native';
 
 type Props = RootStackScreenProps<'SetDetail'>;
@@ -776,9 +778,45 @@ export function SetDetailScreen({ navigation, route }: Props) {
     navigation.navigate('SetEditor', { setId });
   }, [navigation, setId]);
 
+  const isTeacher = useSettingsStore((s) => s.isTeacher) === true;
+
+  // Копия официального набора (юнит учебника) в обычный свой набор — его можно редактировать,
+  // но обновления учебника в копию уже не попадут, а прогресс начинается заново.
+  const handleForkOfficialSet = useCallback(async () => {
+    const ok = await confirmAction(
+      'Сделать копию себе?',
+      'Официальный набор нельзя менять. Копию можно редактировать, но обновления учебника в неё не попадут, а прогресс учеников начнётся заново.',
+      'Сделать копию',
+    );
+    if (!ok) return;
+    const result = await BookService.forkSet(setId);
+    if (!result.ok) {
+      showMessage('Не удалось сделать копию', result.error);
+      return;
+    }
+    const { newSetId } = result.data;
+    const { data: { session } } = await supabase.auth.getSession();
+    const [ownSets, newCards] = await Promise.all([
+      NeonService.loadSets(session?.user?.id),
+      NeonService.loadCardsBySet(newSetId),
+    ]);
+    const newSet = ownSets.find((x) => x.id === newSetId);
+    if (!newSet) {
+      showMessage('Копия создана', 'Она появится в ваших наборах после обновления.');
+      return;
+    }
+    useSetsStore.getState().mergeSets([newSet]);
+    useCardsStore.getState().replaceSetCards(newSetId, newCards);
+    navigation.replace('SetDetail', { setId: newSetId });
+  }, [navigation, setId]);
+
   const handleSetMenu = useCallback(() => {
+    if (set?.isOfficial && isTeacher) {
+      handleForkOfficialSet();
+      return;
+    }
     handleEditSet();
-  }, [handleEditSet]);
+  }, [handleEditSet, handleForkOfficialSet, isTeacher, set?.isOfficial]);
 
   const handlePublish = useCallback(async () => {
     if (!publishCategory) {
@@ -904,6 +942,15 @@ export function SetDetailScreen({ navigation, route }: Props) {
             <MoreHorizontal size={22} color={colors.textPrimary} />
           </Pressable>
         </View>
+
+        {set?.isOfficial && (
+          <View style={[styles.officialBadge, { backgroundColor: colors.primary + '12' }]}>
+            <BookOpen size={14} color={colors.primary} />
+            <Text style={[styles.officialBadgeText, { color: colors.primary }]} numberOfLines={1}>
+              По учебнику{set.bookTitle ? ` · ${set.bookTitle}` : ''}
+            </Text>
+          </View>
+        )}
 
         <View style={styles.progressBlock}>
           <ProgressBar progress={stats.progress} height={8} />
@@ -1837,6 +1884,22 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     fontWeight: '700',
+  },
+  officialBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: 6,
+    marginTop: spacing.s,
+    paddingHorizontal: spacing.s,
+    paddingVertical: 4,
+    borderRadius: borderRadius.full,
+    maxWidth: '100%',
+  },
+  officialBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    flexShrink: 1,
   },
   progressBlock: {
     marginTop: spacing.m,

@@ -1,5 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { ensureDatabaseInitialized } from './_db-init.js';
+import { getAuthedUserId } from './_auth.js';
 
 /**
  * Consolidated Library API
@@ -15,23 +16,36 @@ import { ensureDatabaseInitialized } from './_db-init.js';
  * POST /api/library?action=like             – toggle like
  * POST /api/library?action=rate             – rate a set
  * POST /api/library?action=report           – report a set
- * POST /api/library?action=import           – import a set
+ * POST /api/library?action=import           – import a set { librarySetId, courseId? } (JWT; курс — только свой)
  */
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isUuid = (v) => typeof v === 'string' && UUID_RE.test(v);
+
+const MUTATION_ACTIONS = new Set(['like', 'rate', 'report', 'import', 'publish']);
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
+  const { action, id, userId } = req.query;
+
+  // Мутации требуют Supabase JWT: userId берётся из токена, а не из тела запроса,
+  // иначе любой мог бы лайкать/импортировать/публиковать от имени другого пользователя.
+  if (MUTATION_ACTIONS.has(action)) {
+    const authedUserId = await getAuthedUserId(req);
+    if (!authedUserId) return res.status(401).json({ error: 'Unauthorized' });
+    req.body = { ...(req.body || {}), userId: authedUserId };
+  }
+
   const sql = neon(process.env.POSTGRES_URL);
   await ensureDatabaseInitialized(sql);
-
-  const { action, id, userId } = req.query;
 
   try {
     // ── Action-based routing (sub-endpoints consolidated here) ──────────────
@@ -341,38 +355,53 @@ async function reportSet(req, res, sql) {
 // ── action=import ─────────────────────────────────────────────────────────────
 async function importSet(req, res, sql) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  const { userId, librarySetId } = req.body;
-  if (!userId || !librarySetId) return res.status(400).json({ error: 'userId and librarySetId are required' });
+  // userId — из Supabase JWT (подставляется в handler), не из тела запроса.
+  const { userId, librarySetId, courseId = null } = req.body;
+  if (!isUuid(librarySetId) || (courseId !== null && !isUuid(courseId))) {
+    return res.status(400).json({ error: 'librarySetId required, courseId must be uuid or null' });
+  }
+
+  // Набор можно положить только в свой курс (не в курс, где пользователь ученик).
+  if (courseId) {
+    const course = await sql`SELECT id FROM courses WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid`;
+    if (course.length === 0) return res.status(403).json({ error: 'Not the owner of the course' });
+  }
 
   const existingImport = await sql`SELECT id FROM library_imports WHERE user_id = ${userId} AND library_set_id = ${librarySetId}`;
   if (existingImport.length > 0) return res.status(400).json({ error: 'Set already imported' });
 
   const libSet = await sql`SELECT * FROM library_sets WHERE id = ${librarySetId} AND status = 'published'`;
   if (libSet.length === 0) return res.status(404).json({ error: 'Library set not found' });
-
   const set = libSet[0];
-  const newSet = await sql`
-    INSERT INTO card_sets (user_id, title, description, category, language_from, language_to, icon, total_cards)
-    VALUES (${userId}, ${set.title + ' (из библиотеки)'}, ${set.description || ''}, ${set.category || 'general'},
-            ${set.language_from || 'en'}, ${set.language_to || 'ru'}, ${set.cover_emoji || null}, ${set.cards_count})
-    RETURNING id
+
+  // Одним запросом (атомарно): набор + копии карточек (порядок из библиотеки → sort_order) +
+  // отметка об импорте + счётчик. Повторный двойной тап упрётся в UNIQUE(user_id, library_set_id)
+  // library_imports, и весь запрос откатится — дубля набора не будет.
+  const created = await sql`
+    WITH new_set AS (
+      INSERT INTO card_sets (user_id, course_id, title, description, category, language_from, language_to, total_cards)
+      VALUES (${userId}::uuid, ${courseId}::uuid, ${set.title + ' (из библиотеки)'}, ${set.description || ''},
+              ${set.category || 'general'}, ${set.language_from || 'en'}, ${set.language_to || 'ru'},
+              (SELECT COUNT(*) FROM library_cards WHERE library_set_id = ${librarySetId}::uuid))
+      RETURNING id
+    ), copied AS (
+      INSERT INTO cards (set_id, front, back, example, sort_order)
+      SELECT (SELECT id FROM new_set), lc.front, lc.back, lc.hint, lc.order_index
+        FROM library_cards lc WHERE lc.library_set_id = ${librarySetId}::uuid
+      RETURNING 1
+    ), recorded AS (
+      INSERT INTO library_imports (user_id, library_set_id) VALUES (${userId}::uuid, ${librarySetId}::uuid)
+      RETURNING 1
+    ), counted AS (
+      UPDATE library_sets SET imports_count = imports_count + 1 WHERE id = ${librarySetId}::uuid
+      RETURNING 1
+    )
+    SELECT (SELECT id FROM new_set) AS id, (SELECT COUNT(*) FROM copied) AS cards
   `;
-  const newSetId = newSet[0].id;
 
-  const libCards = await sql`SELECT front, back, hint FROM library_cards WHERE library_set_id = ${librarySetId} ORDER BY order_index ASC`;
-  if (libCards.length > 0) {
-    const placeholders = libCards.map((_, i) => `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4})`).join(', ');
-    const params = libCards.flatMap(card => [newSetId, card.front, card.back, card.hint || null]);
-    await sql(`INSERT INTO cards (set_id, front, back, example) VALUES ${placeholders}`, params);
-  }
-
-  await sql`INSERT INTO library_imports (user_id, library_set_id) VALUES (${userId}, ${librarySetId})`;
-  await sql`UPDATE library_sets SET imports_count = imports_count + 1 WHERE id = ${librarySetId}`;
-
-  return res.status(201).json({ newSetId });
+  return res.status(201).json({ newSetId: created[0].id, courseId, cardsCopied: Number(created[0].cards) || 0 });
 }
 
-// ── action=publish (POST/PUT/DELETE) ─────────────────────────────────────────
 async function publishSet(req, res, sql) {
   const { userId, setId, description, tags, category, coverEmoji } = req.body;
   if (!userId || !setId) return res.status(400).json({ error: 'userId and setId are required' });

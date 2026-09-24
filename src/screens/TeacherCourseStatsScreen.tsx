@@ -13,7 +13,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, X, GraduationCap, FileText, Mic, Clock, AlertTriangle } from 'lucide-react-native';
+import { ArrowLeft, X, GraduationCap, FileText, Mic, Clock, AlertTriangle, BookOpen } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import { useThemeColors, useSettingsStore } from '@/store';
 import { spacing, borderRadius } from '@/constants';
@@ -197,14 +197,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
   const [chartError, setChartError] = useState(false);
 
   // Sets stats
-  const [setsStats, setSetsStats] = useState<Array<{
-    setId: string;
-    title: string;
-    totalCards: number;
-    studentsStarted: number;
-    studentsCompleted: number;
-    progressPct: number;
-  }>>([]);
+  const [setsStats, setSetsStats] = useState<Awaited<ReturnType<typeof NeonService.loadCourseSetStats>>>([]);
   const [setsLoading, setSetsLoading] = useState(true);
   const [setsError, setSetsError] = useState(false);
 
@@ -384,6 +377,34 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
           </View>
           <Text style={[styles.testLobbyText, { color: colors.textPrimary }]}>
             История тестов
+          </Text>
+          <ArrowLeft
+            size={16}
+            color={colors.textSecondary}
+            style={{ transform: [{ rotate: '180deg' }] }}
+          />
+        </Pressable>
+
+        {/* Учебники курса (каталог книг): план юнитов этой группы */}
+        <Pressable
+          style={({ pressed }) => [
+            styles.testLobbyBtn,
+            {
+              backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F8F7FF',
+              borderColor: isDark ? 'rgba(99,102,241,0.3)' : '#E0DDFB',
+            },
+            pressed && { opacity: 0.75, transform: [{ scale: 0.985 }] },
+          ]}
+          onPress={() => navigation.navigate('CourseBooks', {
+            courseId: route.params.courseId,
+            courseTitle: route.params.courseTitle,
+          })}
+        >
+          <View style={[styles.testLobbyIcon, { backgroundColor: isDark ? colors.primary : '#6366F1' }]}>
+            <BookOpen size={18} color="#FFFFFF" />
+          </View>
+          <Text style={[styles.testLobbyText, { color: colors.textPrimary }]}>
+            Учебники курса
           </Text>
           <ArrowLeft
             size={16}
@@ -575,6 +596,14 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
                   key={set.setId}
                   style={[styles.setCard, { backgroundColor: cardBg, borderColor: cardBorder }]}
                 >
+                  {set.isOfficial && (
+                    <View style={styles.unitTag}>
+                      <BookOpen size={12} color={colors.primary} />
+                      <Text style={[styles.unitTagText, { color: colors.primary }]} numberOfLines={1}>
+                        {[set.bookTitle, set.unitOpen === false ? 'закрыт' : 'открыт'].filter(Boolean).join(' · ')}
+                      </Text>
+                    </View>
+                  )}
                   <View style={styles.setCardHeader}>
                     <Text style={[styles.setCardTitle, { color: colors.textPrimary }]} numberOfLines={1}>
                       {set.title}
@@ -596,7 +625,9 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
 
                   <View style={styles.setCardMeta}>
                     <Text style={[styles.setCardMetaText, { color: colors.textSecondary }]}>
-                      {set.studentsStarted} из {members.length} начали · {set.studentsCompleted} завершили
+                      {set.studentsStarted} из {members.length} начали
+                      {members.length > set.studentsStarted ? ` · ${members.length - set.studentsStarted} не начинали` : ''}
+                      {` · ${set.studentsCompleted} завершили`}
                     </Text>
                     <Text style={[styles.setCardAccuracy, { color: colors.primary }]}>
                       {set.progressPct}%
@@ -1028,6 +1059,17 @@ const styles = StyleSheet.create({
   progressFill: {
     height: '100%',
     borderRadius: 2,
+  },
+  unitTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 4,
+  },
+  unitTagText: {
+    fontSize: 11,
+    fontWeight: '700',
+    flexShrink: 1,
   },
   setCardMeta: {
     flexDirection: 'row',

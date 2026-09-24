@@ -102,6 +102,8 @@ export type RootStackParamList = {
     phaseFailedIds?: string[];
   };
   LibrarySetDetail: { setId: string };
+  BookDetail: { bookId: string };
+  CourseBooks: { courseId: string; courseTitle: string };
   MyPublications: undefined;
   PersonalInfo: undefined;
   Security: undefined;

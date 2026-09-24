@@ -32,7 +32,10 @@ import { Search, ArrowDownUp } from 'lucide-react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'react-native-svg';
 import { supabase } from '@/services/supabaseClient';
+import { BookService } from '@/services/BookService';
+import { getBookCover, formatBookMeta } from '@/utils/bookCover';
 import type { LibrarySet } from '@/types/library';
+import type { BookListItem } from '@/types/books';
 
 // ---- Fade edge overlay for horizontal scroll ----
 const FADE_WIDTH = 24;
@@ -180,6 +183,41 @@ const RecentCard = memo(function RecentCard({
   );
 });
 
+const BookCard = memo(function BookCard({
+  book,
+  colors,
+  onPress,
+}: {
+  book: BookListItem;
+  colors: ReturnType<typeof useThemeColors>;
+  onPress?: () => void;
+}) {
+  const cover = getBookCover(book.subject);
+  const meta = formatBookMeta(book);
+  return (
+    <Pressable onPress={onPress} style={[s.bCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <View style={[s.bCardCover, { backgroundColor: cover.color + '1A' }]}>
+        <Text style={s.bCardEmoji}>{cover.emoji}</Text>
+      </View>
+      <Text style={[s.bCardTitle, { color: colors.textPrimary }]} numberOfLines={2}>
+        {book.title}
+      </Text>
+      {meta ? (
+        <Text style={[s.hCardMeta, { color: colors.textTertiary }]} numberOfLines={1}>{meta}</Text>
+      ) : null}
+      <View style={s.statItem}>
+        <Ionicons name="book-outline" size={14} color={colors.textTertiary} />
+        <Text style={[s.statText, { color: colors.textTertiary }]}>{book.unitsCount} юнитов</Text>
+      </View>
+      {!book.isPublished && (
+        <View style={[s.importedBadge, { backgroundColor: '#F59E0B1A' }]}>
+          <Text style={[s.importedText, { color: '#B45309' }]}>Черновик</Text>
+        </View>
+      )}
+    </Pressable>
+  );
+});
+
 // ---- Main Screen ----
 
 export function LibraryScreen() {
@@ -206,6 +244,7 @@ export function LibraryScreen() {
   const [activeLang, setActiveLang] = useState<string | null>(null);
   const [activeCardCount, setActiveCardCount] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | undefined>();
+  const [books, setBooks] = useState<BookListItem[]>([]);
 
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -219,6 +258,18 @@ export function LibraryScreen() {
   // Initial load
   useEffect(() => {
     fetchAllSections(userId);
+  }, [userId]);
+
+  // Каталог книг (нужна сессия Supabase — грузим, когда известен пользователь)
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    BookService.listBooks().then((list) => {
+      if (!cancelled) setBooks(list);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [userId]);
 
   // Debounced search
@@ -265,8 +316,21 @@ export function LibraryScreen() {
     navigation.navigate('LibrarySetDetail' as any, { setId });
   }, [navigation]);
 
+  const navigateToBook = useCallback((bookId: string) => {
+    navigation.navigate('BookDetail' as any, { bookId });
+  }, [navigation]);
+
   const isEmpty = trendingSets.length === 0 && topRatedSets.length === 0 && recentSets.length === 0;
   const isSearchActive = searchText.trim().length > 0 || activeCategory !== null || activeLang !== null || activeCardCount !== null;
+
+  // Книги в режиме поиска — только по тексту запроса (название, издательство, предмет)
+  const matchingBooks = React.useMemo(() => {
+    const q = searchText.trim().toLowerCase();
+    if (!q) return [];
+    return books.filter((b) =>
+      [b.title, b.publisher, b.subject].some((field) => field?.toLowerCase().includes(q)));
+  }, [books, searchText]);
+  const nothingToShow = isEmpty && (isSearchActive ? matchingBooks.length === 0 : books.length === 0);
 
   // Combine all results for search mode (deduplicated)
   const searchResults = React.useMemo(() => {
@@ -398,12 +462,12 @@ export function LibraryScreen() {
       </View>
 
       {/* Content */}
-      {isLoading && isEmpty ? (
+      {isLoading && nothingToShow ? (
         <View style={s.centerContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[s.loadingText, { color: colors.textTertiary }]}>Загрузка библиотеки...</Text>
         </View>
-      ) : error && isEmpty ? (
+      ) : error && nothingToShow ? (
         <View style={s.centerContainer}>
           <Ionicons name="cloud-offline-outline" size={48} color={colors.textTertiary} />
           <Text style={[s.emptyTitle, { color: colors.textPrimary }]}>Ошибка загрузки</Text>
@@ -412,7 +476,7 @@ export function LibraryScreen() {
             <Text style={s.retryBtnText}>Попробовать снова</Text>
           </Pressable>
         </View>
-      ) : isEmpty ? (
+      ) : nothingToShow ? (
         <View style={s.centerContainer}>
           <Ionicons name="search-outline" size={48} color={colors.textTertiary} />
           <Text style={[s.emptyTitle, { color: colors.textPrimary }]}>Ничего не найдено</Text>
@@ -421,20 +485,49 @@ export function LibraryScreen() {
       ) : isSearchActive ? (
         /* Search Results - vertical grid with HorizontalCard design */
         <ScrollView style={s.content} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
-          <View style={s.section}>
-            <View style={s.sectionHeader}>
-              <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>🔍 Результаты поиска</Text>
-              <Text style={[s.searchCount, { color: colors.textTertiary }]}>{searchResults.length}</Text>
+          {matchingBooks.length > 0 && (
+            <View style={s.section}>
+              <View style={s.sectionHeader}>
+                <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>📚 Учебники</Text>
+                <Text style={[s.searchCount, { color: colors.textTertiary }]}>{matchingBooks.length}</Text>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hScroll}>
+                {matchingBooks.map((book) => (
+                  <BookCard key={book.id} book={book} colors={colors} onPress={() => navigateToBook(book.id)} />
+                ))}
+              </ScrollView>
             </View>
-            <View style={s.searchGrid}>
-              {searchResults.map((item) => (
-                <HorizontalCard key={item.id} item={item} colors={colors} fullWidth onPress={() => navigateToDetail(item.id)} />
-              ))}
+          )}
+          {searchResults.length > 0 && (
+            <View style={s.section}>
+              <View style={s.sectionHeader}>
+                <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>🔍 Результаты поиска</Text>
+                <Text style={[s.searchCount, { color: colors.textTertiary }]}>{searchResults.length}</Text>
+              </View>
+              <View style={s.searchGrid}>
+                {searchResults.map((item) => (
+                  <HorizontalCard key={item.id} item={item} colors={colors} fullWidth onPress={() => navigateToDetail(item.id)} />
+                ))}
+              </View>
             </View>
-          </View>
+          )}
         </ScrollView>
       ) : (
         <ScrollView style={s.content} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
+          {/* Books (каталог учебников) */}
+          {books.length > 0 && (
+            <View style={s.section}>
+              <View style={s.sectionHeader}>
+                <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>📚 Учебники</Text>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hScroll}>
+                {books.map((book) => (
+                  <BookCard key={book.id} book={book} colors={colors} onPress={() => navigateToBook(book.id)} />
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
           {/* Trending */}
           {trendingSets.length > 0 && (
             <View style={s.section}>
@@ -520,6 +613,10 @@ const s = StyleSheet.create({
   hScroll: { paddingHorizontal: spacing.m, gap: spacing.s },
   searchGrid: { paddingHorizontal: spacing.m, gap: spacing.s },
   searchCount: { fontSize: 14, fontWeight: '600' },
+  bCard: { width: 150, padding: spacing.m, borderRadius: borderRadius.xl, borderWidth: 1, gap: spacing.xs },
+  bCardCover: { width: '100%', height: 88, borderRadius: borderRadius.l, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xxs },
+  bCardEmoji: { fontSize: 40 },
+  bCardTitle: { fontSize: 14, fontWeight: '700', lineHeight: 18, minHeight: 36 },
   hCard: { width: 260, padding: spacing.m, borderRadius: borderRadius.xl, borderWidth: 1, gap: spacing.s },
   hCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   hCardIcon: { width: 48, height: 48, borderRadius: borderRadius.l, alignItems: 'center', justifyContent: 'center', position: 'relative' },

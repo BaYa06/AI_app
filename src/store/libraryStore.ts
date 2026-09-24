@@ -42,7 +42,7 @@ interface LibraryActions {
   fetchSetDetail: (id: string, userId?: string) => Promise<void>;
   setFilters: (filters: Partial<LibraryFilters>, userId?: string) => Promise<void>;
   publishSet: (userId: string, payload: PublishSetPayload) => Promise<string>;
-  importSet: (userId: string, librarySetId: string) => Promise<string>;
+  importSet: (userId: string, librarySetId: string, courseId?: string | null) => Promise<string>;
   toggleLike: (userId: string, librarySetId: string) => Promise<void>;
   rateSet: (userId: string, librarySetId: string, rating: number) => Promise<void>;
   fetchMyPublications: (userId: string) => Promise<void>;
@@ -183,8 +183,8 @@ export const useLibraryStore = create<LibraryState & LibraryActions>()(
       return result.librarySetId;
     },
 
-    importSet: async (userId, librarySetId) => {
-      const result = await LibraryService.importSet(userId, librarySetId);
+    importSet: async (userId, librarySetId, courseId = null) => {
+      const result = await LibraryService.importSet(userId, librarySetId, courseId);
 
       // Update is_imported flag in all lists
       const updateImported = (sets: LibrarySet[]) =>

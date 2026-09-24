@@ -170,6 +170,12 @@ export interface CardSet {
   isReadOnly?: boolean;
   ownerCourseId?: string;
   isHiddenFromStudents?: boolean;
+  // Официальный набор каталога книг (юнит учебника). Всегда read-only.
+  isOfficial?: boolean;
+  unitId?: string;
+  unitNumber?: number;
+  bookId?: string;
+  bookTitle?: string;
 }
 
 /**
