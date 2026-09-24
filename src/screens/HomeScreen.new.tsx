@@ -36,6 +36,8 @@ import {
   Edit2,
   Sunrise,
   Timer,
+  ArrowUpDown,
+  Check,
 } from 'lucide-react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Svg, { Circle as SvgCircle } from 'react-native-svg';
@@ -46,6 +48,7 @@ import { DatabaseService } from '@/services/DatabaseService';
 import { JoinByCodeModal } from '@/components/JoinByCodeModal';
 import type { DailyActivity } from '@/services/StreakService';
 import type { CardSet } from '@/types';
+import { StorageService, STORAGE_KEYS } from '@/services/StorageService';
 
 const StaggerCard = React.memo(function StaggerCard({
   index,
@@ -71,6 +74,40 @@ const StaggerCard = React.memo(function StaggerCard({
   return <ReanimatedAnimated.View style={animStyle}>{children}</ReanimatedAnimated.View>;
 });
 
+type SetsSortKey = 'recent' | 'due' | 'progress' | 'newest' | 'alpha' | 'size';
+
+const SETS_SORT_OPTIONS: { key: SetsSortKey; label: string; short: string }[] = [
+  { key: 'recent', label: 'Недавно изучал', short: 'Недавние' },
+  { key: 'due', label: 'Нужно повторить', short: 'Повторить' },
+  { key: 'progress', label: 'Прогресс: меньше → больше', short: 'Прогресс' },
+  { key: 'newest', label: 'Новые', short: 'Новые' },
+  { key: 'alpha', label: 'По алфавиту', short: 'А–Я' },
+  { key: 'size', label: 'Больше карточек', short: 'Размер' },
+];
+
+function loadSetsSort(): SetsSortKey {
+  try {
+    const saved = StorageService.getString(STORAGE_KEYS.HOME_SETS_SORT);
+    if (SETS_SORT_OPTIONS.some((o) => o.key === saved)) return saved as SetsSortKey;
+  } catch {}
+  return 'recent';
+}
+
+const byRecent = (a: CardSet, b: CardSet) =>
+  (b.lastStudiedAt ?? 0) - (a.lastStudiedAt ?? 0) || b.createdAt - a.createdAt;
+
+const masteredRatio = (s: CardSet) =>
+  s.cardCount > 0 ? (s.masteredCount || 0) / s.cardCount : Number.POSITIVE_INFINITY; // пустые — в конец
+
+const SETS_COMPARATORS: Record<SetsSortKey, (a: CardSet, b: CardSet) => number> = {
+  recent: byRecent,
+  due: (a, b) => (b.reviewCount || 0) - (a.reviewCount || 0) || byRecent(a, b),
+  progress: (a, b) => masteredRatio(a) - masteredRatio(b) || byRecent(a, b),
+  newest: (a, b) => b.createdAt - a.createdAt,
+  alpha: (a, b) => (a.title || '').localeCompare(b.title || '', 'ru', { sensitivity: 'base', numeric: true }),
+  size: (a, b) => (b.cardCount || 0) - (a.cardCount || 0) || byRecent(a, b),
+};
+
 export function HomeScreen({ navigation }: any) {
   const colors = useThemeColors();
   const resolvedTheme = useSettingsStore((s) => s.resolvedTheme);
@@ -87,6 +124,17 @@ export function HomeScreen({ navigation }: any) {
   const drawerBorder = isDarkMode ? 'rgba(255,255,255,0.08)' : colors.border;
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [setsSort, setSetsSort] = useState<SetsSortKey>(loadSetsSort);
+  const [sortSheetVisible, setSortSheetVisible] = useState(false);
+
+  const selectSetsSort = useCallback((key: SetsSortKey) => {
+    triggerHaptic('selection');
+    setSetsSort(key);
+    setSortSheetVisible(false);
+    try {
+      StorageService.setString(STORAGE_KEYS.HOME_SETS_SORT, key);
+    } catch {}
+  }, []);
   const { width: windowWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const drawerWidth = useMemo(() => Math.min(windowWidth * 0.8, 320), [windowWidth]);
@@ -457,17 +505,19 @@ export function HomeScreen({ navigation }: any) {
     return allSets.filter((set) => set.courseId === activeCourseId);
   }, [allSets, activeCourseId]);
 
-  // Поиск по текущему списку наборов
+  // Поиск и сортировка по текущему списку наборов
   const visibleSets = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    if (!query) return filteredSets;
-    return filteredSets.filter((set) => {
+    const found = !query ? filteredSets : filteredSets.filter((set) => {
       const title = set.title?.toLowerCase() || '';
       const desc = set.description?.toLowerCase() || '';
       const tags = (set.tags || []).join(' ').toLowerCase();
       return title.includes(query) || desc.includes(query) || tags.includes(query);
     });
-  }, [filteredSets, searchQuery]);
+    return [...found].sort(SETS_COMPARATORS[setsSort]);
+  }, [filteredSets, searchQuery, setsSort]);
+
+  const setsSortShortLabel = SETS_SORT_OPTIONS.find((o) => o.key === setsSort)?.short;
   
   // Получаем название активного курса для empty state
   const activeCourseTitle = useMemo(() => {
@@ -1250,13 +1300,16 @@ export function HomeScreen({ navigation }: any) {
               <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
                 {activeCourseId === null ? 'Мои наборы' : activeCourseTitle}
               </Text>
-              {!isTeacher && (
-                <Pressable onPress={() => navigation.navigate('TestJoin')}>
-                  <Text style={[styles.viewAllButton, { color: colors.primary }]}>
-                    Подключиться к тесту
-                  </Text>
-                </Pressable>
-              )}
+              <Pressable
+                onPress={() => setSortSheetVisible(true)}
+                hitSlop={8}
+                style={({ pressed }) => [styles.sortButton, pressed && { opacity: 0.6 }]}
+              >
+                <ArrowUpDown size={16} color={colors.primary} />
+                <Text style={[styles.viewAllButton, { color: colors.primary }]}>
+                  {setsSortShortLabel}
+                </Text>
+              </Pressable>
             </View>
 
           <View style={styles.setsList}>
@@ -1757,6 +1810,50 @@ export function HomeScreen({ navigation }: any) {
                 Не удалось создать ссылку
               </Text>
             )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Sort Sheet */}
+      <Modal
+        visible={sortSheetVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSortSheetVisible(false)}
+      >
+        <Pressable style={styles.sortSheetBackdrop} onPress={() => setSortSheetVisible(false)}>
+          <Pressable
+            style={[
+              styles.sortSheet,
+              { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.m },
+            ]}
+          >
+            <View style={[styles.sortSheetHandle, { backgroundColor: colors.border }]} />
+            <Text style={[styles.sortSheetTitle, { color: colors.textPrimary }]}>Сортировка</Text>
+            {SETS_SORT_OPTIONS.map((option) => {
+              const selected = option.key === setsSort;
+              return (
+                <Pressable
+                  key={option.key}
+                  onPress={() => selectSetsSort(option.key)}
+                  style={({ pressed }) => [
+                    styles.sortOption,
+                    pressed && { backgroundColor: colors.border + '55' },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.sortOptionText,
+                      { color: selected ? colors.primary : colors.textPrimary },
+                      selected && { fontWeight: '700' },
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                  {selected && <Check size={20} color={colors.primary} />}
+                </Pressable>
+              );
+            })}
           </Pressable>
         </Pressable>
       </Modal>
@@ -2327,6 +2424,45 @@ const styles = StyleSheet.create({
   viewAllButton: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  sortButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  sortSheetBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  sortSheet: {
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
+    paddingTop: spacing.s,
+    paddingHorizontal: spacing.m,
+  },
+  sortSheetHandle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    marginBottom: spacing.m,
+  },
+  sortSheetTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: spacing.s,
+  },
+  sortOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: spacing.s,
+    borderRadius: borderRadius.m,
+  },
+  sortOptionText: {
+    fontSize: 16,
   },
 
   // Empty State (modern)

@@ -126,6 +126,7 @@ export const STORAGE_KEYS = {
   // Настройки
   SETTINGS: 'settings',
   THEME: 'theme',
+  HOME_SETS_SORT: 'home_sets_sort',
   
   // Пользователь
   USER: 'user',

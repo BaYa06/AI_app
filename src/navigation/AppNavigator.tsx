@@ -2,13 +2,13 @@
  * App Navigator
  * @description Главный навигатор приложения
  */
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { triggerHaptic } from '@/utils/haptic';
 import { NavigationContainer, useNavigationContainerRef, type LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { useThemeColors } from '@/store';
+import { useThemeColors, useSettingsStore } from '@/store';
 import type { RootStackParamList, MainTabParamList } from '@/types/navigation';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import ReAnimated, {
@@ -92,6 +92,7 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 
 function MainTabs() {
   const colors = useThemeColors();
+  const isTeacher = useSettingsStore((s) => s.isTeacher);
   const tabBarPaddingBottom = Platform.OS === 'android' ? 15 : 0;
   const tabBarHeight = 46 + tabBarPaddingBottom;
 
@@ -151,6 +152,17 @@ function MainTabs() {
         {(props) => <LibraryScreen {...props} />}
       </Tab.Screen>
       <Tab.Screen
+        name="TestTab"
+        options={{
+          tabBarIcon: ({ color, focused }) => <BounceIcon name="clipboard" color={color} focused={focused} />,
+          // Подключение к тесту по коду — только для учеников
+          ...(isTeacher ? { tabBarButton: () => null, tabBarItemStyle: { display: 'none' } } : null),
+        }}
+        listeners={{ tabPress: () => triggerHaptic('selection') }}
+      >
+        {(props) => <TestJoinScreen {...(props as any)} />}
+      </Tab.Screen>
+      <Tab.Screen
         name="Study"
         options={{
           tabBarIcon: ({ color, focused }) => <BounceIcon name="school" color={color} focused={focused} />,
@@ -199,6 +211,7 @@ const NATIVE_LINKING: LinkingOptions<RootStackParamList> = {
         screens: {
           Home: '',
           Library: 'library',
+          TestTab: 'test',
           Study: 'study-tab',
           Statistics: 'statistics',
           Profile: 'profile',

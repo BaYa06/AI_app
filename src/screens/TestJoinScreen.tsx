@@ -24,6 +24,8 @@ import { Text } from '@/components/common';
 import { useThemeColors, useSettingsStore } from '@/store';
 import { spacing, borderRadius } from '@/constants';
 import { supabase } from '@/services/supabaseClient';
+import { NeonService } from '@/services/NeonService';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 
@@ -31,13 +33,19 @@ import { API_BASE } from '@/config/apiBase';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TestJoin'>;
 
-export function TestJoinScreen({ navigation }: Props) {
+// Экран живёт и в стеке (TestJoin), и вкладкой в таббаре (TestTab). Во вкладке нет
+// кнопки «назад», а replace() из вкладки подменил бы весь Main в корневом стеке —
+// поэтому там открываем следующий экран через navigate() поверх табов.
+export function TestJoinScreen({ navigation, route }: Props) {
+  const isTab = route.name !== 'TestJoin';
   const colors = useThemeColors();
   const isDark = useSettingsStore((s) => s.resolvedTheme) === 'dark';
   const insets = useSafeAreaInsets();
 
   const [digits, setDigits] = useState(['', '', '', '']);
-  const [name, setName] = useState('');
+  // Имя берём из профиля — сервер при подключении записывает участнику то же самое
+  // (display_name, иначе email), и именно его видит учитель.
+  const [displayName, setDisplayName] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRefs = useRef<(TextInput | null)[]>([]);
@@ -62,6 +70,26 @@ export function TestJoinScreen({ navigation }: Props) {
       newDigits[index - 1] = '';
       setDigits(newDigits);
     }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      supabase.auth.getSession().then(async ({ data }) => {
+        const user = data.session?.user;
+        if (!user) return;
+        const fromProfile = await NeonService.getDisplayName(user.id);
+        if (active) setDisplayName(fromProfile?.trim() || user.email || null);
+      });
+      return () => {
+        active = false;
+      };
+    }, []),
+  );
+
+  const resetForm = () => {
+    setDigits(['', '', '', '']);
+    setJoining(false);
   };
 
   const code = digits.join('');
@@ -96,18 +124,24 @@ export function TestJoinScreen({ navigation }: Props) {
           setJoining(false);
           return;
         }
-        navigation.replace('TestExam', {
+        const examParams = {
           sessionId: result.sessionId,
           participantId: result.participantId,
           testMode: result.testMode,
           questionCount: result.questionCount,
           timePerQuestion: result.timePerQuestion,
           initialQuestionIndex: result.answerCount,
-        });
+        };
+        if (isTab) {
+          resetForm();
+          navigation.navigate('TestExam', examParams);
+        } else {
+          navigation.replace('TestExam', examParams);
+        }
         return;
       }
 
-      navigation.replace('TestWaiting', {
+      const waitingParams = {
         sessionId: result.sessionId,
         participantId: result.participantId,
         setTitle: result.setTitle,
@@ -115,12 +149,18 @@ export function TestJoinScreen({ navigation }: Props) {
         testMode: result.testMode,
         questionCount: result.questionCount,
         timePerQuestion: result.timePerQuestion,
-      });
+      };
+      if (isTab) {
+        resetForm();
+        navigation.navigate('TestWaiting', waitingParams);
+      } else {
+        navigation.replace('TestWaiting', waitingParams);
+      }
     } catch (e: any) {
       setError(e.message || 'Failed to join test');
       setJoining(false);
     }
-  }, [code, isCodeComplete, joining, navigation]);
+  }, [code, isCodeComplete, joining, navigation, isTab]);
 
   const inputBg = isDark ? 'rgba(255,255,255,0.06)' : '#FFFFFF';
   const inputBorder = isDark ? 'rgba(255,255,255,0.1)' : '#E2E8F0';
@@ -137,7 +177,7 @@ export function TestJoinScreen({ navigation }: Props) {
           },
         ]}
       >
-        <Pressable
+        {isTab ? <View style={{ width: 40 }} /> : <Pressable
           style={({ pressed }) => [
             styles.backBtn,
             {
@@ -148,7 +188,7 @@ export function TestJoinScreen({ navigation }: Props) {
           onPress={() => navigation.goBack()}
         >
           <ArrowLeft size={20} color={colors.textSecondary} />
-        </Pressable>
+        </Pressable>}
         <View style={styles.headerCenter}>
           <View style={[styles.logoBox, { backgroundColor: colors.primary }]}>
             <GraduationCap size={18} color="#FFF" />
@@ -161,7 +201,7 @@ export function TestJoinScreen({ navigation }: Props) {
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 32 }]}
+        contentContainerStyle={[styles.scroll, { paddingBottom: (isTab ? 0 : insets.bottom) + 32 }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -228,7 +268,7 @@ export function TestJoinScreen({ navigation }: Props) {
           ))}
         </View>
 
-        {/* Name Input */}
+        {/* Name — только показ, из профиля */}
         <View style={styles.nameSection}>
           <Text style={[styles.nameLabel, { color: colors.textSecondary }]}>
             YOUR NAME
@@ -243,16 +283,12 @@ export function TestJoinScreen({ navigation }: Props) {
             ]}
           >
             <User size={20} color={colors.textSecondary} style={styles.nameIcon} />
-            <TextInput
-              style={[
-                styles.nameInput,
-                { color: colors.textPrimary },
-              ]}
-              value={name}
-              onChangeText={setName}
-              placeholder="Enter your full name"
-              placeholderTextColor={colors.textSecondary}
-            />
+            <Text
+              style={[styles.nameInput, { color: colors.textPrimary }]}
+              numberOfLines={1}
+            >
+              {displayName ?? '…'}
+            </Text>
           </View>
         </View>
 
@@ -310,7 +346,7 @@ export function TestJoinScreen({ navigation }: Props) {
       </ScrollView>
 
       {/* Footer */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
+      <View style={[styles.footer, { paddingBottom: (isTab ? 0 : insets.bottom) + 12 }]}>
         <Text style={[styles.footerText, { color: colors.textSecondary }]}>
           Need help?{' '}
           <Text style={[styles.footerLink, { color: colors.primary }]}>
