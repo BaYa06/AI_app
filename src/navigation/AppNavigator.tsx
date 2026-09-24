@@ -2,13 +2,12 @@
  * App Navigator
  * @description Главный навигатор приложения
  */
-import React, { useCallback, useEffect, useRef } from 'react';
-import { Animated, Platform } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Platform } from 'react-native';
 import { triggerHaptic } from '@/utils/haptic';
 import { NavigationContainer, useNavigationContainerRef, type LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { useThemeColors } from '@/store';
 import type { RootStackParamList, MainTabParamList } from '@/types/navigation';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -42,38 +41,6 @@ function BounceIcon({ name, color, focused }: { name: string; color: string; foc
     <ReAnimated.View style={animStyle}>
       <Ionicons name={name} size={31} color={color} />
     </ReAnimated.View>
-  );
-}
-
-// Лёгкое проявление вкладки при переключении табов — без сдвига. Сбрасываем прозрачность
-// только когда ушли на другую вкладку: при открытии stack-экрана поверх вкладка остаётся
-// видимой под анимацией push/свайпа назад и не должна бледнеть.
-function FadeScreen({ children }: { children: React.ReactNode }) {
-  const colors = useThemeColors();
-  const navigation = useNavigation();
-  const route = useRoute();
-  const opacity = useRef(new Animated.Value(0.4)).current;
-
-  useFocusEffect(
-    useCallback(() => {
-      if (Platform.OS === 'web') return;
-      Animated.timing(opacity, { toValue: 1, duration: 220, useNativeDriver: true }).start();
-      return () => {
-        const tabState = navigation.getState();
-        const stillActiveTab = tabState?.routes[tabState.index]?.key === route.key;
-        if (!stillActiveTab) opacity.setValue(0.4);
-      };
-    }, [navigation, route.key])
-  );
-
-  if (Platform.OS === 'web') {
-    return <>{children}</>;
-  }
-
-  return (
-    <Animated.View style={{ flex: 1, backgroundColor: colors.background, opacity }}>
-      {children}
-    </Animated.View>
   );
 }
 
@@ -145,10 +112,7 @@ function MainTabs() {
         tabBarInactiveTintColor: colors.textTertiary,
         tabBarShowLabel: false,
         safeAreaInsets: { bottom: 0 },
-        // Без этого фона каждый экран-вкладка сидит прямо на нативном (белом по умолчанию)
-        // фоне окна. FadeScreen анимирует прозрачность через нативный драйвер, так что во
-        // время фейда сквозь неё реально просвечивает то, что позади — без этой подложки это
-        // белый цвет ОС, что особенно режет глаза в тёмной теме.
+        // Без этого фона экран-вкладка сидит на нативном (белом по умолчанию) фоне окна.
         sceneContainerStyle: { backgroundColor: colors.background },
         tabBarStyle: {
           backgroundColor: colors.background,
@@ -177,14 +141,14 @@ function MainTabs() {
         options={{ tabBarIcon: ({ color, focused }) => <BounceIcon name="home" color={color} focused={focused} /> }}
         listeners={{ tabPress: () => triggerHaptic('selection') }}
       >
-        {(props) => <FadeScreen><HomeScreen {...props} /></FadeScreen>}
+        {(props) => <HomeScreen {...props} />}
       </Tab.Screen>
       <Tab.Screen
         name="Library"
         options={{ tabBarIcon: ({ color, focused }) => <BounceIcon name="albums" color={color} focused={focused} /> }}
         listeners={{ tabPress: () => triggerHaptic('selection') }}
       >
-        {(props) => <FadeScreen><LibraryScreen {...props} /></FadeScreen>}
+        {(props) => <LibraryScreen {...props} />}
       </Tab.Screen>
       <Tab.Screen
         name="Study"
@@ -195,7 +159,7 @@ function MainTabs() {
         }}
         listeners={{ tabPress: () => triggerHaptic('selection') }}
       >
-        {(props) => <FadeScreen><StudyPlaceholderScreen {...props} /></FadeScreen>}
+        {(props) => <StudyPlaceholderScreen {...props} />}
       </Tab.Screen>
       <Tab.Screen
         name="Statistics"
@@ -206,14 +170,14 @@ function MainTabs() {
         }}
         listeners={{ tabPress: () => triggerHaptic('selection') }}
       >
-        {(props) => <FadeScreen><StatisticsScreen {...props} /></FadeScreen>}
+        {(props) => <StatisticsScreen {...props} />}
       </Tab.Screen>
       <Tab.Screen
         name="Profile"
         options={{ tabBarIcon: ({ color, focused }) => <BounceIcon name="person" color={color} focused={focused} /> }}
         listeners={{ tabPress: () => triggerHaptic('selection') }}
       >
-        {(props) => <FadeScreen><ProfileScreen {...props} /></FadeScreen>}
+        {(props) => <ProfileScreen {...props} />}
       </Tab.Screen>
     </Tab.Navigator>
   );
