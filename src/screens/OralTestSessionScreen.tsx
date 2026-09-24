@@ -2,7 +2,7 @@
  * Oral Test Session Screen
  * @description Основной экран устного теста — свайп карточек
  */
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -10,6 +10,7 @@ import {
   Animated,
   PanResponder,
   Platform,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, X, Check } from 'lucide-react-native';
@@ -51,6 +52,15 @@ export function OralTestSessionScreen({ navigation, route }: Props) {
   const total = cards.length;
   const progress = total > 0 ? currentIndex / total : 0;
 
+  // Раньше при пустом наборе карточек экран просто пытался отрендерить `card === undefined`
+  // без какой-либо проверки. См. план, пункт 53.
+  useEffect(() => {
+    if (cards.length === 0) {
+      Alert.alert('Нет карточек', 'В этом наборе нет карточек для тренировки.');
+      navigation.goBack();
+    }
+  }, [cards.length, navigation]);
+
   function goToResults(known: string[], unknown: string[]) {
     navigation.replace('OralTestResults', {
       courseId: route.params.courseId,
@@ -64,6 +74,23 @@ export function OralTestSessionScreen({ navigation, route }: Props) {
 
   function confirmFinish() {
     goToResults(knownIdsRef.current, unknownIdsRef.current);
+  }
+
+  // Раньше и кнопка "Назад" в шапке, и "Закончить" внизу сразу завершали сессию без
+  // подтверждения. См. план, пункт 54.
+  function handleEarlyExit() {
+    if (currentIndexRef.current >= cardsRef.current.length) {
+      confirmFinish();
+      return;
+    }
+    Alert.alert(
+      'Завершить тест раньше времени?',
+      'Оставшиеся карточки не будут пройдены.',
+      [
+        { text: 'Отмена', style: 'cancel' },
+        { text: 'Завершить', style: 'destructive', onPress: () => confirmFinish() },
+      ],
+    );
   }
 
   function handleSwipe(direction: 'left' | 'right') {
@@ -156,12 +183,12 @@ export function OralTestSessionScreen({ navigation, route }: Props) {
           {
             backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.85)',
             borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
-            paddingTop: Platform.OS === 'web' ? 12 : insets.top + 8,
+            paddingTop: 12,
           },
         ]}
       >
         <Pressable
-          onPress={() => confirmFinish()}
+          onPress={handleEarlyExit}
           style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
           hitSlop={8}
         >
@@ -173,7 +200,7 @@ export function OralTestSessionScreen({ navigation, route }: Props) {
       </View>
 
       {/* Progress */}
-      <View style={[styles.progressWrap, { paddingTop: insets.top + 60 }]}>
+      <View style={[styles.progressWrap, { paddingTop: 64 }]}>
         <Text style={[styles.counterText, { color: colors.textSecondary }]}>
           Карточка {Math.min(currentIndex + 1, total)} из {total}
         </Text>
@@ -271,7 +298,7 @@ export function OralTestSessionScreen({ navigation, route }: Props) {
       {/* Finish button */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
         <Pressable
-          onPress={() => confirmFinish()}
+          onPress={handleEarlyExit}
           style={({ pressed }) => [
             styles.finishBtn,
             { borderColor: colors.textSecondary },

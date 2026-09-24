@@ -10,6 +10,7 @@ import { NeonService } from '@/services/NeonService';
 import { DatabaseService } from '@/services/DatabaseService';
 import { SyncQueueService } from '@/services/SyncQueueService';
 import { supabase } from '@/services/supabaseClient';
+import { useCardsStore } from '@/store/cardsStore';
 
 // ==================== SYNC QUEUE EXECUTORS ====================
 
@@ -298,18 +299,38 @@ export const useSetsStore = create<SetsState & SetsActions>()(
     // ==================== КУРСЫ ====================
 
     moveSetsFromCourse: (courseId) => {
+      const readOnlySetIds: string[] = [];
+
       set((state) => {
         Object.values(state.sets).forEach((cardSet) => {
-          if (cardSet.courseId === courseId) {
-            cardSet.courseId = null; // Перемещаем в "All"
+          if (cardSet.courseId !== courseId) return;
+
+          if (cardSet.isReadOnly) {
+            // Это read-only зеркало набора учителя (см. loadCourseSetsByMembership) — не наш
+            // набор, а кэш на время членства в курсе. При выходе из курса удаляем целиком,
+            // а не обнуляем courseId — иначе он "всплывёт" в разделе "Все" до следующей
+            // полной синхронизации с Neon.
+            readOnlySetIds.push(cardSet.id);
+          } else {
+            cardSet.courseId = null; // Свой набор — просто перемещаем в "All"
             cardSet.updatedAt = Date.now();
           }
         });
+
+        readOnlySetIds.forEach((id) => {
+          delete state.sets[id];
+          const index = state.setsOrder.indexOf(id);
+          if (index > -1) state.setsOrder.splice(index, 1);
+        });
       });
+
+      // Карточки этих наборов тоже синхронизировались локально как read-only — чистим и их,
+      // иначе останутся сиротами без набора-владельца в cardsStore.
+      readOnlySetIds.forEach((id) => useCardsStore.getState().deleteCardsBySet(id));
 
       // Сохраняем изменения
       DatabaseService.saveSets();
-      console.log('✅ Наборы перемещены из курса в "All":', courseId);
+      console.log('✅ Наборы перемещены из курса в "All":', courseId, '· удалено read-only:', readOnlySetIds.length);
     },
 
     getSetsByCourse: (courseId) => {

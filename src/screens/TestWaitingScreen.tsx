@@ -22,10 +22,10 @@ import { spacing, borderRadius } from '@/constants';
 import { supabase } from '@/services/supabaseClient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
+import { API_BASE } from '@/config/apiBase';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TestWaiting'>;
 
-const API_BASE = __DEV__ ? 'http://localhost:3000/api' : '/api';
 const AVATAR_COLORS = ['#6366F1', '#F59E0B', '#EC4899', '#10B981', '#F97316'];
 const MAX_VISIBLE_AVATARS = 4;
 
@@ -51,7 +51,12 @@ export function TestWaitingScreen({ navigation, route }: Props) {
     let mounted = true;
     (async () => {
       try {
-        const resp = await fetch(`${API_BASE}/test?action=monitor&sessionId=${sessionId}`);
+        const { data: authData } = await supabase.auth.getSession();
+        const token = authData.session?.access_token;
+        if (!token) return;
+        const resp = await fetch(`${API_BASE}/test?action=monitor&sessionId=${sessionId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         const data = await resp.json();
         if (!mounted) return;
         const list: Participant[] = (data.participants || []).map((p: any, idx: number) => ({
@@ -85,7 +90,12 @@ export function TestWaitingScreen({ navigation, route }: Props) {
     const checkStatus = async () => {
       if (cancelled) return;
       try {
-        const resp = await fetch(`${API_BASE}/test?action=monitor&sessionId=${sessionId}`);
+        const { data: authData } = await supabase.auth.getSession();
+        const token = authData.session?.access_token;
+        if (!token) return;
+        const resp = await fetch(`${API_BASE}/test?action=monitor&sessionId=${sessionId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         if (!resp.ok || cancelled) return;
         const data = await resp.json();
         if (cancelled) return;
@@ -225,7 +235,7 @@ export function TestWaitingScreen({ navigation, route }: Props) {
         style={[
           styles.header,
           {
-            paddingTop: insets.top + 8,
+            paddingTop: 8,
           },
         ]}
       >

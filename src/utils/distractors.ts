@@ -10,8 +10,7 @@
  */
 
 import type { Card } from '@/types';
-
-const API_BASE = __DEV__ ? 'http://localhost:3000/api' : '/api';
+import { API_BASE } from '@/config/apiBase';
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];

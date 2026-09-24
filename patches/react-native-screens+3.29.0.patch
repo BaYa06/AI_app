@@ -1,0 +1,38 @@
+diff --git a/node_modules/react-native-screens/lib/module/index.js b/node_modules/react-native-screens/lib/module/index.js
+index 2799d7c..bbc829e 100644
+--- a/node_modules/react-native-screens/lib/module/index.js
++++ b/node_modules/react-native-screens/lib/module/index.js
+@@ -1,6 +1,7 @@
+ function _extends() { _extends = Object.assign ? Object.assign.bind() : function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; }; return _extends.apply(this, arguments); }
+ import React from 'react';
+-import { Animated, View, Image } from 'react-native';
++import { Animated, View, Image, Platform } from 'react-native';
++const IS_WEB = Platform.OS === 'web';
+ export * from './types';
+ export { default as useTransitionProgress } from './useTransitionProgress';
+ export { isSearchBarAvailableForCurrentPlatform, isNewBackTitleImplementation, executeNativeBackPress } from './utils';
+@@ -32,7 +33,24 @@ export class NativeScreen extends React.Component {
+       if (active !== undefined && activityState === undefined) {
+         activityState = active !== 0 ? 2 : 0; // change taken from index.native.tsx
+       }
++      const isVisible = activityState !== 0;
+ 
++      // On web there is no native tab-switch transition (this whole class is the web/JS
++      // fallback), so toggling display:none<->flex is an instant, jarring swap. Cross-fade
++      // via opacity instead; native keeps the original hidden+display:none behavior untouched.
++      if (IS_WEB) {
++        return /*#__PURE__*/React.createElement(View, _extends({
++          style: [style, {
++            display: 'flex',
++            opacity: isVisible ? 1 : 0,
++            pointerEvents: isVisible ? 'auto' : 'none',
++            transitionProperty: 'opacity',
++            transitionDuration: '180ms',
++            transitionTimingFunction: 'ease-out',
++            zIndex: isVisible ? 1 : 0
++          }]
++        }, rest));
++      }
+       return /*#__PURE__*/React.createElement(View
+       // @ts-expect-error: hidden exists on web, but not in React Native
+       , _extends({

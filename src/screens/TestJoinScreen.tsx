@@ -27,7 +27,7 @@ import { supabase } from '@/services/supabaseClient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 
-const API_BASE = __DEV__ ? 'http://localhost:3000/api' : '/api';
+import { API_BASE } from '@/config/apiBase';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TestJoin'>;
 
@@ -74,18 +74,37 @@ export function TestJoinScreen({ navigation }: Props) {
 
     try {
       const { data: authData } = await supabase.auth.getSession();
-      const userId = authData.session?.user?.id;
-      if (!userId) throw new Error('Not authenticated');
+      const token = authData.session?.access_token;
+      if (!token) throw new Error('Not authenticated');
 
       const resp = await fetch(`${API_BASE}/test?action=join`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, userId }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ code }),
       });
       const result = await resp.json();
 
       if (!resp.ok) {
         throw new Error(result.error || `Error ${resp.status}`);
+      }
+
+      // Переподключение к уже идущему тесту — открыть сразу вопрос, на котором ученик
+      // остановился, а не всегда с нуля (см. план, пункт 40).
+      if (result.alreadyJoined && result.status === 'active') {
+        if (result.answerCount >= result.questionCount) {
+          setError('Вы уже завершили этот тест');
+          setJoining(false);
+          return;
+        }
+        navigation.replace('TestExam', {
+          sessionId: result.sessionId,
+          participantId: result.participantId,
+          testMode: result.testMode,
+          questionCount: result.questionCount,
+          timePerQuestion: result.timePerQuestion,
+          initialQuestionIndex: result.answerCount,
+        });
+        return;
       }
 
       navigation.replace('TestWaiting', {
@@ -114,7 +133,7 @@ export function TestJoinScreen({ navigation }: Props) {
           styles.header,
           {
             backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.85)',
-            paddingTop: insets.top + 8,
+            paddingTop: 8,
           },
         ]}
       >

@@ -125,7 +125,6 @@ async function applyMigrations(sql) {
         score           INTEGER DEFAULT 0,
         joined_at       TIMESTAMPTZ DEFAULT NOW(),
         finished_at     TIMESTAMPTZ,
-        is_disqualified BOOLEAN DEFAULT FALSE,
         UNIQUE(session_id, user_id)
       )
     `;
@@ -150,6 +149,16 @@ async function applyMigrations(sql) {
     await sql`CREATE INDEX IF NOT EXISTS idx_test_answers_participant ON test_answers(participant_id)`;
   } catch (e) {
     console.error('Migration 011_live_test failed:', e);
+  }
+
+  // Migration 014: UNIQUE(participant_id, card_id) на test_answers — без него можно было
+  // отправлять ответ на один и тот же вопрос сколько угодно раз, задваивая счётчики и
+  // используя предыдущий ответ сервера (correctAnswer) как оракул. См. database/migrations/
+  // 014_test_answers_unique.sql и plan/teacher_access_fix_plan.md, пункт 35.
+  try {
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_test_answers_unique_participant_card ON test_answers(participant_id, card_id)`;
+  } catch (e) {
+    console.error('Migration 014_test_answers_unique failed:', e);
   }
 }
 
@@ -258,6 +267,11 @@ async function initDatabase(sql) {
   await sql`CREATE INDEX IF NOT EXISTS idx_card_progress_user_card ON card_progress(user_id, card_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_reviews_user_id ON reviews(user_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_reviews_user_card ON reviews(user_id, card_id)`;
+  // Использует api/teacher.js: ростер курса (streak/last_active агрегаты) и аггрегаты
+  // курса/наборов. Раньше создавались лениво при каждом запросе — см. database/migrations/
+  // 015_teacher_aggregate_indexes.sql и план, пункт 28.
+  await sql`CREATE INDEX IF NOT EXISTS idx_reviews_user_reviewed ON reviews(user_id, reviewed_at)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_card_sets_course_id ON card_sets(course_id)`;
 }
 
 export { ensureDatabaseInitialized, initDatabase };

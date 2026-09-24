@@ -244,7 +244,9 @@ let cachedToken: { token: string; exp: number } | null = null;
 
 const getApiKey = () => {
   const key = ENV_GCLOUD_TTS_KEY || undefined;
-  console.log('[speech] API Key available:', !!key, key ? `(${key.substring(0, 10)}...)` : '');
+  // Раньше логировались первые 10 символов ключа — не нужно писать фрагмент секрета в логи,
+  // даже частично. См. план, пункт 52.
+  console.log('[speech] API Key available:', !!key);
   return key;
 };
 

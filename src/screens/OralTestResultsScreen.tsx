@@ -45,7 +45,7 @@ export function OralTestResultsScreen({ navigation, route }: Props) {
           {
             backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.85)',
             borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
-            paddingTop: Platform.OS === 'web' ? 12 : insets.top + 8,
+            paddingTop: 12,
           },
         ]}
       >
@@ -65,7 +65,10 @@ export function OralTestResultsScreen({ navigation, route }: Props) {
         <View style={[styles.summaryCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
           <Text style={styles.summaryEmoji}>🎉</Text>
           <Text style={[styles.summaryTitle, { color: colors.textPrimary }]}>
-            Устный тест завершён
+            Тренировка завершена
+          </Text>
+          <Text style={[styles.emptyNote, { color: colors.textSecondary }]}>
+            Это тренажёр — результат нигде не сохраняется
           </Text>
 
           {total === 0 ? (
@@ -150,7 +153,7 @@ export function OralTestResultsScreen({ navigation, route }: Props) {
           ]}
         >
           <Text style={[styles.outlineText, { color: colors.textSecondary }]}>
-            Провести ещё один тест
+            Провести ещё раз
           </Text>
         </Pressable>
 

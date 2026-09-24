@@ -15,6 +15,7 @@ import { Text } from '@/components/common';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius } from '@/constants';
 import { NeonService } from '@/services/NeonService';
+import { describeTeacherApiReason } from '@/utils/teacherApiErrors';
 import { X } from 'lucide-react-native';
 
 interface JoinByCodeModalProps {
@@ -57,13 +58,13 @@ export function JoinByCodeModal({ visible, userId, onAccepted, onDismiss }: Join
     setInfo(null);
     try {
       const result = await NeonService.getCourseInviteInfoByCode(trimmed);
-      if (result) {
+      if (result.ok) {
         setInfo(result);
       } else {
-        setError('Код не найден или истёк');
+        setError(describeTeacherApiReason(result.reason));
       }
     } catch {
-      setError('Ошибка поиска');
+      setError(describeTeacherApiReason('network'));
     } finally {
       setLooking(false);
     }
@@ -74,14 +75,14 @@ export function JoinByCodeModal({ visible, userId, onAccepted, onDismiss }: Join
     setJoining(true);
     try {
       const result = await NeonService.joinCourseByCode(code.trim(), userId);
-      if (result) {
+      if (result.ok) {
         reset();
         onAccepted(result.courseId, result.courseTitle);
       } else {
-        setError('Не удалось присоединиться');
+        setError(describeTeacherApiReason(result.reason));
       }
     } catch {
-      setError('Ошибка при присоединении');
+      setError(describeTeacherApiReason('network'));
     } finally {
       setJoining(false);
     }

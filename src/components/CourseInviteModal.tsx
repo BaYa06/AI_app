@@ -14,6 +14,7 @@ import { Text } from '@/components/common';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius } from '@/constants';
 import { NeonService } from '@/services/NeonService';
+import { describeTeacherApiReason } from '@/utils/teacherApiErrors';
 import { X } from 'lucide-react-native';
 
 interface CourseInviteModalProps {
@@ -39,14 +40,14 @@ export function CourseInviteModal({ token, userId, onAccepted, onDismiss }: Cour
     setLoading(true);
     setError(null);
     NeonService.getCourseInviteInfo(token)
-      .then((data) => {
-        if (data) {
-          setInfo(data);
+      .then((result) => {
+        if (result.ok) {
+          setInfo(result);
         } else {
-          setError('Приглашение не найдено или истекло');
+          setError(describeTeacherApiReason(result.reason));
         }
       })
-      .catch(() => setError('Ошибка загрузки'))
+      .catch(() => setError(describeTeacherApiReason('network')))
       .finally(() => setLoading(false));
   }, [token]);
 
@@ -55,13 +56,13 @@ export function CourseInviteModal({ token, userId, onAccepted, onDismiss }: Cour
     setJoining(true);
     try {
       const result = await NeonService.joinCourseByToken(token, userId);
-      if (result) {
+      if (result.ok) {
         onAccepted(result.courseId, result.courseTitle);
       } else {
-        setError('Не удалось присоединиться');
+        setError(describeTeacherApiReason(result.reason));
       }
     } catch {
-      setError('Ошибка при присоединении');
+      setError(describeTeacherApiReason('network'));
     } finally {
       setJoining(false);
     }

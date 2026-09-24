@@ -13,7 +13,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, X, GraduationCap, FileText, Mic, Clock } from 'lucide-react-native';
+import { ArrowLeft, X, GraduationCap, FileText, Mic, Clock, AlertTriangle } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import { useThemeColors, useSettingsStore } from '@/store';
 import { spacing, borderRadius } from '@/constants';
@@ -182,13 +182,19 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
     count: number;
   } | null>(null);
 
+  // Владение курсом — null пока не проверено. Данные грузятся только после подтверждения,
+  // чтобы не было гонки "сначала данные, потом дверь" (см. план, пункт 21).
+  const [isOwner, setIsOwner] = useState<boolean | null>(null);
+
   // Реальные участники
   const [members, setMembers] = useState<CourseMember[]>([]);
   const [membersLoading, setMembersLoading] = useState(true);
+  const [membersError, setMembersError] = useState(false);
 
   // Chart data
   const [chartData, setChartData] = useState<{ day: string; pct: number; count: number }[]>([]);
   const [chartLoading, setChartLoading] = useState(false);
+  const [chartError, setChartError] = useState(false);
 
   // Sets stats
   const [setsStats, setSetsStats] = useState<Array<{
@@ -199,20 +205,28 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
     studentsCompleted: number;
     progressPct: number;
   }>>([]);
-  const [setsLoading, setSetsLoading] = useState(false);
+  const [setsLoading, setSetsLoading] = useState(true);
+  const [setsError, setSetsError] = useState(false);
+
+  // Дёргается кнопками "Повторить" при ошибке загрузки — заставляет соответствующий эффект
+  // ниже перезапуститься. См. план, пункт 29.
+  const [retryTick, setRetryTick] = useState(0);
 
   useEffect(() => {
-    if (!route.params.courseId) return;
+    if (!isOwner || !route.params.courseId) return;
     setSetsLoading(true);
+    setSetsError(false);
     NeonService.loadCourseSetStats(route.params.courseId)
       .then(setSetsStats)
-      .catch(() => setSetsStats([]))
+      .catch((e) => { console.error('Failed to load set stats:', e); setSetsError(true); })
       .finally(() => setSetsLoading(false));
-  }, [route.params.courseId]);
+  }, [isOwner, route.params.courseId, retryTick]);
 
   useEffect(() => {
+    if (!isOwner) return;
     let mounted = true;
     setMembersLoading(true);
+    setMembersError(false);
     NeonService.loadCourseMembers(route.params.courseId)
       .then((raw) => {
         if (!mounted) return;
@@ -227,10 +241,13 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
           })),
         );
       })
-      .catch((e) => console.error('Failed to load members:', e))
+      .catch((e) => {
+        console.error('Failed to load members:', e);
+        if (mounted) setMembersError(true);
+      })
       .finally(() => { if (mounted) setMembersLoading(false); });
     return () => { mounted = false; };
-  }, [route.params.courseId]);
+  }, [isOwner, route.params.courseId, retryTick]);
 
   const activeStudents = members.filter((s) => s.status === 'online' || s.status === 'away');
   const inactiveStudents = members.filter((s) => s.status === 'inactive');
@@ -238,28 +255,47 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
   const modalTitle = studentModal === 'active' ? 'Активны сегодня' : 'Не заходили 7д+';
 
   useEffect(() => {
-    if (!route.params.courseId || members.length === 0) return;
+    if (!isOwner || !route.params.courseId || members.length === 0) return;
     setChartLoading(true);
+    setChartError(false);
     const days = chartPeriod === '7d' ? 7 : 30;
     NeonService.loadCourseActivityChart(route.params.courseId, days)
       .then((raw) => {
         setChartData(buildChartDays(raw, days, members.length));
       })
-      .catch(() => setChartData([]))
+      .catch((e) => {
+        console.error('Failed to load activity chart:', e);
+        setChartError(true);
+      })
       .finally(() => setChartLoading(false));
-  }, [chartPeriod, members.length, route.params.courseId]);
+  }, [isOwner, chartPeriod, members.length, route.params.courseId, retryTick]);
 
+  // Проверка владения курсом — блокирующая: остальные эффекты выше гейтятся на `isOwner` и
+  // не грузят данные, пока она не пройдёт. Раньше проверка и загрузка шли параллельно — чужие
+  // данные (хоть теперь и не отдаются сервером, см. план, пп. 19-20) могли в теории
+  // отрендериться на долю секунды до срабатывания редиректа. См. план, пункт 21.
   useEffect(() => {
     let mounted = true;
     const checkOwnership = async () => {
       try {
         const { data } = await supabase.auth.getSession();
         const userId = data.session?.user?.id;
-        if (!userId || !NeonService.isEnabled()) return;
-        const isOwner = await NeonService.isCourseOwner(route.params.courseId, userId);
-        if (mounted && !isOwner) navigation.goBack();
+        if (!userId || !NeonService.isEnabled()) {
+          // Проверить нечем (не авторизован / Neon не сконфигурирован) — не блокируем, как и раньше.
+          if (mounted) setIsOwner(true);
+          return;
+        }
+        const owner = await NeonService.isCourseOwner(route.params.courseId, userId);
+        if (!mounted) return;
+        if (!owner) {
+          navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Main' as any);
+          return;
+        }
+        setIsOwner(true);
       } catch {
-        if (mounted) navigation.goBack();
+        if (mounted) {
+          navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Main' as any);
+        }
       }
     };
     checkOwnership();
@@ -366,6 +402,8 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
             <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>АКТИВНЫХ СЕГОДНЯ</Text>
             {membersLoading ? (
               <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 8 }} />
+            ) : membersError ? (
+              <Text style={[styles.metricValue, { color: colors.textSecondary }]}>—</Text>
             ) : (
               <Text style={[styles.metricValue, { color: colors.primary }]}>{activeStudents.length}</Text>
             )}
@@ -379,6 +417,8 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
             <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>НЕ ЗАХОДИЛИ 7Д+</Text>
             {membersLoading ? (
               <ActivityIndicator size="small" color={colors.error} style={{ marginTop: 8 }} />
+            ) : membersError ? (
+              <Text style={[styles.metricValue, { color: colors.textSecondary }]}>—</Text>
             ) : (
               <Text style={[styles.metricValue, { color: colors.error }]}>{inactiveStudents.length}</Text>
             )}
@@ -423,6 +463,16 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
           {chartLoading ? (
             <View style={{ height: CHART_HEIGHT + 20, justifyContent: 'center', alignItems: 'center' }}>
               <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          ) : chartError ? (
+            // Раньше сбой графика выглядел как пустой график без каких-либо данных — теперь
+            // видно, что это ошибка, а не "активности не было". См. план, пункт 29.
+            <View style={{ height: CHART_HEIGHT + 20, justifyContent: 'center', alignItems: 'center', gap: 8 }}>
+              <AlertTriangle size={20} color={colors.textSecondary} />
+              <Text style={[styles.emptyMembers, { color: colors.textSecondary }]}>Не удалось загрузить график</Text>
+              <Pressable onPress={() => setRetryTick((t) => t + 1)}>
+                <Text style={[styles.viewAll, { color: colors.primary }]}>Повторить</Text>
+              </Pressable>
             </View>
           ) : (
           <View style={[styles.chartWrap, { height: CHART_HEIGHT + 20 }]}>
@@ -472,6 +522,15 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
           </View>
           {membersLoading ? (
             <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: spacing.m }} />
+          ) : membersError ? (
+            <View style={{ alignItems: 'flex-start', gap: 6, marginVertical: spacing.s }}>
+              <Text style={[styles.emptyMembers, { color: colors.textSecondary }]}>
+                Не удалось загрузить учеников
+              </Text>
+              <Pressable onPress={() => setRetryTick((t) => t + 1)}>
+                <Text style={[styles.viewAll, { color: colors.primary }]}>Повторить</Text>
+              </Pressable>
+            </View>
           ) : members.length === 0 ? (
             <Text style={[styles.emptyMembers, { color: colors.textSecondary }]}>
               Пока нет учеников. Отправьте ссылку-приглашение.
@@ -496,6 +555,15 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
           </Text>
           {setsLoading ? (
             <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: spacing.m }} />
+          ) : setsError ? (
+            <View style={{ alignItems: 'flex-start', gap: 6, marginVertical: spacing.s }}>
+              <Text style={[styles.emptyMembers, { color: colors.textSecondary }]}>
+                Не удалось загрузить наборы
+              </Text>
+              <Pressable onPress={() => setRetryTick((t) => t + 1)}>
+                <Text style={[styles.viewAll, { color: colors.primary }]}>Повторить</Text>
+              </Pressable>
+            </View>
           ) : setsStats.length === 0 ? (
             <Text style={[styles.emptyMembers, { color: colors.textSecondary }]}>
               Нет данных — ученики ещё не начали учить
@@ -688,10 +756,10 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.sheetOptionTitle, { color: colors.textPrimary }]}>
-                  Орал тест
+                  Устный тренажёр
                 </Text>
                 <Text style={[styles.sheetOptionDesc, { color: colors.textSecondary }]}>
-                  Устный опрос учеников
+                  Тренировка произношения — результат не сохраняется
                 </Text>
               </View>
               <ArrowLeft

@@ -2,13 +2,20 @@
  * API Client для работы с Neon PostgreSQL через Vercel Functions
  */
 
-const API_BASE_URL = __DEV__
-  ? 'http://localhost:3000/api'
-  : '/api';
+import { API_BASE } from '@/config/apiBase';
 
+// Раньше был отдельный относительный '/api' — не резолвится в fetch() на нативном React
+// Native (в отличие от веба), см. plan/teacher_access_fix_plan.md, пункт 55. Затрагивало как
+// минимум extractImageCards (единственный реально используемый метод ниже помимо AI_BASE_URL).
+const API_BASE_URL = API_BASE;
+
+// '/ai' — не опечатка: vercel.json намеренно проксирует /ai/:path* на внешний сервер
+// (http://34.9.20.41:3001), отдельно от Vercel-функций под /api. Сохраняем тот же путь и в
+// проде — просто делаем его абсолютным (та же проблема с относительным URL на нативном RN,
+// что и у API_BASE_URL), не меняя, какой бэкенд реально обслуживает эти вызовы.
 const AI_BASE_URL = __DEV__
   ? 'http://localhost:3000/api'
-  : '/ai';
+  : 'https://ai-app-seven-zeta.vercel.app/ai';
 
 class ApiService {
   /**

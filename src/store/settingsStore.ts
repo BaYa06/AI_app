@@ -8,6 +8,7 @@ import { colors, ColorScheme } from '@/constants';
 import { StreakService } from '@/services/StreakService';
 import { NeonService } from '@/services/NeonService';
 import { supabase } from '@/services';
+import { API_BASE } from '@/config/apiBase';
 
 interface SettingsState {
   // Настройки пользователя
@@ -33,6 +34,9 @@ interface SettingsState {
     lastActiveDate: string | null;
     loaded: boolean;
   };
+
+  // Является ли текущий пользователь учителем (null — ещё не загружено)
+  isTeacher: boolean | null;
 }
 
 interface SettingsActions {
@@ -51,7 +55,10 @@ interface SettingsActions {
 
   // Синхронизация стрика
   syncStreakFromServer: (data: { currentStreak: number; longestStreak: number; lastActiveDate: string | null }) => void;
-  
+
+  // Роль учителя — загружается заново при каждом фокусе Home, а не один раз за сессию
+  fetchIsTeacher: (userId: string) => Promise<void>;
+
   // Сброс
   resetSettings: () => void;
 }
@@ -92,6 +99,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
       lastActiveDate: null,
       loaded: false,
     },
+    isTeacher: null,
 
     // ==================== НАСТРОЙКИ ====================
     
@@ -180,7 +188,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
           const milestones = [7, 14, 30, 60, 100];
           if (milestones.includes(newCount)) {
             supabase.auth.getSession().then(({ data }) => {
-              fetch('/api/push?action=notify', {
+              fetch(`${API_BASE}/push?action=notify`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -246,14 +254,24 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
       console.log('✅ Streak: синхронизировано с сервером', data);
     },
 
+    // ==================== РОЛЬ УЧИТЕЛЯ ====================
+
+    fetchIsTeacher: async (userId) => {
+      const isTeacher = await NeonService.getIsTeacher(userId);
+      set((state) => {
+        state.isTeacher = isTeacher;
+      });
+    },
+
     // ==================== СБРОС ====================
-    
+
     resetSettings: () => {
       set((state) => {
         state.settings = defaultSettings;
         state.themeMode = 'light';
         state.resolvedTheme = 'light';
         state.colors = colors.light;
+        state.isTeacher = null;
       });
     },
   }))

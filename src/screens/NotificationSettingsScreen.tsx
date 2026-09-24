@@ -24,6 +24,7 @@ import {
   type PushStatus,
 } from '@/services/pushNotifications';
 import { supabase } from '@/services';
+import { API_BASE } from '@/config/apiBase';
 
 const DAYS = [
   { key: 'mon', label: 'Пн' },
@@ -69,7 +70,7 @@ export function NotificationSettingsScreen({ navigation }: any) {
       const uid = data.session?.user?.id;
       setUserId(uid);
       if (uid) {
-        fetch(`/api/push?action=settings?userId=${uid}`)
+        fetch(`${API_BASE}/push?action=settings&userId=${uid}`)
           .then((r) => r.json())
           .then((d) => {
             setReminderEnabled(d.notifEnabled ?? true);
@@ -322,7 +323,7 @@ export function NotificationSettingsScreen({ navigation }: any) {
             if (!userId || saving) return;
             setSaving(true);
             try {
-              await fetch('/api/push?action=settings', {
+              await fetch(`${API_BASE}/push?action=settings`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

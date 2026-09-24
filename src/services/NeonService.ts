@@ -4,7 +4,61 @@
  */
 
 import { neon } from '@neondatabase/serverless';
+import { supabase } from './supabaseClient';
+import { API_BASE } from '@/config/apiBase';
 import type { Card, CardSet, CardStatus, UpdateCardInput, Course } from '@/types';
+
+// Учительские мутации (курсы/инвайты/ростер/видимость наборов) идут через настоящий backend
+// (api/teacher.js), а не напрямую в Neon — он проверяет Supabase JWT вызывающего вместо того,
+// чтобы доверять userId, переданному с клиента. См. plan/teacher_access_fix_plan.md, пункт 1.
+const TEACHER_API_BASE = `${API_BASE}/teacher`;
+
+// Причина отказа — чтобы UI мог показать разный текст под "истёк"/"не найден"/"нет сети" и
+// т.д., вместо одного и того же сообщения на всё подряд (план, пункт 13).
+export type TeacherApiReason =
+  | 'not_found' | 'expired' | 'own_course' | 'unauthorized' | 'forbidden'
+  | 'rate_limited' | 'bad_request' | 'network' | 'unknown';
+
+function reasonFromStatus(status: number): TeacherApiReason {
+  switch (status) {
+    case 401: return 'unauthorized';
+    case 403: return 'forbidden';
+    case 404: return 'not_found';
+    case 410: return 'expired';
+    case 429: return 'rate_limited';
+    case 400: return 'bad_request';
+    default: return 'unknown';
+  }
+}
+
+async function callTeacherApi<T = any>(
+  action: string,
+  { method = 'GET', body, params }: { method?: 'GET' | 'POST'; body?: Record<string, any>; params?: Record<string, string> } = {},
+): Promise<{ ok: true; data: T } | { ok: false; error: string; status: number; reason: TeacherApiReason }> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) return { ok: false, error: 'Not authenticated', status: 401, reason: 'unauthorized' };
+
+  const query = new URLSearchParams({ action, ...(params || {}) }).toString();
+  try {
+    const resp = await fetch(`${TEACHER_API_BASE}?${query}`, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: method === 'POST' ? JSON.stringify(body || {}) : undefined,
+    });
+    const json = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      const reason: TeacherApiReason = json?.reason || reasonFromStatus(resp.status);
+      return { ok: false, error: json?.error || `HTTP ${resp.status}`, status: resp.status, reason };
+    }
+    return { ok: true, data: json as T };
+  } catch (error: any) {
+    return { ok: false, error: error?.message || 'Network error', status: 0, reason: 'network' };
+  }
+}
 
 // Используем переменную окружения для подключения
 const getConnectionString = () => {
@@ -48,24 +102,6 @@ function pgDateToString(value: unknown): string {
     return `${y}-${m}-${d}`;
   }
   return String(value).split('T')[0];
-}
-
-let _migrationsApplied = false;
-
-async function applyClientMigrations() {
-  if (_migrationsApplied) return;
-  _migrationsApplied = true;
-  try {
-    const connectionString = getConnectionString();
-    if (!connectionString) return;
-    const sql = neon(connectionString);
-    await sql`
-      ALTER TABLE card_sets
-      ADD COLUMN IF NOT EXISTS is_hidden_from_students BOOLEAN NOT NULL DEFAULT false
-    `;
-  } catch (e) {
-    console.warn('Client migration is_hidden_from_students skipped:', e);
-  }
 }
 
 /**
@@ -362,7 +398,8 @@ export const NeonService = {
           updated_at,
           total_cards,
           mastered_cards,
-          studying_cards
+          studying_cards,
+          is_hidden_from_students
         FROM card_sets
         WHERE user_id = ${userId}
         ORDER BY created_at DESC
@@ -388,6 +425,7 @@ export const NeonService = {
         isPublic: set.is_public,
         isFavorite: false,
         isArchived: false,
+        isHiddenFromStudents: set.is_hidden_from_students === true,
       }));
     } catch (error) {
       console.error('Failed to load sets:', error);
@@ -943,50 +981,24 @@ export const NeonService = {
    * Переименовать курс
    */
   async renameCourse(courseId: string, title: string): Promise<boolean> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) {
-        return false;
-      }
-
-      const sql = neon(connectionString);
-      
-      await sql`
-        UPDATE courses
-        SET title = ${title}, updated_at = NOW()
-        WHERE id = ${courseId}
-      `;
-
-      console.log('✅ Курс переименован в Neon:', title);
-      return true;
-    } catch (error) {
-      console.error('Failed to rename course in Neon:', error);
+    const result = await callTeacherApi('rename-course', { method: 'POST', body: { courseId, title } });
+    if (!result.ok) {
+      console.error('Failed to rename course:', result.error);
       return false;
     }
+    return true;
   },
 
   /**
    * Удалить курс
    */
   async deleteCourse(courseId: string): Promise<boolean> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) {
-        return false;
-      }
-
-      const sql = neon(connectionString);
-      
-      // При удалении курса, наборы автоматически получат course_id = NULL
-      // благодаря ON DELETE SET NULL в миграции
-      await sql`DELETE FROM courses WHERE id = ${courseId}`;
-
-      console.log('✅ Курс удален из Neon:', courseId);
-      return true;
-    } catch (error) {
-      console.error('Failed to delete course from Neon:', error);
+    const result = await callTeacherApi('delete-course', { method: 'POST', body: { courseId } });
+    if (!result.ok) {
+      console.error('Failed to delete course:', result.error);
       return false;
     }
+    return true;
   },
 
   /**
@@ -1152,7 +1164,7 @@ export const NeonService = {
         // Пропустили день(и) - начинаем заново
         currentStreak = 1;
         console.log('🔄 Streak: начинаем серию заново', { currentStreak });
-        fetch('/api/push?action=notify', {
+        fetch(`${API_BASE}/push?action=notify`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1390,263 +1402,126 @@ export const NeonService = {
   /**
    * Создать или получить существующий инвайт-токен для курса
    */
-  async createCourseInvite(courseId: string, userId: string): Promise<{ token: string; joinCode: string } | null> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) return null;
-
-      const sql = neon(connectionString);
-
-      // Проверить что пользователь — владелец курса
-      const course = await sql`
-        SELECT id FROM courses
-        WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid
-      `;
-      if (course.length === 0) {
-        console.error('createCourseInvite: not course owner');
-        return null;
-      }
-
-      // Проверить существующий инвайт
-      const existing = await sql`
-        SELECT token, join_code FROM course_invites
-        WHERE course_id = ${courseId}::uuid
-        LIMIT 1
-      `;
-      if (existing.length > 0) {
-        // Если join_code ещё нет (старая запись) — заполнить
-        if (!existing[0].join_code) {
-          const code = String(Math.floor(100000 + Math.random() * 900000));
-          await sql`
-            UPDATE course_invites SET join_code = ${code}
-            WHERE token = ${existing[0].token}
-          `;
-          return { token: existing[0].token, joinCode: code };
-        }
-        return { token: existing[0].token, joinCode: existing[0].join_code };
-      }
-
-      // Сгенерировать токен на клиенте
-      const bytes = new Uint8Array(32);
-      if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-        crypto.getRandomValues(bytes);
-      } else {
-        for (let i = 0; i < 32; i++) bytes[i] = Math.floor(Math.random() * 256);
-      }
-      const token = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-      const joinCode = String(Math.floor(100000 + Math.random() * 900000));
-
-      const result = await sql`
-        INSERT INTO course_invites (course_id, token, created_by, join_code)
-        VALUES (
-          ${courseId}::uuid,
-          ${token},
-          ${userId}::uuid,
-          ${joinCode}
-        )
-        RETURNING token, join_code
-      `;
-
-      console.log('✅ Инвайт создан для курса:', courseId);
-      return { token: result[0].token, joinCode: result[0].join_code };
-    } catch (error) {
-      console.error('Failed to create course invite:', error);
+  async createCourseInvite(courseId: string, _userId: string): Promise<{ token: string; joinCode: string } | null> {
+    // _userId сохранён для обратной совместимости сигнатуры вызывающего кода — реальный
+    // владелец теперь определяется backend'ом из Supabase JWT, а не из этого параметра.
+    const result = await callTeacherApi<{ token: string; joinCode: string }>('create-invite', {
+      method: 'POST',
+      body: { courseId },
+    });
+    if (!result.ok) {
+      console.error('Failed to create course invite:', result.error);
       return null;
     }
+    return { token: result.data.token, joinCode: result.data.joinCode };
+  },
+
+  /**
+   * Пересоздать инвайт курса — старые token/join_code сразу перестают работать.
+   * Использовать, если старая ссылка/код могли утечь не в те руки.
+   */
+  async regenerateCourseInvite(courseId: string): Promise<{ token: string; joinCode: string } | null> {
+    const result = await callTeacherApi<{ token: string; joinCode: string }>('regenerate-invite', {
+      method: 'POST',
+      body: { courseId },
+    });
+    if (!result.ok) {
+      console.error('Failed to regenerate course invite:', result.error);
+      return null;
+    }
+    return { token: result.data.token, joinCode: result.data.joinCode };
   },
 
   /**
    * Получить информацию о курсе по короткому коду (для ученика)
    */
-  async getCourseInviteInfoByCode(code: string): Promise<{
-    courseId: string;
-    courseTitle: string;
-    teacherName: string;
-  } | null> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) return null;
-
-      const sql = neon(connectionString);
-
-      const result = await sql`
-        SELECT
-          c.id AS course_id,
-          c.title AS course_title,
-          COALESCE(u.display_name, u.user_name, u.email) AS teacher_name
-        FROM course_invites ci
-        JOIN courses c ON c.id = ci.course_id
-        JOIN users u ON u.id = ci.created_by
-        WHERE ci.join_code = ${code}
-          AND (ci.expires_at IS NULL OR ci.expires_at > NOW())
-      `;
-
-      if (result.length === 0) return null;
-
-      return {
-        courseId: result[0].course_id,
-        courseTitle: result[0].course_title,
-        teacherName: result[0].teacher_name,
-      };
-    } catch (error) {
-      console.error('Failed to get course invite info by code:', error);
-      return null;
+  async getCourseInviteInfoByCode(code: string): Promise<
+    | { ok: true; courseId: string; courseTitle: string; teacherName: string }
+    | { ok: false; reason: TeacherApiReason }
+  > {
+    const result = await callTeacherApi<{ courseId: string; courseTitle: string; teacherName: string }>(
+      'invite-info-by-code',
+      { method: 'GET', params: { code } },
+    );
+    if (!result.ok) {
+      if (result.reason !== 'not_found' && result.reason !== 'expired') {
+        console.error('Failed to get course invite info by code:', result.error);
+      }
+      return { ok: false, reason: result.reason };
     }
+    return { ok: true, courseId: result.data.courseId, courseTitle: result.data.courseTitle, teacherName: result.data.teacherName };
   },
 
   /**
    * Присоединиться к курсу по короткому коду
    */
-  async joinCourseByCode(code: string, userId: string): Promise<{
-    courseId: string;
-    courseTitle: string;
-  } | null> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) return null;
-
-      const sql = neon(connectionString);
-
-      const invite = await sql`
-        SELECT ci.course_id, c.title AS course_title, c.user_id AS owner_id
-        FROM course_invites ci
-        JOIN courses c ON c.id = ci.course_id
-        WHERE ci.join_code = ${code}
-          AND (ci.expires_at IS NULL OR ci.expires_at > NOW())
-      `;
-
-      if (invite.length === 0) return null;
-
-      const { course_id, course_title, owner_id } = invite[0];
-
-      if (owner_id === userId) {
-        console.warn('joinCourseByCode: cannot join own course');
-        return null;
+  async joinCourseByCode(code: string, _userId: string): Promise<
+    | { ok: true; courseId: string; courseTitle: string }
+    | { ok: false; reason: TeacherApiReason }
+  > {
+    // _userId сохранён для обратной совместимости — backend берёт userId из JWT.
+    const result = await callTeacherApi<{ courseId: string; courseTitle: string }>('join-by-code', {
+      method: 'POST',
+      body: { code },
+    });
+    if (!result.ok) {
+      if (result.reason !== 'not_found' && result.reason !== 'expired' && result.reason !== 'own_course') {
+        console.warn('Failed to join course by code:', result.error);
       }
-
-      await sql`
-        INSERT INTO course_members (course_id, user_id, role)
-        VALUES (${course_id}::uuid, ${userId}::uuid, 'student')
-        ON CONFLICT (course_id, user_id) DO NOTHING
-      `;
-
-      console.log('✅ Ученик присоединился по коду к курсу:', course_title);
-      return { courseId: course_id, courseTitle: course_title };
-    } catch (error) {
-      console.error('Failed to join course by code:', error);
-      return null;
+      return { ok: false, reason: result.reason };
     }
+    return { ok: true, courseId: result.data.courseId, courseTitle: result.data.courseTitle };
   },
 
   /**
    * Получить информацию о курсе по токену (для модалки у ученика)
    */
-  async getCourseInviteInfo(token: string): Promise<{
-    courseId: string;
-    courseTitle: string;
-    teacherName: string;
-  } | null> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) return null;
-
-      const sql = neon(connectionString);
-
-      const result = await sql`
-        SELECT
-          c.id AS course_id,
-          c.title AS course_title,
-          COALESCE(u.display_name, u.user_name, u.email) AS teacher_name
-        FROM course_invites ci
-        JOIN courses c ON c.id = ci.course_id
-        JOIN users u ON u.id = ci.created_by
-        WHERE ci.token = ${token}
-          AND (ci.expires_at IS NULL OR ci.expires_at > NOW())
-      `;
-
-      if (result.length === 0) return null;
-
-      return {
-        courseId: result[0].course_id,
-        courseTitle: result[0].course_title,
-        teacherName: result[0].teacher_name,
-      };
-    } catch (error) {
-      console.error('Failed to get course invite info:', error);
-      return null;
+  async getCourseInviteInfo(token: string): Promise<
+    | { ok: true; courseId: string; courseTitle: string; teacherName: string }
+    | { ok: false; reason: TeacherApiReason }
+  > {
+    const result = await callTeacherApi<{ courseId: string; courseTitle: string; teacherName: string }>(
+      'invite-info-by-token',
+      { method: 'GET', params: { token } },
+    );
+    if (!result.ok) {
+      if (result.reason !== 'not_found' && result.reason !== 'expired') {
+        console.error('Failed to get course invite info:', result.error);
+      }
+      return { ok: false, reason: result.reason };
     }
+    return { ok: true, courseId: result.data.courseId, courseTitle: result.data.courseTitle, teacherName: result.data.teacherName };
   },
 
   /**
    * Принять приглашение — добавить ученика в course_members
    */
-  async joinCourseByToken(token: string, userId: string): Promise<{
-    courseId: string;
-    courseTitle: string;
-  } | null> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) return null;
-
-      const sql = neon(connectionString);
-
-      // Найти токен → получить courseId
-      const invite = await sql`
-        SELECT ci.course_id, c.title AS course_title, c.user_id AS owner_id
-        FROM course_invites ci
-        JOIN courses c ON c.id = ci.course_id
-        WHERE ci.token = ${token}
-          AND (ci.expires_at IS NULL OR ci.expires_at > NOW())
-      `;
-
-      if (invite.length === 0) return null;
-
-      const { course_id, course_title, owner_id } = invite[0];
-
-      // Нельзя присоединиться к своему курсу
-      if (owner_id === userId) {
-        console.warn('joinCourseByToken: cannot join own course');
-        return null;
+  async joinCourseByToken(token: string, _userId: string): Promise<
+    | { ok: true; courseId: string; courseTitle: string }
+    | { ok: false; reason: TeacherApiReason }
+  > {
+    // _userId сохранён для обратной совместимости — backend берёт userId из JWT.
+    const result = await callTeacherApi<{ courseId: string; courseTitle: string }>('join-by-token', {
+      method: 'POST',
+      body: { token },
+    });
+    if (!result.ok) {
+      if (result.reason !== 'not_found' && result.reason !== 'expired' && result.reason !== 'own_course') {
+        console.warn('Failed to join course by token:', result.error);
       }
-
-      // INSERT с ON CONFLICT — защита от двойного нажатия
-      await sql`
-        INSERT INTO course_members (course_id, user_id, role)
-        VALUES (${course_id}::uuid, ${userId}::uuid, 'student')
-        ON CONFLICT (course_id, user_id) DO NOTHING
-      `;
-
-      console.log('✅ Ученик присоединился к курсу:', course_title);
-      return { courseId: course_id, courseTitle: course_title };
-    } catch (error) {
-      console.error('Failed to join course by token:', error);
-      return null;
+      return { ok: false, reason: result.reason };
     }
+    return { ok: true, courseId: result.data.courseId, courseTitle: result.data.courseTitle };
   },
 
-  async removeStudentFromCourse(courseId: string, studentUserId: string, teacherUserId: string): Promise<boolean> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) return false;
-
-      const sql = neon(connectionString);
-
-      const course = await sql`
-        SELECT id FROM courses
-        WHERE id = ${courseId}::uuid AND user_id = ${teacherUserId}::uuid
-      `;
-      if (course.length === 0) return false;
-
-      await sql`
-        DELETE FROM course_members
-        WHERE course_id = ${courseId}::uuid AND user_id = ${studentUserId}::uuid
-      `;
-
-      return true;
-    } catch (error) {
-      console.error('Failed to remove student from course:', error);
+  async removeStudentFromCourse(courseId: string, studentUserId: string, _teacherUserId: string): Promise<boolean> {
+    // _teacherUserId сохранён для обратной совместимости — backend берёт userId из JWT.
+    const result = await callTeacherApi('remove-student', { method: 'POST', body: { courseId, studentUserId } });
+    if (!result.ok) {
+      console.error('Failed to remove student from course:', result.error);
       return false;
     }
+    return true;
   },
 
   /**
@@ -1691,43 +1566,35 @@ export const NeonService = {
    * Загрузить наборы курса учителя (для ученика, read-only)
    */
   async loadCourseSetsByMembership(courseId: string): Promise<CardSet[]> {
-    try {
-      await applyClientMigrations();
-      const connectionString = getConnectionString();
-      if (!connectionString) return [];
-
-      const sql = neon(connectionString);
-
-      const rows = await sql`
-        SELECT
-          cs.*,
-          (SELECT COUNT(*) FROM cards WHERE set_id = cs.id) AS total_cards
-        FROM card_sets cs
-        WHERE cs.course_id = ${courseId}::uuid
-          AND cs.is_hidden_from_students = false
-        ORDER BY cs.created_at DESC
-      `;
-
-      return rows.map((row: any) => ({
-        id: row.id,
-        userId: row.user_id,
-        title: row.title,
-        description: row.description || '',
-        category: row.category || '',
-        icon: row.icon || null,
-        languageFrom: row.language_from || 'de',
-        languageTo: row.language_to || 'ru',
-        totalCards: parseInt(row.total_cards, 10) || 0,
-        createdAt: new Date(row.created_at).getTime(),
-        updatedAt: row.updated_at ? new Date(row.updated_at).getTime() : undefined,
-        courseId: row.course_id,
-        isReadOnly: true,
-        ownerCourseId: courseId,
-      }));
-    } catch (error) {
-      console.error('Failed to load course sets by membership:', error);
+    // Идёт через backend — раньше шло напрямую в Neon с клиента без проверки, что
+    // вызывающий реально состоит в этом курсе (см. план, пункт 23).
+    const result = await callTeacherApi<{
+      sets: Array<{
+        id: string; userId: string; title: string; description: string; category: string;
+        icon: string | null; languageFrom: string; languageTo: string; totalCards: number;
+        createdAt: string; updatedAt: string | null; courseId: string;
+      }>;
+    }>('course-sets-by-membership', { method: 'GET', params: { courseId } });
+    if (!result.ok) {
+      console.error('Failed to load course sets by membership:', result.error);
       return [];
     }
+    return result.data.sets.map((row) => ({
+      id: row.id,
+      userId: row.userId,
+      title: row.title,
+      description: row.description || '',
+      category: row.category || '',
+      icon: row.icon || null,
+      languageFrom: row.languageFrom || 'de',
+      languageTo: row.languageTo || 'ru',
+      totalCards: row.totalCards || 0,
+      createdAt: new Date(row.createdAt).getTime(),
+      updatedAt: row.updatedAt ? new Date(row.updatedAt).getTime() : undefined,
+      courseId: row.courseId,
+      isReadOnly: true,
+      ownerCourseId: courseId,
+    }));
   },
 
   /**
@@ -1742,112 +1609,44 @@ export const NeonService = {
     todayCards: number;
     joinedAt: number;
   }>> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) return [];
-
-      const sql = neon(connectionString);
-
-      try {
-        await sql`CREATE INDEX IF NOT EXISTS idx_reviews_user_reviewed ON reviews(user_id, reviewed_at)`;
-        await sql`CREATE INDEX IF NOT EXISTS idx_cards_set_id ON cards(set_id)`;
-        await sql`CREATE INDEX IF NOT EXISTS idx_card_sets_course_id ON card_sets(course_id)`;
-      } catch {}
-
-      const rows = await sql`
-        SELECT
-          u.id,
-          COALESCE(u.display_name, u.user_name, u.email) AS display_name,
-          u.email,
-          cm.joined_at,
-          cr.last_active_date,
-          COALESCE(cr.today_cards, 0) AS today_cards,
-          GREATEST(
-            COALESCE(us.current_streak, 0),
-            COALESCE((
-              SELECT COUNT(*)::int
-              FROM (
-                SELECT
-                  local_date,
-                  (CURRENT_DATE - local_date)::int
-                    - (ROW_NUMBER() OVER (ORDER BY local_date DESC))::int AS grp
-                FROM daily_activity da2
-                WHERE da2.user_id = cm.user_id
-                  AND da2.local_date >= CURRENT_DATE - 365
-              ) t
-              WHERE grp = 0
-            ), 0)
-          ) AS current_streak
-        FROM course_members cm
-        JOIN users u ON u.id = cm.user_id
-        LEFT JOIN user_stats us ON us.user_id = cm.user_id
-        LEFT JOIN (
-          SELECT
-            r.user_id,
-            MAX(r.reviewed_at)::date AS last_active_date,
-            COUNT(DISTINCT CASE
-              WHEN r.reviewed_at::date = CURRENT_DATE THEN r.card_id
-            END) AS today_cards
-          FROM reviews r
-          JOIN cards c ON c.id = r.card_id
-          JOIN card_sets cs ON cs.id = c.set_id AND cs.course_id = ${courseId}::uuid
-          GROUP BY r.user_id
-        ) cr ON cr.user_id = cm.user_id
-        WHERE cm.course_id = ${courseId}::uuid
-        ORDER BY cm.joined_at ASC
-      `;
-
-      return rows.map((row: any) => ({
-        id: row.id,
-        displayName: row.display_name || 'Ученик',
-        email: row.email || null,
-        streak: row.current_streak || 0,
-        lastActiveDate: row.last_active_date ? pgDateToString(row.last_active_date) : null,
-        todayCards: Number(row.today_cards) || 0,
-        joinedAt: new Date(row.joined_at).getTime(),
-      }));
-    } catch (error) {
-      console.error('Failed to load course members:', error);
-      return [];
+    type Member = {
+      id: string; displayName: string; email: string | null;
+      streak: number; lastActiveDate: string | null; todayCards: number; joinedAt: string;
+    };
+    const result = await callTeacherApi<{ members: Member[] }>('list-members', {
+      method: 'GET',
+      params: { courseId },
+    });
+    if (!result.ok) {
+      console.error('Failed to load course members:', result.error);
+      throw new Error(result.error);
     }
+    return result.data.members.map((row) => ({
+      id: row.id,
+      displayName: row.displayName || 'Ученик',
+      email: row.email || null,
+      streak: row.streak || 0,
+      lastActiveDate: row.lastActiveDate ? pgDateToString(row.lastActiveDate) : null,
+      todayCards: Number(row.todayCards) || 0,
+      joinedAt: new Date(row.joinedAt).getTime(),
+    }));
   },
 
   async loadCourseActivityChart(
     courseId: string,
     days: number,
   ): Promise<Array<{ date: string; count: number }>> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) return [];
-
-      const sql = neon(connectionString);
-
-      const rows = await sql`
-        SELECT
-          r.reviewed_at::date::text AS date,
-          COUNT(DISTINCT r.user_id) AS count
-        FROM reviews r
-        JOIN cards c ON c.id = r.card_id
-        JOIN card_sets cs
-          ON cs.id = c.set_id
-          AND cs.course_id = ${courseId}::uuid
-        WHERE r.user_id IN (
-          SELECT user_id FROM course_members WHERE course_id = ${courseId}::uuid
-        )
-          AND r.reviewed_at::date >= CURRENT_DATE - ${days}::int
-          AND r.reviewed_at::date <= CURRENT_DATE
-        GROUP BY r.reviewed_at::date
-        ORDER BY date ASC
-      `;
-
-      return rows.map((row: any) => ({
-        date: row.date,
-        count: Number(row.count),
-      }));
-    } catch (error) {
-      console.error('Failed to load course activity chart:', error);
-      return [];
+    // Идёт через backend — раньше шло напрямую в Neon с клиента без проверки владения
+    // курсом (см. план, пункт 23).
+    const result = await callTeacherApi<{ rows: Array<{ date: string; count: number }> }>(
+      'course-activity-chart',
+      { method: 'GET', params: { courseId, days: String(days) } },
+    );
+    if (!result.ok) {
+      console.error('Failed to load course activity chart:', result.error);
+      throw new Error(result.error);
     }
+    return result.data.rows;
   },
 
   async saveReview(
@@ -1862,11 +1661,9 @@ export const NeonService = {
 
       const sql = neon(connectionString);
 
-      try {
-        await sql`CREATE INDEX IF NOT EXISTS idx_reviews_user_id ON reviews(user_id)`;
-        await sql`CREATE INDEX IF NOT EXISTS idx_reviews_user_card ON reviews(user_id, card_id)`;
-      } catch {}
-
+      // idx_reviews_user_id/idx_reviews_user_card уже создаются один раз при инициализации
+      // БД (api/_db-init.js) — раньше пересоздавались (CREATE INDEX IF NOT EXISTS) на каждый
+      // вызов saveReview, то есть на каждый ответ на карточку в любой сессии. См. план, пункт 28.
       await sql`
         INSERT INTO reviews (card_id, user_id, quality, time_spent)
         VALUES (${cardId}::uuid, ${userId}::uuid, ${quality}, ${timeSpent})
@@ -1930,73 +1727,19 @@ export const NeonService = {
     studentsCompleted: number;
     progressPct: number;
   }>> {
-    try {
-      await applyClientMigrations();
-      const connectionString = getConnectionString();
-      if (!connectionString) return [];
-
-      const sql = neon(connectionString);
-
-      const rows = await sql`
-        WITH course_student_ids AS (
-          SELECT user_id FROM course_members WHERE course_id = ${courseId}::uuid
-        ),
-        total_members AS (
-          SELECT COUNT(*) AS cnt FROM course_student_ids
-        ),
-        set_started AS (
-          SELECT c.set_id, COUNT(DISTINCT r.user_id) AS started
-          FROM reviews r
-          JOIN cards c ON c.id = r.card_id
-          WHERE r.user_id IN (SELECT user_id FROM course_student_ids)
-          GROUP BY c.set_id
-        ),
-        student_set_progress AS (
-          SELECT c.set_id, cp.user_id, COUNT(DISTINCT cp.card_id) AS cards_seen
-          FROM card_progress cp
-          JOIN cards c ON c.id = cp.card_id
-          WHERE cp.user_id IN (SELECT user_id FROM course_student_ids)
-          GROUP BY c.set_id, cp.user_id
-        )
-        SELECT
-          cs.id AS set_id,
-          cs.title,
-          cs.total_cards,
-          COALESCE(ss.started, 0) AS students_started,
-          COALESCE(
-            (SELECT COUNT(*) FROM student_set_progress ssp
-             WHERE ssp.set_id = cs.id AND ssp.cards_seen >= cs.total_cards AND cs.total_cards > 0),
-            0
-          ) AS students_completed,
-          CASE
-            WHEN cs.total_cards = 0 OR (SELECT cnt FROM total_members) = 0 THEN 0
-            ELSE ROUND(
-              COALESCE(
-                (SELECT SUM(ssp.cards_seen) FROM student_set_progress ssp WHERE ssp.set_id = cs.id),
-                0
-              )::numeric
-              / (cs.total_cards * (SELECT cnt FROM total_members)) * 100
-            )
-          END AS progress_pct
-        FROM card_sets cs
-        LEFT JOIN set_started ss ON ss.set_id = cs.id
-        WHERE cs.course_id = ${courseId}::uuid
-          AND cs.is_hidden_from_students = false
-        ORDER BY cs.created_at ASC
-      `;
-
-      return rows.map((row: any) => ({
-        setId: row.set_id,
-        title: row.title,
-        totalCards: Number(row.total_cards) || 0,
-        studentsStarted: Number(row.students_started) || 0,
-        studentsCompleted: Number(row.students_completed) || 0,
-        progressPct: Number(row.progress_pct) || 0,
-      }));
-    } catch (error) {
-      console.error('Failed to load course set stats:', error);
-      return [];
+    // Идёт через backend — раньше шло напрямую в Neon с клиента без проверки владения
+    // курсом (см. план, пункт 23).
+    const result = await callTeacherApi<{
+      sets: Array<{
+        setId: string; title: string; totalCards: number;
+        studentsStarted: number; studentsCompleted: number; progressPct: number;
+      }>;
+    }>('course-set-stats', { method: 'GET', params: { courseId } });
+    if (!result.ok) {
+      console.error('Failed to load course set stats:', result.error);
+      throw new Error(result.error);
     }
+    return result.data.sets;
   },
 
   async loadSetHardCards(setId: string, courseId: string): Promise<Array<{
@@ -2005,84 +1748,39 @@ export const NeonService = {
     back: string;
     attempts: number;
   }>> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) return [];
-
-      const sql = neon(connectionString);
-
-      const rows = await sql`
-        SELECT
-          c.id AS card_id,
-          c.front,
-          c.back,
-          COUNT(r.id) AS attempts
-        FROM cards c
-        JOIN reviews r ON r.card_id = c.id
-        WHERE c.set_id = ${setId}::uuid
-          AND r.user_id IN (
-            SELECT user_id FROM course_members WHERE course_id = ${courseId}::uuid
-          )
-        GROUP BY c.id, c.front, c.back
-        ORDER BY attempts DESC
-        LIMIT 5
-      `;
-
-      return rows.map((row: any) => ({
-        cardId: row.card_id,
-        front: row.front,
-        back: row.back,
-        attempts: Number(row.attempts) || 0,
-      }));
-    } catch (error) {
-      console.error('Failed to load set hard cards:', error);
+    // Идёт через backend — раньше шло напрямую в Neon с клиента без проверки владения
+    // курсом (см. план, пункт 23).
+    const result = await callTeacherApi<{
+      cards: Array<{ cardId: string; front: string; back: string; attempts: number }>;
+    }>('set-hard-cards', { method: 'GET', params: { setId, courseId } });
+    if (!result.ok) {
+      console.error('Failed to load set hard cards:', result.error);
       return [];
     }
+    return result.data.cards;
   },
 
-  async isCourseOwner(courseId: string, userId: string): Promise<boolean> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) return false;
-      const sql = neon(connectionString);
-      const rows = await sql`
-        SELECT id FROM courses
-        WHERE id = ${courseId}::uuid
-          AND user_id = ${userId}::uuid
-      `;
-      return rows.length > 0;
-    } catch (error) {
-      console.error('Failed to check course ownership:', error);
+  async isCourseOwner(courseId: string, _userId: string): Promise<boolean> {
+    // _userId сохранён для обратной совместимости — backend берёт userId из JWT.
+    const result = await callTeacherApi<{ isOwner: boolean }>('check-owner', {
+      method: 'GET',
+      params: { courseId },
+    });
+    if (!result.ok) {
+      console.error('Failed to check course ownership:', result.error);
       return false;
     }
+    return result.data.isOwner;
   },
 
-  async leaveStudentCourse(courseId: string, userId: string): Promise<boolean> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) return false;
-      const sql = neon(connectionString);
-
-      const owner = await sql`
-        SELECT id FROM courses
-        WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid
-      `;
-      if (owner.length > 0) {
-        console.warn('leaveStudentCourse: owner cannot leave own course');
-        return false;
-      }
-
-      await sql`
-        DELETE FROM course_members
-        WHERE course_id = ${courseId}::uuid
-          AND user_id = ${userId}::uuid
-          AND role = 'student'
-      `;
-      return true;
-    } catch (error) {
-      console.error('Failed to leave student course:', error);
+  async leaveStudentCourse(courseId: string, _userId: string): Promise<boolean> {
+    // _userId сохранён для обратной совместимости — backend берёт userId из JWT.
+    const result = await callTeacherApi('leave-course', { method: 'POST', body: { courseId } });
+    if (!result.ok) {
+      console.warn('Failed to leave student course:', result.error);
       return false;
     }
+    return true;
   },
 
   /**
@@ -2091,6 +1789,7 @@ export const NeonService = {
    * "Выученная" карточка — learning_step >= 3 (young / mature).
    */
   async loadStudentCourseStats(courseId: string, studentId: string): Promise<{
+    seenCards: number;
     learnedCards: number;
     unlearnedCards: number;
     sets: Array<{
@@ -2100,87 +1799,27 @@ export const NeonService = {
       learnedCards: number;
       seenCards: number;
     }>;
+    streak: number;
+    lastActiveDate: string | null;
   }> {
-    const empty = { learnedCards: 0, unlearnedCards: 0, sets: [] };
-    try {
-      await applyClientMigrations();
-      const connectionString = getConnectionString();
-      if (!connectionString) return empty;
-
-      const sql = neon(connectionString);
-
-      const rows = await sql`
-        WITH course_sets AS (
-          SELECT id, title, created_at
-          FROM card_sets
-          WHERE course_id = ${courseId}::uuid
-        ),
-        student_progress AS (
-          SELECT
-            c.set_id,
-            -- cards_seen: любой отзыв в reviews (то же что общая статистика курса)
-            COUNT(DISTINCT r.card_id)                                        AS cards_seen,
-            -- cards_learned: learning_step >= 3 из card_progress
-            COUNT(DISTINCT cp.card_id) FILTER (WHERE cp.learning_step >= 3) AS cards_learned
-          FROM cards c
-          INNER JOIN course_sets cs ON cs.id = c.set_id
-          LEFT JOIN reviews r       ON r.card_id  = c.id AND r.user_id  = ${studentId}::uuid
-          LEFT JOIN card_progress cp ON cp.card_id = c.id AND cp.user_id = ${studentId}::uuid
-          GROUP BY c.set_id
-        )
-        SELECT
-          cs.id   AS set_id,
-          cs.title,
-          (SELECT COUNT(*) FROM cards WHERE set_id = cs.id) AS total_cards,
-          COALESCE(sp.cards_seen,    0) AS cards_seen,
-          COALESCE(sp.cards_learned, 0) AS cards_learned
-        FROM course_sets cs
-        LEFT JOIN student_progress sp ON sp.set_id = cs.id
-        ORDER BY cs.created_at ASC
-      `;
-
-      const sets = rows.map((row: any) => ({
-        setId: row.set_id,
-        title: row.title,
-        totalCards: Number(row.total_cards) || 0,
-        learnedCards: Number(row.cards_learned) || 0,
-        seenCards: Number(row.cards_seen) || 0,
-      }));
-
-      const totalCards   = sets.reduce((s, r) => s + r.totalCards, 0);
-      const seenCards    = sets.reduce((s, r) => s + r.seenCards, 0);
-      const learnedCards = sets.reduce((s, r) => s + r.learnedCards, 0);
-
-      return {
-        seenCards,
-        learnedCards,
-        unlearnedCards: Math.max(0, totalCards - seenCards),
-        sets,
-      };
-    } catch (error) {
-      console.error('Failed to load student course stats:', error);
-      return empty;
+    const result = await callTeacherApi<{
+      seenCards: number; learnedCards: number; unlearnedCards: number;
+      sets: Array<{ setId: string; title: string; totalCards: number; learnedCards: number; seenCards: number }>;
+      streak: number; lastActiveDate: string | null;
+    }>('student-stats', { method: 'GET', params: { courseId, studentId } });
+    if (!result.ok) {
+      console.error('Failed to load student course stats:', result.error);
+      throw new Error(result.error);
     }
+    return result.data;
   },
 
   async toggleSetHiddenFromStudents(setId: string, hidden: boolean): Promise<boolean> {
-    try {
-      await applyClientMigrations();
-      const connectionString = getConnectionString();
-      if (!connectionString) return false;
-
-      const sql = neon(connectionString);
-
-      await sql`
-        UPDATE card_sets
-        SET is_hidden_from_students = ${hidden}, updated_at = NOW()
-        WHERE id = ${setId}::uuid
-      `;
-
-      return true;
-    } catch (error) {
-      console.error('Failed to toggle set hidden from students:', error);
+    const result = await callTeacherApi('toggle-set-hidden', { method: 'POST', body: { setId, hidden } });
+    if (!result.ok) {
+      console.error('Failed to toggle set hidden from students:', result.error);
       return false;
     }
+    return true;
   },
 };

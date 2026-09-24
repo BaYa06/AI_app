@@ -186,7 +186,7 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
         contentContainerStyle={[
           styles.scrollContent,
           {
-            paddingTop: insets.top + 10,
+            paddingTop: 10,
             paddingBottom: insets.bottom,
           },
         ]}

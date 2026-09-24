@@ -144,6 +144,7 @@ const CourseRow = memo(function CourseRow({
                     onChangeText={onChangeEditingTitle}
                     autoFocus
                     selectTextOnFocus
+                    maxLength={255}
                     onSubmitEditing={() => onSaveEditingTitle(course.id)}
                   />
                 </View>
@@ -419,6 +420,7 @@ export const CoursesDrawer = memo(function CoursesDrawer(props: CoursesDrawerPro
             placeholderTextColor={colors.textSecondary}
             value={newCourseTitle}
             onChangeText={onChangeNewCourseTitle}
+            maxLength={255}
             onBlur={onSubmitNewCourse}
             onSubmitEditing={onSubmitNewCourse}
             autoFocus

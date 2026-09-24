@@ -24,10 +24,11 @@ import {
 import { Text } from '@/components/common';
 import { useThemeColors, useSettingsStore } from '@/store';
 import { spacing, borderRadius } from '@/constants';
+import { supabase } from '@/services/supabaseClient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 
-const API_BASE = __DEV__ ? 'http://localhost:3000/api' : '/api';
+import { API_BASE } from '@/config/apiBase';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TestResultsTeacher'>;
 
@@ -78,7 +79,12 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch(`${API_BASE}/test?action=results&sessionId=${sessionId}`);
+      const { data: authData } = await supabase.auth.getSession();
+      const token = authData.session?.access_token;
+      if (!token) throw new Error('Not authenticated');
+      const res = await fetch(`${API_BASE}/test?action=results&sessionId=${sessionId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `HTTP ${res.status}`);
@@ -174,7 +180,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={{ height: Platform.OS === 'web' ? 12 : insets.top }} />
+      <View style={{ height: 12 }} />
       {/* Header */}
       <View
         style={[

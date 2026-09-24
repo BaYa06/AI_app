@@ -11,7 +11,6 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ArrowLeft,
   Trophy,
@@ -28,7 +27,7 @@ import { supabase } from '@/services/supabaseClient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 
-const API_BASE = __DEV__ ? 'http://localhost:3000/api' : '/api';
+import { API_BASE } from '@/config/apiBase';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TestHistory'>;
 
@@ -59,7 +58,6 @@ function formatDate(iso: string): string {
 export function TestHistoryScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
   const isDark = useSettingsStore((s) => s.resolvedTheme) === 'dark';
-  const insets = useSafeAreaInsets();
 
   const { courseId, courseTitle } = route.params;
 
@@ -75,13 +73,14 @@ export function TestHistoryScreen({ navigation, route }: Props) {
     setLoading(true);
     try {
       const { data } = await supabase.auth.getSession();
-      const teacherId = data.session?.user?.id;
-      if (!teacherId) {
+      const token = data.session?.access_token;
+      if (!token) {
         setError('Не авторизован');
         return;
       }
       const res = await fetch(
-        `${API_BASE}/test?action=history&courseId=${courseId}&teacherId=${teacherId}`,
+        `${API_BASE}/test?action=history&courseId=${courseId}`,
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -108,7 +107,7 @@ export function TestHistoryScreen({ navigation, route }: Props) {
           {
             backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.85)',
             borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
-            paddingTop: Platform.OS === 'web' ? 12 : insets.top + 8,
+            paddingTop: 12,
           },
         ]}
       >

@@ -245,7 +245,7 @@ export function ContextFillScreen({ navigation, route }: Props) {
   if (prepLoading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+        <View style={[styles.header, { paddingTop: 8 }]}>
           <Pressable
             onPress={() => navigation.goBack()}
             style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
@@ -276,7 +276,7 @@ export function ContextFillScreen({ navigation, route }: Props) {
 
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+        <View style={[styles.header, { paddingTop: 8 }]}>
           <Pressable
             onPress={() => navigation.goBack()}
             style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
@@ -338,7 +338,7 @@ export function ContextFillScreen({ navigation, route }: Props) {
           styles.header,
           {
             backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.95)',
-            paddingTop: insets.top + 8,
+            paddingTop: 8,
           },
         ]}
       >

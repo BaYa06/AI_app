@@ -875,7 +875,9 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 1,
     padding: 24,
-    overflow: 'hidden',
+    // Без overflow:'hidden': фон и рамка сами скругляются через borderRadius,
+    // а маска слоя (masksToBounds) в связке с 3D-трансформом на iOS
+    // рендерится offscreen и может срезать верх глифов.
   },
   cardTopRow: {
     flexDirection: 'row',
@@ -911,7 +913,10 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '700',
     textAlign: 'center',
-    lineHeight: 38,
+    // ~1.5× fontSize + небольшой отступ сверху: запас под умлауты и диакритику
+    // над заглавными (Ä, Ö, Ü, É), иначе iOS срезает их по рамке Text
+    lineHeight: 42,
+    paddingTop: 4,
   },
   divider: {
     width: 48,

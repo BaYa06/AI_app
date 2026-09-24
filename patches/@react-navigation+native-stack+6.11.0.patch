@@ -1,0 +1,44 @@
+diff --git a/node_modules/@react-navigation/native-stack/lib/module/views/NativeStackView.js b/node_modules/@react-navigation/native-stack/lib/module/views/NativeStackView.js
+index 1a78813..57f24b2 100644
+--- a/node_modules/@react-navigation/native-stack/lib/module/views/NativeStackView.js
++++ b/node_modules/@react-navigation/native-stack/lib/module/views/NativeStackView.js
+@@ -1,7 +1,27 @@
+ import { getHeaderTitle, Header, HeaderBackButton, HeaderBackContext, SafeAreaProviderCompat, Screen } from '@react-navigation/elements';
+ import * as React from 'react';
+-import { Image, StyleSheet, View } from 'react-native';
++import { Image, Platform, StyleSheet, View } from 'react-native';
+ const TRANSPARENT_PRESENTATIONS = ['transparentModal', 'containedTransparentModal'];
++const IS_WEB = Platform.OS === 'web';
++// react-native-web has no native slide/fade transition (react-native-screens falls back to a
++// plain View there), so a route swap is otherwise an instant, jarring display:none<->flex swap.
++// Patched to cross-fade via CSS opacity on web only; native behavior is untouched.
++function getScreenVisibilityStyle(shouldShow) {
++  if (IS_WEB) {
++    return {
++      display: 'flex',
++      opacity: shouldShow ? 1 : 0,
++      pointerEvents: shouldShow ? 'auto' : 'none',
++      transitionProperty: 'opacity',
++      transitionDuration: '180ms',
++      transitionTimingFunction: 'ease-out',
++      zIndex: shouldShow ? 1 : 0
++    };
++  }
++  return {
++    display: shouldShow ? 'flex' : 'none'
++  };
++}
+ export default function NativeStackView(_ref) {
+   let {
+     state,
+@@ -111,9 +131,7 @@ export default function NativeStackView(_ref) {
+         headerBackground: headerBackground,
+         headerStyle: headerStyle
+       }),
+-      style: [StyleSheet.absoluteFill, {
+-        display: isFocused || nextPresentation != null && TRANSPARENT_PRESENTATIONS.includes(nextPresentation) ? 'flex' : 'none'
+-      }, presentation != null && TRANSPARENT_PRESENTATIONS.includes(presentation) ? {
++      style: [StyleSheet.absoluteFill, getScreenVisibilityStyle(isFocused || nextPresentation != null && TRANSPARENT_PRESENTATIONS.includes(nextPresentation)), presentation != null && TRANSPARENT_PRESENTATIONS.includes(presentation) ? {
+         backgroundColor: 'transparent'
+       } : null]
+     }, /*#__PURE__*/React.createElement(HeaderBackContext.Provider, {

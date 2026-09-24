@@ -121,6 +121,9 @@ export interface RecognitionResult {
   alternatives: string[];
   isCorrect: boolean;
   timedOut: boolean;
+  // Реальный сбой движка распознавания (не "не расслышал"/"неверный ответ") — вызывающий код
+  // не должен засчитывать это как неправильный ответ. См. план, пункт 51.
+  technicalError?: boolean;
 }
 
 interface ListenOptions {
@@ -287,6 +290,29 @@ let _continuousLang = '';
 let _continuousActive = false;
 let _resultCallback: ((results: string[]) => void) | null = null;
 let _partialCallback: ((partial: string) => void) | null = null;
+let _errorCallback: (() => void) | null = null;
+
+// The native recognizer treats consecutive short pauses as one ongoing utterance and keeps
+// returning the FULL transcript accumulated since the session started (not per-word deltas).
+// Since the mic is intentionally never stopped between cards (to avoid restart lag), we track
+// a "baseline" — the raw text already seen when the current card started listening — and strip
+// it from every later event, so callers only see what was said for the current card.
+let _sessionBaseline = '';
+let _lastRawText = '';
+
+function _stripBaseline(raw: string): string {
+  if (_sessionBaseline && raw.toLowerCase().startsWith(_sessionBaseline.toLowerCase())) {
+    return raw.slice(_sessionBaseline.length).trim();
+  }
+  return raw;
+}
+
+/** Call right before listening for a new card: freezes whatever the engine has already
+ * transcribed in the current (possibly still-running) session as the baseline to discard from
+ * upcoming results, so a still-open native session doesn't leak earlier cards' words forward. */
+export function resetContinuousBaseline(): void {
+  _sessionBaseline = _lastRawText;
+}
 
 export async function startContinuousListening(lang: string): Promise<void> {
   _continuousLang = lang;
@@ -300,6 +326,9 @@ export async function stopContinuousListening(): Promise<void> {
   _continuousActive = false;
   _resultCallback = null;
   _partialCallback = null;
+  _errorCallback = null;
+  _sessionBaseline = '';
+  _lastRawText = '';
   try { Voice.removeAllListeners(); } catch {}
   try { await Voice.stop(); } catch {}
   try { await Voice.destroy(); } catch {}
@@ -308,9 +337,14 @@ export async function stopContinuousListening(): Promise<void> {
 export function setContinuousHandlers(
   onResult: ((results: string[]) => void) | null,
   onPartial: ((partial: string) => void) | null,
+  // Технический сбой распознавания (не "не понял", а реальная ошибка движка) — раньше просто
+  // молча перезапускал сессию, ничего не сообщая вызывающему коду, из-за чего экран мог
+  // зависнуть в "идёт сессия" без обратной связи. См. план, пункт 51.
+  onError?: (() => void) | null,
 ): void {
   _resultCallback = onResult;
   _partialCallback = onPartial;
+  _errorCallback = onError || null;
 }
 
 function _restartContinuous(): void {
@@ -336,15 +370,22 @@ function _attachContinuousListeners(): void {
 
   Voice.onSpeechResults = (e: SpeechResultsEvent) => {
     const results = e.value || [];
-    if (_resultCallback) _resultCallback(results);
+    if (results[0]) _lastRawText = results[0];
+    if (_resultCallback) _resultCallback(results.map(_stripBaseline));
   };
 
   Voice.onSpeechPartialResults = (e: SpeechResultsEvent) => {
-    const partial = (e.value || [])[0] || '';
-    if (_partialCallback && partial) _partialCallback(partial);
+    const raw = (e.value || [])[0] || '';
+    if (!raw) return;
+    _lastRawText = raw;
+    if (_partialCallback) _partialCallback(_stripBaseline(raw));
   };
 
   Voice.onSpeechEnd = () => {
+    // Engine is about to start a fresh session — its own transcript resets to empty,
+    // so any baseline we were stripping no longer applies.
+    _sessionBaseline = '';
+    _lastRawText = '';
     _restartContinuous();
   };
 
@@ -353,6 +394,7 @@ function _attachContinuousListeners(): void {
     // "aborted" is expected when restarting recognition — ignore to avoid restart loop
     if (msg === 'aborted' || msg === 'no-speech') return;
     console.warn('[speechRecognition] Continuous error:', e.error);
+    if (_errorCallback) _errorCallback();
     _restartContinuous();
   };
 }

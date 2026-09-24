@@ -15,10 +15,12 @@ import {
   ActivityIndicator,
   Alert,
   TouchableOpacity,
+  Modal,
+  Clipboard,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, ChevronRight, Plus, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, AlertTriangle, Plus, Trash2, X } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import { useThemeColors, useSettingsStore } from '@/store';
 import { spacing, borderRadius } from '@/constants';
@@ -201,35 +203,103 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  // Владение курсом — null пока не проверено. Список учеников грузится только после
+  // подтверждения, чтобы не было гонки "сначала данные, потом дверь" (см. план, пункт 21).
+  const [isOwner, setIsOwner] = useState<boolean | null>(null);
 
-  // Загрузка реальных участников
-  useEffect(() => {
-    let mounted = true;
-    setLoading(true);
-    NeonService.loadCourseMembers(route.params.courseId)
-      .then((members) => {
-        if (!mounted) return;
-        setStudents(
-          members.map((m) => {
-            const status = getStudentStatus(m.lastActiveDate);
-            const activity = formatLastActivity(m.lastActiveDate);
-            return {
-              id: m.id,
-              name: m.displayName,
-              initials: getInitials(m.displayName),
-              status,
-              streak: m.streak,
-              lastActivity: activity.text,
-              lastActivityColor: activity.color,
-              todayCards: m.todayCards,
-            };
-          }),
-        );
-      })
-      .catch((e) => console.error('Failed to load members:', e))
-      .finally(() => { if (mounted) setLoading(false); });
-    return () => { mounted = false; };
+  // Кнопка "Добавить" в шапке раньше не делала вообще ничего (см. план, пункт 30) — теперь
+  // открывает код приглашения, тем же способом (createCourseInvite/regenerateCourseInvite),
+  // что уже используется на Home-экране для приглашения учеников в курс.
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [inviteJoinCode, setInviteJoinCode] = useState<string | null>(null);
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteCopied, setInviteCopied] = useState(false);
+
+  const openInviteModal = useCallback(async () => {
+    setInviteModalOpen(true);
+    setInviteCopied(false);
+    setInviteJoinCode(null);
+    setInviteLoading(true);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const userId = data.session?.user?.id;
+      const result = userId
+        ? await NeonService.createCourseInvite(route.params.courseId, userId)
+        : null;
+      setInviteJoinCode(result?.joinCode ?? null);
+    } catch (e) {
+      console.error('Failed to create invite:', e);
+    } finally {
+      setInviteLoading(false);
+    }
   }, [route.params.courseId]);
+
+  const handleRegenerateInvite = useCallback(async () => {
+    setInviteCopied(false);
+    setInviteLoading(true);
+    try {
+      const result = await NeonService.regenerateCourseInvite(route.params.courseId);
+      setInviteJoinCode(result?.joinCode ?? null);
+    } catch (e) {
+      console.error('Failed to regenerate invite:', e);
+    } finally {
+      setInviteLoading(false);
+    }
+  }, [route.params.courseId]);
+
+  const handleCopyInviteCode = useCallback(() => {
+    if (!inviteJoinCode) return;
+    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(inviteJoinCode);
+    } else {
+      Clipboard.setString(inviteJoinCode);
+    }
+    setInviteCopied(true);
+    setTimeout(() => setInviteCopied(false), 2000);
+  }, [inviteJoinCode]);
+
+  // Дёргается кнопкой "Повторить" при ошибке загрузки — простой способ заставить эффект ниже
+  // перезапуститься, не вынося саму загрузку в отдельную функцию.
+  const [retryTick, setRetryTick] = useState(0);
+
+  // Загрузка реальных участников — только после подтверждения владения курсом.
+  // useFocusEffect вместо обычного useEffect — список перезагружается при каждом возврате на
+  // экран, а не только один раз при первом открытии. См. план, пункт 33.
+  useFocusEffect(
+    useCallback(() => {
+      if (!isOwner) return;
+      let mounted = true;
+      setLoading(true);
+      setLoadError(false);
+      NeonService.loadCourseMembers(route.params.courseId)
+        .then((members) => {
+          if (!mounted) return;
+          setStudents(
+            members.map((m) => {
+              const status = getStudentStatus(m.lastActiveDate);
+              const activity = formatLastActivity(m.lastActiveDate);
+              return {
+                id: m.id,
+                name: m.displayName,
+                initials: getInitials(m.displayName),
+                status,
+                streak: m.streak,
+                lastActivity: activity.text,
+                lastActivityColor: activity.color,
+                todayCards: m.todayCards,
+              };
+            }),
+          );
+        })
+        .catch((e) => {
+          console.error('Failed to load members:', e);
+          if (mounted) setLoadError(true);
+        })
+        .finally(() => { if (mounted) setLoading(false); });
+      return () => { mounted = false; };
+    }, [isOwner, route.params.courseId, retryTick]),
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -237,11 +307,22 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
       try {
         const { data } = await supabase.auth.getSession();
         const userId = data.session?.user?.id;
-        if (!userId || !NeonService.isEnabled()) return;
-        const isOwner = await NeonService.isCourseOwner(route.params.courseId, userId);
-        if (mounted && !isOwner) navigation.goBack();
+        if (!userId || !NeonService.isEnabled()) {
+          // Проверить нечем (не авторизован / Neon не сконфигурирован) — не блокируем, как и раньше.
+          if (mounted) setIsOwner(true);
+          return;
+        }
+        const owner = await NeonService.isCourseOwner(route.params.courseId, userId);
+        if (!mounted) return;
+        if (!owner) {
+          navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Main' as any);
+          return;
+        }
+        setIsOwner(true);
       } catch {
-        if (mounted) navigation.goBack();
+        if (mounted) {
+          navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Main' as any);
+        }
       }
     };
     checkOwnership();
@@ -357,7 +438,7 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
         style={[
           styles.header,
           {
-            paddingTop: Platform.OS === 'web' ? 12 : insets.top + 8,
+            paddingTop: 12,
             backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.92)',
             borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
             ...Platform.select({ web: { backdropFilter: 'blur(12px)' } }) as any,
@@ -406,6 +487,7 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
         <Pressable
           style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.6 }]}
           hitSlop={8}
+          onPress={openInviteModal}
         >
           <Plus size={20} color={colors.primary} />
           <Text style={[styles.addBtnText, { color: colors.primary }]}>Добавить</Text>
@@ -464,6 +546,21 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
         <View style={styles.empty}>
           <ActivityIndicator size="small" color={colors.primary} />
         </View>
+      ) : loadError ? (
+        // Раньше сетевая ошибка выглядела так же, как "пока нет учеников" — отдельное
+        // состояние с кнопкой "Повторить". См. план, пункт 29.
+        <View style={styles.empty}>
+          <AlertTriangle size={32} color={colors.textSecondary} />
+          <Text style={[styles.emptyText, { color: colors.textPrimary, marginTop: spacing.s }]}>
+            Не удалось загрузить учеников
+          </Text>
+          <Pressable
+            style={[styles.retryBtn, { backgroundColor: colors.primary }]}
+            onPress={() => setRetryTick((t) => t + 1)}
+          >
+            <Text style={styles.retryBtnText}>Повторить</Text>
+          </Pressable>
+        </View>
       ) : (
         <FlatList
           data={filtered}
@@ -499,6 +596,52 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
           }
         />
       )}
+
+      {/* ── Invite Modal ── */}
+      <Modal visible={inviteModalOpen} transparent animationType="fade" onRequestClose={() => setInviteModalOpen(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setInviteModalOpen(false)}>
+          <Pressable
+            style={[styles.inviteCard, { backgroundColor: isDark ? colors.background : '#FFFFFF' }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.inviteHeader}>
+              <Text style={[styles.inviteTitle, { color: colors.textPrimary }]}>Пригласить ученика</Text>
+              <Pressable onPress={() => setInviteModalOpen(false)} hitSlop={8}>
+                <X size={20} color={colors.textSecondary} />
+              </Pressable>
+            </View>
+            <Text style={[styles.inviteDescription, { color: colors.textSecondary }]}>
+              Отправьте код ученику — он введёт его в приложении, чтобы присоединиться к курсу
+            </Text>
+            {inviteLoading ? (
+              <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.l }} />
+            ) : inviteJoinCode ? (
+              <>
+                <View style={[styles.inviteCodeBox, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F3F4F6' }]}>
+                  <Text style={[styles.inviteCodeText, { color: colors.primary }]}>{inviteJoinCode}</Text>
+                </View>
+                <Pressable
+                  style={[styles.inviteActionBtn, { backgroundColor: colors.primary }]}
+                  onPress={handleCopyInviteCode}
+                >
+                  <Text style={styles.inviteActionBtnText}>
+                    {inviteCopied ? '✓ Скопировано' : 'Копировать код'}
+                  </Text>
+                </Pressable>
+                <Pressable onPress={handleRegenerateInvite} style={{ marginTop: spacing.s }}>
+                  <Text style={[styles.inviteRegenerateText, { color: colors.textSecondary }]}>
+                    Обновить код приглашения
+                  </Text>
+                </Pressable>
+              </>
+            ) : (
+              <Text style={[styles.inviteDescription, { color: colors.textSecondary, marginVertical: spacing.m }]}>
+                Не удалось создать приглашение
+              </Text>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -691,5 +834,72 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  retryBtn: {
+    marginTop: spacing.m,
+    paddingHorizontal: spacing.l,
+    paddingVertical: 10,
+    borderRadius: borderRadius.m,
+  },
+  retryBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+
+  // Invite modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.l,
+  },
+  inviteCard: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: borderRadius.l,
+    padding: spacing.l,
+    gap: spacing.s,
+  },
+  inviteHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  inviteTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  inviteDescription: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  inviteCodeBox: {
+    borderRadius: borderRadius.m,
+    paddingVertical: spacing.l,
+    alignItems: 'center',
+    marginTop: spacing.s,
+  },
+  inviteCodeText: {
+    fontSize: 32,
+    fontWeight: '800',
+    letterSpacing: 6,
+  },
+  inviteActionBtn: {
+    marginTop: spacing.s,
+    paddingVertical: 12,
+    borderRadius: borderRadius.m,
+    alignItems: 'center',
+  },
+  inviteActionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  inviteRegenerateText: {
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

@@ -5,31 +5,58 @@ import { ensureDatabaseInitialized } from './_db-init.js';
 /**
  * API для Live-тестов
  *
+ * Каждый запрос требует Supabase JWT (Authorization: Bearer <access_token>) — сервер сам
+ * определяет вызывающего из токена (supabase.auth.getUser), тело/query запроса на
+ * userId/teacherId не полагается. Тот же паттерн, что и в api/teacher.js.
+ * См. plan/teacher_access_fix_plan.md, пп. 17, 35, 36, 38, 39.
+ *
  * POST /api/test?action=create        — учитель создаёт тест
  * POST /api/test?action=join          — ученик подключается по коду
  * POST /api/test?action=start         — учитель запускает тест
  * POST /api/test?action=answer        — ученик отправляет ответ
- * GET  /api/test?action=monitor       — учитель получает прогресс
+ * GET  /api/test?action=monitor       — учитель или участник получает прогресс
  * POST /api/test?action=finish        — учитель завершает тест
- * GET  /api/test?action=results       — итоговые результаты
+ * GET  /api/test?action=results       — итоговые результаты (только учитель — владелец сессии)
  * POST /api/test?action=get-question  — ученик запрашивает вопрос с вариантами
+ * GET  /api/test?action=history       — учитель получает историю тестов курса
  */
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://yiwsmjbeirgomkrckoju.supabase.co';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
 
 function getSupabase() {
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+}
+
+/** Достаёт userId из Supabase JWT в заголовке Authorization. Возвращает null, если токен отсутствует/невалиден. */
+async function getAuthedUserId(req) {
+  const header = req.headers.authorization || req.headers.Authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token || !SUPABASE_ANON_KEY) return null;
+  try {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { data, error } = await supabase.auth.getUser(token);
+    if (error || !data?.user) return null;
+    return data.user.id;
+  } catch {
+    return null;
+  }
 }
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
+  }
+
+  const userId = await getAuthedUserId(req);
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   const sql = neon(process.env.POSTGRES_URL);
@@ -38,15 +65,15 @@ export default async function handler(req, res) {
   const { action } = req.query;
 
   try {
-    if (action === 'create')       return await createTest(req, res, sql);
-    if (action === 'join')         return await joinTest(req, res, sql);
-    if (action === 'start')        return await startTest(req, res, sql);
-    if (action === 'answer')       return await answerQuestion(req, res, sql);
-    if (action === 'monitor')      return await monitorTest(req, res, sql);
-    if (action === 'finish')       return await finishTest(req, res, sql);
-    if (action === 'results')      return await getResults(req, res, sql);
-    if (action === 'get-question') return await getQuestion(req, res, sql);
-    if (action === 'history')      return await getHistory(req, res, sql);
+    if (action === 'create')       return await createTest(req, res, sql, userId);
+    if (action === 'join')         return await joinTest(req, res, sql, userId);
+    if (action === 'start')        return await startTest(req, res, sql, userId);
+    if (action === 'answer')       return await answerQuestion(req, res, sql, userId);
+    if (action === 'monitor')      return await monitorTest(req, res, sql, userId);
+    if (action === 'finish')       return await finishTest(req, res, sql, userId);
+    if (action === 'results')      return await getResults(req, res, sql, userId);
+    if (action === 'get-question') return await getQuestion(req, res, sql, userId);
+    if (action === 'history')      return await getHistory(req, res, sql, userId);
 
     return res.status(400).json({ error: 'Unknown action. Use: create, join, start, answer, monitor, finish, results, get-question, history' });
   } catch (error) {
@@ -56,6 +83,34 @@ export default async function handler(req, res) {
 }
 
 // ─── Helpers ────────────────────────────────────────────
+
+/**
+ * Rate-limit на угадывание 4-значного кода live-теста: не больше `maxAttempts` попыток от
+ * одного userId за `windowSeconds`. Считается в БД (переживает холодный старт serverless-
+ * функции), таблица общая с api/teacher.js — создаётся лениво при первом обращении.
+ */
+async function checkJoinRateLimit(sql, userId) {
+  await sql`
+    CREATE TABLE IF NOT EXISTS api_rate_limits (
+      user_id UUID NOT NULL,
+      action VARCHAR(50) NOT NULL,
+      window_start TIMESTAMPTZ NOT NULL,
+      attempts INT NOT NULL DEFAULT 0,
+      PRIMARY KEY (user_id, action, window_start)
+    )
+  `;
+  const windowSeconds = 60;
+  const maxAttempts = 10;
+  const windowStart = new Date(Math.floor(Date.now() / (windowSeconds * 1000)) * windowSeconds * 1000).toISOString();
+  const result = await sql`
+    INSERT INTO api_rate_limits (user_id, action, window_start, attempts)
+    VALUES (${userId}::uuid, 'live-test-code-guess', ${windowStart}::timestamptz, 1)
+    ON CONFLICT (user_id, action, window_start) DO UPDATE SET
+      attempts = api_rate_limits.attempts + 1
+    RETURNING attempts
+  `;
+  return result[0].attempts <= maxAttempts;
+}
 
 /** Генерация уникального 4-значного кода */
 async function generateUniqueCode(sql) {
@@ -107,6 +162,45 @@ async function broadcast(sessionId, event, payload) {
   });
 }
 
+/**
+ * Автоматически завершить сессию, которая "зависла" в active дольше расчётного времени —
+ * например, если приложение учителя закрылось и finishTest никогда не был вызван. Ленивая
+ * проверка при любом обращении к сессии (monitor), без отдельного cron. См. план, пункт 41.
+ */
+const AUTO_FINISH_MARGIN_SEC = 120;
+const NO_TIME_LIMIT_SEC_PER_QUESTION = 60; // консервативная оценка для тестов без лимита времени
+
+async function autoFinishIfStale(sql, sessionId, session) {
+  if (session.status !== 'active' || !session.started_at) return session;
+
+  const perQuestion = session.time_per_question > 0 ? session.time_per_question : NO_TIME_LIMIT_SEC_PER_QUESTION;
+  const maxDurationSec = perQuestion * session.question_count + AUTO_FINISH_MARGIN_SEC;
+  const elapsedSec = (Date.now() - new Date(session.started_at).getTime()) / 1000;
+  if (elapsedSec <= maxDurationSec) return session;
+
+  await sql`
+    UPDATE test_participants
+    SET finished_at = NOW(),
+        score = CASE
+          WHEN question_order IS NOT NULL AND jsonb_array_length(question_order) > 0
+          THEN ROUND((correct_count::numeric / jsonb_array_length(question_order)) * 100)
+          ELSE 0
+        END
+    WHERE session_id = ${sessionId}::uuid AND finished_at IS NULL
+  `;
+  const updated = await sql`
+    UPDATE test_sessions
+    SET status = 'finished', finished_at = NOW()
+    WHERE id = ${sessionId}::uuid AND status = 'active'
+    RETURNING status, started_at, time_per_question, question_count, teacher_id
+  `;
+  if (updated.length > 0) {
+    await broadcast(sessionId, 'test_finished', { finishedAt: new Date().toISOString() });
+    return updated[0];
+  }
+  return session;
+}
+
 /** Перемешать массив (Fisher-Yates) */
 function shuffle(arr) {
   const a = [...arr];
@@ -121,20 +215,20 @@ function shuffle(arr) {
 
 /**
  * POST ?action=create
- * Body: { setId, courseId, testMode, questionCount, timePerQuestion, teacherId }
+ * Body: { setId, courseId, testMode, questionCount, timePerQuestion }
  */
-async function createTest(req, res, sql) {
+async function createTest(req, res, sql, userId) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { setId, courseId, testMode, questionCount, timePerQuestion, teacherId } = req.body;
-  if (!setId || !courseId || !teacherId || !questionCount) {
-    return res.status(400).json({ error: 'setId, courseId, teacherId, questionCount are required' });
+  const { setId, courseId, testMode, questionCount, timePerQuestion } = req.body;
+  if (!setId || !courseId || !questionCount) {
+    return res.status(400).json({ error: 'setId, courseId, questionCount are required' });
   }
 
-  // Проверить что учитель — владелец курса
+  // Проверить что вызывающий — владелец курса
   const course = await sql`
     SELECT id FROM courses
-    WHERE id = ${courseId}::uuid AND user_id = ${teacherId}::uuid
+    WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid
   `;
   if (course.length === 0) {
     return res.status(403).json({ error: 'Access denied: not course owner' });
@@ -144,7 +238,7 @@ async function createTest(req, res, sql) {
 
   const result = await sql`
     INSERT INTO test_sessions (teacher_id, set_id, course_id, code, test_mode, question_count, time_per_question)
-    VALUES (${teacherId}::uuid, ${setId}::uuid, ${courseId}::uuid, ${code}, ${testMode || 'multiple'}, ${questionCount}, ${timePerQuestion || 0})
+    VALUES (${userId}::uuid, ${setId}::uuid, ${courseId}::uuid, ${code}, ${testMode || 'multiple'}, ${questionCount}, ${timePerQuestion || 0})
     RETURNING id
   `;
 
@@ -156,14 +250,18 @@ async function createTest(req, res, sql) {
 
 /**
  * POST ?action=join
- * Body: { code, userId }
+ * Body: { code }
  */
-async function joinTest(req, res, sql) {
+async function joinTest(req, res, sql, userId) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { code, userId } = req.body;
-  if (!code || !userId) {
-    return res.status(400).json({ error: 'code and userId are required' });
+  const { code } = req.body;
+  if (!code) {
+    return res.status(400).json({ error: 'code is required' });
+  }
+
+  if (!(await checkJoinRateLimit(sql, userId))) {
+    return res.status(429).json({ error: 'Too many attempts, try again in a minute' });
   }
 
   // Найти активную сессию по коду
@@ -194,7 +292,7 @@ async function joinTest(req, res, sql) {
 
   // Проверить что ученик ещё не в сессии
   const existing = await sql`
-    SELECT id FROM test_participants
+    SELECT id, answer_count FROM test_participants
     WHERE session_id = ${session.id}::uuid AND user_id = ${userId}::uuid
   `;
   if (existing.length > 0) {
@@ -207,6 +305,10 @@ async function joinTest(req, res, sql) {
       questionCount: session.question_count,
       timePerQuestion: session.time_per_question,
       alreadyJoined: true,
+      // Статус сессии и уже отвеченное кол-во — чтобы клиент мог восстановить прогресс вместо
+      // того чтобы всегда открывать вопрос с индексом 0 (см. план, пункт 40).
+      status: session.status,
+      answerCount: existing[0].answer_count,
     });
   }
 
@@ -235,13 +337,15 @@ async function joinTest(req, res, sql) {
     RETURNING id
   `;
 
-  // Отправить событие учителю
+  // Отправить событие учителю. participantId НЕ включаем — канал `test:${sessionId}` публичный
+  // (broadcast без контроля доступа), рассылка чужого participantId в открытом виде позволяла бы
+  // слать ответы от чужого имени (см. план, пункт 36). participantId возвращается только в этом
+  // прямом HTTP-ответе — только вызывающему ученику.
   const initials = displayName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
   await broadcast(session.id, 'student_joined', {
     userId,
     displayName,
     initials,
-    participantId: participant[0].id,
   });
 
   return res.status(200).json({
@@ -257,20 +361,20 @@ async function joinTest(req, res, sql) {
 
 /**
  * POST ?action=start
- * Body: { sessionId, teacherId }
+ * Body: { sessionId }
  */
-async function startTest(req, res, sql) {
+async function startTest(req, res, sql, userId) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { sessionId, teacherId } = req.body;
-  if (!sessionId || !teacherId) {
-    return res.status(400).json({ error: 'sessionId and teacherId are required' });
+  const { sessionId } = req.body;
+  if (!sessionId) {
+    return res.status(400).json({ error: 'sessionId is required' });
   }
 
   // Проверить владельца
   const session = await sql`
     SELECT id FROM test_sessions
-    WHERE id = ${sessionId}::uuid AND teacher_id = ${teacherId}::uuid AND status = 'waiting'
+    WHERE id = ${sessionId}::uuid AND teacher_id = ${userId}::uuid AND status = 'waiting'
   `;
   if (session.length === 0) {
     return res.status(403).json({ error: 'Not authorized or test already started' });
@@ -292,12 +396,33 @@ async function startTest(req, res, sql) {
  * POST ?action=answer
  * Body: { participantId, cardId, chosenAnswer, timeSpentSec }
  */
-async function answerQuestion(req, res, sql) {
+async function answerQuestion(req, res, sql, userId) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { participantId, cardId, chosenAnswer, timeSpentSec } = req.body;
   if (!participantId || !cardId) {
     return res.status(400).json({ error: 'participantId and cardId are required' });
+  }
+
+  // participantId владелец — иначе кто угодно с валидным токеном мог бы слать ответы за
+  // чужого участника (см. план, пункт 36 — раньше participantId вообще утекал всем в сессии).
+  const participantRow = await sql`
+    SELECT session_id, user_id, display_name, question_order, answer_count
+    FROM test_participants
+    WHERE id = ${participantId}::uuid
+  `;
+  if (participantRow.length === 0) {
+    return res.status(404).json({ error: 'Participant not found' });
+  }
+  const p0 = participantRow[0];
+  if (p0.user_id !== userId) {
+    return res.status(403).json({ error: 'Not authorized for this participant' });
+  }
+
+  // cardId должен реально быть в вопросах, выданных этому участнику при join — иначе можно
+  // было бы отвечать на произвольные карточки чужих наборов.
+  if (!p0.question_order.includes(cardId)) {
+    return res.status(400).json({ error: 'Card is not part of this test session' });
   }
 
   // Получить правильный ответ
@@ -311,19 +436,26 @@ async function answerQuestion(req, res, sql) {
   const correctAnswer = card[0].back;
   const isCorrect = (chosenAnswer || '').trim().toLowerCase() === correctAnswer.trim().toLowerCase();
 
-  // Сохранить ответ
-  await sql`
+  // UNIQUE(participant_id, card_id) + ON CONFLICT DO NOTHING: повторная отправка того же
+  // вопроса (например, retry после обрыва связи, см. план пункт 37) не создаёт вторую строку
+  // и не может задвоить счётчики/накрутить score повторными попытками, пока не угадает ответ —
+  // раньше каждый ответ возвращал correctAnswer в теле, что было оракулом для такой накрутки.
+  const inserted = await sql`
     INSERT INTO test_answers (participant_id, card_id, chosen_answer, correct_answer, is_correct, time_spent_sec)
     VALUES (${participantId}::uuid, ${cardId}::uuid, ${chosenAnswer || ''}, ${correctAnswer}, ${isCorrect}, ${timeSpentSec || 0})
+    ON CONFLICT (participant_id, card_id) DO NOTHING
+    RETURNING is_correct, correct_answer
   `;
+  const isFirstSubmission = inserted.length > 0;
 
-  // Обновить счётчики
-  await sql`
-    UPDATE test_participants
-    SET answer_count = answer_count + 1,
-        correct_count = correct_count + ${isCorrect ? 1 : 0}
-    WHERE id = ${participantId}::uuid
-  `;
+  if (isFirstSubmission) {
+    await sql`
+      UPDATE test_participants
+      SET answer_count = answer_count + 1,
+          correct_count = correct_count + ${isCorrect ? 1 : 0}
+      WHERE id = ${participantId}::uuid
+    `;
+  }
 
   // Получить обновлённого участника
   const participant = await sql`
@@ -335,30 +467,41 @@ async function answerQuestion(req, res, sql) {
   const totalQuestions = p.question_order.length;
   const done = p.answer_count >= totalQuestions;
 
-  // Если все вопросы отвечены — пометить финиш и посчитать score
-  if (done) {
-    await sql`
-      UPDATE test_participants
-      SET finished_at = NOW(),
-          score = CASE WHEN jsonb_array_length(question_order) > 0
-                       THEN ROUND((correct_count::numeric / jsonb_array_length(question_order)) * 100)
-                       ELSE 0 END
-      WHERE id = ${participantId}::uuid
-    `;
+  // Broadcast/финиш — только на реальном новом ответе, не на повторе.
+  if (isFirstSubmission) {
+    // Если все вопросы отвечены — пометить финиш и посчитать score.
+    if (done) {
+      await sql`
+        UPDATE test_participants
+        SET finished_at = NOW(),
+            score = CASE WHEN jsonb_array_length(question_order) > 0
+                         THEN ROUND((correct_count::numeric / jsonb_array_length(question_order)) * 100)
+                         ELSE 0 END
+        WHERE id = ${participantId}::uuid
+      `;
+    }
+    await broadcast(p.session_id, 'progress_update', {
+      userId: p.user_id,
+      displayName: p.display_name,
+      answered: p.answer_count,
+      total: totalQuestions,
+      done,
+    });
   }
 
-  // Broadcast прогресс учителю
-  await broadcast(p.session_id, 'progress_update', {
-    userId: p.user_id,
-    displayName: p.display_name,
-    answered: p.answer_count,
-    total: totalQuestions,
-    done,
-  });
+  // На повторной отправке возвращаем уже сохранённый на первой попытке результат (не
+  // пересчитываем из нового chosenAnswer) — так это не даёт новой информации по сравнению с
+  // тем, что клиент уже получил, и не может быть использовано, чтобы задним числом изменить счёт.
+  const resultRow = isFirstSubmission
+    ? { is_correct: isCorrect, correct_answer: correctAnswer }
+    : (await sql`
+        SELECT is_correct, correct_answer FROM test_answers
+        WHERE participant_id = ${participantId}::uuid AND card_id = ${cardId}::uuid
+      `)[0];
 
   return res.status(200).json({
-    isCorrect,
-    correctAnswer,
+    isCorrect: resultRow.is_correct,
+    correctAnswer: resultRow.correct_answer,
     answered: p.answer_count,
     total: totalQuestions,
     done,
@@ -368,7 +511,7 @@ async function answerQuestion(req, res, sql) {
 /**
  * GET ?action=monitor&sessionId=...
  */
-async function monitorTest(req, res, sql) {
+async function monitorTest(req, res, sql, userId) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   const { sessionId } = req.query;
@@ -377,13 +520,26 @@ async function monitorTest(req, res, sql) {
   }
 
   const session = await sql`
-    SELECT status, started_at, time_per_question, question_count
+    SELECT status, started_at, time_per_question, question_count, teacher_id
     FROM test_sessions
     WHERE id = ${sessionId}::uuid
   `;
   if (session.length === 0) {
     return res.status(404).json({ error: 'Session not found' });
   }
+
+  // Разрешено учителю — владельцу сессии, либо ученику, который уже подключился к ней
+  // (раньше monitor был доступен вообще без проверки личности, см. план, пункт 39).
+  if (session[0].teacher_id !== userId) {
+    const membership = await sql`
+      SELECT id FROM test_participants WHERE session_id = ${sessionId}::uuid AND user_id = ${userId}::uuid
+    `;
+    if (membership.length === 0) {
+      return res.status(403).json({ error: 'Not authorized for this session' });
+    }
+  }
+
+  session[0] = await autoFinishIfStale(sql, sessionId, session[0]);
 
   const participants = await sql`
     SELECT user_id, display_name, answer_count, question_order, finished_at IS NOT NULL AS done
@@ -414,23 +570,31 @@ async function monitorTest(req, res, sql) {
 
 /**
  * POST ?action=finish
- * Body: { sessionId, teacherId }
+ * Body: { sessionId }
  */
-async function finishTest(req, res, sql) {
+async function finishTest(req, res, sql, userId) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { sessionId, teacherId } = req.body;
-  if (!sessionId || !teacherId) {
-    return res.status(400).json({ error: 'sessionId and teacherId are required' });
+  const { sessionId } = req.body;
+  if (!sessionId) {
+    return res.status(400).json({ error: 'sessionId is required' });
   }
 
   // Проверить владельца
   const session = await sql`
-    SELECT id FROM test_sessions
-    WHERE id = ${sessionId}::uuid AND teacher_id = ${teacherId}::uuid AND status = 'active'
+    SELECT id, status FROM test_sessions
+    WHERE id = ${sessionId}::uuid AND teacher_id = ${userId}::uuid
   `;
   if (session.length === 0) {
-    return res.status(403).json({ error: 'Not authorized or test not active' });
+    return res.status(403).json({ error: 'Not authorized' });
+  }
+  // Сессия уже могла автоматически завершиться как "зависшая" при следующем monitor-опросе
+  // (см. план, пункт 41) — не считаем это ошибкой, раз результат (тест завершён) уже достигнут.
+  if (session[0].status === 'finished') {
+    return res.status(200).json({ ok: true });
+  }
+  if (session[0].status !== 'active') {
+    return res.status(403).json({ error: 'Test not active' });
   }
 
   // Пометить незавершивших
@@ -460,7 +624,7 @@ async function finishTest(req, res, sql) {
 /**
  * GET ?action=results&sessionId=...
  */
-async function getResults(req, res, sql) {
+async function getResults(req, res, sql, userId) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   const { sessionId } = req.query;
@@ -470,7 +634,7 @@ async function getResults(req, res, sql) {
 
   // Данные сессии
   const session = await sql`
-    SELECT ts.question_count, ts.created_at,
+    SELECT ts.question_count, ts.created_at, ts.teacher_id,
            cs.title AS set_title
     FROM test_sessions ts
     JOIN card_sets cs ON cs.id = ts.set_id
@@ -478,6 +642,11 @@ async function getResults(req, res, sql) {
   `;
   if (session.length === 0) {
     return res.status(404).json({ error: 'Session not found' });
+  }
+  // Только учитель — владелец сессии (раньше результаты были доступны вообще без проверки
+  // личности запрашивающего, см. план, пункт 39).
+  if (session[0].teacher_id !== userId) {
+    return res.status(403).json({ error: 'Not authorized for this session' });
   }
 
   // Участники отсортированы по score
@@ -534,7 +703,7 @@ async function getResults(req, res, sql) {
  * POST ?action=get-question
  * Body: { participantId, questionIndex }
  */
-async function getQuestion(req, res, sql) {
+async function getQuestion(req, res, sql, userId) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { participantId, questionIndex } = req.body;
@@ -544,12 +713,15 @@ async function getQuestion(req, res, sql) {
 
   // Получить участника
   const participant = await sql`
-    SELECT question_order, session_id
+    SELECT question_order, session_id, user_id
     FROM test_participants
     WHERE id = ${participantId}::uuid
   `;
   if (participant.length === 0) {
     return res.status(404).json({ error: 'Participant not found' });
+  }
+  if (participant[0].user_id !== userId) {
+    return res.status(403).json({ error: 'Not authorized for this participant' });
   }
 
   const questionOrder = participant[0].question_order;
@@ -590,12 +762,12 @@ async function getQuestion(req, res, sql) {
   });
 }
 
-async function getHistory(req, res, sql) {
+async function getHistory(req, res, sql, userId) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { courseId, teacherId } = req.query;
-  if (!courseId || !teacherId) {
-    return res.status(400).json({ error: 'courseId and teacherId are required' });
+  const { courseId } = req.query;
+  if (!courseId) {
+    return res.status(400).json({ error: 'courseId is required' });
   }
 
   const rows = await sql`
@@ -611,7 +783,7 @@ async function getHistory(req, res, sql) {
     LEFT JOIN card_sets cs ON cs.id = ts.set_id
     LEFT JOIN test_participants tp ON tp.session_id = ts.id
     WHERE ts.course_id  = ${courseId}::uuid
-      AND ts.teacher_id = ${teacherId}::uuid
+      AND ts.teacher_id = ${userId}::uuid
       AND ts.status     = 'finished'
     GROUP BY ts.id, cs.title
     ORDER BY ts.finished_at DESC

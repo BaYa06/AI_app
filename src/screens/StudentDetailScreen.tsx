@@ -2,7 +2,7 @@
  * Student Detail Screen
  * @description Статистика ученика для учителя (реальные данные из БД)
  */
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   ScrollView,
@@ -11,12 +11,14 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, AlertTriangle } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import { useThemeColors, useSettingsStore } from '@/store';
 import { spacing, borderRadius } from '@/constants';
 import { NeonService } from '@/services/NeonService';
+import { supabase } from '@/services/supabaseClient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 
@@ -37,6 +39,8 @@ interface StudentStats {
   learnedCards: number;
   unlearnedCards: number;
   sets: SetStat[];
+  streak: number;
+  lastActiveDate: string | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -63,6 +67,34 @@ function statusLabel(s: 'done' | 'inProgress' | 'notStarted'): string {
   return 'Не начат';
 }
 
+// Та же логика, что и в TeacherStudentsScreen.tsx (getStudentStatus/formatLastActivity) —
+// раньше здесь бейдж "Активен" был захардкожен независимо от реальной активности. См. план,
+// пункт 31.
+function activityStatus(lastActiveDate: string | null): 'online' | 'away' | 'offline' | 'inactive' {
+  if (!lastActiveDate) return 'inactive';
+  const now = new Date();
+  const last = new Date(lastActiveDate + 'T12:00:00Z');
+  const diffDays = Math.round((now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays <= 1) return 'online';
+  if (diffDays <= 2) return 'away';
+  if (diffDays <= 6) return 'offline';
+  return 'inactive';
+}
+
+function formatLastActive(lastActiveDate: string | null): string {
+  if (!lastActiveDate) return 'Нет активности';
+  const now = new Date();
+  const last = new Date(lastActiveDate + 'T12:00:00Z');
+  const diffDays = Math.round((now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays <= 0) return 'Сегодня';
+  if (diffDays === 1) return 'Вчера';
+  if (diffDays < 30) return `${diffDays} дн. назад`;
+  const weeks = Math.floor(diffDays / 7);
+  if (weeks < 5) return `${weeks} нед. назад`;
+  const months = Math.floor(diffDays / 30);
+  return `${months} мес. назад`;
+}
+
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 export function StudentDetailScreen({ navigation, route }: Props) {
@@ -74,8 +106,6 @@ export function StudentDetailScreen({ navigation, route }: Props) {
   const {
     studentName,
     studentInitials,
-    streak,
-    lastActivity,
     courseId,
     courseTitle,
     studentId,
@@ -83,16 +113,55 @@ export function StudentDetailScreen({ navigation, route }: Props) {
 
   const [stats, setStats] = useState<StudentStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
+  // useFocusEffect вместо обычного useEffect — данные перезагружаются при каждом возврате на
+  // экран (например, после того как ученик позанимался, пока учитель смотрел другой экран),
+  // а не только один раз при первом открытии. См. план, пункт 33.
+  useFocusEffect(
+    useCallback(() => {
+      let mounted = true;
+      setLoading(true);
+      setError(false);
+      NeonService.loadStudentCourseStats(courseId, studentId)
+        .then((data) => { if (mounted) setStats(data); })
+        .catch((e) => {
+          console.error('Failed to load student stats:', e);
+          if (mounted) setError(true);
+        })
+        .finally(() => { if (mounted) setLoading(false); });
+      return () => { mounted = false; };
+    }, [courseId, studentId]),
+  );
+
+  // Экран открывается напрямую по courseId/studentId из route.params — без этой проверки
+  // сюда можно было попасть на чужой курс/ученика без единого запроса к серверу (статистика и
+  // так теперь защищена на бэкенде, см. api/teacher.js action=student-stats, но без этого
+  // гейта экран мог успеть отрендерить пустографик вместо сразу же уйти назад). См. план,
+  // пункт 20.
   useEffect(() => {
     let mounted = true;
-    setLoading(true);
-    NeonService.loadStudentCourseStats(courseId, studentId)
-      .then((data) => { if (mounted) setStats(data); })
-      .catch((e) => console.error('Failed to load student stats:', e))
-      .finally(() => { if (mounted) setLoading(false); });
+    const checkOwnership = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const userId = data.session?.user?.id;
+        if (!userId) { if (mounted) goBack(); return; }
+        const isOwner = await NeonService.isCourseOwner(courseId, userId);
+        if (mounted && !isOwner) goBack();
+      } catch {
+        if (mounted) goBack();
+      }
+    };
+    checkOwnership();
     return () => { mounted = false; };
-  }, [courseId, studentId]);
+  }, [courseId]);
+
+  // Свежие значения из backend (студент мог позаниматься после того, как учитель открыл
+  // список) вместо застывшего снимка из route.params, с которым экран раньше жил всё время,
+  // пока был открыт. См. план, пункт 34.
+  const currentStreak = stats?.streak ?? 0;
+  const activeStatus = activityStatus(stats?.lastActiveDate ?? null);
+  const isActive = activeStatus === 'online' || activeStatus === 'away';
 
   const cardBg     = isDark ? 'rgba(255,255,255,0.05)' : '#FFFFFF';
   const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : '#E5E7EB';
@@ -123,7 +192,7 @@ export function StudentDetailScreen({ navigation, route }: Props) {
         style={[
           styles.header,
           {
-            paddingTop: Platform.OS === 'web' ? 12 : insets.top + 8,
+            paddingTop: 12,
             backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.92)',
             borderBottomColor: cardBorder,
             ...Platform.select({ web: { backdropFilter: 'blur(12px)' } }) as any,
@@ -146,6 +215,28 @@ export function StudentDetailScreen({ navigation, route }: Props) {
         <View style={styles.loadingBox}>
           <ActivityIndicator size="small" color={colors.primary} />
         </View>
+      ) : error ? (
+        // Раньше сбой сети выглядел так же, как "нет данных" (просто нули) — теперь
+        // отдельное состояние с кнопкой "Повторить". См. план, пункт 29.
+        <View style={styles.loadingBox}>
+          <AlertTriangle size={32} color={colors.textSecondary} />
+          <Text style={[styles.errorText, { color: colors.textPrimary }]}>
+            Не удалось загрузить данные
+          </Text>
+          <Pressable
+            style={[styles.retryBtn, { backgroundColor: colors.primary }]}
+            onPress={() => {
+              setLoading(true);
+              setError(false);
+              NeonService.loadStudentCourseStats(courseId, studentId)
+                .then(setStats)
+                .catch((e) => { console.error('Failed to load student stats:', e); setError(true); })
+                .finally(() => setLoading(false));
+            }}
+          >
+            <Text style={styles.retryBtnText}>Повторить</Text>
+          </Pressable>
+        </View>
       ) : (
         <ScrollView
           contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}
@@ -166,9 +257,17 @@ export function StudentDetailScreen({ navigation, route }: Props) {
                 <Text style={[styles.profileName, { color: colors.textPrimary }]}>
                   {studentName}
                 </Text>
-                <View style={[styles.activeBadge, isDark && { backgroundColor: 'rgba(22,163,74,0.15)' }]}>
-                  <Text style={[styles.activeBadgeText, isDark && { color: '#4ADE80' }]}>Активен</Text>
-                </View>
+                {isActive ? (
+                  <View style={[styles.activeBadge, isDark && { backgroundColor: 'rgba(22,163,74,0.15)' }]}>
+                    <Text style={[styles.activeBadgeText, isDark && { color: '#4ADE80' }]}>Активен</Text>
+                  </View>
+                ) : (
+                  <View style={[styles.activeBadge, styles.inactiveBadge, isDark && { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
+                    <Text style={[styles.activeBadgeText, styles.inactiveBadgeText, isDark && { color: colors.textSecondary }]}>
+                      Не в сети
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
 
@@ -176,7 +275,7 @@ export function StudentDetailScreen({ navigation, route }: Props) {
             <View style={[styles.statsRow, { borderTopColor: divider }]}>
               <StatCell
                 label="Серия"
-                value={streak > 0 ? `🔥 ${streak}` : '—'}
+                value={currentStreak > 0 ? `🔥 ${currentStreak}` : '—'}
                 isLast={false}
                 divider={divider}
                 textColor={colors.textPrimary}
@@ -197,7 +296,7 @@ export function StudentDetailScreen({ navigation, route }: Props) {
               />
               <StatCell
                 label="Вход"
-                value={lastActivity || '—'}
+                value={formatLastActive(stats?.lastActiveDate ?? null)}
                 isLast
                 divider={divider}
                 textColor={colors.textPrimary}
@@ -348,6 +447,24 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: spacing.s,
+    paddingHorizontal: spacing.l,
+  },
+  errorText: {
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  retryBtn: {
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.l,
+    paddingVertical: 10,
+    borderRadius: borderRadius.m,
+  },
+  retryBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
   },
 
   // Scroll
@@ -402,6 +519,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: '#16A34A',
+  },
+  inactiveBadge: {
+    backgroundColor: '#F3F4F6',
+  },
+  inactiveBadgeText: {
+    color: '#6B7280',
   },
 
   // Stats

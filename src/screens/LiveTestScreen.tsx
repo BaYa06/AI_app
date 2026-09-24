@@ -20,12 +20,14 @@ import { supabase } from '@/services/supabaseClient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 
-const API_BASE = __DEV__ ? 'http://localhost:3000/api' : '/api';
+import { API_BASE } from '@/config/apiBase';
+
 const AVATAR_COLORS = ['#6366F1', '#F59E0B', '#EC4899', '#10B981', '#F97316'];
 
 type Props = NativeStackScreenProps<RootStackParamList, 'LiveTest'>;
 
 interface StudentProgress {
+  userId: string;
   name: string;
   initial: string;
   answered: number;
@@ -56,32 +58,43 @@ export function LiveTestScreen({ navigation, route }: Props) {
     });
   }, [sessionId, route.params]);
 
-  // Загрузить начальные данные через monitor
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const resp = await fetch(`${API_BASE}/test?action=monitor&sessionId=${sessionId}`);
-        const data = await resp.json();
-        if (!mounted) return;
+  // Загрузить данные через monitor — сразу и затем каждые 4с как fallback поверх Realtime
+  // (раньше был только один вызов при монтировании + подписка; если broadcast пропадёт —
+  // например, реконнект сокета — экран замирал до следующего realtime-события). См. план,
+  // пункт 44.
+  const fetchMonitor = useCallback(async (mountedRef: { current: boolean }) => {
+    try {
+      const { data: authData } = await supabase.auth.getSession();
+      const token = authData.session?.access_token;
+      if (!token) return;
+      const resp = await fetch(`${API_BASE}/test?action=monitor&sessionId=${sessionId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await resp.json();
+      if (!mountedRef.current) return;
 
-        if (data.status === 'finished') { goToResults(); return; }
+      if (data.status === 'finished') { goToResults(); return; }
 
-        setQuestionCount(data.questionCount || 0);
-        setStudents(data.participants || []);
+      setQuestionCount(data.questionCount || 0);
+      setStudents(data.participants || []);
 
-        // Вычислить оставшееся время
-        if (data.timePerQuestion > 0 && data.startedAt && data.questionCount) {
-          const totalSec = data.timePerQuestion * data.questionCount;
-          const elapsed = Math.floor((Date.now() - new Date(data.startedAt).getTime()) / 1000);
-          setTimeLeft(Math.max(0, totalSec - elapsed));
-        }
-      } catch (e) {
-        console.error('Monitor fetch error:', e);
+      // Вычислить оставшееся время
+      if (data.timePerQuestion > 0 && data.startedAt && data.questionCount) {
+        const totalSec = data.timePerQuestion * data.questionCount;
+        const elapsed = Math.floor((Date.now() - new Date(data.startedAt).getTime()) / 1000);
+        setTimeLeft(Math.max(0, totalSec - elapsed));
       }
-    })();
-    return () => { mounted = false; };
-  }, [sessionId]);
+    } catch (e) {
+      console.error('Monitor fetch error:', e);
+    }
+  }, [sessionId, goToResults]);
+
+  useEffect(() => {
+    const mountedRef = { current: true };
+    fetchMonitor(mountedRef);
+    const interval = setInterval(() => fetchMonitor(mountedRef), 4000);
+    return () => { mountedRef.current = false; clearInterval(interval); };
+  }, [fetchMonitor]);
 
   // Таймер обратного отсчёта
   useEffect(() => {
@@ -112,7 +125,8 @@ export function LiveTestScreen({ navigation, route }: Props) {
     }
   }, [students]);
 
-  // Realtime: progress_update
+  // Realtime: progress_update — сопоставление по userId, а не по displayName (два "Гостя" в
+  // одной сессии раньше перезаписывали друг друга, т.к. имена не уникальны). См. план, пункт 43.
   useEffect(() => {
     const channel = supabase.channel(`test:${sessionId}`);
     channel
@@ -120,7 +134,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
         if (!payload) return;
         setStudents(prev =>
           prev.map(s =>
-            s.name === payload.displayName
+            s.userId === payload.userId
               ? { ...s, answered: payload.answered, total: payload.total, done: payload.done }
               : s,
           ),
@@ -129,8 +143,9 @@ export function LiveTestScreen({ navigation, route }: Props) {
       .on('broadcast', { event: 'student_joined' }, ({ payload }) => {
         if (!payload) return;
         setStudents(prev => {
-          if (prev.some(s => s.name === payload.displayName)) return prev;
+          if (prev.some(s => s.userId === payload.userId)) return prev;
           return [...prev, {
+            userId: payload.userId,
             name: payload.displayName,
             initial: (payload.displayName || '?')[0].toUpperCase(),
             answered: 0,
@@ -149,13 +164,13 @@ export function LiveTestScreen({ navigation, route }: Props) {
     setEnding(true);
     try {
       const { data } = await supabase.auth.getSession();
-      const teacherId = data.session?.user?.id;
-      if (!teacherId) throw new Error('Not authenticated');
+      const token = data.session?.access_token;
+      if (!token) throw new Error('Not authenticated');
 
       await fetch(`${API_BASE}/test?action=finish`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, teacherId }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ sessionId }),
       });
       goToResults();
     } catch (e: any) {
@@ -187,7 +202,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
           styles.header,
           {
             backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.85)',
-            paddingTop: Platform.OS === 'web' ? 12 : insets.top + 8,
+            paddingTop: 12,
           },
         ]}
       >
@@ -293,7 +308,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
 
             return (
               <View
-                key={`${st.name}-${idx}`}
+                key={st.userId}
                 style={[styles.studentCard, { backgroundColor: cardBg, borderColor: cardBorder }]}
               >
                 <View style={styles.studentTopRow}>

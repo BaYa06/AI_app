@@ -108,12 +108,14 @@ export function HomeScreen({ navigation }: any) {
   const [wordLimit, setWordLimit] = useState<'10' | '20' | '30' | 'all'>('10');
   const [onlyHard, setOnlyHard] = useState(false);
   const [showMnemonic, setShowMnemonic] = useState(true);
-  const [isTeacher, setIsTeacher] = useState<boolean | null>(null);
+  const isTeacher = useSettingsStore((s) => s.isTeacher);
+  const fetchIsTeacher = useSettingsStore((s) => s.fetchIsTeacher);
   const [inviteModalCourseId, setInviteModalCourseId] = useState<string | null>(null);
   const [inviteCopied, setInviteCopied] = useState(false);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [inviteJoinCode, setInviteJoinCode] = useState<string | null>(null);
   const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteRegenerating, setInviteRegenerating] = useState(false);
   const [joinByCodeVisible, setJoinByCodeVisible] = useState(false);
   const inviteBaseUrl = 'https://ai-app-seven-zeta.vercel.app';
   const [setMenuTarget, setSetMenuTarget] = useState<CardSet | null>(null);
@@ -300,13 +302,19 @@ export function HomeScreen({ navigation }: any) {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      const userId = data.session?.user?.id ?? null;
-      setCurrentUserId(userId);
-      if (userId) {
-        NeonService.getIsTeacher(userId).then(setIsTeacher);
-      }
+      setCurrentUserId(data.session?.user?.id ?? null);
     });
   }, []);
+
+  // Перезагружаем isTeacher при каждом возврате на Home, а не один раз за сессию —
+  // роль могла поменяться (например, вручную в БД) пока приложение было свёрнуто.
+  useFocusEffect(
+    useCallback(() => {
+      if (currentUserId) {
+        fetchIsTeacher(currentUserId);
+      }
+    }, [currentUserId, fetchIsTeacher])
+  );
 
   const SWIPE_THRESHOLD = 50;
   const SWIPE_VELOCITY = 200;
@@ -749,6 +757,36 @@ export function HomeScreen({ navigation }: any) {
     setInviteToken(null);
     setInviteJoinCode(null);
   }, []);
+
+  const handleRegenerateInvite = useCallback(() => {
+    if (!inviteModalCourseId) return;
+    Alert.alert(
+      'Обновить код приглашения?',
+      'Старые ссылка и код перестанут работать — ученики, у которых они есть, больше не смогут по ним присоединиться.',
+      [
+        { text: 'Отмена', style: 'cancel' },
+        {
+          text: 'Обновить',
+          style: 'destructive',
+          onPress: async () => {
+            setInviteRegenerating(true);
+            setInviteCopied(false);
+            try {
+              const result = await NeonService.regenerateCourseInvite(inviteModalCourseId);
+              if (result) {
+                setInviteToken(result.token);
+                setInviteJoinCode(result.joinCode);
+              } else {
+                Alert.alert('Ошибка', 'Не удалось обновить код приглашения');
+              }
+            } finally {
+              setInviteRegenerating(false);
+            }
+          },
+        },
+      ]
+    );
+  }, [inviteModalCourseId]);
 
   // Обработка удаления курса через модальное окно
   const openDeleteModal = useCallback((courseId: string) => {
@@ -1682,6 +1720,20 @@ export function HomeScreen({ navigation }: any) {
                     </Text>
                   </Pressable>
                 </View>
+
+                <Pressable
+                  style={[styles.editModalButton, { backgroundColor: 'transparent', marginTop: spacing.s }]}
+                  onPress={handleRegenerateInvite}
+                  disabled={inviteRegenerating}
+                >
+                  {inviteRegenerating ? (
+                    <ActivityIndicator size="small" color={colors.textSecondary} />
+                  ) : (
+                    <Text style={[styles.editModalButtonText, { color: colors.textSecondary }]}>
+                      Обновить код приглашения
+                    </Text>
+                  )}
+                </Pressable>
               </>
             ) : (
               <Text style={[styles.inviteDescription, { color: colors.error || '#EF4444' }]}>

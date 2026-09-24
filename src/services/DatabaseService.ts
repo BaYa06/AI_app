@@ -15,6 +15,9 @@ const getStores = () => ({
   useSettingsStore: require('../store/settingsStore').useSettingsStore,
 });
 
+/** Лог только в деве — эти сообщения не секретные, но не нужны в продовых логах. */
+const devLog = (...args: unknown[]) => { if (__DEV__) console.log(...args); };
+
 /**
  * Интерфейс сохраненных данных
  */
@@ -53,7 +56,7 @@ export const DatabaseService = {
         console.warn('⚠️ Supabase не инициализирован, используем локальные данные');
       }
 
-      console.log('🔄 Загрузка данных из Neon PostgreSQL...');
+      devLog('🔄 Загрузка данных из Neon PostgreSQL...');
       
       // Пытаемся загрузить данные из Neon
       const [sets, allCards, courses] = await Promise.all([
@@ -62,9 +65,9 @@ export const DatabaseService = {
         NeonService.loadCourses(currentUserId),
       ]);
 
-      console.log(`📚 Загружено наборов: ${sets.length}`);
-      console.log(`🃏 Загружено карточек: ${allCards.length}`);
-      console.log(`📁 Загружено курсов: ${courses.length}`);
+      devLog(`📚 Загружено наборов: ${sets.length}`);
+      devLog(`🃏 Загружено карточек: ${allCards.length}`);
+      devLog(`📁 Загружено курсов: ${courses.length}`);
 
       // Преобразуем данные из Neon в объекты для store
       const setsMap: Record<string, CardSet> = {};
@@ -116,7 +119,7 @@ export const DatabaseService = {
           const studentCourses = await NeonService.loadStudentCourses(currentUserId);
           if (studentCourses.length > 0) {
             allCourses.push(...studentCourses);
-            console.log(`🎓 Загружено курсов ученика: ${studentCourses.length}`);
+            devLog(`🎓 Загружено курсов ученика: ${studentCourses.length}`);
 
             // Загружаем наборы каждого курса учителя (read-only)
             for (const sc of studentCourses) {
@@ -125,7 +128,7 @@ export const DatabaseService = {
                 setsMap[ts.id] = ts;
                 setsOrder.push(ts.id);
               });
-              console.log(`  📚 Курс "${sc.title}": ${teacherSets.length} наборов`);
+              devLog(`  📚 Курс "${sc.title}": ${teacherSets.length} наборов`);
             }
           }
         } catch (e) {
@@ -145,7 +148,7 @@ export const DatabaseService = {
         setsOrder,
       });
 
-      console.log('✅ Наборы загружены в store (Neon + локальные)');
+      devLog('✅ Наборы загружены в store (Neon + локальные)');
 
       // Сохраняем курсы в store
       stores.useCoursesStore.setState({
@@ -153,7 +156,7 @@ export const DatabaseService = {
         activeCourseId,
       });
 
-      console.log('✅ Курсы загружены в store из Neon');
+      devLog('✅ Курсы загружены в store из Neon');
 
       // Преобразуем карточки в объекты
       const cardsMap: Record<string, Card> = {};
@@ -202,7 +205,7 @@ export const DatabaseService = {
         cardsBySet,
       });
 
-      console.log('✅ Карточки загружены в store (Neon + локальные)');
+      devLog('✅ Карточки загружены в store (Neon + локальные)');
 
       // Загружаем настройки из локального хранилища
       const settings = StorageService.getObject<UserSettings>(STORAGE_KEYS.SETTINGS);
@@ -220,7 +223,7 @@ export const DatabaseService = {
               longestStreak: userStats.longest_streak,
               lastActiveDate: userStats.last_active_date,
             });
-            console.log('🔥 Streak загружен:', userStats.current_streak, 'дней');
+            devLog('🔥 Streak загружен:', userStats.current_streak, 'дней');
           }
         } catch (e) {
           console.warn('⚠️ Не удалось загрузить streak:', e);

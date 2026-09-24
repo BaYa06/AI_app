@@ -32,7 +32,7 @@ import { NeonService } from '@/services/NeonService';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 
-const API_BASE = __DEV__ ? 'http://localhost:3000/api' : '/api';
+import { API_BASE } from '@/config/apiBase';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ExamLobby'>;
 
@@ -100,7 +100,7 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
           {
             backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.85)',
             borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
-            paddingTop: Platform.OS === 'web' ? 12 : insets.top + 8,
+            paddingTop: 12,
           },
         ]}
       >
@@ -400,19 +400,18 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
             setCreating(true);
             try {
               const { data } = await supabase.auth.getSession();
-              const teacherId = data.session?.user?.id;
-              if (!teacherId) throw new Error('Not authenticated');
+              const token = data.session?.access_token;
+              if (!token) throw new Error('Not authenticated');
 
               const resp = await fetch(`${API_BASE}/test?action=create`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify({
                   setId: selectedSetId,
                   courseId: route.params.courseId,
                   testMode,
                   questionCount: totalQuestions,
                   timePerQuestion,
-                  teacherId,
                 }),
               });
               const result = await resp.json();

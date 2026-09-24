@@ -5,6 +5,7 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { v4 as uuid } from 'uuid';
+import { Alert } from 'react-native';
 import type { Course } from '@/types';
 import { StorageService, STORAGE_KEYS } from '@/services/StorageService';
 import { NeonService } from '@/services/NeonService';
@@ -12,8 +13,6 @@ import { supabase } from '@/services/supabaseClient';
 
 // Lazy import для useSetsStore чтобы избежать циклических зависимостей
 const getSetsStore = () => require('./setsStore').useSetsStore;
-
-const DEFAULT_USER_ID = '00000000-0000-0000-0000-000000000001'; // Валидный UUID для локального пользователя
 
 interface CoursesState {
   // Данные
@@ -99,6 +98,10 @@ export const useCoursesStore = create<CoursesState & CoursesActions>()(
             console.log('✅ Курс сохранен в Neon PostgreSQL:', newCourse.title);
           } else {
             console.warn('⚠️  Не удалось синхронизировать курс с Neon:', newCourse.title);
+            Alert.alert(
+              'Не удалось сохранить курс на сервере',
+              `Курс "${newCourse.title}" сохранён только на этом устройстве. Проверьте соединение с интернетом и попробуйте создать его ещё раз.`
+            );
           }
         })();
       }
@@ -128,6 +131,10 @@ export const useCoursesStore = create<CoursesState & CoursesActions>()(
             console.log('✅ Курс обновлен в Neon PostgreSQL:', title);
           } else {
             console.warn('⚠️  Не удалось обновить курс в Neon:', title);
+            Alert.alert(
+              'Не удалось переименовать курс на сервере',
+              'Новое название сохранено только на этом устройстве. Проверьте соединение с интернетом и попробуйте ещё раз.'
+            );
           }
         })();
       }

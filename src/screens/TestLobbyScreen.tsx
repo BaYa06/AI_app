@@ -30,7 +30,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
-const API_BASE = __DEV__ ? 'http://localhost:3000/api' : '/api';
+import { API_BASE } from '@/config/apiBase';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TestLobby'>;
 
@@ -60,7 +60,12 @@ export function TestLobbyScreen({ navigation, route }: Props) {
     const fetchParticipants = async () => {
       if (cancelled) return;
       try {
-        const resp = await fetch(`${API_BASE}/test?action=monitor&sessionId=${sessionId}`);
+        const { data: authData } = await supabase.auth.getSession();
+        const token = authData.session?.access_token;
+        if (!token) return;
+        const resp = await fetch(`${API_BASE}/test?action=monitor&sessionId=${sessionId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         if (!resp.ok || cancelled) return;
         const data = await resp.json();
         if (cancelled) return;
@@ -124,13 +129,13 @@ export function TestLobbyScreen({ navigation, route }: Props) {
     setStarting(true);
     try {
       const { data } = await supabase.auth.getSession();
-      const teacherId = data.session?.user?.id;
-      if (!teacherId) throw new Error('Not authenticated');
+      const token = data.session?.access_token;
+      if (!token) throw new Error('Not authenticated');
 
       const resp = await fetch(`${API_BASE}/test?action=start`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, teacherId }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ sessionId }),
       });
       const result = await resp.json();
       if (!resp.ok) throw new Error(result.error || 'Failed to start test');
@@ -158,7 +163,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
           styles.header,
           {
             backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.85)',
-            paddingTop: Platform.OS === 'web' ? 12 : insets.top + 8,
+            paddingTop: 12,
           },
         ]}
       >

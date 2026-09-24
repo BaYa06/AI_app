@@ -73,7 +73,7 @@ export function TestDoneScreen({ navigation, route }: Props) {
         style={[
           styles.header,
           {
-            paddingTop: insets.top + 4,
+            paddingTop: 4,
             backgroundColor: isDark
               ? colors.background + 'CC'
               : 'rgba(246,246,248,0.8)',

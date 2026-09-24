@@ -19,7 +19,7 @@ import { supabase } from '@/services/supabaseClient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 
-const API_BASE = __DEV__ ? 'http://localhost:3000/api' : '/api';
+import { API_BASE } from '@/config/apiBase';
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D'];
 
@@ -44,9 +44,9 @@ export function TestExamScreen({ navigation, route }: Props) {
   const isDark = useSettingsStore((s) => s.resolvedTheme) === 'dark';
   const insets = useSafeAreaInsets();
 
-  const { sessionId, participantId, questionCount, timePerQuestion } = route.params;
+  const { sessionId, participantId, questionCount, timePerQuestion, initialQuestionIndex } = route.params;
 
-  const [questionIndex, setQuestionIndex] = useState(0);
+  const [questionIndex, setQuestionIndex] = useState(initialQuestionIndex || 0);
   const [question, setQuestion] = useState<QuestionData | null>(null);
   const [loadingQuestion, setLoadingQuestion] = useState(true);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
@@ -80,9 +80,13 @@ export function TestExamScreen({ navigation, route }: Props) {
     if (timePerQuestion > 0) setTimeLeft(timePerQuestion);
 
     try {
+      const { data: authData } = await supabase.auth.getSession();
+      const token = authData.session?.access_token;
+      if (!token) throw new Error('Not authenticated');
+
       const res = await fetch(`${API_BASE}/test?action=get-question`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ participantId, questionIndex: idx }),
       });
       const json = await res.json();
@@ -95,9 +99,10 @@ export function TestExamScreen({ navigation, route }: Props) {
     }
   }, [participantId, timePerQuestion]);
 
-  // Загрузить первый вопрос
+  // Загрузить первый вопрос — или, при переподключении к уже идущему тесту, тот, на котором
+  // ученик остановился (см. план, пункт 40).
   useEffect(() => {
-    fetchQuestion(0);
+    fetchQuestion(initialQuestionIndex || 0);
   }, []);
 
   // Realtime: учитель принудительно завершил тест
@@ -148,9 +153,14 @@ export function TestExamScreen({ navigation, route }: Props) {
     const isLastQuestion = nextIdx >= questionCount;
 
     try {
+      const { data: authData } = await supabase.auth.getSession();
+      const token = authData.session?.access_token;
+      if (!token) throw new Error('Not authenticated');
+      const authHeaders = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+
       const answerPromise = fetch(`${API_BASE}/test?action=answer`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders,
         body: JSON.stringify({
           participantId,
           cardId: question.cardId,
@@ -162,7 +172,7 @@ export function TestExamScreen({ navigation, route }: Props) {
       const nextQuestionPromise = !isLastQuestion
         ? fetch(`${API_BASE}/test?action=get-question`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: authHeaders,
             body: JSON.stringify({ participantId, questionIndex: nextIdx }),
           }).then((r) => r.json())
         : Promise.resolve(null);
@@ -207,7 +217,7 @@ export function TestExamScreen({ navigation, route }: Props) {
           styles.header,
           {
             backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.95)',
-            paddingTop: insets.top + 8,
+            paddingTop: 8,
           },
         ]}
       >

@@ -14,6 +14,7 @@ import {
   Animated,
   Modal,
   Switch,
+  Alert,
 } from 'react-native';
 import { ArrowLeft, Settings, Mic, Check, X, AudioLines } from 'lucide-react-native';
 import { useThemeColors, useSettingsStore, useCardsStore, useSetsStore } from '@/store';
@@ -28,6 +29,7 @@ import {
   startContinuousListening,
   stopContinuousListening,
   setContinuousHandlers,
+  resetContinuousBaseline,
 } from '@/utils/speechRecognition';
 import type { RecognitionResult } from '@/utils/speechRecognition';
 import type { RootStackScreenProps } from '@/types/navigation';
@@ -190,7 +192,7 @@ export function AudioLearningScreen({ navigation, route }: Props) {
   }, [cards, navigation, setId, cardLimit, dueCardIds, studiedInPhase, phaseOffset]);
 
   // Process one card then auto-continue (mic stays on between cards)
-  const processCard = useCallback(async (idx: number) => {
+  const processCard = useCallback(async (idx: number, technicalRetries = 0) => {
     if (!isRunningRef.current) return;
 
     const card = cards[idx];
@@ -216,6 +218,9 @@ export function AudioLearningScreen({ navigation, route }: Props) {
     setSessionState('listening');
     setPartialText('');
     setRecognizedText('');
+    // Discard whatever the still-running native session already transcribed for previous
+    // cards, so this card's partial/final results only reflect speech said from now on.
+    resetContinuousBaseline();
 
     // Wait for correct answer or "Не знаю" skip
     const result = await new Promise<RecognitionResult>((resolve) => {
@@ -255,12 +260,55 @@ export function AudioLearningScreen({ navigation, route }: Props) {
           }
         },
         (partial) => setPartialText(partial),
+        () => {
+          // Реальный сбой движка (не "не расслышал") — не должен засчитываться как
+          // неправильный ответ. См. план, пункт 51.
+          if (!settled) {
+            settled = true;
+            skipResolveRef.current = null;
+            setContinuousHandlers(null, null);
+            resolve({
+              recognized: false,
+              alternatives: allAlternatives,
+              isCorrect: false,
+              timedOut: false,
+              technicalError: true,
+            });
+          }
+        },
       );
     });
 
     // Stopped while listening?
     if (!isRunningRef.current) {
       setSessionState('idle');
+      return;
+    }
+
+    const advance = () => {
+      if (idx < cards.length - 1) {
+        const next = idx + 1;
+        currentIndexRef.current = next;
+        setCurrentIndex(next);
+        setSessionState('listening');
+        setPartialText('');
+        setRecognizedText('');
+        setTimeout(() => processCard(next), 200);
+      } else {
+        finishSession();
+      }
+    };
+
+    // Технический сбой распознавания — не засчитываем как неправильный ответ, просто слушаем
+    // эту же карточку ещё раз (мик уже перезапускается автоматически). После нескольких сбоев
+    // подряд на одной карточке не блокируем сессию бесконечно — переходим дальше без штрафа.
+    // См. план, пункт 51.
+    if (result.technicalError) {
+      if (technicalRetries < 2) {
+        setTimeout(() => processCard(idx, technicalRetries + 1), 300);
+      } else {
+        advance();
+      }
       return;
     }
 
@@ -286,18 +334,7 @@ export function AudioLearningScreen({ navigation, route }: Props) {
       return;
     }
 
-    // Advance
-    if (idx < cards.length - 1) {
-      const next = idx + 1;
-      currentIndexRef.current = next;
-      setCurrentIndex(next);
-      setSessionState('listening');
-      setPartialText('');
-      setRecognizedText('');
-      setTimeout(() => processCard(next), 200);
-    } else {
-      finishSession();
-    }
+    advance();
   }, [cards, finishSession]);
 
   // Compute the STT language based on current reverse state
@@ -322,7 +359,10 @@ export function AudioLearningScreen({ navigation, route }: Props) {
 
     const hasPermission = await requestMicrophonePermission();
     if (!hasPermission) {
-      console.warn('[AudioLearning] Microphone permission denied');
+      Alert.alert(
+        'Нет доступа к микрофону',
+        'Разрешите доступ к микрофону в настройках устройства, чтобы использовать Audio Tap.',
+      );
       return;
     }
 
@@ -332,9 +372,22 @@ export function AudioLearningScreen({ navigation, route }: Props) {
     setIsRunning(true);
     sessionStartTime.current = Date.now();
 
-    // Start mic once — it stays on for the entire session
-    await startContinuousListening(lang);
-    processCard(currentIndexRef.current);
+    try {
+      // Start mic once — it stays on for the entire session
+      await startContinuousListening(lang);
+      processCard(currentIndexRef.current);
+    } catch (e) {
+      // Раньше при отказе Voice.start() (например, разрешение реально не было выдано, несмотря
+      // на то что requestMicrophonePermission на iOS сейчас безусловно возвращает true — см.
+      // план, пункт 49) UI тихо зависал в состоянии "идёт сессия". См. план, пункт 50.
+      console.error('[AudioLearning] Failed to start listening:', e);
+      isRunningRef.current = false;
+      setIsRunning(false);
+      Alert.alert(
+        'Не удалось запустить микрофон',
+        'Нет доступа к микрофону — разрешите в настройках устройства и попробуйте снова.',
+      );
+    }
   }, [processCard, getAnswerLang]);
 
   // Stop session
@@ -736,7 +789,9 @@ const styles = StyleSheet.create({
   cardWord: {
     fontSize: 32,
     fontWeight: '700',
-    lineHeight: 40,
+    // Запас под умлауты/диакритику над заглавными (см. StudyScreen cardWord)
+    lineHeight: 46,
+    paddingTop: 4,
     textAlign: 'center',
   },
   partialText: {

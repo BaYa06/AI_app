@@ -191,7 +191,7 @@ export function EmailAuthScreen({ onBack }: Props) {
         style={styles.shell}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={[styles.navBar, { paddingTop: insets.top }]}>
+        <View style={[styles.navBar, { paddingTop: 0 }]}>
           <Button
             title=""
             variant="ghost"

@@ -175,6 +175,9 @@ export type RootStackParamList = {
     testMode: string;
     questionCount: number;
     timePerQuestion: number;
+    // С какого вопроса начинать — используется при переподключении к уже идущему тесту
+    // (см. TestJoinScreen.tsx, alreadyJoined). По умолчанию 0.
+    initialQuestionIndex?: number;
   };
   TestDone: {
     correct: number;

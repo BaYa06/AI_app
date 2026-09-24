@@ -59,7 +59,7 @@ export function OralTestLobbyScreen({ navigation, route }: Props) {
           {
             backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.85)',
             borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
-            paddingTop: Platform.OS === 'web' ? 12 : insets.top + 8,
+            paddingTop: 12,
           },
         ]}
       >
@@ -71,7 +71,7 @@ export function OralTestLobbyScreen({ navigation, route }: Props) {
           <ArrowLeft size={22} color={colors.textPrimary} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-          Орал тест
+          Устный тренажёр
         </Text>
       </View>
 
@@ -85,10 +85,10 @@ export function OralTestLobbyScreen({ navigation, route }: Props) {
             <Mic size={32} color="#F97316" />
           </View>
           <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>
-            Устный опрос
+            Устный тренажёр
           </Text>
           <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
-            Студент произносит перевод вслух,{'\n'}учитель свайпом отмечает результат
+            Студент произносит перевод вслух,{'\n'}учитель свайпом отмечает результат.{'\n'}Это тренировка — результат нигде не сохраняется.
           </Text>
         </View>
 
@@ -176,7 +176,7 @@ export function OralTestLobbyScreen({ navigation, route }: Props) {
           onPress={handleStart}
         >
           <Mic size={20} color="#FFFFFF" />
-          <Text style={styles.ctaText}>Начать устный тест</Text>
+          <Text style={styles.ctaText}>Начать тренировку</Text>
         </Pressable>
       </View>
     </View>
