@@ -117,6 +117,13 @@ function AppRoot({
     });
   }, [isAuthenticated, needsOnboarding]);
 
+  // В нативном приложении баннера нет: сразу системный запрос iOS. Диалог показывается
+  // только пока пользователь не ответил, дальше вызов лишь перерегистрирует токен.
+  useEffect(() => {
+    if (!isAuthenticated || needsOnboarding || !currentUserId || Platform.OS === 'web') return;
+    requestPushPermission(currentUserId).catch(() => {});
+  }, [isAuthenticated, needsOnboarding, currentUserId]);
+
   // ✅ уменьшаем safe-area сверху на 15px
   const top = insets.top > 0 ? Math.max(insets.top - 15, 0) : 0;
   // ✅ для PWA полностью убираем bottom safe-area, для нативных урезаем на 15px

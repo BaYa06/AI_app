@@ -14,6 +14,7 @@
 import { neon } from '@neondatabase/serverless';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
+import { createClient } from '@supabase/supabase-js';
 import { ensureDatabaseInitialized } from './_db-init.js';
 
 function initFirebase() {
@@ -21,6 +22,24 @@ function initFirebase() {
     initializeApp({ credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)) });
   }
   return getMessaging();
+}
+
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://yiwsmjbeirgomkrckoju.supabase.co';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
+
+/** userId из Supabase JWT (Authorization: Bearer). null — нет токена или он невалиден. */
+async function getAuthedUserId(req) {
+  const header = req.headers.authorization || req.headers.Authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token || !SUPABASE_ANON_KEY) return null;
+  try {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { data, error } = await supabase.auth.getUser(token);
+    if (error || !data?.user) return null;
+    return data.user.id;
+  } catch {
+    return null;
+  }
 }
 
 function buildMessage(type, name, streak, longest, data = {}) {
@@ -48,15 +67,23 @@ export default async function handler(req, res) {
   try {
     // ── subscribe ──────────────────────────────────────────────
     if (action === 'subscribe' && req.method === 'POST') {
-      const { token, platform, userId } = req.body || {};
+      const { token, platform, userId: bodyUserId } = req.body || {};
       if (!token || typeof token !== 'string') {
         return res.status(400).json({ error: 'Missing or invalid token' });
       }
+      // Нативное приложение шлёт JWT — тогда userId только из него. userId из тела
+      // остаётся для веб-версии, которая пока подписывается без токена входа.
+      const authedUserId = await getAuthedUserId(req);
+      if (req.headers.authorization && !authedUserId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      const userId = authedUserId || bodyUserId;
       await sql`
         INSERT INTO push_tokens (token, user_id, platform, updated_at)
         VALUES (${token}, ${userId || null}, ${platform || 'web'}, NOW())
         ON CONFLICT (token) DO UPDATE SET
           user_id    = EXCLUDED.user_id,
+          platform   = EXCLUDED.platform,
           updated_at = NOW()
       `;
       return res.status(200).json({ ok: true });
@@ -127,8 +154,8 @@ export default async function handler(req, res) {
       const { userId, type, data = {} } = req.body || {};
       if (!userId || !type) return res.status(400).json({ error: 'Missing userId or type' });
 
-      const [tokenRow] = await sql`SELECT token FROM push_tokens WHERE user_id = ${userId} LIMIT 1`;
-      if (!tokenRow?.token) return res.status(200).json({ ok: false, reason: 'no token' });
+      const tokenRows = await sql`SELECT token FROM push_tokens WHERE user_id = ${userId}`;
+      if (tokenRows.length === 0) return res.status(200).json({ ok: false, reason: 'no token' });
 
       const [user] = await sql`
         SELECT u.display_name, us.current_streak, us.longest_streak, us.notif_enabled, us.notif_streak
@@ -140,8 +167,21 @@ export default async function handler(req, res) {
       if (!message) return res.status(400).json({ error: `Unknown type: ${type}` });
 
       const messaging = initFirebase();
-      await messaging.send({ token: tokenRow.token, notification: message, data: { type, url: '/' } });
-      return res.status(200).json({ ok: true });
+      // На все устройства пользователя (телефон + веб), а не на первое попавшееся
+      const tokens = tokenRows.map((r) => r.token);
+      const result = await messaging.sendEachForMulticast({
+        tokens,
+        notification: message,
+        data: { type, url: '/' },
+        apns: { payload: { aps: { sound: 'default' } } },
+      });
+      // Удалённое приложение / отозванное разрешение — токен больше не нужен
+      const dead = tokens.filter((_, i) => {
+        const code = result.responses[i].error?.code;
+        return code === 'messaging/registration-token-not-registered' || code === 'messaging/invalid-registration-token';
+      });
+      if (dead.length) await sql`DELETE FROM push_tokens WHERE token = ANY(${dead})`;
+      return res.status(200).json({ ok: result.successCount > 0, sent: result.successCount, failed: result.failureCount });
     }
 
     // ── cron-streak ────────────────────────────────────────────
@@ -150,7 +190,7 @@ export default async function handler(req, res) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
       const users = await sql`
-        SELECT us.user_id FROM user_stats us
+        SELECT DISTINCT us.user_id FROM user_stats us
         JOIN push_tokens pt ON pt.user_id = us.user_id
         WHERE us.notif_enabled = true AND us.notif_streak = true
           AND us.current_streak > 0 AND us.last_active_date < CURRENT_DATE
@@ -178,11 +218,11 @@ export default async function handler(req, res) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
       const users3d = await sql`
-        SELECT us.user_id FROM user_stats us JOIN push_tokens pt ON pt.user_id = us.user_id
+        SELECT DISTINCT us.user_id FROM user_stats us JOIN push_tokens pt ON pt.user_id = us.user_id
         WHERE us.notif_enabled = true AND us.last_active_date = CURRENT_DATE - INTERVAL '3 days'
       `;
       const users7d = await sql`
-        SELECT us.user_id FROM user_stats us JOIN push_tokens pt ON pt.user_id = us.user_id
+        SELECT DISTINCT us.user_id FROM user_stats us JOIN push_tokens pt ON pt.user_id = us.user_id
         WHERE us.notif_enabled = true AND us.last_active_date = CURRENT_DATE - INTERVAL '7 days'
       `;
       const baseUrl = `https://${req.headers.host}`;

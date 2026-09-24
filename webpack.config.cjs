@@ -129,6 +129,8 @@ module.exports = (env, argv) => {
           // Дублируем манифест как manifest.json для совместимости с клиентами, ожидающими json-расширение
           { from: 'public/manifest.webmanifest', to: 'manifest.json' },
           { from: 'public/sw.js', to: 'sw.js' },
+          // Universal Links: iOS открывает /join/* сразу в приложении
+          { from: 'public/.well-known/apple-app-site-association', to: '.well-known/apple-app-site-association', toType: 'file' },
           { from: 'public/icons', to: 'icons' },
           // Аудио-файлы для звуковых эффектов викторин
           { from: 'public/correct.wav', to: 'correct.wav' },
