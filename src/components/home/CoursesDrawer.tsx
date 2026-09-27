@@ -9,7 +9,7 @@
  * этот компонент, а сам он не ре-рендерится во время перетаскивания вообще (translateX
  * меняется на UI-потоке, без React state).
  */
-import React, { memo, useCallback } from 'react';
+import React, { memo, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -28,6 +28,8 @@ import Animated, {
   useSharedValue,
   interpolate,
   Extrapolation,
+  withTiming,
+  Easing,
   type SharedValue,
 } from 'react-native-reanimated';
 import {
@@ -86,6 +88,101 @@ interface CourseRowProps {
   onOpenLeaveModal: (id: string) => void;
 }
 
+type CurtainAction = {
+  key: string;
+  label: string;
+  icon: React.ReactNode;
+  color: string;
+  tint: string;
+  onPress: () => void;
+};
+
+/** Кнопка шторки: появляется с небольшой задержкой после предыдущей — сверху вниз «волной» */
+const CurtainButton = memo(function CurtainButton({
+  action,
+  index,
+  progress,
+}: {
+  action: CurtainAction;
+  index: number;
+  progress: SharedValue<number>;
+}) {
+  const style = useAnimatedStyle(() => {
+    const start = 0.2 + index * 0.12;
+    const t = interpolate(progress.value, [start, Math.min(1, start + 0.45)], [0, 1], Extrapolation.CLAMP);
+    return {
+      opacity: t,
+      transform: [{ translateY: (1 - t) * -10 }, { scale: 0.94 + t * 0.06 }],
+    };
+  });
+  return (
+    <Animated.View style={[styles.curtainButtonWrap, style]}>
+      <Pressable
+        style={({ pressed }) => [styles.curtainButton, { backgroundColor: action.tint }, pressed && { opacity: 0.7 }]}
+        onPress={(e) => {
+          e.stopPropagation();
+          triggerHaptic('selection');
+          action.onPress();
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={action.label}
+      >
+        {action.icon}
+        <Text style={[styles.curtainButtonText, { color: action.color }]} numberOfLines={1}>
+          {action.label}
+        </Text>
+      </Pressable>
+    </Animated.View>
+  );
+});
+
+/**
+ * Действия курса, которые выезжают из-под карточки «шторкой» (вместо плавающего меню):
+ * карточка плавно растёт вниз, кнопки проявляются по очереди.
+ */
+const CourseActionsCurtain = memo(function CourseActionsCurtain({
+  open,
+  actions,
+}: {
+  open: boolean;
+  actions: CurtainAction[];
+}) {
+  const progress = useSharedValue(open ? 1 : 0);
+  const contentHeight = useSharedValue(0);
+
+  useEffect(() => {
+    progress.value = withTiming(open ? 1 : 0, {
+      duration: open ? 320 : 220,
+      easing: open ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
+    });
+  }, [open, progress]);
+
+  const containerStyle = useAnimatedStyle(() => ({
+    height: contentHeight.value * progress.value,
+  }));
+
+  return (
+    <Animated.View
+      style={[styles.curtain, containerStyle]}
+      pointerEvents={open ? 'auto' : 'none'}
+      accessibilityElementsHidden={!open}
+      importantForAccessibility={open ? 'auto' : 'no-hide-descendants'}
+    >
+      {/* Абсолютный слой — чтобы измерить настоящую высоту кнопок, пока шторка закрыта */}
+      <View
+        style={styles.curtainInner}
+        onLayout={(e) => {
+          contentHeight.value = e.nativeEvent.layout.height;
+        }}
+      >
+        {actions.map((action, i) => (
+          <CurtainButton key={action.key} action={action} index={i} progress={progress} />
+        ))}
+      </View>
+    </Animated.View>
+  );
+});
+
 const CourseRow = memo(function CourseRow({
   course,
   index,
@@ -109,10 +206,45 @@ const CourseRow = memo(function CourseRow({
 }: CourseRowProps) {
   const isStudent = course.isStudentCourse === true;
   const courseAccent = getDeckAccentColor(course.id || index);
-  // В тёмной теме colors.surface полупрозрачный — меню просвечивало. Непрозрачный фон, как у модалок главной.
   const isDark = useSettingsStore((s) => s.resolvedTheme) === 'dark';
-  const menuBg = isDark ? 'rgb(32, 34, 44)' : colors.surface;
-  const menuBorder = isDark ? 'rgba(255,255,255,0.08)' : colors.border;
+
+  // Три точки поворачиваются, пока шторка открыта
+  const dotsRotation = useSharedValue(isMenuOpen ? 1 : 0);
+  useEffect(() => {
+    dotsRotation.value = withTiming(isMenuOpen ? 1 : 0, { duration: 260, easing: Easing.out(Easing.cubic) });
+  }, [isMenuOpen, dotsRotation]);
+  const dotsStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${dotsRotation.value * 90}deg` }],
+  }));
+
+  const dangerTint = isDark ? 'rgba(239,68,68,0.14)' : '#FEF2F2';
+  const neutralTint = isDark ? 'rgba(255,255,255,0.07)' : colors.background;
+  const primaryTint = colors.primary + (isDark ? '26' : '14');
+  const actions: CurtainAction[] = isStudent
+    ? [{
+        key: 'leave', label: 'Выйти из курса', color: colors.error, tint: dangerTint,
+        icon: <LogOut size={18} color={colors.error} />,
+        onPress: () => onOpenLeaveModal(course.id),
+      }]
+    : [
+        ...(isTeacher
+          ? [{
+              key: 'invite', label: 'Пригласить', color: colors.primary, tint: primaryTint,
+              icon: <UserPlus size={18} color={colors.primary} />,
+              onPress: () => onOpenInvite(course.id),
+            }]
+          : []),
+        {
+          key: 'rename', label: 'Переименовать', color: colors.textPrimary, tint: neutralTint,
+          icon: <Edit2 size={18} color={colors.textPrimary} />,
+          onPress: () => onOpenEditModal(course.id, course.title),
+        },
+        {
+          key: 'delete', label: 'Удалить', color: colors.error, tint: dangerTint,
+          icon: <Trash2 size={18} color={colors.error} />,
+          onPress: () => onOpenDeleteModal(course.id),
+        },
+      ];
 
   return (
     <Pressable
@@ -121,10 +253,7 @@ const CourseRow = memo(function CourseRow({
         isActive
           ? { borderLeftColor: courseAccent, backgroundColor: courseAccent + '1A' }
           : { borderLeftColor: colors.border },
-        { borderColor: colors.border, position: 'relative' },
-        // Меню выше карточки и накрывает следующий курс. Без этого следующая карточка (более поздний
-        // соседний элемент) оказывалась поверх и перехватывала нажатия — «Delete» не нажимался.
-        isMenuOpen && styles.courseItemMenuOpen,
+        { borderColor: colors.border },
       ]}
       onPress={() => {
         if (!isEditing) {
@@ -189,72 +318,23 @@ const CourseRow = memo(function CourseRow({
           </View>
         </View>
         <Pressable
-          style={styles.courseMoreButton}
+          style={[styles.courseMoreButton, isMenuOpen && { backgroundColor: neutralTint }]}
           onPress={(e) => {
             e.stopPropagation();
+            triggerHaptic('selection');
             onToggleMenu(course.id);
           }}
+          accessibilityRole="button"
+          accessibilityLabel={isMenuOpen ? 'Скрыть действия курса' : 'Действия курса'}
         >
-          <MoreHorizontal size={18} color={colors.textSecondary} />
+          <Animated.View style={dotsStyle}>
+            <MoreHorizontal size={18} color={isMenuOpen ? colors.textPrimary : colors.textSecondary} />
+          </Animated.View>
         </Pressable>
       </View>
 
-      {isMenuOpen && (
-        <View
-          style={[
-            styles.courseMenu,
-            { backgroundColor: menuBg, borderColor: menuBorder, shadowColor: '#000' },
-          ]}
-        >
-          {isStudent ? (
-            <Pressable
-              style={({ pressed }) => [styles.courseMenuItem, pressed && { backgroundColor: colors.border }]}
-              onPress={(e) => {
-                e.stopPropagation();
-                onOpenLeaveModal(course.id);
-              }}
-            >
-              <LogOut size={16} color={colors.error} style={{ marginRight: spacing.s }} />
-              <Text style={[styles.courseMenuText, { color: colors.error }]}>Выйти из курса</Text>
-            </Pressable>
-          ) : (
-            <>
-              {isTeacher && (
-                <Pressable
-                  style={({ pressed }) => [styles.courseMenuItem, pressed && { backgroundColor: colors.border }]}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    onOpenInvite(course.id);
-                  }}
-                >
-                  <UserPlus size={16} color={colors.primary} style={{ marginRight: spacing.s }} />
-                  <Text style={[styles.courseMenuText, { color: colors.primary }]}>Добавить</Text>
-                </Pressable>
-              )}
-              <Pressable
-                style={({ pressed }) => [styles.courseMenuItem, pressed && { backgroundColor: colors.border }]}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  onOpenEditModal(course.id, course.title);
-                }}
-              >
-                <Edit2 size={16} color={colors.textPrimary} style={{ marginRight: spacing.s }} />
-                <Text style={[styles.courseMenuText, { color: colors.textPrimary }]}>Переименовать</Text>
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [styles.courseMenuItem, pressed && { backgroundColor: colors.border }]}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  onOpenDeleteModal(course.id);
-                }}
-              >
-                <Trash2 size={16} color={colors.error} style={{ marginRight: spacing.s }} />
-                <Text style={[styles.courseMenuText, { color: colors.error }]}>Удалить</Text>
-              </Pressable>
-            </>
-          )}
-        </View>
-      )}
+      <CourseActionsCurtain open={isMenuOpen} actions={actions} />
+
     </Pressable>
   );
 });
@@ -691,34 +771,38 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   courseMoreButton: {
-    padding: spacing.xs,
-  },
-  courseItemMenuOpen: {
-    zIndex: 50,
-    elevation: 12,
-  },
-  courseMenu: {
-    position: 'absolute',
-    top: spacing.s,
-    right: spacing.s,
-    borderWidth: 1,
-    borderRadius: borderRadius.m,
-    overflow: 'hidden',
-    // @ts-ignore web shadow
-    boxShadow: '0px 8px 20px rgba(0,0,0,0.12)',
-    elevation: 6,
-    zIndex: 10,
-  },
-  courseMenuItem: {
-    flexDirection: 'row',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.s,
-    minWidth: 140,
-    zIndex: 11,
+    justifyContent: 'center',
   },
-  courseMenuText: {
-    fontSize: 14,
+  curtain: {
+    overflow: 'hidden',
+  },
+  curtainInner: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    gap: spacing.s,
+    paddingTop: spacing.m,
+  },
+  curtainButtonWrap: {
+    flex: 1,
+  },
+  curtainButton: {
+    minHeight: 56,
+    borderRadius: borderRadius.m,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: 4,
+    paddingVertical: spacing.s,
+  },
+  curtainButtonText: {
+    fontSize: 12,
     fontWeight: '600',
   },
   drawerEmpty: {

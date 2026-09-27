@@ -16,7 +16,7 @@ import type { DiamondRewardRef } from '@/components/common';
 import { StudyModeSheet, DEFAULT_STUDY_MODE_GAMES, type StudyMode } from '@/components/study/StudyModeSheet';
 import { CoursesDrawer } from '@/components/home/CoursesDrawer';
 import { animateDrawerTo, clampTranslateX, resolveDrawerOpen } from '@/components/home/drawerAnimation';
-import ReanimatedAnimated, { useSharedValue, withTiming, withSequence, useAnimatedStyle, Easing, withDelay, runOnJS } from 'react-native-reanimated';
+import ReanimatedAnimated, { useSharedValue, withTiming, withSequence, withRepeat, useAnimatedStyle, Easing, withDelay, runOnJS } from 'react-native-reanimated';
 import { spacing, borderRadius, getDeckAccentColor } from '@/constants';
 import { triggerHaptic } from '@/utils/haptic';
 import {
@@ -37,7 +37,6 @@ import {
   File,
   Folder,
   Edit2,
-  Sunrise,
   Timer,
   ArrowUpDown,
   Check,
@@ -45,12 +44,12 @@ import {
   ChevronRight,
 } from 'lucide-react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import Svg, { Circle as SvgCircle } from 'react-native-svg';
 import { StreakService, getLocalDateKey } from '@/services/StreakService';
 import { supabase } from '@/services/supabaseClient';
 import { NeonService, type CourseLeaderboard } from '@/services/NeonService';
 import { leaderboardSeenKey, type LeaderboardSeen } from '@/screens/CourseLeaderboardScreen';
 import { DatabaseService } from '@/services/DatabaseService';
+import { BookService } from '@/services/BookService';
 import { JoinByCodeModal } from '@/components/JoinByCodeModal';
 import type { DailyActivity } from '@/services/StreakService';
 import type { Card, CardSet } from '@/types';
@@ -114,6 +113,29 @@ const SETS_COMPARATORS: Record<SetsSortKey, (a: CardSet, b: CardSet) => number> 
   alpha: (a, b) => (a.title || '').localeCompare(b.title || '', 'ru', { sensitivity: 'base', numeric: true }),
   size: (a, b) => (b.cardCount || 0) - (a.cardCount || 0) || byRecent(a, b),
 };
+
+/** «Забрать +10» на выполненной мини-игре — мягко пульсирует, пока награду не забрали */
+function ClaimButton({ onPress, buttonRef }: { onPress: () => void; buttonRef: (el: View | null) => void }) {
+  const scale = useSharedValue(1);
+  useEffect(() => {
+    scale.value = withRepeat(
+      withSequence(
+        withTiming(1.06, { duration: 650, easing: Easing.inOut(Easing.quad) }),
+        withTiming(1, { duration: 650, easing: Easing.inOut(Easing.quad) }),
+      ),
+      -1,
+    );
+  }, [scale]);
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  return (
+    <ReanimatedAnimated.View style={style}>
+      <Pressable ref={buttonRef} style={styles.challengeClaimButton} onPress={onPress} accessibilityRole="button" accessibilityLabel="Забрать 10 алмазов">
+        <Text style={styles.challengeClaimText}>Забрать +10</Text>
+        <Ionicons name="diamond" size={13} color="#059669" />
+      </Pressable>
+    </ReanimatedAnimated.View>
+  );
+}
 
 /**
  * Карточки для мини-игры (план §3.2): сначала слова, которым пришло время повторения — самые
@@ -989,8 +1011,9 @@ export function HomeScreen({ navigation }: any) {
     setInviteCopied(false);
     setInviteToken(null);
     setInviteJoinCode(null);
-    setInviteModalCourseId(courseId);
     setInviteLoading(true);
+    // Окно — только после закрытия боковой панели (иначе iOS покажет его под панелью и оно пропадёт)
+    runAfterDrawerClosed(() => setInviteModalCourseId(courseId));
     try {
       const { data } = await supabase.auth.getSession();
       const userId = data.session?.user?.id;
@@ -1004,7 +1027,7 @@ export function HomeScreen({ navigation }: any) {
     } finally {
       setInviteLoading(false);
     }
-  }, []);
+  }, [runAfterDrawerClosed]);
 
   const closeInviteModal = useCallback(() => {
     setInviteModalCourseId(null);
@@ -1064,18 +1087,30 @@ export function HomeScreen({ navigation }: any) {
 
   const removeLocalCourse = useCoursesStore((s) => s.removeLocalCourse);
 
+  // «Выйти из курса» из боковой панели: как и остальные действия — окно после её закрытия.
+  // Раньше окно открывалось сразу, под открытой панелью, и кнопка «не работала».
+  const openLeaveModal = useCallback((courseId: string) => {
+    setCourseMenuOpen(null);
+    runAfterDrawerClosed(() => setLeaveModalCourseId(courseId));
+  }, [runAfterDrawerClosed]);
+
   const handleLeaveCourse = useCallback(async () => {
     if (!leaveModalCourseId) return;
     setLeaveLoading(true);
     try {
       const { data } = await supabase.auth.getSession();
       const userId = data.session?.user?.id;
-      if (!userId) return;
+      if (!userId) {
+        Alert.alert('Нужно войти', 'Войдите в аккаунт, чтобы выйти из курса.');
+        return;
+      }
 
       const success = await NeonService.leaveStudentCourse(leaveModalCourseId, userId);
       if (success) {
         removeLocalCourse(leaveModalCourseId);
         setLeaveModalCourseId(null);
+        // Юнит учебника мог быть открыт и в другом курсе — вернуть его туда после локальной чистки
+        BookService.syncOfficialSets().catch(() => {});
       } else {
         Alert.alert('Ошибка', 'Не удалось выйти из курса. Попробуйте ещё раз.');
       }
@@ -1220,30 +1255,45 @@ export function HomeScreen({ navigation }: any) {
   );
 
   // Карточка ежедневного челленджа: играть → "Забрать" 10 алмазов → "Получено" до завтра
-  const renderChallengeCard = ({ id, title, badge, icon, onPlay }: {
+  // Мини-игра: «Играть» → «Выполнено, забрать +10» → «Получено, снова завтра»
+  const hoursUntilTomorrow = (() => {
+    const now = new Date();
+    const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    return Math.max(1, Math.ceil((midnight.getTime() - now.getTime()) / 3_600_000));
+  })();
+  const renderChallengeCard = ({ id, title, badge, icon, accent, onPlay }: {
     id: ChallengeId;
     title: string;
     badge: string;
     icon: React.ReactNode;
+    accent: string;
     onPlay: () => void;
   }) => {
     const status = challengeStatuses[id];
     if (status === 'pending') {
       return (
-        <Pressable key={id} style={[styles.challengeCard, { backgroundColor: '#7C3AED' }]} onPress={onPlay}>
-          <Text style={styles.challengeTitle}>{title}</Text>
-          <View style={styles.challengeBadge}>
-            <Text style={styles.challengeBadgeText}>{badge}</Text>
-          </View>
-          <View style={styles.challengeProgressContainer}>
-            <View style={styles.challengeRingWrapper}>
-              <Svg width={64} height={64} style={{ transform: [{ rotate: '-90deg' }] }}>
-                <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.2)" strokeWidth={4} fill="transparent" />
-                <SvgCircle cx={32} cy={32} r={28} stroke="#FFFFFF" strokeWidth={4} fill="transparent" strokeDasharray={175.9} strokeDashoffset={175.9} strokeLinecap="round" />
-              </Svg>
-              <View style={styles.challengeIconOverlay}>{icon}</View>
+        <Pressable
+          key={id}
+          style={({ pressed }) => [styles.challengeCard, { backgroundColor: accent }, pressed && styles.challengeCardPressed]}
+          onPress={onPlay}
+          accessibilityRole="button"
+          accessibilityLabel={`${title}. ${badge}. Награда 10 алмазов`}
+        >
+          <View style={styles.challengeTopRow}>
+            <View style={styles.challengeIconCircle}>{icon}</View>
+            <View style={styles.challengeBadge}>
+              <Text style={styles.challengeBadgeText}>{badge}</Text>
             </View>
-            <Text style={styles.challengeProgressText}>+10 💎</Text>
+          </View>
+          <Text style={styles.challengeTitle} numberOfLines={2}>{title}</Text>
+          <View style={styles.challengeBottomRow}>
+            <View style={styles.challengeReward}>
+              <Ionicons name="diamond" size={12} color="#FFFFFF" />
+              <Text style={styles.challengeRewardText}>+10</Text>
+            </View>
+            <View style={styles.challengePlay}>
+              <Ionicons name="play" size={14} color={accent} style={{ marginLeft: 2 }} />
+            </View>
           </View>
         </Pressable>
       );
@@ -1251,47 +1301,39 @@ export function HomeScreen({ navigation }: any) {
     if (status === 'completed') {
       return (
         <View key={id} style={[styles.challengeCard, styles.challengeCardCompleted]}>
-          <Text style={styles.challengeTitle}>{title}</Text>
-          <View style={styles.challengeBadgeCompleted}>
-            <Text style={styles.challengeBadgeTextCompleted}>Выполнено ✓</Text>
-          </View>
-          <View style={styles.challengeProgressContainer}>
-            <View style={styles.challengeRingWrapper}>
-              <Svg width={64} height={64} style={{ transform: [{ rotate: '-90deg' }] }}>
-                <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.15)" strokeWidth={4} fill="transparent" />
-                <SvgCircle cx={32} cy={32} r={28} stroke="#FFFFFF" strokeWidth={4} fill="transparent" strokeDasharray={175.9} strokeDashoffset={0} strokeLinecap="round" />
-              </Svg>
-              <View style={styles.challengeIconOverlay}>
-                <Ionicons name="checkmark-circle" size={32} color="#FFFFFF" />
-              </View>
+          <View style={styles.challengeTopRow}>
+            <View style={[styles.challengeIconCircle, { backgroundColor: '#FFFFFF' }]}>
+              <Ionicons name="checkmark" size={20} color="#059669" />
+            </View>
+            <View style={styles.challengeBadge}>
+              <Text style={styles.challengeBadgeText}>Выполнено</Text>
             </View>
           </View>
-          <Pressable
-            ref={(el) => { claimBtnRefs.current[id] = el; }}
-            style={styles.challengeClaimButton}
+          <Text style={styles.challengeTitle} numberOfLines={2}>{title}</Text>
+          <ClaimButton
+            buttonRef={(el) => { claimBtnRefs.current[id] = el; }}
             onPress={() => handleChallengeClaim(id)}
-          >
-            <Text style={styles.challengeClaimText}>Забрать</Text>
-          </Pressable>
+          />
         </View>
       );
     }
     return (
-      <View key={id} style={[styles.challengeCard, styles.challengeCardClaimed]}>
-        <Text style={[styles.challengeTitle, { opacity: 0.5 }]}>{title}</Text>
-        <View style={styles.challengeBadgeClaimed}>
-          <Text style={styles.challengeBadgeTextClaimed}>Получено ✓</Text>
-        </View>
-        <View style={styles.challengeProgressContainer}>
-          <View style={styles.challengeRingWrapper}>
-            <Svg width={64} height={64} style={{ transform: [{ rotate: '-90deg' }] }}>
-              <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.1)" strokeWidth={4} fill="transparent" />
-              <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.35)" strokeWidth={4} fill="transparent" strokeDasharray={175.9} strokeDashoffset={0} strokeLinecap="round" />
-            </Svg>
-            <View style={styles.challengeIconOverlay}>
-              <Ionicons name="checkmark-circle" size={32} color="rgba(255,255,255,0.4)" />
-            </View>
+      <View
+        key={id}
+        style={[styles.challengeCard, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]}
+        accessibilityLabel={`${title}: награда получена, снова через ${hoursUntilTomorrow} ч`}
+      >
+        <View style={styles.challengeTopRow}>
+          <View style={[styles.challengeIconCircle, { backgroundColor: colors.success + '22' }]}>
+            <Ionicons name="checkmark" size={20} color={colors.success} />
           </View>
+          <Text style={[styles.challengeDoneLabel, { color: colors.success }]}>Получено</Text>
+        </View>
+        <Text style={[styles.challengeTitle, { color: colors.textSecondary }]} numberOfLines={2}>{title}</Text>
+        <View style={styles.challengeBottomRow}>
+          <Text style={[styles.challengeAgainText, { color: colors.textTertiary }]}>
+            Снова через {hoursUntilTomorrow} ч
+          </Text>
         </View>
       </View>
     );
@@ -1460,23 +1502,26 @@ export function HomeScreen({ navigation }: any) {
                 >
                   {renderChallengeCard({
                     id: 'quick_round',
-                    title: 'Быстрый раунд ⚡',
-                    badge: 'Новинка ⚡',
-                    icon: <Sunrise size={28} color="#FFFFFF" />,
+                    title: 'Быстрый раунд',
+                    badge: '2 минуты',
+                    icon: <Ionicons name="flash" size={18} color="#FFFFFF" />,
+                    accent: '#7C3AED',
                     onPlay: handleQuickRound,
                   })}
                   {renderChallengeCard({
                     id: 'sniper',
-                    title: 'Снайпер 🎯',
+                    title: 'Снайпер',
                     badge: '5 подряд',
-                    icon: <Ionicons name="flame-outline" size={28} color="#FFFFFF" />,
+                    icon: <Ionicons name="locate" size={18} color="#FFFFFF" />,
+                    accent: '#BE123C',
                     onPlay: handleSniperChallenge,
                   })}
                   {renderChallengeCard({
                     id: 'forgotten',
-                    title: 'Вспомни забытое 🧠',
+                    title: 'Вспомни забытое',
                     badge: '7+ дней',
-                    icon: <Ionicons name="time-outline" size={28} color="#FFFFFF" />,
+                    icon: <Ionicons name="time" size={18} color="#FFFFFF" />,
+                    accent: '#0E7490',
                     onPlay: handleForgottenChallenge,
                   })}
                 </ScrollView>
@@ -1730,7 +1775,7 @@ export function HomeScreen({ navigation }: any) {
         onOpenInvite={openInviteModal}
         onOpenEditModal={openEditModal}
         onOpenDeleteModal={openDeleteModal}
-        onOpenLeaveModal={setLeaveModalCourseId}
+        onOpenLeaveModal={openLeaveModal}
         onBackdropPress={handleDrawerBackdropPress}
         onRequestClose={handleDrawerRequestClose}
       />
@@ -2545,23 +2590,39 @@ const styles = StyleSheet.create({
   },
   challengeCard: {
     width: 136,
-    height: 200,
-    borderRadius: 24,
-    padding: 16,
+    height: 168,
+    borderRadius: 22,
+    padding: 14,
+    justifyContent: 'space-between',
+  },
+  challengeCardPressed: {
+    opacity: 0.9,
+    transform: [{ scale: 0.97 }],
+  },
+  challengeTopRow: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  challengeIconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   challengeTitle: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '800',
     color: '#FFFFFF',
-    textAlign: 'center',
-    lineHeight: 17,
+    lineHeight: 19,
+    letterSpacing: -0.2,
   },
   challengeBadge: {
     backgroundColor: 'rgba(255,255,255,0.2)',
     paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingVertical: 3,
     borderRadius: 999,
   },
   challengeBadgeText: {
@@ -2569,56 +2630,44 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
-  challengeProgressContainer: {
+  challengeBottomRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 32,
   },
-  challengeRingWrapper: {
-    width: 64,
-    height: 64,
+  challengeReward: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  challengeIconOverlay: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  challengeProgressText: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#FFFFFF',
-    marginTop: 4,
-  },
-  challengeCardClaimed: {
-    backgroundColor: '#9CA3AF',
-    opacity: 0.7,
-  },
-  challengeBadgeClaimed: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.18)',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
     borderRadius: 999,
   },
-  challengeBadgeTextClaimed: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.7)',
+  challengeRewardText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  challengePlay: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   challengeCardCompleted: {
     backgroundColor: '#059669',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.3)',
   },
-  challengeBadgeCompleted: {
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 999,
-  },
-  challengeBadgeTextCompleted: {
-    fontSize: 10,
+  challengeDoneLabel: {
+    fontSize: 12,
     fontWeight: '700',
-    color: '#FFFFFF',
+  },
+  challengeAgainText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   challengeClaimButton: {
     flexDirection: 'row',
@@ -2626,8 +2675,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 4,
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    minHeight: 34,
     borderRadius: 999,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -2636,9 +2684,9 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   challengeClaimText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
-    color: '#7C3AED',
+    color: '#059669',
   },
   allChallengesButtonContainer: {
     paddingHorizontal: spacing.m,
