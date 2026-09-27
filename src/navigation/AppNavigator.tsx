@@ -72,6 +72,7 @@ import { TeacherStudentsScreen } from '@/screens/TeacherStudentsScreen';
 import { StudentDetailScreen } from '@/screens/StudentDetailScreen';
 import { ExamLobbyScreen } from '@/screens/ExamLobbyScreen';
 import { TestHistoryScreen } from '@/screens/TestHistoryScreen';
+import { CourseLeaderboardScreen } from '@/screens/CourseLeaderboardScreen';
 import { OralTestLobbyScreen } from '@/screens/OralTestLobbyScreen';
 import { OralTestSessionScreen } from '@/screens/OralTestSessionScreen';
 import { OralTestResultsScreen } from '@/screens/OralTestResultsScreen';
@@ -95,7 +96,7 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 function MainTabs() {
   const colors = useThemeColors();
   const isTeacher = useSettingsStore((s) => s.isTeacher);
-  const tabBarPaddingBottom = Platform.OS === 'android' ? 15 : 0;
+  const tabBarPaddingBottom = Platform.OS === 'android' ? 20 : 5;
   const tabBarHeight = 46 + tabBarPaddingBottom;
 
   // Синхронизируем CSS-переменную --app-bg с текущей темой (для ios-pwa-fix.css)
@@ -156,7 +157,7 @@ function MainTabs() {
       <Tab.Screen
         name="TestTab"
         options={{
-          tabBarIcon: ({ color, focused }) => <BounceIcon name="clipboard" color={color} focused={focused} />,
+          tabBarIcon: ({ color, focused }) => <BounceIcon name="qr-code" color={color} focused={focused} />,
           // Подключение к тесту по коду — только для учеников
           ...(isTeacher ? { tabBarButton: () => null, tabBarItemStyle: { display: 'none' } } : null),
         }}
@@ -419,6 +420,11 @@ export function AppNavigator() {
         <Stack.Screen
           name="TestHistory"
           component={TestHistoryScreen}
+          options={{ headerShown: false, gestureEnabled: true }}
+        />
+        <Stack.Screen
+          name="CourseLeaderboard"
+          component={CourseLeaderboardScreen}
           options={{ headerShown: false, gestureEnabled: true }}
         />
         <Stack.Screen

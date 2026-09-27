@@ -1,26 +1,24 @@
 /**
  * SRS (Spaced Repetition System) Service
- * @description Упрощенная система интервальных повторений
- * 
- * Логика:
- * 1. Не знаю (1) - сброс learningStep на 0, nextReview НЕ меняется
- * 2. Сомневаюсь (2) - ничего не меняется
- * 3. Почти (3) - learningStep +1, nextReview обновляется
- * 4. Уверенно (4) - learningStep +2, nextReview обновляется
+ * @description Интервальные повторения. Уровень карточки считает сервер (api/progress.js) —
+ * здесь та же логика только для мгновенного отклика интерфейса; после ответа сервера
+ * состояние карточки заменяется серверным. При изменении правил менять оба места.
+ *
+ * Правила (plan/course_rating_and_review_plan.md, §1.2):
+ * - шаг растёт только когда пришло время повторения (или карточка новая), на 1 за ответ;
+ * - правильный ответ раньше срока ничего не меняет;
+ * - ошибка — шаг −1 и сразу к повторению; «Не знаю» — шаг 0; «Сомневаюсь» — шаг тот же, сразу к повторению;
+ * - слово просрочено дольше интервала своего шага («угасает») — сначала шаг −1 (план §3.3).
  */
-import type { Card, Rating, ReviewResult, CardStatus } from '@/types';
+import type { Card, Rating, CardStatus } from '@/types';
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
+/** Повторение «вовремя», если до срока осталось не больше 6 часов */
+const DUE_GRACE_MS = 6 * 60 * 60 * 1000;
 
 /**
  * Интервалы повторения в днях в зависимости от learningStep
- * step 0: сегодня (не выучено)
- * step 1: 1 день
- * step 2: 3 дня
- * step 3: 7 дней
- * step 4: 14 дней
- * step 5: 30 дней
- * step 6+: 60 дней
+ * step 0: сегодня, 1: 1 день, 2: 3 дня, 3: 7 дней, 4: 14 дней, 5: 30 дней, 6+: 60 дней
  */
 const INTERVALS = [0, 1, 3, 7, 14, 30, 60];
 
@@ -33,53 +31,68 @@ function getIntervalForStep(step: number): number {
 /**
  * Определяет статус карточки на основе learningStep
  */
-function getStatusForStep(step: number): CardStatus {
+export function getStatusForStep(step: number): CardStatus {
   if (step === 0) return 'new';
   if (step <= 2) return 'learning';
   if (step <= 4) return 'young';
   return 'mature';
 }
 
+/** Выученная карточка — «знаю» и выше (шаг ≥ 3). Одно определение для наборов, статистики и рейтинга. */
+export const LEARNED_STEP = 3;
+
+export function isCardLearned(card: Pick<Card, 'learningStep'>): boolean {
+  return (card.learningStep || 0) >= LEARNED_STEP;
+}
+
+/** Режимы, в которых ответ меняет уровень: тест и «Собери слово» проверяет сервер, карточки — самооценка */
+export type AnswerMode = 'test' | 'builder' | 'flashcard';
+
+/** Пришло ли время повторения карточки */
+export function isCardDue(card: Pick<Card, 'learningStep' | 'nextReviewDate'>, now: number = Date.now()): boolean {
+  return (card.learningStep || 0) === 0 || card.nextReviewDate <= now + DUE_GRACE_MS;
+}
+
 /**
- * Рассчитывает следующую дату повторения и обновляет параметры карточки
+ * Новое состояние карточки после ответа (зеркало applyAnswer в api/progress.js).
  */
-export function calculateNextReview(card: Card, rating: Rating): ReviewResult {
-  const now = Date.now();
-  let newLearningStep = card.learningStep || 0;
-  let nextReviewDate: number;
+/**
+ * Слово «угасает»: не повторяли дольше интервала его шага (зеркало isFading в api/progress.js).
+ * При следующем ответе такое слово сначала теряет шаг.
+ */
+export function isCardFading(card: Pick<Card, 'learningStep' | 'nextReviewDate'>, now: number = Date.now()): boolean {
+  const step = card.learningStep || 0;
+  return step >= 1 && now - card.nextReviewDate > getIntervalForStep(step) * DAY_IN_MS;
+}
 
-  switch (rating) {
-    case 1: // Не знаю - сброс на 0, nextReview удаляется
-      newLearningStep = 0;
-      nextReviewDate = 0; // Удаляем дату повторения
-      break;
+/** Слово ждёт повторения: уже изучалось (шаг ≥ 1) и время повторения пришло */
+export function isCardWaitingReview(card: Pick<Card, 'learningStep' | 'nextReviewDate'>, now: number = Date.now()): boolean {
+  return (card.learningStep || 0) >= 1 && card.nextReviewDate <= now + DUE_GRACE_MS;
+}
 
-    case 2: // Сомневаюсь - nextReview удаляется
-      nextReviewDate = 0; // Удаляем дату повторения
-      break;
+export function applyAnswer(
+  card: Pick<Card, 'learningStep' | 'nextReviewDate'>,
+  answer: { mode: AnswerMode; correct: boolean; selfRating?: Rating },
+  answeredAt: number = Date.now(),
+): Pick<Card, 'learningStep' | 'nextReviewDate' | 'lastReviewDate' | 'status'> {
+  const fading = isCardFading(card, answeredAt);
+  let step = fading ? (card.learningStep || 0) - 1 : card.learningStep || 0;
+  let nextReviewDate = card.nextReviewDate;
 
-    case 3: // Почти - step +1, обновляем nextReview
-      newLearningStep = newLearningStep + 1;
-      const intervalGood = getIntervalForStep(newLearningStep);
-      nextReviewDate = now + (intervalGood * DAY_IN_MS);
-      break;
-
-    case 4: // Уверенно - step +2, обновляем nextReview
-      newLearningStep = newLearningStep + 2;
-      const intervalEasy = getIntervalForStep(newLearningStep);
-      nextReviewDate = now + (intervalEasy * DAY_IN_MS);
-      break;
+  if (answer.mode === 'flashcard' && answer.selfRating === 1) {
+    step = 0;
+    nextReviewDate = answeredAt;
+  } else if (answer.mode === 'flashcard' && answer.selfRating === 2) {
+    nextReviewDate = answeredAt;
+  } else if (!answer.correct) {
+    step = Math.max(0, step - 1);
+    nextReviewDate = answeredAt;
+  } else if (isCardDue(card, answeredAt)) {
+    step = step + 1;
+    nextReviewDate = answeredAt + getIntervalForStep(step) * DAY_IN_MS;
   }
 
-  const newStatus = getStatusForStep(newLearningStep);
-
-  return {
-    cardId: card.id,
-    rating,
-    nextReviewDate,
-    newStatus,
-    newLearningStep,
-  };
+  return { learningStep: step, nextReviewDate, lastReviewDate: answeredAt, status: getStatusForStep(step) };
 }
 
 /**
@@ -177,16 +190,12 @@ function pluralize(n: number, one: string, few: string, many: string): string {
  */
 export function getExpectedIntervals(card: Card): Record<Rating, string> {
   const currentStep = card.learningStep || 0;
-  
-  // Не знаю (1) - сброс, показываем текущий интервал
-  // Сомневаюсь (2) - без изменений
-  // Почти (3) - +1 шаг
-  // Уверенно (4) - +2 шага
-  
+  // Раньше срока правильный ответ уровень не меняет
+  const next = isCardDue(card) ? formatInterval(getIntervalForStep(currentStep + 1)) : '—';
   return {
     1: 'сброс',
     2: '—',
-    3: formatInterval(getIntervalForStep(currentStep + 1)),
-    4: formatInterval(getIntervalForStep(currentStep + 2)),
+    3: next,
+    4: next,
   };
 }

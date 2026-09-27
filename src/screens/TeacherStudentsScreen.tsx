@@ -44,6 +44,8 @@ interface Student {
   lastActivity: string;
   lastActivityColor: string;
   todayCards: number;
+  /** Слова курса, которым пришло время повторения */
+  waitingReviews: number;
 }
 
 type FilterKey = 'all' | 'active' | 'away3d' | 'away7d';
@@ -172,6 +174,13 @@ function StudentRow({ student, colors, isDark, onPress, onRemove }: {
               </Text>
             </View>
           )}
+          {student.waitingReviews > 0 && (
+            <View style={[styles.cardsBadge, { backgroundColor: isDark ? 'rgba(245,158,11,0.14)' : '#FFFBEB' }]}>
+              <Text style={[styles.cardsBadgeText, { color: '#B45309' }]}>
+                {student.waitingReviews} ждут повторения
+              </Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -288,6 +297,7 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
                 lastActivity: activity.text,
                 lastActivityColor: activity.color,
                 todayCards: m.todayCards,
+                waitingReviews: m.waitingReviews,
               };
             }),
           );
@@ -349,6 +359,23 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
 
     return list;
   }, [query, activeFilter, students]);
+
+  // «Напомнить повторить» (план §3.8): пуш ученикам с просроченными словами, всему классу — раз в сутки
+  const [reminding, setReminding] = useState(false);
+  const studentsWaiting = students.filter((st) => st.waitingReviews > 0).length;
+  const handleRemindAll = useCallback(async () => {
+    if (reminding) return;
+    setReminding(true);
+    const result = await NeonService.remindCourseReview(route.params.courseId);
+    setReminding(false);
+    if (result === 'rate_limited') {
+      Alert.alert('Уже напомнили', 'Классу можно напоминать не чаще раза в сутки.');
+    } else if (!result) {
+      Alert.alert('Не получилось', 'Проверь соединение и попробуй ещё раз.');
+    } else {
+      Alert.alert('Напоминание отправлено', `Ученикам с уведомлениями: ${result.sent} из ${result.students}.`);
+    }
+  }, [reminding, route.params.courseId]);
 
   const handleRemoveStudent = useCallback(async (student: Student) => {
     const confirmed = Platform.OS === 'web'
@@ -565,6 +592,22 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
         <FlatList
           data={filtered}
           keyExtractor={(item) => item.id}
+          ListHeaderComponent={
+            studentsWaiting > 0 ? (
+              <View style={[styles.remindBanner, { backgroundColor: isDark ? 'rgba(245,158,11,0.12)' : '#FFFBEB' }]}>
+                <Text style={[styles.remindText, { color: colors.textPrimary }]}>
+                  У {studentsWaiting} {studentsWaiting === 1 ? 'ученика' : 'учеников'} есть слова к повторению
+                </Text>
+                <Pressable
+                  onPress={handleRemindAll}
+                  disabled={reminding}
+                  style={[styles.remindBtn, { backgroundColor: colors.primary, opacity: reminding ? 0.6 : 1 }]}
+                >
+                  <Text style={styles.remindBtnText}>Напомнить</Text>
+                </Pressable>
+              </View>
+            ) : null
+          }
           renderItem={({ item }) => (
             <StudentRow
               student={item}
@@ -842,6 +885,32 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.m,
   },
   retryBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  remindBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+  },
+  remindText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  remindBtn: {
+    minHeight: 44,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    justifyContent: 'center',
+  },
+  remindBtnText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',

@@ -84,7 +84,7 @@ export function isSetInCourse(cardSet: CardSet, courseId: string): boolean {
 }
 
 const LOCAL_USER_ID = 'local'; // Для локального хранения
-const REMOTE_USER_ID = process.env.POSTGRES_DEFAULT_USER_ID || '00000000-0000-0000-0000-000000000001';
+const REMOTE_USER_ID = '00000000-0000-0000-0000-000000000001'; // метка владельца до входа; на сервере владелец — из токена
 
 export const useSetsStore = create<SetsState & SetsActions>()(
   immer((set, get) => ({

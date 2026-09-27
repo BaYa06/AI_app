@@ -126,6 +126,8 @@ export type RootStackParamList = {
   };
   ExamLobby: { courseId: string; courseTitle: string };
   TestHistory: { courseId: string; courseTitle: string };
+  /** Рейтинг курса за неделю (week: 'previous' — сразу итоги прошлой недели) */
+  CourseLeaderboard: { courseId: string; courseTitle?: string; week?: 'current' | 'previous' };
   OralTestLobby: { courseId: string; courseTitle: string };
   OralTestSession: {
     courseId: string;

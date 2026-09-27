@@ -1,5 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import { getAuthedUserId } from './_auth.js';
+import { courseSetIdsSql } from './_course.js';
+import { sendNotification } from './push.js';
 import crypto from 'crypto';
 
 /**
@@ -28,26 +30,9 @@ import crypto from 'crypto';
  * GET  /api/teacher?action=course-set-stats      ?courseId=
  * GET  /api/teacher?action=set-hard-cards        ?setId=&courseId=
  * GET  /api/teacher?action=course-sets-by-membership ?courseId= (ученик — курс, в котором состоит)
+ * POST /api/teacher?action=remind-review       { courseId, studentId? } — пуш «повтори слова»
+ *                                               (всему классу — не чаще раза в сутки)
  */
-
-/**
- * id наборов курса для статистики: собственные наборы курса (card_sets.course_id) + официальные
- * наборы юнитов книг (каталог книг), которые учитель хоть раз открывал в этом курсе. Закрытый
- * после прохождения юнит остаётся в статистике. Вкладывается в другие запросы (композиция
- * шаблонов @neondatabase/serverless 1.x).
- */
-function courseSetIdsSql(sql, courseId) {
-  return sql`
-    SELECT id FROM card_sets WHERE course_id = ${courseId}::uuid
-    UNION
-    SELECT ocs.id
-    FROM course_units cu
-    JOIN book_units u ON u.id = cu.unit_id
-    JOIN course_books cb ON cb.course_id = cu.course_id AND cb.book_id = u.book_id
-    JOIN card_sets ocs ON ocs.unit_id = u.id AND ocs.is_official = true
-    WHERE cu.course_id = ${courseId}::uuid AND cu.opened_at IS NOT NULL
-  `;
-}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -82,6 +67,7 @@ export default async function handler(req, res) {
     if (action === 'student-stats')       return await studentStats(req, res, sql, userId);
     if (action === 'toggle-set-hidden')   return await toggleSetHidden(req, res, sql, userId);
     if (action === 'check-owner')         return await checkOwner(req, res, sql, userId);
+    if (action === 'remind-review')       return await remindReview(req, res, sql, userId);
     if (action === 'course-activity-chart')      return await courseActivityChart(req, res, sql, userId);
     if (action === 'course-set-stats')           return await courseSetStats(req, res, sql, userId);
     if (action === 'set-hard-cards')             return await setHardCards(req, res, sql, userId);
@@ -413,7 +399,12 @@ async function listMembers(req, res, sql, userId) {
           ) t
           WHERE grp = 0
         ), 0)
-      ) AS current_streak
+      ) AS current_streak,
+      (
+        SELECT COUNT(*)::int FROM card_progress cp JOIN cards c ON c.id = cp.card_id
+        WHERE cp.user_id = cm.user_id AND cp.learning_step >= 1 AND cp.next_review <= NOW()
+          AND c.set_id IN (${courseSetIdsSql(sql, courseId)})
+      ) AS waiting_reviews
     FROM course_members cm
     JOIN users u ON u.id = cm.user_id
     LEFT JOIN user_stats us ON us.user_id = cm.user_id
@@ -422,7 +413,7 @@ async function listMembers(req, res, sql, userId) {
         r.user_id,
         MAX(r.reviewed_at)::date AS last_active_date,
         COUNT(DISTINCT CASE WHEN r.reviewed_at::date = CURRENT_DATE THEN r.card_id END) AS today_cards
-      FROM reviews r
+      FROM review_log r
       JOIN cards c ON c.id = r.card_id
       WHERE c.set_id IN (${courseSetIdsSql(sql, courseId)})
       GROUP BY r.user_id
@@ -443,6 +434,8 @@ async function listMembers(req, res, sql, userId) {
     lastActiveDate: row.last_active_date,
     todayCards: Number(row.today_cards) || 0,
     joinedAt: row.joined_at,
+    // Слова курса, которым пришло время повторения (план §3.8)
+    waitingReviews: Number(row.waiting_reviews) || 0,
   }));
   return res.status(200).json({ ok: true, members, hasMore });
 }
@@ -472,7 +465,7 @@ async function studentStats(req, res, sql, userId) {
         COUNT(DISTINCT cp.card_id) FILTER (WHERE cp.learning_step >= 3) AS cards_learned
       FROM cards c
       INNER JOIN course_sets cs ON cs.id = c.set_id
-      LEFT JOIN reviews r ON r.card_id = c.id AND r.user_id = ${studentId}::uuid
+      LEFT JOIN review_log r ON r.card_id = c.id AND r.user_id = ${studentId}::uuid
       LEFT JOIN card_progress cp ON cp.card_id = c.id AND cp.user_id = ${studentId}::uuid
       GROUP BY c.set_id
     )
@@ -517,7 +510,7 @@ async function studentStats(req, res, sql, userId) {
           WHERE grp = 0
         ), 0)
       ) AS current_streak,
-      (SELECT MAX(reviewed_at)::date FROM reviews WHERE user_id = ${studentId}::uuid) AS last_active_date
+      (SELECT MAX(reviewed_at)::date FROM review_log WHERE user_id = ${studentId}::uuid) AS last_active_date
   `;
 
   return res.status(200).json({
@@ -578,7 +571,7 @@ async function courseActivityChart(req, res, sql, userId) {
     SELECT
       r.reviewed_at::date::text AS date,
       COUNT(DISTINCT r.user_id) AS count
-    FROM reviews r
+    FROM review_log r
     JOIN cards c ON c.id = r.card_id
     WHERE c.set_id IN (${courseSetIdsSql(sql, courseId)})
       AND r.user_id IN (
@@ -630,7 +623,7 @@ async function courseSetStats(req, res, sql, userId) {
     ),
     set_started AS (
       SELECT c.set_id, COUNT(DISTINCT r.user_id) AS started
-      FROM reviews r
+      FROM review_log r
       JOIN cards c ON c.id = r.card_id
       WHERE r.user_id IN (SELECT user_id FROM course_student_ids)
         AND c.set_id IN (SELECT id FROM course_sets)
@@ -713,7 +706,7 @@ async function setHardCards(req, res, sql, userId) {
       c.back,
       COUNT(r.id) AS attempts
     FROM cards c
-    JOIN reviews r ON r.card_id = c.id
+    JOIN review_log r ON r.card_id = c.id
     WHERE c.set_id = ${setId}::uuid
       AND r.user_id IN (
         SELECT user_id FROM course_members WHERE course_id = ${courseId}::uuid
@@ -792,4 +785,43 @@ async function courseSetsByMembership(req, res, sql, userId) {
       unitNumber: row.unit_number ?? null,
     })),
   });
+}
+
+/**
+ * Учитель просит повторить слова (план §3.8): пуш ученикам курса, у которых есть слова курса
+ * к повторению. Всему классу — не чаще раза в сутки; одному ученику — в любой момент.
+ */
+async function remindReview(req, res, sql, userId) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const { courseId, studentId = null } = req.body || {};
+  if (!courseId) return res.status(400).json({ error: 'courseId required' });
+
+  const course = await sql`
+    SELECT c.id, COALESCE(u.display_name, u.user_name) AS teacher, c.last_review_reminder_at > NOW() - INTERVAL '20 hours' AS recent
+    FROM courses c JOIN users u ON u.id = c.user_id
+    WHERE c.id = ${courseId}::uuid AND c.user_id = ${userId}::uuid
+  `;
+  if (course.length === 0) return res.status(403).json({ error: 'Not the owner' });
+  if (!studentId && course[0].recent) {
+    return res.status(429).json({ error: 'Already reminded today', reason: 'rate_limited' });
+  }
+
+  const students = await sql`
+    SELECT cm.user_id, COUNT(cp.card_id)::int AS waiting
+    FROM course_members cm
+    JOIN card_progress cp ON cp.user_id = cm.user_id AND cp.learning_step >= 1 AND cp.next_review <= NOW()
+    JOIN cards c ON c.id = cp.card_id AND c.set_id IN (${courseSetIdsSql(sql, courseId)})
+    WHERE cm.course_id = ${courseId}::uuid AND cm.role = 'student'
+      AND (${studentId}::uuid IS NULL OR cm.user_id = ${studentId}::uuid)
+    GROUP BY cm.user_id
+  `;
+  let sent = 0;
+  for (const s of students) {
+    const result = await sendNotification(sql, s.user_id, 'teacher_review', { teacher: course[0].teacher, count: s.waiting });
+    if (result.ok) sent++;
+  }
+  if (!studentId) {
+    await sql`UPDATE courses SET last_review_reminder_at = NOW() WHERE id = ${courseId}::uuid`;
+  }
+  return res.status(200).json({ ok: true, students: students.length, sent });
 }

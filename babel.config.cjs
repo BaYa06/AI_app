@@ -4,16 +4,13 @@ module.exports = {
     [
       'babel-plugin-transform-inline-environment-variables',
       {
+        // Никаких строк подключения к БД и серверных секретов: всё, что здесь перечислено,
+        // попадает в сборку приложения открытым текстом. Данные — только через /api.
         include: [
           'SUPABASE_URL',
           'SUPABASE_ANON_KEY',
           'SUPABASE_REDIRECT_URI',
           'SUPABASE_WEB_REDIRECT_URI',
-          'POSTGRES_URL',
-          'POSTGRES_DEFAULT_USER_ID',
-          'EXPO_PUBLIC_POSTGRES_URL',
-          'REACT_APP_POSTGRES_URL',
-          'NEXT_PUBLIC_POSTGRES_URL',
           'FIREBASE_API_KEY',
           'FIREBASE_AUTH_DOMAIN',
           'FIREBASE_PROJECT_ID',

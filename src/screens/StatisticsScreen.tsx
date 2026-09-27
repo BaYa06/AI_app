@@ -2,6 +2,7 @@
  * Statistics Screen
  * @description Full statistics page with hero card, goals, heatmap, charts, achievements
  */
+import { isCardLearned } from '@/services/SRSService';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
@@ -198,16 +199,15 @@ export function StatisticsScreen({ navigation }: any) {
   }));
 
   const cardStats = useMemo(() => {
-    const now = Date.now();
     let newCount = 0;
     let learningCount = 0;
     let masteredCount = 0;
 
     const cards = Object.values(allCards);
     for (const card of cards) {
-      if (card.status === 'new') {
+      if ((card.learningStep || 0) === 0) {
         newCount++;
-      } else if (card.nextReviewDate > now) {
+      } else if (isCardLearned(card)) {
         masteredCount++;
       } else {
         learningCount++;

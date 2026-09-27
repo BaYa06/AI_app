@@ -23,6 +23,10 @@ export interface UserStats {
   total_words_learned: number;
   total_minutes_learned: number;
   total_cards_studied: number;
+  /** Заморозок серии в запасе (покупаются за алмазы, спасают один пропущенный день) */
+  streak_freezes: number;
+  /** Сегодня заморозка спасла серию */
+  freeze_used: boolean;
 }
 
 export interface WeekDayStatus {
@@ -99,8 +103,6 @@ function getYesterdayKey(timezone: string = getDeviceTimezone()): string {
 
 // ==================== ОСНОВНЫЕ ФУНКЦИИ ====================
 
-const MIN_CARDS_FOR_STREAK = 10; // Минимум карточек для продления стрика
-
 /**
  * Записать активность за сессию
  * Вызывать при завершении изучения карточек
@@ -149,21 +151,16 @@ export async function recordActivity(params: RecordActivityParams): Promise<bool
       return false;
     }
 
-    // 2. Проверка минимального порога карточек для стрика
-    if (cardsDelta < MIN_CARDS_FOR_STREAK) {
-      console.log(`ℹ️ Streak: недостаточно карточек для стрика (${cardsDelta}/${MIN_CARDS_FOR_STREAK}), активность записана без обновления стрика`);
-      return false;
-    }
-
-    // 3. Обновляем user_stats (стрик)
-    await updateUserStats(userId, localDate, yesterdayDate, {
+    // 2. Серия: засчитывается ли день, решает сервер — по журналу ответов (повторение слов, которым
+    //    пришло время; план §3.5). true — день засчитан.
+    const counted = await updateUserStats(userId, localDate, yesterdayDate, {
       wordsDelta,
       minutesDelta,
       cardsDelta,
     });
 
-    console.log('✅ Streak: активность записана успешно');
-    return true;
+    console.log(counted ? '✅ Streak: день засчитан' : 'ℹ️ Streak: активность записана, день в серию пока не засчитан');
+    return counted;
   } catch (error) {
     console.error('❌ Streak: ошибка при записи активности:', error);
     return false;

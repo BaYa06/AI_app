@@ -2,6 +2,7 @@
  * Set Detail Screen
  * @description Экран детали набора карточек
  */
+import { isCardLearned, isCardWaitingReview } from '@/services/SRSService';
 import React, { useCallback, useMemo, useState, useRef, useEffect } from 'react';
 import { shallow } from 'zustand/shallow';
 import { View, FlatList, StyleSheet, Pressable, TextInput, ScrollView, ActivityIndicator, Platform, Alert, KeyboardAvoidingView, Modal, Dimensions } from 'react-native';
@@ -9,7 +10,7 @@ import { triggerHaptic } from '@/utils/haptic';
 import { BlurView } from '@/utils/BlurView';
 import DocumentPicker from 'react-native-document-picker';
 import { launchImageLibrary } from 'react-native-image-picker';
-import { useSetsStore, useCardsStore, useThemeColors, selectSetStats, useSettingsStore } from '@/store';
+import { useSetsStore, useCardsStore, useThemeColors, selectSetStats, useSettingsStore, useCoursesStore, isSetInCourse } from '@/store';
 import { Container, Text, ProgressBar, Loading, Button } from '@/components/common';
 import { StudyModeSheet, type StudyMode } from '@/components/study/StudyModeSheet';
 import { spacing, borderRadius } from '@/constants';
@@ -122,13 +123,12 @@ export function SetDetailScreen({ navigation, route }: Props) {
     const getFront = (card: Card) => card.frontText ?? (card as any).front ?? '';
     const getBack = (card: Card) => card.backText ?? (card as any).back ?? '';
     const query = search.trim().toLowerCase();
-    const now = Date.now();
 
     return cards
       .filter((card) => {
-        // mastered = nextReview > сейчас (выученные)
-        if (filter === 'mastered') return card.nextReviewDate > now;
-        if (filter === 'unmastered') return card.nextReviewDate <= now;
+        // выученные = уровень «знаю» и выше (шаг ≥ 3)
+        if (filter === 'mastered') return isCardLearned(card);
+        if (filter === 'unmastered') return !isCardLearned(card);
         return true;
       })
       .filter((card) => {
@@ -810,6 +810,52 @@ export function SetDetailScreen({ navigation, route }: Props) {
     navigation.replace('SetDetail', { setId: newSetId });
   }, [navigation, setId]);
 
+  // Разминка перед уроком (план §3.4): слова из других наборов этого курса, которым пришло время
+  const activeCourseId = useCoursesStore((s) => s.activeCourseId);
+  const allCardsMap = useCardsStore((s) => s.cards);
+  const allCardsBySet = useCardsStore((s) => s.cardsBySet);
+  const warmup = useMemo(() => {
+    if (!set) return { waiting: [] as Card[], pool: [] as Card[] };
+    const courseId = activeCourseId && isSetInCourse(set, activeCourseId) ? activeCourseId : set.courseId;
+    if (!courseId) return { waiting: [] as Card[], pool: [] as Card[] };
+    const now = Date.now();
+    const waiting: Card[] = [];
+    const pool: Card[] = [];
+    for (const other of useSetsStore.getState().getAllSets()) {
+      if (other.id === set.id || !isSetInCourse(other, courseId)) continue;
+      for (const id of allCardsBySet[other.id] || []) {
+        const card = allCardsMap[id];
+        if (!card) continue;
+        pool.push(card);
+        if (isCardWaitingReview(card, now)) waiting.push(card);
+      }
+    }
+    waiting.sort((a, b) => a.nextReviewDate - b.nextReviewDate);
+    return { waiting: waiting.slice(0, 10), pool };
+  }, [set, activeCourseId, allCardsMap, allCardsBySet]);
+
+  const handleWarmup = useCallback(() => {
+    triggerHaptic('selection');
+    let queue = warmup.waiting;
+    if (queue.length === 0) return;
+    // Тесту нужно хотя бы 4 варианта ответа — добираем карточками из прошлых уроков
+    if (queue.length < 4) {
+      const taken = new Set(queue.map((c) => c.id));
+      queue = [...queue, ...warmup.pool.filter((c) => !taken.has(c.id)).slice(0, 4 - queue.length)];
+    }
+    navigation.navigate('MultipleChoice', {
+      setId: queue[0].setId,
+      cardLimit: queue.length,
+      dueCardIds: queue.map((c) => c.id),
+      questionIndex: 1,
+      totalQuestions: queue.length,
+      phaseId: `warmup_${Date.now()}`,
+      totalPhaseCards: queue.length,
+      studiedInPhase: 0,
+      phaseOffset: 0,
+    });
+  }, [navigation, warmup]);
+
   const handleSetMenu = useCallback(() => {
     if (set?.isOfficial && isTeacher) {
       handleForkOfficialSet();
@@ -871,17 +917,17 @@ export function SetDetailScreen({ navigation, route }: Props) {
               styles.statusBadge,
               {
                 backgroundColor:
-                  item.nextReviewDate > Date.now()
+                  isCardLearned(item)
                     ? 'rgba(16, 185, 129, 0.15)'
                     : 'rgba(148, 163, 184, 0.15)',
                 borderColor:
-                  item.nextReviewDate > Date.now()
+                  isCardLearned(item)
                     ? 'rgba(16, 185, 129, 0.3)'
                     : colors.border,
               },
             ]}
           >
-            {item.nextReviewDate > Date.now() ? (
+            {isCardLearned(item) ? (
               <Check size={16} color={colors.success} strokeWidth={2.5} />
             ) : (
               <Circle size={14} color={colors.textTertiary} strokeWidth={2} />
@@ -950,6 +996,23 @@ export function SetDetailScreen({ navigation, route }: Props) {
               По учебнику{set.bookTitle ? ` · ${set.bookTitle}` : ''}
             </Text>
           </View>
+        )}
+
+        {warmup.waiting.length > 0 && (
+          <Pressable
+            onPress={handleWarmup}
+            style={[styles.warmupBanner, { backgroundColor: colors.warning + '18', borderColor: colors.warning + '55' }]}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.warmupTitle, { color: colors.textPrimary }]}>
+                Разминка: {warmup.waiting.length} слов из прошлых уроков
+              </Text>
+              <Text style={[styles.warmupSubtitle, { color: colors.textSecondary }]}>
+                Повтори перед новыми словами, чтобы не забыть · ~{Math.max(1, Math.round(warmup.waiting.length / 4))} мин
+              </Text>
+            </View>
+            <Text style={[styles.warmupAction, { color: colors.warning }]}>Начать</Text>
+          </Pressable>
         )}
 
         <View style={styles.progressBlock}>
@@ -1034,7 +1097,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
         </View>
       </View>
     ),
-    [set, stats, colors, filteredCards.length, navigation, openAddCardSheet, handleSetMenu, filter, search, setId]
+    [set, stats, colors, filteredCards.length, navigation, openAddCardSheet, handleSetMenu, filter, search, setId, warmup, handleWarmup]
   );
 
   // Пустой список
@@ -1883,6 +1946,30 @@ const styles = StyleSheet.create({
   topTitle: {
     flex: 1,
     textAlign: 'center',
+    fontWeight: '700',
+  },
+  warmupBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: 16,
+    marginTop: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    minHeight: 44,
+  },
+  warmupTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  warmupSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  warmupAction: {
+    fontSize: 15,
     fontWeight: '700',
   },
   officialBadge: {

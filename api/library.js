@@ -17,12 +17,17 @@ import { getAuthedUserId } from './_auth.js';
  * POST /api/library?action=rate             – rate a set
  * POST /api/library?action=report           – report a set
  * POST /api/library?action=import           – import a set { librarySetId, courseId? } (JWT; курс — только свой)
+ * GET  /api/library?action=cards&id=xxx      – все карточки опубликованного набора
+ *
+ * userId — только из Supabase JWT: мутации и «мои» запросы требуют токен, в списке/деталях
+ * токен необязателен (без него флаги is_imported/is_liked = false).
  */
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isUuid = (v) => typeof v === 'string' && UUID_RE.test(v);
 
 const MUTATION_ACTIONS = new Set(['like', 'rate', 'report', 'import', 'publish']);
+const OWN_READ_ACTIONS = new Set(['my-publications', 'check-published']);
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -34,15 +39,24 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const { action, id, userId } = req.query;
+  const { action, id } = req.query;
 
-  // Мутации требуют Supabase JWT: userId берётся из токена, а не из тела запроса,
-  // иначе любой мог бы лайкать/импортировать/публиковать от имени другого пользователя.
-  if (MUTATION_ACTIONS.has(action)) {
-    const authedUserId = await getAuthedUserId(req);
-    if (!authedUserId) return res.status(401).json({ error: 'Unauthorized' });
-    req.body = { ...(req.body || {}), userId: authedUserId };
+  // userId никогда не берётся из запроса — только из Supabase JWT, иначе любой мог бы
+  // лайкать/импортировать/публиковать от имени другого пользователя или смотреть его публикации.
+  const authedUserId = await getAuthedUserId(req);
+  if ((MUTATION_ACTIONS.has(action) || OWN_READ_ACTIONS.has(action)) && !authedUserId) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
+  req.body = { ...(req.body || {}), userId: authedUserId };
+  req.query = { ...req.query, userId: authedUserId || undefined };
+  const userId = authedUserId;
+  for (const key of ['librarySetId', 'setId']) {
+    const value = req.body[key] ?? req.query[key];
+    if (value !== undefined && value !== null && !isUuid(value)) {
+      return res.status(400).json({ error: `${key} must be a uuid` });
+    }
+  }
+  if (id !== undefined && !isUuid(id)) return res.status(400).json({ error: 'id must be a uuid' });
 
   const sql = neon(process.env.POSTGRES_URL);
   await ensureDatabaseInitialized(sql);
@@ -55,6 +69,7 @@ export default async function handler(req, res) {
     if (action === 'rate')            return await rateSet(req, res, sql);
     if (action === 'report')          return await reportSet(req, res, sql);
     if (action === 'import')          return await importSet(req, res, sql);
+    if (action === 'cards')           return await getLibraryCards(req, res, sql, id);
     if (action === 'publish') {
       switch (req.method) {
         case 'POST':   return await publishSet(req, res, sql);
@@ -91,6 +106,7 @@ async function getLibrarySets(req, res, sql) {
     page = '1',
     limit = '20',
     userId,
+    curatedOnly,
   } = req.query;
 
   const pageNum = parseInt(page, 10);
@@ -101,6 +117,10 @@ async function getLibrarySets(req, res, sql) {
   const conditions = [`ls.status = 'published'`];
   const params = [];
   let paramIndex = 1;
+
+  if (curatedOnly === 'true') {
+    conditions.push(`ls.is_featured = true`);
+  }
 
   if (search) {
     if (search.startsWith('@')) {
@@ -134,13 +154,13 @@ async function getLibrarySets(req, res, sql) {
   }
 
   if (cardsMin) {
-    conditions.push(`ls.cards_count >= $${paramIndex}`);
+    conditions.push(`(SELECT COUNT(*) FROM library_cards lc WHERE lc.library_set_id = ls.id) >= $${paramIndex}`);
     params.push(parseInt(cardsMin, 10));
     paramIndex++;
   }
 
   if (cardsMax) {
-    conditions.push(`ls.cards_count <= $${paramIndex}`);
+    conditions.push(`(SELECT COUNT(*) FROM library_cards lc WHERE lc.library_set_id = ls.id) <= $${paramIndex}`);
     params.push(parseInt(cardsMax, 10));
     paramIndex++;
   }
@@ -191,7 +211,8 @@ async function getLibrarySets(req, res, sql) {
   const query = `
     SELECT ls.*,
       COALESCE(u.user_name, u.email) AS author_name,
-      CASE WHEN ls.rating_count > 0 THEN ROUND(ls.rating_sum::numeric / ls.rating_count, 1) ELSE NULL END AS average_rating
+      CASE WHEN ls.rating_count > 0 THEN ROUND(ls.rating_sum::numeric / ls.rating_count, 1) ELSE NULL END AS average_rating,
+      (SELECT COUNT(*) FROM library_cards lc WHERE lc.library_set_id = ls.id)::int AS cards_count
       ${importedSelect}
     FROM library_sets ls
     LEFT JOIN users u ON u.id = ls.user_id
@@ -200,7 +221,7 @@ async function getLibrarySets(req, res, sql) {
     LIMIT ${limitParam} OFFSET ${offsetParam}
   `;
 
-  const rows = await sql(query, params);
+  const rows = await sql.query(query, params);
 
   const has_more = rows.length > limitNum;
   const sets = has_more ? rows.slice(0, limitNum) : rows;
@@ -225,10 +246,11 @@ async function getSetDetail(req, res, sql, id, userId) {
     importedSelect = `, false AS is_imported, false AS is_liked, NULL::smallint AS user_rating`;
   }
 
-  const setRows = await sql(`
+  const setRows = await sql.query(`
     SELECT ls.*,
       COALESCE(u.user_name, u.email) AS author_name,
-      CASE WHEN ls.rating_count > 0 THEN ROUND(ls.rating_sum::numeric / ls.rating_count, 1) ELSE NULL END AS average_rating
+      CASE WHEN ls.rating_count > 0 THEN ROUND(ls.rating_sum::numeric / ls.rating_count, 1) ELSE NULL END AS average_rating,
+      (SELECT COUNT(*) FROM library_cards lc WHERE lc.library_set_id = ls.id)::int AS cards_count
       ${importedSelect}
     FROM library_sets ls
     LEFT JOIN users u ON u.id = ls.user_id
@@ -240,7 +262,7 @@ async function getSetDetail(req, res, sql, id, userId) {
   }
 
   // Get preview cards (first 10)
-  const cards = await sql(`
+  const cards = await sql.query(`
     SELECT * FROM library_cards
     WHERE library_set_id = $1
     ORDER BY order_index ASC
@@ -249,6 +271,21 @@ async function getSetDetail(req, res, sql, id, userId) {
 
   const detail = { ...setRows[0], preview_cards: cards };
   return res.status(200).json(detail);
+}
+
+// ── action=cards ─────────────────────────────────────────────────────────────
+// Все карточки опубликованного набора (гостевой импорт на устройство).
+async function getLibraryCards(req, res, sql, id) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  if (!id) return res.status(400).json({ error: 'id is required' });
+  const cards = await sql`
+    SELECT lc.front, lc.back, lc.hint
+    FROM library_cards lc
+    JOIN library_sets ls ON ls.id = lc.library_set_id AND ls.status = 'published'
+    WHERE lc.library_set_id = ${id}::uuid
+    ORDER BY lc.order_index ASC
+  `;
+  return res.status(200).json(cards);
 }
 
 // ── action=my-publications ────────────────────────────────────────────────────
@@ -262,7 +299,8 @@ async function getMyPublications(req, res, sql) {
       CASE WHEN ls.rating_count > 0
         THEN ROUND(ls.rating_sum::numeric / ls.rating_count, 1)
         ELSE NULL
-      END AS average_rating
+      END AS average_rating,
+      (SELECT COUNT(*) FROM library_cards lc WHERE lc.library_set_id = ls.id)::int AS cards_count
     FROM library_sets ls
     WHERE ls.user_id = ${userId} AND ls.status IN ('published', 'archived')
     ORDER BY ls.published_at DESC
@@ -320,7 +358,7 @@ async function rateSet(req, res, sql) {
   if (!userId || !librarySetId || !rating) return res.status(400).json({ error: 'userId, librarySetId, and rating are required' });
 
   const ratingNum = parseInt(rating, 10);
-  if (ratingNum < 1 || ratingNum > 5) return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+  if (!(ratingNum >= 1 && ratingNum <= 5)) return res.status(400).json({ error: 'Rating must be between 1 and 5' });
 
   const existing = await sql`
     SELECT id, rating FROM library_ratings
@@ -431,7 +469,7 @@ async function publishSet(req, res, sql) {
   if (cards.length > 0) {
     const placeholders = cards.map((_, i) => `($${i * 5 + 1}, $${i * 5 + 2}, $${i * 5 + 3}, $${i * 5 + 4}, $${i * 5 + 5})`).join(', ');
     const params = cards.flatMap((card, i) => [librarySetId, card.front, card.back, card.example || null, i]);
-    await sql(`INSERT INTO library_cards (library_set_id, front, back, hint, order_index) VALUES ${placeholders}`, params);
+    await sql.query(`INSERT INTO library_cards (library_set_id, front, back, hint, order_index) VALUES ${placeholders}`, params);
   }
 
   return res.status(201).json({ librarySetId });
@@ -461,7 +499,7 @@ async function updatePublication(req, res, sql) {
   if (cards.length > 0) {
     const placeholders = cards.map((_, i) => `($${i * 5 + 1}, $${i * 5 + 2}, $${i * 5 + 3}, $${i * 5 + 4}, $${i * 5 + 5})`).join(', ');
     const params = cards.flatMap((card, i) => [librarySetId, card.front, card.back, card.example || null, i]);
-    await sql(`INSERT INTO library_cards (library_set_id, front, back, hint, order_index) VALUES ${placeholders}`, params);
+    await sql.query(`INSERT INTO library_cards (library_set_id, front, back, hint, order_index) VALUES ${placeholders}`, params);
   }
 
   // Update metadata from original set

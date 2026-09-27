@@ -8,8 +8,11 @@ import { createClient } from '@supabase/supabase-js';
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://yiwsmjbeirgomkrckoju.supabase.co';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
 
-/** Достаёт userId из Supabase JWT в заголовке Authorization. Возвращает null, если токен отсутствует/невалиден. */
-export async function getAuthedUserId(req) {
+/**
+ * Достаёт пользователя Supabase из JWT в заголовке Authorization.
+ * Возвращает null, если токен отсутствует/невалиден.
+ */
+export async function getAuthedUser(req) {
   const header = req.headers.authorization || req.headers.Authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (!token || !SUPABASE_ANON_KEY) return null;
@@ -17,8 +20,14 @@ export async function getAuthedUserId(req) {
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const { data, error } = await supabase.auth.getUser(token);
     if (error || !data?.user) return null;
-    return data.user.id;
+    return data.user;
   } catch {
     return null;
   }
+}
+
+/** Достаёт userId из Supabase JWT в заголовке Authorization. Возвращает null, если токен отсутствует/невалиден. */
+export async function getAuthedUserId(req) {
+  const user = await getAuthedUser(req);
+  return user ? user.id : null;
 }

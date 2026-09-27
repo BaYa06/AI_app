@@ -5,13 +5,11 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { v4 as uuid } from 'uuid';
+import { getStatusForStep, isCardLearned } from '@/services/SRSService';
 import type { Card, CreateCardInput, UpdateCardInput } from '@/types';
 import { NeonService } from '@/services/NeonService';
 import { DatabaseService } from '@/services/DatabaseService';
 import { SyncQueueService } from '@/services/SyncQueueService';
-
-// Lazy import для useSetsStore чтобы избежать циклических зависимостей
-const getSetsStore = () => require('./setsStore').useSetsStore;
 
 // ==================== SYNC QUEUE EXECUTORS ====================
 
@@ -29,9 +27,38 @@ SyncQueueService.registerExecutor('updateCard', (p) => {
 SyncQueueService.registerExecutor('deleteCard', (p) =>
   NeonService.deleteCard(p as string));
 
-SyncQueueService.registerExecutor('updateCardSRS', (p) => {
-  const { cardId, srsData } = p as { cardId: string; srsData: Record<string, unknown> };
-  return NeonService.updateCardSRS(cardId, srsData);
+// Старые задачи из очереди (до серверного SRS): уровень больше не пишется клиентом — просто выбрасываем
+SyncQueueService.registerExecutor('updateCardSRS', async () => true);
+
+export type SubmitAnswerPayload = {
+  answerId: string;
+  cardId: string;
+  mode: 'test' | 'builder' | 'flashcard';
+  chosen?: string;
+  selfRating?: number;
+  answeredAt: number;
+  timeSpentMs?: number;
+};
+
+// Ответ ученика → api/progress.js; сервер считает уровень, мы выравниваем локальную карточку по нему
+SyncQueueService.registerExecutor('submitAnswer', async (p) => {
+  const answer = p as SubmitAnswerPayload;
+  const results = await NeonService.submitAnswers([answer]);
+  if (results === null) return false; // нет сети/сессии — повторим позже
+  const result = results[0];
+  if (result && result.learningStep !== null && result.nextReview !== null) {
+    const card = useCardsStore.getState().cards[answer.cardId];
+    // Если по карточке уже есть более новый локальный ответ — его состояние придёт со следующей задачей
+    if (card && card.lastReviewDate <= answer.answeredAt) {
+      useCardsStore.getState().updateCardSRS(answer.cardId, {
+        learningStep: result.learningStep,
+        nextReviewDate: result.nextReview,
+        lastReviewDate: result.lastReviewed ?? answer.answeredAt,
+        status: getStatusForStep(result.learningStep),
+      });
+    }
+  }
+  return true;
 });
 
 interface CardsState {
@@ -224,18 +251,8 @@ export const useCardsStore = create<CardsState & CardsActions>()(
         }
       });
 
-      // Не синкаем SRS в таблицу cards для read-only наборов — они пишутся в card_progress
-      const card = get().cards[cardId];
-      if (card) {
-        const setsStore = getSetsStore();
-        const cardSet = setsStore.getState().getSet(card.setId);
-        if (cardSet?.isReadOnly) return;
-      }
-
-      // Синхронизируем SRS с базой (через очередь с retry)
-      if (NeonService.isEnabled()) {
-        SyncQueueService.enqueue('updateCardSRS', { cardId, srsData });
-      }
+      // Только локально: на сервер уходит сам ответ (ProgressService.recordAnswer),
+      // уровень карточки в базе считает и пишет сервер (api/progress.js)
     },
 
     resetCardProgress: (cardId) => {
@@ -317,27 +334,22 @@ export const useCardsStore = create<CardsState & CardsActions>()(
 // ==================== МЕМОИЗИРОВАННЫЕ СЕЛЕКТОРЫ ====================
 
 /**
- * Селектор для получения количества карточек по статусам для набора
- * Упрощенная логика: выученной считается карточка с nextReview > сейчас
+ * Селектор для получения количества карточек по статусам для набора.
+ * Выученная — уровень «знаю» и выше (шаг ≥ 3); к повторению — время повторения пришло.
  */
 export const selectSetStats = (setId: string) => {
   const state = useCardsStore.getState();
   const cardIds = state.cardsBySet[setId] || [];
-  
-  let learnedCount = 0;   // Выученные (nextReview > сейчас)
+
+  let learnedCount = 0;   // Выученные (шаг ≥ 3)
   let dueCount = 0;       // К повторению (nextReview <= сейчас)
   const now = Date.now();
 
   for (const id of cardIds) {
     const card = state.cards[id];
     if (!card) continue;
-
-    // Простая логика: только время повторения
-    if (card.nextReviewDate > now) {
-      learnedCount++;  // Выучено - повторение в будущем
-    } else {
-      dueCount++;      // Нужно повторить
-    }
+    if (isCardLearned(card)) learnedCount++;
+    if (card.nextReviewDate <= now) dueCount++;
   }
 
   const total = cardIds.length;

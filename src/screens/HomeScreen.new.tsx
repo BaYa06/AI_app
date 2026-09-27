@@ -9,6 +9,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSetsStore, useSettingsStore, useThemeColors, useCardsStore, useCoursesStore, useDiamondStore, useChallengeStore, isSetInCourse } from '@/store';
+import type { ChallengeId } from '@/store';
 import { selectSetStats } from '@/store/cardsStore';
 import { Text, DiamondReward } from '@/components/common';
 import type { DiamondRewardRef } from '@/components/common';
@@ -40,16 +41,20 @@ import {
   Timer,
   ArrowUpDown,
   Check,
+  RotateCcw,
+  ChevronRight,
 } from 'lucide-react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Svg, { Circle as SvgCircle } from 'react-native-svg';
 import { StreakService, getLocalDateKey } from '@/services/StreakService';
 import { supabase } from '@/services/supabaseClient';
-import { NeonService } from '@/services/NeonService';
+import { NeonService, type CourseLeaderboard } from '@/services/NeonService';
+import { leaderboardSeenKey, type LeaderboardSeen } from '@/screens/CourseLeaderboardScreen';
 import { DatabaseService } from '@/services/DatabaseService';
 import { JoinByCodeModal } from '@/components/JoinByCodeModal';
 import type { DailyActivity } from '@/services/StreakService';
-import type { CardSet } from '@/types';
+import type { Card, CardSet } from '@/types';
+import { isCardWaitingReview, isCardFading } from '@/services/SRSService';
 import { StorageService, STORAGE_KEYS } from '@/services/StorageService';
 
 const StaggerCard = React.memo(function StaggerCard({
@@ -110,6 +115,27 @@ const SETS_COMPARATORS: Record<SetsSortKey, (a: CardSet, b: CardSet) => number> 
   size: (a, b) => (b.cardCount || 0) - (a.cardCount || 0) || byRecent(a, b),
 };
 
+/**
+ * Карточки для мини-игры (план §3.2): сначала слова, которым пришло время повторения — самые
+ * просроченные первыми, потом случайные. Порядок в игре перемешан.
+ */
+function pickCardsForGame(cards: Card[], count: number): Card[] {
+  const now = Date.now();
+  const shuffle = <T,>(arr: T[]): T[] => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+  const waiting = cards
+    .filter((c) => isCardWaitingReview(c, now))
+    .sort((a, b) => a.nextReviewDate - b.nextReviewDate);
+  const rest = shuffle(cards.filter((c) => !isCardWaitingReview(c, now)));
+  return shuffle([...waiting, ...rest].slice(0, count));
+}
+
 export function HomeScreen({ navigation }: any) {
   const colors = useThemeColors();
   const resolvedTheme = useSettingsStore((s) => s.resolvedTheme);
@@ -142,6 +168,9 @@ export function HomeScreen({ navigation }: any) {
   const drawerWidth = useMemo(() => Math.min(windowWidth * 0.8, 320), [windowWidth]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [streakModalVisible, setStreakModalVisible] = useState(false);
+  // Заморозки серии в запасе (план §3.5); null — ещё не загружено
+  const [streakFreezes, setStreakFreezes] = useState<number | null>(null);
+  const [buyingFreeze, setBuyingFreeze] = useState(false);
   const [todayBackendCards, setTodayBackendCards] = useState<number | null>(null);
   const [weekActivity, setWeekActivity] = useState<DailyActivity[]>([]);
   const syncStreakFromServer = useSettingsStore((s) => s.syncStreakFromServer);
@@ -176,12 +205,16 @@ export function HomeScreen({ navigation }: any) {
   // Diamond reward animation
   const diamondRewardRef = useRef<DiamondRewardRef>(null);
   const diamondIconRef = useRef<View>(null);
-  const claimBtnRef = useRef<View>(null);
+  const claimBtnRefs = useRef<Partial<Record<ChallengeId, View | null>>>({});
   const [diamondTargetPos, setDiamondTargetPos] = useState<{ x: number; y: number } | null>(null);
   const diamonds = useDiamondStore((s) => s.diamonds);
-  const addDiamonds = useDiamondStore((s) => s.addDiamonds);
-  const quickRoundStatus = useChallengeStore((s) => s.quickRoundStatus);
-  const claimQuickRound = useChallengeStore((s) => s.claimQuickRound);
+  const loadRewards = useDiamondStore((s) => s.loadRewards);
+  const claimReward = useDiamondStore((s) => s.claimReward);
+  const setDiamonds = useDiamondStore((s) => s.setDiamonds);
+  const pendingDiamondsRef = useRef<number | null>(null);
+  const [claimingReward, setClaimingReward] = useState(false);
+  const challengeStatuses = useChallengeStore((s) => s.statuses);
+  const claimChallenge = useChallengeStore((s) => s.claimChallenge);
   const diamondCountScale = useSharedValue(1);
   const diamondCountAnimStyle = useAnimatedStyle(() => {
     'worklet';
@@ -205,14 +238,7 @@ export function HomeScreen({ navigation }: any) {
       return;
     }
 
-    // Fisher-Yates shuffle
-    const shuffled = [...allCards];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-
-    const selected = shuffled.slice(0, 10);
+    const selected = pickCardsForGame(allCards, 10);
     const dueCardIds = selected.map((c) => c.id);
 
     navigation.navigate('MultipleChoice', {
@@ -224,15 +250,47 @@ export function HomeScreen({ navigation }: any) {
     });
   }, [navigation]);
 
-  const handleQuickRoundClaim = useCallback(() => {
-    if (!claimBtnRef.current) return;
-    claimBtnRef.current.measureInWindow((x, y, w, h) => {
+  const handleChallengeClaim = useCallback(async (id: ChallengeId) => {
+    if (!claimBtnRefs.current[id] || claimingReward) return;
+    setClaimingReward(true);
+    // Сначала сервер: он начисляет алмазы и не даёт забрать награду второй раз за день
+    const balance = await claimReward(id);
+    setClaimingReward(false);
+    if (balance === null) {
+      Alert.alert('Нет соединения', 'Не удалось получить награду. Попробуй ещё раз.');
+      return;
+    }
+    pendingDiamondsRef.current = balance;
+    claimBtnRefs.current[id]?.measureInWindow((x, y, w, h) => {
       diamondRewardRef.current?.collect({ x: x + w / 2, y: y + h / 2 });
     });
     setTimeout(() => {
-      claimQuickRound();
+      claimChallenge(id);
     }, 900);
-  }, [claimQuickRound]);
+  }, [claimReward, claimingReward, claimChallenge]);
+
+  const STREAK_FREEZE_PRICE = 50;
+  const MAX_STREAK_FREEZES = 2;
+  const handleBuyStreakFreeze = useCallback(async () => {
+    if (buyingFreeze) return;
+    setBuyingFreeze(true);
+    const result = await NeonService.buyStreakFreeze();
+    setBuyingFreeze(false);
+    if (!result) {
+      Alert.alert('Нет соединения', 'Попробуй ещё раз.');
+    } else if ('error' in result) {
+      Alert.alert(
+        result.error === 'max_freezes' ? 'Уже максимум' : 'Не хватает алмазов',
+        result.error === 'max_freezes'
+          ? `В запасе может быть не больше ${MAX_STREAK_FREEZES} заморозок.`
+          : `Заморозка стоит ${STREAK_FREEZE_PRICE} алмазов — их дают за мини-игры.`,
+      );
+    } else {
+      triggerHaptic('notificationSuccess');
+      setDiamonds(result.diamonds);
+      setStreakFreezes(result.streakFreezes);
+    }
+  }, [buyingFreeze, setDiamonds]);
 
   const handleSniperChallenge = useCallback(() => {
     triggerHaptic('selection');
@@ -249,13 +307,7 @@ export function HomeScreen({ navigation }: any) {
       return;
     }
 
-    const shuffled = [...allCards];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-
-    const selected = shuffled.slice(0, 5);
+    const selected = pickCardsForGame(allCards, 5);
     navigation.navigate('MultipleChoice', {
       setId: firstSetId,
       cardLimit: selected.length,
@@ -292,13 +344,8 @@ export function HomeScreen({ navigation }: any) {
       return;
     }
 
-    const shuffled = [...forgottenCards];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-
-    const selected = shuffled.slice(0, 3);
+    // Раунд — до 10 забытых карточек (сначала те, что ждут повторения); награда только если все правильные
+    const selected = pickCardsForGame(forgottenCards, 10);
     navigation.navigate('MultipleChoice', {
       setId: firstSetId,
       cardLimit: selected.length,
@@ -309,7 +356,10 @@ export function HomeScreen({ navigation }: any) {
   }, [navigation]);
 
   const handleDiamondRewardComplete = useCallback(() => {
-    addDiamonds(10);
+    if (pendingDiamondsRef.current !== null) {
+      setDiamonds(pendingDiamondsRef.current);
+      pendingDiamondsRef.current = null;
+    }
     diamondCountScale.value = withSequence(
       withTiming(1.3, { duration: 150, easing: Easing.out(Easing.back(2)) }),
       withTiming(1, { duration: 150, easing: Easing.inOut(Easing.quad) }),
@@ -385,8 +435,10 @@ export function HomeScreen({ navigation }: any) {
     useCallback(() => {
       if (currentUserId) {
         fetchIsTeacher(currentUserId);
+        // Баланс алмазов и забранные сегодня челленджи — из БД
+        loadRewards();
       }
-    }, [currentUserId, fetchIsTeacher])
+    }, [currentUserId, fetchIsTeacher, loadRewards])
   );
 
   const SWIPE_THRESHOLD = 50;
@@ -421,6 +473,7 @@ export function HomeScreen({ navigation }: any) {
                 longestStreak: stats.longest_streak,
                 lastActiveDate: stats.last_active_date,
               });
+              setStreakFreezes(stats.streak_freezes);
             }
           }
         })
@@ -444,10 +497,6 @@ export function HomeScreen({ navigation }: any) {
   // Sets store
   const allSets = useSetsStore((s) => s.getAllSets());
   const courseOrder = useMemo(() => [null, ...courses.map((c) => c.id)], [courses]);
-  const totalMastered = useMemo(
-    () => allSets.reduce((sum, set) => sum + (set.masteredCount || 0), 0),
-    [allSets]
-  );
   const todayStats = useSettingsStore((s) => s.todayStats);
   const DAILY_GOAL = 10;
   const dailyGoal = DAILY_GOAL;
@@ -507,6 +556,131 @@ export function HomeScreen({ navigation }: any) {
     return allSets.filter((set) => isSetInCourse(set, activeCourseId));
   }, [allSets, activeCourseId]);
 
+  // Слова к повторению в текущем курсе (план §3.1, §3.3): ждут, угасают, будут завтра
+  const cardsMap = useCardsStore((s) => s.cards);
+  const cardsBySet = useCardsStore((s) => s.cardsBySet);
+  const reviewStats = useMemo(() => {
+    const now = Date.now();
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const waiting: Card[] = [];
+    const all: Card[] = [];
+    const waitingBySet: Record<string, number> = {};
+    let fading = 0;
+    let tomorrow = 0;
+    for (const set of filteredSets) {
+      for (const id of cardsBySet[set.id] || []) {
+        const card = cardsMap[id];
+        if (!card) continue;
+        all.push(card);
+        if (isCardWaitingReview(card, now)) {
+          waiting.push(card);
+          waitingBySet[set.id] = (waitingBySet[set.id] || 0) + 1;
+          if (isCardFading(card, now)) fading++;
+        } else if ((card.learningStep || 0) >= 1 && card.nextReviewDate <= now + DAY_MS) {
+          tomorrow++;
+        }
+      }
+    }
+    // Сначала самые просроченные
+    waiting.sort((a, b) => a.nextReviewDate - b.nextReviewDate);
+    return { waiting, all, waitingBySet, fading, tomorrow };
+  }, [filteredSets, cardsBySet, cardsMap]);
+
+  // «Повторение дня» (план §3.1): слова курса, которым пришло время, самые просроченные первыми
+  const DAILY_REVIEW_MAX = 30;
+  const handleDailyReview = useCallback(() => {
+    triggerHaptic('selection');
+    let queue = reviewStats.waiting.slice(0, DAILY_REVIEW_MAX);
+    if (queue.length === 0) return;
+    // Тесту нужно хотя бы 4 варианта ответа — добираем карточками курса (ответ раньше срока уровень не меняет)
+    if (queue.length < 4) {
+      const taken = new Set(queue.map((c) => c.id));
+      queue = [...queue, ...pickCardsForGame(reviewStats.all.filter((c) => !taken.has(c.id)), 4 - queue.length)];
+    }
+    const total = queue.length;
+    const rootNav = navigation?.getParent?.() ?? navigation;
+    rootNav?.navigate('MultipleChoice', {
+      setId: queue[0].setId,
+      cardLimit: total,
+      dueCardIds: queue.map((c) => c.id),
+      questionIndex: 1,
+      totalQuestions: total,
+      phaseId: `review_${Date.now()}`,
+      totalPhaseCards: total,
+      studiedInPhase: 0,
+      phaseOffset: 0,
+    });
+  }, [navigation, reviewStats]);
+
+  // Тизер рейтинга курса (план, этап 4): маленькая кнопка между мини-играми и «Повторением дня»
+  const [leaderboard, setLeaderboard] = useState<CourseLeaderboard | null>(null);
+  const [lastWeekBoard, setLastWeekBoard] = useState<CourseLeaderboard | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      if (!activeCourseId || isTeacher !== false) {
+        setLeaderboard(null);
+        setLastWeekBoard(null);
+        return;
+      }
+      let active = true;
+      const isMonday = new Date().getDay() === 1;
+      Promise.all([
+        NeonService.loadLeaderboard(activeCourseId, 'current'),
+        isMonday ? NeonService.loadLeaderboard(activeCourseId, 'previous') : Promise.resolve(null),
+      ]).then(([current, previous]) => {
+        if (!active) return;
+        setLeaderboard(current);
+        setLastWeekBoard(previous);
+      });
+      return () => { active = false; };
+    }, [activeCourseId, isTeacher]),
+  );
+
+  const ratingTeaser = useMemo(() => {
+    if (!activeCourseId || !leaderboard || !('rows' in leaderboard) || !leaderboard.enabled || !leaderboard.me) return null;
+    const seen = StorageService.getObject<LeaderboardSeen>(leaderboardSeenKey(activeCourseId)) || {};
+    const word = (n: number) => {
+      const m10 = n % 10, m100 = n % 100;
+      if (m100 >= 11 && m100 <= 19) return 'очков';
+      if (m10 === 1) return 'очко';
+      if (m10 >= 2 && m10 <= 4) return 'очка';
+      return 'очков';
+    };
+    // Понедельник: итоги прошлой недели, ещё не просмотренные
+    if (lastWeekBoard && 'rows' in lastWeekBoard && lastWeekBoard.frozen && lastWeekBoard.me?.place
+        && seen.resultsWeekStart !== lastWeekBoard.weekStart) {
+      const mine = lastWeekBoard.rows.find((r) => r.isMe);
+      return {
+        badge: `#${lastWeekBoard.me.place}`,
+        title: 'Итоги недели готовы',
+        hint: mine && mine.reward > 0 ? `Твоя награда: +${mine.reward} алмазов` : 'Посмотри, кто победил',
+        dot: true,
+        week: 'previous' as const,
+      };
+    }
+    const me = leaderboard.me;
+    if (me.hidden) return { badge: '—', title: 'Рейтинг недели', hint: 'Ты скрыт из рейтинга', dot: false, week: 'current' as const };
+    if (me.points === 0 || me.place === null) {
+      return { badge: '?', title: 'Узнай своё место', hint: 'Первые очки — за повторение слов', dot: false, week: 'current' as const };
+    }
+    const lastPlace = seen.weekStart === leaderboard.weekStart ? seen.place ?? null : null;
+    if (lastPlace && me.place > lastPlace) {
+      return { badge: `#${me.place}`, title: 'Тебя обогнали', hint: `Было #${lastPlace} — верни место`, dot: true, week: 'current' as const };
+    }
+    if (lastPlace && me.place < lastPlace) {
+      return { badge: `#${me.place}`, title: `Ты поднялся на ${me.place}-е место`, hint: me.gapToNext != null ? `До ${me.place - 1}-го — ${me.gapToNext} ${word(me.gapToNext)}` : 'Так держать!', dot: true, week: 'current' as const };
+    }
+    if (me.place === 1) return { badge: '#1', title: 'Ты лидер недели', hint: 'Удержишь до воскресенья?', dot: false, week: 'current' as const };
+    return {
+      badge: `#${me.place}`,
+      title: me.gapToNext != null ? `До ${me.place - 1}-го места — ${me.gapToNext} ${word(me.gapToNext)}` : 'Рейтинг недели',
+      hint: 'Повторяй слова вовремя — это +2 за каждое',
+      dot: false,
+      week: 'current' as const,
+    };
+  }, [activeCourseId, leaderboard, lastWeekBoard]);
+
+
   // Поиск и сортировка по текущему списку наборов
   const visibleSets = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -527,6 +701,13 @@ export function HomeScreen({ navigation }: any) {
     const course = courses.find((c) => c.id === activeCourseId);
     return course?.title || 'this course';
   }, [activeCourseId, courses]);
+
+  const openLeaderboard = useCallback((week: 'current' | 'previous') => {
+    if (!activeCourseId) return;
+    triggerHaptic('selection');
+    const rootNav = navigation?.getParent?.() ?? navigation;
+    rootNav?.navigate('CourseLeaderboard', { courseId: activeCourseId, courseTitle: activeCourseTitle ?? undefined, week });
+  }, [activeCourseId, activeCourseTitle, navigation]);
 
   const switchCourseByStep = useCallback(
     (step: number) => {
@@ -1038,6 +1219,84 @@ export function HomeScreen({ navigation }: any) {
     </View>
   );
 
+  // Карточка ежедневного челленджа: играть → "Забрать" 10 алмазов → "Получено" до завтра
+  const renderChallengeCard = ({ id, title, badge, icon, onPlay }: {
+    id: ChallengeId;
+    title: string;
+    badge: string;
+    icon: React.ReactNode;
+    onPlay: () => void;
+  }) => {
+    const status = challengeStatuses[id];
+    if (status === 'pending') {
+      return (
+        <Pressable key={id} style={[styles.challengeCard, { backgroundColor: '#7C3AED' }]} onPress={onPlay}>
+          <Text style={styles.challengeTitle}>{title}</Text>
+          <View style={styles.challengeBadge}>
+            <Text style={styles.challengeBadgeText}>{badge}</Text>
+          </View>
+          <View style={styles.challengeProgressContainer}>
+            <View style={styles.challengeRingWrapper}>
+              <Svg width={64} height={64} style={{ transform: [{ rotate: '-90deg' }] }}>
+                <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.2)" strokeWidth={4} fill="transparent" />
+                <SvgCircle cx={32} cy={32} r={28} stroke="#FFFFFF" strokeWidth={4} fill="transparent" strokeDasharray={175.9} strokeDashoffset={175.9} strokeLinecap="round" />
+              </Svg>
+              <View style={styles.challengeIconOverlay}>{icon}</View>
+            </View>
+            <Text style={styles.challengeProgressText}>+10 💎</Text>
+          </View>
+        </Pressable>
+      );
+    }
+    if (status === 'completed') {
+      return (
+        <View key={id} style={[styles.challengeCard, styles.challengeCardCompleted]}>
+          <Text style={styles.challengeTitle}>{title}</Text>
+          <View style={styles.challengeBadgeCompleted}>
+            <Text style={styles.challengeBadgeTextCompleted}>Выполнено ✓</Text>
+          </View>
+          <View style={styles.challengeProgressContainer}>
+            <View style={styles.challengeRingWrapper}>
+              <Svg width={64} height={64} style={{ transform: [{ rotate: '-90deg' }] }}>
+                <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.15)" strokeWidth={4} fill="transparent" />
+                <SvgCircle cx={32} cy={32} r={28} stroke="#FFFFFF" strokeWidth={4} fill="transparent" strokeDasharray={175.9} strokeDashoffset={0} strokeLinecap="round" />
+              </Svg>
+              <View style={styles.challengeIconOverlay}>
+                <Ionicons name="checkmark-circle" size={32} color="#FFFFFF" />
+              </View>
+            </View>
+          </View>
+          <Pressable
+            ref={(el) => { claimBtnRefs.current[id] = el; }}
+            style={styles.challengeClaimButton}
+            onPress={() => handleChallengeClaim(id)}
+          >
+            <Text style={styles.challengeClaimText}>Забрать</Text>
+          </Pressable>
+        </View>
+      );
+    }
+    return (
+      <View key={id} style={[styles.challengeCard, styles.challengeCardClaimed]}>
+        <Text style={[styles.challengeTitle, { opacity: 0.5 }]}>{title}</Text>
+        <View style={styles.challengeBadgeClaimed}>
+          <Text style={styles.challengeBadgeTextClaimed}>Получено ✓</Text>
+        </View>
+        <View style={styles.challengeProgressContainer}>
+          <View style={styles.challengeRingWrapper}>
+            <Svg width={64} height={64} style={{ transform: [{ rotate: '-90deg' }] }}>
+              <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.1)" strokeWidth={4} fill="transparent" />
+              <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.35)" strokeWidth={4} fill="transparent" strokeDasharray={175.9} strokeDashoffset={0} strokeLinecap="round" />
+            </Svg>
+            <View style={styles.challengeIconOverlay}>
+              <Ionicons name="checkmark-circle" size={32} color="rgba(255,255,255,0.4)" />
+            </View>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
   return (
     <GestureDetector gesture={rootGesture}>
       <View
@@ -1080,7 +1339,7 @@ export function HomeScreen({ navigation }: any) {
               <Ionicons name="diamond" size={24} color={isDarkMode ? '#A5B4FC' : '#4F46E5'} />
               <ReanimatedAnimated.View style={diamondCountAnimStyle}>
                 <Text style={[styles.badgeText, { color: isDarkMode ? '#E0E7FF' : '#312E81' }]}>
-                  {totalMastered + diamonds}
+                  {diamonds}
                 </Text>
               </ReanimatedAnimated.View>
             </View>
@@ -1199,110 +1458,81 @@ export function HomeScreen({ navigation }: any) {
                   snapToInterval={136 + 12}
                   decelerationRate="fast"
                 >
-                  {/* Challenge 1 — Быстрый раунд */}
-                  {quickRoundStatus === 'pending' ? (
-                    <Pressable style={[styles.challengeCard, { backgroundColor: '#7C3AED' }]} onPress={handleQuickRound}>
-                      <Text style={styles.challengeTitle}>Быстрый раунд ⚡</Text>
-                      <View style={styles.challengeBadge}>
-                        <Text style={styles.challengeBadgeText}>Новинка ⚡</Text>
-                      </View>
-                      <View style={styles.challengeProgressContainer}>
-                        <View style={styles.challengeRingWrapper}>
-                          <Svg width={64} height={64} style={{ transform: [{ rotate: '-90deg' }] }}>
-                            <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.2)" strokeWidth={4} fill="transparent" />
-                            <SvgCircle cx={32} cy={32} r={28} stroke="#FFFFFF" strokeWidth={4} fill="transparent" strokeDasharray={175.9} strokeDashoffset={175.9} strokeLinecap="round" />
-                          </Svg>
-                          <View style={styles.challengeIconOverlay}>
-                            <Sunrise size={28} color="#FFFFFF" />
-                          </View>
-                        </View>
-                        <Text style={styles.challengeProgressText}>0 из 3</Text>
-                      </View>
-                    </Pressable>
-                  ) : quickRoundStatus === 'completed' ? (
-                    <View style={[styles.challengeCard, styles.challengeCardCompleted]}>
-                      <Text style={styles.challengeTitle}>Быстрый раунд ⚡</Text>
-                      <View style={styles.challengeBadgeCompleted}>
-                        <Text style={styles.challengeBadgeTextCompleted}>Выполнено ✓</Text>
-                      </View>
-                      <View style={styles.challengeProgressContainer}>
-                        <View style={styles.challengeRingWrapper}>
-                          <Svg width={64} height={64} style={{ transform: [{ rotate: '-90deg' }] }}>
-                            <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.15)" strokeWidth={4} fill="transparent" />
-                            <SvgCircle cx={32} cy={32} r={28} stroke="#FFFFFF" strokeWidth={4} fill="transparent" strokeDasharray={175.9} strokeDashoffset={0} strokeLinecap="round" />
-                          </Svg>
-                          <View style={styles.challengeIconOverlay}>
-                            <Ionicons name="checkmark-circle" size={32} color="#FFFFFF" />
-                          </View>
-                        </View>
-                      </View>
-                      <Pressable ref={claimBtnRef} style={styles.challengeClaimButton} onPress={handleQuickRoundClaim}>
-                        <Text style={styles.challengeClaimText}>Забрать</Text>
-                      </Pressable>
-                    </View>
-                  ) : (
-                    <View style={[styles.challengeCard, styles.challengeCardClaimed]}>
-                      <Text style={[styles.challengeTitle, { opacity: 0.5 }]}>Быстрый раунд ⚡</Text>
-                      <View style={styles.challengeBadgeClaimed}>
-                        <Text style={styles.challengeBadgeTextClaimed}>Получено ✓</Text>
-                      </View>
-                      <View style={styles.challengeProgressContainer}>
-                        <View style={styles.challengeRingWrapper}>
-                          <Svg width={64} height={64} style={{ transform: [{ rotate: '-90deg' }] }}>
-                            <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.1)" strokeWidth={4} fill="transparent" />
-                            <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.35)" strokeWidth={4} fill="transparent" strokeDasharray={175.9} strokeDashoffset={0} strokeLinecap="round" />
-                          </Svg>
-                          <View style={styles.challengeIconOverlay}>
-                            <Ionicons name="checkmark-circle" size={32} color="rgba(255,255,255,0.4)" />
-                          </View>
-                        </View>
-                      </View>
-                    </View>
-                  )}
-
-                  {/* Challenge 2 — Снайпер */}
-                  <Pressable style={[styles.challengeCard, { backgroundColor: '#7C3AED' }]} onPress={handleSniperChallenge}>
-                    <Text style={styles.challengeTitle}>Снайпер 🎯</Text>
-                    <View style={styles.challengeBadge}>
-                      <Text style={styles.challengeBadgeText}>5 подряд</Text>
-                    </View>
-                    <View style={styles.challengeProgressContainer}>
-                      <View style={styles.challengeRingWrapper}>
-                        <Svg width={64} height={64} style={{ transform: [{ rotate: '-90deg' }] }}>
-                          <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.2)" strokeWidth={4} fill="transparent" />
-                          <SvgCircle cx={32} cy={32} r={28} stroke="#FFFFFF" strokeWidth={4} fill="transparent" strokeDasharray={175.9} strokeDashoffset={175.9} strokeLinecap="round" />
-                        </Svg>
-                        <View style={styles.challengeIconOverlay}>
-                          <Ionicons name="flame-outline" size={28} color="#FFFFFF" />
-                        </View>
-                      </View>
-                    </View>
-                  </Pressable>
-
-                  {/* Challenge 3 — Вспомни забытое */}
-                  <Pressable style={[styles.challengeCard, { backgroundColor: '#7C3AED' }]} onPress={handleForgottenChallenge}>
-                    <Text style={styles.challengeTitle}>Вспомни забытое 🧠</Text>
-                    <View style={styles.challengeBadge}>
-                      <Text style={styles.challengeBadgeText}>7+ дней</Text>
-                    </View>
-                    <View style={styles.challengeProgressContainer}>
-                      <View style={styles.challengeRingWrapper}>
-                        <Svg width={64} height={64} style={{ transform: [{ rotate: '-90deg' }] }}>
-                          <SvgCircle cx={32} cy={32} r={28} stroke="rgba(255,255,255,0.2)" strokeWidth={4} fill="transparent" />
-                          <SvgCircle cx={32} cy={32} r={28} stroke="#FFFFFF" strokeWidth={4} fill="transparent" strokeDasharray={175.9} strokeDashoffset={175.9} strokeLinecap="round" />
-                        </Svg>
-                        <View style={styles.challengeIconOverlay}>
-                          <Ionicons name="time-outline" size={28} color="#FFFFFF" />
-                        </View>
-                      </View>
-                    </View>
-                  </Pressable>
+                  {renderChallengeCard({
+                    id: 'quick_round',
+                    title: 'Быстрый раунд ⚡',
+                    badge: 'Новинка ⚡',
+                    icon: <Sunrise size={28} color="#FFFFFF" />,
+                    onPlay: handleQuickRound,
+                  })}
+                  {renderChallengeCard({
+                    id: 'sniper',
+                    title: 'Снайпер 🎯',
+                    badge: '5 подряд',
+                    icon: <Ionicons name="flame-outline" size={28} color="#FFFFFF" />,
+                    onPlay: handleSniperChallenge,
+                  })}
+                  {renderChallengeCard({
+                    id: 'forgotten',
+                    title: 'Вспомни забытое 🧠',
+                    badge: '7+ дней',
+                    icon: <Ionicons name="time-outline" size={28} color="#FFFFFF" />,
+                    onPlay: handleForgottenChallenge,
+                  })}
                 </ScrollView>
 
-                <View style={styles.allChallengesButtonContainer}>
-                  <Pressable style={styles.allChallengesButton} onPress={() => setShowStudyModeModal(true)}>
-                    <Text style={styles.allChallengesButtonText}>Учить все карточки</Text>
+                {ratingTeaser && (
+                  <Pressable
+                    onPress={() => openLeaderboard(ratingTeaser.week)}
+                    style={[styles.ratingTeaser, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                    accessibilityLabel={`${ratingTeaser.title}. ${ratingTeaser.hint}`}
+                  >
+                    <View style={styles.ratingTeaserIcon}>
+                      <Ionicons name="trophy" size={18} color="#B45309" />
+                      {ratingTeaser.dot && <View style={[styles.ratingTeaserDot, { borderColor: colors.surface }]} />}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.ratingTeaserTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                        {ratingTeaser.title}
+                      </Text>
+                      <Text style={[styles.ratingTeaserHint, { color: colors.textSecondary }]} numberOfLines={1}>
+                        {ratingTeaser.hint}
+                      </Text>
+                    </View>
+                    <Text style={[styles.ratingTeaserBadge, { color: colors.primary }]}>{ratingTeaser.badge}</Text>
+                    <ChevronRight size={18} color={colors.textTertiary} />
                   </Pressable>
+                )}
+
+                <View style={styles.allChallengesButtonContainer}>
+                  {reviewStats.waiting.length > 0 ? (
+                    <>
+                      <Pressable style={[styles.allChallengesButton, styles.dailyReviewButton]} onPress={handleDailyReview}>
+                        <Text style={styles.dailyReviewTitle}>
+                          Повторение дня · {Math.min(reviewStats.waiting.length, DAILY_REVIEW_MAX)} слов · ~{Math.max(1, Math.round(Math.min(reviewStats.waiting.length, DAILY_REVIEW_MAX) / 4))} мин
+                        </Text>
+                        {reviewStats.fading > 0 && (
+                          <Text style={styles.dailyReviewSubtitle}>
+                            {reviewStats.fading} начинают забываться
+                          </Text>
+                        )}
+                      </Pressable>
+                      <Pressable style={styles.studyAllLink} onPress={() => setShowStudyModeModal(true)}>
+                        <Text style={[styles.studyAllLinkText, { color: colors.textSecondary }]}>Учить все карточки</Text>
+                      </Pressable>
+                    </>
+                  ) : (
+                    <>
+                      {reviewStats.all.some((c) => (c.learningStep || 0) >= 1) && (
+                        <Text style={[styles.reviewDoneText, { color: colors.textSecondary }]}>
+                          Всё повторено ✓{reviewStats.tomorrow > 0 ? ` · завтра ${reviewStats.tomorrow}` : ''}
+                        </Text>
+                      )}
+                      <Pressable style={styles.allChallengesButton} onPress={() => setShowStudyModeModal(true)}>
+                        <Text style={styles.allChallengesButtonText}>Учить все карточки</Text>
+                      </Pressable>
+                    </>
+                  )}
                 </View>
               </View>
             )}
@@ -1388,6 +1618,14 @@ export function HomeScreen({ navigation }: any) {
                             <BookOpen size={12} color={colors.primary} />
                             <Text style={[styles.hiddenBadgeText, { color: colors.primary }]}>
                               По учебнику
+                            </Text>
+                          </View>
+                        )}
+                        {(reviewStats.waitingBySet[set.id] || 0) > 0 && (
+                          <View style={styles.hiddenBadge}>
+                            <RotateCcw size={12} color={colors.warning} />
+                            <Text style={[styles.hiddenBadgeText, { color: colors.warning }]}>
+                              {reviewStats.waitingBySet[set.id]} ждут повторения
                             </Text>
                           </View>
                         )}
@@ -2094,6 +2332,29 @@ export function HomeScreen({ navigation }: any) {
             <Text style={[styles.streakQuote, { color: colors.textSecondary }]}>
               {streakSupportText}
             </Text>
+
+            {streakFreezes !== null && (
+              <View style={[styles.freezeRow, { borderColor: colors.border }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.freezeTitle, { color: colors.textPrimary }]}>
+                    Заморозка серии: {streakFreezes} из {MAX_STREAK_FREEZES}
+                  </Text>
+                  <Text style={[styles.freezeHint, { color: colors.textSecondary }]}>
+                    Спасёт серию, если пропустишь один день
+                  </Text>
+                </View>
+                {streakFreezes < MAX_STREAK_FREEZES && (
+                  <Pressable
+                    onPress={handleBuyStreakFreeze}
+                    disabled={buyingFreeze}
+                    style={[styles.freezeButton, { backgroundColor: colors.primary, opacity: buyingFreeze ? 0.6 : 1 }]}
+                  >
+                    <Ionicons name="diamond" size={14} color="#FFFFFF" />
+                    <Text style={styles.freezeButtonText}>{STREAK_FREEZE_PRICE}</Text>
+                  </Pressable>
+                )}
+              </View>
+            )}
           </View>
         </View>
       </Modal>
@@ -2382,6 +2643,110 @@ const styles = StyleSheet.create({
   allChallengesButtonContainer: {
     paddingHorizontal: spacing.m,
     marginTop: spacing.l,
+  },
+  ratingTeaser: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: spacing.m,
+    marginTop: spacing.l,
+    minHeight: 56,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  ratingTeaserIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ratingTeaserDot: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#EF4444',
+    borderWidth: 2,
+  },
+  ratingTeaserTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  ratingTeaserHint: {
+    fontSize: 12,
+    marginTop: 1,
+  },
+  ratingTeaserBadge: {
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  freezeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: spacing.m,
+    paddingTop: spacing.m,
+    borderTopWidth: 1,
+  },
+  freezeTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  freezeHint: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  freezeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    minHeight: 44,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+  },
+  freezeButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  dailyReviewButton: {
+    height: undefined,
+    minHeight: 56,
+    paddingVertical: spacing.s,
+    paddingHorizontal: spacing.m,
+    flexDirection: 'column',
+  },
+  dailyReviewTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  dailyReviewSubtitle: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 13,
+    marginTop: 2,
+  },
+  studyAllLink: {
+    alignSelf: 'center',
+    paddingVertical: spacing.s,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  studyAllLinkText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  reviewDoneText: {
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: spacing.s,
   },
   allChallengesButton: {
     width: '100%',

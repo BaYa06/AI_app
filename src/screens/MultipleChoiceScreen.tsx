@@ -9,12 +9,10 @@ import { ArrowLeft, Volume2 } from 'lucide-react-native';
 import { Container, Text, ProgressBar, Loading } from '@/components/common';
 import { useCardsStore, useSetsStore, useThemeColors, useSettingsStore, selectSetStats } from '@/store';
 import { spacing, borderRadius } from '@/constants';
-import { calculateNextReview } from '@/services/SRSService';
+import { ProgressService } from '@/services/ProgressService';
 import { speak, detectLanguage } from '@/utils/speech';
 import { playCorrectSound, preloadSound } from '@/utils/sound';
 import { Analytics } from '@/services/analytics';
-import { NeonService } from '@/services/NeonService';
-import { supabase } from '@/services/supabaseClient';
 import { useChallengeStore } from '@/store';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card, Rating } from '@/types';
@@ -37,7 +35,6 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
   const set = useSetsStore((s) => s.getSet(setId));
   const updateSetStats = useSetsStore((s) => s.updateSetStats);
-  const updateCardSRS = useCardsStore((s) => s.updateCardSRS);
   const incrementTodayCards = useSettingsStore((s) => s.incrementTodayCards);
   const finishStudySession = useSettingsStore((s) => s.finishStudySession);
   
@@ -85,18 +82,12 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
   const getFront = (card: Card) => card.frontText ?? (card as any).front ?? '';
   const getBack = (card: Card) => card.backText ?? (card as any).back ?? '';
 
+  // Ответ в тесте: уровень карточки считает сервер (сверяет выбранный вариант), экран обновляется сразу
   const applySrsUpdate = React.useCallback(
-    (card: Card, rating: Rating) => {
-      const result = calculateNextReview(card, rating);
+    (card: Card, isCorrect: boolean, chosenCardId: string, timeSpentMs: number) => {
+      ProgressService.recordAnswer(card, { mode: 'test', correct: isCorrect, chosen: chosenCardId, timeSpentMs });
 
-      updateCardSRS(card.id, {
-        learningStep: result.newLearningStep,
-        nextReviewDate: result.nextReviewDate,
-        lastReviewDate: Date.now(),
-        status: result.newStatus,
-      });
-
-      if (rating >= 3) {
+      if (isCorrect) {
         incrementTodayCards();
       }
 
@@ -108,26 +99,8 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
         reviewCount: statsSnapshot.reviewCount,
         masteredCount: statsSnapshot.masteredCount,
       });
-
-      if (NeonService.isEnabled()) {
-        (async () => {
-          try {
-            const { data: sd } = await supabase.auth.getSession();
-            const uid = sd?.session?.user?.id;
-            if (uid) {
-              await NeonService.saveReview(uid, card.id, rating, 0);
-              await NeonService.upsertCardProgress(uid, card.id, {
-                status: result.newStatus,
-                learningStep: result.newLearningStep,
-                nextReview: result.nextReviewDate,
-                lastReviewed: Date.now(),
-              });
-            }
-          } catch {}
-        })();
-      }
     },
-    [updateCardSRS, updateSetStats, incrementTodayCards]
+    [updateSetStats, incrementTodayCards]
   );
 
   const shuffle = <T,>(arr: T[]): T[] => {
@@ -400,10 +373,9 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
           },
         ];
 
-    // Skip SRS in challenge mode
-    if (!challengeMode) {
-      applySrsUpdate(currentCard, rating);
-    }
+    // Ответ записывается и в мини-играх: они сначала берут слова, которым пришло время повторения,
+    // и так незаметно повторяют их (план §3.2). Повторный ответ раньше срока уровень не меняет.
+    applySrsUpdate(currentCard, isCorrect, option.id, Date.now() - cardShownAtRef.current);
     if (isCorrect) {
       triggerHaptic('notificationSuccess');
       playCorrectSound();
@@ -424,6 +396,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
         const newStreak = sniperStreak + 1;
         setSniperStreak(newStreak);
         if (newStreak >= TARGET_STREAK) {
+          useChallengeStore.getState().completeChallenge('sniper');
           timeoutRef.current = setTimeout(() => {
             setChallengeResult({ finished: true, timesUp: false });
           }, 650);
@@ -465,6 +438,10 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
       timeoutRef.current = setTimeout(() => {
         if (isLast) {
           const correctCount = totalQuestions - nextErrors;
+          // Награда только за раунд без единой ошибки
+          if (correctCount === totalQuestions) {
+            useChallengeStore.getState().completeChallenge('forgotten');
+          }
           setChallengeResult({
             finished: true,
             timesUp: false,
@@ -501,7 +478,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
         if (challengeMode) {
           // All correct — challenge won!
           if (timerRef.current) clearInterval(timerRef.current);
-          useChallengeStore.getState().completeQuickRound();
+          useChallengeStore.getState().completeChallenge('quick_round');
           setChallengeResult({
             finished: true,
             timesUp: false,
@@ -550,7 +527,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
 
   const handleClose = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
-    if (!challengeMode) finishStudySession();
+    finishStudySession();
     navigation.navigate('Main', { screen: 'Home' });
   }, [challengeMode, finishStudySession, navigation]);
 
@@ -628,6 +605,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
 
   // Forgotten mode result screen
   if (forgottenMode && challengeResult) {
+    const forgottenWon = challengeResult.correct === challengeResult.total;
     const restartForgotten = () => {
       setCurrentIndex(0);
       setErrors(0);
@@ -640,12 +618,14 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
     return (
       <Container padded={false}>
         <View style={styles.challengeResultContainer}>
-          <RNText style={styles.challengeResultEmoji}>{'\uD83E\uDDE0'}</RNText>
+          <RNText style={styles.challengeResultEmoji}>{forgottenWon ? '\uD83E\uDDE0' : '\uD83D\uDE14'}</RNText>
           <RNText style={[styles.challengeResultTitle, { color: colors.textPrimary }]}>
-            Память освежена!
+            {forgottenWon ? 'Память освежена!' : 'Почти получилось'}
           </RNText>
           <RNText style={[styles.challengeResultSubtitle, { color: colors.textSecondary }]}>
-            {`Правильно: ${challengeResult.correct} из ${challengeResult.total}`}
+            {forgottenWon
+              ? `Все ${challengeResult.total} правильно — забери награду на главной`
+              : `Правильно: ${challengeResult.correct} из ${challengeResult.total}. Для награды нужны все ответы без ошибок`}
           </RNText>
           <View style={styles.challengeResultButtons}>
             <Pressable
@@ -725,7 +705,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
           aria-label="Назад"
           onPress={() => {
             if (timerRef.current) clearInterval(timerRef.current);
-            if (!challengeMode) finishStudySession();
+            finishStudySession();
             navigation.goBack();
           }}
           style={({ pressed }) => [

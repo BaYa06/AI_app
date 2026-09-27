@@ -4,11 +4,11 @@
   "devCommand": "npm run web",
   "installCommand": "npm install",
   "framework": null,
+  "crons": [
+    { "path": "/api/progress?action=close-week", "schedule": "30 20 * * *" }
+  ],
   "functions": {
-    "api/extract-pdf.js": {
-      "maxDuration": 60
-    },
-    "api/generate-examples.js": {
+    "api/ai.js": {
       "maxDuration": 60
     },
     "api/push.js": {
@@ -116,6 +116,11 @@
     { "source": "/api/library/import",             "destination": "/api/library?action=import" },
     { "source": "/ai/:path*", "destination": "http://34.9.20.41:3001/:path*" },
     { "source": "/join/:token", "destination": "/api/join?token=:token" },
+    { "source": "/api/translate-words",           "destination": "/api/ai?fn=translate-words" },
+    { "source": "/api/generate-examples",         "destination": "/api/ai?fn=generate-examples" },
+    { "source": "/api/context",                   "destination": "/api/ai?fn=context" },
+    { "source": "/api/extract-pdf",               "destination": "/api/ai?fn=extract-pdf" },
+    { "source": "/api/extract-image",             "destination": "/api/ai?fn=extract-image" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/((?!.*\\.).*)", "destination": "/index.html" }
   ]

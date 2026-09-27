@@ -16,9 +16,7 @@ import { ProgressBar, Text, Loading } from '@/components/common';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card, Rating } from '@/types';
 import { spacing, borderRadius } from '@/constants';
-import { calculateNextReview } from '@/services/SRSService';
-import { NeonService } from '@/services/NeonService';
-import { supabase } from '@/services/supabaseClient';
+import { ProgressService } from '@/services/ProgressService';
 import { speak, detectLanguage } from '@/utils/speech';
 import { playCorrectSound2 as playCorrectSound, preloadSound } from '@/utils/sound';
 
@@ -51,7 +49,6 @@ export function WordBuilderScreen({ navigation, route }: Props) {
   } = route.params;
   const colors = useThemeColors();
   const updateSetStats = useSetsStore((s) => s.updateSetStats);
-  const updateCardSRS = useCardsStore((s) => s.updateCardSRS);
   const incrementTodayCards = useSettingsStore((s) => s.incrementTodayCards);
   const finishStudySession = useSettingsStore((s) => s.finishStudySession);
   const { ids, map } = useCardsStore(
@@ -230,18 +227,23 @@ export function WordBuilderScreen({ navigation, route }: Props) {
     [normalizeWord, targetWord],
   );
 
-  const applySrsUpdate = useCallback(
-    (card: Card, rating: Rating) => {
-      const result = calculateNextReview(card, rating);
+  // Когда показано текущее слово — для времени ответа
+  const wordShownAtRef = useRef<number>(Date.now());
+  useEffect(() => {
+    wordShownAtRef.current = Date.now();
+  }, [currentCard?.id]);
 
-      updateCardSRS(card.id, {
-        learningStep: result.newLearningStep,
-        nextReviewDate: result.nextReviewDate,
-        lastReviewDate: Date.now(),
-        status: result.newStatus,
+  // Ответ в «Собери слово»: уровень считает сервер (сверяет собранное слово), экран обновляется сразу
+  const applySrsUpdate = useCallback(
+    (card: Card, isCorrect: boolean, builtWord: string) => {
+      ProgressService.recordAnswer(card, {
+        mode: 'builder',
+        correct: isCorrect,
+        chosen: builtWord,
+        timeSpentMs: Date.now() - wordShownAtRef.current,
       });
 
-      if (rating >= 3) {
+      if (isCorrect) {
         incrementTodayCards();
       }
 
@@ -253,26 +255,8 @@ export function WordBuilderScreen({ navigation, route }: Props) {
         reviewCount: statsSnapshot.reviewCount,
         masteredCount: statsSnapshot.masteredCount,
       });
-
-      if (NeonService.isEnabled()) {
-        (async () => {
-          try {
-            const { data: sd } = await supabase.auth.getSession();
-            const uid = sd?.session?.user?.id;
-            if (uid) {
-              await NeonService.saveReview(uid, card.id, rating, 0);
-              await NeonService.upsertCardProgress(uid, card.id, {
-                status: result.newStatus,
-                learningStep: result.newLearningStep,
-                nextReview: result.nextReviewDate,
-                lastReviewed: Date.now(),
-              });
-            }
-          } catch {}
-        })();
-      }
     },
-    [updateCardSRS, updateSetStats, incrementTodayCards],
+    [updateSetStats, incrementTodayCards],
   );
 
   const finishSession = useCallback(
@@ -448,7 +432,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
           },
         ];
 
-    applySrsUpdate(currentCard, rating);
+    applySrsUpdate(currentCard, isCorrect, userWord);
 
     setErrors(nextErrors);
     setErrorCards(updatedErrorCards);

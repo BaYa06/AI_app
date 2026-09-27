@@ -6,9 +6,10 @@ import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react'
 import { View, StyleSheet, Pressable, Dimensions, Animated, Modal, Switch, AppState } from 'react-native';
 import { useCardsStore, useSetsStore, useStudyStore, useThemeColors, useSettingsStore, selectSetStats } from '@/store';
 import { Text, Loading } from '@/components/common';
-import { calculateNextReview, buildStudyQueue } from '@/services/SRSService';
+import { buildStudyQueue, isCardLearned } from '@/services/SRSService';
+import { ProgressService } from '@/services/ProgressService';
 import { spacing } from '@/constants';
-import { DatabaseService, NeonService, supabase, Analytics } from '@/services';
+import { DatabaseService, Analytics } from '@/services';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Rating, Card } from '@/types';
 import { ArrowLeft, Settings, Volume2, Check } from 'lucide-react-native';
@@ -55,7 +56,6 @@ export function StudyScreen({ navigation, route }: Props) {
   const updateLastStudied = useSetsStore((s) => s.updateLastStudied);
   const updateSetStats = useSetsStore((s) => s.updateSetStats);
   const getCardsBySet = useCardsStore((s) => s.getCardsBySet);
-  const updateCardSRS = useCardsStore((s) => s.updateCardSRS);
   const currentSet = useSetsStore((s) => s.getSet(setId));
   
   // Study store
@@ -76,7 +76,7 @@ export function StudyScreen({ navigation, route }: Props) {
   const updateSettings = useSettingsStore((s) => s.updateSettings);
   const sheetTranslate = useRef(new Animated.Value(-220)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
-  const isCurrentMastered = currentCard ? currentCard.nextReviewDate > Date.now() : false;
+  const isCurrentMastered = currentCard ? isCardLearned(currentCard) : false;
   const overlayColor = theme === 'dark' ? 'rgba(0, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.55)';
   const settingsSheetBackground = theme === 'dark' ? '#0f172a' : colors.surface;
   const settingsSheetBorder = theme === 'dark' ? 'rgba(255, 255, 255, 0.12)' : colors.border;
@@ -298,15 +298,12 @@ export function StudyScreen({ navigation, route }: Props) {
         }]);
       }
 
-      // Рассчитываем новые SRS параметры
-      const result = calculateNextReview(currentCard, rating);
-
-      // Обновляем карточку
-      updateCardSRS(currentCard.id, {
-        learningStep: result.newLearningStep,
-        nextReviewDate: result.nextReviewDate,
-        lastReviewDate: Date.now(),
-        status: result.newStatus,
+      // Самооценка: уровень считает сервер (очков рейтинга она не даёт — план §1.3), экран обновляется сразу
+      ProgressService.recordAnswer(currentCard, {
+        mode: 'flashcard',
+        correct: isCorrect,
+        selfRating: rating,
+        timeSpentMs: Date.now() - cardShownAtRef.current,
       });
       // Обновляем статистику набора (Запомнил/Не запомнил)
       const statsSnapshot = selectSetStats(setId);
@@ -321,27 +318,6 @@ export function StudyScreen({ navigation, route }: Props) {
       // Обновляем статистику только для правильных ответов (rating >= 3)
       if (isCorrect) {
         incrementTodayCards();
-      }
-
-      // Сохраняем review в Neon (fire-and-forget)
-      if (NeonService.isEnabled()) {
-        (async () => {
-          try {
-            const { data: sd } = await supabase.auth.getSession();
-            const uid = sd?.session?.user?.id;
-            if (uid) {
-              await NeonService.saveReview(uid, currentCard.id, rating, 0);
-
-              // Сохраняем прогресс в card_progress для статистики учителя
-              await NeonService.upsertCardProgress(uid, currentCard.id, {
-                status: result.newStatus,
-                learningStep: result.newLearningStep,
-                nextReview: result.nextReviewDate,
-                lastReviewed: Date.now(),
-              });
-            }
-          } catch {}
-        })();
       }
 
       // Переход к следующей карточке
@@ -460,7 +436,7 @@ export function StudyScreen({ navigation, route }: Props) {
         });
       }
     },
-    [currentCard, updateCardSRS, incrementTodayCards, session, setId, updateSetStats, navigation, errorCards, studiedInPhase, phaseOffset, isErrorReview]
+    [currentCard, incrementTodayCards, session, setId, updateSetStats, navigation, errorCards, studiedInPhase, phaseOffset, isErrorReview]
   );
 
   const openSettings = useCallback(() => {

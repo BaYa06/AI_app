@@ -1,9 +1,9 @@
 /**
- * API Service для работы с Neon PostgreSQL
- * @description Сервис для загрузки данных из базы данных
+ * Сервис данных пользователя (наборы, карточки, курсы, прогресс, серия).
+ * @description Все запросы идут через backend (api/data.js, api/teacher.js) с Supabase JWT —
+ * строки подключения к БД в приложении нет. См. plan/course_rating_and_review_plan.md, этап 0.
  */
 
-import { neon } from '@neondatabase/serverless';
 import { supabase } from './supabaseClient';
 import { API_BASE } from '@/config/apiBase';
 import type { Card, CardSet, CardStatus, UpdateCardInput, Course } from '@/types';
@@ -60,28 +60,6 @@ async function callTeacherApi<T = any>(
   }
 }
 
-// Используем переменную окружения для подключения
-const getConnectionString = () => {
-  const envUrl =
-    process.env.POSTGRES_URL ||
-    process.env.EXPO_PUBLIC_POSTGRES_URL ||
-    process.env.REACT_APP_POSTGRES_URL ||
-    process.env.NEXT_PUBLIC_POSTGRES_URL ||
-    (globalThis as any)?.POSTGRES_URL ||
-    '';
-
-  if (envUrl) return envUrl;
-
-  // Для веба можно прокинуть в window.POSTGRES_URL
-  if (typeof window !== 'undefined' && (window as any).POSTGRES_URL) {
-    return (window as any).POSTGRES_URL as string;
-  }
-
-  return '';
-};
-
-const DEFAULT_USER_ID = process.env.POSTGRES_DEFAULT_USER_ID || '00000000-0000-0000-0000-000000000001';
-
 type EnsureUserArgs = {
   id: string;
   email?: string | null;
@@ -114,224 +92,207 @@ function getStatusFromStep(learningStep: number): CardStatus {
   return 'mature';
 }
 
+const DATA_API_BASE = `${API_BASE}/data`;
+
+/**
+ * Вызов api/data.js. userId сервер берёт из Supabase JWT — параметры userId у методов ниже
+ * оставлены только ради совместимости сигнатур вызывающего кода.
+ * Возвращает null, если нет сессии, сети или сервер ответил ошибкой.
+ */
+async function callDataApi<T = any>(action: string, params: Record<string, any> = {}, method: 'GET' | 'POST' = 'POST'): Promise<T | null> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) return null;
+  try {
+    const query = new URLSearchParams({ action });
+    if (method === 'GET') {
+      for (const [key, value] of Object.entries(params)) {
+        if (value !== undefined && value !== null) query.set(key, String(value));
+      }
+    }
+    const resp = await fetch(`${DATA_API_BASE}?${query.toString()}`, {
+      method,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: method === 'POST' ? JSON.stringify(params) : undefined,
+    });
+    const json = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      console.error(`Data API ${action} failed:`, json?.error || resp.status);
+      return null;
+    }
+    return json.data as T;
+  } catch (error) {
+    console.error(`Data API ${action} network error:`, error);
+    return null;
+  }
+}
+
+export type CourseLeaderboard =
+  | { enabled: false }
+  | {
+      enabled: boolean;
+      isTeacher: boolean;
+      week: 'current' | 'previous';
+      weekStart: string;
+      timezone: string;
+      frozen: boolean;
+      /** Конец текущей недели (мс); для прошлой недели — null */
+      endsAt: number | null;
+      /** Награда топ-3 в алмазах */
+      rewards: number[];
+      rows: Array<{ userId: string; name: string; points: number; place: number | null; reward: number; hidden: boolean; isMe: boolean }>;
+      me: { place: number | null; points: number; hidden: boolean; gapToNext: number | null; learnedTotal: number | null } | null;
+    };
+
+/** Вызов api/progress.js (рейтинг курса). null — нет сессии, сети или ошибка сервера. */
+async function callProgressApi<T = any>(
+  action: string,
+  { method, params, body }: { method: 'GET' | 'POST'; params?: Record<string, string>; body?: object },
+): Promise<T | null> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) return null;
+  try {
+    const query = new URLSearchParams({ action, ...(params || {}) });
+    const resp = await fetch(`${API_BASE}/progress?${query.toString()}`, {
+      method,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const json = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      console.error(`Progress API ${action} failed:`, json?.error || resp.status);
+      return null;
+    }
+    return json as T;
+  } catch (error) {
+    console.error(`Progress API ${action} network error:`, error);
+    return null;
+  }
+}
+
+type ProfileRow = {
+  teacher: boolean | null;
+  user_name: string | null;
+  display_name: string | null;
+  native_language: string | null;
+  target_languages: string[] | null;
+  onboarding_completed: boolean | null;
+};
+
+function mapCardRow(card: any): Card {
+  return {
+    id: card.id,
+    setId: card.set_id,
+    frontText: card.front,
+    backText: card.back,
+    example: card.example || '',
+    wordForm: card.word_form || undefined,
+    wordType: card.word_type || undefined,
+    frontImage: card.image_url,
+    backImage: undefined,
+    frontAudio: card.audio_url,
+    backAudio: undefined,
+    createdAt: new Date(card.created_at).getTime(),
+    updatedAt: new Date(card.created_at).getTime(),
+    // SRS данные
+    learningStep: card.learning_step || 0,
+    nextReviewDate: card.next_review ? new Date(card.next_review).getTime() : Date.now(),
+    lastReviewDate: card.last_reviewed ? new Date(card.last_reviewed).getTime() : Date.now(),
+    status: getStatusFromStep(card.learning_step || 0),
+  } as Card;
+}
+
 export const NeonService = {
+  /** Синхронизация с сервером доступна всегда — пропускается только без сессии (см. callDataApi). */
   isEnabled(): boolean {
-    return Boolean(getConnectionString());
+    return true;
   },
 
   /**
    * Гарантировать наличие пользователя в таблице users (идемпотентно).
+   * email и признак гостя сервер берёт из токена.
    */
   async ensureUserExists(user: EnsureUserArgs): Promise<void> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) {
-        console.warn('POSTGRES_URL не настроен, пропускаем ensureUserExists');
-        return;
-      }
-      const sql = neon(connectionString);
-      const displayName =
-        user.displayName ||
-        (user.email ? user.email.split('@')[0] : null);
-
-      const defaultUserName = user.email
-        ? '@' + user.email.split('@')[0].toLowerCase()
-        : null;
-
-      await sql`
-        INSERT INTO users (id, email, display_name, is_anonymous, user_name)
-        VALUES (${user.id}::uuid, ${user.email ?? null}, ${displayName ?? 'Гость'}, ${user.isAnonymous ?? false}, ${defaultUserName ?? null})
-        ON CONFLICT (id) DO UPDATE SET
-          user_name = COALESCE(users.user_name, EXCLUDED.user_name);
-      `;
-    } catch (error) {
-      console.error('Failed to ensure user exists:', error);
-    }
+    await callDataApi('ensureUserExists', { displayName: user.displayName ?? null });
   },
 
   /**
    * Проверить, является ли пользователь учителем
    */
-  async getIsTeacher(userId: string): Promise<boolean> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) return false;
-      const sql = neon(connectionString);
-      const rows = await sql`
-        SELECT teacher FROM users WHERE id = ${userId}::uuid
-      `;
-      return rows[0]?.teacher === true;
-    } catch (error) {
-      console.error('Failed to get teacher status:', error);
-      return false;
-    }
+  async getIsTeacher(_userId: string): Promise<boolean> {
+    const profile = await callDataApi<ProfileRow | null>('getProfile', {}, 'GET');
+    return profile?.teacher === true;
   },
 
   /**
    * Получить user_name пользователя
    */
-  async getUserName(userId: string): Promise<string | null> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) return null;
-      const sql = neon(connectionString);
-      const rows = await sql`
-        SELECT user_name FROM users WHERE id = ${userId}::uuid
-      `;
-      return rows[0]?.user_name ?? null;
-    } catch (error) {
-      console.error('Failed to get user_name:', error);
-      return null;
-    }
+  async getUserName(_userId: string): Promise<string | null> {
+    const profile = await callDataApi<ProfileRow | null>('getProfile', {}, 'GET');
+    return profile?.user_name ?? null;
   },
 
   /**
    * Получить display_name пользователя
    */
-  async getDisplayName(userId: string): Promise<string | null> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) return null;
-      const sql = neon(connectionString);
-      const rows = await sql`
-        SELECT display_name FROM users WHERE id = ${userId}::uuid
-      `;
-      return rows[0]?.display_name ?? null;
-    } catch (error) {
-      console.error('Failed to get display_name:', error);
-      return null;
-    }
+  async getDisplayName(_userId: string): Promise<string | null> {
+    const profile = await callDataApi<ProfileRow | null>('getProfile', {}, 'GET');
+    return profile?.display_name ?? null;
   },
 
   /**
    * Обновить display_name пользователя
    */
-  async updateDisplayName(userId: string, displayName: string): Promise<boolean> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) return false;
-      const sql = neon(connectionString);
-      await sql`
-        UPDATE users SET display_name = ${displayName} WHERE id = ${userId}::uuid
-      `;
-      return true;
-    } catch (error) {
-      console.error('Failed to update display_name:', error);
-      return false;
-    }
+  async updateDisplayName(_userId: string, displayName: string): Promise<boolean> {
+    return (await callDataApi<boolean>('updateDisplayName', { displayName })) === true;
   },
 
   /**
    * Обновить user_name пользователя
    */
-  async updateUserName(userId: string, userName: string): Promise<boolean> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) return false;
-      const sql = neon(connectionString);
-
-      const normalized = userName.startsWith('@') ? userName.toLowerCase() : '@' + userName.toLowerCase();
-
-      await sql`
-        UPDATE users SET user_name = ${normalized} WHERE id = ${userId}::uuid
-      `;
-      return true;
-    } catch (error) {
-      console.error('Failed to update user_name:', error);
-      return false;
-    }
+  async updateUserName(_userId: string, userName: string): Promise<boolean> {
+    return (await callDataApi<boolean>('updateUserName', { userName })) === true;
   },
 
   /**
    * Получить родной язык и изучаемые языки пользователя
    */
   async getLanguagePreferences(
-    userId: string,
+    _userId: string,
   ): Promise<{ nativeLanguage: string | null; targetLanguages: string[] }> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) return { nativeLanguage: null, targetLanguages: [] };
-      const sql = neon(connectionString);
-      const rows = await sql`
-        SELECT native_language, target_languages FROM users WHERE id = ${userId}::uuid
-      `;
-      return {
-        nativeLanguage: rows[0]?.native_language ?? null,
-        targetLanguages: rows[0]?.target_languages ?? [],
-      };
-    } catch (error) {
-      console.error('Failed to get language preferences:', error);
-      return { nativeLanguage: null, targetLanguages: [] };
-    }
+    const profile = await callDataApi<ProfileRow | null>('getProfile', {}, 'GET');
+    return {
+      nativeLanguage: profile?.native_language ?? null,
+      targetLanguages: profile?.target_languages ?? [],
+    };
   },
 
   /**
    * Обновить родной язык и/или изучаемые языки пользователя
    */
   async updateLanguagePreferences(
-    userId: string,
+    _userId: string,
     data: { nativeLanguage?: string; targetLanguages?: string[] },
   ): Promise<boolean> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) return false;
-      const sql = neon(connectionString);
-      await sql`
-        UPDATE users SET
-          native_language = COALESCE(${data.nativeLanguage ?? null}, native_language),
-          target_languages = COALESCE(${data.targetLanguages ?? null}, target_languages)
-        WHERE id = ${userId}::uuid
-      `;
-      return true;
-    } catch (error) {
-      console.error('Failed to update language preferences:', error);
-      return false;
-    }
+    return (await callDataApi<boolean>('updateLanguagePreferences', data)) === true;
   },
 
   /**
-   * Добавить алмазы пользователю (increment)
+   * Проверить, завершил ли пользователь онбординг.
+   * Нет профиля или нет сети — считаем завершённым (как раньше), чтобы не блокировать вход.
    */
-  async addDiamonds(userId: string, amount: number): Promise<boolean> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) return false;
-      const sql = neon(connectionString);
-
-      await sql`
-        UPDATE users SET diamond = COALESCE(diamond, 0) + ${amount} WHERE id = ${userId}::uuid
-      `;
-      return true;
-    } catch (error) {
-      console.error('Failed to add diamonds:', error);
-      return false;
-    }
-  },
-
-  /**
-   * Проверить, завершил ли пользователь онбординг
-   */
-  async checkOnboardingCompleted(userId: string): Promise<boolean> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) return true;
-      const sql = neon(connectionString);
-      const rows = await sql`
-        SELECT onboarding_completed FROM users WHERE id = ${userId}::uuid
-      `;
-      if (rows.length === 0) return true;
-      return rows[0]?.onboarding_completed === true;
-    } catch (error) {
-      console.error('Failed to check onboarding status:', error);
-      return true;
-    }
+  async checkOnboardingCompleted(_userId: string): Promise<boolean> {
+    const profile = await callDataApi<ProfileRow | null>('getProfile', {}, 'GET');
+    if (!profile) return true;
+    return profile.onboarding_completed === true;
   },
 
   /**
    * Сохранить данные онбординга и отметить онбординг завершённым
    */
   async saveOnboardingData(
-    userId: string,
+    _userId: string,
     data: {
       displayName?: string;
       teacher?: boolean;
@@ -343,322 +304,71 @@ export const NeonService = {
       teacherGroupSize?: string;
     },
   ): Promise<void> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) return;
-      const sql = neon(connectionString);
-      await sql`
-        UPDATE users SET
-          display_name = COALESCE(${data.displayName ?? null}, display_name),
-          teacher = COALESCE(${data.teacher ?? null}, teacher),
-          native_language = COALESCE(${data.nativeLanguage ?? null}, native_language),
-          target_languages = COALESCE(${data.targetLanguages ?? null}, target_languages),
-          learning_goal = COALESCE(${data.learningGoal ?? null}, learning_goal),
-          daily_goal = COALESCE(${data.dailyGoal ?? null}, daily_goal),
-          teacher_subject = COALESCE(${data.teacherSubject ?? null}, teacher_subject),
-          teacher_group_size = COALESCE(${data.teacherGroupSize ?? null}, teacher_group_size),
-          onboarding_completed = true
-        WHERE id = ${userId}::uuid
-      `;
-    } catch (error) {
-      console.error('Failed to save onboarding data:', error);
-    }
+    await callDataApi('saveOnboardingData', data);
   },
 
   /**
-   * Загрузить все наборы карточек
+   * Загрузить все наборы карточек пользователя
    */
   async loadSets(userId?: string): Promise<CardSet[]> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) {
-        console.warn('POSTGRES_URL не настроен');
-        return [];
-      }
-
-      if (!userId) {
-        console.warn('userId не передан, пропускаем загрузку наборов');
-        return [];
-      }
-
-      const sql = neon(connectionString);
-      
-      const sets = await sql`
-        SELECT 
-          id,
-          user_id,
-          course_id,
-          title,
-          description,
-          category,
-          language_from,
-          language_to,
-          is_public,
-          created_at,
-          updated_at,
-          total_cards,
-          mastered_cards,
-          studying_cards,
-          is_hidden_from_students
-        FROM card_sets
-        WHERE user_id = ${userId}
-        ORDER BY created_at DESC
-      `;
-
-      return sets.map(set => ({
-        id: set.id,
-        userId: set.user_id,
-        courseId: set.course_id || null,
-        title: set.title,
-        description: set.description || '',
-        category: set.category || 'Общие',
-        tags: [],
-        languageFrom: set.language_from || 'de',
-        languageTo: set.language_to || 'ru',
-        createdAt: new Date(set.created_at).getTime(),
-        updatedAt: new Date(set.updated_at).getTime(),
-        cardCount: set.total_cards || 0,
-        newCount: 0,
-        learningCount: set.studying_cards || 0,
-        reviewCount: 0,
-        masteredCount: set.mastered_cards || 0,
-        isPublic: set.is_public,
-        isFavorite: false,
-        isArchived: false,
-        isHiddenFromStudents: set.is_hidden_from_students === true,
-      }));
-    } catch (error) {
-      console.error('Failed to load sets:', error);
+    if (!userId) {
+      console.warn('userId не передан, пропускаем загрузку наборов');
       return [];
     }
+    const sets = await callDataApi<any[]>('loadSets', {}, 'GET');
+    return (sets || []).map(set => ({
+      id: set.id,
+      userId: set.user_id,
+      courseId: set.course_id || null,
+      title: set.title,
+      description: set.description || '',
+      category: set.category || 'Общие',
+      tags: [],
+      languageFrom: set.language_from || 'de',
+      languageTo: set.language_to || 'ru',
+      createdAt: new Date(set.created_at).getTime(),
+      updatedAt: new Date(set.updated_at).getTime(),
+      cardCount: set.total_cards || 0,
+      newCount: 0,
+      learningCount: set.studying_cards || 0,
+      reviewCount: 0,
+      masteredCount: set.mastered_cards || 0,
+      isPublic: set.is_public,
+      isFavorite: false,
+      isArchived: false,
+      isHiddenFromStudents: set.is_hidden_from_students === true,
+    }));
   },
 
   /**
    * Загрузить карточки для набора
    */
   async loadCardsBySet(setId: string): Promise<Card[]> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) {
-        console.warn('POSTGRES_URL не настроен');
-        return [];
-      }
-
-      const sql = neon(connectionString);
-      
-      const cards = await sql`
-        SELECT
-          id,
-          set_id,
-          front,
-          back,
-          example,
-          word_form,
-          word_type,
-          image_url,
-          audio_url,
-          created_at,
-          learning_step,
-          next_review,
-          last_reviewed,
-          status
-        FROM cards
-        WHERE set_id = ${setId}
-        -- sort_order задан только у карточек официальных наборов (порядок из Excel);
-        -- у обычных он NULL, и порядок остаётся по created_at, как раньше.
-        ORDER BY sort_order NULLS LAST, created_at ASC
-      `;
-
-      return cards.map(card => ({
-        id: card.id,
-        setId: card.set_id,
-        frontText: card.front,
-        backText: card.back,
-        example: card.example || '',
-        wordForm: card.word_form || undefined,
-        wordType: card.word_type || undefined,
-        frontImage: card.image_url,
-        backImage: undefined,
-        frontAudio: card.audio_url,
-        backAudio: undefined,
-        createdAt: new Date(card.created_at).getTime(),
-        updatedAt: new Date(card.created_at).getTime(),
-        // SRS данные
-        learningStep: card.learning_step || 0,
-        nextReviewDate: card.next_review ? new Date(card.next_review).getTime() : Date.now(),
-        lastReviewDate: card.last_reviewed ? new Date(card.last_reviewed).getTime() : Date.now(),
-        status: getStatusFromStep(card.learning_step || 0),
-      }));
-    } catch (error) {
-      console.error('Failed to load cards:', error);
-      return [];
-    }
+    const cards = await callDataApi<any[]>('loadCardsBySet', { setId }, 'GET');
+    return (cards || []).map(mapCardRow);
   },
 
   /**
-   * Загрузить все карточки
+   * Загрузить все карточки: свои наборы + наборы курсов, где пользователь ученик (с его прогрессом)
    */
   async loadAllCards(userId?: string): Promise<Card[]> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) {
-        console.warn('POSTGRES_URL не настроен');
-        return [];
-      }
-
-      if (!userId) {
-        console.warn('userId не передан, пропускаем загрузку карточек');
-        return [];
-      }
-
-      const sql = neon(connectionString);
-
-      // Миграция: добавить word_type и word_form если ещё нет (идемпотентна)
-      try {
-        await sql`ALTER TABLE cards ADD COLUMN IF NOT EXISTS word_type VARCHAR(20)`;
-        await sql`ALTER TABLE cards ADD COLUMN IF NOT EXISTS word_form VARCHAR(100)`;
-      } catch {}
-
-      const cards = await sql`
-        SELECT
-          c.id,
-          c.set_id,
-          c.front,
-          c.back,
-          c.example,
-          c.word_form,
-          c.word_type,
-          c.image_url,
-          c.audio_url,
-          c.created_at,
-          CASE
-            WHEN s.user_id = ${userId} THEN COALESCE(cp.learning_step, c.learning_step)
-            ELSE COALESCE(cp.learning_step, 0)
-          END AS learning_step,
-          CASE
-            WHEN s.user_id = ${userId} THEN COALESCE(cp.next_review, c.next_review)
-            ELSE COALESCE(cp.next_review, NOW())
-          END AS next_review,
-          CASE
-            WHEN s.user_id = ${userId} THEN COALESCE(cp.last_reviewed, c.last_reviewed)
-            ELSE cp.last_reviewed
-          END AS last_reviewed,
-          CASE
-            WHEN s.user_id = ${userId} THEN COALESCE(cp.status, c.status)
-            ELSE COALESCE(cp.status, 'new')
-          END AS status
-        FROM cards c
-        INNER JOIN card_sets s ON c.set_id = s.id
-        LEFT JOIN card_progress cp ON cp.card_id = c.id AND cp.user_id = ${userId}::uuid
-        WHERE s.user_id = ${userId}
-          OR s.course_id IN (
-            SELECT course_id FROM course_members
-            WHERE user_id = ${userId} AND role = 'student'
-          )
-        -- sort_order — порядок карточек, вставленных одним запросом (импорт из библиотеки, копия
-        -- юнита): у них одинаковый created_at. У остальных карточек он NULL и ничего не меняет.
-        ORDER BY c.created_at ASC, c.sort_order NULLS LAST
-      `;
-
-      return cards.map(card => ({
-        id: card.id,
-        setId: card.set_id,
-        frontText: card.front,
-        backText: card.back,
-        example: card.example || '',
-        wordForm: card.word_form || undefined,
-        wordType: card.word_type || undefined,
-        frontImage: card.image_url,
-        backImage: undefined,
-        frontAudio: card.audio_url,
-        backAudio: undefined,
-        createdAt: new Date(card.created_at).getTime(),
-        updatedAt: new Date(card.created_at).getTime(),
-        // SRS данные
-        learningStep: card.learning_step || 0,
-        nextReviewDate: card.next_review ? new Date(card.next_review).getTime() : Date.now(),
-        lastReviewDate: card.last_reviewed ? new Date(card.last_reviewed).getTime() : Date.now(),
-        status: getStatusFromStep(card.learning_step || 0),
-      }));
-    } catch (error) {
-      console.error('Failed to load all cards:', error);
+    if (!userId) {
+      console.warn('userId не передан, пропускаем загрузку карточек');
       return [];
     }
-  },
-
-  /**
-   * Обновить SRS-поля карточки
-   */
-  async updateCardSRS(
-    cardId: string,
-    data: Partial<Pick<Card, 'learningStep' | 'nextReviewDate' | 'lastReviewDate' | 'status'>>
-  ): Promise<boolean> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) {
-        console.warn('POSTGRES_URL не настроен, пропускаем обновление карточки');
-        return false;
-      }
-
-      const sql = neon(connectionString);
-
-      // Нормализуем значения для SQL
-      const learningStep = data.learningStep != null ? data.learningStep : null;
-      const nextReview = data.nextReviewDate ? new Date(data.nextReviewDate).toISOString() : null;
-      const lastReviewed = data.lastReviewDate ? new Date(data.lastReviewDate).toISOString() : null;
-
-      await sql`
-        UPDATE cards
-        SET
-          learning_step = COALESCE(${learningStep}::int, learning_step),
-          next_review = COALESCE(${nextReview}::timestamptz, next_review),
-          last_reviewed = COALESCE(${lastReviewed}::timestamptz, last_reviewed),
-          status = COALESCE(${data.status}, status)
-        WHERE id = ${cardId}
-      `;
-
-      return true;
-    } catch (error) {
-      console.error('Failed to update card in Neon:', error);
-      return false;
-    }
+    const cards = await callDataApi<any[]>('loadAllCards', {}, 'GET');
+    return (cards || []).map(mapCardRow);
   },
 
   /**
    * Обновить содержимое карточки (текст, медиа)
    */
   async updateCard(cardId: string, data: UpdateCardInput): Promise<boolean> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) {
-        console.warn('POSTGRES_URL не настроен, пропускаем обновление карточки');
-        return false;
-      }
-
-      const sql = neon(connectionString);
-
-      await sql`
-        UPDATE cards
-        SET
-          front = COALESCE(${data.frontText ?? null}, front),
-          back = COALESCE(${data.backText ?? null}, back),
-          example = COALESCE(${data.example ?? null}, example),
-          word_form = COALESCE(${data.wordForm ?? null}, word_form),
-          word_type = COALESCE(${data.wordType ?? null}, word_type),
-          image_url = COALESCE(${data.frontImage ?? null}, image_url),
-          audio_url = COALESCE(${data.frontAudio ?? null}, audio_url)
-        WHERE id = ${cardId}
-      `;
-
-      return true;
-    } catch (error) {
-      console.error('Failed to update card in Neon:', error);
-      return false;
-    }
+    return (await callDataApi<boolean>('updateCard', { cardId, data })) === true;
   },
 
   /**
-   * Создать новый набор карточек
+   * Создать новый набор карточек (владелец — текущий пользователь)
    */
   async createSet(payload: {
     id: string;
@@ -673,113 +383,15 @@ export const NeonService = {
     createdAt?: number;
     updatedAt?: number;
   }): Promise<boolean> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) {
-        console.warn('POSTGRES_URL не настроен, пропускаем сохранение набора');
-        return false;
-      }
-
-      const sql = neon(connectionString);
-      const now = new Date();
-
-      await sql`
-        INSERT INTO card_sets (
-          id,
-          user_id,
-          course_id,
-          title,
-          description,
-          category,
-          language_from,
-          language_to,
-          is_public,
-          created_at,
-          updated_at,
-          total_cards,
-          mastered_cards,
-          studying_cards
-        ) VALUES (
-          ${payload.id},
-          ${payload.userId || DEFAULT_USER_ID},
-          ${payload.courseId ?? null},
-          ${payload.title},
-          ${payload.description || null},
-          ${payload.category || 'custom'},
-          ${payload.languageFrom || null},
-          ${payload.languageTo || null},
-          ${payload.isPublic ?? false},
-          ${payload.createdAt ? new Date(payload.createdAt).toISOString() : now.toISOString()},
-          ${payload.updatedAt ? new Date(payload.updatedAt).toISOString() : now.toISOString()},
-          0,
-          0,
-          0
-        )
-        ON CONFLICT (id) DO NOTHING
-      `;
-
-      return true;
-    } catch (error) {
-      console.error('Failed to create set in Neon:', error);
-      return false;
-    }
+    const { userId: _ignored, ...rest } = payload;
+    return (await callDataApi<boolean>('createSet', rest)) === true;
   },
 
   /**
    * Создать одну карточку
    */
   async createCard(card: Card): Promise<boolean> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) {
-        console.warn('POSTGRES_URL не настроен, пропускаем сохранение карточки');
-        return false;
-      }
-
-      const sql = neon(connectionString);
-
-      await sql`
-        INSERT INTO cards (
-          id,
-          set_id,
-          front,
-          back,
-          example,
-          word_type,
-          image_url,
-          audio_url,
-          created_at,
-          next_review,
-          last_reviewed,
-          status
-        ) VALUES (
-          ${card.id},
-          ${card.setId},
-          ${card.frontText},
-          ${card.backText},
-          ${card.example || null},
-          ${card.wordType || null},
-          ${card.frontImage || null},
-          ${card.frontAudio || null},
-          ${new Date(card.createdAt).toISOString()},
-          ${new Date(card.nextReviewDate).toISOString()},
-          ${card.lastReviewDate ? new Date(card.lastReviewDate).toISOString() : null},
-          ${card.status}
-        )
-        ON CONFLICT (id) DO NOTHING
-      `;
-
-      await sql`
-        UPDATE card_sets 
-        SET total_cards = total_cards + 1
-        WHERE id = ${card.setId}
-      `;
-
-      return true;
-    } catch (error) {
-      console.error('Failed to create card in Neon:', error);
-      return false;
-    }
+    return (await callDataApi<boolean>('createCard', { card })) === true;
   },
 
   /**
@@ -787,118 +399,21 @@ export const NeonService = {
    */
   async createCardsBatch(cards: Card[]): Promise<boolean> {
     if (cards.length === 0) return true;
-
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) {
-        console.warn('POSTGRES_URL не настроен, пропускаем пакетное сохранение карточек');
-        return false;
-      }
-
-      const sql = neon(connectionString);
-
-      for (const card of cards) {
-        await sql`
-          INSERT INTO cards (
-            id,
-            set_id,
-            front,
-            back,
-            example,
-            word_type,
-            image_url,
-            audio_url,
-            created_at,
-            next_review,
-            last_reviewed,
-            status
-          )
-          VALUES (
-            ${card.id},
-            ${card.setId},
-            ${card.frontText},
-            ${card.backText},
-            ${card.example || null},
-            ${card.wordType || null},
-            ${card.frontImage || null},
-            ${card.frontAudio || null},
-            ${new Date(card.createdAt).toISOString()},
-            ${new Date(card.nextReviewDate).toISOString()},
-            ${card.lastReviewDate ? new Date(card.lastReviewDate).toISOString() : null},
-            ${card.status}
-          )
-          ON CONFLICT (id) DO NOTHING
-        `;
-      }
-
-      // Обновляем total_cards по каждому набору
-      const countsBySet: Record<string, number> = {};
-      for (const card of cards) {
-        countsBySet[card.setId] = (countsBySet[card.setId] || 0) + 1;
-      }
-
-      for (const [setId, count] of Object.entries(countsBySet)) {
-        await sql`
-          UPDATE card_sets
-          SET total_cards = total_cards + ${count}
-          WHERE id = ${setId}
-        `;
-      }
-
-      return true;
-    } catch (error) {
-      console.error('Failed to create cards batch in Neon:', error);
-      return false;
-    }
+    return (await callDataApi<boolean>('createCardsBatch', { cards })) === true;
   },
 
   /**
-   * Удалить набор карточек
+   * Удалить набор карточек вместе с карточками
    */
   async deleteSet(setId: string): Promise<boolean> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) {
-        console.warn('POSTGRES_URL не настроен, пропускаем удаление набора');
-        return false;
-      }
-
-      const sql = neon(connectionString);
-
-      // Сначала удаляем все карточки набора
-      await sql`DELETE FROM cards WHERE set_id = ${setId}`;
-
-      // Потом удаляем сам набор
-      await sql`DELETE FROM card_sets WHERE id = ${setId}`;
-
-      console.log('✅ Набор и его карточки удалены из Neon:', setId);
-      return true;
-    } catch (error) {
-      console.error('Failed to delete set from Neon:', error);
-      return false;
-    }
+    return (await callDataApi<boolean>('deleteSet', { setId })) === true;
   },
 
   /**
    * Удалить карточку
    */
   async deleteCard(cardId: string): Promise<boolean> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) {
-        console.warn('POSTGRES_URL не настроен, пропускаем удаление карточки');
-        return false;
-      }
-
-      const sql = neon(connectionString);
-
-      await sql`DELETE FROM cards WHERE id = ${cardId}`;
-
-      return true;
-    } catch (error) {
-      console.error('Failed to delete card from Neon:', error);
-      return false;
-    }
+    return (await callDataApi<boolean>('deleteCard', { cardId })) === true;
   },
 
   // ==============================================
@@ -906,7 +421,7 @@ export const NeonService = {
   // ==============================================
 
   /**
-   * Загрузить все курсы пользователя
+   * Загрузить все курсы пользователя (где он учитель)
    */
   async loadCourses(userId?: string): Promise<Array<{
     id: string;
@@ -914,35 +429,14 @@ export const NeonService = {
     createdAt: number;
     updatedAt?: number;
   }>> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString || !userId) {
-        return [];
-      }
-
-      const sql = neon(connectionString);
-      
-      const courses = await sql`
-        SELECT 
-          id,
-          title,
-          created_at,
-          updated_at
-        FROM courses
-        WHERE user_id = ${userId}
-        ORDER BY created_at ASC
-      `;
-
-      return courses.map(course => ({
-        id: course.id,
-        title: course.title,
-        createdAt: new Date(course.created_at).getTime(),
-        updatedAt: course.updated_at ? new Date(course.updated_at).getTime() : undefined,
-      }));
-    } catch (error) {
-      console.error('Failed to load courses:', error);
-      return [];
-    }
+    if (!userId) return [];
+    const courses = await callDataApi<any[]>('loadCourses', {}, 'GET');
+    return (courses || []).map(course => ({
+      id: course.id,
+      title: course.title,
+      createdAt: new Date(course.created_at).getTime(),
+      updatedAt: course.updated_at ? new Date(course.updated_at).getTime() : undefined,
+    }));
   },
 
   /**
@@ -954,30 +448,243 @@ export const NeonService = {
     title: string;
     createdAt: number;
   }): Promise<boolean> {
+    return (await callDataApi<boolean>('createCourse', {
+      id: course.id,
+      title: course.title,
+      createdAt: course.createdAt,
+    })) === true;
+  },
+
+  /**
+   * Обновить мета-данные набора (title, description, category, languageFrom, languageTo)
+   */
+  async updateSetMeta(setId: string, fields: {
+    title?: string;
+    description?: string;
+    category?: string;
+    languageFrom?: string;
+    languageTo?: string;
+  }): Promise<boolean> {
+    return (await callDataApi<boolean>('updateSetMeta', { setId, fields })) === true;
+  },
+
+  /**
+   * Обновить course_id у набора
+   */
+  async updateSetCourse(setId: string, courseId: string | null): Promise<boolean> {
+    return (await callDataApi<boolean>('updateSetCourse', { setId, courseId })) === true;
+  },
+
+  /**
+   * Загрузить курсы где пользователь — ученик
+   */
+  async loadStudentCourses(_userId: string): Promise<Course[]> {
+    const rows = await callDataApi<any[]>('loadStudentCourses', {}, 'GET');
+    return (rows || []).map((row: any) => ({
+      id: row.id,
+      title: row.title,
+      createdAt: new Date(row.joined_at).getTime(),
+      isStudentCourse: true,
+      teacherName: row.teacher_name,
+      ownerId: row.owner_id,
+    }));
+  },
+
+  // ==================== STREAK SYSTEM ====================
+
+  /**
+   * Upsert запись в daily_activity
+   */
+  async upsertDailyActivity(
+    _userId: string,
+    localDate: string,
+    deltas: { wordsDelta: number; minutesDelta: number; cardsDelta: number }
+  ): Promise<boolean> {
+    return (await callDataApi<boolean>('upsertDailyActivity', { localDate, deltas })) === true;
+  },
+
+  /**
+   * Засчитать сегодняшний день в серию. Решает сервер — по журналу ответов (план §3.5):
+   * день засчитывается за повторение слов, которым пришло время. true — день засчитан.
+   * Пуши о потере серии и о рекорде тоже шлёт сервер.
+   */
+  async updateUserStatsStreak(
+    _userId: string,
+    localDate: string,
+    yesterdayDate: string,
+    deltas: { wordsDelta: number; minutesDelta: number; cardsDelta: number }
+  ): Promise<boolean> {
+    const result = await callDataApi<{ counted: boolean }>('updateUserStatsStreak', { localDate, yesterdayDate, deltas });
+    return result?.counted === true;
+  },
+
+  /**
+   * Купить заморозку серии за алмазы. null — нет сети; { error } — не хватает алмазов или уже максимум.
+   */
+  async buyStreakFreeze(): Promise<{ diamonds: number; streakFreezes: number } | { error: 'not_enough_diamonds' | 'max_freezes' | 'unknown' } | null> {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) return null;
     try {
-      const connectionString = getConnectionString();
-      if (!connectionString) {
-        return false;
+      const resp = await fetch(`${DATA_API_BASE}?action=buyStreakFreeze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: '{}',
+      });
+      const json = await resp.json().catch(() => ({}));
+      if (resp.status === 409) return { error: json?.error === 'max_freezes' ? 'max_freezes' : 'not_enough_diamonds' };
+      if (!resp.ok) return { error: 'unknown' };
+      return json.data;
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * Записать событие получения/продления стрика (для админ-панели)
+   */
+  async logStreakEvent(_userId: string, streakDay: number): Promise<void> {
+    await callDataApi('logStreakEvent', { streakDay });
+  },
+
+  /**
+   * Получить активность за последние N дней
+   */
+  async getWeekActivity(_userId: string, days: number = 7): Promise<{
+    local_date: string;
+    words_learned: number;
+    minutes_learned: number;
+    cards_studied: number;
+  }[]> {
+    const rows = await callDataApi<any[]>('getWeekActivity', { days }, 'GET');
+    return (rows || []).map((row: any) => ({
+      local_date: pgDateToString(row.local_date),
+      words_learned: row.words_learned || 0,
+      minutes_learned: row.minutes_learned || 0,
+      cards_studied: row.cards_studied || 0,
+    }));
+  },
+
+  /**
+   * Получить статистику пользователя (сброс серии при пропуске делает сервер)
+   */
+  async getUserStats(_userId: string): Promise<{
+    current_streak: number;
+    longest_streak: number;
+    last_active_date: string | null;
+    timezone: string;
+    total_words_learned: number;
+    total_minutes_learned: number;
+    total_cards_studied: number;
+    /** Заморозок серии в запасе */
+    streak_freezes: number;
+    /** Сегодня заморозка спасла серию (вчера был пропуск) */
+    freeze_used: boolean;
+  } | null> {
+    const row = await callDataApi<any>('getUserStats', {}, 'GET');
+    if (!row) return null;
+    let timezone: string;
+    try {
+      timezone = row.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch {
+      timezone = 'UTC';
+    }
+    return {
+      current_streak: row.current_streak || 0,
+      longest_streak: row.longest_streak || 0,
+      last_active_date: row.last_active_date ? pgDateToString(row.last_active_date) : null,
+      timezone,
+      total_words_learned: row.total_words_learned || 0,
+      total_minutes_learned: row.total_minutes_learned || 0,
+      total_cards_studied: row.total_cards_studied || 0,
+      streak_freezes: row.streak_freezes || 0,
+      freeze_used: row.freeze_used === true,
+    };
+  },
+
+  /**
+   * Получить активность за конкретную дату
+   */
+  async getDailyActivity(_userId: string, localDate: string): Promise<{
+    local_date: string;
+    words_learned: number;
+    minutes_learned: number;
+    cards_studied: number;
+  } | null> {
+    const row = await callDataApi<any>('getDailyActivity', { localDate }, 'GET');
+    if (!row) return null;
+    return {
+      local_date: pgDateToString(row.local_date),
+      words_learned: row.words_learned || 0,
+      minutes_learned: row.minutes_learned || 0,
+      cards_studied: row.cards_studied || 0,
+    };
+  },
+
+  // ==================== РЕЙТИНГ КУРСА ====================
+
+  /**
+   * Рейтинг курса за неделю (очки считает сервер — api/progress.js).
+   * null — нет сессии/сети или нет доступа к курсу.
+   */
+  async loadLeaderboard(courseId: string, week: 'current' | 'previous' = 'current'): Promise<CourseLeaderboard | null> {
+    return callProgressApi<CourseLeaderboard>('leaderboard', { method: 'GET', params: { courseId, week } });
+  },
+
+  /** Учитель включает/выключает рейтинг в своём курсе */
+  async setCourseRatingEnabled(courseId: string, enabled: boolean): Promise<boolean> {
+    return (await callProgressApi('rating-enabled', { method: 'POST', body: { courseId, enabled } })) !== null;
+  },
+
+  /** Ученик скрывает себя из рейтинга курса (таблицу видит, других не видят его) */
+  async setHiddenFromRating(courseId: string, hidden: boolean): Promise<boolean> {
+    return (await callProgressApi('hide-me', { method: 'POST', body: { courseId, hidden } })) !== null;
+  },
+
+  // ==================== CARD PROGRESS ====================
+
+  /**
+   * Отправить ответы ученика (до 50 за раз). Уровень и дату повторения считает сервер —
+   * в ответе его итоговое состояние каждой карточки. null — нет сессии/сети/ошибка сервера.
+   */
+  async submitAnswers(answers: Array<{
+    answerId: string;
+    cardId: string;
+    mode: 'test' | 'builder' | 'flashcard';
+    chosen?: string;
+    selfRating?: number;
+    answeredAt: number;
+    timeSpentMs?: number;
+  }>): Promise<Array<{
+    answerId: string;
+    cardId: string;
+    status: 'ok' | 'duplicate' | 'rejected';
+    reason?: string;
+    learningStep: number | null;
+    nextReview: number | null;
+    lastReviewed: number | null;
+    /** Очки рейтинга за этот ответ */
+    points: number;
+  }> | null> {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) return null;
+    try {
+      const resp = await fetch(`${API_BASE}/progress?action=answer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ answers }),
+      });
+      const json = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        console.error('Progress API failed:', json?.error || resp.status);
+        // Некорректный ответ не исправится повтором — не держим его в очереди
+        return resp.status === 400 ? [] : null;
       }
-
-      const sql = neon(connectionString);
-      
-      await sql`
-        INSERT INTO courses (id, user_id, title, created_at, updated_at)
-        VALUES (
-          ${course.id}::uuid,
-          ${course.userId}::uuid,
-          ${course.title},
-          ${new Date(course.createdAt).toISOString()},
-          ${new Date(course.createdAt).toISOString()}
-        )
-      `;
-
-      console.log('✅ Курс создан в Neon:', course.title);
-      return true;
+      return json.results;
     } catch (error) {
-      console.error('Failed to create course in Neon:', error);
-      return false;
+      console.error('Progress API network error:', error);
+      return null;
     }
   },
 
@@ -1003,402 +710,6 @@ export const NeonService = {
       return false;
     }
     return true;
-  },
-
-  /**
-   * Обновить мета-данные набора (title, description, category, languageFrom, languageTo)
-   */
-  async updateSetMeta(setId: string, fields: {
-    title?: string;
-    description?: string;
-    category?: string;
-    languageFrom?: string;
-    languageTo?: string;
-  }): Promise<boolean> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) return false;
-
-      const sql = neon(connectionString);
-      await sql`
-        UPDATE card_sets
-        SET
-          title        = COALESCE(${fields.title ?? null}, title),
-          description  = COALESCE(${fields.description ?? null}, description),
-          category     = COALESCE(${fields.category ?? null}, category),
-          language_from = COALESCE(${fields.languageFrom ?? null}, language_from),
-          language_to  = COALESCE(${fields.languageTo ?? null}, language_to),
-          updated_at   = NOW()
-        WHERE id = ${setId}::uuid
-      `;
-      console.log('✅ updateSetMeta выполнен:', { setId, fields });
-      return true;
-    } catch (error) {
-      console.error('Failed to updateSetMeta in Neon:', error);
-      return false;
-    }
-  },
-
-  /**
-   * Обновить course_id у набора
-   */
-  async updateSetCourse(setId: string, courseId: string | null): Promise<boolean> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) {
-        return false;
-      }
-
-      const sql = neon(connectionString);
-      
-      // Используем разные запросы для null и не-null значений
-      if (courseId) {
-        await sql`
-          UPDATE card_sets
-          SET course_id = ${courseId}::uuid, updated_at = NOW()
-          WHERE id = ${setId}::uuid
-        `;
-      } else {
-        await sql`
-          UPDATE card_sets
-          SET course_id = NULL, updated_at = NOW()
-          WHERE id = ${setId}::uuid
-        `;
-      }
-
-      console.log('✅ SQL UPDATE выполнен для card_sets:', { setId, courseId });
-      return true;
-    } catch (error) {
-      console.error('Failed to update set course in Neon:', error);
-      return false;
-    }
-  },
-
-  // ==================== STREAK SYSTEM ====================
-
-  /**
-   * Upsert запись в daily_activity
-   */
-  async upsertDailyActivity(
-    userId: string,
-    localDate: string,
-    deltas: { wordsDelta: number; minutesDelta: number; cardsDelta: number }
-  ): Promise<boolean> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) {
-        return false;
-      }
-
-      const sql = neon(connectionString);
-      
-      // Используем INSERT ... ON CONFLICT для атомарного upsert
-      await sql`
-        INSERT INTO daily_activity (user_id, local_date, words_learned, minutes_learned, cards_studied)
-        VALUES (
-          ${userId}::uuid,
-          ${localDate}::date,
-          ${deltas.wordsDelta},
-          ${deltas.minutesDelta},
-          ${deltas.cardsDelta}
-        )
-        ON CONFLICT (user_id, local_date) DO UPDATE SET
-          words_learned = daily_activity.words_learned + ${deltas.wordsDelta},
-          minutes_learned = daily_activity.minutes_learned + ${deltas.minutesDelta},
-          cards_studied = daily_activity.cards_studied + ${deltas.cardsDelta},
-          updated_at = NOW()
-      `;
-
-      console.log('✅ Streak: daily_activity upserted', { userId, localDate, deltas });
-      return true;
-    } catch (error) {
-      console.error('Failed to upsert daily_activity in Neon:', error);
-      return false;
-    }
-  },
-
-  /**
-   * Обновить user_stats с расчётом стрика
-   */
-  async updateUserStatsStreak(
-    userId: string,
-    localDate: string,
-    yesterdayDate: string,
-    deltas: { wordsDelta: number; minutesDelta: number; cardsDelta: number }
-  ): Promise<boolean> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) {
-        return false;
-      }
-
-      const sql = neon(connectionString);
-
-      // Получаем текущую статистику пользователя
-      const existing = await sql`
-        SELECT current_streak, longest_streak, last_active_date
-        FROM user_stats
-        WHERE user_id = ${userId}::uuid
-      `;
-
-      let currentStreak = 0;
-      let longestStreak = 0;
-      let lastActiveDate: string | null = null;
-
-      if (existing.length > 0) {
-        currentStreak = existing[0].current_streak || 0;
-        longestStreak = existing[0].longest_streak || 0;
-        const rawDate = existing[0].last_active_date;
-        if (rawDate) {
-          lastActiveDate = pgDateToString(rawDate);
-        }
-      }
-
-      console.log('🔍 Streak calc:', { lastActiveDate, localDate, yesterdayDate, currentStreak });
-
-      // Рассчитываем новый стрик
-      if (lastActiveDate === localDate) {
-        // Уже записали сегодня - стрик не меняется
-        console.log('ℹ️ Streak: уже записано сегодня, стрик не меняется');
-      } else if (lastActiveDate === yesterdayDate) {
-        // Учились вчера - продолжаем серию
-        currentStreak += 1;
-        console.log('✅ Streak: продолжаем серию', { currentStreak });
-      } else {
-        // Пропустили день(и) - начинаем заново
-        currentStreak = 1;
-        console.log('🔄 Streak: начинаем серию заново', { currentStreak });
-        fetch(`${API_BASE}/push?action=notify`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + (process.env.EXPO_PUBLIC_NOTIFY_SECRET || ''),
-          },
-          body: JSON.stringify({
-            userId,
-            type: 'streak_lost',
-            data: { prevStreak: existing[0].current_streak },
-          }),
-        }).catch(() => {});
-      }
-
-      // Обновляем longest_streak если нужно
-      if (currentStreak > longestStreak) {
-        longestStreak = currentStreak;
-      }
-
-      // Upsert user_stats
-      await sql`
-        INSERT INTO user_stats (user_id, current_streak, longest_streak, last_active_date, total_words_learned, total_minutes_learned, total_cards_studied)
-        VALUES (
-          ${userId}::uuid,
-          ${currentStreak},
-          ${longestStreak},
-          ${localDate}::date,
-          ${deltas.wordsDelta},
-          ${deltas.minutesDelta},
-          ${deltas.cardsDelta}
-        )
-        ON CONFLICT (user_id) DO UPDATE SET
-          current_streak = ${currentStreak},
-          longest_streak = ${longestStreak},
-          last_active_date = ${localDate}::date,
-          total_words_learned = user_stats.total_words_learned + ${deltas.wordsDelta},
-          total_minutes_learned = user_stats.total_minutes_learned + ${deltas.minutesDelta},
-          total_cards_studied = user_stats.total_cards_studied + ${deltas.cardsDelta},
-          updated_at = NOW()
-      `;
-
-      console.log('✅ Streak: user_stats updated', { userId, currentStreak, longestStreak, localDate });
-      return true;
-    } catch (error) {
-      console.error('Failed to update user_stats in Neon:', error);
-      return false;
-    }
-  },
-
-  /**
-   * Записать событие получения/продления стрика (для админ-панели)
-   */
-  async logStreakEvent(userId: string, streakDay: number): Promise<void> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) return;
-      const sql = neon(connectionString);
-      await sql`
-        INSERT INTO streak_events (user_id, streak_day)
-        VALUES (${userId}::uuid, ${streakDay})
-      `;
-    } catch (error) {
-      console.warn('logStreakEvent failed:', error);
-    }
-  },
-
-  /**
-   * Получить активность за последние N дней
-   */
-  async getWeekActivity(userId: string, days: number = 7): Promise<{
-    local_date: string;
-    words_learned: number;
-    minutes_learned: number;
-    cards_studied: number;
-  }[]> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) {
-        return [];
-      }
-
-      const sql = neon(connectionString);
-
-      const result = await sql`
-        SELECT local_date, words_learned, minutes_learned, cards_studied
-        FROM daily_activity
-        WHERE user_id = ${userId}::uuid
-          AND local_date >= CURRENT_DATE - ${days}::int
-        ORDER BY local_date DESC
-      `;
-
-      return result.map((row: any) => ({
-        local_date: pgDateToString(row.local_date),
-        words_learned: row.words_learned || 0,
-        minutes_learned: row.minutes_learned || 0,
-        cards_studied: row.cards_studied || 0,
-      }));
-    } catch (error) {
-      console.error('Failed to get week activity from Neon:', error);
-      return [];
-    }
-  },
-
-  /**
-   * Получить статистику пользователя
-   */
-  async getUserStats(userId: string): Promise<{
-    current_streak: number;
-    longest_streak: number;
-    last_active_date: string | null;
-    timezone: string;
-    total_words_learned: number;
-    total_minutes_learned: number;
-    total_cards_studied: number;
-  } | null> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) {
-        return null;
-      }
-
-      const sql = neon(connectionString);
-
-      const result = await sql`
-        SELECT current_streak, longest_streak, last_active_date, timezone,
-               total_words_learned, total_minutes_learned, total_cards_studied
-        FROM user_stats
-        WHERE user_id = ${userId}::uuid
-      `;
-
-      if (result.length === 0) {
-        return null;
-      }
-
-      const row = result[0];
-      const lastActiveDate = row.last_active_date
-        ? pgDateToString(row.last_active_date)
-        : null;
-      let currentStreak = row.current_streak || 0;
-      const longestStreak = row.longest_streak || 0;
-
-      // Определяем таймзон: из БД или системный
-      let timezone: string;
-      try {
-        timezone = row.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-      } catch {
-        timezone = 'UTC';
-      }
-
-      // Серверная проверка сброса стрика: если пропущено > 1 дня — обнуляем
-      if (lastActiveDate && currentStreak > 0) {
-        try {
-          const todayKey = new Intl.DateTimeFormat('en-CA', {
-            timeZone: timezone,
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-          }).format(new Date());
-
-          const lastDate = new Date(lastActiveDate + 'T12:00:00Z');
-          const todayDate = new Date(todayKey + 'T12:00:00Z');
-          const diffDays = Math.round(
-            (todayDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24)
-          );
-
-          if (diffDays > 1) {
-            currentStreak = 0;
-            await sql`
-              UPDATE user_stats SET current_streak = 0, updated_at = NOW()
-              WHERE user_id = ${userId}::uuid
-            `;
-            console.log(`🔄 Streak: сброс на сервере — пропущено ${diffDays} дней`);
-          }
-        } catch (e) {
-          console.warn('⚠️ Streak: ошибка при проверке сброса стрика', e);
-        }
-      }
-
-      return {
-        current_streak: currentStreak,
-        longest_streak: longestStreak,
-        last_active_date: lastActiveDate,
-        timezone,
-        total_words_learned: row.total_words_learned || 0,
-        total_minutes_learned: row.total_minutes_learned || 0,
-        total_cards_studied: row.total_cards_studied || 0,
-      };
-    } catch (error) {
-      console.error('Failed to get user stats from Neon:', error);
-      return null;
-    }
-  },
-
-  /**
-   * Получить активность за конкретную дату
-   */
-  async getDailyActivity(userId: string, localDate: string): Promise<{
-    local_date: string;
-    words_learned: number;
-    minutes_learned: number;
-    cards_studied: number;
-  } | null> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) {
-        return null;
-      }
-
-      const sql = neon(connectionString);
-
-      const result = await sql`
-        SELECT local_date, words_learned, minutes_learned, cards_studied
-        FROM daily_activity
-        WHERE user_id = ${userId}::uuid AND local_date = ${localDate}::date
-      `;
-
-      if (result.length === 0) {
-        return null;
-      }
-
-      const row = result[0];
-      return {
-        local_date: pgDateToString(row.local_date),
-        words_learned: row.words_learned || 0,
-        minutes_learned: row.minutes_learned || 0,
-        cards_studied: row.cards_studied || 0,
-      };
-    } catch (error) {
-      console.error('Failed to get daily activity from Neon:', error);
-      return null;
-    }
   },
 
   // ==================== COURSE INVITES ====================
@@ -1529,44 +840,6 @@ export const NeonService = {
   },
 
   /**
-   * Загрузить курсы где пользователь — ученик
-   */
-  async loadStudentCourses(userId: string): Promise<Course[]> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) return [];
-
-      const sql = neon(connectionString);
-
-      const rows = await sql`
-        SELECT
-          c.id,
-          c.title,
-          c.user_id AS owner_id,
-          cm.joined_at,
-          COALESCE(u.display_name, u.user_name, u.email) AS teacher_name
-        FROM course_members cm
-        JOIN courses c ON c.id = cm.course_id
-        JOIN users u ON u.id = c.user_id
-        WHERE cm.user_id = ${userId}::uuid AND cm.role = 'student'
-        ORDER BY cm.joined_at DESC
-      `;
-
-      return rows.map((row: any) => ({
-        id: row.id,
-        title: row.title,
-        createdAt: new Date(row.joined_at).getTime(),
-        isStudentCourse: true,
-        teacherName: row.teacher_name,
-        ownerId: row.owner_id,
-      }));
-    } catch (error) {
-      console.error('Failed to load student courses:', error);
-      return [];
-    }
-  },
-
-  /**
    * Загрузить наборы курса учителя (для ученика, read-only)
    */
   async loadCourseSetsByMembership(courseId: string): Promise<CardSet[]> {
@@ -1619,10 +892,13 @@ export const NeonService = {
     lastActiveDate: string | null;
     todayCards: number;
     joinedAt: number;
+    /** Слова курса, которым пришло время повторения */
+    waitingReviews: number;
   }>> {
     type Member = {
       id: string; displayName: string; email: string | null;
       streak: number; lastActiveDate: string | null; todayCards: number; joinedAt: string;
+      waitingReviews?: number;
     };
     const result = await callTeacherApi<{ members: Member[] }>('list-members', {
       method: 'GET',
@@ -1640,7 +916,21 @@ export const NeonService = {
       lastActiveDate: row.lastActiveDate ? pgDateToString(row.lastActiveDate) : null,
       todayCards: Number(row.todayCards) || 0,
       joinedAt: new Date(row.joinedAt).getTime(),
+      waitingReviews: Number(row.waitingReviews) || 0,
     }));
+  },
+
+  /**
+   * Учитель просит повторить слова: всему классу (не чаще раза в сутки) или одному ученику.
+   * → число учеников, которым ушло напоминание; 'rate_limited' — классу уже напоминали сегодня.
+   */
+  async remindCourseReview(courseId: string, studentId?: string): Promise<{ students: number; sent: number } | 'rate_limited' | null> {
+    const result = await callTeacherApi<{ students: number; sent: number }>('remind-review', {
+      method: 'POST',
+      body: { courseId, ...(studentId ? { studentId } : {}) },
+    });
+    if (!result.ok) return result.reason === 'rate_limited' ? 'rate_limited' : null;
+    return result.data;
   },
 
   async loadCourseActivityChart(
@@ -1658,76 +948,6 @@ export const NeonService = {
       throw new Error(result.error);
     }
     return result.data.rows;
-  },
-
-  async saveReview(
-    userId: string,
-    cardId: string,
-    quality: number,
-    timeSpent: number,
-  ): Promise<boolean> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) return false;
-
-      const sql = neon(connectionString);
-
-      // idx_reviews_user_id/idx_reviews_user_card уже создаются один раз при инициализации
-      // БД (api/_db-init.js) — раньше пересоздавались (CREATE INDEX IF NOT EXISTS) на каждый
-      // вызов saveReview, то есть на каждый ответ на карточку в любой сессии. См. план, пункт 28.
-      await sql`
-        INSERT INTO reviews (card_id, user_id, quality, time_spent)
-        VALUES (${cardId}::uuid, ${userId}::uuid, ${quality}, ${timeSpent})
-      `;
-
-      return true;
-    } catch (error) {
-      console.error('Failed to save review:', error);
-      return false;
-    }
-  },
-
-  async upsertCardProgress(
-    userId: string,
-    cardId: string,
-    data: {
-      status: string;
-      learningStep: number;
-      nextReview: number;
-      lastReviewed: number;
-    }
-  ): Promise<boolean> {
-    try {
-      const connectionString = getConnectionString();
-      if (!connectionString) return false;
-
-      const sql = neon(connectionString);
-
-      const nextReviewIso = data.nextReview ? new Date(data.nextReview).toISOString() : new Date().toISOString();
-      const lastReviewedIso = data.lastReviewed ? new Date(data.lastReviewed).toISOString() : null;
-
-      await sql`
-        INSERT INTO card_progress (
-          user_id, card_id, status, learning_step,
-          next_review, last_reviewed, updated_at
-        )
-        VALUES (
-          ${userId}::uuid, ${cardId}::uuid, ${data.status}, ${data.learningStep},
-          ${nextReviewIso}::timestamptz, ${lastReviewedIso}::timestamptz, NOW()
-        )
-        ON CONFLICT (user_id, card_id) DO UPDATE SET
-          status        = EXCLUDED.status,
-          learning_step = EXCLUDED.learning_step,
-          next_review   = EXCLUDED.next_review,
-          last_reviewed = EXCLUDED.last_reviewed,
-          updated_at    = NOW()
-      `;
-
-      return true;
-    } catch (error) {
-      console.error('Failed to upsert card progress:', error);
-      return false;
-    }
   },
 
   async loadCourseSetStats(courseId: string): Promise<Array<{

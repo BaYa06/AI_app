@@ -1,9 +1,9 @@
 /**
- * Library Service — direct DB access via @neondatabase/serverless
- * Mirrors the API logic from api/library/*.js but runs client-side
+ * Library Service — публичная библиотека наборов.
+ * Все запросы идут через backend (api/library.js); пользователь определяется по Supabase JWT.
+ * Строки подключения к БД в приложении нет — см. plan/course_rating_and_review_plan.md, этап 0.
  */
 
-import { neon } from '@neondatabase/serverless';
 import { supabase } from './supabaseClient';
 import { API_BASE } from '@/config/apiBase';
 import type {
@@ -19,579 +19,134 @@ import type {
   LibrarySet,
 } from '@/types/library';
 
-const getConnectionString = () => {
-  return (
-    process.env.POSTGRES_URL ||
-    process.env.EXPO_PUBLIC_POSTGRES_URL ||
-    process.env.REACT_APP_POSTGRES_URL ||
-    process.env.NEXT_PUBLIC_POSTGRES_URL ||
-    (globalThis as any)?.POSTGRES_URL ||
-    (typeof window !== 'undefined' && (window as any).POSTGRES_URL) ||
-    ''
-  );
-};
+const LIBRARY_API = `${API_BASE}/library`;
 
-const getSql = () => {
-  const connStr = getConnectionString();
-  if (!connStr) throw new Error('Database connection string not configured');
-  return neon(connStr);
-};
+/**
+ * Запрос к api/library.js. Токен добавляется, если есть сессия (для списка/деталей он
+ * необязателен — без него сервер вернёт is_imported/is_liked = false).
+ * Ошибка сервера превращается в Error с его текстом.
+ */
+async function callLibraryApi<T>(
+  params: Record<string, string | number | boolean | null | undefined>,
+  { method = 'GET', body, requireAuth = false }: { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: object; requireAuth?: boolean } = {},
+): Promise<T> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (requireAuth && !token) throw new Error('Необходимо войти в аккаунт');
 
-let _tablesEnsured = false;
-
-async function ensureLibraryTables() {
-  if (_tablesEnsured) return;
-  const sql = getSql();
-  try {
-    const result = await sql.query(`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables WHERE table_name = 'library_sets'
-      )
-    `);
-    if (result[0]?.exists) {
-      _tablesEnsured = true;
-      return;
-    }
-  } catch {}
-
-  // Create tables if they don't exist
-  await sql.query(`CREATE TABLE IF NOT EXISTS library_sets (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL,
-    original_set_id UUID,
-    title VARCHAR(100) NOT NULL,
-    description TEXT,
-    category VARCHAR(50),
-    tags TEXT[],
-    language_from VARCHAR(10),
-    language_to VARCHAR(10),
-    cards_count INTEGER DEFAULT 0,
-    imports_count INTEGER DEFAULT 0,
-    likes_count INTEGER DEFAULT 0,
-    rating_sum INTEGER DEFAULT 0,
-    rating_count INTEGER DEFAULT 0,
-    status VARCHAR(20) DEFAULT 'published',
-    is_featured BOOLEAN DEFAULT false,
-    cover_emoji VARCHAR(10),
-    published_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-  )`);
-  await sql.query(`CREATE TABLE IF NOT EXISTS library_cards (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    library_set_id UUID NOT NULL REFERENCES library_sets(id) ON DELETE CASCADE,
-    front TEXT NOT NULL,
-    back TEXT NOT NULL,
-    hint TEXT,
-    order_index INTEGER DEFAULT 0
-  )`);
-  await sql.query(`CREATE TABLE IF NOT EXISTS library_imports (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL,
-    library_set_id UUID NOT NULL REFERENCES library_sets(id) ON DELETE CASCADE,
-    imported_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(user_id, library_set_id)
-  )`);
-  await sql.query(`CREATE TABLE IF NOT EXISTS library_likes (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL,
-    library_set_id UUID NOT NULL REFERENCES library_sets(id) ON DELETE CASCADE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(user_id, library_set_id)
-  )`);
-  await sql.query(`CREATE TABLE IF NOT EXISTS library_ratings (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL,
-    library_set_id UUID NOT NULL REFERENCES library_sets(id) ON DELETE CASCADE,
-    rating SMALLINT NOT NULL CHECK (rating >= 1 AND rating <= 5),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(user_id, library_set_id)
-  )`);
-  await sql.query(`CREATE TABLE IF NOT EXISTS library_reports (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL,
-    library_set_id UUID NOT NULL REFERENCES library_sets(id) ON DELETE CASCADE,
-    reason VARCHAR(100),
-    status VARCHAR(20) DEFAULT 'pending',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-  )`);
-
-  // Indexes
-  await sql.query(`CREATE INDEX IF NOT EXISTS idx_library_sets_status ON library_sets(status)`);
-  await sql.query(`CREATE INDEX IF NOT EXISTS idx_library_sets_category ON library_sets(category)`);
-  await sql.query(`CREATE INDEX IF NOT EXISTS idx_library_sets_user_id ON library_sets(user_id)`);
-  await sql.query(`CREATE INDEX IF NOT EXISTS idx_library_cards_set ON library_cards(library_set_id)`);
-  await sql.query(`CREATE INDEX IF NOT EXISTS idx_library_imports_user ON library_imports(user_id)`);
-  await sql.query(`CREATE INDEX IF NOT EXISTS idx_library_likes_user ON library_likes(user_id)`);
-
-  _tablesEnsured = true;
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') query.set(key, String(value));
+  }
+  const qs = query.toString();
+  const resp = await fetch(qs ? `${LIBRARY_API}?${qs}` : LIBRARY_API, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const json = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    if (resp.status === 403) throw new Error('Можно добавлять только в свои курсы');
+    throw new Error(json?.error || `HTTP ${resp.status}`);
+  }
+  return json as T;
 }
 
 class LibraryServiceClass {
 
   /** Get library sets with filters */
-  async getLibrarySets(filters: LibraryFilters, userId?: string): Promise<LibraryListResponse> {
-    await ensureLibraryTables();
-    const sql = getSql();
-    const {
+  async getLibrarySets(filters: LibraryFilters, _userId?: string): Promise<LibraryListResponse> {
+    const { search, category, language, sort = 'popular', cardsMin, cardsMax, page = 1, curatedOnly } = filters;
+    return callLibraryApi<LibraryListResponse>({
       search,
       category,
       language,
-      sort = 'popular',
+      sort,
       cardsMin,
       cardsMax,
-      page = 1,
-      curatedOnly,
-    } = filters;
-    const limitNum = 20;
-    const offset = (page - 1) * limitNum;
-
-    // Build dynamic query with parameterized values
-    const conditions: string[] = [`ls.status = 'published'`];
-    const params: any[] = [];
-    let paramIndex = 1;
-
-    if (curatedOnly) {
-      conditions.push(`ls.is_featured = true`);
-    }
-
-    if (search) {
-      if (search.startsWith('@')) {
-        // Search by @username
-        conditions.push(`u.user_name ILIKE $${paramIndex}`);
-        params.push(`%${search}%`);
-        paramIndex++;
-      } else {
-        conditions.push(`(ls.title ILIKE $${paramIndex} OR ls.description ILIKE $${paramIndex})`);
-        params.push(`%${search}%`);
-        paramIndex++;
-      }
-    }
-
-    if (category) {
-      conditions.push(`ls.category = $${paramIndex}`);
-      params.push(category);
-      paramIndex++;
-    }
-
-    if (language) {
-      const [langFrom, langTo] = language.split('-');
-      if (langFrom && langTo) {
-        conditions.push(`ls.language_from = $${paramIndex}`);
-        params.push(langFrom);
-        paramIndex++;
-        conditions.push(`ls.language_to = $${paramIndex}`);
-        params.push(langTo);
-        paramIndex++;
-      }
-    }
-
-    if (cardsMin) {
-      conditions.push(`(SELECT COUNT(*) FROM library_cards lc WHERE lc.library_set_id = ls.id) >= $${paramIndex}`);
-      params.push(cardsMin);
-      paramIndex++;
-    }
-
-    if (cardsMax) {
-      conditions.push(`(SELECT COUNT(*) FROM library_cards lc WHERE lc.library_set_id = ls.id) <= $${paramIndex}`);
-      params.push(cardsMax);
-      paramIndex++;
-    }
-
-    if (sort === 'featured') {
-      conditions.push(`ls.is_featured = true`);
-    }
-
-    const whereClause = conditions.join(' AND ');
-
-    let orderBy: string;
-    switch (sort) {
-      case 'top_rated':
-        orderBy = 'CASE WHEN ls.rating_count > 0 THEN ls.rating_sum::float / ls.rating_count ELSE 0 END DESC, ls.rating_count DESC';
-        break;
-      case 'newest':
-        orderBy = 'ls.published_at DESC';
-        break;
-      case 'featured':
-      case 'popular':
-      default:
-        orderBy = 'ls.imports_count DESC';
-        break;
-    }
-
-    let importedSelect: string;
-    if (userId) {
-      const uidParam = `$${paramIndex}`;
-      params.push(userId);
-      paramIndex++;
-      importedSelect = `, EXISTS(SELECT 1 FROM library_imports li WHERE li.library_set_id = ls.id AND li.user_id = ${uidParam}) AS is_imported,
-         EXISTS(SELECT 1 FROM library_likes ll WHERE ll.library_set_id = ls.id AND ll.user_id = ${uidParam}) AS is_liked`;
-    } else {
-      importedSelect = `, false AS is_imported, false AS is_liked`;
-    }
-
-    const limitParam = `$${paramIndex}`;
-    params.push(limitNum + 1);
-    paramIndex++;
-    const offsetParam = `$${paramIndex}`;
-    params.push(offset);
-
-    const query = `
-      SELECT ls.*,
-        COALESCE(u.user_name, u.email) AS author_name,
-        CASE WHEN ls.rating_count > 0 THEN ROUND(ls.rating_sum::numeric / ls.rating_count, 1) ELSE NULL END AS average_rating,
-        (SELECT COUNT(*) FROM library_cards lc WHERE lc.library_set_id = ls.id)::int AS cards_count
-        ${importedSelect}
-      FROM library_sets ls
-      LEFT JOIN users u ON u.id = ls.user_id
-      WHERE ${whereClause}
-      ORDER BY ${orderBy}
-      LIMIT ${limitParam} OFFSET ${offsetParam}
-    `;
-
-    const rows = await sql.query(query, params);
-    const has_more = rows.length > limitNum;
-    const sets = has_more ? rows.slice(0, limitNum) : rows;
-
-    return { sets: sets as unknown as LibrarySet[], has_more };
+      page,
+      curatedOnly: curatedOnly ? true : undefined,
+    });
   }
 
   /** Get single library set detail */
-  async getLibrarySetDetail(id: string, userId?: string): Promise<LibrarySetDetail> {
-    await ensureLibraryTables();
-    const sql = getSql();
-    const params: any[] = [id];
-    let paramIndex = 2;
-
-    let importedSelect: string;
-    if (userId) {
-      const uidParam = `$${paramIndex}`;
-      params.push(userId);
-      paramIndex++;
-      importedSelect = `, EXISTS(SELECT 1 FROM library_imports li WHERE li.library_set_id = ls.id AND li.user_id = ${uidParam}) AS is_imported,
-         EXISTS(SELECT 1 FROM library_likes ll WHERE ll.library_set_id = ls.id AND ll.user_id = ${uidParam}) AS is_liked,
-         (SELECT rating FROM library_ratings lr WHERE lr.library_set_id = ls.id AND lr.user_id = ${uidParam}) AS user_rating`;
-    } else {
-      importedSelect = `, false AS is_imported, false AS is_liked, NULL::smallint AS user_rating`;
-    }
-
-    const setRows = await sql.query(`
-      SELECT ls.*,
-        COALESCE(u.user_name, u.email) AS author_name,
-        CASE WHEN ls.rating_count > 0 THEN ROUND(ls.rating_sum::numeric / ls.rating_count, 1) ELSE NULL END AS average_rating,
-        (SELECT COUNT(*) FROM library_cards lc WHERE lc.library_set_id = ls.id)::int AS cards_count
-        ${importedSelect}
-      FROM library_sets ls
-      LEFT JOIN users u ON u.id = ls.user_id
-      WHERE ls.id = $1 AND ls.status = 'published'
-    `, params);
-
-    if (setRows.length === 0) {
-      throw new Error('Set not found');
-    }
-
-    const cards = await sql.query(`
-      SELECT * FROM library_cards
-      WHERE library_set_id = $1
-      ORDER BY order_index ASC
-      LIMIT 10
-    `, [id]);
-
-    return { ...setRows[0], preview_cards: cards } as unknown as LibrarySetDetail;
+  async getLibrarySetDetail(id: string, _userId?: string): Promise<LibrarySetDetail> {
+    return callLibraryApi<LibrarySetDetail>({ id });
   }
 
   /** Publish a personal set to the library */
-  async publishSet(userId: string, payload: PublishSetPayload): Promise<PublishResponse> {
-    await ensureLibraryTables();
-    const sql = getSql();
-    const { setId, description, tags, category, coverEmoji } = payload;
-
-    // Check set belongs to user
-    const setRows = await sql.query(`
-      SELECT * FROM card_sets WHERE id = $1 AND user_id = $2
-    `, [setId, userId]);
-    if (setRows.length === 0) {
-      throw new Error('Set not found or access denied');
-    }
-    const cardSet = setRows[0];
-
-    // Check minimum 5 cards
-    const cardCount = await sql.query(`SELECT COUNT(*) as cnt FROM cards WHERE set_id = $1`, [setId]);
-    if (parseInt(cardCount[0].cnt, 10) < 5) {
-      throw new Error('At least 5 cards are required to publish');
-    }
-
-    // Check not already published
-    const existing = await sql.query(`
-      SELECT id FROM library_sets WHERE original_set_id = $1 AND status = 'published'
-    `, [setId]);
-    if (existing.length > 0) {
-      throw new Error('Set is already published');
-    }
-
-    // Format tags as PostgreSQL array literal
-    const tagsArr = tags && tags.length > 0
-      ? '{' + tags.map(t => '"' + t.replace(/"/g, '\\"') + '"').join(',') + '}'
-      : '{}';
-
-    // Create library set
-    const libSet = await sql.query(`
-      INSERT INTO library_sets (
-        user_id, original_set_id, title, description, category, tags,
-        language_from, language_to, cards_count, cover_emoji, status
-      ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'published'
-      )
-      RETURNING id
-    `, [
-      userId, setId, cardSet.title,
-      description || cardSet.description || null,
-      category || cardSet.category || null,
-      tagsArr,
-      cardSet.language_from || null, cardSet.language_to || null,
-      parseInt(cardCount[0].cnt, 10),
-      coverEmoji || null,
-    ]);
-
-    const librarySetId = libSet[0].id;
-
-    // Copy cards
-    const cards = await sql.query(`
-      SELECT front, back, example FROM cards WHERE set_id = $1 ORDER BY created_at ASC
-    `, [setId]);
-
-    if (cards.length > 0) {
-      const placeholders = cards.map((_, i) => `($${i * 5 + 1}, $${i * 5 + 2}, $${i * 5 + 3}, $${i * 5 + 4}, $${i * 5 + 5})`).join(', ');
-      const params = cards.flatMap((card, i) => [librarySetId, card.front, card.back, card.example || null, i]);
-      await sql.query(`INSERT INTO library_cards (library_set_id, front, back, hint, order_index) VALUES ${placeholders}`, params);
-    }
-
-    return { librarySetId };
+  async publishSet(_userId: string, payload: PublishSetPayload): Promise<PublishResponse> {
+    return callLibraryApi<PublishResponse>({ action: 'publish' }, { method: 'POST', body: payload, requireAuth: true });
   }
 
   /** Update published set cards and metadata from original */
-  async updatePublication(userId: string, librarySetId: string, meta?: { description?: string; category?: string; coverEmoji?: string }): Promise<{ success: boolean }> {
-    const sql = getSql();
-
-    const libSet = await sql.query(`
-      SELECT * FROM library_sets WHERE id = $1 AND user_id = $2 AND status = 'published'
-    `, [librarySetId, userId]);
-    if (libSet.length === 0) {
-      throw new Error('Publication not found or access denied');
-    }
-
-    const originalSetId = libSet[0].original_set_id;
-    if (!originalSetId) {
-      throw new Error('Original set reference is missing');
-    }
-
-    // Get fresh data from the original set
-    const setRows = await sql.query(`SELECT * FROM card_sets WHERE id = $1`, [originalSetId]);
-    if (setRows.length === 0) {
-      throw new Error('Original set not found');
-    }
-    const cardSet = setRows[0];
-
-    const cardCount = await sql.query(`SELECT COUNT(*) as cnt FROM cards WHERE set_id = $1`, [originalSetId]);
-    if (parseInt(cardCount[0].cnt, 10) < 5) {
-      throw new Error('Original set must have at least 5 cards');
-    }
-
-    // Delete old library cards
-    await sql.query(`DELETE FROM library_cards WHERE library_set_id = $1`, [librarySetId]);
-
-    // Copy fresh cards
-    const cards = await sql.query(`
-      SELECT front, back, example FROM cards WHERE set_id = $1 ORDER BY created_at ASC
-    `, [originalSetId]);
-
-    if (cards.length > 0) {
-      const placeholders = cards.map((_, i) => `($${i * 5 + 1}, $${i * 5 + 2}, $${i * 5 + 3}, $${i * 5 + 4}, $${i * 5 + 5})`).join(', ');
-      const params = cards.flatMap((card, i) => [librarySetId, card.front, card.back, card.example || null, i]);
-      await sql.query(`INSERT INTO library_cards (library_set_id, front, back, hint, order_index) VALUES ${placeholders}`, params);
-    }
-
-    // Update metadata from original set
-    await sql.query(`
-      UPDATE library_sets
-      SET title = $1, description = $2, category = $3,
-          language_from = $4, language_to = $5,
-          cards_count = $6, cover_emoji = $7, updated_at = NOW()
-      WHERE id = $8
-    `, [
-      cardSet.title,
-      meta?.description || cardSet.description || null,
-      meta?.category || cardSet.category || null,
-      cardSet.language_from || null,
-      cardSet.language_to || null,
-      cards.length,
-      meta?.coverEmoji || null,
-      librarySetId,
-    ]);
-
-    return { success: true };
+  async updatePublication(_userId: string, librarySetId: string, meta?: { description?: string; category?: string; coverEmoji?: string }): Promise<{ success: boolean }> {
+    return callLibraryApi<{ success: boolean }>(
+      { action: 'publish' },
+      { method: 'PUT', body: { librarySetId, ...meta }, requireAuth: true },
+    );
   }
 
   /** Unpublish (archive) a set */
-  async unpublishSet(userId: string, librarySetId: string): Promise<{ success: boolean }> {
-    const sql = getSql();
-
-    const result = await sql.query(`
-      UPDATE library_sets SET status = 'archived'
-      WHERE id = $1 AND user_id = $2 AND status = 'published'
-      RETURNING id
-    `, [librarySetId, userId]);
-
-    if (result.length === 0) {
-      throw new Error('Publication not found or access denied');
-    }
-
-    return { success: true };
+  async unpublishSet(_userId: string, librarySetId: string): Promise<{ success: boolean }> {
+    return callLibraryApi<{ success: boolean }>(
+      { action: 'publish' },
+      { method: 'DELETE', body: { librarySetId }, requireAuth: true },
+    );
   }
 
   /**
    * Import a library set into personal collection (optionally into one of the user's own courses).
-   * Идёт через backend (api/library.js) с Supabase JWT: сервер сам определяет пользователя,
-   * проверяет, что курс принадлежит ему, и создаёт набор с карточками одним атомарным запросом.
+   * Сервер сам определяет пользователя, проверяет, что курс принадлежит ему, и создаёт набор
+   * с карточками одним атомарным запросом.
    */
   async importSet(_userId: string, librarySetId: string, courseId: string | null = null): Promise<ImportResponse> {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
-    if (!token) throw new Error('Необходимо войти в аккаунт');
-
-    const resp = await fetch(`${API_BASE}/library?action=import`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ librarySetId, courseId }),
-    });
-    const json = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      if (resp.status === 403) throw new Error('Можно добавлять только в свои курсы');
-      throw new Error(json?.error || `HTTP ${resp.status}`);
-    }
+    const json = await callLibraryApi<{ newSetId: string }>(
+      { action: 'import' },
+      { method: 'POST', body: { librarySetId, courseId }, requireAuth: true },
+    );
     return { newSetId: json.newSetId };
   }
 
   /** Fetch all cards for a library set (READ only, used for guest import) */
   async getLibraryCards(librarySetId: string): Promise<{ front: string; back: string; hint: string | null }[]> {
-    const sql = getSql();
-    const rows = await sql.query(`
-      SELECT front, back, hint FROM library_cards
-      WHERE library_set_id = $1 ORDER BY order_index ASC
-    `, [librarySetId]);
-    return rows as { front: string; back: string; hint: string | null }[];
+    return callLibraryApi<{ front: string; back: string; hint: string | null }[]>({ action: 'cards', id: librarySetId });
   }
 
   /** Toggle like on a library set */
-  async toggleLike(userId: string, librarySetId: string): Promise<ToggleLikeResponse> {
-    const sql = getSql();
-
-    const existing = await sql.query(`
-      SELECT id FROM library_likes WHERE user_id = $1 AND library_set_id = $2
-    `, [userId, librarySetId]);
-
-    let is_liked: boolean;
-    if (existing.length > 0) {
-      await sql.query(`DELETE FROM library_likes WHERE user_id = $1 AND library_set_id = $2`, [userId, librarySetId]);
-      await sql.query(`UPDATE library_sets SET likes_count = GREATEST(likes_count - 1, 0) WHERE id = $1`, [librarySetId]);
-      is_liked = false;
-    } else {
-      await sql.query(`INSERT INTO library_likes (user_id, library_set_id) VALUES ($1, $2)`, [userId, librarySetId]);
-      await sql.query(`UPDATE library_sets SET likes_count = likes_count + 1 WHERE id = $1`, [librarySetId]);
-      is_liked = true;
-    }
-
-    const updated = await sql.query(`SELECT likes_count FROM library_sets WHERE id = $1`, [librarySetId]);
-    const likes_count = updated.length > 0 ? updated[0].likes_count : 0;
-
-    return { is_liked, likes_count };
+  async toggleLike(_userId: string, librarySetId: string): Promise<ToggleLikeResponse> {
+    return callLibraryApi<ToggleLikeResponse>({ action: 'like' }, { method: 'POST', body: { librarySetId }, requireAuth: true });
   }
 
   /** Rate a library set (1-5) */
-  async rateSet(userId: string, librarySetId: string, rating: number): Promise<RateResponse> {
-    const sql = getSql();
-
+  async rateSet(_userId: string, librarySetId: string, rating: number): Promise<RateResponse> {
     const ratingNum = Math.max(1, Math.min(5, Math.round(rating)));
-
-    const existing = await sql.query(`
-      SELECT id, rating FROM library_ratings
-      WHERE user_id = $1 AND library_set_id = $2
-    `, [userId, librarySetId]);
-
-    if (existing.length > 0) {
-      const oldRating = existing[0].rating;
-      await sql.query(`
-        UPDATE library_ratings SET rating = $1
-        WHERE user_id = $2 AND library_set_id = $3
-      `, [ratingNum, userId, librarySetId]);
-      await sql.query(`
-        UPDATE library_sets
-        SET rating_sum = rating_sum - $1 + $2
-        WHERE id = $3
-      `, [oldRating, ratingNum, librarySetId]);
-    } else {
-      await sql.query(`
-        INSERT INTO library_ratings (user_id, library_set_id, rating)
-        VALUES ($1, $2, $3)
-      `, [userId, librarySetId, ratingNum]);
-      await sql.query(`
-        UPDATE library_sets
-        SET rating_sum = rating_sum + $1, rating_count = rating_count + 1
-        WHERE id = $2
-      `, [ratingNum, librarySetId]);
-    }
-
-    const updated = await sql.query(`
-      SELECT rating_sum, rating_count FROM library_sets WHERE id = $1
-    `, [librarySetId]);
-
-    const { rating_sum, rating_count } = updated[0];
-    const average_rating = rating_count > 0
-      ? Math.round((rating_sum / rating_count) * 10) / 10
-      : 0;
-
-    return { user_rating: ratingNum, average_rating, rating_count };
+    const json = await callLibraryApi<RateResponse>(
+      { action: 'rate' },
+      { method: 'POST', body: { librarySetId, rating: ratingNum }, requireAuth: true },
+    );
+    return { ...json, average_rating: json.average_rating ?? 0 };
   }
 
   /** Report a library set */
-  async reportSet(userId: string, librarySetId: string, reason: string): Promise<{ success: boolean }> {
-    const sql = getSql();
-    await sql.query(`
-      INSERT INTO library_reports (user_id, library_set_id, reason)
-      VALUES ($1, $2, $3)
-    `, [userId, librarySetId, reason || null]);
-    return { success: true };
+  async reportSet(_userId: string, librarySetId: string, reason: string): Promise<{ success: boolean }> {
+    return callLibraryApi<{ success: boolean }>(
+      { action: 'report' },
+      { method: 'POST', body: { librarySetId, reason: reason || null }, requireAuth: true },
+    );
   }
 
   /** Get user's own publications */
-  async getMyPublications(userId: string): Promise<LibrarySet[]> {
-    const sql = getSql();
-    const sets = await sql.query(`
-      SELECT ls.*,
-        CASE WHEN ls.rating_count > 0
-          THEN ROUND(ls.rating_sum::numeric / ls.rating_count, 1)
-          ELSE NULL
-        END AS average_rating,
-        (SELECT COUNT(*) FROM library_cards lc WHERE lc.library_set_id = ls.id)::int AS cards_count
-      FROM library_sets ls
-      WHERE ls.user_id = $1 AND ls.status IN ('published', 'archived')
-      ORDER BY ls.published_at DESC
-    `, [userId]);
-    return sets as unknown as LibrarySet[];
+  async getMyPublications(_userId: string): Promise<LibrarySet[]> {
+    return callLibraryApi<LibrarySet[]>({ action: 'my-publications' }, { requireAuth: true });
   }
 
   /** Check if a personal set is published */
-  async checkPublished(setId: string, userId: string): Promise<CheckPublishedResponse> {
-    const sql = getSql();
-    const result = await sql.query(`
-      SELECT id FROM library_sets
-      WHERE original_set_id = $1 AND user_id = $2 AND status = 'published'
-      LIMIT 1
-    `, [setId, userId]);
-
-    if (result.length > 0) {
-      return { isPublished: true, librarySetId: result[0].id };
-    }
-    return { isPublished: false };
+  async checkPublished(setId: string, _userId: string): Promise<CheckPublishedResponse> {
+    return callLibraryApi<CheckPublishedResponse>({ action: 'check-published', setId }, { requireAuth: true });
   }
 }
 

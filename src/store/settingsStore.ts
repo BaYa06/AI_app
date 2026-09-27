@@ -8,7 +8,6 @@ import { colors, ColorScheme } from '@/constants';
 import { StreakService } from '@/services/StreakService';
 import { NeonService } from '@/services/NeonService';
 import { supabase } from '@/services';
-import { API_BASE } from '@/config/apiBase';
 
 interface SettingsState {
   // Настройки пользователя
@@ -185,23 +184,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
             state.todayStats.streak = newCount;
           });
 
-          const milestones = [7, 14, 30, 60, 100];
-          if (milestones.includes(newCount)) {
-            supabase.auth.getSession().then(({ data }) => {
-              fetch(`${API_BASE}/push?action=notify`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': 'Bearer ' + (process.env.EXPO_PUBLIC_NOTIFY_SECRET || ''),
-                },
-                body: JSON.stringify({
-                  userId: data.session?.user?.id,
-                  type: 'streak_milestone',
-                  data: { days: newCount },
-                }),
-              }).catch(() => {});
-            });
-          }
+          // Пуш о рекорде серии шлёт сервер (api/data.js, updateUserStatsStreak)
 
           // Логируем событие стрика для админ-панели
           supabase.auth.getSession().then(({ data }) => {

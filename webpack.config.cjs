@@ -144,7 +144,6 @@ module.exports = (env, argv) => {
         'process.env': JSON.stringify({
           NODE_ENV: argv.mode || 'production',
           JEST_WORKER_ID: null,
-          POSTGRES_URL: envVars.POSTGRES_URL || process.env.POSTGRES_URL || '',
           SUPABASE_URL: envVars.SUPABASE_URL || process.env.SUPABASE_URL || '',
           SUPABASE_ANON_KEY: envVars.SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '',
           SUPABASE_REDIRECT_URI: envVars.SUPABASE_REDIRECT_URI || process.env.SUPABASE_REDIRECT_URI || '',
