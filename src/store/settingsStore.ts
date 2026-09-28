@@ -1,7 +1,9 @@
 /**
  * Store для настроек и темы
  */
+import { Appearance } from 'react-native';
 import { readCache } from '@/services/localCache';
+import { StorageService, STORAGE_KEYS } from '@/services/StorageService';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import type { UserSettings, ThemeMode } from '@/types';
@@ -80,6 +82,28 @@ import { getLocalDateKey } from '@/services/StreakService';
 
 const getTodayDate = () => getLocalDateKey();
 
+/** 'system' → светлая/тёмная по настройке устройства */
+function resolveTheme(mode: ThemeMode): 'light' | 'dark' {
+  if (mode !== 'system') return mode;
+  return Appearance.getColorScheme() === 'dark' ? 'dark' : 'light';
+}
+
+/**
+ * Настройки с прошлого запуска. MMKV читается синхронно, поэтому выбранная тема применяется
+ * с первого кадра, а не после загрузки данных в DatabaseService (раньше мигала светлая тема).
+ */
+function initialSettings(): UserSettings {
+  try {
+    const saved = StorageService.getObject<UserSettings>(STORAGE_KEYS.SETTINGS);
+    return saved ? { ...defaultSettings, ...saved } : defaultSettings;
+  } catch {
+    return defaultSettings;
+  }
+}
+
+const startSettings = initialSettings();
+const startTheme = resolveTheme(startSettings.theme);
+
 /** Серия, сохранённая при прошлом запуске (StreakService кэширует user_stats) */
 function initialStreakCache() {
   const cached = readCache<{ current_streak?: number; longest_streak?: number; last_active_date?: string | null }>('user_stats');
@@ -94,10 +118,10 @@ function initialStreakCache() {
 export const useSettingsStore = create<SettingsState & SettingsActions>()(
   immer((set, get) => ({
     // Начальное состояние
-    settings: defaultSettings,
-    themeMode: 'light',
-    resolvedTheme: 'light',
-    colors: colors.light,
+    settings: startSettings,
+    themeMode: startSettings.theme,
+    resolvedTheme: startTheme,
+    colors: colors[startTheme] as any,
     todayStats: {
       cardsStudied: 0,
       streak: 0,
@@ -117,8 +141,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
       
       // Обновляем тему если изменилась (вне Immer)
       if (updates.theme) {
-        const newTheme = updates.theme === 'system' ? 'light' : updates.theme;
-        const resolved = newTheme as 'light' | 'dark';
+        const resolved = resolveTheme(updates.theme);
         set({ 
           themeMode: updates.theme,
           resolvedTheme: resolved,
@@ -130,7 +153,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
     // ==================== ТЕМА ====================
     
     setTheme: (mode) => {
-      const resolved = (mode === 'system' ? 'light' : mode) as 'light' | 'dark';
+      const resolved = resolveTheme(mode);
       set((state) => {
         state.themeMode = mode;
         state.resolvedTheme = resolved;
@@ -270,3 +293,9 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
 
 // Хук для получения цветов темы
 export const useThemeColors = () => useSettingsStore((state) => state.colors);
+
+// В режиме 'system' тема меняется вместе с настройкой устройства
+Appearance.addChangeListener(() => {
+  const { themeMode, setTheme } = useSettingsStore.getState();
+  if (themeMode === 'system') setTheme('system');
+});

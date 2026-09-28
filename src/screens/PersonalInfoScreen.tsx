@@ -19,25 +19,14 @@ import { supabase, NeonService } from '@/services';
 import { spacing, borderRadius, TOP_LANGUAGES, MAX_TARGET_LANGUAGES, getLanguageLabel, getLanguageFlag } from '@/constants';
 import {
   ArrowLeft,
-  Calendar,
   ChevronDown,
-  MapPin,
-  Clock,
   X,
   Plus,
   CheckCircle,
-  Pencil,
 } from 'lucide-react-native';
 import type { RootStackScreenProps } from '@/types/navigation';
 
 type Props = RootStackScreenProps<'PersonalInfo'>;
-
-const TIMEZONES = [
-  { value: 'cet', label: '(GMT+01:00) Central European Time' },
-  { value: 'est', label: '(GMT-05:00) Eastern Standard Time' },
-  { value: 'msk', label: '(GMT+03:00) Moscow Standard Time' },
-  { value: 'pdt', label: '(GMT-07:00) Pacific Daylight Time' },
-];
 
 export function PersonalInfoScreen({ navigation }: Props) {
   const colors = useThemeColors();
@@ -48,14 +37,10 @@ export function PersonalInfoScreen({ navigation }: Props) {
   const [lastName, setLastName] = useState('');
   const [userName, setUserName] = useState('');
   const [saving, setSaving] = useState(false);
-  const [birthday, setBirthday] = useState('1995-05-15');
   const [nativeLang, setNativeLang] = useState('ru');
   const [learningLangs, setLearningLangs] = useState<string[]>([]);
-  const [location, setLocation] = useState('Berlin, Germany');
-  const [timezone, setTimezone] = useState('cet');
   const [showNativeLangPicker, setShowNativeLangPicker] = useState(false);
   const [showLearningLangPicker, setShowLearningLangPicker] = useState(false);
-  const [showTimezonePicker, setShowTimezonePicker] = useState(false);
 
   // Загрузить user_name, display_name и языковые предпочтения из БД
   useEffect(() => {
@@ -126,15 +111,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
             <View style={[s.avatar, { backgroundColor: colors.primary }]}>
               <Text style={s.avatarText}>{(firstName?.[0] || '').toUpperCase()}{(lastName?.[0] || '').toUpperCase()}</Text>
             </View>
-            <Pressable style={[s.avatarEditBtn, { backgroundColor: colors.primary, borderColor: isDark ? colors.background : '#FFFFFF' }]}>
-              <Pencil size={14} color="#FFFFFF" />
-            </Pressable>
           </View>
-          <Pressable>
-            <Text variant="bodySmall" style={{ color: colors.primary, fontWeight: '600' }}>
-              Изменить фото
-            </Text>
-          </Pressable>
         </View>
 
         {/* Form */}
@@ -197,25 +174,6 @@ export function PersonalInfoScreen({ navigation }: Props) {
                   Platform.OS === 'web' && { outlineStyle: 'none' },
                 ]}
               />
-            </View>
-          </View>
-
-          {/* Birthday */}
-          <View style={s.field}>
-            <Text style={[s.label, { color: colors.textTertiary }]}>Дата рождения</Text>
-            <View style={[s.inputWrap, { backgroundColor: inputBg, borderColor: inputBorder }]}>
-              <TextInput
-                value={birthday}
-                onChangeText={setBirthday}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.textTertiary}
-                style={[
-                  s.inputInner,
-                  { color: colors.textPrimary },
-                  Platform.OS === 'web' && { outlineStyle: 'none' },
-                ]}
-              />
-              <Calendar size={20} color={colors.textTertiary} />
             </View>
           </View>
 
@@ -314,82 +272,6 @@ export function PersonalInfoScreen({ navigation }: Props) {
                     </Pressable>
                   );
                 })}
-              </View>
-            )}
-          </View>
-
-          {/* Location */}
-          <View style={s.field}>
-            <Text style={[s.label, { color: colors.textTertiary }]}>Местоположение</Text>
-            <View style={[s.inputWrap, { backgroundColor: inputBg, borderColor: inputBorder }]}>
-              <TextInput
-                value={location}
-                onChangeText={setLocation}
-                placeholder="Город, Страна"
-                placeholderTextColor={colors.textTertiary}
-                style={[
-                  s.inputInner,
-                  { color: colors.textPrimary },
-                  Platform.OS === 'web' && { outlineStyle: 'none' },
-                ]}
-              />
-              <MapPin size={20} color={colors.textTertiary} />
-            </View>
-            {/* Map placeholder */}
-            <View style={[s.mapPlaceholder, { backgroundColor: inputBg, borderColor: inputBorder }]}>
-              <MapPin size={32} color={colors.textTertiary + '40'} />
-              <Text variant="caption" style={{ color: colors.textTertiary }}>
-                Berlin, Germany
-              </Text>
-            </View>
-          </View>
-
-          {/* Timezone */}
-          <View style={s.field}>
-            <Text style={[s.label, { color: colors.textTertiary }]}>Часовой пояс</Text>
-            <Pressable
-              onPress={() => setShowTimezonePicker(!showTimezonePicker)}
-              style={[s.inputWrap, { backgroundColor: inputBg, borderColor: inputBorder }]}
-            >
-              <Text
-                variant="bodySmall"
-                style={{ color: colors.textPrimary, flex: 1 }}
-                numberOfLines={1}
-              >
-                {TIMEZONES.find((t) => t.value === timezone)?.label ?? ''}
-              </Text>
-              <Clock size={20} color={colors.textTertiary} />
-            </Pressable>
-            {showTimezonePicker && (
-              <View style={[s.picker, { backgroundColor: isDark ? 'rgb(32, 34, 44)' : '#FFFFFF', borderColor: inputBorder }]}>
-                {TIMEZONES.map((tz) => (
-                  <Pressable
-                    key={tz.value}
-                    style={[
-                      s.pickerItem,
-                      timezone === tz.value && { backgroundColor: colors.primary + '10' },
-                    ]}
-                    onPress={() => {
-                      setTimezone(tz.value);
-                      setShowTimezonePicker(false);
-                    }}
-                  >
-                    <Text
-                      variant="caption"
-                      style={{
-                        color: timezone === tz.value ? colors.primary : colors.textPrimary,
-                        fontWeight: timezone === tz.value ? '700' : '500',
-                        flex: 1,
-                      }}
-                      numberOfLines={1}
-                    >
-                      {tz.label}
-                    </Text>
-                    {timezone === tz.value && (
-                      <CheckCircle size={18} color={colors.primary} />
-                    )}
-                  </Pressable>
-                ))}
               </View>
             )}
           </View>
@@ -497,17 +379,6 @@ const s = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
-  avatarEditBtn: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
 
   // Form
   form: {
@@ -599,17 +470,6 @@ const s = StyleSheet.create({
     paddingHorizontal: spacing.s,
     paddingVertical: 6,
     borderRadius: borderRadius.m,
-  },
-
-  // Map placeholder
-  mapPlaceholder: {
-    height: 96,
-    borderRadius: borderRadius.xl,
-    borderWidth: 1,
-    marginTop: spacing.xs,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xxs,
   },
 
   // Bottom Bar

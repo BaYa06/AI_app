@@ -2,61 +2,59 @@
  * Profile Screen
  * @description Экран профиля и настроек
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   StyleSheet,
   ScrollView,
   Pressable,
   Alert,
-  Switch,
   Platform,
+  Linking,
+  ActivityIndicator,
 } from 'react-native';
-import { useSettingsStore, useThemeColors } from '@/store';
-import { DatabaseService, supabase, NeonService, Analytics } from '@/services';
+import { useSettingsStore, useThemeColors, useDiamondStore } from '@/store';
+import { supabase, NeonService, Analytics, StreakService, DatabaseService } from '@/services';
+import type { UserStats } from '@/services';
 import { Text } from '@/components/common';
 import { spacing, borderRadius } from '@/constants';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import type { Session } from '@supabase/supabase-js';
+import type { ThemeMode } from '@/types';
 import { useFocusEffect } from '@react-navigation/native';
+import { version as APP_VERSION } from '../../package.json';
+import { getLevelProgress, XP_PER_LEVEL } from '@/utils/level';
 
-// ==================== НАСТРОЙКИ СЕКЦИЙ ====================
+// ==================== ПРАВОВАЯ ИНФОРМАЦИЯ ====================
 
-const QUICK_ACTIONS = [
-  { icon: 'trophy-outline', label: 'Награды' },
-  { icon: 'settings-outline', label: 'Настройки' },
-] as const;
+// Пустая ссылка — пункт не показывается
+const PRIVACY_POLICY_URL = '';
+const TERMS_URL = '';
 
-const ACCOUNT_ITEMS = [
-  { icon: 'person-outline', label: 'Личные данные', badge: null, disabled: false },
-  { icon: 'lock-closed-outline', label: 'Безопасность', badge: null, disabled: true },
-  { icon: 'lock-closed-outline', label: 'Подписка', badge: 'PRO', disabled: true },
-] as const;
-
-const PREFERENCES_ITEMS = [
-  { icon: 'school-outline', label: 'Настройки обучения' },
-] as const;
-
-const CUSTOMIZATION_ITEMS_KEYS = ['appearance', 'notifications', 'sound'] as const;
-
-const DATA_ITEMS = [
-  { icon: 'server-outline', label: 'Данные и хранилище' },
-  { icon: 'document-text-outline', label: 'Правовая информация' },
-] as const;
+const THEME_OPTIONS: Array<{ value: ThemeMode; label: string }> = [
+  { value: 'light', label: 'Светлая' },
+  { value: 'dark', label: 'Тёмная' },
+  { value: 'system', label: 'Авто' },
+];
 
 // ==================== MAIN SCREEN ====================
 
 export function ProfileScreen({ navigation }: any) {
   const colors = useThemeColors();
-  const settings = useSettingsStore((s) => s.settings);
   const themeMode = useSettingsStore((s) => s.themeMode);
   const resolvedTheme = useSettingsStore((s) => s.resolvedTheme);
-  const updateSettings = useSettingsStore((s) => s.updateSettings);
-  const toggleTheme = useSettingsStore((s) => s.toggleTheme);
+  const setTheme = useSettingsStore((s) => s.setTheme);
   const isDark = resolvedTheme === 'dark';
 
   const [session, setSession] = useState<Session | null>(null);
   const [userNameHandle, setUserNameHandle] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
+  const [userStats, setUserStats] = useState<UserStats | null>(() => StreakService.cachedUserStats());
+  const streak = useSettingsStore((s) => s.streakCache.currentStreak);
+  const diamonds = useDiamondStore((s) => s.diamonds);
+  const loadRewards = useDiamondStore((s) => s.loadRewards);
+  const isTeacher = useSettingsStore((s) => s.isTeacher);
+  const [deleting, setDeleting] = useState(false);
 
   const cardBg = isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF';
   const cardBorder = isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9';
@@ -82,85 +80,45 @@ export function ProfileScreen({ navigation }: any) {
     };
   }, []);
 
-  // Загружаем user_name из БД (обновляем при каждом фокусе экрана)
+  // Имя и статистика из БД (обновляем при каждом фокусе экрана)
   const sessionUserId = session?.user?.id;
   useFocusEffect(
     useCallback(() => {
       if (!sessionUserId) {
         setUserNameHandle(null);
+        setDisplayName(null);
         return;
       }
-      NeonService.getUserName(sessionUserId).then((name) => {
-        setUserNameHandle(name);
+      NeonService.getUserName(sessionUserId).then(setUserNameHandle);
+      NeonService.getDisplayName(sessionUserId).then(setDisplayName);
+      StreakService.fetchUserStats().then((stats) => {
+        if (stats) setUserStats(stats);
       });
-    }, [sessionUserId]),
+      loadRewards();
+    }, [sessionUserId, loadRewards]),
   );
 
   const userEmail = session?.user?.email;
   const userName = useMemo(() => {
+    if (displayName?.trim()) return displayName.trim();
     if (!userEmail) return 'Гость';
     return userEmail.split('@')[0];
-  }, [userEmail]);
+  }, [displayName, userEmail]);
 
   const avatarLetter = useMemo(
-    () => (userEmail ? userEmail[0].toUpperCase() : '?'),
-    [userEmail],
+    () => (userName !== 'Гость' ? userName[0].toUpperCase() : '?'),
+    [userName],
   );
 
-  // Переключение темной темы
-  const handleToggleDarkMode = useCallback(() => {
-    toggleTheme();
-  }, [toggleTheme]);
+  // Без входа статистики нет — показываем нули, а не кэш прошлого аккаунта
+  const totalCardsStudied = session ? (userStats?.total_cards_studied ?? 0) : 0;
+  const { level, xpCurrent, xpPercent, xpToNext } = getLevelProgress(totalCardsStudied);
 
-  // Экспорт данных
-  const handleExport = useCallback(async () => {
-    try {
-      DatabaseService.exportData();
-      if (Platform.OS === 'web') {
-        window.alert('Данные подготовлены для экспорта');
-      } else {
-        Alert.alert('Экспорт', 'Данные подготовлены для экспорта');
-      }
-    } catch (error) {
-      if (Platform.OS === 'web') {
-        window.alert('Не удалось экспортировать данные');
-      } else {
-        Alert.alert('Ошибка', 'Не удалось экспортировать данные');
-      }
-    }
-  }, []);
-
-  // Очистка данных
-  const handleClearData = useCallback(() => {
-    if (Platform.OS === 'web') {
-      if (window.confirm('Удалить все данные?\nВсе наборы и карточки будут удалены. Это действие нельзя отменить.')) {
-        DatabaseService.clearAll();
-        window.alert('Все данные удалены');
-      }
-      return;
-    }
-    Alert.alert(
-      'Удалить все данные?',
-      'Все наборы и карточки будут удалены. Это действие нельзя отменить.',
-      [
-        { text: 'Отмена', style: 'cancel' },
-        {
-          text: 'Удалить',
-          style: 'destructive',
-          onPress: () => {
-            DatabaseService.clearAll();
-            Alert.alert('Готово', 'Все данные удалены');
-          },
-        },
-      ],
-    );
-  }, []);
-
-  // Logout
-  const doSignOut = useCallback(async () => {
+  // Logout. scope 'global' — завершить сессии и на всех остальных устройствах
+  const doSignOut = useCallback(async (scope: 'local' | 'global' = 'local') => {
     try {
       Analytics.logout();
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope });
     } catch (e) {
       console.error('Logout error:', e);
     }
@@ -175,9 +133,55 @@ export function ProfileScreen({ navigation }: any) {
     }
     Alert.alert('Выйти из аккаунта?', '', [
       { text: 'Отмена', style: 'cancel' },
-      { text: 'Выйти', style: 'destructive', onPress: doSignOut },
+      { text: 'Выйти', style: 'destructive', onPress: () => doSignOut() },
     ]);
   }, [doSignOut]);
+
+  const handleLogoutEverywhere = useCallback(() => {
+    const title = 'Выйти на всех устройствах?';
+    const message = 'Сессии завершатся на всех телефонах и в браузерах, включая этот.';
+    if (Platform.OS === 'web') {
+      if (window.confirm(`${title}\n${message}`)) doSignOut('global');
+      return;
+    }
+    Alert.alert(title, message, [
+      { text: 'Отмена', style: 'cancel' },
+      { text: 'Выйти везде', style: 'destructive', onPress: () => doSignOut('global') },
+    ]);
+  }, [doSignOut]);
+
+  // Удаление аккаунта (требование App Store): сервер удаляет данные и пользователя,
+  // затем чистим устройство и выходим — App.tsx по SIGNED_OUT вернёт на экран приветствия
+  const doDeleteAccount = useCallback(async () => {
+    setDeleting(true);
+    const ok = await NeonService.deleteAccount();
+    if (!ok) {
+      setDeleting(false);
+      const msg = 'Не удалось удалить аккаунт. Проверьте интернет и попробуйте ещё раз.';
+      if (Platform.OS === 'web') window.alert(msg);
+      else Alert.alert('Ошибка', msg);
+      return;
+    }
+    DatabaseService.clearAll();
+    await doSignOut('local');
+  }, [doSignOut]);
+
+  const handleDeleteAccount = useCallback(() => {
+    if (deleting) return;
+    const title = 'Удалить аккаунт?';
+    const message =
+      'Будут безвозвратно удалены все ваши наборы, прогресс, серия, алмазы и публикации в библиотеке.' +
+      (isTeacher ? ' Ваши курсы тоже будут удалены, и ученики потеряют к ним доступ.' : '') +
+      ' Отменить это нельзя.';
+    if (Platform.OS === 'web') {
+      if (window.confirm(`${title}\n\n${message}`)) doDeleteAccount();
+      return;
+    }
+    Alert.alert(title, message, [
+      { text: 'Отмена', style: 'cancel' },
+      { text: 'Удалить', style: 'destructive', onPress: doDeleteAccount },
+    ]);
+  }, [deleting, isTeacher, doDeleteAccount]);
 
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
@@ -189,11 +193,6 @@ export function ProfileScreen({ navigation }: any) {
         {/* ======== Header ======== */}
         <View style={st.header}>
           <Text style={[st.headerTitle, { color: colors.textPrimary }]}>Профиль</Text>
-          <Pressable
-            style={[st.headerBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9' }]}
-          >
-            <Ionicons name="ellipsis-vertical" size={20} color={colors.textSecondary} />
-          </Pressable>
         </View>
 
         {/* ======== Hero Card ======== */}
@@ -203,12 +202,11 @@ export function ProfileScreen({ navigation }: any) {
             <View style={st.avatarWrap}>
               {/* Level Ring */}
               <View style={[st.avatarRing, { borderColor: colors.primary + '30' }]} />
-              <View style={[st.avatarRingProgress, { borderColor: colors.primary, borderTopColor: 'transparent' }]} />
               <View style={[st.avatar, { backgroundColor: colors.primary }]}>
                 <Text style={st.avatarText}>{avatarLetter}</Text>
               </View>
               <View style={[st.levelBadge, { backgroundColor: colors.primary }]}>
-                <Text style={st.levelText}>LVL 12</Text>
+                <Text style={st.levelText}>LVL {level}</Text>
               </View>
             </View>
             <View style={st.userInfo}>
@@ -226,160 +224,127 @@ export function ProfileScreen({ navigation }: any) {
           <View style={st.xpSection}>
             <View style={st.xpLabelRow}>
               <Text style={[st.xpLabel, { color: colors.textTertiary }]}>Прогресс XP</Text>
-              <Text style={[st.xpPercent, { color: colors.primary }]}>67%</Text>
+              <Text style={[st.xpPercent, { color: colors.primary }]}>{xpCurrent} / {XP_PER_LEVEL} XP</Text>
             </View>
             <View style={[st.xpBarBg, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9' }]}>
-              <View style={[st.xpBarFill, { backgroundColor: colors.primary, width: '67%' }]} />
+              <View style={[st.xpBarFill, { backgroundColor: colors.primary, width: `${xpPercent}%` }]} />
             </View>
-            <Text style={[st.xpHint, { color: colors.textTertiary }]}>330 XP до уровня 13</Text>
+            <Text style={[st.xpHint, { color: colors.textTertiary }]}>{xpToNext} XP до уровня {level + 1} · 1 карточка = 1 XP</Text>
           </View>
 
           {/* Quick Stats */}
           <View style={[st.statsRow, { borderTopColor: dividerColor }]}>
             <View style={st.statItem}>
-              <Text style={[st.statValue, { color: colors.primary }]}>7</Text>
+              <Text style={[st.statValue, { color: colors.primary }]}>{session ? streak : 0}</Text>
               <Text style={[st.statLabel, { color: colors.textTertiary }]}>Серия</Text>
             </View>
             <View style={[st.statItem, st.statMiddle, { borderColor: dividerColor }]}>
-              <Text style={[st.statValue, { color: colors.primary }]}>24</Text>
-              <Text style={[st.statLabel, { color: colors.textTertiary }]}>Награды</Text>
+              <Text style={[st.statValue, { color: colors.primary }]}>{session ? diamonds : 0}</Text>
+              <Text style={[st.statLabel, { color: colors.textTertiary }]}>Алмазы</Text>
             </View>
             <View style={st.statItem}>
-              <Text style={[st.statValue, { color: colors.primary }]}>847</Text>
-              <Text style={[st.statLabel, { color: colors.textTertiary }]}>Карточки</Text>
+              <Text style={[st.statValue, { color: colors.primary }]}>{totalCardsStudied}</Text>
+              <Text style={[st.statLabel, { color: colors.textTertiary }]}>Изучено</Text>
             </View>
           </View>
         </View>
 
-        {/* ======== Quick Actions ======== */}
-        <View style={st.quickActionsRow}>
-          {QUICK_ACTIONS.map((action, i) => (
-            <Pressable
-              key={i}
-              style={[st.quickActionBtn, { backgroundColor: cardBg, borderColor: cardBorder }]}
-              onPress={() => {
-                if (i === 0) navigation?.navigate('Achievements');
-              }}
-            >
-              <Ionicons name={action.icon as any} size={28} color={colors.primary} />
-              <Text style={[st.quickActionLabel, { color: colors.textPrimary }]}>{action.label}</Text>
-            </Pressable>
-          ))}
-        </View>
-
-        {/* ======== Account Settings ======== */}
-        <Text style={[st.sectionLabel, { color: colors.textTertiary }]}>Настройки аккаунта</Text>
+        {/* ======== Account ======== */}
+        <Text style={[st.sectionLabel, { color: colors.textTertiary }]}>Аккаунт</Text>
         <View style={[st.settingsCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-          {ACCOUNT_ITEMS.map((item, i) => (
-            <React.Fragment key={i}>
-              {i > 0 && <View style={[st.divider, { backgroundColor: dividerColor }]} />}
-              <Pressable
-                style={[st.settingsItem, item.disabled && { opacity: 0.4 }]}
-                disabled={item.disabled}
-                onPress={() => {
-                  if (i === 0) navigation?.navigate('PersonalInfo');
-                }}
-              >
-                <Ionicons name={item.icon as any} size={22} color={colors.textTertiary} />
-                <Text style={[st.settingsItemText, { color: colors.textPrimary }]}>{item.label}</Text>
-                {item.badge && (
-                  <View style={[st.proBadge, { backgroundColor: colors.primary + '15' }]}>
-                    <Text style={[st.proBadgeText, { color: colors.primary }]}>{item.badge}</Text>
-                  </View>
-                )}
-                <Ionicons name="chevron-forward" size={18} color={colors.textTertiary + '60'} />
-              </Pressable>
-            </React.Fragment>
-          ))}
-        </View>
+          <Pressable style={st.settingsItem} onPress={() => navigation?.navigate('PersonalInfo')}>
+            <Ionicons name="person-outline" size={22} color={colors.textTertiary} />
+            <Text style={[st.settingsItemText, { color: colors.textPrimary }]}>Личные данные</Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.textTertiary + '60'} />
+          </Pressable>
 
-        {/* ======== Library ======== */}
-        <Text style={[st.sectionLabel, { color: colors.textTertiary }]}>Библиотека</Text>
-        <View style={[st.settingsCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-          <Pressable
-            style={st.settingsItem}
-            onPress={() => navigation?.navigate('MyPublications')}
-          >
+          <View style={[st.divider, { backgroundColor: dividerColor }]} />
+
+          <Pressable style={st.settingsItem} onPress={() => navigation?.navigate('MyPublications')}>
             <Ionicons name="book-outline" size={22} color={colors.textTertiary} />
             <Text style={[st.settingsItemText, { color: colors.textPrimary }]}>Мои публикации</Text>
             <Ionicons name="chevron-forward" size={18} color={colors.textTertiary + '60'} />
           </Pressable>
         </View>
 
-        {/* ======== Preferences ======== */}
-        <Text style={[st.sectionLabel, { color: colors.textTertiary }]}>Предпочтения</Text>
+        {/* ======== Learning ======== */}
+        <Text style={[st.sectionLabel, { color: colors.textTertiary }]}>Обучение</Text>
         <View style={[st.settingsCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-          {PREFERENCES_ITEMS.map((item, i) => (
-            <Pressable key={i} style={st.settingsItem}>
-              <Ionicons name={item.icon as any} size={22} color={colors.textTertiary} />
-              <Text style={[st.settingsItemText, { color: colors.textPrimary }]}>{item.label}</Text>
-              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary + '60'} />
-            </Pressable>
-          ))}
-        </View>
-
-        {/* ======== App Customization ======== */}
-        <Text style={[st.sectionLabel, { color: colors.textTertiary }]}>Кастомизация</Text>
-        <View style={[st.settingsCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-          {/* Appearance */}
-          <View style={st.settingsItem}>
-            <Ionicons name="color-palette-outline" size={22} color={colors.textTertiary} />
-            <Text style={[st.settingsItemText, { color: colors.textPrimary }]}>Внешний вид</Text>
-            <Switch
-              value={themeMode === 'dark'}
-              onValueChange={handleToggleDarkMode}
-              trackColor={{ false: colors.border, true: colors.primary }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
+          <Pressable style={st.settingsItem} onPress={() => navigation?.navigate('LearningSettings')}>
+            <Ionicons name="school-outline" size={22} color={colors.textTertiary} />
+            <Text style={[st.settingsItemText, { color: colors.textPrimary }]}>Настройки обучения</Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.textTertiary + '60'} />
+          </Pressable>
 
           <View style={[st.divider, { backgroundColor: dividerColor }]} />
 
-          {/* Notifications */}
-          <Pressable
-            style={st.settingsItem}
-            onPress={() => navigation?.navigate('NotificationSettings')}
-          >
+          <Pressable style={st.settingsItem} onPress={() => navigation?.navigate('NotificationSettings')}>
             <Ionicons name="notifications-outline" size={22} color={colors.textTertiary} />
             <Text style={[st.settingsItemText, { color: colors.textPrimary }]}>Уведомления</Text>
             <Ionicons name="chevron-forward" size={18} color={colors.textTertiary + '60'} />
           </Pressable>
-
-          <View style={[st.divider, { backgroundColor: dividerColor }]} />
-
-          {/* Sound */}
-          <Pressable style={st.settingsItem}>
-            <Ionicons name="volume-medium-outline" size={22} color={colors.textTertiary} />
-            <Text style={[st.settingsItemText, { color: colors.textPrimary }]}>Звук и эффекты</Text>
-            <Ionicons name="chevron-forward" size={18} color={colors.textTertiary + '60'} />
-          </Pressable>
         </View>
 
-        {/* ======== Data & Legal ======== */}
+        {/* ======== App ======== */}
+        <Text style={[st.sectionLabel, { color: colors.textTertiary }]}>Приложение</Text>
         <View style={[st.settingsCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-          <Pressable style={st.settingsItem} onPress={handleExport}>
-            <Ionicons name="server-outline" size={22} color={colors.textTertiary} />
-            <Text style={[st.settingsItemText, { color: colors.textPrimary }]}>Данные и хранилище</Text>
-            <Ionicons name="chevron-forward" size={18} color={colors.textTertiary + '60'} />
-          </Pressable>
+          <View style={st.settingsItem}>
+            <Ionicons name="color-palette-outline" size={22} color={colors.textTertiary} />
+            <Text style={[st.settingsItemText, { color: colors.textPrimary }]}>Тема</Text>
+            <View style={[st.segment, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9' }]}>
+              {THEME_OPTIONS.map((opt) => {
+                const active = themeMode === opt.value;
+                return (
+                  <Pressable
+                    key={opt.value}
+                    onPress={() => setTheme(opt.value)}
+                    style={[st.segmentItem, active && { backgroundColor: colors.primary }]}
+                  >
+                    <Text style={[st.segmentText, { color: active ? '#FFFFFF' : colors.textSecondary }]}>
+                      {opt.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
 
           <View style={[st.divider, { backgroundColor: dividerColor }]} />
 
-          <Pressable style={st.settingsItem}>
-            <Ionicons name="document-text-outline" size={22} color={colors.textTertiary} />
-            <Text style={[st.settingsItemText, { color: colors.textPrimary }]}>Правовая информация</Text>
+          <Pressable style={st.settingsItem} onPress={() => navigation?.navigate('SoundSettings')}>
+            <Ionicons name="volume-medium-outline" size={22} color={colors.textTertiary} />
+            <Text style={[st.settingsItemText, { color: colors.textPrimary }]}>Звук и вибрация</Text>
             <Ionicons name="chevron-forward" size={18} color={colors.textTertiary + '60'} />
           </Pressable>
         </View>
 
-        {/* ======== Danger Zone ======== */}
-        <Pressable
-          style={[st.dangerBtn, { backgroundColor: isDark ? 'rgba(239,68,68,0.08)' : '#FEF2F2' }]}
-          onPress={handleClearData}
-        >
-          <Ionicons name="trash-outline" size={20} color={colors.error} />
-          <Text style={[st.dangerBtnText, { color: colors.error }]}>Удалить все данные</Text>
-        </Pressable>
+        {/* ======== Legal ======== */}
+        {(PRIVACY_POLICY_URL || TERMS_URL) ? (
+          <>
+            <Text style={[st.sectionLabel, { color: colors.textTertiary }]}>Правовая информация</Text>
+            <View style={[st.settingsCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+              {PRIVACY_POLICY_URL ? (
+                <Pressable style={st.settingsItem} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
+                  <Ionicons name="shield-checkmark-outline" size={22} color={colors.textTertiary} />
+                  <Text style={[st.settingsItemText, { color: colors.textPrimary }]}>Политика конфиденциальности</Text>
+                  <Ionicons name="open-outline" size={18} color={colors.textTertiary + '60'} />
+                </Pressable>
+              ) : null}
+
+              {PRIVACY_POLICY_URL && TERMS_URL ? (
+                <View style={[st.divider, { backgroundColor: dividerColor }]} />
+              ) : null}
+
+              {TERMS_URL ? (
+                <Pressable style={st.settingsItem} onPress={() => Linking.openURL(TERMS_URL)}>
+                  <Ionicons name="document-text-outline" size={22} color={colors.textTertiary} />
+                  <Text style={[st.settingsItemText, { color: colors.textPrimary }]}>Условия использования</Text>
+                  <Ionicons name="open-outline" size={18} color={colors.textTertiary + '60'} />
+                </Pressable>
+              ) : null}
+            </View>
+          </>
+        ) : null}
 
         {/* ======== Logout ======== */}
         {session && (
@@ -392,8 +357,22 @@ export function ProfileScreen({ navigation }: any) {
           </Pressable>
         )}
 
+        {session && (
+          <View style={st.accountLinks}>
+            <Pressable onPress={handleLogoutEverywhere} hitSlop={8}>
+              <Text style={[st.accountLinkText, { color: colors.textTertiary }]}>Выйти на всех устройствах</Text>
+            </Pressable>
+            <Pressable onPress={handleDeleteAccount} disabled={deleting} hitSlop={8} style={st.deleteRow}>
+              {deleting && <ActivityIndicator size="small" color={colors.error} />}
+              <Text style={[st.accountLinkText, { color: colors.error }]}>
+                {deleting ? 'Удаляем аккаунт…' : 'Удалить аккаунт'}
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
         {/* App Info */}
-        <Text style={[st.appVersion, { color: colors.textTertiary }]}>Flashly v1.0.0</Text>
+        <Text style={[st.appVersion, { color: colors.textTertiary }]}>Flashly v{APP_VERSION}</Text>
       </ScrollView>
     </View>
   );
@@ -426,13 +405,6 @@ const st = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: -0.5,
   },
-  headerBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
 
   // Hero Card
   heroCard: {
@@ -460,14 +432,6 @@ const st = StyleSheet.create({
     height: 72,
     borderRadius: 36,
     borderWidth: 3,
-  },
-  avatarRingProgress: {
-    position: 'absolute',
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    borderWidth: 3,
-    transform: [{ rotate: '-45deg' }],
   },
   avatar: {
     width: 60,
@@ -573,28 +537,6 @@ const st = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Quick Actions
-  quickActionsRow: {
-    flexDirection: 'row',
-    gap: spacing.s,
-    marginBottom: spacing.l,
-  },
-  quickActionBtn: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.m,
-    borderRadius: borderRadius.xl,
-    borderWidth: 1,
-  },
-  quickActionLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-  },
-
   // Section Label
   sectionLabel: {
     fontSize: 11,
@@ -629,32 +571,6 @@ const st = StyleSheet.create({
     marginHorizontal: spacing.m,
   },
 
-  // PRO Badge
-  proBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: borderRadius.xs,
-  },
-  proBadgeText: {
-    fontSize: 11,
-    fontWeight: '800',
-  },
-
-  // Danger Button
-  dangerBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    paddingVertical: 14,
-    borderRadius: borderRadius.xl,
-    marginBottom: spacing.s,
-  },
-  dangerBtnText: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-
   // Logout
   logoutBtn: {
     flexDirection: 'row',
@@ -667,6 +583,38 @@ const st = StyleSheet.create({
   },
   logoutText: {
     fontSize: 15,
+    fontWeight: '700',
+  },
+
+  // Account links
+  accountLinks: {
+    alignItems: 'center',
+    gap: spacing.m,
+    marginBottom: spacing.l,
+  },
+  accountLinkText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  deleteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+
+  // Theme segment
+  segment: {
+    flexDirection: 'row',
+    borderRadius: borderRadius.full,
+    padding: 3,
+  },
+  segmentItem: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: borderRadius.full,
+  },
+  segmentText: {
+    fontSize: 12,
     fontWeight: '700',
   },
 

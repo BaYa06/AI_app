@@ -17,6 +17,8 @@ export { MatchScreen } from './MatchScreen';
 export { MultipleChoiceScreen } from './MultipleChoiceScreen';
 export { AudioLearningScreen } from './AudioLearningScreen';
 export { NotificationSettingsScreen } from './NotificationSettingsScreen';
+export { LearningSettingsScreen } from './LearningSettingsScreen';
+export { SoundSettingsScreen } from './SoundSettingsScreen';
 export { SharedSetDetailScreen } from './SharedSetDetailScreen';
 export { PersonalInfoScreen } from './PersonalInfoScreen';
 export { SecurityScreen } from './SecurityScreen';

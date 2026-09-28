@@ -19,6 +19,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { StreakService } from '@/services';
 import type { DailyActivity, UserStats } from '@/services';
 import { supabase } from '@/services/supabaseClient';
+import { getLevelProgress, XP_PER_LEVEL } from '@/utils/level';
 
 // ---- Helpers ----
 
@@ -98,7 +99,6 @@ const CHALLENGES = [
 ];
 
 const DAILY_GOAL = 10;
-const XP_PER_LEVEL = 100;
 
 // ---- Main Screen ----
 
@@ -177,9 +177,7 @@ export function StatisticsScreen({ navigation }: any) {
   // ---- Computed values ----
 
   const totalCardsStudied = userStats?.total_cards_studied ?? 0;
-  const level = Math.floor(totalCardsStudied / XP_PER_LEVEL) + 1;
-  const xpCurrent = totalCardsStudied % XP_PER_LEVEL;
-  const xpPercent = Math.round((xpCurrent / XP_PER_LEVEL) * 100);
+  const { level, xpCurrent, xpPercent } = getLevelProgress(totalCardsStudied);
 
   const currentStreak = userStats?.current_streak ?? 0;
 

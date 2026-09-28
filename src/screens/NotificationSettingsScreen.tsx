@@ -9,9 +9,9 @@ import {
   ScrollView,
   Pressable,
   Switch,
-  TextInput,
-  Platform,
   ActivityIndicator,
+  Alert,
+  Platform,
 } from 'react-native';
 import { useThemeColors, useSettingsStore } from '@/store';
 import { Text } from '@/components/common';
@@ -25,6 +25,11 @@ import {
 } from '@/services/pushNotifications';
 import { supabase } from '@/services';
 import { API_BASE } from '@/config/apiBase';
+
+// Сервер шлёт напоминания раз в час и только с 8 до 21 (api/push.js, cron-reminders)
+const MIN_HOUR = 8;
+const MAX_HOUR = 21;
+const clampHour = (h: number) => Math.min(MAX_HOUR, Math.max(MIN_HOUR, h));
 
 const DAYS = [
   { key: 'mon', label: 'Пн' },
@@ -49,14 +54,10 @@ export function NotificationSettingsScreen({ navigation }: any) {
   // ---- State ----
   const [reminderEnabled, setReminderEnabled] = useState(true);
   const [hours, setHours] = useState(19);
-  const [minutes, setMinutes] = useState(0);
   const [selectedDays, setSelectedDays] = useState<Record<string, boolean>>({
     mon: true, tue: true, wed: true, thu: true, fri: true, sat: false, sun: false,
   });
-  const [customMessage, setCustomMessage] = useState('Время учиться!');
-  const [emailNotifications, setEmailNotifications] = useState(false);
   const [streakReminders, setStreakReminders] = useState(true);
-  const [achievementAlerts, setAchievementAlerts] = useState(true);
 
   // Push notifications (real)
   const [pushStatus, setPushStatus] = useState<PushStatus | null>(null);
@@ -74,8 +75,7 @@ export function NotificationSettingsScreen({ navigation }: any) {
           .then((r) => r.json())
           .then((d) => {
             setReminderEnabled(d.notifEnabled ?? true);
-            setHours(d.notifHour ?? 19);
-            setMinutes(d.notifMinute ?? 0);
+            setHours(clampHour(d.notifHour ?? 19));
             setStreakReminders(d.notifStreak ?? true);
             if (d.notifDays) {
               const active = d.notifDays.split(',');
@@ -119,10 +119,8 @@ export function NotificationSettingsScreen({ navigation }: any) {
     setSelectedDays((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const incrementHours = () => setHours((h) => (h + 1) % 24);
-  const decrementHours = () => setHours((h) => (h - 1 + 24) % 24);
-  const incrementMinutes = () => setMinutes((m) => (m + 5) % 60);
-  const decrementMinutes = () => setMinutes((m) => (m - 5 + 60) % 60);
+  const incrementHours = () => setHours((h) => (h >= MAX_HOUR ? MIN_HOUR : h + 1));
+  const decrementHours = () => setHours((h) => (h <= MIN_HOUR ? MAX_HOUR : h - 1));
 
   const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -159,6 +157,7 @@ export function NotificationSettingsScreen({ navigation }: any) {
         {/* Time Picker */}
         <View style={[st.card, { backgroundColor: subtleBg, borderColor: cardBorder }]}>
           <Text style={[st.cardLabel, { color: colors.textTertiary }]}>Время ежедневного напоминания</Text>
+          <Text style={[st.cardHint, { color: colors.textTertiary }]}>Напоминания приходят с 8:00 до 21:00</Text>
           <View style={st.timeRow}>
             <View style={st.timeCol}>
               <Pressable onPress={incrementHours} style={st.timeArrow}>
@@ -172,25 +171,13 @@ export function NotificationSettingsScreen({ navigation }: any) {
               </Pressable>
             </View>
 
-            <Text style={[st.timeSep, { color: colors.textTertiary }]}>:</Text>
-
-            <View style={st.timeCol}>
-              <Pressable onPress={incrementMinutes} style={st.timeArrow}>
-                <Ionicons name="chevron-up" size={24} color={colors.textTertiary} />
-              </Pressable>
-              <View style={[st.timeBox, { backgroundColor: cardBg, borderColor: colors.primary + '30' }]}>
-                <Text style={[st.timeText, { color: colors.primary }]}>{pad(minutes)}</Text>
-              </View>
-              <Pressable onPress={decrementMinutes} style={st.timeArrow}>
-                <Ionicons name="chevron-down" size={24} color={colors.textTertiary} />
-              </Pressable>
-            </View>
+            <Text style={[st.timeSep, { color: colors.textTertiary }]}>:00</Text>
           </View>
         </View>
 
         {/* Day Selector */}
         <View style={[st.card, { backgroundColor: subtleBg, borderColor: cardBorder }]}>
-          <Text style={[st.cardLabel, { color: colors.textTertiary }]}>Повторять</Text>
+          <Text style={[st.cardLabel, { color: colors.textTertiary, marginBottom: spacing.m }]}>Повторять</Text>
           <View style={st.daysRow}>
             {DAYS.map((day) => {
               const active = selectedDays[day.key];
@@ -219,33 +206,6 @@ export function NotificationSettingsScreen({ navigation }: any) {
           </View>
         </View>
 
-        {/* Custom Message */}
-        <View style={st.inputSection}>
-          <Text style={[st.cardLabel, { color: colors.textTertiary }]}>Текст напоминания</Text>
-          <View style={[st.inputWrap, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-            <TextInput
-              style={[st.input, { color: colors.textPrimary }, Platform.OS === 'web' && { outlineStyle: 'none' as any }]}
-              value={customMessage}
-              onChangeText={setCustomMessage}
-              placeholder="Введите текст..."
-              placeholderTextColor={colors.textTertiary}
-            />
-            <Ionicons name="create-outline" size={18} color={colors.textTertiary} />
-          </View>
-        </View>
-
-        {/* Sound Picker */}
-        <Pressable style={[st.soundCard, { backgroundColor: subtleBg, borderColor: cardBorder }]}>
-          <View style={[st.soundIcon, { backgroundColor: colors.primary + '15' }]}>
-            <Ionicons name="musical-note" size={20} color={colors.primary} />
-          </View>
-          <View style={st.soundInfo}>
-            <Text style={[st.soundTitle, { color: colors.textPrimary }]}>Звук уведомления</Text>
-            <Text style={[st.soundValue, { color: colors.textTertiary }]}>Aurora (по умолч.)</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.textTertiary + '60'} />
-        </Pressable>
-
         {/* ======== Divider ======== */}
         <View style={[st.sectionDivider, { backgroundColor: dividerColor }]} />
 
@@ -269,20 +229,6 @@ export function NotificationSettingsScreen({ navigation }: any) {
               />
             )}
           </View>
-
-          <View style={[st.divider, { backgroundColor: dividerColor }]} />
-
-          {/* Email */}
-          <View style={st.toggleRow}>
-            <Ionicons name="mail-outline" size={22} color={colors.textTertiary} />
-            <Text style={[st.toggleText, { color: colors.textPrimary }]}>Email-уведомления</Text>
-            <Switch
-              value={emailNotifications}
-              onValueChange={setEmailNotifications}
-              trackColor={{ false: colors.border, true: colors.primary }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
         </View>
 
         {/* ======== Gamification ======== */}
@@ -300,20 +246,6 @@ export function NotificationSettingsScreen({ navigation }: any) {
               thumbColor="#FFFFFF"
             />
           </View>
-
-          <View style={[st.divider, { backgroundColor: dividerColor }]} />
-
-          {/* Achievement */}
-          <View style={st.toggleRow}>
-            <Ionicons name="trophy-outline" size={22} color={colors.textTertiary} />
-            <Text style={[st.toggleText, { color: colors.textPrimary }]}>Оповещения о наградах</Text>
-            <Switch
-              value={achievementAlerts}
-              onValueChange={setAchievementAlerts}
-              trackColor={{ false: colors.border, true: colors.primary }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
         </View>
 
         {/* ======== Save Button ======== */}
@@ -323,14 +255,14 @@ export function NotificationSettingsScreen({ navigation }: any) {
             if (!userId || saving) return;
             setSaving(true);
             try {
-              await fetch(`${API_BASE}/push?action=settings`, {
+              const res = await fetch(`${API_BASE}/push?action=settings`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   userId,
                   notifEnabled: reminderEnabled,
                   notifHour: hours,
-                  notifMinute: minutes,
+                  notifMinute: 0,
                   notifDays: Object.entries(selectedDays)
                     .filter(([, v]) => v)
                     .map(([k]) => k)
@@ -338,11 +270,15 @@ export function NotificationSettingsScreen({ navigation }: any) {
                   notifStreak: streakReminders,
                 }),
               });
+              if (!res.ok) throw new Error(`HTTP ${res.status}`);
+              navigation.goBack();
             } catch (e) {
               console.error('[NotificationSettings] Save error:', e);
+              const msg = 'Не удалось сохранить настройки. Проверьте интернет и попробуйте ещё раз.';
+              if (Platform.OS === 'web') window.alert(msg);
+              else Alert.alert('Ошибка', msg);
             } finally {
               setSaving(false);
-              navigation.goBack();
             }
           }}
         >
@@ -417,6 +353,11 @@ const st = StyleSheet.create({
   cardLabel: {
     fontSize: 13,
     fontWeight: '600',
+    marginBottom: spacing.xxs,
+  },
+  cardHint: {
+    fontSize: 12,
+    fontWeight: '500',
     marginBottom: spacing.m,
   },
 
@@ -468,55 +409,6 @@ const st = StyleSheet.create({
     fontWeight: '700',
   },
 
-  // Input
-  inputSection: {
-    marginBottom: spacing.m,
-  },
-  inputWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: borderRadius.xl,
-    borderWidth: 1,
-    paddingHorizontal: spacing.m,
-    height: 52,
-  },
-  input: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '500',
-    height: '100%',
-  },
-
-  // Sound
-  soundCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: borderRadius.xl,
-    borderWidth: 1,
-    padding: spacing.m,
-    gap: spacing.s,
-    marginBottom: spacing.l,
-  },
-  soundIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.m,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  soundInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  soundTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  soundValue: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-
   // Divider
   sectionDivider: {
     height: 2,
@@ -552,10 +444,6 @@ const st = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     fontWeight: '600',
-  },
-  divider: {
-    height: 1,
-    marginHorizontal: spacing.m,
   },
 
   // Save button

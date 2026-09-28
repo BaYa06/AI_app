@@ -5,6 +5,7 @@
  */
 
 import { Platform } from 'react-native';
+import { useSettingsStore } from '@/store/settingsStore';
 
 let Sound: any | null = null;
 if (Platform.OS !== 'web') {
@@ -163,6 +164,8 @@ export function preloadSound(url: string): void {
 }
 
 export async function playSound(url: string, volume = 0.7): Promise<void> {
+  if (!useSettingsStore.getState().settings.soundEnabled) return;
+
   if (isNative) {
     const assetName = urlToAssetName(url);
     return playNativeSound(assetName, volume);

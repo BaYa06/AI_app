@@ -60,6 +60,8 @@ import { StudyScreen } from '@/screens/StudyScreen';
 import { StudyPlaceholderScreen } from '@/screens/StudyPlaceholderScreen';
 import { AchievementsScreen } from '@/screens/AchievementsScreen';
 import { NotificationSettingsScreen } from '@/screens/NotificationSettingsScreen';
+import { LearningSettingsScreen } from '@/screens/LearningSettingsScreen';
+import { SoundSettingsScreen } from '@/screens/SoundSettingsScreen';
 import { LibrarySetDetailScreen } from '@/screens/LibrarySetDetailScreen';
 import { BookDetailScreen } from '@/screens/BookDetailScreen';
 import { CourseBooksScreen } from '@/screens/CourseBooksScreen';
@@ -230,6 +232,8 @@ const NATIVE_LINKING: LinkingOptions<RootStackParamList> = {
       CardEditor: 'card-editor',
       Achievements: 'achievements',
       NotificationSettings: 'notification-settings',
+      LearningSettings: 'learning-settings',
+      SoundSettings: 'sound-settings',
       LibrarySetDetail: 'library-set/:setId',
       BookDetail: 'book/:bookId',
       CourseBooks: 'course-books/:courseId',
@@ -356,6 +360,24 @@ export function AppNavigator() {
         <Stack.Screen
           name="NotificationSettings"
           component={NotificationSettingsScreen}
+          options={{
+            headerShown: false,
+            animation: 'slide_from_right',
+            animationDuration: 300,
+          }}
+        />
+        <Stack.Screen
+          name="LearningSettings"
+          component={LearningSettingsScreen}
+          options={{
+            headerShown: false,
+            animation: 'slide_from_right',
+            animationDuration: 300,
+          }}
+        />
+        <Stack.Screen
+          name="SoundSettings"
+          component={SoundSettingsScreen}
           options={{
             headerShown: false,
             animation: 'slide_from_right',

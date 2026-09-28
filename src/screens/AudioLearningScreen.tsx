@@ -323,12 +323,12 @@ export function AudioLearningScreen({ navigation, route }: Props) {
     if (result.isCorrect) {
       setSessionState('correct');
       playCorrectSound();
-      Vibration.vibrate(20);
+      if (useSettingsStore.getState().settings.hapticEnabled) Vibration.vibrate(20);
     } else {
       setSessionState('incorrect');
       errorCardIdsRef.current = [...errorCardIdsRef.current, card.id];
       setErrorCardIds([...errorCardIdsRef.current]);
-      Vibration.vibrate([0, 50, 50, 50]);
+      if (useSettingsStore.getState().settings.hapticEnabled) Vibration.vibrate([0, 50, 50, 50]);
     }
 
     // Show result: 1s for correct, 2s for incorrect (to read the answer)

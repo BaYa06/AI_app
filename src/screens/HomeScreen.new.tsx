@@ -207,7 +207,18 @@ export function HomeScreen({ navigation }: any) {
   const [leaveModalCourseId, setLeaveModalCourseId] = useState<string | null>(null);
   const [leaveLoading, setLeaveLoading] = useState(false);
   const [showStudyModeModal, setShowStudyModeModal] = useState(false);
-  const [wordLimit, setWordLimit] = useState<'10' | '20' | '30' | 'all'>('10');
+  // Размер порции — общая настройка (Профиль → Настройки обучения)
+  const studyCardLimit = useSettingsStore((s) => s.settings.studyCardLimit);
+  const updateSettings = useSettingsStore((s) => s.updateSettings);
+  const wordLimit: '10' | '20' | '30' | 'all' =
+    studyCardLimit === null ? 'all' : studyCardLimit === 10 || studyCardLimit === 30 ? String(studyCardLimit) as '10' | '30' : '20';
+  const setWordLimit = useCallback(
+    (val: '10' | '20' | '30' | 'all') => {
+      updateSettings({ studyCardLimit: val === 'all' ? null : Number(val) });
+      DatabaseService.saveSettings();
+    },
+    [updateSettings],
+  );
   const [onlyHard, setOnlyHard] = useState(false);
   const [showMnemonic, setShowMnemonic] = useState(true);
   const isTeacher = useSettingsStore((s) => s.isTeacher);

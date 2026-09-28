@@ -110,6 +110,8 @@ export type RootStackParamList = {
   Subscription: undefined;
   Achievements: undefined;
   NotificationSettings: undefined;
+  LearningSettings: undefined;
+  SoundSettings: undefined;
   Settings: undefined;
   Search: undefined;
   TeacherCourseStats: { courseId: string; courseTitle: string };

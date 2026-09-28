@@ -392,6 +392,13 @@ export const NeonService = {
   /**
    * Обновить display_name пользователя
    */
+  /**
+   * Безвозвратно удалить аккаунт: все данные в Neon и пользователя в Supabase (api/data.js deleteAccount)
+   */
+  async deleteAccount(): Promise<boolean> {
+    return (await callDataApi<boolean>('deleteAccount', { confirm: 'DELETE' })) === true;
+  },
+
   async updateDisplayName(_userId: string, displayName: string): Promise<boolean> {
     return (await callDataApi<boolean>('updateDisplayName', { displayName })) === true;
   },
