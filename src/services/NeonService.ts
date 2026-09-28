@@ -6,6 +6,8 @@
 
 import { supabase } from './supabaseClient';
 import { API_BASE } from '@/config/apiBase';
+import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
+import { readCache, writeCache } from './localCache';
 import type { Card, CardSet, CardStatus, UpdateCardInput, Course } from '@/types';
 
 // Учительские мутации (курсы/инвайты/ростер/видимость наборов) идут через настоящий backend
@@ -41,7 +43,7 @@ async function callTeacherApi<T = any>(
 
   const query = new URLSearchParams({ action, ...(params || {}) }).toString();
   try {
-    const resp = await fetch(`${TEACHER_API_BASE}?${query}`, {
+    const resp = await fetchWithTimeout(`${TEACHER_API_BASE}?${query}`, {
       method,
       headers: {
         'Content-Type': 'application/json',
@@ -99,7 +101,12 @@ const DATA_API_BASE = `${API_BASE}/data`;
  * оставлены только ради совместимости сигнатур вызывающего кода.
  * Возвращает null, если нет сессии, сети или сервер ответил ошибкой.
  */
-async function callDataApi<T = any>(action: string, params: Record<string, any> = {}, method: 'GET' | 'POST' = 'POST'): Promise<T | null> {
+async function callDataApi<T = any>(
+  action: string,
+  params: Record<string, any> = {},
+  method: 'GET' | 'POST' = 'POST',
+  strict = false,
+): Promise<T | null> {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
   if (!token) return null;
@@ -110,7 +117,7 @@ async function callDataApi<T = any>(action: string, params: Record<string, any> 
         if (value !== undefined && value !== null) query.set(key, String(value));
       }
     }
-    const resp = await fetch(`${DATA_API_BASE}?${query.toString()}`, {
+    const resp = await fetchWithTimeout(`${DATA_API_BASE}?${query.toString()}`, {
       method,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: method === 'POST' ? JSON.stringify(params) : undefined,
@@ -118,11 +125,14 @@ async function callDataApi<T = any>(action: string, params: Record<string, any> 
     const json = await resp.json().catch(() => ({}));
     if (!resp.ok) {
       console.error(`Data API ${action} failed:`, json?.error || resp.status);
+      if (strict) throw new NetworkLoadError(action, resp.status);
       return null;
     }
     return json.data as T;
   } catch (error) {
+    if (error instanceof NetworkLoadError) throw error;
     console.error(`Data API ${action} network error:`, error);
+    if (strict) throw new NetworkLoadError(action);
     return null;
   }
 }
@@ -154,7 +164,7 @@ async function callProgressApi<T = any>(
   if (!token) return null;
   try {
     const query = new URLSearchParams({ action, ...(params || {}) });
-    const resp = await fetch(`${API_BASE}/progress?${query.toString()}`, {
+    const resp = await fetchWithTimeout(`${API_BASE}/progress?${query.toString()}`, {
       method,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: body ? JSON.stringify(body) : undefined,
@@ -168,6 +178,20 @@ async function callProgressApi<T = any>(
   } catch (error) {
     console.error(`Progress API ${action} network error:`, error);
     return null;
+  }
+}
+
+/** Загрузка на старте: сетевую ошибку не выдавать за «пусто», иначе сохранённые данные затрутся */
+type LoadOptions = { throwOnError?: boolean };
+
+/** Сервер не ответил (нет сети/таймаут/ошибка) — в отличие от пустого ответа */
+export class NetworkLoadError extends Error {
+  /** HTTP-код ответа; 0 — сеть/таймаут */
+  status: number;
+  constructor(what: string, status = 0) {
+    super(`Network load failed: ${what}`);
+    this.name = 'NetworkLoadError';
+    this.status = status;
   }
 }
 
@@ -202,6 +226,130 @@ function mapCardRow(card: any): Card {
     status: getStatusFromStep(card.learning_step || 0),
   } as Card;
 }
+
+function mapSetRow(set: any): CardSet {
+  return {
+    id: set.id,
+    userId: set.user_id,
+    courseId: set.course_id || null,
+    title: set.title,
+    description: set.description || '',
+    category: set.category || 'Общие',
+    tags: [],
+    languageFrom: set.language_from || 'de',
+    languageTo: set.language_to || 'ru',
+    createdAt: new Date(set.created_at).getTime(),
+    updatedAt: new Date(set.updated_at).getTime(),
+    cardCount: set.total_cards || 0,
+    newCount: 0,
+    learningCount: set.studying_cards || 0,
+    reviewCount: 0,
+    masteredCount: set.mastered_cards || 0,
+    isPublic: set.is_public,
+    isFavorite: false,
+    isArchived: false,
+    isHiddenFromStudents: set.is_hidden_from_students === true,
+  } as CardSet;
+}
+
+function mapCourseRow(course: any): { id: string; title: string; createdAt: number; updatedAt?: number } {
+  return {
+    id: course.id,
+    title: course.title,
+    createdAt: new Date(course.created_at).getTime(),
+    updatedAt: course.updated_at ? new Date(course.updated_at).getTime() : undefined,
+  };
+}
+
+function mapStudentCourseRow(row: any): Course {
+  return {
+    id: row.id,
+    title: row.title,
+    createdAt: new Date(row.joined_at).getTime(),
+    isStudentCourse: true,
+    teacherName: row.teacher_name,
+    ownerId: row.owner_id,
+  } as Course;
+}
+
+/** Набор курса для ученика (форма ответа courseSetsForStudent в api/_course.js) */
+type MembershipSetRow = {
+  id: string; userId: string; title: string; description: string; category: string;
+  icon: string | null; languageFrom: string; languageTo: string; totalCards: number;
+  createdAt: string; updatedAt: string | null; courseId: string;
+  isOfficial?: boolean; unitId?: string | null; bookId?: string | null;
+  bookTitle?: string | null; unitNumber?: number | null;
+};
+
+function mapMembershipSetRow(row: MembershipSetRow, courseId: string): CardSet {
+  return {
+    id: row.id,
+    userId: row.userId,
+    title: row.title,
+    description: row.description || '',
+    category: row.category || '',
+    icon: row.icon || null,
+    languageFrom: row.languageFrom || 'de',
+    languageTo: row.languageTo || 'ru',
+    totalCards: row.totalCards || 0,
+    createdAt: new Date(row.createdAt).getTime(),
+    updatedAt: row.updatedAt ? new Date(row.updatedAt).getTime() : undefined,
+    courseId: row.courseId,
+    isReadOnly: true,
+    ownerCourseId: courseId,
+    isOfficial: row.isOfficial === true,
+    unitId: row.unitId || undefined,
+    bookId: row.bookId || undefined,
+    bookTitle: row.bookTitle || undefined,
+    unitNumber: row.unitNumber ?? undefined,
+  } as unknown as CardSet;
+}
+
+/** Статистика пользователя (серия и итоги) — форма, которую кэширует StreakService */
+export type UserStatsData = {
+  current_streak: number;
+  longest_streak: number;
+  last_active_date: string | null;
+  timezone: string;
+  total_words_learned: number;
+  total_minutes_learned: number;
+  total_cards_studied: number;
+  /** Заморозок серии в запасе */
+  streak_freezes: number;
+  /** Сегодня заморозка спасла серию (вчера был пропуск) */
+  freeze_used: boolean;
+};
+
+function mapUserStatsRow(row: any): UserStatsData {
+  let timezone: string;
+  try {
+    timezone = row.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    timezone = 'UTC';
+  }
+  return {
+    current_streak: row.current_streak || 0,
+    longest_streak: row.longest_streak || 0,
+    last_active_date: row.last_active_date ? pgDateToString(row.last_active_date) : null,
+    timezone,
+    total_words_learned: row.total_words_learned || 0,
+    total_minutes_learned: row.total_minutes_learned || 0,
+    total_cards_studied: row.total_cards_studied || 0,
+    streak_freezes: row.streak_freezes || 0,
+    freeze_used: row.freeze_used === true,
+  };
+}
+
+/** Всё для запуска приложения одним запросом (api/data.js?action=bootstrap) */
+export type BootstrapData = {
+  sets: CardSet[];
+  cards: Card[];
+  courses: Array<{ id: string; title: string; createdAt: number; updatedAt?: number }>;
+  studentCourses: Course[];
+  /** Наборы курсов ученика: courseId → наборы */
+  courseSets: Record<string, CardSet[]>;
+  stats: UserStatsData | null;
+};
 
 export const NeonService = {
   /** Синхронизация с сервером доступна всегда — пропускается только без сессии (см. callDataApi). */
@@ -308,36 +456,37 @@ export const NeonService = {
   },
 
   /**
+   * Запуск приложения одним запросом вместо 8–10. Сетевая ошибка — NetworkLoadError
+   * (вызывающий оставит на экране сохранённые данные, а не «пусто»).
+   */
+  async bootstrap(): Promise<BootstrapData> {
+    const data = await callDataApi<any>('bootstrap', {}, 'GET', true);
+    if (!data) throw new NetworkLoadError('bootstrap');
+    const courseSets: Record<string, CardSet[]> = {};
+    for (const [courseId, rows] of Object.entries(data.courseSets || {})) {
+      courseSets[courseId] = (rows as MembershipSetRow[]).map((row) => mapMembershipSetRow(row, courseId));
+    }
+    return {
+      sets: (data.sets || []).map(mapSetRow),
+      cards: (data.cards || []).map(mapCardRow),
+      courses: (data.courses || []).map(mapCourseRow),
+      studentCourses: (data.studentCourses || []).map(mapStudentCourseRow),
+      courseSets,
+      stats: data.stats ? mapUserStatsRow(data.stats) : null,
+    };
+  },
+
+  /**
    * Загрузить все наборы карточек пользователя
    */
-  async loadSets(userId?: string): Promise<CardSet[]> {
+  async loadSets(userId?: string, options?: LoadOptions): Promise<CardSet[]> {
     if (!userId) {
       console.warn('userId не передан, пропускаем загрузку наборов');
       return [];
     }
     const sets = await callDataApi<any[]>('loadSets', {}, 'GET');
-    return (sets || []).map(set => ({
-      id: set.id,
-      userId: set.user_id,
-      courseId: set.course_id || null,
-      title: set.title,
-      description: set.description || '',
-      category: set.category || 'Общие',
-      tags: [],
-      languageFrom: set.language_from || 'de',
-      languageTo: set.language_to || 'ru',
-      createdAt: new Date(set.created_at).getTime(),
-      updatedAt: new Date(set.updated_at).getTime(),
-      cardCount: set.total_cards || 0,
-      newCount: 0,
-      learningCount: set.studying_cards || 0,
-      reviewCount: 0,
-      masteredCount: set.mastered_cards || 0,
-      isPublic: set.is_public,
-      isFavorite: false,
-      isArchived: false,
-      isHiddenFromStudents: set.is_hidden_from_students === true,
-    }));
+    if (sets === null && options?.throwOnError) throw new NetworkLoadError('loadSets');
+    return (sets || []).map(mapSetRow);
   },
 
   /**
@@ -351,12 +500,13 @@ export const NeonService = {
   /**
    * Загрузить все карточки: свои наборы + наборы курсов, где пользователь ученик (с его прогрессом)
    */
-  async loadAllCards(userId?: string): Promise<Card[]> {
+  async loadAllCards(userId?: string, options?: LoadOptions): Promise<Card[]> {
     if (!userId) {
       console.warn('userId не передан, пропускаем загрузку карточек');
       return [];
     }
     const cards = await callDataApi<any[]>('loadAllCards', {}, 'GET');
+    if (cards === null && options?.throwOnError) throw new NetworkLoadError('loadAllCards');
     return (cards || []).map(mapCardRow);
   },
 
@@ -423,7 +573,7 @@ export const NeonService = {
   /**
    * Загрузить все курсы пользователя (где он учитель)
    */
-  async loadCourses(userId?: string): Promise<Array<{
+  async loadCourses(userId?: string, options?: LoadOptions): Promise<Array<{
     id: string;
     title: string;
     createdAt: number;
@@ -431,12 +581,8 @@ export const NeonService = {
   }>> {
     if (!userId) return [];
     const courses = await callDataApi<any[]>('loadCourses', {}, 'GET');
-    return (courses || []).map(course => ({
-      id: course.id,
-      title: course.title,
-      createdAt: new Date(course.created_at).getTime(),
-      updatedAt: course.updated_at ? new Date(course.updated_at).getTime() : undefined,
-    }));
+    if (courses === null && options?.throwOnError) throw new NetworkLoadError('loadCourses');
+    return (courses || []).map(mapCourseRow);
   },
 
   /**
@@ -478,16 +624,10 @@ export const NeonService = {
   /**
    * Загрузить курсы где пользователь — ученик
    */
-  async loadStudentCourses(_userId: string): Promise<Course[]> {
+  async loadStudentCourses(_userId: string, options?: LoadOptions): Promise<Course[]> {
     const rows = await callDataApi<any[]>('loadStudentCourses', {}, 'GET');
-    return (rows || []).map((row: any) => ({
-      id: row.id,
-      title: row.title,
-      createdAt: new Date(row.joined_at).getTime(),
-      isStudentCourse: true,
-      teacherName: row.teacher_name,
-      ownerId: row.owner_id,
-    }));
+    if (rows === null && options?.throwOnError) throw new NetworkLoadError('loadStudentCourses');
+    return (rows || []).map(mapStudentCourseRow);
   },
 
   // ==================== STREAK SYSTEM ====================
@@ -526,7 +666,7 @@ export const NeonService = {
     const token = session?.access_token;
     if (!token) return null;
     try {
-      const resp = await fetch(`${DATA_API_BASE}?action=buyStreakFreeze`, {
+      const resp = await fetchWithTimeout(`${DATA_API_BASE}?action=buyStreakFreeze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: '{}',
@@ -550,13 +690,13 @@ export const NeonService = {
   /**
    * Получить активность за последние N дней
    */
-  async getWeekActivity(_userId: string, days: number = 7): Promise<{
+  async getWeekActivity(_userId: string, days: number = 7, options?: LoadOptions): Promise<{
     local_date: string;
     words_learned: number;
     minutes_learned: number;
     cards_studied: number;
   }[]> {
-    const rows = await callDataApi<any[]>('getWeekActivity', { days }, 'GET');
+    const rows = await callDataApi<any[]>('getWeekActivity', { days }, 'GET', options?.throwOnError);
     return (rows || []).map((row: any) => ({
       local_date: pgDateToString(row.local_date),
       words_learned: row.words_learned || 0,
@@ -568,50 +708,21 @@ export const NeonService = {
   /**
    * Получить статистику пользователя (сброс серии при пропуске делает сервер)
    */
-  async getUserStats(_userId: string): Promise<{
-    current_streak: number;
-    longest_streak: number;
-    last_active_date: string | null;
-    timezone: string;
-    total_words_learned: number;
-    total_minutes_learned: number;
-    total_cards_studied: number;
-    /** Заморозок серии в запасе */
-    streak_freezes: number;
-    /** Сегодня заморозка спасла серию (вчера был пропуск) */
-    freeze_used: boolean;
-  } | null> {
-    const row = await callDataApi<any>('getUserStats', {}, 'GET');
-    if (!row) return null;
-    let timezone: string;
-    try {
-      timezone = row.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-    } catch {
-      timezone = 'UTC';
-    }
-    return {
-      current_streak: row.current_streak || 0,
-      longest_streak: row.longest_streak || 0,
-      last_active_date: row.last_active_date ? pgDateToString(row.last_active_date) : null,
-      timezone,
-      total_words_learned: row.total_words_learned || 0,
-      total_minutes_learned: row.total_minutes_learned || 0,
-      total_cards_studied: row.total_cards_studied || 0,
-      streak_freezes: row.streak_freezes || 0,
-      freeze_used: row.freeze_used === true,
-    };
+  async getUserStats(_userId: string, options?: LoadOptions): Promise<UserStatsData | null> {
+    const row = await callDataApi<any>('getUserStats', {}, 'GET', options?.throwOnError);
+    return row ? mapUserStatsRow(row) : null;
   },
 
   /**
    * Получить активность за конкретную дату
    */
-  async getDailyActivity(_userId: string, localDate: string): Promise<{
+  async getDailyActivity(_userId: string, localDate: string, options?: LoadOptions): Promise<{
     local_date: string;
     words_learned: number;
     minutes_learned: number;
     cards_studied: number;
   } | null> {
-    const row = await callDataApi<any>('getDailyActivity', { localDate }, 'GET');
+    const row = await callDataApi<any>('getDailyActivity', { localDate }, 'GET', options?.throwOnError);
     if (!row) return null;
     return {
       local_date: pgDateToString(row.local_date),
@@ -628,7 +739,14 @@ export const NeonService = {
    * null — нет сессии/сети или нет доступа к курсу.
    */
   async loadLeaderboard(courseId: string, week: 'current' | 'previous' = 'current'): Promise<CourseLeaderboard | null> {
-    return callProgressApi<CourseLeaderboard>('leaderboard', { method: 'GET', params: { courseId, week } });
+    const board = await callProgressApi<CourseLeaderboard>('leaderboard', { method: 'GET', params: { courseId, week } });
+    if (board) writeCache(`leaderboard_${courseId}_${week}`, board);
+    return board;
+  },
+
+  /** Последний сохранённый рейтинг курса — показать сразу, пока грузится свежий */
+  cachedLeaderboard(courseId: string, week: 'current' | 'previous' = 'current'): CourseLeaderboard | null {
+    return readCache<CourseLeaderboard>(`leaderboard_${courseId}_${week}`) ?? null;
   },
 
   /** Учитель включает/выключает рейтинг в своём курсе */
@@ -670,7 +788,7 @@ export const NeonService = {
     const token = session?.access_token;
     if (!token) return null;
     try {
-      const resp = await fetch(`${API_BASE}/progress?action=answer`, {
+      const resp = await fetchWithTimeout(`${API_BASE}/progress?action=answer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ answers }),
@@ -842,7 +960,7 @@ export const NeonService = {
   /**
    * Загрузить наборы курса учителя (для ученика, read-only)
    */
-  async loadCourseSetsByMembership(courseId: string): Promise<CardSet[]> {
+  async loadCourseSetsByMembership(courseId: string, options?: LoadOptions): Promise<CardSet[]> {
     // Идёт через backend — раньше шло напрямую в Neon с клиента без проверки, что
     // вызывающий реально состоит в этом курсе (см. план, пункт 23).
     const result = await callTeacherApi<{
@@ -855,30 +973,14 @@ export const NeonService = {
       }>;
     }>('course-sets-by-membership', { method: 'GET', params: { courseId } });
     if (!result.ok) {
+      // Сеть/сервер — не «пусто»; а 403/404 (ученика убрали из курса) — честно пусто
+      if (options?.throwOnError && (result.reason === 'network' || result.status === 0 || result.status >= 500)) {
+        throw new NetworkLoadError('loadCourseSetsByMembership');
+      }
       console.error('Failed to load course sets by membership:', result.error);
       return [];
     }
-    return result.data.sets.map((row) => ({
-      id: row.id,
-      userId: row.userId,
-      title: row.title,
-      description: row.description || '',
-      category: row.category || '',
-      icon: row.icon || null,
-      languageFrom: row.languageFrom || 'de',
-      languageTo: row.languageTo || 'ru',
-      totalCards: row.totalCards || 0,
-      createdAt: new Date(row.createdAt).getTime(),
-      updatedAt: row.updatedAt ? new Date(row.updatedAt).getTime() : undefined,
-      courseId: row.courseId,
-      isReadOnly: true,
-      ownerCourseId: courseId,
-      isOfficial: row.isOfficial === true,
-      unitId: row.unitId || undefined,
-      bookId: row.bookId || undefined,
-      bookTitle: row.bookTitle || undefined,
-      unitNumber: row.unitNumber ?? undefined,
-    }));
+    return result.data.sets.map((row) => mapMembershipSetRow(row, courseId));
   },
 
   /**

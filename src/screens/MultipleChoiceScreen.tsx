@@ -10,7 +10,7 @@ import { Container, Text, ProgressBar, Loading } from '@/components/common';
 import { useCardsStore, useSetsStore, useThemeColors, useSettingsStore, selectSetStats } from '@/store';
 import { spacing, borderRadius } from '@/constants';
 import { ProgressService } from '@/services/ProgressService';
-import { speak, detectLanguage } from '@/utils/speech';
+import { speak, detectLanguage, prefetchSpeech } from '@/utils/speech';
 import { playCorrectSound, preloadSound } from '@/utils/sound';
 import { Analytics } from '@/services/analytics';
 import { useChallengeStore } from '@/store';
@@ -196,6 +196,12 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
 
   const totalQuestions = questions.length;
   const currentCard = questions[currentIndex];
+
+  // Заранее озвучиваем слово текущей и следующей карточки — кнопка динамика играет сразу
+  useEffect(() => {
+    const upcoming = [questions[currentIndex], questions[currentIndex + 1]].filter(Boolean) as Card[];
+    prefetchSpeech(upcoming.map((c) => ({ text: getFront(c), counterpart: getBack(c) })));
+  }, [questions, currentIndex]);
   const progressPercent = totalQuestions ? Math.round(((currentIndex + 1) / totalQuestions) * 100) : 0;
 
   const options = useMemo(() => {

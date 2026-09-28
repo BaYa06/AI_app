@@ -1,6 +1,7 @@
 /**
  * Store для настроек и темы
  */
+import { readCache } from '@/services/localCache';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import type { UserSettings, ThemeMode } from '@/types';
@@ -79,6 +80,17 @@ import { getLocalDateKey } from '@/services/StreakService';
 
 const getTodayDate = () => getLocalDateKey();
 
+/** Серия, сохранённая при прошлом запуске (StreakService кэширует user_stats) */
+function initialStreakCache() {
+  const cached = readCache<{ current_streak?: number; longest_streak?: number; last_active_date?: string | null }>('user_stats');
+  return {
+    currentStreak: cached?.current_streak ?? 0,
+    longestStreak: cached?.longest_streak ?? 0,
+    lastActiveDate: cached?.last_active_date ?? null,
+    loaded: !!cached,
+  };
+}
+
 export const useSettingsStore = create<SettingsState & SettingsActions>()(
   immer((set, get) => ({
     // Начальное состояние
@@ -92,12 +104,8 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
       longestStreak: 0,
       lastStudyDate: getTodayDate(),
     },
-    streakCache: {
-      currentStreak: 0,
-      longestStreak: 0,
-      lastActiveDate: null,
-      loaded: false,
-    },
+    // Серия с прошлого запуска — показываем сразу, сервер обновит (syncStreakFromServer)
+    streakCache: initialStreakCache(),
     isTeacher: null,
 
     // ==================== НАСТРОЙКИ ====================

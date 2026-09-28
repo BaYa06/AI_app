@@ -10,6 +10,8 @@ import { AppNavigator } from '@/navigation';
 import { LoadingSplash } from '@/components/common';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { DatabaseService, setupAutoSave, supabase, NeonService, setAnalyticsUserId, SyncQueueService, Analytics, setAnalyticsUserProperties, BookService } from '@/services';
+import { StorageService } from '@/services/StorageService';
+import { CACHE_OWNER_KEY } from '@/services/DatabaseService';
 import { refreshPushToken, subscribeForegroundMessages, requestPushPermission, isPushSupported } from '@/services/pushNotifications';
 import { useThemeColors, useSettingsStore } from '@/store';
 import { CourseInviteModal } from '@/components/CourseInviteModal';
@@ -310,6 +312,15 @@ export default function App() {
   const processedOAuthCodeRef = useRef<string | null>(null);
   // Guard: не отправляем push токен повторно для того же userId
   const pushedTokenForUserRef = useRef<string | null>(null);
+  // Мгновенный старт: данные прошлого запуска показываем сразу, до ответа сервера.
+  // Здесь — чьи это данные (null — показывать нечего: первый запуск или выход из аккаунта).
+  const cachedOwnerRef = useRef<string | null | undefined>(undefined);
+  if (cachedOwnerRef.current === undefined) {
+    cachedOwnerRef.current = DatabaseService.hydrateFromCache();
+    // Данные на экране уже этого пользователя: handleSession не должен их очищать и грузить заново
+    // (свежие данные подтянет init → loadAll). Другой пользователь — перезагрузка как обычно.
+    if (cachedOwnerRef.current) loadedUserIdRef.current = cachedOwnerRef.current;
+  }
 
   // Каталог книг: при возврате в приложение подтягиваем юниты, которые открыли/закрыли в курсах
   // пользователя (полная загрузка данных идёт только при старте). Не чаще раза в минуту.
@@ -329,7 +340,23 @@ export default function App() {
     let isMounted = true;
     let unsubscribe: (() => void) | null = null;
 
+    // Экран загрузки не ждёт сеть дольше этого (первый запуск без сохранённых данных):
+    // данные дозагрузятся в фоне и появятся сами
+    const STARTUP_MAX_WAIT_MS = 8_000;
+    let splashReleased = false;
+    const splashTimer = setTimeout(() => {
+      if (isMounted && !splashReleased) {
+        splashReleased = true;
+        console.warn('⚠️ Startup: загрузка данных дольше 15 с — показываем приложение, данные догрузятся');
+        setIsReady(true);
+        setAuthChecked(true);
+      }
+    }, STARTUP_MAX_WAIT_MS);
+
     const init = async () => {
+      // Очередь отправки (ответы, правки) — сразу: с мгновенным стартом ученик может отвечать ещё до
+      // загрузки с сервера, а позже init() очереди заменил бы свежие задачи сохранёнными с диска
+      SyncQueueService.init();
       try {
         const loaded = await DatabaseService.loadAll();
         if (!isMounted) return;
@@ -342,11 +369,12 @@ export default function App() {
             }
           } catch {}
           unsubscribe = setupAutoSave();
-          SyncQueueService.init();
         }
       } catch (error) {
         console.error('Failed to initialize app:', error);
       } finally {
+        clearTimeout(splashTimer);
+        splashReleased = true;
         if (isMounted) {
           setIsReady(true);
           setAuthChecked(true);
@@ -447,23 +475,45 @@ export default function App() {
         }
         const user = data.session?.user;
         if (user) {
+          // Тот же пользователь, чьи данные уже на экране, — пускаем сразу; проверки
+          // (профиль, онбординг, свежие данные) идут в фоне в handleSession
+          if (user.id === cachedOwnerRef.current) {
+            setIsAuthenticated(true);
+            setNeedsOnboarding(false);
+            setIsReady(true);
+            setAuthChecked(true);
+          }
           await handleSession(user);
         } else {
           setIsAuthenticated(false);
+          // Не вошёл — экран приветствия не зависит от загрузки данных
+          setIsReady(true);
+          setAuthChecked(true);
         }
       })
       .catch((error) => {
         console.error('⚠️ Ошибка получения сессии:', error);
       });
 
-    const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // Supabase вызывает этот обработчик ВНУТРИ своей блокировки сессии (например, SIGNED_IN при
+    // обновлении токена на старте). handleSession ходит в API, а тот вызывает getSession(), который
+    // ждёт ту же блокировку → взаимоблокировка: вход не завершался, и приложение навсегда оставалось
+    // на экране загрузки. Поэтому здесь ничего не ждём, работу откладываем до выхода из блокировки.
+    // (Документация Supabase: не вызывать supabase-функции с await внутри onAuthStateChange.)
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
       if (!isMounted) return;
       // TOKEN_REFRESHED не требует перезагрузки данных — только обновление токена
       if (event === 'TOKEN_REFRESHED') return;
       if (session?.user) {
-        await handleSession(session.user);
+        const user = session.user;
+        setTimeout(() => {
+          if (isMounted) handleSession(user).catch((e) => console.error('handleSession failed:', e));
+        }, 0);
       } else {
         Analytics.logout();
+        // Сохранённые данные больше не показываем мгновенно — следующий вошедший может быть другим
+        StorageService.delete(CACHE_OWNER_KEY);
+        cachedOwnerRef.current = null;
         setCurrentUserId(null);
         setIsAuthenticated(false);
         setNeedsOnboarding(false);

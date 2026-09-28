@@ -17,7 +17,7 @@ import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card, Rating } from '@/types';
 import { spacing, borderRadius } from '@/constants';
 import { ProgressService } from '@/services/ProgressService';
-import { speak, detectLanguage } from '@/utils/speech';
+import { speak, detectLanguage, prefetchSpeech } from '@/utils/speech';
 import { playCorrectSound2 as playCorrectSound, preloadSound } from '@/utils/sound';
 
 type Props = RootStackScreenProps<'WordBuilder'>;
@@ -171,8 +171,15 @@ export function WordBuilderScreen({ navigation, route }: Props) {
 
   const currentCard = cardsQueue[currentIndex];
 
+
   const getFront = (card: Card) => card.frontText ?? (card as any).front ?? '';
   const getBack = (card: Card) => card.backText ?? (card as any).back ?? '';
+
+  // Заранее озвучиваем слово текущей и следующей карточки — кнопка динамика играет сразу
+  useEffect(() => {
+    const upcoming = [cardsQueue[currentIndex], cardsQueue[currentIndex + 1]].filter(Boolean) as Card[];
+    prefetchSpeech(upcoming.map((c) => ({ text: getFront(c), counterpart: getBack(c) })));
+  }, [cardsQueue, currentIndex]);
 
   const { promptText, targetWord } = useMemo(() => {
     if (!currentCard) {

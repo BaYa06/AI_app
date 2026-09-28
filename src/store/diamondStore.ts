@@ -1,24 +1,20 @@
 import { create } from 'zustand';
 import { supabase } from '@/services/supabaseClient';
 import { API_BASE } from '@/config/apiBase';
-import { useChallengeStore, type ChallengeId } from './challengeStore';
+import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
+import { useChallengeStore, localDay, type ChallengeId } from './challengeStore';
+import { readCache, writeCache } from '@/services/localCache';
 
 // Баланс и ежедневные награды живут в БД (users.diamond, daily_rewards). Начисляет только
 // сервер (api/push.js?action=claim-reward), он же не даёт забрать награду дважды за день.
 const REWARDS_API = `${API_BASE}/push`;
-
-/** Сегодняшняя дата по локальному времени — "день" челленджа для пользователя. */
-function localDay(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
 
 async function callRewardsApi(action: string, init: { method: 'GET' | 'POST'; body?: object }, day: string) {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
   if (!token) return null;
   try {
-    const resp = await fetch(`${REWARDS_API}?action=${action}&day=${day}`, {
+    const resp = await fetchWithTimeout(`${REWARDS_API}?action=${action}&day=${day}`, {
       method: init.method,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: init.body ? JSON.stringify({ ...init.body, day }) : undefined,
@@ -43,19 +39,28 @@ interface DiamondState {
 }
 
 export const useDiamondStore = create<DiamondState>((set) => ({
-  diamonds: 0,
+  // Баланс с прошлого запуска — виден сразу и без сети; сервер обновит в loadRewards
+  diamonds: readCache<number>('diamonds') ?? 0,
   loadRewards: async () => {
     const day = localDay();
     const data = await callRewardsApi('rewards', { method: 'GET' }, day);
     if (!data) return;
     set({ diamonds: data.diamonds });
+    writeCache('diamonds', data.diamonds);
+    writeCache('challenges_claimed', { day, claimed: data.claimedToday });
     useChallengeStore.getState().syncClaimed(data.claimedToday);
   },
   claimReward: async (challenge) => {
     const day = localDay();
     const data = await callRewardsApi('claim-reward', { method: 'POST', body: { challenge } }, day);
     if (!data) return null;
+    const cached = readCache<{ day: string; claimed: string[] }>('challenges_claimed');
+    const claimed = cached?.day === day ? cached.claimed : [];
+    writeCache('challenges_claimed', { day, claimed: Array.from(new Set([...claimed, challenge])) });
     return data.diamonds;
   },
-  setDiamonds: (diamonds) => set({ diamonds }),
+  setDiamonds: (diamonds) => {
+    set({ diamonds });
+    writeCache('diamonds', diamonds);
+  },
 }));

@@ -6,6 +6,7 @@
 
 import { supabase } from './supabaseClient';
 import { API_BASE } from '@/config/apiBase';
+import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
 import type { Card, CardSet, CardStatus } from '@/types';
 import type { BookDetail, BookFilters, BookListItem, CoursePlan } from '@/types/books';
 
@@ -29,7 +30,7 @@ async function callBooksApi<T>(
 
   const query = new URLSearchParams({ action, ...(params || {}) }).toString();
   try {
-    const resp = await fetch(`${BOOKS_API_BASE}?${query}`, {
+    const resp = await fetchWithTimeout(`${BOOKS_API_BASE}?${query}`, {
       method,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: method === 'POST' ? JSON.stringify(body || {}) : undefined,

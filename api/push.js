@@ -17,8 +17,8 @@
 import { neon } from '@neondatabase/serverless';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
-import { createClient } from '@supabase/supabase-js';
 import { ensureDatabaseInitialized } from './_db-init.js';
+import { getAuthedUserId } from './_auth.js';
 import { computeStandings } from './progress.js';
 
 function initFirebase() {
@@ -26,24 +26,6 @@ function initFirebase() {
     initializeApp({ credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)) });
   }
   return getMessaging();
-}
-
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://yiwsmjbeirgomkrckoju.supabase.co';
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
-
-/** userId из Supabase JWT (Authorization: Bearer). null — нет токена или он невалиден. */
-async function getAuthedUserId(req) {
-  const header = req.headers.authorization || req.headers.Authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
-  if (!token || !SUPABASE_ANON_KEY) return null;
-  try {
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    const { data, error } = await supabase.auth.getUser(token);
-    if (error || !data?.user) return null;
-    return data.user.id;
-  } catch {
-    return null;
-  }
 }
 
 /** Награды за ежедневные челленджи — сумму определяет сервер, не клиент. */

@@ -13,7 +13,7 @@ import { DatabaseService, Analytics } from '@/services';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Rating, Card } from '@/types';
 import { ArrowLeft, Settings, Volume2, Check } from 'lucide-react-native';
-import { speak, detectLanguage } from '@/utils/speech';
+import { speak, detectLanguage, prefetchSpeech } from '@/utils/speech';
 import { triggerHaptic } from '@/utils/haptic';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ReAnimated, {
@@ -537,6 +537,24 @@ export function StudyScreen({ navigation, route }: Props) {
       backfaceVisibility: 'hidden' as const,
     };
   });
+
+  // Заранее озвучиваем вопрос и ответ текущей и следующей карточки — кнопка динамика играет сразу
+  useEffect(() => {
+    if (!session) return;
+    const ids = [session.queue[session.currentIndex], session.queue[session.currentIndex + 1]].filter(Boolean);
+    const frontLang = normalizeLang(currentSet?.languageFrom);
+    const backLang = normalizeLang(currentSet?.languageTo);
+    const items: Array<{ text: string; lang: string }> = [];
+    for (const id of ids) {
+      const card = useCardsStore.getState().cards[id];
+      if (!card) continue;
+      const front = (card.frontText ?? (card as any).front ?? '').trim();
+      const back = (card.backText ?? (card as any).back ?? '').trim();
+      if (front) items.push({ text: front, lang: frontLang || detectLanguage(front, back) });
+      if (back) items.push({ text: back, lang: backLang || detectLanguage(back, front) });
+    }
+    prefetchSpeech(items);
+  }, [session?.currentIndex, session?.queue, currentSet?.languageFrom, currentSet?.languageTo]);
 
   // Загрузка
   if (!currentCard) {

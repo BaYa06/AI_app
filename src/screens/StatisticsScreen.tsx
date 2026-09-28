@@ -109,15 +109,14 @@ export function StatisticsScreen({ navigation }: any) {
   const todayStatsLocal = useSettingsStore((s) => s.todayStats);
 
   const [chartTab, setChartTab] = useState<'week' | 'month' | 'year'>('week');
-  const [loading, setLoading] = useState(true);
-
-  // Data from backend
-  const [userStats, setUserStats] = useState<UserStats | null>(null);
-  const [todayActivity, setTodayActivity] = useState<DailyActivity | null>(null);
-  const [heatmapActivity, setHeatmapActivity] = useState<DailyActivity[]>([]);
-  const [weekActivity, setWeekActivity] = useState<DailyActivity[]>([]);
-  const [monthActivity, setMonthActivity] = useState<DailyActivity[] | null>(null);
-  const [yearActivity, setYearActivity] = useState<DailyActivity[] | null>(null);
+  // Сразу — сохранённое с прошлого раза, свежее с сервера подменит (без индикатора загрузки)
+  const [userStats, setUserStats] = useState<UserStats | null>(() => StreakService.cachedUserStats());
+  const [todayActivity, setTodayActivity] = useState<DailyActivity | null>(() => StreakService.cachedTodayActivity() ?? null);
+  const [heatmapActivity, setHeatmapActivity] = useState<DailyActivity[]>(() => StreakService.cachedWeekActivity(42) ?? []);
+  const [weekActivity, setWeekActivity] = useState<DailyActivity[]>(() => StreakService.cachedWeekActivity(7) ?? []);
+  const [monthActivity, setMonthActivity] = useState<DailyActivity[] | null>(() => StreakService.cachedWeekActivity(30));
+  const [yearActivity, setYearActivity] = useState<DailyActivity[] | null>(() => StreakService.cachedWeekActivity(365));
+  const [loading, setLoading] = useState(() => userStats === null);
   const [userName, setUserName] = useState('');
 
   const cardBg = isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF';

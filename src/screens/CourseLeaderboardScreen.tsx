@@ -62,8 +62,9 @@ export function CourseLeaderboardScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
 
   const [week, setWeek] = useState<Week>(route.params.week ?? 'current');
-  const [board, setBoard] = useState<CourseLeaderboard | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Сразу — последний сохранённый рейтинг, свежий подменит без индикатора загрузки
+  const [board, setBoard] = useState<CourseLeaderboard | null>(() => NeonService.cachedLeaderboard(courseId, route.params.week ?? 'current'));
+  const [loading, setLoading] = useState(() => board === null);
   const [error, setError] = useState(false);
   const [showRules, setShowRules] = useState(false);
   const [savingToggle, setSavingToggle] = useState(false);
@@ -72,12 +73,15 @@ export function CourseLeaderboardScreen({ navigation, route }: Props) {
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      setLoading(true);
+      const cached = NeonService.cachedLeaderboard(courseId, week);
+      if (cached) setBoard(cached);
+      setLoading(!cached);
       setError(false);
       NeonService.loadLeaderboard(courseId, week).then((result) => {
         if (!active) return;
-        setBoard(result);
-        setError(result === null);
+        if (result) setBoard(result);
+        // Ошибку показываем, только если и сохранённого нет (без сети — последняя таблица)
+        setError(result === null && !cached);
         setLoading(false);
       });
       return () => { active = false; };

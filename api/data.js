@@ -2,6 +2,7 @@ import { neon } from '@neondatabase/serverless';
 import { getAuthedUser } from './_auth.js';
 import { ensureDatabaseInitialized } from './_db-init.js';
 import { HttpError, uuid, assertReadableSet } from './_access.js';
+import { courseSetsForStudent } from './_course.js';
 
 /**
  * API данных пользователя: профиль, наборы, карточки, курсы, прогресс, серия.
@@ -567,6 +568,28 @@ async function getDailyActivity(sql, me, p) {
   return rows[0] ?? null;
 }
 
+// ─── Запуск приложения одним запросом ───────────────────────────────────────
+
+/**
+ * Всё, что приложение грузит при старте, — одним ответом (вместо 8–10 отдельных запросов, каждый
+ * со своей проверкой входа): свои наборы, все карточки с прогрессом, свои курсы, курсы ученика
+ * и их наборы, статистика серии.
+ */
+async function bootstrap(sql, me) {
+  const [sets, cards, courses, studentCourses, stats] = await Promise.all([
+    loadSets(sql, me),
+    loadAllCards(sql, me),
+    loadCourses(sql, me),
+    loadStudentCourses(sql, me),
+    getUserStats(sql, me),
+  ]);
+  const courseSets = {};
+  await Promise.all(studentCourses.map(async (course) => {
+    courseSets[course.id] = await courseSetsForStudent(sql, course.id);
+  }));
+  return { sets, cards, courses, studentCourses, courseSets, stats, serverTime: Date.now() };
+}
+
 // ─── Роутер ─────────────────────────────────────────────────────────────────
 
 const ACTIONS = {
@@ -575,6 +598,7 @@ const ACTIONS = {
   deleteSet, deleteCard, updateSetMeta, updateSetCourse,
   loadCourses, createCourse, loadStudentCourses,
   upsertDailyActivity, updateUserStatsStreak, buyStreakFreeze, logStreakEvent, getWeekActivity, getUserStats,
+  bootstrap,
   getDailyActivity,
 };
 

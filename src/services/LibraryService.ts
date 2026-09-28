@@ -6,6 +6,7 @@
 
 import { supabase } from './supabaseClient';
 import { API_BASE } from '@/config/apiBase';
+import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
 import type {
   LibraryFilters,
   LibraryListResponse,
@@ -39,7 +40,7 @@ async function callLibraryApi<T>(
     if (value !== undefined && value !== null && value !== '') query.set(key, String(value));
   }
   const qs = query.toString();
-  const resp = await fetch(qs ? `${LIBRARY_API}?${qs}` : LIBRARY_API, {
+  const resp = await fetchWithTimeout(qs ? `${LIBRARY_API}?${qs}` : LIBRARY_API, {
     method,
     headers: {
       'Content-Type': 'application/json',

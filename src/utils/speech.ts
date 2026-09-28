@@ -331,42 +331,171 @@ const toGooglePitch = (pitch = 1) => {
   return (clamped - 1) * 10; // ±10 semitones
 };
 
-const playAudioNative = (audioBase64: string, volume = 1): Promise<void> => {
-  if (!RNFS || !Sound) {
-    return Promise.reject(new Error('Native audio dependencies unavailable'));
+// ----------------- Кэш озвучки -----------------
+// Один раз озвученное слово сохраняется: повторно играет сразу, без сети (план оптимизации, п. 4).
+// Натив — mp3-файлы в Caches (iOS может почистить их сам при нехватке места), веб — память вкладки.
+
+const TTS_TIMEOUT_MS = 8_000;
+const TTS_CACHE_MAX_FILES = 800;
+const TTS_WEB_CACHE_MAX = 300;
+
+const webAudioCache = new Map<string, string>(); // key → base64 (веб)
+const inflight = new Map<string, Promise<boolean>>(); // key → идёт синтез
+let ttsCachePruned = false;
+
+/** Стабильный короткий ключ: голос + язык + скорость + высота + текст (djb2 → hex) */
+const ttsKey = (text: string, lang: string, options?: { rate?: number; pitch?: number }) => {
+  const raw = `${pickGoogleVoice(lang) || ''}|${lang}|${toGoogleRate(options?.rate)}|${toGooglePitch(options?.pitch)}|${text}`;
+  let h1 = 5381;
+  let h2 = 52711;
+  for (let i = 0; i < raw.length; i++) {
+    const c = raw.charCodeAt(i);
+    h1 = (h1 * 33) ^ c;
+    h2 = (h2 * 33) ^ c;
   }
-  const filePath = `${RNFS.CachesDirectoryPath}/tts_${Date.now()}.mp3`;
-  return RNFS.writeFile(filePath, audioBase64, 'base64').then(
-    () =>
-      new Promise<void>((resolve, reject) => {
-        const sound = new Sound(filePath, '', (err: any) => {
-          if (err) {
-            console.error('[speech] Sound load error:', err);
-            reject(err);
-            return;
-          }
-          sound.setVolume(clamp01(volume));
-          sound.play((success: boolean) => {
-            sound.release();
-            // Clean up temp file
-            RNFS.unlink(filePath).catch(() => {});
-            if (success) resolve();
-            else reject(new Error('Sound playback failed'));
-          });
-        });
-      })
-  );
+  return (h1 >>> 0).toString(16) + (h2 >>> 0).toString(16);
 };
 
-const playAudio = async (audioBase64: string, volume = 1) => {
-  if (isNative) {
-    return playAudioNative(audioBase64, volume);
+const ttsCacheDir = () => `${RNFS.CachesDirectoryPath}/tts-cache`;
+const ttsCachePath = (key: string) => `${ttsCacheDir()}/${key}.mp3`;
+
+/** Раз за запуск: не держать больше TTS_CACHE_MAX_FILES файлов — удаляем самые старые */
+const pruneTtsCache = async () => {
+  if (ttsCachePruned || !RNFS) return;
+  ttsCachePruned = true;
+  try {
+    const files = await RNFS.readDir(ttsCacheDir());
+    if (files.length <= TTS_CACHE_MAX_FILES) return;
+    files.sort((x: any, y: any) => new Date(x.mtime).getTime() - new Date(y.mtime).getTime());
+    for (const f of files.slice(0, files.length - TTS_CACHE_MAX_FILES)) {
+      RNFS.unlink(f.path).catch(() => {});
+    }
+  } catch {
+    // папки ещё нет — нечего чистить
   }
+};
+
+const hasCachedAudio = async (key: string): Promise<boolean> => {
+  if (!isNative) return webAudioCache.has(key);
+  if (!RNFS) return false;
+  return RNFS.exists(ttsCachePath(key)).catch(() => false);
+};
+
+const storeCachedAudio = async (key: string, audioBase64: string) => {
+  if (!isNative) {
+    webAudioCache.set(key, audioBase64);
+    if (webAudioCache.size > TTS_WEB_CACHE_MAX) {
+      const oldest = webAudioCache.keys().next().value;
+      if (oldest) webAudioCache.delete(oldest);
+    }
+    return;
+  }
+  if (!RNFS) return;
+  await RNFS.mkdir(ttsCacheDir()).catch(() => {});
+  await RNFS.writeFile(ttsCachePath(key), audioBase64, 'base64');
+  pruneTtsCache();
+};
+
+const playAudioFile = (filePath: string, volume = 1): Promise<void> => {
+  if (!Sound) return Promise.reject(new Error('Native audio dependencies unavailable'));
+  return new Promise<void>((resolve, reject) => {
+    const sound = new Sound(filePath, '', (err: any) => {
+      if (err) {
+        console.error('[speech] Sound load error:', err);
+        reject(err);
+        return;
+      }
+      sound.setVolume(clamp01(volume));
+      sound.play((success: boolean) => {
+        sound.release();
+        if (success) resolve();
+        else reject(new Error('Sound playback failed'));
+      });
+    });
+  });
+};
+
+const playCachedAudio = async (key: string, volume = 1) => {
+  if (isNative) return playAudioFile(ttsCachePath(key), volume);
   const AudioCtor = getGlobal().Audio;
-  if (!AudioCtor) return;
+  const audioBase64 = webAudioCache.get(key);
+  if (!AudioCtor || !audioBase64) return;
   const audio = new AudioCtor(`data:audio/mp3;base64,${audioBase64}`);
   audio.volume = clamp01(volume);
   await audio.play();
+};
+
+/** Синтез у Google и сохранение в кэш (без проигрывания). false — нет ключа/токена. */
+const synthesizeToCache = async (
+  key: string,
+  text: string,
+  lang: string,
+  options?: { rate?: number; pitch?: number },
+): Promise<boolean> => {
+  const fetchFn = getGlobal().fetch as FetchLike | undefined;
+  if (!fetchFn) return false;
+
+  // Prefer service account over API key for better Neural2/Wavenet support
+  let token: string | null = null;
+  const apiKey = getApiKey();
+  try {
+    token = await getAccessToken();
+  } catch (e) {
+    console.warn('[speech] getAccessToken failed:', e);
+  }
+  if (!token && !apiKey) return false;
+
+  const languageCode = (lang || 'en-US').split('-').slice(0, 2).join('-');
+  const url = token ? GOOGLE_TTS_ENDPOINT : `${GOOGLE_TTS_ENDPOINT}?key=${apiKey}`;
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), TTS_TIMEOUT_MS) : null;
+  try {
+    const res = await fetchFn(url, {
+      method: 'POST',
+      headers,
+      signal: controller?.signal,
+      body: JSON.stringify({
+        input: { text },
+        voice: { languageCode, name: pickGoogleVoice(lang) },
+        audioConfig: {
+          audioEncoding: 'MP3',
+          speakingRate: toGoogleRate(options?.rate),
+          pitch: toGooglePitch(options?.pitch),
+          volumeGainDb: 0,
+        },
+      }),
+    });
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => 'unknown error');
+      throw new Error(`Google TTS failed: ${res.status} - ${errorText}`);
+    }
+    const data = await res.json();
+    if (!data?.audioContent) throw new Error('Google TTS: empty audio');
+    await storeCachedAudio(key, data.audioContent);
+    return true;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+};
+
+/** Синтез с защитой от дублей: одно слово параллельно запрашивается один раз */
+const ensureCached = (
+  key: string,
+  text: string,
+  lang: string,
+  options?: { rate?: number; pitch?: number },
+): Promise<boolean> => {
+  const pending = inflight.get(key);
+  if (pending) return pending;
+  const job = (async () => {
+    if (await hasCachedAudio(key)) return true;
+    return synthesizeToCache(key, text, lang, options);
+  })().finally(() => inflight.delete(key));
+  inflight.set(key, job);
+  return job;
 };
 
 const speakWithGoogle = async (
@@ -374,78 +503,30 @@ const speakWithGoogle = async (
   lang: string,
   options?: { rate?: number; pitch?: number; volume?: number }
 ) => {
-  const fetchFn = getGlobal().fetch as FetchLike | undefined;
-  if (!fetchFn) {
-    console.log('[speech] fetch not available');
-    return false;
+  const key = ttsKey(text, lang, options);
+  // Уже озвучивали — играем с диска/из памяти сразу, без сети
+  if (await hasCachedAudio(key)) {
+    await playCachedAudio(key, options?.volume);
+    return true;
   }
-
-  // Prefer service account over API key for better Neural2/Wavenet support
-  let token: string | null = null;
-  const apiKey = getApiKey();
-  
-  console.log('[speech] Checking service account first...');
-  try {
-    token = await getAccessToken();
-    console.log('[speech] Got access token:', !!token);
-  } catch (e) {
-    console.warn('[speech] getAccessToken failed:', e);
-  }
-
-  if (!token && !apiKey) {
-    console.log('[speech] No service account token and no API key available');
-    return false;
-  }
-  
-  if (token) {
-    console.log('[speech] Using service account token');
-  } else {
-    console.log('[speech] Falling back to API key');
-  }
-
-  const languageCode = (lang || 'en-US').split('-').slice(0, 2).join('-');
-  const voiceName = pickGoogleVoice(lang);
-
-  // Use token if available, otherwise fall back to API key
-  const url = token ? GOOGLE_TTS_ENDPOINT : `${GOOGLE_TTS_ENDPOINT}?key=${apiKey}`;
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  console.log('[speech] Calling Google TTS API...', { languageCode, voiceName, hasToken: !!token, hasApiKey: !!apiKey });
-
-  const res = await fetchFn(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      input: { text },
-      voice: {
-        languageCode,
-        name: voiceName,
-      },
-      audioConfig: {
-        audioEncoding: 'MP3',
-        speakingRate: toGoogleRate(options?.rate),
-        pitch: toGooglePitch(options?.pitch),
-        volumeGainDb: 0,
-      },
-    }),
-  });
-
-  if (!res.ok) {
-    const errorText = await res.text().catch(() => 'unknown error');
-    console.error('[speech] Google TTS API error:', res.status, errorText);
-    throw new Error(`Google TTS failed: ${res.status} - ${errorText}`);
-  }
-  const data = await res.json();
-  if (!data?.audioContent) throw new Error('Google TTS: empty audio');
-  console.log('[speech] Got audio content, playing...');
-  await playAudio(data.audioContent, options?.volume);
+  const ok = await ensureCached(key, text, lang, options);
+  if (!ok) return false;
+  await playCachedAudio(key, options?.volume);
   return true;
 };
+
+/**
+ * Заранее озвучить слова, которые вероятно нажмут (текущая и следующая карточка) — тогда кнопка
+ * динамика играет мгновенно. Тихо: ошибки (нет сети, нет ключа) игнорируются.
+ */
+export function prefetchSpeech(items: Array<{ text: string; counterpart?: string; lang?: string }>): void {
+  for (const item of items) {
+    const normalized = (item.text || '').trim().split(/\r?\n/)[0].trim();
+    if (!normalized) continue;
+    const lang = item.lang || detectLanguage(normalized, item.counterpart);
+    ensureCached(ttsKey(normalized, lang), normalized, lang).catch(() => {});
+  }
+}
 
 // ----------------- Web Speech -----------------
 

@@ -193,8 +193,9 @@ export function HomeScreen({ navigation }: any) {
   // Заморозки серии в запасе (план §3.5); null — ещё не загружено
   const [streakFreezes, setStreakFreezes] = useState<number | null>(null);
   const [buyingFreeze, setBuyingFreeze] = useState(false);
-  const [todayBackendCards, setTodayBackendCards] = useState<number | null>(null);
-  const [weekActivity, setWeekActivity] = useState<DailyActivity[]>([]);
+  // Сразу — сохранённое с прошлого раза; свежее с сервера подменит в useFocusEffect ниже
+  const [todayBackendCards, setTodayBackendCards] = useState<number | null>(() => StreakService.cachedTodayActivity()?.cards_studied ?? null);
+  const [weekActivity, setWeekActivity] = useState<DailyActivity[]>(() => StreakService.cachedWeekActivity(10) ?? []);
   const syncStreakFromServer = useSettingsStore((s) => s.syncStreakFromServer);
   const [courseMenuOpen, setCourseMenuOpen] = useState<string | null>(null);
   const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
@@ -272,24 +273,36 @@ export function HomeScreen({ navigation }: any) {
     });
   }, [navigation]);
 
-  const handleChallengeClaim = useCallback(async (id: ChallengeId) => {
+  // «Забрать +10» — сразу (оптимистично): алмазы летят и прибавляются, сервер подтверждает в фоне.
+  // Выдаёт награду только сервер: не подтвердил (нет сети/уже забрано) — откатываем экран.
+  const handleChallengeClaim = useCallback((id: ChallengeId) => {
     if (!claimBtnRefs.current[id] || claimingReward) return;
     setClaimingReward(true);
-    // Сначала сервер: он начисляет алмазы и не даёт забрать награду второй раз за день
-    const balance = await claimReward(id);
-    setClaimingReward(false);
-    if (balance === null) {
-      Alert.alert('Нет соединения', 'Не удалось получить награду. Попробуй ещё раз.');
-      return;
-    }
-    pendingDiamondsRef.current = balance;
+    const balanceBefore = useDiamondStore.getState().diamonds;
+    let reverted = false;
+    pendingDiamondsRef.current = balanceBefore + 10;
     claimBtnRefs.current[id]?.measureInWindow((x, y, w, h) => {
       diamondRewardRef.current?.collect({ x: x + w / 2, y: y + h / 2 });
     });
     setTimeout(() => {
-      claimChallenge(id);
+      if (!reverted) claimChallenge(id);
     }, 900);
-  }, [claimReward, claimingReward, claimChallenge]);
+
+    claimReward(id).then((balance) => {
+      setClaimingReward(false);
+      if (balance === null) {
+        reverted = true;
+        pendingDiamondsRef.current = null;
+        setDiamonds(balanceBefore);
+        useChallengeStore.getState().revertClaim(id);
+        Alert.alert('Нет соединения', 'Награда не получена — попробуй ещё раз, когда появится интернет.');
+        return;
+      }
+      // Точный баланс с сервера: если анимация ещё летит — применится по её окончании
+      if (pendingDiamondsRef.current !== null) pendingDiamondsRef.current = balance;
+      else setDiamonds(balance);
+    });
+  }, [claimReward, claimingReward, claimChallenge, setDiamonds]);
 
   const STREAK_FREEZE_PRICE = 50;
   const MAX_STREAK_FREEZES = 2;
@@ -646,13 +659,16 @@ export function HomeScreen({ navigation }: any) {
       }
       let active = true;
       const isMonday = new Date().getDay() === 1;
+      // Сразу — сохранённое (тизер виден без ожидания и без сети), свежее подменит
+      setLeaderboard(NeonService.cachedLeaderboard(activeCourseId, 'current'));
+      if (isMonday) setLastWeekBoard(NeonService.cachedLeaderboard(activeCourseId, 'previous'));
       Promise.all([
         NeonService.loadLeaderboard(activeCourseId, 'current'),
         isMonday ? NeonService.loadLeaderboard(activeCourseId, 'previous') : Promise.resolve(null),
       ]).then(([current, previous]) => {
         if (!active) return;
-        setLeaderboard(current);
-        setLastWeekBoard(previous);
+        if (current) setLeaderboard(current);
+        if (previous) setLastWeekBoard(previous);
       });
       return () => { active = false; };
     }, [activeCourseId, isTeacher]),
@@ -1556,15 +1572,16 @@ export function HomeScreen({ navigation }: any) {
                         <Text style={styles.dailyReviewTitle}>
                           Повторение дня · {Math.min(reviewStats.waiting.length, DAILY_REVIEW_MAX)} слов · ~{Math.max(1, Math.round(Math.min(reviewStats.waiting.length, DAILY_REVIEW_MAX) / 4))} мин
                         </Text>
-                        {reviewStats.fading > 0 && (
+                        {(reviewStats.fading > 0 || reviewStats.waiting.length > DAILY_REVIEW_MAX) && (
                           <Text style={styles.dailyReviewSubtitle}>
-                            {reviewStats.fading} начинают забываться
+                            {[
+                              reviewStats.fading > 0 ? `${reviewStats.fading} начинают забываться` : null,
+                              reviewStats.waiting.length > DAILY_REVIEW_MAX ? `всего ждут ${reviewStats.waiting.length}` : null,
+                            ].filter(Boolean).join(' · ')}
                           </Text>
                         )}
                       </Pressable>
-                      <Pressable style={styles.studyAllLink} onPress={() => setShowStudyModeModal(true)}>
-                        <Text style={[styles.studyAllLinkText, { color: colors.textSecondary }]}>Учить все карточки</Text>
-                      </Pressable>
+                      {/* «Учить все карточки» — только когда повторение дня закончено: сначала старые слова */}
                     </>
                   ) : (
                     <>
@@ -2780,16 +2797,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.85)',
     fontSize: 13,
     marginTop: 2,
-  },
-  studyAllLink: {
-    alignSelf: 'center',
-    paddingVertical: spacing.s,
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  studyAllLinkText: {
-    fontSize: 14,
-    fontWeight: '600',
   },
   reviewDoneText: {
     fontSize: 13,

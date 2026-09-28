@@ -1,9 +1,39 @@
 import { neon } from '@neondatabase/serverless';
 
 /**
- * Проверка и автоматическая инициализация БД
+ * Версия схемы: при добавлении миграции в applyMigrations увеличить (и дописать файл в
+ * database/migrations). Пока в app_migrations есть отметка этой версии, миграции не выполняются.
+ */
+const SCHEMA_VERSION = 'schema_022';
+
+// Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
+let initPromise = null;
+
+/**
+ * Проверка и автоматическая инициализация БД.
+ * Раньше миграции (~76 запросов, в т.ч. ALTER TABLE, блокирующие таблицы целиком) выполнялись на
+ * КАЖДОМ запросе: запуск приложения шёл десятки секунд, параллельные запросы ждали друг друга на
+ * блокировках, и приложение висело на экране загрузки. Теперь — один быстрый SELECT, и тот раз
+ * на экземпляр функции.
  */
 async function ensureDatabaseInitialized(sql) {
+  if (!initPromise) {
+    initPromise = runDatabaseInit(sql).catch((error) => {
+      initPromise = null; // следующий запрос попробует снова
+      console.error('Database init failed:', error);
+    });
+  }
+  return initPromise;
+}
+
+async function runDatabaseInit(sql) {
+  try {
+    const done = await sql`SELECT 1 FROM app_migrations WHERE name = ${SCHEMA_VERSION}`;
+    if (done.length > 0) return;
+  } catch {
+    // app_migrations ещё нет — старая БД, выполняем миграции ниже
+  }
+
   try {
     // Проверяем, существует ли таблица users
     const result = await sql`
@@ -23,6 +53,7 @@ async function ensureDatabaseInitialized(sql) {
 
     // Миграции для существующих БД
     await applyMigrations(sql);
+    await sql`INSERT INTO app_migrations (name) VALUES (${SCHEMA_VERSION}) ON CONFLICT (name) DO NOTHING`;
   } catch (error) {
     console.error('Error checking database:', error);
     // Если произошла ошибка, пытаемся инициализировать

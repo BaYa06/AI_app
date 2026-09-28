@@ -3,7 +3,7 @@
  * @description Сервис для работы с локальной базой данных (персистентность)
  */
 import { StorageService, STORAGE_KEYS } from './StorageService';
-import { NeonService } from './NeonService';
+import { NeonService, NetworkLoadError, type BootstrapData } from './NeonService';
 import { BookService } from './BookService';
 import { supabase } from './supabaseClient';
 import type { Card, CardSet, Course, UserSettings } from '@/types';
@@ -34,6 +34,11 @@ interface PersistedData {
 const CURRENT_VERSION = 1;
 const LOCAL_DATA_TTL_MS = 30 * 60 * 1000; // 30 минут — после этого локальные данные считаются устаревшими
 
+// Чьи данные сохранены на устройстве: по нему при запуске сразу показываем сохранённое,
+// не дожидаясь сервера; при выходе — стираем (ключ объявлен в localCache)
+import { CACHE_OWNER_KEY, writeCache } from './localCache';
+export { CACHE_OWNER_KEY };
+
 /**
  * Database Service для сохранения и загрузки данных
  */
@@ -41,6 +46,51 @@ export const DatabaseService = {
   /**
    * Загрузить все данные из хранилища в store
    */
+  /**
+   * Мгновенный старт: показать данные, сохранённые на устройстве при прошлом запуске, до ответа
+   * сервера (loadAll потом заменит их свежими). Возвращает id их владельца или null, если показывать
+   * нечего (первый запуск, выход из аккаунта).
+   */
+  hydrateFromCache(): string | null {
+    try {
+      const owner = StorageService.getString(CACHE_OWNER_KEY);
+      if (!owner) return null;
+      const setsData = StorageService.getObject<{ sets: Record<string, CardSet>; setsOrder: string[] }>(STORAGE_KEYS.SETS);
+      const cardsData = StorageService.getObject<{ cards: Record<string, any>; cardsBySet: Record<string, string[]> }>(STORAGE_KEYS.CARDS);
+      const coursesData = StorageService.getObject<{ courses: Course[]; activeCourseId: string | null }>(STORAGE_KEYS.COURSES);
+      if (!setsData?.sets && !coursesData?.courses) return null;
+
+      const stores = getStores();
+      if (setsData?.sets) {
+        stores.useSetsStore.setState({ sets: setsData.sets, setsOrder: setsData.setsOrder || Object.keys(setsData.sets) });
+      }
+      if (cardsData?.cards) {
+        stores.useCardsStore.setState({ cards: cardsData.cards, cardsBySet: cardsData.cardsBySet || {} });
+      }
+      if (coursesData?.courses) {
+        stores.useCoursesStore.setState({ courses: coursesData.courses, activeCourseId: coursesData.activeCourseId ?? null });
+      }
+      return owner;
+    } catch (error) {
+      console.warn('⚠️ Не удалось показать сохранённые данные:', error);
+      return null;
+    }
+  },
+
+  /**
+   * Сервер недоступен при запуске: оставляем на экране сохранённые данные (если их ещё не показали —
+   * показываем). true — чтобы включилось автосохранение и очередь: учиться можно и без сети.
+   */
+  keepCachedData(currentUserId?: string): boolean {
+    devLog('📴 Сервер недоступен — работаем с сохранёнными данными');
+    const stores = getStores();
+    const empty = Object.keys(stores.useSetsStore.getState().sets).length === 0;
+    if (empty && currentUserId && StorageService.getString(CACHE_OWNER_KEY) === currentUserId) {
+      this.hydrateFromCache();
+    }
+    return true;
+  },
+
   async loadAll(): Promise<boolean> {
     try {
       // Определяем текущего авторизованного пользователя (если есть)
@@ -59,12 +109,40 @@ export const DatabaseService = {
 
       devLog('🔄 Загрузка данных из Neon PostgreSQL...');
       
-      // Пытаемся загрузить данные из Neon
-      const [sets, allCards, courses] = await Promise.all([
-        NeonService.loadSets(currentUserId),
-        NeonService.loadAllCards(currentUserId),
-        NeonService.loadCourses(currentUserId),
-      ]);
+      // Пытаемся загрузить данные с сервера. Сетевая ошибка — не «пусто»: тогда ничего не заменяем,
+      // на экране остаются сохранённые данные (иначе без интернета наборы пропадали, а автосохранение
+      // затирало ими кэш на устройстве)
+      const strict = { throwOnError: true };
+      let sets: CardSet[];
+      let allCards: Awaited<ReturnType<typeof NeonService.loadAllCards>>;
+      let courses: Awaited<ReturnType<typeof NeonService.loadCourses>>;
+
+      // Один запрос на всё (вместо 8–10). К отдельным запросам откатываемся, только если сервер
+      // старый и не знает bootstrap (400/404); сеть/таймаут — сразу оставляем сохранённые данные
+      let boot: BootstrapData | null = null;
+      if (currentUserId) {
+        try {
+          boot = await NeonService.bootstrap();
+        } catch (error) {
+          if (!(error instanceof NetworkLoadError)) throw error;
+          if (error.status !== 400 && error.status !== 404) return this.keepCachedData(currentUserId);
+        }
+      }
+
+      try {
+        if (boot) {
+          ({ sets, cards: allCards, courses } = boot);
+        } else {
+          [sets, allCards, courses] = await Promise.all([
+            NeonService.loadSets(currentUserId, strict),
+            NeonService.loadAllCards(currentUserId, strict),
+            NeonService.loadCourses(currentUserId, strict),
+          ]);
+        }
+      } catch (error) {
+        if (!(error instanceof NetworkLoadError)) throw error;
+        return this.keepCachedData(currentUserId);
+      }
 
       devLog(`📚 Загружено наборов: ${sets.length}`);
       devLog(`🃏 Загружено карточек: ${allCards.length}`);
@@ -120,14 +198,18 @@ export const DatabaseService = {
       // Загружаем курсы где пользователь — ученик
       if (currentUserId) {
         try {
-          const studentCourses = await NeonService.loadStudentCourses(currentUserId);
+          const studentCourses = boot ? boot.studentCourses : await NeonService.loadStudentCourses(currentUserId, strict);
           if (studentCourses.length > 0) {
             allCourses.push(...studentCourses);
             devLog(`🎓 Загружено курсов ученика: ${studentCourses.length}`);
 
-            // Загружаем наборы каждого курса учителя (read-only)
-            for (const sc of studentCourses) {
-              const teacherSets = await NeonService.loadCourseSetsByMembership(sc.id);
+            // Загружаем наборы каждого курса учителя (read-only) — параллельно, а не по одному:
+            // при 5 курсах последовательные запросы заметно затягивали экран загрузки
+            const setsByCourse = boot
+              ? studentCourses.map((sc) => boot!.courseSets[sc.id] || [])
+              : await Promise.all(studentCourses.map((sc) => NeonService.loadCourseSetsByMembership(sc.id, strict)));
+            studentCourses.forEach((sc, i) => {
+              const teacherSets = setsByCourse[i];
               teacherSets.forEach(ts => {
                 setsMap[ts.id] = ts;
                 setsOrder.push(ts.id);
@@ -135,9 +217,11 @@ export const DatabaseService = {
                 if (ts.isOfficial) officialCourseIdBySet[ts.id] = sc.id;
               });
               devLog(`  📚 Курс "${sc.title}": ${teacherSets.length} наборов`);
-            }
+            });
           }
         } catch (e) {
+          // Без курсов ученика картина неполная — не заменяем сохранённые данные урезанными
+          if (e instanceof NetworkLoadError) return this.keepCachedData(currentUserId);
           console.warn('⚠️ Не удалось загрузить курсы ученика:', e);
         }
       }
@@ -239,8 +323,10 @@ export const DatabaseService = {
       // Загружаем статистику стрика из БД
       if (currentUserId) {
         try {
-          const userStats = await NeonService.getUserStats(currentUserId);
+          // Статистика уже пришла в bootstrap — отдельный запрос не нужен
+          const userStats = boot ? boot.stats : await NeonService.getUserStats(currentUserId);
           if (userStats) {
+            writeCache('user_stats', userStats);
             stores.useSettingsStore.getState().syncStreakFromServer({
               currentStreak: userStats.current_streak,
               longestStreak: userStats.longest_streak,
@@ -253,6 +339,7 @@ export const DatabaseService = {
         }
       }
 
+      if (currentUserId) StorageService.setString(CACHE_OWNER_KEY, currentUserId);
       return true;
     } catch (error) {
       console.error('❌ Failed to load data:', error);

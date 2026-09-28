@@ -3,7 +3,8 @@
  * @description Сервис для работы со стриками и ежедневной активностью
  */
 
-import { NeonService } from './NeonService';
+import { NeonService, NetworkLoadError } from './NeonService';
+import { readCache, writeCache } from './localCache';
 import { supabase } from './supabaseClient';
 
 // ==================== ТИПЫ ====================
@@ -224,9 +225,12 @@ export async function fetchWeekActivity(days: number = 7): Promise<DailyActivity
       return [];
     }
 
-    const activity = await NeonService.getWeekActivity(userId, days);
+    const activity = await NeonService.getWeekActivity(userId, days, { throwOnError: true });
+    writeCache(`activity_${days}`, activity);
     return activity;
   } catch (error) {
+    // Нет сети — последнее сохранённое
+    if (error instanceof NetworkLoadError) return readCache<DailyActivity[]>(`activity_${days}`) ?? [];
     console.error('❌ Streak: ошибка получения активности за неделю:', error);
     return [];
   }
@@ -244,9 +248,11 @@ export async function fetchUserStats(): Promise<UserStats | null> {
       return null;
     }
 
-    const stats = await NeonService.getUserStats(userId);
+    const stats = await NeonService.getUserStats(userId, { throwOnError: true });
+    if (stats) writeCache('user_stats', stats);
     return stats;
   } catch (error) {
+    if (error instanceof NetworkLoadError) return readCache<UserStats>('user_stats') ?? null;
     console.error('❌ Streak: ошибка получения user_stats:', error);
     return null;
   }
@@ -327,18 +333,41 @@ export async function fetchTodayActivity(): Promise<DailyActivity | null> {
     }
 
     const todayKey = getLocalDateKey();
-    const activity = await NeonService.getDailyActivity(userId, todayKey);
+    const activity = await NeonService.getDailyActivity(userId, todayKey, { throwOnError: true });
+    writeCache('activity_today', { date: todayKey, activity });
     return activity;
   } catch (error) {
+    if (error instanceof NetworkLoadError) return cachedTodayActivity() ?? null;
     console.error('❌ Streak: ошибка получения активности за сегодня:', error);
     return null;
   }
+}
+
+// ==================== КЭШ (показать сразу, до ответа сервера) ====================
+
+/** Последняя сохранённая статистика пользователя (серия, итоги) */
+export function cachedUserStats(): UserStats | null {
+  return readCache<UserStats>('user_stats') ?? null;
+}
+
+/** Сохранённая активность за N дней */
+export function cachedWeekActivity(days: number): DailyActivity[] | null {
+  return readCache<DailyActivity[]>(`activity_${days}`) ?? null;
+}
+
+/** Сохранённая активность за сегодня (только если она именно за сегодняшний день) */
+export function cachedTodayActivity(): DailyActivity | null | undefined {
+  const cached = readCache<{ date: string; activity: DailyActivity | null }>('activity_today');
+  return cached && cached.date === getLocalDateKey() ? cached.activity : undefined;
 }
 
 // ==================== ЭКСПОРТ ====================
 
 export const StreakService = {
   getLocalDateKey,
+  cachedUserStats,
+  cachedWeekActivity,
+  cachedTodayActivity,
   recordActivity,
   fetchWeekActivity,
   fetchUserStats,
