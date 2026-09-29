@@ -11,3 +11,5 @@ export { Screen, useScreenBottomInset } from './Screen';
 export type { ScreenProps } from './Screen';
 export { Card, ListRow, ListGroup } from './Card';
 export type { CardProps, ListRowProps, ListGroupProps } from './Card';
+export { TextField } from './TextField';
+export type { TextFieldProps } from './TextField';
