@@ -778,11 +778,6 @@ export const NeonService = {
     return (await callProgressApi('rating-enabled', { method: 'POST', body: { courseId, enabled } })) !== null;
   },
 
-  /** Ученик скрывает себя из рейтинга курса (таблицу видит, других не видят его) */
-  async setHiddenFromRating(courseId: string, hidden: boolean): Promise<boolean> {
-    return (await callProgressApi('hide-me', { method: 'POST', body: { courseId, hidden } })) !== null;
-  },
-
   // ==================== CARD PROGRESS ====================
 
   /**

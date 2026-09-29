@@ -109,14 +109,6 @@ export function CourseLeaderboardScreen({ navigation, route }: Props) {
   const cardBg = isDark ? 'rgba(255,255,255,0.05)' : '#FFFFFF';
   const mutedBg = isDark ? 'rgba(255,255,255,0.06)' : '#F1F1F6';
 
-  const toggleHidden = useCallback(async (hidden: boolean) => {
-    if (savingToggle) return;
-    setSavingToggle(true);
-    const ok = await NeonService.setHiddenFromRating(courseId, hidden);
-    setSavingToggle(false);
-    if (ok) setRetryTick((t) => t + 1);
-  }, [courseId, savingToggle]);
-
   const toggleEnabled = useCallback(async (enabled: boolean) => {
     if (savingToggle) return;
     setSavingToggle(true);
@@ -293,7 +285,7 @@ export function CourseLeaderboardScreen({ navigation, route }: Props) {
               </View>
             )}
 
-            {/* Настройки */}
+            {/* Настройки — только у учителя. Ученик скрыть себя из рейтинга не может */}
             {data.isTeacher ? (
               <View style={[styles.settingRow, { backgroundColor: cardBg }]}>
                 <View style={{ flex: 1 }}>
@@ -301,14 +293,6 @@ export function CourseLeaderboardScreen({ navigation, route }: Props) {
                   <Text style={[styles.settingHint, { color: colors.textSecondary }]}>Ученики видят места и соревнуются за награды</Text>
                 </View>
                 <Switch value={data.enabled} onValueChange={toggleEnabled} disabled={savingToggle} accessibilityLabel="Рейтинг для учеников" />
-              </View>
-            ) : data.me && data.week === 'current' ? (
-              <View style={[styles.settingRow, { backgroundColor: cardBg }]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.settingTitle, { color: colors.textPrimary }]}>Скрыть меня из рейтинга</Text>
-                  <Text style={[styles.settingHint, { color: colors.textSecondary }]}>Ты видишь таблицу, другие ученики тебя — нет</Text>
-                </View>
-                <Switch value={data.me.hidden} onValueChange={toggleHidden} disabled={savingToggle} accessibilityLabel="Скрыть меня из рейтинга" />
               </View>
             ) : null}
           </ScrollView>
@@ -318,9 +302,7 @@ export function CourseLeaderboardScreen({ navigation, route }: Props) {
             <View style={[styles.me, { borderTopColor: colors.border, backgroundColor: colors.background, paddingBottom: insets.bottom + spacing.s }]}>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.meTitle, { color: colors.textPrimary }]}>
-                  {data.me.hidden
-                    ? 'Ты скрыт из рейтинга'
-                    : data.me.points === 0
+                  {data.me.points === 0
                       ? 'Набери первые очки, чтобы занять место'
                       : data.me.place === 1
                         ? 'Ты на 1-м месте — удержи до конца недели'

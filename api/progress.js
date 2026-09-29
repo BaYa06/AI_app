@@ -22,7 +22,7 @@ import { courseSetIdsSql } from './_course.js';
  *
  * GET  /api/progress?action=leaderboard&courseId=…&week=current|previous — рейтинг курса (этап 2)
  * POST /api/progress?action=rating-enabled  { courseId, enabled }  — учитель включает/выключает рейтинг
- * POST /api/progress?action=hide-me         { courseId, hidden }   — ученик скрывает себя из рейтинга
+ * POST /api/progress?action=hide-me         { courseId, hidden }   — только вернуться в рейтинг (скрываться нельзя)
  * GET  /api/progress?action=close-week      — Vercel Cron (Authorization: Bearer CRON_SECRET):
  *                                              заморозка итогов прошлой недели и награды топ-3
  */
@@ -484,6 +484,9 @@ async function setRatingEnabled(sql, me, body) {
 async function hideMe(sql, me, body) {
   const courseId = uuid(body.courseId, 'courseId');
   if (typeof body.hidden !== 'boolean') throw new HttpError(400, 'hidden must be boolean');
+  // Скрываться из рейтинга ученикам больше нельзя (кнопку убрали; старые версии приложения
+  // ещё могут прислать hidden: true). Вернуться в рейтинг — можно.
+  if (body.hidden) throw new HttpError(403, 'Hiding from the rating is disabled');
   const rows = await sql`
     UPDATE course_members SET hide_from_rating = ${body.hidden}
     WHERE course_id = ${courseId}::uuid AND user_id = ${me}::uuid AND role = 'student' RETURNING id
