@@ -166,8 +166,12 @@ function check(rel, raw) {
   }
 
   // fontWeight
-  const weightRe = /\bfontWeight\s*:\s*['"]?([0-9a-z]+)['"]?/g;
-  while ((m = weightRe.exec(src))) if (!ALLOWED_WEIGHTS.has(m[1])) add('weight', m.index, `fontWeight ${m[1]}`);
+  // Только литералы: '500', "bold", 800. Ссылки на токены (typography.body.fontWeight) — не нарушение
+  const weightRe = /\bfontWeight\s*:\s*(?:(['"])([0-9a-z]+)\1|(\d+)\b)/g;
+  while ((m = weightRe.exec(src))) {
+    const weight = m[2] ?? m[3];
+    if (!ALLOWED_WEIGHTS.has(weight)) add('weight', m.index, `fontWeight ${weight}`);
+  }
 
   // borderRadius и borderTopLeftRadius и т.п.
   const radiusRe = /\bborder(?:Top|Bottom)?(?:Left|Right|Start|End)?Radius\s*:\s*(\d+(?:\.\d+)?)\b/g;
