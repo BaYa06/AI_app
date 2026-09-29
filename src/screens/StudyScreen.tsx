@@ -3,16 +3,17 @@
  * @description Экран изучения карточек с CSS-анимациями для web
  */
 import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
-import { View, StyleSheet, Pressable, Dimensions, Animated, Modal, Switch, AppState } from 'react-native';
+import { View, StyleSheet, Pressable, Dimensions, Animated, Modal, AppState } from 'react-native';
 import { useCardsStore, useSetsStore, useStudyStore, useThemeColors, useSettingsStore, selectSetStats } from '@/store';
 import { Text, Loading } from '@/components/common';
+import { Button, ProgressBar, ScreenHeader, Switch } from '@/components/ui';
 import { buildStudyQueue, isCardLearned } from '@/services/SRSService';
 import { ProgressService } from '@/services/ProgressService';
-import { spacing } from '@/constants';
+import { spacing, borderRadius, heights, iconSize, screenPadding, alpha } from '@/constants';
 import { DatabaseService, Analytics } from '@/services';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Rating, Card } from '@/types';
-import { ArrowLeft, Settings, Volume2, Check } from 'lucide-react-native';
+import { Settings, Volume2, Check } from 'lucide-react-native';
 import { speak, resolveSpeechLang, prefetchSpeech, cardSpeechLangs } from '@/utils/speech';
 import { triggerHaptic } from '@/utils/haptic';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -35,7 +36,6 @@ export function StudyScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const settings = useSettingsStore((s) => s.settings);
-  const theme = useSettingsStore((s) => s.resolvedTheme);
   const incrementTodayCards = useSettingsStore((s) => s.incrementTodayCards);
   const finishStudySession = useSettingsStore((s) => s.finishStudySession);
   const isErrorReview = Boolean(errorCardsFronts && errorCardsFronts.length > 0);
@@ -76,9 +76,6 @@ export function StudyScreen({ navigation, route }: Props) {
   const sheetTranslate = useRef(new Animated.Value(-220)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const isCurrentMastered = currentCard ? isCardLearned(currentCard) : false;
-  const overlayColor = theme === 'dark' ? 'rgba(0, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.55)';
-  const settingsSheetBackground = theme === 'dark' ? '#0f172a' : colors.surface;
-  const settingsSheetBorder = theme === 'dark' ? 'rgba(255, 255, 255, 0.12)' : colors.border;
   const handleSpeak = useCallback(
     (text: string, langHint?: string, counterpart?: string) => {
       const normalized = (text || '').trim();
@@ -558,43 +555,54 @@ export function StudyScreen({ navigation, route }: Props) {
   const questionLang = reverseEnabled ? backLang : frontLang;
   const answerLang = reverseEnabled ? frontLang : backLang;
 
+  // Кнопки оценки: цвета оценок SRS, текст — «текстовые» токены; «Уверенно» — главная кнопка
+  const ratingOptions: Array<{ rating: Rating; label: string; bg: string; text: string }> = [
+    { rating: 1, label: 'Не знаю', bg: alpha(colors.ratingAgain, 10), text: colors.errorText },
+    { rating: 2, label: 'Сомнев...', bg: alpha(colors.ratingHard, 10), text: colors.warningText },
+    { rating: 3, label: 'Почти', bg: alpha(colors.ratingEasy, 10), text: colors.info },
+    { rating: 4, label: 'Уверенно', bg: colors.primaryFill, text: colors.onPrimary },
+  ];
+  const ratingA11y: Record<Rating, string> = { 1: 'Не знаю', 2: 'Сомневаюсь', 3: 'Почти', 4: 'Уверенно' };
+
+  const renderCardTop = (onSpeak: () => void) => (
+    <View style={styles.cardTopRow}>
+      <View style={styles.statusPlaceholder}>
+        {isCurrentMastered ? (
+          <View
+            accessible
+            accessibilityLabel="Выучено"
+            style={[styles.masteredBadge, { backgroundColor: alpha(colors.success, 10), borderColor: alpha(colors.success, 40) }]}
+          >
+            <Check size={iconSize.xs} color={colors.successText} />
+          </View>
+        ) : null}
+      </View>
+      <Pressable
+        style={({ pressed }) => [styles.audioButton, { backgroundColor: pressed ? alpha(colors.primary, 20) : colors.surfaceMuted }]}
+        hitSlop={spacing.xxs}
+        accessibilityRole="button"
+        accessibilityLabel="Прослушать"
+        onPress={(e) => { e.stopPropagation(); triggerHaptic('selection'); onSpeak(); }}
+      >
+        <Volume2 size={iconSize.s} color={colors.primary} />
+      </Pressable>
+    </View>
+  );
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Хедер */}
-      <View style={styles.header}>
-        <Pressable 
-          onPress={handleFinish} 
-          hitSlop={20} 
-          style={styles.iconButton}
-        >
-          <ArrowLeft size={28} color={colors.textPrimary} />
-        </Pressable>
-        <Text style={[styles.title, { color: colors.textPrimary }]}>
-          Карточки
-        </Text>
-        <Pressable hitSlop={20} style={styles.iconButton} onPress={openSettings}>
-          <Settings size={24} color={colors.textPrimary} />
-        </Pressable>
-      </View>
+      <ScreenHeader
+        title="Карточки"
+        onBack={handleFinish}
+        right={<Button variant="icon" icon={Settings} accessibilityLabel="Настройки" onPress={openSettings} />}
+      />
 
       {/* Прогресс бар */}
       <View style={styles.progressSection}>
-        <View style={styles.progressInfo}>
-          <Text style={[styles.progressText, { color: colors.textSecondary }]}>
-            {progress.current}/{progress.total}
-          </Text>
-        </View>
-        <View style={[styles.progressBarBg, { backgroundColor: colors.border }]}>
-          <View 
-            style={[
-              styles.progressBarFill, 
-              { 
-                backgroundColor: colors.primary,
-                width: `${progress.percentage}%`
-              }
-            ]} 
-          />
-        </View>
+        <Text variant="bodySmall" style={[styles.semibold, { color: colors.textSecondary }]}>
+          {progress.current}/{progress.total}
+        </Text>
+        <ProgressBar progress={progress.percentage} accessibilityLabel="Прогресс" />
       </View>
 
       {/* Основной контент */}
@@ -602,6 +610,8 @@ export function StudyScreen({ navigation, route }: Props) {
         {/* Флеш-карточка */}
         <Pressable
           onPress={handleToggleCard}
+          accessibilityRole="button"
+          accessibilityLabel={isFlipped ? `Ответ: ${answerText}. Нажми, чтобы перевернуть` : `${questionText}. Нажми, чтобы перевернуть`}
           style={[
             styles.cardWrapper,
             { opacity: cardVisible ? 1 : 0 },
@@ -609,41 +619,18 @@ export function StudyScreen({ navigation, route }: Props) {
         >
           {/* Передняя сторона (вопрос) */}
           <ReAnimated.View style={[styles.cardAnim, frontAnimStyle]} pointerEvents={isFlipped ? 'none' : 'auto'}>
-            <View
-              style={[
-                styles.cardInner,
-                {
-                  backgroundColor: colors.surface,
-                  borderColor: colors.border,
-                },
-              ]}
-            >
-              <View style={styles.cardTopRow}>
-                <View style={styles.statusPlaceholder}>
-                  {isCurrentMastered ? (
-                    <View style={[styles.masteredBadge, { backgroundColor: colors.success + '1A', borderColor: colors.success + '40' }]}>
-                      <Check size={16} color={colors.success} />
-                    </View>
-                  ) : null}
-                </View>
-                <Pressable
-                  style={[styles.audioButton, { backgroundColor: '#f1f5f9' }]}
-                  hitSlop={10}
-                  onPress={(e) => { e.stopPropagation(); triggerHaptic('selection'); handleSpeak(questionText, questionLang, answerText); }}
-                >
-                  <Volume2 size={20} color={colors.primary} />
-                </Pressable>
-              </View>
+            <View style={[styles.cardInner, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              {renderCardTop(() => handleSpeak(questionText, questionLang, answerText))}
 
               <View style={styles.cardContent}>
-                <Text style={[styles.cardWord, { color: colors.textPrimary }]}>
+                <Text variant="h2" style={[styles.cardWord, { color: colors.textPrimary }]}>
                   {questionText}
                 </Text>
               </View>
 
               <View style={styles.cardBottom}>
-                <Text style={[styles.tapHint, { color: colors.textSecondary }]}>
-                  Нажмите, чтобы перевернуть
+                <Text variant="bodySmall" align="center" style={{ color: colors.textSecondary }}>
+                  Нажми, чтобы перевернуть
                 </Text>
               </View>
             </View>
@@ -651,39 +638,16 @@ export function StudyScreen({ navigation, route }: Props) {
 
           {/* Задняя сторона (ответ) */}
           <ReAnimated.View style={[styles.cardAnim, backAnimStyle]} pointerEvents={isFlipped ? 'auto' : 'none'}>
-            <View
-              style={[
-                styles.cardInner,
-                {
-                  backgroundColor: colors.surface,
-                  borderColor: colors.border,
-                },
-              ]}
-            >
-              <View style={styles.cardTopRow}>
-                <View style={styles.statusPlaceholder}>
-                  {isCurrentMastered ? (
-                    <View style={[styles.masteredBadge, { backgroundColor: colors.success + '1A', borderColor: colors.success + '40' }]}>
-                      <Check size={16} color={colors.success} />
-                    </View>
-                  ) : null}
-                </View>
-                <Pressable
-                  style={[styles.audioButton, { backgroundColor: '#f1f5f9' }]}
-                  hitSlop={10}
-                  onPress={(e) => { e.stopPropagation(); triggerHaptic('selection'); handleSpeak(answerText, answerLang, questionText); }}
-                >
-                  <Volume2 size={20} color={colors.primary} />
-                </Pressable>
-              </View>
+            <View style={[styles.cardInner, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              {renderCardTop(() => handleSpeak(answerText, answerLang, questionText))}
 
               <View style={styles.cardContent}>
-                <Text style={[styles.cardWord, { color: colors.textPrimary }]}>
+                <Text variant="h2" style={[styles.cardWord, { color: colors.textPrimary }]}>
                   {answerText}
                 </Text>
                 <View style={[styles.divider, { backgroundColor: colors.border }]} />
                 {example ? (
-                  <Text style={[styles.cardExample, { color: colors.textSecondary }]}>
+                  <Text variant="bodyLarge" align="center" style={{ color: colors.textSecondary }}>
                     {example}
                   </Text>
                 ) : null}
@@ -703,40 +667,36 @@ export function StudyScreen({ navigation, route }: Props) {
         onRequestClose={closeSettings}
       >
         <View style={styles.modalRoot}>
-          <Pressable style={styles.backdrop} onPress={closeSettings}>
+          <Pressable style={styles.backdrop} onPress={closeSettings} accessibilityLabel="Закрыть настройки">
             <Animated.View
               pointerEvents="none"
-              style={[styles.backdropTint, { opacity: backdropOpacity, backgroundColor: overlayColor }]}
+              style={[styles.backdropTint, { opacity: backdropOpacity, backgroundColor: colors.overlay }]}
             />
           </Pressable>
 
+          {/* Панель настроек выезжает сверху (формат прежний) */}
           <Animated.View
             style={[
               styles.settingsSheet,
               {
-                top: insets.top + 18,
-                backgroundColor: settingsSheetBackground,
-                borderColor: settingsSheetBorder,
+                top: insets.top + spacing.m,
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
                 transform: [{ translateY: sheetTranslate }],
               },
             ]}
           >
             <View style={styles.settingsRow}>
-              <View style={[styles.settingsIconWrap, { backgroundColor: colors.primary + '1A' }]}>
-                <Settings size={18} color={colors.primary} />
+              <View style={[styles.settingsIconWrap, { backgroundColor: alpha(colors.primary, 10) }]}>
+                <Settings size={iconSize.s} color={colors.primary} />
               </View>
               <View style={styles.settingsTexts}>
-                <Text style={[styles.settingsTitle, { color: colors.textPrimary }]}>Реверс карточек</Text>
-                <Text style={[styles.settingsSubtitle, { color: colors.textSecondary }]}>
+                <Text variant="body" style={[styles.semibold, { color: colors.textPrimary }]}>Реверс карточек</Text>
+                <Text variant="caption" style={{ color: colors.textSecondary }}>
                   Сначала показывать обратную сторону
                 </Text>
               </View>
-              <Switch
-                value={reverseEnabled}
-                onValueChange={handleToggleReverse}
-                trackColor={{ false: colors.border, true: colors.primary }}
-                thumbColor={theme === 'dark' ? '#0f172a' : '#ffffff'}
-              />
+              <Switch value={reverseEnabled} onValueChange={handleToggleReverse} accessibilityLabel="Реверс карточек" />
             </View>
           </Animated.View>
         </View>
@@ -744,34 +704,21 @@ export function StudyScreen({ navigation, route }: Props) {
 
       {/* Нижняя панель SRS - всегда доступна */}
       <View style={[styles.bottomPanel, { backgroundColor: colors.background }]}>
-        <Text style={[styles.rateHint, { color: colors.textSecondary }]}>
+        <Text variant="bodySmall" align="center" style={[styles.rateHint, { color: colors.textSecondary }]}>
           Оцени, насколько уверенно знаешь
         </Text>
         <View style={styles.ratingGrid}>
-          <Pressable 
-            onPress={() => handleRate(1)}
-            style={[styles.ratingButton, styles.ratingFail]}
-          >
-            <Text style={styles.ratingFailText}>Не знаю</Text>
-          </Pressable>
-          <Pressable 
-            onPress={() => handleRate(2)}
-            style={[styles.ratingButton, styles.ratingHard]}
-          >
-            <Text style={styles.ratingHardText}>Сомнев...</Text>
-          </Pressable>
-          <Pressable 
-            onPress={() => handleRate(3)}
-            style={[styles.ratingButton, styles.ratingGood]}
-          >
-            <Text style={styles.ratingGoodText}>Почти</Text>
-          </Pressable>
-          <Pressable 
-            onPress={() => handleRate(4)}
-            style={[styles.ratingButton, styles.ratingEasy]}
-          >
-            <Text style={styles.ratingEasyText}>Уверенно</Text>
-          </Pressable>
+          {ratingOptions.map(({ rating, label, bg, text }) => (
+            <Pressable
+              key={rating}
+              onPress={() => handleRate(rating)}
+              accessibilityRole="button"
+              accessibilityLabel={ratingA11y[rating]}
+              style={({ pressed }) => [styles.ratingButton, { backgroundColor: bg }, pressed && styles.pressed]}
+            >
+              <Text variant="label" numberOfLines={1} style={{ color: text }}>{label}</Text>
+            </Pressable>
+          ))}
         </View>
       </View>
     </View>
@@ -784,51 +731,18 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
+  semibold: {
+    fontWeight: '600',
   },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: -0.3,
+  pressed: {
+    opacity: 0.85,
   },
 
   // Progress
   progressSection: {
-    paddingHorizontal: 24,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  progressInfo: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-  },
-  progressText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  progressBarBg: {
-    height: 6,
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 3,
+    paddingHorizontal: spacing.l,
+    paddingVertical: spacing.xs,
+    gap: spacing.xs,
   },
 
   // Main content
@@ -836,7 +750,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: screenPadding,
   },
 
   // Card
@@ -852,9 +766,9 @@ const styles = StyleSheet.create({
   },
   cardInner: {
     flex: 1,
-    borderRadius: 24,
+    borderRadius: borderRadius.xl,
     borderWidth: 1,
-    padding: 24,
+    padding: spacing.l,
     // Без overflow:'hidden': фон и рамка сами скругляются через borderRadius,
     // а маска слоя (masksToBounds) в связке с 3D-трансформом на iOS
     // рендерится offscreen и может срезать верх глифов.
@@ -872,14 +786,14 @@ const styles = StyleSheet.create({
   },
   masteredBadge: {
     borderWidth: 1,
-    borderRadius: spacing.m,
+    borderRadius: borderRadius.full,
     paddingHorizontal: spacing.xs,
-    paddingVertical: 4,
+    paddingVertical: spacing.xxs,
   },
   audioButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: borderRadius.full,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -887,110 +801,47 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 16,
+    gap: spacing.m,
   },
   cardWord: {
-    fontSize: 28,
-    fontWeight: '700',
     textAlign: 'center',
-    // ~1.5× fontSize + небольшой отступ сверху: запас под умлауты и диакритику
+    // Высота строки ×1.5 и отступ сверху: запас под умлауты и диакритику
     // над заглавными (Ä, Ö, Ü, É), иначе iOS срезает их по рамке Text
-    lineHeight: 42,
-    paddingTop: 4,
+    lineHeight: 36,
+    paddingTop: spacing.xxs,
   },
   divider: {
     width: 48,
     height: 2,
-    borderRadius: 1,
-  },
-  cardExample: {
-    fontSize: 18,
-    fontWeight: '500',
-    textAlign: 'center',
-    lineHeight: 26,
+    borderRadius: borderRadius.full,
   },
   cardBottom: {
-    paddingTop: 24,
-  },
-  tapHint: {
-    fontSize: 14,
-    textAlign: 'center',
-  },
-
-  // Hint text inside card (plain, no background/blur)
-  hintContainer: {
-    width: '100%',
-    paddingHorizontal: 16,
-    marginTop: 12,
-    alignItems: 'flex-end',
-  },
-  hintHidden: {
-    display: 'none',
-  },
-  hintText: {
-    fontSize: 16,
-    fontWeight: '500',
-    lineHeight: 22,
-    textAlign: 'center',
+    paddingTop: spacing.l,
   },
 
   // Bottom panel
   bottomPanel: {
-    paddingHorizontal: 16,
-    paddingBottom: 24,
-    paddingTop: 8,
+    paddingHorizontal: screenPadding,
+    paddingBottom: spacing.l,
+    paddingTop: spacing.xs,
   },
   rateHint: {
-    fontSize: 14,
-    fontWeight: '500',
-    textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: spacing.s,
   },
   ratingGrid: {
     flexDirection: 'row',
-    gap: 8,
+    gap: spacing.xs,
     maxWidth: 448,
     alignSelf: 'center',
     width: '100%',
   },
   ratingButton: {
     flex: 1,
-    height: 52,
-    borderRadius: 16,
+    height: heights.button,
+    borderRadius: borderRadius.m,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  ratingFail: {
-    backgroundColor: '#fef2f2',
-  },
-  ratingFailText: {
-    color: '#dc2626',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  ratingHard: {
-    backgroundColor: '#fff7ed',
-  },
-  ratingHardText: {
-    color: '#ea580c',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  ratingGood: {
-    backgroundColor: '#f0f9ff',
-  },
-  ratingGoodText: {
-    color: '#0284c7',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  ratingEasy: {
-    backgroundColor: '#2d65e6',
-  },
-  ratingEasyText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '700',
+    paddingHorizontal: spacing.xxs,
   },
   modalRoot: {
     flex: 1,
@@ -1000,75 +851,29 @@ const styles = StyleSheet.create({
   },
   backdropTint: {
     flex: 1,
-    backgroundColor: '#00000055',
   },
+  // Без тени — панель отделяет затемнение
   settingsSheet: {
     position: 'absolute',
-    left: spacing.m,
-    right: spacing.m,
+    left: screenPadding,
+    right: screenPadding,
     padding: spacing.m,
-    borderRadius: 20,
+    borderRadius: borderRadius.l,
     borderWidth: 1,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowOffset: { width: 0, height: 10 },
-    shadowRadius: 20,
-    elevation: 10,
   },
   settingsRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.s,
   },
   settingsIconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
+    width: 36,
+    height: 36,
+    borderRadius: borderRadius.m,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.s,
   },
   settingsTexts: {
     flex: 1,
-    marginRight: spacing.s,
-  },
-  settingsTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  settingsSubtitle: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-
-  // Complete screen
-  completeContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.l,
-    width: '100%',
-  },
-  completeIcon: {
-    fontSize: 64,
-    marginBottom: spacing.m,
-  },
-  completeText: {
-    marginTop: spacing.xs,
-    marginBottom: spacing.l,
-  },
-  statsCard: {
-    width: '100%',
-    padding: spacing.m,
-    borderRadius: 16,
-    marginBottom: spacing.xl,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.s,
-  },
-  finishButton: {
-    marginTop: spacing.m,
   },
 });
