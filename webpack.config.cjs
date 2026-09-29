@@ -129,6 +129,8 @@ module.exports = (env, argv) => {
           // Дублируем манифест как manifest.json для совместимости с клиентами, ожидающими json-расширение
           { from: 'public/manifest.webmanifest', to: 'manifest.json' },
           { from: 'public/sw.js', to: 'sw.js' },
+          // Админка по ссылке (/admin): вход Google-аккаунтом, данные только для users.is_admin
+          { from: 'public/dashboard.html', to: 'admin.html' },
           // Universal Links: iOS открывает /join/* сразу в приложении
           { from: 'public/.well-known/apple-app-site-association', to: '.well-known/apple-app-site-association', toType: 'file' },
           { from: 'public/icons', to: 'icons' },

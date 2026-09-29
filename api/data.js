@@ -5,6 +5,7 @@ import { ensureDatabaseInitialized } from './_db-init.js';
 import { HttpError, uuid, assertReadableSet } from './_access.js';
 import { courseSetsForStudent } from './_course.js';
 import { notifyCoursesChanged } from './_realtime.js';
+import { getAdminStats, getAdminFeedback, markAdminFeedbackRead } from './_admin.js';
 
 /**
  * API данных пользователя: профиль, наборы, карточки, курсы, прогресс, серия.
@@ -594,6 +595,75 @@ async function bootstrap(sql, me) {
 
 // ─── Роутер ─────────────────────────────────────────────────────────────────
 
+// ==================== ОБРАТНАЯ СВЯЗЬ ====================
+
+const FEEDBACK_CATEGORIES = new Set(['problem', 'idea', 'question']);
+const FEEDBACK_TAGS = new Set(['speech', 'cards', 'tests', 'courses', 'sync', 'other']);
+const FEEDBACK_DAILY_LIMIT = 10;
+
+/**
+ * «Написать нам» (kind = message) и окно оценки (kind = rating). Смотрится только в админке.
+ * Роль берём из БД, а не из запроса; данные устройства — как прислало приложение (только для справки).
+ */
+async function submitFeedback(sql, me, p) {
+  const kind = p.kind;
+  if (kind !== 'message' && kind !== 'rating') throw new HttpError(400, 'Invalid kind');
+
+  const message = optString(p.message, 4000)?.trim() || null;
+  let category = null;
+  let rating = null;
+  let hasProblem = null;
+  let tags = null;
+
+  if (kind === 'message') {
+    category = FEEDBACK_CATEGORIES.has(p.category) ? p.category : null;
+    if (!category) throw new HttpError(400, 'Invalid category');
+    if (!message || message.length < 3) throw new HttpError(400, 'Message required');
+  } else {
+    rating = Number(p.rating);
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) throw new HttpError(400, 'Invalid rating');
+    hasProblem = typeof p.hasProblem === 'boolean' ? p.hasProblem : null;
+    tags = Array.isArray(p.tags) ? [...new Set(p.tags.filter((t) => FEEDBACK_TAGS.has(t)))] : null;
+    if (tags && tags.length === 0) tags = null;
+  }
+
+  const recent = await sql`
+    SELECT count(*)::int AS n FROM app_feedback
+    WHERE user_id = ${me}::uuid AND created_at > NOW() - INTERVAL '1 day'
+  `;
+  if (recent[0].n >= FEEDBACK_DAILY_LIMIT) throw new HttpError(429, 'Too many messages today');
+
+  const roleRows = await sql`SELECT teacher FROM users WHERE id = ${me}::uuid`;
+  const role = roleRows[0]?.teacher === true ? 'teacher' : 'student';
+
+  await sql`
+    INSERT INTO app_feedback (user_id, kind, category, rating, has_problem, tags, message,
+                              app_version, platform, os_version, user_role)
+    VALUES (${me}::uuid, ${kind}, ${category}, ${rating}, ${hasProblem}, ${tags}, ${message},
+            ${optString(p.appVersion, 20)}, ${optString(p.platform, 10)}, ${optString(p.osVersion, 40)}, ${role})
+  `;
+  return true;
+}
+
+// ==================== АДМИНКА (/admin) ====================
+
+/** Только для users.is_admin — тот же признак, что у каталога книг (api/books.js). */
+async function assertAdmin(sql, me) {
+  const rows = await sql`SELECT is_admin FROM users WHERE id = ${me}::uuid`;
+  if (rows[0]?.is_admin !== true) throw new HttpError(403, 'Admins only');
+}
+
+async function adminDashboard(sql, me) {
+  await assertAdmin(sql, me);
+  const [stats, feedback] = await Promise.all([getAdminStats(sql), getAdminFeedback(sql)]);
+  return { stats, feedback };
+}
+
+async function adminMarkFeedbackRead(sql, me, p) {
+  await assertAdmin(sql, me);
+  return markAdminFeedbackRead(sql, uuid(p.id, 'id'));
+}
+
 // ==================== УДАЛЕНИЕ АККАУНТА ====================
 
 /**
@@ -650,6 +720,9 @@ const ACTIONS = {
   bootstrap,
   getDailyActivity,
   deleteAccount,
+  submitFeedback,
+  adminDashboard,
+  adminMarkFeedbackRead,
 };
 
 // ─── Сигнал ученикам об изменениях в курсе ─────────────────────────────────

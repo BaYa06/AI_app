@@ -32,6 +32,13 @@
       ]
     },
     {
+      "source": "/admin.html",
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
+    },
+    {
       "source": "/sw.js",
       "headers": [
         { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
@@ -116,6 +123,7 @@
     { "source": "/api/library/import",             "destination": "/api/library?action=import" },
     { "source": "/ai/:path*", "destination": "http://34.9.20.41:3001/:path*" },
     { "source": "/join/:token", "destination": "/api/join?token=:token" },
+    { "source": "/admin", "destination": "/admin.html" },
     { "source": "/api/translate-words",           "destination": "/api/ai?fn=translate-words" },
     { "source": "/api/generate-examples",         "destination": "/api/ai?fn=generate-examples" },
     { "source": "/api/context",                   "destination": "/api/ai?fn=context" },

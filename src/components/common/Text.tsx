@@ -3,7 +3,7 @@
  * @description Типографика с автоматической темизацией
  */
 import React, { memo } from 'react';
-import { Text as RNText, TextProps as RNTextProps } from 'react-native';
+import { Text as RNText, TextProps as RNTextProps, StyleSheet } from 'react-native';
 import { useThemeColors } from '@/store';
 import { typography, TypographyVariant } from '@/constants';
 
@@ -32,12 +32,24 @@ export const Text = memo<TextProps>(function Text({
     success: colors.success,
   }[color];
 
+  // Вариант задаёт lineHeight под свой размер (body: 16/24). Если экран увеличил fontSize, а
+  // lineHeight не указал, строка оставалась высотой 24 и iOS срезал верх крупного текста/эмодзи
+  // (🎓 72px в лобби теста, код игры 44px, буквы аватара). Высоту строки подтягиваем под шрифт.
+  const flat = StyleSheet.flatten(style) || {};
+  const fontSize = flat.fontSize ?? typography[variant].fontSize ?? 16;
+  const minLineHeight = Math.ceil(fontSize * 1.2);
+  const lineHeightFix =
+    flat.lineHeight === undefined && (typography[variant].lineHeight ?? 0) < minLineHeight
+      ? { lineHeight: minLineHeight }
+      : null;
+
   return (
     <RNText
       style={[
         typography[variant],
         { color: textColor, textAlign: align },
         style,
+        lineHeightFix,
       ]}
       {...rest}
     >

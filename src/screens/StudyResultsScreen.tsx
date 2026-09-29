@@ -8,6 +8,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '@/store';
 import { Text, StreakCelebrationModal } from '@/components/common';
 import { Analytics } from '@/services/analytics';
+import { recordSessionForRatingPrompt, markRatingPromptShown } from '@/services/feedback';
+import { RatingPromptModal } from '@/components/RatingPromptModal';
 import { spacing } from '@/constants';
 import type { RootStackScreenProps } from '@/types/navigation';
 import { ArrowLeft, Settings, CheckCircle2, List, ArrowRight, RotateCcw, BookOpen, X } from 'lucide-react-native';
@@ -38,6 +40,19 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const [showErrorsModal, setShowErrorsModal] = React.useState(false);
   const [showStreakModal, setShowStreakModal] = React.useState(streakIncreased === true);
+  const [showRatingPrompt, setShowRatingPrompt] = React.useState(false);
+
+  // Окно оценки — только в хороший момент (правила в services/feedback.ts). Когда показываем
+  // празднование серии, второе окно подряд не открываем — спросим в другой раз.
+  React.useEffect(() => {
+    const goodMoment = recordSessionForRatingPrompt({ totalCards, errors });
+    if (!goodMoment || streakIncreased) return;
+    const timer = setTimeout(() => {
+      markRatingPromptShown();
+      setShowRatingPrompt(true);
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Логика фаз: проверяем завершена ли фаза
   // Фаза завершена только если все карточки просмотрены (phaseOffset >= totalPhaseCards) И нет ошибок
@@ -542,6 +557,10 @@ export function StudyResultsScreen({ navigation, route }: Props) {
         visible={showStreakModal}
         streakCount={newStreakCount ?? 0}
         onClose={() => setShowStreakModal(false)}
+      />
+      <RatingPromptModal
+        visible={showRatingPrompt}
+        onClose={() => setShowRatingPrompt(false)}
       />
     </View>
   );

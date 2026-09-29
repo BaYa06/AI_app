@@ -318,6 +318,16 @@ export function ProfileScreen({ navigation }: any) {
           </Pressable>
         </View>
 
+        {/* ======== Support ======== */}
+        <Text style={[st.sectionLabel, { color: colors.textTertiary }]}>Поддержка</Text>
+        <View style={[st.settingsCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+          <Pressable style={st.settingsItem} onPress={() => navigation?.navigate('Feedback')}>
+            <Ionicons name="chatbubble-ellipses-outline" size={22} color={colors.textTertiary} />
+            <Text style={[st.settingsItemText, { color: colors.textPrimary }]}>Написать нам</Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.textTertiary + '60'} />
+          </Pressable>
+        </View>
+
         {/* ======== Legal ======== */}
         {(PRIVACY_POLICY_URL || TERMS_URL) ? (
           <>

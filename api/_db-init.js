@@ -4,7 +4,7 @@ import { neon } from '@neondatabase/serverless';
  * Версия схемы: при добавлении миграции в applyMigrations увеличить (и дописать файл в
  * database/migrations). Пока в app_migrations есть отметка этой версии, миграции не выполняются.
  */
-const SCHEMA_VERSION = 'schema_022';
+const SCHEMA_VERSION = 'schema_023';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -298,6 +298,32 @@ async function applyMigrations(sql) {
     `;
   } catch (e) {
     console.error('Migration 022_review_triggers failed:', e);
+  }
+
+  // Migration 023: обратная связь — «Написать нам» и окно оценки приложения (смотрится в админке)
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS app_feedback (
+        id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id      UUID REFERENCES users(id) ON DELETE CASCADE,
+        kind         VARCHAR(10) NOT NULL CHECK (kind IN ('message', 'rating')),
+        category     VARCHAR(20),
+        rating       SMALLINT CHECK (rating BETWEEN 1 AND 5),
+        has_problem  BOOLEAN,
+        tags         TEXT[],
+        message      TEXT,
+        app_version  VARCHAR(20),
+        platform     VARCHAR(10),
+        os_version   VARCHAR(40),
+        user_role    VARCHAR(10),
+        status       VARCHAR(10) NOT NULL DEFAULT 'new',
+        created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_app_feedback_created ON app_feedback(created_at DESC)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_app_feedback_user_created ON app_feedback(user_id, created_at DESC)`;
+  } catch (e) {
+    console.error('Migration 023_app_feedback failed:', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)

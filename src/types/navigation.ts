@@ -112,6 +112,7 @@ export type RootStackParamList = {
   NotificationSettings: undefined;
   LearningSettings: undefined;
   SoundSettings: undefined;
+  Feedback: undefined;
   Settings: undefined;
   Search: undefined;
   TeacherCourseStats: { courseId: string; courseTitle: string };

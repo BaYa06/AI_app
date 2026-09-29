@@ -62,6 +62,7 @@ import { AchievementsScreen } from '@/screens/AchievementsScreen';
 import { NotificationSettingsScreen } from '@/screens/NotificationSettingsScreen';
 import { LearningSettingsScreen } from '@/screens/LearningSettingsScreen';
 import { SoundSettingsScreen } from '@/screens/SoundSettingsScreen';
+import { FeedbackScreen } from '@/screens/FeedbackScreen';
 import { LibrarySetDetailScreen } from '@/screens/LibrarySetDetailScreen';
 import { BookDetailScreen } from '@/screens/BookDetailScreen';
 import { CourseBooksScreen } from '@/screens/CourseBooksScreen';
@@ -234,6 +235,7 @@ const NATIVE_LINKING: LinkingOptions<RootStackParamList> = {
       NotificationSettings: 'notification-settings',
       LearningSettings: 'learning-settings',
       SoundSettings: 'sound-settings',
+      Feedback: 'feedback',
       LibrarySetDetail: 'library-set/:setId',
       BookDetail: 'book/:bookId',
       CourseBooks: 'course-books/:courseId',
@@ -378,6 +380,15 @@ export function AppNavigator() {
         <Stack.Screen
           name="SoundSettings"
           component={SoundSettingsScreen}
+          options={{
+            headerShown: false,
+            animation: 'slide_from_right',
+            animationDuration: 300,
+          }}
+        />
+        <Stack.Screen
+          name="Feedback"
+          component={FeedbackScreen}
           options={{
             headerShown: false,
             animation: 'slide_from_right',

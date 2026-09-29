@@ -19,6 +19,7 @@ export { AudioLearningScreen } from './AudioLearningScreen';
 export { NotificationSettingsScreen } from './NotificationSettingsScreen';
 export { LearningSettingsScreen } from './LearningSettingsScreen';
 export { SoundSettingsScreen } from './SoundSettingsScreen';
+export { FeedbackScreen } from './FeedbackScreen';
 export { SharedSetDetailScreen } from './SharedSetDetailScreen';
 export { PersonalInfoScreen } from './PersonalInfoScreen';
 export { SecurityScreen } from './SecurityScreen';

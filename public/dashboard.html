@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Flashly Admin</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.93.2/dist/umd/supabase.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0d0d1a;
+      --surface:  #13132a;
+      --border:   #1f1f3d;
+      --accent:   #534AB7;
+      --accent2:  #6c63d4;
+      --text:     #e8e8f0;
+      --muted:    #7a7a9a;
+      --green:    #2ec27e;
+      --orange:   #e5a50a;
+      --red:      #e66;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    header h1 {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+    header h1 span { color: var(--accent2); }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    #updated { color: var(--muted); font-size: 12px; }
+    #refresh-btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 7px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: opacity .15s;
+    }
+    #refresh-btn:hover { opacity: .85; }
+    #refresh-btn:disabled { opacity: .5; cursor: default; }
+
+    /* ── Layout ── */
+    main { padding: 24px; max-width: 1280px; margin: 0 auto; }
+    section { margin-bottom: 28px; }
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    /* ── Cards row ── */
+    .cards-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px;
+    }
+    .metric-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 20px;
+    }
+    .metric-card .label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .metric-card .value { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; line-height: 1; }
+    .metric-card .sub { font-size: 12px; color: var(--muted); margin-top: 5px; }
+    .metric-card .sub .pos { color: var(--green); }
+    .metric-card .sub .neg { color: var(--red); }
+
+    /* ── 2-column row ── */
+    .two-col {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 820px) { .two-col { grid-template-columns: 1fr; } }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+    }
+    .panel-title { font-size: 13px; font-weight: 700; margin-bottom: 16px; }
+
+    /* ── Bar chart ── */
+    .chart-wrap { position: relative; height: 200px; }
+
+    /* ── Breakdown bars ── */
+    .breakdown-item { margin-bottom: 14px; }
+    .breakdown-item .row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; }
+    .breakdown-item .row .name { color: var(--muted); }
+    .breakdown-item .row .pct  { font-weight: 700; }
+    .bar-track { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    .bar-fill  { height: 100%; border-radius: 3px; transition: width .4s; }
+
+    /* ── Retention ── */
+    .retention-grid { display: flex; flex-direction: column; gap: 14px; }
+    .ret-row { display: flex; align-items: center; gap: 12px; }
+    .ret-label { width: 36px; font-size: 12px; font-weight: 700; color: var(--muted); }
+    .ret-track { flex: 1; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+    .ret-fill   { height: 100%; background: var(--accent); border-radius: 4px; transition: width .4s; }
+    .ret-pct    { width: 36px; text-align: right; font-size: 13px; font-weight: 700; }
+
+    /* ── Heatmap ── */
+    .heatmap { display: grid; grid-template-columns: 28px 1fr; gap: 6px 8px; align-items: center; }
+    .hm-day  { font-size: 11px; color: var(--muted); text-align: right; }
+    .hm-bar-wrap { height: 14px; background: var(--border); border-radius: 4px; overflow: hidden; }
+    .hm-bar { height: 100%; background: var(--accent); border-radius: 4px; min-width: 2px; transition: width .4s; }
+
+    /* ── 3-col bottom ── */
+    .three-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 960px) { .three-col { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 600px) { .three-col { grid-template-columns: 1fr; } }
+
+    /* ── Corporate stats ── */
+    .stat-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--border); }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-row .name  { color: var(--muted); font-size: 12px; }
+    .stat-row .val   { font-weight: 700; font-size: 15px; }
+
+    /* ── Event feed ── */
+    .events-list { display: flex; flex-direction: column; gap: 0; overflow-y: auto; max-height: 340px; }
+    .event-item { display: flex; gap: 10px; align-items: flex-start; padding: 9px 0; border-bottom: 1px solid var(--border); }
+    .event-item:last-child { border-bottom: none; }
+    .event-icon { font-size: 14px; padding-top: 1px; flex-shrink: 0; }
+    .event-label { font-size: 12px; line-height: 1.4; flex: 1; }
+    .event-time  { font-size: 11px; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
+
+    /* ── Feedback ── */
+    .fb-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+    .fb-filter {
+      background: var(--surface); color: var(--muted); border: 1px solid var(--border);
+      border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer;
+    }
+    .fb-filter.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .fb-list { display: flex; flex-direction: column; gap: 10px; }
+    .fb-item {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px;
+    }
+    .fb-item.new { border-color: var(--accent2); }
+    .fb-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+    .fb-badge { font-size: 11px; font-weight: 700; border-radius: 6px; padding: 2px 8px; }
+    .fb-stars { color: var(--orange); font-size: 14px; letter-spacing: 1px; }
+    .fb-tag { font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 6px; padding: 1px 7px; }
+    .fb-msg { font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; margin-bottom: 8px; }
+    .fb-meta { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 11px; color: var(--muted); }
+    .fb-read-btn {
+      background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 8px;
+      padding: 4px 10px; font-size: 11px; cursor: pointer;
+    }
+    .fb-read-btn:hover { color: var(--text); border-color: var(--accent2); }
+    .fb-empty { color: var(--muted); font-size: 12px; padding: 12px 0; }
+
+    /* ── Вход ── */
+    #auth-gate {
+      position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+      background: var(--bg); z-index: 200; padding: 24px;
+    }
+    .auth-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+      padding: 28px; max-width: 380px; width: 100%; text-align: center;
+    }
+    .auth-card h2 { font-size: 20px; margin-bottom: 8px; }
+    .auth-card p { color: var(--muted); font-size: 13px; line-height: 1.5; margin-bottom: 20px; }
+    .auth-btn {
+      background: var(--accent); color: #fff; border: none; border-radius: 10px;
+      padding: 11px 18px; font-size: 14px; font-weight: 600; cursor: pointer; width: 100%;
+    }
+    .auth-link { background: none; border: none; color: var(--muted); font-size: 12px; cursor: pointer; margin-top: 12px; }
+    #logout-btn { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 8px; padding: 6px 12px; font-size: 12px; cursor: pointer; }
+
+    /* ── Loading / error ── */
+    #loading {
+      position: fixed; inset: 0; display: flex; align-items: center;
+      justify-content: center; background: var(--bg); z-index: 100;
+      flex-direction: column; gap: 12px;
+    }
+    .spinner {
+      width: 36px; height: 36px; border-radius: 50%;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #error-bar {
+      display: none;
+      background: #3a1515; color: var(--red); border: 1px solid #6e2020;
+      border-radius: 10px; padding: 12px 16px; margin-bottom: 20px; font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="auth-gate">
+  <div class="auth-card">
+    <h2>⚡ Flashly Admin</h2>
+    <p id="auth-text">Войдите тем же Google-аккаунтом, что и в приложении.</p>
+    <button class="auth-btn" id="auth-login" onclick="signIn()">Войти через Google</button>
+    <button class="auth-link" id="auth-logout" onclick="signOut()" style="display:none">Выйти и войти другим аккаунтом</button>
+  </div>
+</div>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <span style="color:var(--muted);font-size:13px">Загрузка статистики…</span>
+</div>
+
+<header>
+  <h1>⚡ Flashly <span>Admin</span></h1>
+  <div class="header-right">
+    <span id="updated"></span>
+    <button id="refresh-btn" onclick="loadStats()">Обновить</button>
+    <button id="logout-btn" onclick="signOut()">Выйти</button>
+  </div>
+</header>
+
+<main>
+  <div id="error-bar"></div>
+
+  <!-- Block 1: Метрики -->
+  <section>
+    <div class="section-title">Главные метрики</div>
+    <div class="cards-row">
+      <div class="metric-card">
+        <div class="label">Всего пользователей</div>
+        <div class="value" id="m-total">—</div>
+        <div class="sub">+ <span id="m-new7d" class="pos">—</span> за 7 дней</div>
+      </div>
+      <div class="metric-card">
+        <div class="label">Активных сегодня</div>
+        <div class="value" id="m-today">—</div>
+        <div class="sub"><span id="m-active7d">—</span> за 7 дней</div>
+      </div>
+      <div class="metric-card">
+        <div class="label">Учителей</div>
+        <div class="value" id="m-teachers">—</div>
+        <div class="sub" id="m-teachers-pct" style="color:var(--muted)">— %</div>
+      </div>
+      <div class="metric-card">
+        <div class="label">Анонимных</div>
+        <div class="value" id="m-anon">—</div>
+        <div class="sub" id="m-anon-pct" style="color:var(--muted)">— %</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Block 2: Регистрации + разбивка -->
+  <section>
+    <div class="section-title">Регистрации за 30 дней</div>
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-title">По дням</div>
+        <div class="chart-wrap">
+          <canvas id="reg-chart"></canvas>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Разбивка</div>
+        <div id="breakdown-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Block 2b: Активных по дням -->
+  <section>
+    <div class="section-title">Активных пользователей за 30 дней</div>
+    <div class="panel">
+      <div class="chart-wrap">
+        <canvas id="dau-chart"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <!-- Block 3: Retention + Heatmap -->
+  <section>
+    <div class="section-title">Retention и активность</div>
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-title">Retention</div>
+        <div class="retention-grid">
+          <div class="ret-row">
+            <div class="ret-label">D1</div>
+            <div class="ret-track"><div class="ret-fill" id="ret-d1-bar" style="width:0%"></div></div>
+            <div class="ret-pct" id="ret-d1-pct">—</div>
+          </div>
+          <div class="ret-row">
+            <div class="ret-label">D7</div>
+            <div class="ret-track"><div class="ret-fill" id="ret-d7-bar" style="width:0%"></div></div>
+            <div class="ret-pct" id="ret-d7-pct">—</div>
+          </div>
+          <div class="ret-row">
+            <div class="ret-label">D30</div>
+            <div class="ret-track"><div class="ret-fill" id="ret-d30-bar" style="width:0%"></div></div>
+            <div class="ret-pct" id="ret-d30-pct">—</div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Активность по дням недели</div>
+        <div class="heatmap" id="heatmap-grid"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Block 4+5+6: Активность / Корпоратив / Лента -->
+  <section>
+    <div class="section-title">Детали</div>
+    <div class="three-col">
+
+      <div class="panel">
+        <div class="panel-title">Активность</div>
+        <div class="stat-row">
+          <span class="name">Карточек за 7 дней</span>
+          <span class="val" id="c-weekly-cards">—</span>
+        </div>
+        <div class="stat-row">
+          <span class="name">Среднее в день / юзер</span>
+          <span class="val" id="c-avg-cards">—</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Корпоративный тариф</div>
+        <div class="stat-row">
+          <span class="name">Активных учителей</span>
+          <span class="val" id="c-active-teachers">—</span>
+        </div>
+        <div class="stat-row">
+          <span class="name">Всего курсов</span>
+          <span class="val" id="c-courses">—</span>
+        </div>
+        <div class="stat-row">
+          <span class="name">Ср. учеников на курс</span>
+          <span class="val" id="c-avg-students">—</span>
+        </div>
+        <div class="stat-row">
+          <span class="name">Вступлений за 7 дней</span>
+          <span class="val" id="c-joins">—</span>
+        </div>
+        <div class="stat-row">
+          <span class="name">Live-тестов за 7 дней</span>
+          <span class="val" id="c-tests">—</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Последние события</div>
+        <div class="events-list" id="events-list"></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Block 7: Обратная связь -->
+  <section>
+    <div class="section-title">Обратная связь</div>
+    <div class="cards-row" style="margin-bottom:14px">
+      <div class="metric-card">
+        <div class="label">Средняя оценка</div>
+        <div class="value" id="fb-avg">—</div>
+        <div class="sub"><span id="fb-ratings">—</span> оценок, <span id="fb-ratings30">—</span> за 30 дней</div>
+      </div>
+      <div class="metric-card">
+        <div class="label">Сообщили о проблемах</div>
+        <div class="value" id="fb-problems">—</div>
+        <div class="sub">в окне оценки</div>
+      </div>
+      <div class="metric-card">
+        <div class="label">Сообщений «Написать нам»</div>
+        <div class="value" id="fb-messages">—</div>
+        <div class="sub"><span id="fb-unread" class="pos">—</span> непрочитанных всего</div>
+      </div>
+    </div>
+    <div class="fb-filters" id="fb-filters"></div>
+    <div class="fb-list" id="fb-list"></div>
+  </section>
+</main>
+
+<script>
+  const DOW_LABELS = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+  const EVENT_ICONS = {
+    new_user:       '🟢',
+    course_join:    '📚',
+    course_created: '🏫',
+    live_test:      '⚡',
+    streak:         '🔥',
+  };
+
+  // Вход: тот же Supabase, что у приложения. На этом домене сессия общая с веб-версией —
+  // если там уже вошли, здесь тоже. Данные отдаёт API только для users.is_admin.
+  const SUPABASE_URL = 'https://yiwsmjbeirgomkrckoju.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlpd3NtamJlaXJnb21rcmNrb2p1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1NzUzMTksImV4cCI6MjA4NTE1MTMxOX0.d8ck5zaELDtMYLyLHVrYEyiytj3a_8Q7XikSLWM1o3Q';
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { flowType: 'pkce', detectSessionInUrl: true, persistSession: true },
+  });
+
+  function showGate(text, { canLogout = false } = {}) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('auth-text').textContent = text;
+    document.getElementById('auth-login').style.display = canLogout ? 'none' : 'block';
+    document.getElementById('auth-logout').style.display = canLogout ? 'inline-block' : 'none';
+    document.getElementById('auth-gate').style.display = 'flex';
+  }
+
+  async function signIn() {
+    await sb.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin + '/admin.html' },
+    });
+  }
+
+  async function signOut() {
+    await sb.auth.signOut({ scope: 'local' });
+    showGate('Вы вышли. Войдите аккаунтом администратора.');
+  }
+
+  /** Запрос к API с токеном. null — нужно войти (показан экран входа) */
+  async function adminApi(action, { method = 'GET', body } = {}) {
+    const { data } = await sb.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) {
+      showGate('Войдите тем же Google-аккаунтом, что и в приложении.');
+      return null;
+    }
+    const res = await fetch('/api/data?action=' + action, {
+      method,
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (res.status === 401) {
+      showGate('Сессия истекла — войдите снова.');
+      return null;
+    }
+    if (res.status === 403) {
+      showGate('У аккаунта ' + (data.session.user.email || '') + ' нет доступа к админке.', { canLogout: true });
+      return null;
+    }
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'HTTP ' + res.status);
+    return json.data;
+  }
+
+  let regChart = null;
+  let dauChart = null;
+
+  function fmt(n) { return n?.toLocaleString('ru-RU') ?? '—'; }
+
+  function timeAgo(dateStr) {
+    const diff = (Date.now() - new Date(dateStr)) / 1000;
+    if (diff < 60)   return Math.round(diff) + ' с назад';
+    if (diff < 3600) return Math.round(diff / 60) + ' мин назад';
+    if (diff < 86400) return Math.round(diff / 3600) + ' ч назад';
+    return Math.round(diff / 86400) + ' д назад';
+  }
+
+  function pct(part, total) {
+    if (!total) return 0;
+    return Math.round(part / total * 100);
+  }
+
+  function setEl(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  }
+
+  function renderBreakdown(data) {
+    const total = data.users.total + data.users.anonymous;
+    const items = [
+      { name: 'Зарегистрированы',  count: data.users.total,     color: '#534AB7' },
+      { name: 'Учителя',           count: data.users.teachers,  color: '#2ec27e' },
+      { name: 'Анонимные',         count: data.users.anonymous, color: '#e5a50a' },
+    ];
+    const el = document.getElementById('breakdown-list');
+    el.innerHTML = items.map(item => {
+      const p = pct(item.count, total);
+      return `
+        <div class="breakdown-item">
+          <div class="row">
+            <span class="name">${item.name}</span>
+            <span class="pct" style="color:${item.color}">${p}% &nbsp;(${fmt(item.count)})</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${p}%;background:${item.color}"></div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function renderChart(data) {
+    // Fill missing days in last 30 days
+    const map = {};
+    data.registrations.forEach(r => { map[r.day.slice(0, 10)] = r.count; });
+    const labels = [], values = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      labels.push(key.slice(5)); // MM-DD
+      values.push(map[key] || 0);
+    }
+
+    const ctx = document.getElementById('reg-chart').getContext('2d');
+    if (regChart) regChart.destroy();
+    regChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          data: values,
+          backgroundColor: '#534AB7',
+          borderRadius: 4,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: {
+          callbacks: { title: t => t[0].label, label: t => t.raw + ' рег.' }
+        }},
+        scales: {
+          x: {
+            ticks: { color: '#7a7a9a', maxRotation: 0, font: { size: 10 },
+                     callback: (_, i) => i % 5 === 0 ? labels[i] : '' },
+            grid: { color: '#1f1f3d' },
+          },
+          y: {
+            ticks: { color: '#7a7a9a', font: { size: 10 } },
+            grid: { color: '#1f1f3d' },
+            beginAtZero: true,
+          },
+        }
+      }
+    });
+  }
+
+  function renderDauChart(data) {
+    if (!data) return;
+    const map = {};
+    data.forEach(r => { map[r.day.slice(0, 10)] = r.count; });
+    const labels = [], values = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      labels.push(key.slice(5));
+      values.push(map[key] || 0);
+    }
+    const ctx = document.getElementById('dau-chart').getContext('2d');
+    if (dauChart) dauChart.destroy();
+    dauChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          data: values,
+          backgroundColor: '#2ec27e',
+          borderRadius: 4,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: {
+          callbacks: { title: t => t[0].label, label: t => t.raw + ' активных' }
+        }},
+        scales: {
+          x: {
+            ticks: { color: '#7a7a9a', maxRotation: 0, font: { size: 10 },
+                     callback: (_, i) => i % 5 === 0 ? labels[i] : '' },
+            grid: { color: '#1f1f3d' },
+          },
+          y: {
+            ticks: { color: '#7a7a9a', font: { size: 10 }, precision: 0 },
+            grid: { color: '#1f1f3d' },
+            beginAtZero: true,
+          },
+        }
+      }
+    });
+  }
+
+  function renderHeatmap(heatmap) {
+    const maxUsers = Math.max(...heatmap.map(h => h.users), 1);
+    const grid = document.getElementById('heatmap-grid');
+    grid.innerHTML = '';
+    DOW_LABELS.forEach((label, dow) => {
+      const row = heatmap.find(h => h.dow === dow) || { users: 0, cards: 0 };
+      const w = Math.round(row.users / maxUsers * 100);
+      grid.innerHTML += `
+        <div class="hm-day">${label}</div>
+        <div class="hm-bar-wrap" title="${row.users} активных, ${fmt(row.cards)} карточек">
+          <div class="hm-bar" style="width:${w}%"></div>
+        </div>`;
+    });
+  }
+
+  function renderEvents(events) {
+    const el = document.getElementById('events-list');
+    if (!events.length) {
+      el.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:12px 0">Событий пока нет</div>';
+      return;
+    }
+    el.innerHTML = events.map(e => `
+      <div class="event-item">
+        <div class="event-icon">${EVENT_ICONS[e.type] || '•'}</div>
+        <div class="event-label">${e.label}</div>
+        <div class="event-time">${timeAgo(e.ts)}</div>
+      </div>`).join('');
+  }
+
+  async function loadStats() {
+    const btn = document.getElementById('refresh-btn');
+    btn.disabled = true;
+    btn.textContent = '…';
+    document.getElementById('error-bar').style.display = 'none';
+
+    try {
+      const payload = await adminApi('adminDashboard');
+      if (!payload) return;
+      document.getElementById('auth-gate').style.display = 'none';
+      const d = payload.stats;
+      renderFeedback(payload.feedback);
+
+      const total = d.users.total + d.users.anonymous;
+
+      // Block 1
+      setEl('m-total',    fmt(d.users.total));
+      setEl('m-new7d',    '+' + fmt(d.users.new7d));
+      setEl('m-today',    fmt(d.users.activeToday));
+      setEl('m-active7d', fmt(d.users.active7d));
+      setEl('m-teachers', fmt(d.users.teachers));
+      setEl('m-teachers-pct', pct(d.users.teachers, total) + '% от зарег.');
+      setEl('m-anon',     fmt(d.users.anonymous));
+      setEl('m-anon-pct', pct(d.users.anonymous, total) + '% от всех');
+
+      // Block 2
+      renderChart(d);
+      renderBreakdown(d);
+      renderDauChart(d.dailyActiveUsers);
+
+      // Block 3
+      ['d1', 'd7', 'd30'].forEach(k => {
+        const v = d.retention[k] ?? 0;
+        document.getElementById(`ret-${k}-bar`).style.width = v + '%';
+        setEl(`ret-${k}-pct`, v + '%');
+      });
+      renderHeatmap(d.heatmap);
+
+      // Block 4
+      setEl('c-weekly-cards', fmt(d.activity.weeklyCards));
+      setEl('c-avg-cards',    fmt(d.activity.avgCardsPerDay));
+
+      // Block 5
+      setEl('c-active-teachers', fmt(d.corporate.activeTeachers));
+      setEl('c-courses',         fmt(d.corporate.courses));
+      setEl('c-avg-students',    fmt(d.corporate.avgStudents));
+      setEl('c-joins',           fmt(d.corporate.joins7d));
+      setEl('c-tests',           fmt(d.corporate.liveTests7d));
+
+      // Block 6
+      renderEvents(d.events);
+
+      // Header
+      const t = new Date(d.generatedAt);
+      document.getElementById('updated').textContent =
+        'Обновлено: ' + t.toLocaleTimeString('ru-RU');
+
+    } catch (e) {
+      const bar = document.getElementById('error-bar');
+      bar.textContent = 'Ошибка: ' + e.message;
+      bar.style.display = 'block';
+      console.error(e);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Обновить';
+      document.getElementById('loading').style.display = 'none';
+    }
+  }
+
+  // ── Обратная связь ──
+  const FB_FILTERS = [
+    { key: 'all',      label: 'Все' },
+    { key: 'new',      label: 'Новые' },
+    { key: 'problem',  label: 'Проблемы' },
+    { key: 'idea',     label: 'Идеи' },
+    { key: 'question', label: 'Вопросы' },
+    { key: 'rating',   label: 'Оценки' },
+  ];
+  const FB_CATEGORY = {
+    problem:  { label: 'Проблема', color: '#e66' },
+    idea:     { label: 'Идея',     color: '#2ec27e' },
+    question: { label: 'Вопрос',   color: '#6c63d4' },
+  };
+  const FB_TAGS = { speech: 'Озвучка', cards: 'Карточки', tests: 'Тесты', courses: 'Курсы', sync: 'Синхронизация', other: 'Другое' };
+  let fbItems = [];
+  let fbFilter = 'all';
+
+  // Текст пишут пользователи — вставляем только экранированным
+  function esc(str) {
+    return String(str ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function fbMatches(item) {
+    if (fbFilter === 'all') return true;
+    if (fbFilter === 'new') return item.status === 'new';
+    if (fbFilter === 'rating') return item.kind === 'rating';
+    return item.kind === 'message' && item.category === fbFilter;
+  }
+
+  function renderFeedbackFilters() {
+    document.getElementById('fb-filters').innerHTML = FB_FILTERS.map((f) =>
+      `<button class="fb-filter ${f.key === fbFilter ? 'active' : ''}" onclick="setFbFilter('${f.key}')">${f.label}</button>`
+    ).join('');
+  }
+
+  function setFbFilter(key) {
+    fbFilter = key;
+    renderFeedbackFilters();
+    renderFeedbackList();
+  }
+
+  function renderFeedbackList() {
+    const list = fbItems.filter(fbMatches);
+    const el = document.getElementById('fb-list');
+    if (!list.length) {
+      el.innerHTML = '<div class="fb-empty">Пока пусто</div>';
+      return;
+    }
+    el.innerHTML = list.map((f) => {
+      let badge;
+      if (f.kind === 'rating') {
+        badge = `<span class="fb-badge" style="background:#e5a50a22;color:var(--orange)">Оценка</span>
+                 <span class="fb-stars">${'★'.repeat(f.rating)}${'☆'.repeat(5 - f.rating)}</span>
+                 ${f.has_problem === true ? '<span class="fb-badge" style="background:#e6666622;color:var(--red)">Есть проблемы</span>' : ''}`;
+      } else {
+        const c = FB_CATEGORY[f.category] || { label: f.category, color: 'var(--muted)' };
+        badge = `<span class="fb-badge" style="background:${c.color}22;color:${c.color}">${esc(c.label)}</span>`;
+      }
+      const tags = (f.tags || []).map((t) => `<span class="fb-tag">${esc(FB_TAGS[t] || t)}</span>`).join('');
+      const device = [f.platform, f.os_version, f.app_version && 'v' + f.app_version].filter(Boolean).map(esc).join(' · ');
+      return `
+        <div class="fb-item ${f.status === 'new' ? 'new' : ''}">
+          <div class="fb-head">${badge}${tags}</div>
+          ${f.message ? `<div class="fb-msg">${esc(f.message)}</div>` : ''}
+          <div class="fb-meta">
+            <span>${esc(f.user_label)}${f.email ? ' (' + esc(f.email) + ')' : ''} · ${f.user_role === 'teacher' ? 'учитель' : 'ученик'} · ${device} · ${timeAgo(f.created_at)}</span>
+            ${f.status === 'new' ? `<button class="fb-read-btn" onclick="markFbRead('${esc(f.id)}')">Прочитано</button>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function renderFeedback(d) {
+    try {
+      if (!d) return;
+      if (d.missing) {
+        document.getElementById('fb-list').innerHTML =
+          '<div class="fb-empty">Таблицы ещё нет — она создастся после деплоя API (миграция 023).</div>';
+        return;
+      }
+      fbItems = d.items;
+      const s = d.summary || {};
+      setEl('fb-avg', s.avg_rating != null ? Number(s.avg_rating).toFixed(1) + ' ★' : '—');
+      setEl('fb-ratings', fmt(s.ratings));
+      setEl('fb-ratings30', fmt(s.ratings30d));
+      setEl('fb-problems', fmt(s.with_problems));
+      setEl('fb-messages', fmt(s.messages));
+      setEl('fb-unread', fmt(s.unread));
+      renderFeedbackFilters();
+      renderFeedbackList();
+    } catch (e) {
+      document.getElementById('fb-list').innerHTML = `<div class="fb-empty">Ошибка загрузки: ${esc(e.message)}</div>`;
+    }
+  }
+
+  async function markFbRead(id) {
+    await adminApi('adminMarkFeedbackRead', { method: 'POST', body: { id } });
+    const item = fbItems.find((f) => f.id === id);
+    if (item) item.status = 'read';
+    renderFeedbackList();
+  }
+
+  // Первая загрузка после разбора ?code= из входа через Google; дальше — раз в минуту
+  sb.auth.getSession().then(() => {
+    loadStats();
+    setInterval(() => {
+      if (document.getElementById('auth-gate').style.display !== 'flex') loadStats();
+    }, 60_000);
+  });
+</script>
+</body>
+</html>

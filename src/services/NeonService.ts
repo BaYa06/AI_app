@@ -393,6 +393,23 @@ export const NeonService = {
    * Обновить display_name пользователя
    */
   /**
+   * Обратная связь: «Написать нам» (message) или окно оценки (rating). Смотрится в админке.
+   */
+  async submitFeedback(payload: {
+    kind: 'message' | 'rating';
+    category?: string;
+    rating?: number;
+    hasProblem?: boolean | null;
+    tags?: string[];
+    message?: string;
+    appVersion?: string;
+    platform?: string;
+    osVersion?: string;
+  }): Promise<boolean> {
+    return (await callDataApi<boolean>('submitFeedback', payload)) === true;
+  },
+
+  /**
    * Безвозвратно удалить аккаунт: все данные в Neon и пользователя в Supabase (api/data.js deleteAccount)
    */
   async deleteAccount(): Promise<boolean> {
