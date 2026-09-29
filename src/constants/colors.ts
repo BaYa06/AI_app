@@ -58,6 +58,11 @@ export const colors = {
     star: '#F59E0B',    // звёзды оценки, золото в рейтинге
     silver: '#8A94A6',  // серебро (2-е место)
     bronze: '#C2703D',  // бронза (3-е место)
+    // Мини-игры на главной — заливка карточек под белый текст (контраст ≥ 5,3)
+    gameViolet: '#7C3AED', // «Быстрый раунд»
+    gameRose: '#BE123C',   // «Снайпер»
+    gameTeal: '#0E7490',   // «Вспомни забытое»
+    gameGreen: '#047857',  // выполненная мини-игра
     
     // Overlay
     overlay: 'rgba(0, 0, 0, 0.5)',
@@ -120,6 +125,10 @@ export const colors = {
     star: '#F59E0B',
     silver: '#8A94A6',
     bronze: '#C2703D',
+    gameViolet: '#7C3AED',
+    gameRose: '#BE123C',
+    gameTeal: '#0E7490',
+    gameGreen: '#047857',
     
     // Overlay
     overlay: 'rgba(0, 0, 0, 0.7)',

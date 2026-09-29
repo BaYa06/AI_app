@@ -27,6 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '@/store';
 import { Text } from '@/components/common/Text';
 import { alpha, animation, borderRadius, screenPadding, spacing } from '@/constants';
+import { ToastHost } from './Toast';
 
 const useNativeDriver = Platform.OS !== 'web';
 
@@ -161,13 +162,18 @@ export function Sheet({
           </Animated.View>
         </View>
       </KeyboardAvoidingView>
+      {/* Тосты поверх окна — Modal перекрывает хост приложения */}
+      <ToastHost offset={insets.bottom + spacing.xl} />
     </Modal>
   );
 }
 
 // ==================== Dialog ====================
 
-export type DialogProps = OverlayProps;
+export interface DialogProps extends OverlayProps {
+  /** center — по центру (по умолчанию); top — у верхнего края (окно серии). */
+  placement?: 'center' | 'top';
+}
 
 export function Dialog({
   visible,
@@ -177,9 +183,11 @@ export function Dialog({
   headerRight,
   children,
   footer,
+  placement = 'center',
   style,
 }: DialogProps) {
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const { mounted, progress } = useOverlayAnimation(visible);
 
   if (!mounted) return null;
@@ -189,7 +197,11 @@ export function Dialog({
   return (
     <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
       <KeyboardAvoidingView
-        style={[styles.fill, styles.dialogWrapper]}
+        style={[
+          styles.fill,
+          styles.dialogWrapper,
+          placement === 'top' && { justifyContent: 'flex-start', paddingTop: insets.top + spacing.xl },
+        ]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: colors.overlay, opacity: progress }]}>
@@ -213,6 +225,7 @@ export function Dialog({
           {footer ? <View style={styles.dialogFooter}>{footer}</View> : null}
         </Animated.View>
       </KeyboardAvoidingView>
+      <ToastHost offset={insets.bottom + spacing.xl} />
     </Modal>
   );
 }

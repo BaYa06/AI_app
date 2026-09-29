@@ -3,8 +3,11 @@
  *
  * Для сообщений без выбора, которые раньше показывались системным Alert:
  *   toast.success('Сохранено');  toast.info('Код скопирован');  toast.error('Не удалось сохранить');
- * Показывается 2 с, без кнопок, над панелью вкладок. Новый тост заменяет текущий.
- * ToastHost монтируется один раз — в App.tsx.
+ * Показывается 2 с (длинный текст — дольше), без кнопок, над панелью вкладок.
+ * Новый тост заменяет текущий.
+ *
+ * ToastHost — в App.tsx и внутри Sheet / Dialog: системный Modal перекрывает приложение,
+ * поэтому тост показывает последний смонтированный хост (окно поверх — его хост).
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Platform, StyleSheet, View } from 'react-native';
@@ -23,12 +26,16 @@ interface ToastMessage {
   duration: number;
 }
 
-const DEFAULT_DURATION = 2000;
+const MIN_DURATION = 2000;
+const MAX_DURATION = 5000;
+/** Время на прочтение: 2 с + ~40 мс на символ, но не больше 5 с. */
+const readingTime = (message: string) => Math.min(MAX_DURATION, MIN_DURATION + message.length * 40);
 const ICONS = { success: CheckCircle2, info: Info, error: AlertCircle } as const;
 
 // ---- Мини-хранилище: показать тост можно из любого места, даже вне React ----
 type Listener = (toast: ToastMessage) => void;
-const listeners = new Set<Listener>();
+/** Стек хостов: тост получает только верхний (последний смонтированный). */
+const hosts: Listener[] = [];
 let nextId = 1;
 
 function show(message: string, options: { tone?: ToastTone; duration?: number } = {}) {
@@ -36,9 +43,9 @@ function show(message: string, options: { tone?: ToastTone; duration?: number } 
     id: nextId++,
     message,
     tone: options.tone ?? 'success',
-    duration: options.duration ?? DEFAULT_DURATION,
+    duration: options.duration ?? readingTime(message),
   };
-  listeners.forEach((listener) => listener(toastMessage));
+  hosts[hosts.length - 1]?.(toastMessage);
 }
 
 export const toast = {
@@ -51,7 +58,7 @@ export const toast = {
 // ---- Хост ----
 const useNativeDriver = Platform.OS !== 'web';
 
-export function ToastHost() {
+export function ToastHost({ offset }: { offset?: number } = {}) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const [current, setCurrent] = useState<ToastMessage | null>(null);
@@ -71,9 +78,10 @@ export function ToastHost() {
         });
       }, next.duration);
     };
-    listeners.add(listener);
+    hosts.push(listener);
     return () => {
-      listeners.delete(listener);
+      const index = hosts.lastIndexOf(listener);
+      if (index >= 0) hosts.splice(index, 1);
       if (hideTimer.current) clearTimeout(hideTimer.current);
     };
   }, [progress]);
@@ -86,7 +94,7 @@ export function ToastHost() {
   return (
     <View
       pointerEvents="none"
-      style={[styles.host, { bottom: insets.bottom + heights.tabBar + spacing.xs }]}
+      style={[styles.host, { bottom: offset ?? insets.bottom + heights.tabBar + spacing.xs }]}
     >
       <Animated.View
         accessibilityLiveRegion="polite"
