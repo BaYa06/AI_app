@@ -1,5 +1,5 @@
 /**
- * Отступы и размеры
+ * Отступы и размеры — брендбук, разделы 4–5 (сетка 4 pt).
  */
 
 export const spacing = {
@@ -12,7 +12,15 @@ export const spacing = {
   xxl: 48,
 } as const;
 
+/** Боковой отступ экрана — одинаковый на всех экранах. */
+export const screenPadding = spacing.m;
+
+/**
+ * Только пять скруглений: s — чипы и бейджи, m — кнопки и поля,
+ * l — карточки, xl — окна и нижние листы, full — аватары и круглые кнопки.
+ */
 export const borderRadius = {
+  /** @deprecated не входит в брендбук — используй `s`. Уберём на шаге 7.3. */
   xs: 4,
   s: 8,
   m: 12,
@@ -45,10 +53,11 @@ export const animation = {
 
 // Высота элементов
 export const heights = {
-  button: 48,
+  button: 52,       // главная / вторичная кнопка
   buttonSmall: 36,
-  input: 48,
-  header: 56,
+  input: 48,        // однострочное поле
+  header: 56,       // шапка экрана
+  touch: 44,        // минимальная зона нажатия, кнопка-иконка
   tabBar: 64,
   card: 120,
 } as const;
