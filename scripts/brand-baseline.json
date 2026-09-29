@@ -3,17 +3,17 @@
     "hex": 808,
     "rgba": 351,
     "isDark": 260,
-    "font": 344,
+    "font": 343,
     "weight": 180,
     "radius": 157,
     "alpha": 156,
     "alert": 76,
-    "small": 105,
+    "small": 104,
     "emoji": 63,
     "ion": 26,
     "a11y": 106,
     "en": 23,
-    "total": 2332
+    "total": 2331
   },
   "files": {
     "src/screens/HomeScreen.new.tsx": {
@@ -748,11 +748,6 @@
     },
     "src/components/study/GameRow.tsx": {
       "rgba": 1,
-      "total": 1
-    },
-    "src/navigation/AppNavigator.tsx": {
-      "font": 1,
-      "small": 1,
       "total": 1
     },
     "src/screens/EmailAuthScreen.tsx": {

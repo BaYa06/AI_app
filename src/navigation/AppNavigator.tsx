@@ -10,6 +10,9 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useThemeColors, useSettingsStore } from '@/store';
 import type { RootStackParamList, MainTabParamList } from '@/types/navigation';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { typography, iconSize, spacing } from '@/constants';
+// Панель вкладок — единственное место с Ionicons (брендбук, раздел 6)
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import ReAnimated, {
   useSharedValue,
@@ -39,7 +42,7 @@ function BounceIcon({ name, color, focused }: { name: string; color: string; foc
 
   return (
     <ReAnimated.View style={animStyle}>
-      <Ionicons name={name} size={31} color={color} />
+      <Ionicons name={name} size={iconSize.m} color={color} />
     </ReAnimated.View>
   );
 }
@@ -99,8 +102,11 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 function MainTabs() {
   const colors = useThemeColors();
   const isTeacher = useSettingsStore((s) => s.isTeacher);
-  const tabBarPaddingBottom = Platform.OS === 'android' ? 20 : 5;
-  const tabBarHeight = 46 + tabBarPaddingBottom;
+  const insets = useSafeAreaInsets();
+  // Иконка 24 + подпись 16 + зазор 4; снизу — полный safe area (или 8 без «полоски Home»)
+  const tabBarPaddingTop = spacing.xs;
+  const tabBarPaddingBottom = insets.bottom > 0 ? insets.bottom : spacing.xs;
+  const tabBarHeight = tabBarPaddingTop + iconSize.m + spacing.xxs + typography.caption.lineHeight! + tabBarPaddingBottom;
 
   // Синхронизируем CSS-переменную --app-bg с текущей темой (для ios-pwa-fix.css)
   useEffect(() => {
@@ -112,47 +118,45 @@ function MainTabs() {
 
   return (
     <Tab.Navigator
+      // Без этого фона экран-вкладка сидит на нативном (белом по умолчанию) фоне окна.
+      sceneContainerStyle={{ backgroundColor: colors.background }}
       screenOptions={{
         headerShown: false,
         lazy: true,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textTertiary,
-        tabBarShowLabel: false,
-        safeAreaInsets: { bottom: 0 },
-        // Без этого фона экран-вкладка сидит на нативном (белом по умолчанию) фоне окна.
-        sceneContainerStyle: { backgroundColor: colors.background },
+        tabBarShowLabel: true,
+        tabBarLabelPosition: 'below-icon',
         tabBarStyle: {
           backgroundColor: colors.background,
           borderTopWidth: 1,
           borderTopColor: colors.border,
           elevation: 0,
           shadowOpacity: 0,
+          paddingTop: tabBarPaddingTop,
           paddingBottom: tabBarPaddingBottom,
-          paddingTop: 6,
-          paddingHorizontal: 64,
           height: tabBarHeight,
-          marginBottom: 20,
         },
         tabBarLabelStyle: {
-          fontSize: 11,
+          ...typography.caption,
           fontWeight: '600',
-          marginTop: 2,
+          marginTop: spacing.xxs,
         },
         tabBarItemStyle: {
-          paddingVertical: 2,
+          paddingVertical: 0,
         },
       }}
     >
       <Tab.Screen
         name="Home"
-        options={{ tabBarIcon: ({ color, focused }) => <BounceIcon name="home" color={color} focused={focused} /> }}
+        options={{ tabBarLabel: 'Главная', tabBarIcon: ({ color, focused }) => <BounceIcon name="home" color={color} focused={focused} /> }}
         listeners={{ tabPress: () => triggerHaptic('selection') }}
       >
         {(props) => <HomeScreen {...props} />}
       </Tab.Screen>
       <Tab.Screen
         name="Library"
-        options={{ tabBarIcon: ({ color, focused }) => <BounceIcon name="albums" color={color} focused={focused} /> }}
+        options={{ tabBarLabel: 'Библиотека', tabBarIcon: ({ color, focused }) => <BounceIcon name="albums" color={color} focused={focused} /> }}
         listeners={{ tabPress: () => triggerHaptic('selection') }}
       >
         {(props) => <LibraryScreen {...props} />}
@@ -160,6 +164,7 @@ function MainTabs() {
       <Tab.Screen
         name="TestTab"
         options={{
+          tabBarLabel: 'Тест',
           tabBarIcon: ({ color, focused }) => <BounceIcon name="qr-code" color={color} focused={focused} />,
           // Подключение к тесту по коду — только для учеников
           ...(isTeacher ? { tabBarButton: () => null, tabBarItemStyle: { display: 'none' } } : null),
@@ -192,7 +197,7 @@ function MainTabs() {
       </Tab.Screen>
       <Tab.Screen
         name="Profile"
-        options={{ tabBarIcon: ({ color, focused }) => <BounceIcon name="person" color={color} focused={focused} /> }}
+        options={{ tabBarLabel: 'Профиль', tabBarIcon: ({ color, focused }) => <BounceIcon name="person" color={color} focused={focused} /> }}
         listeners={{ tabPress: () => triggerHaptic('selection') }}
       >
         {(props) => <ProfileScreen {...props} />}

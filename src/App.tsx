@@ -127,12 +127,9 @@ function AppRoot({
     requestPushPermission(currentUserId).catch(() => {});
   }, [isAuthenticated, needsOnboarding, currentUserId]);
 
-  // ✅ уменьшаем safe-area сверху на 15px
-  const top = insets.top > 0 ? Math.max(insets.top - 15, 0) : 0;
-  // ✅ для PWA полностью убираем bottom safe-area, для нативных урезаем на 15px
-  const bottom = Platform.OS === 'web' 
-    ? 0 
-    : (insets.bottom > 0 ? Math.max(insets.bottom - 15, 0) : 0);
+  // Полный safe area сверху: контент не заходит под статус-бар / Dynamic Island.
+  // Нижний отступ каждый низ экрана учитывает сам (панель вкладок — в AppNavigator).
+  const top = insets.top;
 
 
   // Синхронизируем meta theme-color с текущей темой (только веб)
