@@ -4,7 +4,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet, Pressable, ScrollView, AppState } from 'react-native';
-import { ArrowLeft, Settings, Volume2 } from 'lucide-react-native';
+import { Settings, Volume2 } from 'lucide-react-native';
 import {
   useThemeColors,
   useCardsStore,
@@ -12,10 +12,11 @@ import {
   useSettingsStore,
   selectSetStats,
 } from '@/store';
-import { ProgressBar, Text, Loading } from '@/components/common';
+import { Text, Loading } from '@/components/common';
+import { Button, ProgressBar, ScreenHeader } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card, Rating } from '@/types';
-import { spacing, borderRadius } from '@/constants';
+import { spacing, borderRadius, iconSize, screenPadding, alpha } from '@/constants';
 import { ProgressService } from '@/services/ProgressService';
 import { speak, resolveSpeechLang, prefetchSpeech, cardSpeechLangs } from '@/utils/speech';
 import { playCorrectSound2 as playCorrectSound, preloadSound } from '@/utils/sound';
@@ -509,43 +510,24 @@ export function WordBuilderScreen({ navigation, route }: Props) {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.background }]}>
-        <Pressable
-          onPress={() => { finishStudySession(); navigation.goBack(); }}
-          style={({ pressed }) => [
-            styles.iconButton,
-            { backgroundColor: pressed ? colors.surface : 'transparent' },
-          ]}
-          hitSlop={10}
-        >
-          <ArrowLeft size={22} color={colors.textPrimary} />
-        </Pressable>
-        <Text variant="h3" style={{ color: colors.textPrimary, fontWeight: '800' }}>
-          Собери слово
-        </Text>
-        <Pressable
-          style={({ pressed }) => [
-            styles.iconButton,
-            { backgroundColor: pressed ? colors.surface : 'transparent' },
-          ]}
-          hitSlop={10}
-        >
-          <Settings size={20} color={colors.textPrimary} />
-        </Pressable>
-      </View>
+      <ScreenHeader
+        title="Собери слово"
+        onBack={() => { finishStudySession(); navigation.goBack(); }}
+        right={<Button variant="icon" icon={Settings} accessibilityLabel="Настройки" />}
+      />
 
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingHorizontal: spacing.m }]}
+        contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
         {/* Progress */}
         <View style={styles.progressSection}>
           <View style={styles.progressInfo}>
-            <Text variant="bodySmall" style={{ color: colors.textSecondary, fontWeight: '700' }}>
+            <Text variant="bodySmall" style={[styles.semibold, { color: colors.textSecondary }]}>
               Слово: {currentIndex + 1}/{totalWords || 1}
             </Text>
           </View>
-          <ProgressBar progress={progressPercent} height={8} />
+          <ProgressBar progress={progressPercent} accessibilityLabel="Прогресс" />
         </View>
 
         {/* Card */}
@@ -555,21 +537,17 @@ export function WordBuilderScreen({ navigation, route }: Props) {
             {
               backgroundColor: colors.surface,
               borderColor: colors.border,
-              shadowColor: colors.textPrimary,
             },
           ]}
         >
           <View
             style={[
               styles.cardTopLine,
-              { backgroundColor: colors.primary, shadowColor: colors.primary },
+              { backgroundColor: colors.primary },
             ]}
           />
-          <View style={[styles.cardChip, { backgroundColor: `${colors.primary}12` }]}>
-            <Text
-              variant="caption"
-              style={{ color: colors.primary, fontWeight: '700', letterSpacing: 1 }}
-            >
+          <View style={[styles.cardChip, { backgroundColor: alpha(colors.primary, 10) }]}>
+            <Text variant="overline" style={{ color: colors.primary }}>
               Собери слово
             </Text>
           </View>
@@ -588,13 +566,15 @@ export function WordBuilderScreen({ navigation, route }: Props) {
               style={({ pressed }) => [
                 styles.audioButton,
                 {
-                  backgroundColor: pressed ? `${colors.primary}22` : colors.surfaceVariant,
+                  backgroundColor: pressed ? alpha(colors.primary, 20) : colors.surfaceMuted,
                   borderColor: colors.border,
                 },
               ]}
+              accessibilityRole="button"
+              accessibilityLabel="Прослушать слово"
               onPress={() => handleSpeak(targetWord, promptText, cardSpeechLangs(currentCard).front)}
             >
-              <Volume2 size={22} color={colors.primary} />
+              <Volume2 size={iconSize.m} color={colors.primary} />
             </Pressable>
           )}
         </View>
@@ -610,19 +590,21 @@ export function WordBuilderScreen({ navigation, route }: Props) {
               
               // Определяем цвет границы для каждой ячейки
               let slotBorderColor: string = slot.isFilled ? colors.primary : colors.border;
-              let slotBgColor: string = slot.isFilled ? `${colors.primary}10` : colors.surfaceVariant;
+              let slotBgColor: string = slot.isFilled ? alpha(colors.primary, 10) : colors.surfaceMuted;
               let slotTextColor: string = slot.isFilled ? colors.primary : colors.textSecondary;
               
               if (wordResult && slot.isFilled) {
                 slotBorderColor = isSlotCorrect ? colors.success : colors.error;
-                slotBgColor = isSlotCorrect ? `${colors.success}30` : `${colors.error}30`;
-                slotTextColor = isSlotCorrect ? colors.success : colors.error;
+                slotBgColor = isSlotCorrect ? alpha(colors.success, 20) : alpha(colors.error, 20);
+                slotTextColor = isSlotCorrect ? colors.successText : colors.errorText;
               }
               
               return (
                 <Pressable
                   key={slot.id}
                   disabled={!slot.isFilled || isLocked}
+                  accessibilityRole="button"
+                  accessibilityLabel={slot.char ? `Буква ${slot.char}, убрать` : 'Пустая ячейка'}
                   onPress={() => handleSlotPress(slot.id)}
                   style={({ pressed }) => [
                     styles.slot,
@@ -635,13 +617,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
                   ]}
                   hitSlop={6}
                 >
-                  <Text
-                    variant="h3"
-                    style={{
-                      color: slotTextColor,
-                      fontWeight: '800',
-                    }}
-                  >
+                  <Text variant="h3" style={[styles.bold, { color: slotTextColor }]}>
                     {slot.char ?? ''}
                   </Text>
                 </Pressable>
@@ -649,25 +625,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
             })}
           </View>
           {wordResult === 'wrong' && (
-            <Pressable
-              style={({ pressed }) => [
-                styles.backspaceButton,
-                {
-                  backgroundColor: pressed ? `${colors.primary}12` : 'transparent',
-                  alignSelf: 'center',
-                  paddingHorizontal: spacing.m,
-                  paddingVertical: spacing.s,
-                  borderRadius: borderRadius.l,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                },
-              ]}
-              onPress={handleConfirmNext}
-            >
-              <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
-                Хорошо
-              </Text>
-            </Pressable>
+            <Button variant="secondary" title="Хорошо" onPress={handleConfirmNext} />
           )}
         </View>
 
@@ -678,33 +636,30 @@ export function WordBuilderScreen({ navigation, route }: Props) {
               <Pressable
                 key={tile.id}
                 disabled={tile.used || isLocked}
+                accessibilityRole="button"
+                accessibilityLabel={`Буква ${tile.char}`}
+                accessibilityState={{ disabled: tile.used || isLocked }}
                 onPress={() => handleTilePress(tile.id)}
                 style={({ pressed }) => [
                   styles.tile,
                   {
                     backgroundColor:
                       resultBorderColor && tile.used
-                        ? `${resultBorderColor}22`
+                        ? alpha(resultBorderColor, 20)
                         : tile.used
-                          ? colors.surfaceVariant
+                          ? colors.surfaceMuted
                           : colors.surface,
                     borderColor:
                       resultBorderColor && tile.used
                         ? resultBorderColor
                         : tile.used
-                          ? colors.surfaceVariant
+                          ? colors.surfaceMuted
                           : colors.border,
                   },
                   pressed && !tile.used && { transform: [{ translateY: 1 }] },
                 ]}
               >
-                <Text
-                  variant="h2"
-                  style={{
-                    color: tile.used ? colors.textTertiary : colors.textPrimary,
-                    fontWeight: '800',
-                  }}
-                >
+                <Text variant="h2" style={{ color: tile.used ? colors.textTertiary : colors.textPrimary }}>
                   {tile.char}
                 </Text>
               </Pressable>
@@ -720,23 +675,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    paddingHorizontal: spacing.m,
-    paddingTop: spacing.l,
-    paddingBottom: spacing.m,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  semibold: {
+    fontWeight: '600',
   },
-  iconButton: {
-    width: 44,
-    height: 44,
-    borderRadius: borderRadius.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
+  bold: {
+    fontWeight: '700',
   },
   content: {
-    paddingBottom: spacing.xl * 1.5,
+    paddingHorizontal: screenPadding,
+    paddingBottom: spacing.xxl,
     gap: spacing.m,
   },
   progressSection: {
@@ -747,15 +694,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  // Рамка без тени (брендбук, 7.3)
   card: {
-    borderRadius: spacing.xl,
+    borderRadius: borderRadius.l,
     borderWidth: 1,
     padding: spacing.l,
-    paddingTop: spacing.l + 6,
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 4,
+    paddingTop: spacing.l + spacing.xxs,
     overflow: 'hidden',
     gap: spacing.s,
   },
@@ -764,12 +708,12 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 6,
+    height: spacing.xxs,
   },
   cardChip: {
     alignSelf: 'center',
     paddingHorizontal: spacing.s,
-    paddingVertical: spacing.xs,
+    paddingVertical: spacing.xxs,
     borderRadius: borderRadius.full,
   },
   wordBlock: {
@@ -778,8 +722,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.s,
   },
   word: {
-    fontSize: 30,
-    fontWeight: '800',
     textAlign: 'center',
   },
   audioButton: {
@@ -787,7 +729,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: 56,
     height: 56,
-    borderRadius: borderRadius.xl,
+    borderRadius: borderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -805,14 +747,11 @@ const styles = StyleSheet.create({
   slot: {
     width: 48,
     height: 56,
-    borderRadius: borderRadius.l,
+    borderRadius: borderRadius.m,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.xs,
-  },
-  backspaceButton: {
-    padding: spacing.xs,
   },
   grid: {
     flexDirection: 'row',
@@ -824,7 +763,7 @@ const styles = StyleSheet.create({
   tile: {
     width: 56,
     height: 56,
-    borderRadius: borderRadius.l,
+    borderRadius: borderRadius.m,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',

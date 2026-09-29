@@ -3,17 +3,17 @@
     "hex": 690,
     "rgba": 301,
     "isDark": 255,
-    "font": 298,
-    "weight": 155,
+    "font": 297,
+    "weight": 151,
     "radius": 130,
-    "alpha": 149,
+    "alpha": 142,
     "alert": 61,
     "small": 94,
     "emoji": 59,
     "ion": 24,
-    "a11y": 88,
+    "a11y": 85,
     "en": 23,
-    "total": 2039
+    "total": 2027
   },
   "files": {
     "src/screens/TeacherCourseStatsScreen.tsx": {
@@ -549,13 +549,6 @@
       "font": 1,
       "radius": 1,
       "alert": 1,
-      "total": 12
-    },
-    "src/screens/WordBuilderScreen.tsx": {
-      "font": 1,
-      "weight": 4,
-      "alpha": 7,
-      "a11y": 3,
       "total": 12
     },
     "src/screens/PreviewImportScreen.tsx": {
