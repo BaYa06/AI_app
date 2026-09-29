@@ -30,6 +30,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 
 import { API_BASE } from '@/config/apiBase';
+import { describeTestError } from '@/utils/testApiErrors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TestJoin'>;
 
@@ -120,7 +121,7 @@ export function TestJoinScreen({ navigation, route }: Props) {
       // остановился, а не всегда с нуля (см. план, пункт 40).
       if (result.alreadyJoined && result.status === 'active') {
         if (result.answerCount >= result.questionCount) {
-          setError('Вы уже завершили этот тест');
+          setError('Ты уже прошёл этот тест');
           setJoining(false);
           return;
         }
@@ -157,7 +158,7 @@ export function TestJoinScreen({ navigation, route }: Props) {
         navigation.replace('TestWaiting', waitingParams);
       }
     } catch (e: any) {
-      setError(e.message || 'Failed to join test');
+      setError(describeTestError(e, 'Не удалось подключиться к тесту. Попробуй ещё раз.'));
       setJoining(false);
     }
   }, [code, isCodeComplete, joining, navigation, isTab]);
@@ -194,7 +195,7 @@ export function TestJoinScreen({ navigation, route }: Props) {
             <GraduationCap size={18} color="#FFF" />
           </View>
           <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-            Test Lobby
+            Вход в тест
           </Text>
         </View>
         <View style={{ width: 40 }} />
@@ -231,10 +232,10 @@ export function TestJoinScreen({ navigation, route }: Props) {
 
         {/* Title */}
         <Text style={[styles.title, { color: colors.textPrimary }]}>
-          Join a Test
+          Подключись к тесту
         </Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          ENTER GAME CODE
+          Введи код от учителя
         </Text>
 
         {/* PIN Input */}
@@ -271,7 +272,7 @@ export function TestJoinScreen({ navigation, route }: Props) {
         {/* Name — только показ, из профиля */}
         <View style={styles.nameSection}>
           <Text style={[styles.nameLabel, { color: colors.textSecondary }]}>
-            YOUR NAME
+            Твоё имя
           </Text>
           <View
             style={[
@@ -295,7 +296,7 @@ export function TestJoinScreen({ navigation, route }: Props) {
         {/* Divider */}
         <View style={styles.dividerRow}>
           <View style={[styles.dividerLine, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0' }]} />
-          <Text style={[styles.dividerText, { color: colors.textSecondary }]}>or</Text>
+          <Text style={[styles.dividerText, { color: colors.textSecondary }]}>или</Text>
           <View style={[styles.dividerLine, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0' }]} />
         </View>
 
@@ -311,7 +312,7 @@ export function TestJoinScreen({ navigation, route }: Props) {
         >
           <QrCode size={20} color={colors.primary} />
           <Text style={[styles.qrBtnText, { color: colors.primary }]}>
-            Scan QR Code
+            Сканировать QR-код
           </Text>
         </Pressable>
 
@@ -338,7 +339,7 @@ export function TestJoinScreen({ navigation, route }: Props) {
             <ActivityIndicator color="#FFF" />
           ) : (
             <>
-              <Text style={styles.joinBtnText}>Join Now</Text>
+              <Text style={styles.joinBtnText}>Подключиться</Text>
               <ArrowRight size={20} color="#FFF" />
             </>
           )}
@@ -348,10 +349,7 @@ export function TestJoinScreen({ navigation, route }: Props) {
       {/* Footer */}
       <View style={[styles.footer, { paddingBottom: (isTab ? 0 : insets.bottom) + 12 }]}>
         <Text style={[styles.footerText, { color: colors.textSecondary }]}>
-          Need help?{' '}
-          <Text style={[styles.footerLink, { color: colors.primary }]}>
-            Contact Teacher
-          </Text>
+          Код теста показывает учитель на своём экране
         </Text>
       </View>
     </View>
@@ -548,8 +546,5 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 13,
-  },
-  footerLink: {
-    fontWeight: '600',
   },
 });

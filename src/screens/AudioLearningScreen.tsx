@@ -184,7 +184,7 @@ export function AudioLearningScreen({ navigation, route }: Props) {
           rating: 1,
         };
       }),
-      modeTitle: 'Audio Tap',
+      modeTitle: 'Аудио',
       nextMode: 'audio',
       cardLimit,
       dueCardIds,
@@ -366,7 +366,7 @@ export function AudioLearningScreen({ navigation, route }: Props) {
     if (!hasPermission) {
       Alert.alert(
         'Нет доступа к микрофону',
-        'Разрешите доступ к микрофону в настройках устройства, чтобы использовать Audio Tap.',
+        'Разреши доступ к микрофону в настройках телефона, чтобы заниматься в режиме «Аудио».',
       );
       return;
     }
@@ -490,7 +490,7 @@ export function AudioLearningScreen({ navigation, route }: Props) {
           <ArrowLeft size={24} color={colors.textPrimary} />
         </Pressable>
 
-        <Heading2 style={styles.headerTitle}>Audio Tap</Heading2>
+        <Heading2 style={styles.headerTitle}>Аудио</Heading2>
 
         <Pressable onPress={openSettings} style={styles.headerButton} hitSlop={8}>
           <Settings size={24} color={colors.textPrimary} />
@@ -504,7 +504,7 @@ export function AudioLearningScreen({ navigation, route }: Props) {
             ({currentIndex + 1}/{totalCards})
           </Text>
           <Text variant="caption" color="tertiary" style={styles.sessionLabel}>
-            AUDIO SESSION
+            Аудиотренировка
           </Text>
         </View>
 

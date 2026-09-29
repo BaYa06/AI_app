@@ -22,6 +22,7 @@ import { spacing, borderRadius } from '@/constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePwaInstall } from '@/hooks/usePwaInstall';
 import { SUPABASE_OAUTH_REDIRECT, supabase } from '@/services/supabaseClient';
+import { describeError } from '@/utils/userErrors';
 
 type Props = {
   isLoading?: boolean;
@@ -72,7 +73,7 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
       });
       if (error) {
         console.error('[auth] Google sign-in error', error);
-        setAuthError(error.message);
+        setAuthError(describeError(error, 'Не удалось войти. Попробуй ещё раз.'));
         setIsLoading(false);
       }
       return;
@@ -89,7 +90,7 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
 
     if (error) {
       console.error('[auth] Google sign-in error', error);
-      setAuthError(error.message);
+      setAuthError(describeError(error, 'Не удалось войти. Попробуй ещё раз.'));
       setIsLoading(false);
       return;
     }
@@ -109,12 +110,12 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
               const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
               if (exchangeError) {
                 console.error('[auth] Code exchange failed:', exchangeError.message);
-                setAuthError(exchangeError.message);
+                setAuthError(describeError(exchangeError, 'Не удалось войти. Попробуй ещё раз.'));
               }
             } else {
               const errorDesc = getParamFromCallbackUrl(result.url, 'error_description');
               if (errorDesc) {
-                setAuthError(errorDesc);
+                setAuthError(describeError(errorDesc, 'Не удалось войти. Попробуй ещё раз.'));
               }
             }
           }
@@ -154,7 +155,7 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
 
       if (error) {
         console.error('[auth] Apple sign-in error', error);
-        setAuthError(error.message);
+        setAuthError(describeError(error, 'Не удалось войти. Попробуй ещё раз.'));
       }
     } catch (e: any) {
       if (e?.code !== appleAuth.Error.CANCELED) {
@@ -218,7 +219,7 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
             align="center"
             style={styles.subtitle}
           >
-            Learn smarter. Remember longer.
+            Учись умнее. Запоминай надолго.
           </Text>
         </View>
 

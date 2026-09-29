@@ -30,7 +30,7 @@ export const RecommendedModeCard = memo(function RecommendedModeCard({ onPress }
     >
       <View style={styles.badge}>
         <Text variant="caption" style={{ color: '#fff', fontWeight: '700' }}>
-          Recommended
+          Рекомендуем
         </Text>
       </View>
       <View style={styles.header}>
@@ -39,7 +39,7 @@ export const RecommendedModeCard = memo(function RecommendedModeCard({ onPress }
         </View>
         <View style={{ flex: 1 }}>
           <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
-            Flashcards
+            Карточки
           </Text>
           <Text variant="caption" color="secondary">
             Переворот 180° • Классический режим

@@ -24,7 +24,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
     timeSpent,
     errors,
     errorCards,
-    modeTitle = 'Flashcards',
+    modeTitle = 'Карточки',
     cardLimit,
     dueCardIds,
     phaseId,
@@ -68,9 +68,9 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   // Analytics: study_session_complete
   React.useEffect(() => {
     const modeMap: Record<string, 'flashcard' | 'quiz' | 'match'> = {
-      'Flashcards': 'flashcard',
-      'Multiple Choice': 'quiz',
-      'Match': 'match',
+      'Карточки': 'flashcard',
+      'Тест': 'quiz',
+      'Пары': 'match',
     };
     Analytics.studySessionComplete({
       setId,

@@ -206,7 +206,7 @@ export function ProfileScreen({ navigation }: any) {
                 <Text style={st.avatarText}>{avatarLetter}</Text>
               </View>
               <View style={[st.levelBadge, { backgroundColor: colors.primary }]}>
-                <Text style={st.levelText}>LVL {level}</Text>
+                <Text style={st.levelText}>Ур. {level}</Text>
               </View>
             </View>
             <View style={st.userInfo}>
@@ -223,13 +223,13 @@ export function ProfileScreen({ navigation }: any) {
           {/* XP Progress */}
           <View style={st.xpSection}>
             <View style={st.xpLabelRow}>
-              <Text style={[st.xpLabel, { color: colors.textTertiary }]}>Прогресс XP</Text>
-              <Text style={[st.xpPercent, { color: colors.primary }]}>{xpCurrent} / {XP_PER_LEVEL} XP</Text>
+              <Text style={[st.xpLabel, { color: colors.textTertiary }]}>Опыт</Text>
+              <Text style={[st.xpPercent, { color: colors.primary }]}>{xpCurrent} / {XP_PER_LEVEL}</Text>
             </View>
             <View style={[st.xpBarBg, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9' }]}>
               <View style={[st.xpBarFill, { backgroundColor: colors.primary, width: `${xpPercent}%` }]} />
             </View>
-            <Text style={[st.xpHint, { color: colors.textTertiary }]}>{xpToNext} XP до уровня {level + 1} · 1 карточка = 1 XP</Text>
+            <Text style={[st.xpHint, { color: colors.textTertiary }]}>{xpToNext} до уровня {level + 1} · 1 карточка = 1 очко опыта</Text>
           </View>
 
           {/* Quick Stats */}

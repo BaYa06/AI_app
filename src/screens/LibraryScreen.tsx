@@ -111,7 +111,7 @@ const HorizontalCard = memo(function HorizontalCard({
           {item.title}
         </Text>
         <Text style={[s.hCardMeta, { color: colors.textTertiary }]} numberOfLines={1}>
-          {item.author_name || 'Unknown'}{langDef ? ` • ${langDef.flag} ${langDef.label}` : ''}
+          {item.author_name || 'Автор неизвестен'}{langDef ? ` • ${langDef.flag} ${langDef.label}` : ''}
         </Text>
       </View>
 
@@ -169,7 +169,7 @@ const RecentCard = memo(function RecentCard({
               <Text style={[s.categoryText, { color: colors.primary }]}>{getCategoryLabel(item.category)}</Text>
             </View>
           )}
-          <Text style={[s.rCardAuthor, { color: colors.textTertiary }]}>{item.author_name || 'Unknown'}</Text>
+          <Text style={[s.rCardAuthor, { color: colors.textTertiary }]}>{item.author_name || 'Автор неизвестен'}</Text>
         </View>
       </View>
       <View style={s.rCardRight}>
@@ -359,7 +359,7 @@ export function LibraryScreen() {
                 { color: colors.textPrimary },
                 Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
               ]}
-              placeholder="Поиск наборов или @username..."
+              placeholder="Поиск наборов или @ник автора..."
               placeholderTextColor={colors.textTertiary}
               value={searchText}
               onChangeText={onSearchChange}

@@ -35,7 +35,7 @@ export function LoadingSplash() {
           align="center"
           style={[styles.subtitle, { color: '#6b7280' }]}
         >
-          Learn smarter. Remember longer.
+          Учись умнее. Запоминай надолго.
         </Text>
         <ActivityIndicator
           size="large"

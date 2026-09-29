@@ -29,6 +29,8 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 
 import { API_BASE } from '@/config/apiBase';
+import { describeTestError } from '@/utils/testApiErrors';
+import { pluralize } from '@/utils';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TestResultsTeacher'>;
 
@@ -92,7 +94,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
       const json: ResultsData = await res.json();
       setData(json);
     } catch (e: any) {
-      setError(e.message || 'Failed to load results');
+      setError(describeTestError(e, 'Не удалось загрузить результаты.'));
     } finally {
       setLoading(false);
     }
@@ -105,20 +107,20 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
   const handleExportCSV = useCallback(async () => {
     if (!data) return;
 
-    const header = 'Rank,Name,Score (%),Correct,Total,Finished';
+    const header = 'Место,Имя,Результат (%),Верно,Всего,Завершил';
     const rows = data.participants.map((p, idx) =>
-      `${idx + 1},"${p.name}",${p.score},${p.correct},${p.total},${p.finished ? 'Yes' : 'No'}`
+      `${idx + 1},"${p.name}",${p.score},${p.correct},${p.total},${p.finished ? 'Да' : 'Нет'}`
     );
-    const hardHeader = '\n\nHardest Cards\nWord,Hint,Missed,Total';
+    const hardHeader = '\n\nСамые трудные слова\nСлово,Подсказка,Ошибок,Всего';
     const hardRows = data.hardestCards.map(c =>
       `"${c.word}","${c.hint}",${c.missed},${c.total}`
     );
 
     const csv = [
-      `Test Results: ${data.setTitle}`,
-      `Date: ${new Date(data.date).toLocaleDateString()}`,
-      `Average Score: ${data.avgScore}%`,
-      `Total Questions: ${data.totalQuestions}`,
+      `Результаты теста: ${data.setTitle}`,
+      `Дата: ${new Date(data.date).toLocaleDateString('ru-RU')}`,
+      `Средний результат: ${data.avgScore}%`,
+      `Вопросов: ${data.totalQuestions}`,
       '',
       header,
       ...rows,
@@ -129,10 +131,10 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
     try {
       await Share.share({
         message: csv,
-        title: `Test Results - ${data.setTitle}`,
+        title: `Результаты теста — ${data.setTitle}`,
       });
     } catch {
-      Alert.alert('Export Error', 'Could not export results');
+      Alert.alert('Ошибка', 'Не удалось выгрузить результаты');
     }
   }, [data]);
 
@@ -145,7 +147,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
       <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-          Loading results...
+          Загружаем результаты…
         </Text>
       </View>
     );
@@ -157,7 +159,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
       <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
         <AlertTriangle size={40} color="#F43F5E" />
         <Text style={[styles.errorText, { color: colors.textPrimary }]}>
-          {error || 'No data'}
+          {error || 'Нет данных'}
         </Text>
         <Pressable
           style={({ pressed }) => [
@@ -167,7 +169,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
           ]}
           onPress={fetchResults}
         >
-          <Text style={styles.retryText}>Retry</Text>
+          <Text style={styles.retryText}>Повторить</Text>
         </Pressable>
       </View>
     );
@@ -201,7 +203,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
           <X size={18} color={colors.textPrimary} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-          Test Results
+          Результаты теста
         </Text>
         <Pressable
           style={({ pressed }) => [
@@ -211,7 +213,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
           ]}
           onPress={handleExportCSV}
         >
-          <Text style={[styles.exportHeaderText, { color: colors.primary }]}>Export</Text>
+          <Text style={[styles.exportHeaderText, { color: colors.primary }]}>Выгрузить</Text>
         </Pressable>
       </View>
 
@@ -223,18 +225,18 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
         <View style={styles.summaryCard}>
           <View style={styles.summaryTop}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.summaryLabel}>LIVE SESSION COMPLETE</Text>
+              <Text style={styles.summaryLabel}>Тест завершён</Text>
               <Text style={styles.summaryTitle}>{setTitle}</Text>
             </View>
           </View>
           <View style={styles.summaryBottom}>
             <View>
               <Text style={styles.summaryScore}>{avgScore}%</Text>
-              <Text style={styles.summaryScoreLabel}>Average score</Text>
+              <Text style={styles.summaryScoreLabel}>Средний результат</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={styles.summaryStudents}>{participants.length} students</Text>
-              <Text style={styles.summaryQuestions}>{totalQuestions} questions total</Text>
+              <Text style={styles.summaryStudents}>{participants.length} {pluralize(participants.length, 'ученик', 'ученика', 'учеников')}</Text>
+              <Text style={styles.summaryQuestions}>Всего {totalQuestions} {pluralize(totalQuestions, 'вопрос', 'вопроса', 'вопросов')}</Text>
             </View>
           </View>
         </View>
@@ -244,7 +246,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
           <View style={styles.section}>
             <View style={styles.sectionTitleRow}>
               <Trophy size={20} color="#F59E0B" />
-              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Podium</Text>
+              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Лучшие</Text>
             </View>
 
             <View style={styles.podiumRow}>
@@ -260,7 +262,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
                 const pedestalBg = isFirst
                   ? (isDark ? colors.primary + '25' : colors.primary + '15')
                   : (isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9');
-                const placeLabel = place === 1 ? 'Winner' : place === 2 ? '2nd' : '3rd';
+                const placeLabel = place === 1 ? 'Победитель' : place === 2 ? '2-е место' : '3-е место';
                 const globalIdx = participants.indexOf(student);
 
                 return (
@@ -334,7 +336,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
         {/* Leaderboard */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-            Leaderboard
+            Рейтинг
           </Text>
           <View style={styles.leaderList}>
             {participants.map((student, idx) => (
@@ -377,7 +379,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
             <View style={styles.sectionTitleRow}>
               <AlertTriangle size={20} color="#F43F5E" />
               <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-                Hardest Cards
+                Самые трудные слова
               </Text>
             </View>
             <View style={styles.hardList}>
@@ -409,7 +411,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
                     ]}
                   >
                     <Text style={styles.missedText}>
-                      {card.missed}/{card.total} Missed
+                      Ошибок: {card.missed} из {card.total}
                     </Text>
                   </View>
                 </View>
@@ -446,7 +448,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
             ]}
             onPress={() => navigation.navigate('TeacherCourseStats', { courseId, courseTitle })}
           >
-            <Text style={[styles.backBtnText, { color: colors.textPrimary }]}>Back to Course</Text>
+            <Text style={[styles.backBtnText, { color: colors.textPrimary }]}>К курсу</Text>
           </Pressable>
           <Pressable
             style={({ pressed }) => [
@@ -457,7 +459,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
             onPress={handleExportCSV}
           >
             <Download size={18} color="#FFFFFF" />
-            <Text style={styles.ctaText}>Export</Text>
+            <Text style={styles.ctaText}>Выгрузить</Text>
           </Pressable>
         </View>
       </View>

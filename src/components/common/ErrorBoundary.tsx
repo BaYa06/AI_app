@@ -46,10 +46,11 @@ export class ErrorBoundary extends Component<Props, State> {
           >
             <View style={styles.overlay}>
               <View style={styles.modal}>
-                <Text style={styles.title}>Something went wrong</Text>
+                <Text style={styles.title}>Что-то пошло не так</Text>
                 <ScrollView style={styles.scroll}>
+                  {/* Технический текст ошибки — только разработчику */}
                   <Text style={styles.errorText}>
-                    {error?.toString()}
+                    {__DEV__ ? error?.toString() : 'Закрой это окно и попробуй ещё раз. Если повторится — напиши нам: Профиль → «Написать нам».'}
                   </Text>
                   {__DEV__ && errorInfo?.componentStack && (
                     <Text style={styles.stackText}>
@@ -58,7 +59,7 @@ export class ErrorBoundary extends Component<Props, State> {
                   )}
                 </ScrollView>
                 <TouchableOpacity style={styles.button} onPress={this.handleDismiss}>
-                  <Text style={styles.buttonText}>Dismiss</Text>
+                  <Text style={styles.buttonText}>Закрыть</Text>
                 </TouchableOpacity>
               </View>
             </View>

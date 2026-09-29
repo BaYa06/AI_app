@@ -30,7 +30,7 @@ type Props = RootStackScreenProps<'Subscription'>;
 type PlanKey = 'yearly' | 'monthly';
 
 const BENEFITS = [
-  { icon: Infinity, title: 'Безлимитные наборы', desc: 'Создавайте сколько угодно колод' },
+  { icon: Infinity, title: 'Безлимитные наборы', desc: 'Создавай сколько угодно наборов' },
   { icon: Sparkles, title: 'AI генерация', desc: 'Автоматическое создание карточек из текста' },
   { icon: FileDown, title: 'Экспорт в PDF', desc: 'Печатайте и делитесь карточками' },
   { icon: WifiOff, title: 'Офлайн режим', desc: 'Учитесь без интернета' },

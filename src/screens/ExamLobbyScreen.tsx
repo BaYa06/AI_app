@@ -33,6 +33,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 
 import { API_BASE } from '@/config/apiBase';
+import { describeTestError } from '@/utils/testApiErrors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ExamLobby'>;
 
@@ -428,7 +429,7 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
               });
             } catch (e: any) {
               console.error('Create test error:', e);
-              alert(e.message || 'Ошибка создания теста');
+              alert(describeTestError(e, 'Не удалось создать тест. Попробуй ещё раз.'));
             } finally {
               setCreating(false);
             }

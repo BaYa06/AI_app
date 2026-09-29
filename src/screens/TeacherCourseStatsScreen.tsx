@@ -348,7 +348,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
             <GraduationCap size={18} color="#FFFFFF" />
           </View>
           <Text style={[styles.testLobbyText, { color: colors.textPrimary }]}>
-            Test Lobby
+            Живой тест
           </Text>
           <ArrowLeft
             size={16}

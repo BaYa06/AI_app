@@ -214,14 +214,14 @@ export function LiveTestScreen({ navigation, route }: Props) {
           <ArrowLeft size={22} color={colors.textPrimary} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-          Live Test
+          Тест идёт
         </Text>
         <Pressable
           style={({ pressed }) => [pressed && { opacity: 0.6 }]}
           onPress={handleEndTest}
           disabled={ending}
         >
-          <Text style={styles.endHeaderBtn}>{ending ? '...' : 'End'}</Text>
+          <Text style={styles.endHeaderBtn}>{ending ? '...' : 'Завершить'}</Text>
         </Pressable>
       </View>
 
@@ -239,8 +239,8 @@ export function LiveTestScreen({ navigation, route }: Props) {
           </View>
         </View>
         <View style={styles.timerLabels}>
-          <Text style={[styles.timerLabel, { color: colors.textSecondary }]}>MINUTES</Text>
-          <Text style={[styles.timerLabel, { color: colors.textSecondary }]}>SECONDS</Text>
+          <Text style={[styles.timerLabel, { color: colors.textSecondary }]}>Мин</Text>
+          <Text style={[styles.timerLabel, { color: colors.textSecondary }]}>Сек</Text>
         </View>
 
         {/* Live Status Card */}
@@ -249,7 +249,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
           <View style={[styles.statusBanner, { backgroundColor: isDark ? 'rgba(99,102,241,0.15)' : '#EEF2FF' }]}>
             <View style={styles.bannerContent}>
               <Text style={[styles.bannerEmoji, { fontSize: 32 }]}>📝</Text>
-              <Text style={[styles.bannerLabel, { color: colors.primary }]}>Test in progress</Text>
+              <Text style={[styles.bannerLabel, { color: colors.primary }]}>Тест идёт</Text>
             </View>
           </View>
 
@@ -259,7 +259,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
                 {avgQuestion} / {totalQuestions} questions
               </Text>
               <View style={styles.liveBadge}>
-                <Text style={styles.liveBadgeText}>LIVE</Text>
+                <Text style={styles.liveBadgeText}>В эфире</Text>
               </View>
             </View>
 
@@ -274,7 +274,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
             <View style={styles.completionSection}>
               <View style={styles.completionHeader}>
                 <Text style={[styles.completionLabel, { color: colors.textSecondary }]}>
-                  Class Completion
+                  Прогресс класса
                 </Text>
                 <Text style={[styles.completionPct, { color: colors.primary }]}>
                   {classPct}%
@@ -294,7 +294,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
 
         {/* Student Progress */}
         <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-          Student Progress
+          Ученики
         </Text>
 
         <View style={styles.studentsList}>
@@ -328,7 +328,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
                   </View>
                   {st.done ? (
                     <View style={styles.doneRow}>
-                      <Text style={styles.doneText}>Done</Text>
+                      <Text style={styles.doneText}>Готово</Text>
                     </View>
                   ) : (
                     <Text style={[styles.studentProgress, { color: colors.textSecondary }]}>
@@ -385,7 +385,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
           ) : (
             <>
               <StopCircle size={22} color="#EF4444" />
-              <Text style={styles.endBtnText}>End test early</Text>
+              <Text style={styles.endBtnText}>Завершить досрочно</Text>
             </>
           )}
         </Pressable>

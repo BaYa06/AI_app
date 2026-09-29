@@ -103,7 +103,7 @@ export function ContextFillScreen({ navigation, route }: Props) {
       Alert.alert(
         'Мало карточек',
         `Для этого режима нужно минимум ${MIN_CARDS} карточки в наборе.`,
-        [{ text: 'OK', onPress: () => navigation.goBack() }],
+        [{ text: 'Понятно', onPress: () => navigation.goBack() }],
       );
       return;
     }
@@ -158,7 +158,7 @@ export function ContextFillScreen({ navigation, route }: Props) {
       Alert.alert(
         'Нет примеров',
         'Не удалось загрузить примеры для карточек. Попробуй позже.',
-        [{ text: 'OK', onPress: () => navigation.goBack() }],
+        [{ text: 'Понятно', onPress: () => navigation.goBack() }],
       );
       return;
     }
@@ -254,7 +254,7 @@ export function ContextFillScreen({ navigation, route }: Props) {
             <ArrowLeft size={22} color={colors.textPrimary} />
           </Pressable>
           <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-            Fill in the Blank
+            Слово в контексте
           </Text>
         </View>
         <View style={styles.centered}>
@@ -285,7 +285,7 @@ export function ContextFillScreen({ navigation, route }: Props) {
             <ArrowLeft size={22} color={colors.textPrimary} />
           </Pressable>
           <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-            Fill in the Blank
+            Слово в контексте
           </Text>
         </View>
 
@@ -351,7 +351,7 @@ export function ContextFillScreen({ navigation, route }: Props) {
         </Pressable>
         <View style={styles.headerCenter}>
           <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-            Fill in the Blank
+            Слово в контексте
           </Text>
           <Text style={[styles.headerCounter, { color: colors.textSecondary }]}>
             {currentIndex + 1} / {questions.length}

@@ -29,6 +29,7 @@ import {
   Sparkles,
   Info,
 } from 'lucide-react-native';
+import { describeError } from '@/utils/userErrors';
 
 type Props = RootStackScreenProps<'ImportFiles'>;
 
@@ -338,7 +339,7 @@ export function ImportFilesScreen({ navigation, route }: Props) {
         setId,
       });
     } catch (e: any) {
-      Alert.alert('Ошибка', e.message || 'Не удалось создать карточки');
+      Alert.alert('Ошибка', describeError(e, 'Не удалось создать карточки'));
     } finally {
       setLoading(false);
     }
@@ -365,7 +366,7 @@ export function ImportFilesScreen({ navigation, route }: Props) {
         </Text>
         <View style={[styles.aiBadge, { backgroundColor: colors.primary + '22' }]}>
           <Text variant="caption" style={{ color: colors.primary, fontWeight: '700' }}>
-            AI
+            ИИ
           </Text>
         </View>
       </View>

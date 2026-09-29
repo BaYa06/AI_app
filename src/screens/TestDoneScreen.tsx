@@ -46,17 +46,18 @@ export function TestDoneScreen({ navigation, route }: Props) {
   const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0';
 
   const getGreeting = () => {
-    if (percent >= 90) return 'Excellent work!';
-    if (percent >= 70) return 'Great job!';
-    if (percent >= 50) return 'Good effort!';
-    return 'Keep practicing!';
+    if (percent >= 90) return 'Отличная работа!';
+    if (percent >= 70) return 'Хороший результат!';
+    if (percent >= 50) return 'Неплохо!';
+    return 'Продолжай тренироваться!';
   };
 
+  // Медаль за процент правильных ответов — это не место в классе (раньше писали «1st place»)
   const getRankText = () => {
-    if (percent >= 90) return '1st place';
-    if (percent >= 75) return '2nd place';
-    if (percent >= 60) return '3rd place';
-    return 'Keep going!';
+    if (percent >= 90) return 'Золото';
+    if (percent >= 75) return 'Серебро';
+    if (percent >= 60) return 'Бронза';
+    return 'Ещё немного!';
   };
 
   const getRankEmoji = () => {
@@ -181,7 +182,7 @@ export function TestDoneScreen({ navigation, route }: Props) {
             ]}
           >
             <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
-              Correct
+              Верно
             </Text>
             <Text style={[styles.statValue, { color: '#22C55E' }]}>
               {correct}
@@ -197,7 +198,7 @@ export function TestDoneScreen({ navigation, route }: Props) {
             ]}
           >
             <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
-              Wrong
+              Ошибки
             </Text>
             <Text style={[styles.statValue, { color: '#EF4444' }]}>
               {wrong}
@@ -213,7 +214,7 @@ export function TestDoneScreen({ navigation, route }: Props) {
             ]}
           >
             <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
-              Score
+              Результат
             </Text>
             <Text style={[styles.statValue, { color: colors.textPrimary }]}>
               {percent}%
@@ -225,7 +226,7 @@ export function TestDoneScreen({ navigation, route }: Props) {
         {answers.length > 0 && (
           <View style={styles.reviewSection}>
             <Text style={[styles.reviewTitle, { color: colors.textPrimary }]}>
-              Answers Review
+              Разбор ответов
             </Text>
 
             {answers.map((item, idx) => (
@@ -299,7 +300,7 @@ export function TestDoneScreen({ navigation, route }: Props) {
           ]}
           onPress={() => navigation.navigate('Main' as any)}
         >
-          <Text style={styles.homeBtnText}>Back to Home</Text>
+          <Text style={styles.homeBtnText}>На главную</Text>
           <Home size={18} color="#FFF" />
         </Pressable>
       </View>

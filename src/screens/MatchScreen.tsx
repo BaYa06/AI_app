@@ -223,7 +223,7 @@ export function MatchScreen({ navigation, route }: Props) {
       timeSpent,
       errors: mistakes,
       errorCards: [],
-      modeTitle: 'Match',
+      modeTitle: 'Пары',
       cardLimit,
       dueCardIds,
       nextMode: 'match',
@@ -274,7 +274,7 @@ export function MatchScreen({ navigation, route }: Props) {
           <ArrowLeft size={22} color={colors.textPrimary} />
         </Pressable>
         <Text variant="h3" style={{ color: colors.textPrimary }}>
-          Match
+          Пары
         </Text>
         <Pressable hitSlop={8} style={styles.iconButton} onPress={openSettings}>
           <Settings size={20} color={colors.textPrimary} />

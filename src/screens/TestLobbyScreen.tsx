@@ -31,6 +31,7 @@ import type { RootStackParamList } from '@/types/navigation';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 import { API_BASE } from '@/config/apiBase';
+import { describeTestError } from '@/utils/testApiErrors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TestLobby'>;
 
@@ -72,7 +73,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
         setStudents(
           (data.participants || []).map((p: any) => ({
             id: p.userId,
-            name: p.name || 'Student',
+            name: p.name || 'Ученик',
             initials: p.initials || (p.name?.[0] ?? 'S').toUpperCase(),
           }))
         );
@@ -100,7 +101,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
           if (prev.some(s => s.id === payload.userId)) return prev;
           return [...prev, {
             id: payload.userId,
-            name: payload.displayName || 'Student',
+            name: payload.displayName || 'Ученик',
             initials: payload.initials || '??',
           }];
         });
@@ -147,7 +148,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
       });
     } catch (e: any) {
       console.error('Start test error:', e);
-      alert(e.message || 'Ошибка запуска теста');
+      alert(describeTestError(e, 'Не удалось запустить тест. Попробуй ещё раз.'));
       setStarting(false);
     }
   }, [starting, students.length, sessionId, route.params]);
@@ -170,7 +171,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
         <View style={styles.headerLeft}>
           <GraduationCap size={22} color={colors.primary} />
           <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-            Test Lobby
+            Лобби теста
           </Text>
         </View>
         <Pressable
@@ -184,7 +185,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
           ]}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.endBtnText}>End</Text>
+          <Text style={styles.endBtnText}>Завершить</Text>
         </Pressable>
       </View>
 
@@ -196,7 +197,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
         <View style={styles.codeCard}>
           <View style={styles.codeCardTop}>
             <View style={styles.codeCardLeft}>
-              <Text style={styles.codeLabel}>GAME CODE</Text>
+              <Text style={styles.codeLabel}>Код теста</Text>
               <Text style={styles.codeValue}>{gameCode}</Text>
             </View>
             <View style={styles.qrWrap}>
@@ -217,7 +218,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
               ) : (
                 <Copy size={14} color="#6366F1" />
               )}
-              <Text style={styles.copyBtnText}>{copied ? 'Copied!' : 'Copy'}</Text>
+              <Text style={styles.copyBtnText}>{copied ? 'Скопировано' : 'Копировать'}</Text>
             </Pressable>
           </View>
         </View>
@@ -235,7 +236,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
           </View>
           <View style={[styles.joinedBadge, { backgroundColor: colors.primary + '15' }]}>
             <Text style={[styles.joinedText, { color: colors.primary }]}>
-              {students.length} joined
+              Подключились: {students.length}
             </Text>
           </View>
         </View>
@@ -274,7 +275,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
                     {s.name}
                   </Text>
                   <Text style={[styles.studentStatus, { color: colors.textSecondary }]}>
-                    Ready to play
+                    Готов к тесту
                   </Text>
                 </View>
               </View>
@@ -332,7 +333,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
               ))}
             </View>
             <Text style={[styles.crewLabel, { color: colors.textSecondary }]}>
-              JOINED CREW
+              Подключились
             </Text>
           </View>
         )}
@@ -368,7 +369,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
             <ActivityIndicator color="#FFFFFF" />
           ) : (
             <>
-              <Text style={styles.ctaText}>Start Test</Text>
+              <Text style={styles.ctaText}>Начать тест</Text>
               <ArrowRight size={20} color="#FFFFFF" />
             </>
           )}

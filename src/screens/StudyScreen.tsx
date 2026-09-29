@@ -395,7 +395,7 @@ export function StudyScreen({ navigation, route }: Props) {
           timeSpent,
           errors,
           errorCards: errorCardsWithIds,
-          modeTitle: 'Flashcards',
+          modeTitle: 'Карточки',
           cardLimit,
           dueCardIds,
           nextMode: 'study',
@@ -570,7 +570,7 @@ export function StudyScreen({ navigation, route }: Props) {
           <ArrowLeft size={28} color={colors.textPrimary} />
         </Pressable>
         <Text style={[styles.title, { color: colors.textPrimary }]}>
-          Flashcards
+          Карточки
         </Text>
         <Pressable hitSlop={20} style={styles.iconButton} onPress={openSettings}>
           <Settings size={24} color={colors.textPrimary} />

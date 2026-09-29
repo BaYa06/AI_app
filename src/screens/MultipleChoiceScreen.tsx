@@ -348,7 +348,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
         timeSpent,
         errors: errorsCount,
         errorCards: errorList,
-        modeTitle: 'Multiple Choice',
+        modeTitle: 'Тест',
         cardLimit,
         dueCardIds,
         nextMode: 'multipleChoice',
@@ -537,7 +537,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
       ? 'Вспомни забытое \uD83E\uDDE0'
       : challengeMode
         ? 'Быстрый раунд \u26A1'
-        : 'Multiple Choice';
+        : 'Тест';
 
   const handleClose = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -569,7 +569,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
             Нет карточек для игры
           </Text>
           <Text variant="body" color="secondary" align="center">
-            Добавьте карточки в набор, чтобы начать Multiple Choice
+            Добавь карточки в набор, чтобы начать тест
           </Text>
         </View>
       </Container>

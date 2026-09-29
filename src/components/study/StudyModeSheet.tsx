@@ -36,11 +36,11 @@ export interface StudyModeGame {
 }
 
 export const DEFAULT_STUDY_MODE_GAMES: StudyModeGame[] = [
-  { mode: 'match', icon: Puzzle, title: 'Match', tag: 'Быстро', description: 'Сопоставление слов и переводов' },
-  { mode: 'multipleChoice', icon: ClipboardList, title: 'Multiple Choice', tag: 'Лёгко', description: 'Выбери правильный из 4 вариантов' },
-  { mode: 'wordBuilder', icon: Type, title: 'Word Builder', tag: 'Правописание', description: 'Собери слово из букв' },
-  { mode: 'audio', icon: Headphones, title: 'Audio Tap', tag: 'Аудирование', description: 'Прослушай и выбери верное' },
-  { mode: 'contextFill', icon: BookOpenCheck, title: 'Fill in the Blank', tag: 'Контекст', description: 'Угадай слово по примеру' },
+  { mode: 'match', icon: Puzzle, title: 'Пары', tag: 'Быстро', description: 'Сопоставление слов и переводов' },
+  { mode: 'multipleChoice', icon: ClipboardList, title: 'Тест', tag: 'Легко', description: 'Выбери правильный из 4 вариантов' },
+  { mode: 'wordBuilder', icon: Type, title: 'Собери слово', tag: 'Правописание', description: 'Собери слово из букв' },
+  { mode: 'audio', icon: Headphones, title: 'Аудио', tag: 'Аудирование', description: 'Прослушай и выбери верное' },
+  { mode: 'contextFill', icon: BookOpenCheck, title: 'Слово в контексте', tag: 'Контекст', description: 'Угадай слово по примеру' },
 ];
 
 export interface StudyModeSettings {

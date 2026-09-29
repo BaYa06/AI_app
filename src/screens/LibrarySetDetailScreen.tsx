@@ -35,6 +35,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { supabase } from '@/services/supabaseClient';
 import { DatabaseService } from '@/services/DatabaseService';
 import type { RootStackScreenProps } from '@/types/navigation';
+import { describeError } from '@/utils/userErrors';
 
 type Props = RootStackScreenProps<'LibrarySetDetail'>;
 
@@ -154,7 +155,7 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
       setChooseCourseVisible(false);
       showMessage('Готово!', 'Набор сохранён на устройстве');
     } catch (err) {
-      showMessage('Ошибка', err instanceof Error ? err.message : 'Не удалось импортировать набор');
+      showMessage('Ошибка', describeError(err, 'Не удалось импортировать набор'));
     } finally {
       setImporting(false);
     }
@@ -174,7 +175,7 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
       // Reload user data so the set appears
       DatabaseService.loadAll().catch(() => {});
     } catch (err) {
-      showMessage('Ошибка', err instanceof Error ? err.message : 'Не удалось импортировать набор');
+      showMessage('Ошибка', describeError(err, 'Не удалось импортировать набор'));
     } finally {
       setImporting(false);
     }
@@ -277,7 +278,7 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
               </Text>
             </View>
             <Text variant="bodySmall" style={{ color: colors.primary, fontWeight: '600' }}>
-              {currentSet.author_name || 'Unknown'}
+              {currentSet.author_name || 'Автор неизвестен'}
             </Text>
             <Text variant="bodySmall" style={{ color: colors.textTertiary }}>
               • {formatRelativeTime(currentSet.published_at)}
@@ -421,14 +422,14 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
               {currentSet.preview_cards.map((card, idx) => (
                 <View key={card.id || idx} style={[s.sampleCard, { backgroundColor: surfaceBg, borderColor: colors.border }]}>
                   <View style={s.sampleCardSide}>
-                    <Text style={[s.sampleCardLabel, { color: colors.textTertiary }]}>Front</Text>
+                    <Text style={[s.sampleCardLabel, { color: colors.textTertiary }]}>Слово</Text>
                     <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>{card.front}</Text>
                   </View>
                   <View style={s.sampleCardArrow}>
                     <ArrowRight size={18} color={colors.border} />
                   </View>
                   <View style={[s.sampleCardSide, { paddingLeft: spacing.m }]}>
-                    <Text style={[s.sampleCardLabel, { color: colors.textTertiary }]}>Back</Text>
+                    <Text style={[s.sampleCardLabel, { color: colors.textTertiary }]}>Перевод</Text>
                     <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>{card.back}</Text>
                   </View>
                 </View>

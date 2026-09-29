@@ -63,9 +63,9 @@ const ACHIEVEMENTS = [
     iconColor: '#D97706',
     bgColor: '#FEF3C7',
     bgColorDark: 'rgba(217,119,6,0.15)',
-    title: 'Early Bird',
-    desc: 'Studied before 7:00 AM',
-    date: 'Oct 24',
+    title: 'Ранняя пташка',
+    desc: 'Позанимался до 7:00',
+    date: '24 окт',
   },
   {
     id: '2',
@@ -73,9 +73,9 @@ const ACHIEVEMENTS = [
     iconColor: '#4F46E5',
     bgColor: '#E0E7FF',
     bgColorDark: 'rgba(79,70,229,0.15)',
-    title: 'Knowledge Seeker',
-    desc: 'Finished 5 decks in one day',
-    date: 'Oct 21',
+    title: 'Искатель знаний',
+    desc: 'Прошёл 5 наборов за день',
+    date: '21 окт',
   },
 ];
 
@@ -83,16 +83,16 @@ const CHALLENGES = [
   {
     id: '1',
     icon: 'calendar-outline',
-    title: 'Perfect Week',
-    progress: '5/7 Days',
+    title: 'Идеальная неделя',
+    progress: '5/7 дней',
     percent: 71,
     variant: 'primary' as const,
   },
   {
     id: '2',
     icon: 'rocket-outline',
-    title: 'Sprint 100',
-    progress: '45/100 Cards',
+    title: 'Спринт 100',
+    progress: '45/100 карточек',
     percent: 45,
     variant: 'green' as const,
   },
@@ -311,7 +311,7 @@ export function StatisticsScreen({ navigation }: any) {
                 </View>
               </View>
               <View style={[st.levelBadge, { backgroundColor: colors.primary, borderColor: isDark ? colors.background : '#FFFFFF' }]}>
-                <Text style={st.levelText}>LVL {level}</Text>
+                <Text style={st.levelText}>Ур. {level}</Text>
               </View>
             </View>
 
@@ -322,7 +322,7 @@ export function StatisticsScreen({ navigation }: any) {
               </Text>
               <View style={st.proBadgeRow}>
                 <Ionicons name="flash" size={14} color={colors.primary} />
-                <Text style={[st.proLabel, { color: colors.primary }]}>Flashly Member</Text>
+                <Text style={[st.proLabel, { color: colors.primary }]}>Участник Flashly</Text>
               </View>
             </View>
 
@@ -338,9 +338,9 @@ export function StatisticsScreen({ navigation }: any) {
           {/* XP Bar */}
           <View style={st.xpSection}>
             <View style={st.xpLabelRow}>
-              <Text style={[st.xpLabel, { color: colors.textTertiary }]}>XP Progress</Text>
+              <Text style={[st.xpLabel, { color: colors.textTertiary }]}>Опыт</Text>
               <Text style={[st.xpLabel, { color: colors.textTertiary }]}>
-                {xpCurrent} / {XP_PER_LEVEL} XP
+                {xpCurrent} / {XP_PER_LEVEL}
               </Text>
             </View>
             <View style={[st.xpBarBg, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9' }]}>
@@ -366,7 +366,7 @@ export function StatisticsScreen({ navigation }: any) {
               <Ionicons name="trophy" size={22} color={colors.primary} />
               <View>
                 <Text style={[st.heroBadgeValue, { color: colors.textPrimary }]}>24</Text>
-                <Text style={[st.heroBadgeMeta, { color: colors.textTertiary }]}>Badges</Text>
+                <Text style={[st.heroBadgeMeta, { color: colors.textTertiary }]}>Награды</Text>
               </View>
             </Pressable>
           </View>
@@ -510,7 +510,7 @@ export function StatisticsScreen({ navigation }: any) {
         {/* ======== Context Fill Stats ======== */}
         {contextFill.totalAnswered > 0 && (
           <>
-            <Text style={[st.sectionTitle, { color: colors.textPrimary }]}>Fill in the Blank</Text>
+            <Text style={[st.sectionTitle, { color: colors.textPrimary }]}>Слово в контексте</Text>
             <View style={[st.card, { backgroundColor: cardBg, borderColor: cardBorder }]}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                 <View style={{ alignItems: 'center', flex: 1 }}>
@@ -541,7 +541,7 @@ export function StatisticsScreen({ navigation }: any) {
         )}
 
         {/* ======== Recent Achievements ======== */}
-        <Text style={[st.sectionTitle, { color: colors.textPrimary }]}>Recent Achievements</Text>
+        <Text style={[st.sectionTitle, { color: colors.textPrimary }]}>Последние награды</Text>
         <View style={st.achieveList}>
           {ACHIEVEMENTS.map((a) => (
             <View key={a.id} style={[st.achieveCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
@@ -558,7 +558,7 @@ export function StatisticsScreen({ navigation }: any) {
         </View>
 
         {/* ======== Active Challenges ======== */}
-        <Text style={[st.sectionTitle, { color: colors.textPrimary }]}>Active Challenges</Text>
+        <Text style={[st.sectionTitle, { color: colors.textPrimary }]}>Активные задания</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -582,7 +582,7 @@ export function StatisticsScreen({ navigation }: any) {
                 </View>
                 <View style={st.challengeProgress}>
                   <View style={st.challengeProgressRow}>
-                    <Text style={[st.challengeProgressLabel, { color: colors.textTertiary }]}>Progress</Text>
+                    <Text style={[st.challengeProgressLabel, { color: colors.textTertiary }]}>Прогресс</Text>
                     <Text style={[st.challengeProgressLabel, { color: colors.textTertiary }]}>{ch.progress}</Text>
                   </View>
                   <View style={[st.challengeBar, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#FFFFFF' }]}>

@@ -17,7 +17,7 @@ import { ArrowLeft } from 'lucide-react-native';
 
 // ---- Data ----
 
-const TABS = ['Все', 'Стрики', 'Обучение', 'Сеты', 'Соцсети'];
+const TABS = ['Все', 'Серия', 'Обучение', 'Наборы', 'Соцсети'];
 
 type Achievement = {
   id: string;
@@ -38,13 +38,13 @@ const ACHIEVEMENTS: Achievement[] = [
     icon: 'flame',
     title: 'Огненная неделя',
     unlocked: true,
-    description: 'Поддерживайте стрик 7 дней подряд',
+    description: 'Держи серию 7 дней подряд',
     unlockedLabel: 'Разблокировано: Вчера',
   },
   {
     id: '2',
     icon: 'book',
-    title: 'Мастер сетов',
+    title: 'Мастер наборов',
     unlocked: true,
     description: 'Создайте свои первые 10 наборов карточек',
     unlockedLabel: 'Разблокировано: Пн',

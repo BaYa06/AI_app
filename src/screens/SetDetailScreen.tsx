@@ -40,6 +40,7 @@ import {
   Image as ImageIcon,
   BookOpen,
 } from 'lucide-react-native';
+import { describeError } from '@/utils/userErrors';
 
 type Props = RootStackScreenProps<'SetDetail'>;
 type Filter = 'all' | 'mastered' | 'unmastered';
@@ -791,7 +792,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
     if (!ok) return;
     const result = await BookService.forkSet(setId);
     if (!result.ok) {
-      showMessage('Не удалось сделать копию', result.error);
+      showMessage('Не удалось сделать копию', describeError(result.error, 'Попробуй ещё раз.'));
       return;
     }
     const { newSetId } = result.data;
@@ -888,7 +889,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
       setShowPublishModal(false);
       Alert.alert('Успех', 'Набор успешно опубликован!');
     } catch (e: any) {
-      Alert.alert('Ошибка', e.message || 'Не удалось опубликовать');
+      Alert.alert('Ошибка', describeError(e, 'Не удалось опубликовать'));
     } finally {
       setIsPublishing(false);
     }
@@ -1083,7 +1084,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                 >
                   <Upload size={14} color={colors.primary} />
                   <Text variant="bodySmall" style={{ color: colors.primary, fontWeight: '700' }}>
-                    AI
+                    ИИ
                   </Text>
                 </Pressable>
               )}

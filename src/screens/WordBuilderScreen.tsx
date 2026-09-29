@@ -302,7 +302,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
         timeSpent,
         errors: errorsCount,
         errorCards: errorList,
-        modeTitle: 'Word Builder',
+        modeTitle: 'Собери слово',
         nextMode: 'wordBuilder',
         cardLimit,
         dueCardIds,
@@ -521,7 +521,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
           <ArrowLeft size={22} color={colors.textPrimary} />
         </Pressable>
         <Text variant="h3" style={{ color: colors.textPrimary, fontWeight: '800' }}>
-          Word Builder
+          Собери слово
         </Text>
         <Pressable
           style={({ pressed }) => [

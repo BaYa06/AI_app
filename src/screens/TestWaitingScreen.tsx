@@ -23,6 +23,7 @@ import { supabase } from '@/services/supabaseClient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 import { API_BASE } from '@/config/apiBase';
+import { pluralize } from '@/utils';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TestWaiting'>;
 
@@ -32,9 +33,9 @@ const MAX_VISIBLE_AVATARS = 4;
 type Participant = { id: string; initials: string };
 
 const MODE_LABELS: Record<string, string> = {
-  multiple: 'Multiple Choice',
-  writing: 'Writing',
-  mixed: 'Mixed',
+  multiple: 'Выбор ответа',
+  writing: 'Письменный',
+  mixed: 'Смешанный',
 };
 
 export function TestWaitingScreen({ navigation, route }: Props) {
@@ -222,8 +223,8 @@ export function TestWaitingScreen({ navigation, route }: Props) {
   }, []);
 
   const timeText = timePerQuestion > 0
-    ? `${questionCount} questions • ${Math.round((timePerQuestion * questionCount) / 60)} min`
-    : `${questionCount} questions • No time limit`;
+    ? `${questionCount} ${pluralize(questionCount, 'вопрос', 'вопроса', 'вопросов')} • ${Math.round((timePerQuestion * questionCount) / 60)} мин`
+    : `${questionCount} ${pluralize(questionCount, 'вопрос', 'вопроса', 'вопросов')} • Без ограничения времени`;
 
   const cardBg = isDark ? 'rgba(255,255,255,0.05)' : '#FFFFFF';
   const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0';
@@ -249,7 +250,7 @@ export function TestWaitingScreen({ navigation, route }: Props) {
           <ArrowLeft size={22} color={colors.textPrimary} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-          Test Lobby
+          Ожидание теста
         </Text>
         <View style={{ width: 48 }} />
       </View>
@@ -301,10 +302,10 @@ export function TestWaitingScreen({ navigation, route }: Props) {
 
         {/* Title */}
         <Text style={[styles.title, { color: colors.textPrimary }]}>
-          Get Ready!
+          Приготовься!
         </Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          The test will begin shortly
+          Тест скоро начнётся
         </Text>
 
         {/* Set Info Card */}
@@ -393,8 +394,8 @@ export function TestWaitingScreen({ navigation, route }: Props) {
           </View>
           <Text style={[styles.avatarsLabel, { color: colors.textPrimary }]}>
             {participants.length <= 1
-              ? 'Just you joined'
-              : `You + ${participants.length - 1} others joined`}
+              ? 'Пока подключился только ты'
+              : `Ты и ещё ${participants.length - 1} ${pluralize(participants.length - 1, 'ученик', 'ученика', 'учеников')}`}
           </Text>
         </View>
       </View>
@@ -408,7 +409,7 @@ export function TestWaitingScreen({ navigation, route }: Props) {
       >
         <View style={styles.waitingRow}>
           <Text style={[styles.waitingText, { color: colors.primary }]}>
-            Waiting for teacher to start
+            Ждём, когда учитель начнёт
           </Text>
           <View style={styles.dotsRow}>
             <Animated.View
