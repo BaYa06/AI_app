@@ -3,12 +3,14 @@
  * @description Экран игры Match с базовой логикой сопоставления
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, StyleSheet, ScrollView, Pressable, Animated, Modal, Switch } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable, Animated, Modal } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { triggerHaptic } from '@/utils/haptic';
-import { ArrowLeft, Settings } from 'lucide-react-native';
-import { Container, Text, ProgressBar, Loading } from '@/components/common';
+import { Layers, Settings } from 'lucide-react-native';
+import { Container, Text, Loading } from '@/components/common';
+import { Button, EmptyState, ProgressBar, ScreenHeader, Switch } from '@/components/ui';
 import { useCardsStore, useSetsStore, useThemeColors, useSettingsStore } from '@/store';
-import { spacing, borderRadius } from '@/constants';
+import { spacing, borderRadius, heights, screenPadding, alpha } from '@/constants';
 import { DatabaseService } from '@/services';
 import { Analytics } from '@/services/analytics';
 import { playCorrectSound2 as playCorrectSound, preloadSound } from '@/utils/sound';
@@ -20,7 +22,7 @@ type Props = RootStackScreenProps<'Match'>;
 export function MatchScreen({ navigation, route }: Props) {
   const { setId, cardLimit, dueCardIds, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0 } = route.params;
   const colors = useThemeColors();
-  const theme = useSettingsStore((s) => s.resolvedTheme);
+  const insets = useSafeAreaInsets();
 
   // Генерируем phaseId при первом запуске (если не передан)
   const currentPhaseId = useRef(phaseId || `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
@@ -261,29 +263,16 @@ export function MatchScreen({ navigation, route }: Props) {
 
   return (
     <Container padded={false}>
-      <View
-        style={[
-          styles.header,
-          {
-            backgroundColor: colors.background,
-            borderBottomColor: colors.border,
-          },
-        ]}
-      >
-        <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={styles.iconButton}>
-          <ArrowLeft size={22} color={colors.textPrimary} />
-        </Pressable>
-        <Text variant="h3" style={{ color: colors.textPrimary }}>
-          Пары
-        </Text>
-        <Pressable hitSlop={8} style={styles.iconButton} onPress={openSettings}>
-          <Settings size={20} color={colors.textPrimary} />
-        </Pressable>
-      </View>
+      <ScreenHeader
+        title="Пары"
+        onBack={() => navigation.goBack()}
+        bordered
+        right={<Button variant="icon" icon={Settings} accessibilityLabel="Настройки" onPress={openSettings} />}
+      />
 
       <View style={styles.statusBlock}>
         <View style={styles.statusRow}>
-          <Text variant="bodySmall" style={{ color: colors.textPrimary, fontWeight: '700' }}>
+          <Text variant="bodySmall" style={[styles.semibold, { color: colors.textPrimary }]}>
             Пары: {matchedPairs}/{totalPairs || 0}
           </Text>
           <Text
@@ -293,7 +282,7 @@ export function MatchScreen({ navigation, route }: Props) {
             {formatTime(elapsed)}
           </Text>
         </View>
-        <ProgressBar progress={progress} height={8} />
+        <ProgressBar progress={progress} accessibilityLabel="Найдено пар" />
         {/* <Text
           variant="caption"
           color="secondary"
@@ -304,14 +293,9 @@ export function MatchScreen({ navigation, route }: Props) {
       </View>
 
       {emptyState ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>🃏</Text>
-          <Text variant="body" color="secondary" align="center">
-            В этом наборе пока нет карточек
-          </Text>
-        </View>
+        <EmptyState icon={Layers} title="В этом наборе пока нет карточек" />
       ) : (
-        <View style={[styles.contentWrapper, { paddingHorizontal: spacing.m }]}>
+        <View style={[styles.contentWrapper, { paddingHorizontal: screenPadding }]}>
           <View style={styles.grid}>
             <ScrollView
               style={styles.column}
@@ -327,14 +311,16 @@ export function MatchScreen({ navigation, route }: Props) {
                   <Animated.View key={card.id} style={{ opacity: fade }}>
                     <Pressable
                       disabled={isMatched || isComplete}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: isSelected, disabled: isMatched || isComplete }}
                       onPress={() => handleSelectLeft(card.id)}
                       style={({ pressed }) => [
                         styles.card,
                         {
                           backgroundColor: isMatched
-                            ? `${colors.success}1A`
+                            ? alpha(colors.success, 10)
                             : isSelected
-                              ? `${colors.primary}1A`
+                              ? alpha(colors.primary, 10)
                               : colors.surface,
                           borderColor: isMatched
                             ? colors.success
@@ -351,7 +337,7 @@ export function MatchScreen({ navigation, route }: Props) {
                           styles.cardText,
                           {
                             color: isMatched
-                              ? colors.success
+                              ? colors.successText
                               : isSelected
                                 ? colors.primary
                                 : colors.textPrimary,
@@ -381,14 +367,16 @@ export function MatchScreen({ navigation, route }: Props) {
                   <Animated.View key={`${card.id}-back`} style={{ opacity: fade }}>
                     <Pressable
                       disabled={isMatched || isComplete}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: isSelected, disabled: isMatched || isComplete }}
                       onPress={() => handleSelectRight(card.id)}
                       style={({ pressed }) => [
                         styles.card,
                         {
                           backgroundColor: isMatched
-                            ? `${colors.success}1A`
+                            ? alpha(colors.success, 10)
                             : isSelected
-                              ? `${colors.primary}1A`
+                              ? alpha(colors.primary, 10)
                               : colors.surface,
                           borderColor: isMatched
                             ? colors.success
@@ -405,7 +393,7 @@ export function MatchScreen({ navigation, route }: Props) {
                           styles.cardText,
                           {
                             color: isMatched
-                              ? colors.success
+                              ? colors.successText
                               : isSelected
                                 ? colors.primary
                                 : colors.textPrimary,
@@ -432,10 +420,10 @@ export function MatchScreen({ navigation, route }: Props) {
         onRequestClose={closeSettings}
       >
         <View style={styles.modalRoot}>
-          <Pressable style={styles.backdrop} onPress={closeSettings}>
+          <Pressable style={styles.backdrop} onPress={closeSettings} accessibilityLabel="Закрыть настройки">
             <Animated.View
               pointerEvents="none"
-              style={[styles.backdropTint, { opacity: backdropOpacity }]}
+              style={[styles.backdropTint, { backgroundColor: colors.overlay, opacity: backdropOpacity }]}
             />
           </Pressable>
 
@@ -445,31 +433,21 @@ export function MatchScreen({ navigation, route }: Props) {
               {
                 backgroundColor: colors.surface,
                 borderColor: colors.border,
+                paddingTop: insets.top + spacing.m,
                 transform: [{ translateY: sheetTranslate }],
               },
             ]}
           >
             <View style={styles.settingsRow}>
-              <Text style={[styles.settingsLabel, { color: colors.textPrimary }]}>Реверс</Text>
-              <Switch
-                value={reverseEnabled}
-                onValueChange={handleToggleReverse}
-                trackColor={{ false: colors.border, true: colors.primary }}
-                thumbColor={theme === 'dark' ? '#0f172a' : '#ffffff'}
-              />
+              <Text variant="body" style={[styles.semibold, { color: colors.textPrimary }]}>Реверс</Text>
+              <Switch value={reverseEnabled} onValueChange={handleToggleReverse} accessibilityLabel="Реверс" />
             </View>
           </Animated.View>
         </View>
       </Modal>
 
       <View
-        style={[
-          styles.bottomFade,
-          {
-            backgroundColor:
-              theme === 'dark' ? 'rgba(17, 24, 39, 0.65)' : 'rgba(255, 255, 255, 1)',
-          },
-        ]}
+        style={[styles.bottomFade, { backgroundColor: colors.background }]}
         pointerEvents="none"
       />
     </Container>
@@ -477,23 +455,11 @@ export function MatchScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.m,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
+  semibold: {
+    fontWeight: '600',
   },
   statusBlock: {
-    paddingHorizontal: spacing.m,
+    paddingHorizontal: screenPadding,
     paddingVertical: spacing.m,
     gap: spacing.xs,
   },
@@ -508,14 +474,14 @@ const styles = StyleSheet.create({
   grid: {
     flex: 1,
     flexDirection: 'row',
-    gap: spacing.m,
+    gap: spacing.s,
   },
   column: {
     flex: 1,
   },
   columnContent: {
-    gap: spacing.m,
-    paddingBottom: spacing.xl * 1.5,
+    gap: spacing.s,
+    paddingBottom: spacing.xxl,
   },
   card: {
     borderRadius: borderRadius.l,
@@ -525,24 +491,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cardText: {
-    fontWeight: '700',
-    lineHeight: 22,
+    fontWeight: '600',
   },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.xl,
-    gap: spacing.s,
-  },
-  emptyIcon: {
-    fontSize: 32,
-  },
+  // Мягкое затухание списка у нижнего края
   bottomFade: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
     height: 40,
+    opacity: 0.8,
   },
   modalRoot: {
     flex: 1,
@@ -552,32 +510,23 @@ const styles = StyleSheet.create({
   },
   backdropTint: {
     flex: 1,
-    backgroundColor: '#00000055',
   },
+  // Панель настроек выезжает сверху (формат прежний), без тени — её отделяет затемнение
   settingsSheet: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: spacing.m,
-    paddingTop: 50,
+    paddingHorizontal: screenPadding,
     paddingBottom: spacing.m,
     borderBottomWidth: 1,
     borderBottomLeftRadius: borderRadius.l,
     borderBottomRightRadius: borderRadius.l,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowOffset: { width: 0, height: 8 },
-    shadowRadius: 12,
-    elevation: 6,
   },
   settingsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  settingsLabel: {
-    fontSize: 16,
-    fontWeight: '700',
+    minHeight: heights.touch,
   },
 });
