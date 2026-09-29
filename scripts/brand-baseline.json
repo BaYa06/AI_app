@@ -1,34 +1,21 @@
 {
   "totals": {
-    "hex": 808,
-    "rgba": 351,
+    "hex": 726,
+    "rgba": 317,
     "isDark": 260,
-    "font": 343,
-    "weight": 171,
-    "radius": 157,
-    "alpha": 156,
-    "alert": 76,
-    "small": 104,
+    "font": 316,
+    "weight": 159,
+    "radius": 137,
+    "alpha": 151,
+    "alert": 61,
+    "small": 95,
     "emoji": 63,
-    "ion": 26,
-    "a11y": 106,
+    "ion": 25,
+    "a11y": 96,
     "en": 23,
-    "total": 2322
+    "total": 2127
   },
   "files": {
-    "src/screens/HomeScreen.new.tsx": {
-      "hex": 82,
-      "rgba": 34,
-      "font": 27,
-      "weight": 12,
-      "radius": 20,
-      "alpha": 5,
-      "alert": 15,
-      "small": 9,
-      "ion": 1,
-      "a11y": 10,
-      "total": 195
-    },
     "src/screens/TeacherCourseStatsScreen.tsx": {
       "hex": 60,
       "rgba": 24,

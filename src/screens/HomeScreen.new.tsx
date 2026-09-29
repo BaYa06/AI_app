@@ -3,8 +3,7 @@
  * @description Главная страница с современным дизайном
  */
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { View, StyleSheet, ScrollView, Pressable, TextInput, useWindowDimensions, TextInput as RNTextInput, Modal, Platform, Alert, Clipboard, Share, ActivityIndicator, RefreshControl } from 'react-native';
-import { showMessage } from '@/utils/dialogs';
+import { View, StyleSheet, ScrollView, Pressable, useWindowDimensions, TextInput as RNTextInput, Platform, Clipboard, Share, ActivityIndicator, RefreshControl } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -17,34 +16,37 @@ import { StudyModeSheet, DEFAULT_STUDY_MODE_GAMES, type StudyMode } from '@/comp
 import { CoursesDrawer } from '@/components/home/CoursesDrawer';
 import { animateDrawerTo, clampTranslateX, resolveDrawerOpen } from '@/components/home/drawerAnimation';
 import ReanimatedAnimated, { useSharedValue, withTiming, withSequence, withRepeat, useAnimatedStyle, Easing, withDelay, runOnJS } from 'react-native-reanimated';
-import { spacing, borderRadius, getDeckAccentColor } from '@/constants';
+import { spacing, borderRadius, heights, iconSize, typography, screenPadding, alpha, getDeckAccentColor } from '@/constants';
 import { triggerHaptic } from '@/utils/haptic';
+import { pluralize } from '@/utils';
+import { Button, Card as SurfaceCard, Badge, Dialog, EmptyState, ListRow, ProgressBar, Sheet, TextField, confirmDialog, toast } from '@/components/ui';
 import {
   Menu,
   Search,
   Plus,
-  Calendar,
-  ArrowRight,
   Library,
-  Star,
   Lightbulb,
-  Upload,
   MoreVertical,
   X,
   Eye,
   EyeOff,
   BookOpen,
-  File,
   Folder,
   Edit2,
-  Timer,
   ArrowUpDown,
   Check,
   RotateCcw,
   ChevronRight,
   Users,
+  Flame,
+  Gem,
+  Zap,
+  Crosshair,
+  Clock,
+  Play,
+  GraduationCap,
+  Trophy,
 } from 'lucide-react-native';
-import Ionicons from 'react-native-vector-icons/Ionicons';
 import { StreakService, getLocalDateKey } from '@/services/StreakService';
 import { supabase } from '@/services/supabaseClient';
 import { NeonService, type CourseLeaderboard } from '@/services/NeonService';
@@ -117,6 +119,7 @@ const SETS_COMPARATORS: Record<SetsSortKey, (a: CardSet, b: CardSet) => number> 
 
 /** «Забрать +10» на выполненной мини-игре — мягко пульсирует, пока награду не забрали */
 function ClaimButton({ onPress, buttonRef }: { onPress: () => void; buttonRef: (el: View | null) => void }) {
+  const colors = useThemeColors();
   const scale = useSharedValue(1);
   useEffect(() => {
     scale.value = withRepeat(
@@ -130,9 +133,15 @@ function ClaimButton({ onPress, buttonRef }: { onPress: () => void; buttonRef: (
   const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return (
     <ReanimatedAnimated.View style={style}>
-      <Pressable ref={buttonRef} style={styles.challengeClaimButton} onPress={onPress} accessibilityRole="button" accessibilityLabel="Забрать 10 алмазов">
-        <Text style={styles.challengeClaimText}>Забрать +10</Text>
-        <Ionicons name="diamond" size={13} color="#059669" />
+      <Pressable
+        ref={buttonRef}
+        style={[styles.challengeClaimButton, { backgroundColor: colors.onPrimary }]}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel="Забрать 10 алмазов"
+      >
+        <Text variant="label" style={{ color: colors.gameGreen }}>Забрать +10</Text>
+        <Gem size={iconSize.xs} color={colors.gameGreen} />
       </Pressable>
     </ReanimatedAnimated.View>
   );
@@ -161,18 +170,7 @@ function pickCardsForGame(cards: Card[], count: number): Card[] {
 
 export function HomeScreen({ navigation }: any) {
   const colors = useThemeColors();
-  const resolvedTheme = useSettingsStore((s) => s.resolvedTheme);
-  const isDarkMode = resolvedTheme === 'dark';
-  const headerBackground = isDarkMode ? 'rgba(0, 0, 0, 0)' : 'rgb(255, 255, 255)';
-  const backdropColor = isDarkMode ? 'rgba(6, 8, 20, 0.65)' : 'rgba(0, 0, 0, 0.35)';
-  const modalSurface = isDarkMode ? 'rgb(32, 34, 44)' : colors.surface;
-  const modalBorder = isDarkMode ? 'rgba(255,255,255,0.08)' : colors.border;
-  const modalTextPrimary = isDarkMode ? '#F8FAFC' : colors.textPrimary;
-  const modalTextSecondary = isDarkMode ? '#A8B3C1' : colors.textSecondary;
-  const modalHandleColor = isDarkMode ? '#4b5563' : '#cbd5e1';
-  const modalOverlayBg = isDarkMode ? 'rgba(0, 0, 0, 0.85)' : 'rgba(0, 0, 0, 0.5)';
-  const drawerBackground = isDarkMode ? '#15192f' : colors.surface;
-  const drawerBorder = isDarkMode ? 'rgba(255,255,255,0.08)' : colors.border;
+  const isDarkMode = useSettingsStore((s) => s.resolvedTheme) === 'dark';
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [setsSort, setSetsSort] = useState<SetsSortKey>(loadSetsSort);
@@ -273,14 +271,14 @@ export function HomeScreen({ navigation }: any) {
     triggerHaptic('selection');
     const allSets = useSetsStore.getState().getAllSets();
     if (allSets.length === 0) {
-      Alert.alert('Нет наборов', 'Сначала создай набор с карточками');
+      toast.info('Нет наборов — сначала создай набор с карточками');
       return;
     }
     const firstSetId = allSets[0].id;
 
     const allCards = Object.values(useCardsStore.getState().cards);
     if (allCards.length < 4) {
-      Alert.alert('Мало карточек', 'Добавь хотя бы 4 карточки чтобы играть в челлендж');
+      toast.info('Мало карточек — добавь хотя бы 4, чтобы играть в челлендж');
       return;
     }
 
@@ -318,7 +316,7 @@ export function HomeScreen({ navigation }: any) {
         pendingDiamondsRef.current = null;
         setDiamonds(balanceBefore);
         useChallengeStore.getState().revertClaim(id);
-        Alert.alert('Нет соединения', 'Награда не получена — попробуй ещё раз, когда появится интернет.');
+        toast.error('Нет соединения. Награда не получена — попробуй ещё раз, когда появится интернет');
         return;
       }
       // Точный баланс с сервера: если анимация ещё летит — применится по её окончании
@@ -335,13 +333,12 @@ export function HomeScreen({ navigation }: any) {
     const result = await NeonService.buyStreakFreeze();
     setBuyingFreeze(false);
     if (!result) {
-      Alert.alert('Нет соединения', 'Попробуй ещё раз.');
+      toast.error('Нет соединения. Попробуй ещё раз');
     } else if ('error' in result) {
-      Alert.alert(
-        result.error === 'max_freezes' ? 'Уже максимум' : 'Не хватает алмазов',
+      toast.info(
         result.error === 'max_freezes'
-          ? `В запасе может быть не больше ${MAX_STREAK_FREEZES} заморозок.`
-          : `Заморозка стоит ${STREAK_FREEZE_PRICE} алмазов — их дают за мини-игры.`,
+          ? `Уже максимум: в запасе может быть не больше ${MAX_STREAK_FREEZES} заморозок`
+          : `Не хватает алмазов: заморозка стоит ${STREAK_FREEZE_PRICE} — их дают за мини-игры`,
       );
     } else {
       triggerHaptic('notificationSuccess');
@@ -354,14 +351,14 @@ export function HomeScreen({ navigation }: any) {
     triggerHaptic('selection');
     const allSets = useSetsStore.getState().getAllSets();
     if (allSets.length === 0) {
-      Alert.alert('Нет наборов', 'Сначала создай набор с карточками');
+      toast.info('Нет наборов — сначала создай набор с карточками');
       return;
     }
     const firstSetId = allSets[0].id;
 
     const allCards = Object.values(useCardsStore.getState().cards);
     if (allCards.length < 4) {
-      Alert.alert('Мало карточек', 'Добавь хотя бы 4 карточки');
+      toast.info('Мало карточек — добавь хотя бы 4');
       return;
     }
 
@@ -379,7 +376,7 @@ export function HomeScreen({ navigation }: any) {
     triggerHaptic('selection');
     const allSets = useSetsStore.getState().getAllSets();
     if (allSets.length === 0) {
-      Alert.alert('Нет наборов', 'Сначала создай набор с карточками');
+      toast.info('Нет наборов — сначала создай набор с карточками');
       return;
     }
     const firstSetId = allSets[0].id;
@@ -394,11 +391,11 @@ export function HomeScreen({ navigation }: any) {
     });
 
     if (forgottenCards.length === 0) {
-      Alert.alert('Всё свежо! \uD83C\uDF89', 'Нет забытых карточек — ты недавно всё повторил');
+      toast.success('Всё свежо! Нет забытых карточек — ты недавно всё повторил');
       return;
     }
     if (forgottenCards.length < 4) {
-      Alert.alert('Мало карточек', 'Нужно минимум 4 забытых карточки для игры');
+      toast.info('Мало карточек — нужно минимум 4 забытых карточки для игры');
       return;
     }
 
@@ -833,38 +830,8 @@ export function HomeScreen({ navigation }: any) {
     }
   }, [isCreatingCourse]);
   
-  const safeBottomPad = 0; // убираем нижний safe-area/паддинг
-  const TAB_BAR_HEIGHT = 46;
-
-  // Базовый стиль нижней навигации (должен совпадать с AppNavigator)
-  const baseTabBarStyle = useMemo(
-    () => ({
-      backgroundColor: 'rgba(0, 0, 0, 0)',
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
-      paddingBottom: safeBottomPad,
-      paddingTop: 6,
-      height: TAB_BAR_HEIGHT,
-      marginBottom: 20,
-    }),
-    [colors, safeBottomPad, TAB_BAR_HEIGHT]
-  );
-
-  // Прячем tab bar, когда открыт боковой drawer
-  useEffect(() => {
-    const parent = navigation?.getParent?.();
-    if (!parent?.setOptions) return;
-
-    parent.setOptions({
-      tabBarStyle: drawerOpen
-        ? { ...baseTabBarStyle, display: 'none' }
-        : baseTabBarStyle,
-    });
-
-    return () => {
-      parent.setOptions({ tabBarStyle: baseTabBarStyle });
-    };
-  }, [drawerOpen, navigation, baseTabBarStyle]);
+  // Стиль панели вкладок задаёт только AppNavigator (шаг брендбука 1.6). Боковая панель —
+  // отдельный Modal поверх всего экрана, прятать панель вкладок под ней не нужно.
   
   const updateSetStats = useSetsStore((s) => s.updateSetStats);
   const updateSet = useSetsStore((s) => s.updateSet);
@@ -880,7 +847,7 @@ export function HomeScreen({ navigation }: any) {
       await NeonService.toggleSetHiddenFromStudents(set.id, newHidden);
     } catch {
       updateSet(set.id, { isHiddenFromStudents: !newHidden });
-      Alert.alert('Ошибка', 'Не удалось изменить видимость набора');
+      toast.error('Не удалось изменить видимость набора');
     }
   }, [updateSet]);
 
@@ -1032,7 +999,7 @@ export function HomeScreen({ navigation }: any) {
     if (!deleteModalCourse || !deleteModalStats) return '';
     if (deleteModalHasSets) {
       const setWord = formatSetWord(deleteModalStats.setCount);
-      return `В курсе "${deleteModalCourse.title}" ${deleteModalStats.setCount} ${setWord}. Переместите наборы в другие курсы или удалите их.`;
+      return `В курсе "${deleteModalCourse.title}" ${deleteModalStats.setCount} ${setWord}. Перемести наборы в другие курсы или удали их.`;
     }
     return `Удалить курс "${deleteModalCourse.title}"?`;
   }, [deleteModalCourse, deleteModalHasSets, deleteModalStats, formatSetWord]);
@@ -1067,34 +1034,28 @@ export function HomeScreen({ navigation }: any) {
     setInviteJoinCode(null);
   }, []);
 
-  const handleRegenerateInvite = useCallback(() => {
+  const handleRegenerateInvite = useCallback(async () => {
     if (!inviteModalCourseId) return;
-    Alert.alert(
-      'Обновить код приглашения?',
-      'Старые ссылка и код перестанут работать — ученики, у которых они есть, больше не смогут по ним присоединиться.',
-      [
-        { text: 'Отмена', style: 'cancel' },
-        {
-          text: 'Обновить',
-          style: 'destructive',
-          onPress: async () => {
-            setInviteRegenerating(true);
-            setInviteCopied(false);
-            try {
-              const result = await NeonService.regenerateCourseInvite(inviteModalCourseId);
-              if (result) {
-                setInviteToken(result.token);
-                setInviteJoinCode(result.joinCode);
-              } else {
-                Alert.alert('Ошибка', 'Не удалось обновить код приглашения');
-              }
-            } finally {
-              setInviteRegenerating(false);
-            }
-          },
-        },
-      ]
-    );
+    const confirmed = await confirmDialog({
+      title: 'Обновить код приглашения?',
+      message: 'Старые ссылка и код перестанут работать — ученики, у которых они есть, больше не смогут по ним присоединиться.',
+      confirmText: 'Обновить',
+      destructive: true,
+    });
+    if (!confirmed) return;
+    setInviteRegenerating(true);
+    setInviteCopied(false);
+    try {
+      const result = await NeonService.regenerateCourseInvite(inviteModalCourseId);
+      if (result) {
+        setInviteToken(result.token);
+        setInviteJoinCode(result.joinCode);
+      } else {
+        toast.error('Не удалось обновить код приглашения');
+      }
+    } finally {
+      setInviteRegenerating(false);
+    }
   }, [inviteModalCourseId]);
 
   // Обработка удаления курса через модальное окно
@@ -1132,7 +1093,7 @@ export function HomeScreen({ navigation }: any) {
       const { data } = await supabase.auth.getSession();
       const userId = data.session?.user?.id;
       if (!userId) {
-        Alert.alert('Нужно войти', 'Войдите в аккаунт, чтобы выйти из курса.');
+        toast.info('Войди в аккаунт, чтобы выйти из курса');
         return;
       }
 
@@ -1143,10 +1104,10 @@ export function HomeScreen({ navigation }: any) {
         // Юнит учебника мог быть открыт и в другом курсе — вернуть его туда после локальной чистки
         BookService.syncOfficialSets().catch(() => {});
       } else {
-        Alert.alert('Ошибка', 'Не удалось выйти из курса. Попробуйте ещё раз.');
+        toast.error('Не удалось выйти из курса. Попробуй ещё раз');
       }
     } catch {
-      Alert.alert('Ошибка', 'Не удалось выйти из курса.');
+      toast.error('Не удалось выйти из курса');
     } finally {
       setLeaveLoading(false);
     }
@@ -1250,15 +1211,19 @@ export function HomeScreen({ navigation }: any) {
   // Баннер учителя — вход в курс (ученики, приглашения, тесты, «Учебники курса»). Показывается и
   // когда в курсе ещё нет наборов: иначе в новом пустом курсе до него было не добраться.
   const teacherBanner = (
-    <View style={{ paddingHorizontal: spacing.m, paddingTop: spacing.m, paddingBottom: spacing.s }}>
+    <View style={styles.teacherBannerWrap}>
       <Pressable
-        style={styles.teacherBanner}
+        accessibilityRole="button"
+        style={({ pressed }) => [
+          styles.teacherBanner,
+          { backgroundColor: pressed ? colors.primaryPressed : colors.primaryFill },
+        ]}
         onPress={() => {
           const ownCourses = courses.filter(c => !c.isStudentCourse);
           const targetCourse = ownCourses.find(c => c.id === activeCourseId) ?? ownCourses[0];
 
           if (!targetCourse) {
-            showMessage('Нет курсов', 'Сначала создайте курс, чтобы открыть статистику учителя.');
+            toast.info('Нет курсов — сначала создай курс, чтобы открыть статистику учителя');
             return;
           }
 
@@ -1270,16 +1235,18 @@ export function HomeScreen({ navigation }: any) {
         }}
       >
         <View style={styles.teacherBannerLeft}>
-          <View style={styles.teacherBannerIcon}>
-            <Ionicons name="school-outline" size={22} color="#FFFFFF" />
+          <View style={[styles.teacherBannerIcon, { backgroundColor: alpha(colors.onPrimary, 20) }]}>
+            <GraduationCap size={iconSize.s} color={colors.onPrimary} />
           </View>
-          <View>
-            <Text style={styles.teacherBannerTitle}>Режим учителя</Text>
-            <Text style={styles.teacherBannerSubtitle}>Ученики, наборы и тесты</Text>
+          <View style={styles.flexShrink}>
+            <Text variant="label" style={{ color: colors.onPrimary }}>Режим учителя</Text>
+            <Text variant="caption" style={[styles.onFillMuted, { color: colors.onPrimary }]}>
+              Ученики, наборы и тесты
+            </Text>
           </View>
         </View>
-        <View style={styles.teacherBannerButton}>
-          <Text style={styles.teacherBannerButtonText}>Мои курсы →</Text>
+        <View style={[styles.teacherBannerButton, { backgroundColor: colors.onPrimary }]}>
+          <Text variant="caption" style={[styles.semibold, { color: colors.primaryFill }]}>Мои курсы →</Text>
         </View>
       </Pressable>
     </View>
@@ -1292,15 +1259,16 @@ export function HomeScreen({ navigation }: any) {
     const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     return Math.max(1, Math.ceil((midnight.getTime() - now.getTime()) / 3_600_000));
   })();
-  const renderChallengeCard = ({ id, title, badge, icon, accent, onPlay }: {
+  const renderChallengeCard = ({ id, title, badge, icon: ChallengeIcon, accent, onPlay }: {
     id: ChallengeId;
     title: string;
     badge: string;
-    icon: React.ReactNode;
+    icon: typeof Zap;
     accent: string;
     onPlay: () => void;
   }) => {
     const status = challengeStatuses[id];
+    const onFillSoft = alpha(colors.onPrimary, 20);
     if (status === 'pending') {
       return (
         <Pressable
@@ -1311,19 +1279,21 @@ export function HomeScreen({ navigation }: any) {
           accessibilityLabel={`${title}. ${badge}. Награда 10 алмазов`}
         >
           <View style={styles.challengeTopRow}>
-            <View style={styles.challengeIconCircle}>{icon}</View>
-            <View style={styles.challengeBadge}>
-              <Text style={styles.challengeBadgeText}>{badge}</Text>
+            <View style={[styles.challengeIconCircle, { backgroundColor: onFillSoft }]}>
+              <ChallengeIcon size={iconSize.s} color={colors.onPrimary} />
+            </View>
+            <View style={[styles.challengeBadge, { backgroundColor: onFillSoft }]}>
+              <Text variant="caption" style={[styles.semibold, { color: colors.onPrimary }]}>{badge}</Text>
             </View>
           </View>
-          <Text style={styles.challengeTitle} numberOfLines={2}>{title}</Text>
+          <Text style={[styles.challengeTitle, { color: colors.onPrimary }]} numberOfLines={2}>{title}</Text>
           <View style={styles.challengeBottomRow}>
-            <View style={styles.challengeReward}>
-              <Ionicons name="diamond" size={12} color="#FFFFFF" />
-              <Text style={styles.challengeRewardText}>+10</Text>
+            <View style={[styles.challengeReward, { backgroundColor: onFillSoft }]}>
+              <Gem size={iconSize.xs} color={colors.onPrimary} />
+              <Text variant="caption" style={[styles.bold, { color: colors.onPrimary }]}>+10</Text>
             </View>
-            <View style={styles.challengePlay}>
-              <Ionicons name="play" size={14} color={accent} style={{ marginLeft: 2 }} />
+            <View style={[styles.challengePlay, { backgroundColor: colors.onPrimary }]}>
+              <Play size={iconSize.xs} color={accent} fill={accent} style={styles.playIconNudge} />
             </View>
           </View>
         </Pressable>
@@ -1331,16 +1301,16 @@ export function HomeScreen({ navigation }: any) {
     }
     if (status === 'completed') {
       return (
-        <View key={id} style={[styles.challengeCard, styles.challengeCardCompleted]}>
+        <View key={id} style={[styles.challengeCard, { backgroundColor: colors.gameGreen }]}>
           <View style={styles.challengeTopRow}>
-            <View style={[styles.challengeIconCircle, { backgroundColor: '#FFFFFF' }]}>
-              <Ionicons name="checkmark" size={20} color="#059669" />
+            <View style={[styles.challengeIconCircle, { backgroundColor: colors.onPrimary }]}>
+              <Check size={iconSize.s} color={colors.gameGreen} />
             </View>
-            <View style={styles.challengeBadge}>
-              <Text style={styles.challengeBadgeText}>Выполнено</Text>
+            <View style={[styles.challengeBadge, { backgroundColor: onFillSoft }]}>
+              <Text variant="caption" style={[styles.semibold, { color: colors.onPrimary }]}>Выполнено</Text>
             </View>
           </View>
-          <Text style={styles.challengeTitle} numberOfLines={2}>{title}</Text>
+          <Text style={[styles.challengeTitle, { color: colors.onPrimary }]} numberOfLines={2}>{title}</Text>
           <ClaimButton
             buttonRef={(el) => { claimBtnRefs.current[id] = el; }}
             onPress={() => handleChallengeClaim(id)}
@@ -1355,14 +1325,14 @@ export function HomeScreen({ navigation }: any) {
         accessibilityLabel={`${title}: награда получена, снова через ${hoursUntilTomorrow} ч`}
       >
         <View style={styles.challengeTopRow}>
-          <View style={[styles.challengeIconCircle, { backgroundColor: colors.success + '22' }]}>
-            <Ionicons name="checkmark" size={20} color={colors.success} />
+          <View style={[styles.challengeIconCircle, { backgroundColor: alpha(colors.success, 10) }]}>
+            <Check size={iconSize.s} color={colors.successText} />
           </View>
-          <Text style={[styles.challengeDoneLabel, { color: colors.success }]}>Получено</Text>
+          <Text variant="caption" style={[styles.semibold, { color: colors.successText }]}>Получено</Text>
         </View>
         <Text style={[styles.challengeTitle, { color: colors.textSecondary }]} numberOfLines={2}>{title}</Text>
         <View style={styles.challengeBottomRow}>
-          <Text style={[styles.challengeAgainText, { color: colors.textTertiary }]}>
+          <Text variant="caption" style={{ color: colors.textTertiary }}>
             Снова через {hoursUntilTomorrow} ч
           </Text>
         </View>
@@ -1370,81 +1340,105 @@ export function HomeScreen({ navigation }: any) {
     );
   };
 
+  // Кнопки закрытия окон — одна и та же «тихая» кнопка-иконка
+  const closeButton = (onPress: () => void, disabled?: boolean) => (
+    <Button
+      variant="icon"
+      icon={X}
+      background="none"
+      iconSize={iconSize.s}
+      iconColor={colors.textSecondary}
+      accessibilityLabel="Закрыть"
+      onPress={onPress}
+      disabled={disabled}
+    />
+  );
+
+  const copyToClipboard = (text: string) => {
+    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+    } else {
+      Clipboard.setString(text);
+    }
+  };
+
+  const leaveModalCourseTitle = courses.find((c) => c.id === leaveModalCourseId)?.title ?? '';
+
   return (
     <GestureDetector gesture={rootGesture}>
-      <View
-        style={[
-          styles.container,
-          { backgroundColor: colors.background },
-        ]}
-      >
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View
-        style={[
-          styles.header,
-          { backgroundColor: headerBackground, borderBottomColor: colors.border },
-        ]}
-      >
-        <View style={styles.headerLeft}>
-          <Pressable style={styles.menuButton} onPress={() => setDrawerOpen(true)}>
-            <Menu size={24} color={colors.textPrimary} />
-          </Pressable>
-        </View>
-        
-          <View style={styles.headerCenter}>
-          <View style={styles.headerBadges}>
-            <Pressable style={styles.badge} onPress={() => setStreakModalVisible(true)}>
-              <Ionicons name="flame" size={24} color={todayGoalReached ? (isDarkMode ? '#FBBF24' : '#EA580C') : (isDarkMode ? '#6B7280' : '#9CA3AF')} />
-              <Text style={[styles.badgeText, { color: todayGoalReached ? (isDarkMode ? '#FDE68A' : '#C2410C') : (isDarkMode ? '#9CA3AF' : '#6B7280') }]}>
-                {formatDays(streakValue)}
-              </Text>
-            </Pressable>
+      <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+        <Button variant="icon" icon={Menu} background="none" accessibilityLabel="Курсы" onPress={() => setDrawerOpen(true)} />
 
-            <View
-              ref={diamondIconRef}
-              style={styles.badge}
-              onLayout={() => {
-                diamondIconRef.current?.measureInWindow((x, y, w, h) => {
-                  setDiamondTargetPos({ x: x + w / 2, y: y + h / 2 });
-                });
-              }}
-            >
-              <Ionicons name="diamond" size={24} color={isDarkMode ? '#A5B4FC' : '#4F46E5'} />
-              <ReanimatedAnimated.View style={diamondCountAnimStyle}>
-                <Text style={[styles.badgeText, { color: isDarkMode ? '#E0E7FF' : '#312E81' }]}>
-                  {diamonds}
-                </Text>
-              </ReanimatedAnimated.View>
-            </View>
+        <View style={styles.headerCenter}>
+          <Pressable
+            style={styles.headerStat}
+            onPress={() => setStreakModalVisible(true)}
+            accessibilityRole="button"
+            accessibilityLabel={`Серия: ${formatDays(streakValue)}`}
+          >
+            <Flame size={iconSize.m} color={todayGoalReached ? colors.streak : colors.textTertiary} />
+            <Text style={[styles.headerStatText, { color: todayGoalReached ? colors.textPrimary : colors.textSecondary }]}>
+              {formatDays(streakValue)}
+            </Text>
+          </Pressable>
+
+          <View
+            ref={diamondIconRef}
+            style={styles.headerStat}
+            accessible
+            accessibilityLabel={`Алмазы: ${diamonds}`}
+            onLayout={() => {
+              diamondIconRef.current?.measureInWindow((x, y, w, h) => {
+                setDiamondTargetPos({ x: x + w / 2, y: y + h / 2 });
+              });
+            }}
+          >
+            <Gem size={iconSize.m} color={colors.diamond} />
+            <ReanimatedAnimated.View style={diamondCountAnimStyle}>
+              <Text style={[styles.headerStatText, { color: colors.textPrimary }]}>
+                {diamonds}
+              </Text>
+            </ReanimatedAnimated.View>
           </View>
         </View>
-        
+
         <View style={styles.headerRight}>
-          <Pressable
-            style={styles.iconButton}
+          <Button
+            variant="icon"
+            icon={Search}
+            background="none"
+            iconSize={iconSize.s}
+            accessibilityLabel="Поиск по наборам"
             onPress={() => setSearchVisible(!searchVisible)}
-          >
-            <Search size={20} color={colors.textPrimary} />
-          </Pressable>
+          />
           <Pressable
-            style={styles.addButton}
+            style={({ pressed }) => [
+              styles.addButton,
+              { backgroundColor: pressed ? colors.primaryPressed : colors.primaryFill },
+            ]}
+            hitSlop={spacing.xxs}
+            accessibilityRole="button"
+            accessibilityLabel="Создать набор"
             onPress={() => { triggerHaptic('selection'); navigation?.navigate('SetEditor', {}); }}
           >
-            <Plus size={18} color="#FFFFFF" strokeWidth={2.5} />
+            <Plus size={iconSize.s} color={colors.onPrimary} strokeWidth={2.5} />
           </Pressable>
         </View>
       </View>
 
       {/* Search Bar */}
       {searchVisible && (
-        <View style={[styles.searchBar, { backgroundColor: colors.surface }]}>
-          <TextInput
-            style={[styles.searchInput, { color: colors.textPrimary }, Platform.OS === 'web' && { outlineStyle: 'none' }]}
+        <View style={styles.searchBar}>
+          <TextField
+            variant="search"
             placeholder="Поиск по наборам..."
-            placeholderTextColor={colors.textSecondary}
             value={searchQuery}
             onChangeText={setSearchQuery}
+            // Поиск — исключение из правила «клавиатура не открывается сама»
             autoFocus
+            inputStyle={Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : undefined}
           />
         </View>
       )}
@@ -1458,7 +1452,7 @@ export function HomeScreen({ navigation }: any) {
       <View style={styles.body}>
         {/* Overlay to close search when tapping outside */}
         {searchVisible && (
-          <Pressable style={styles.searchOverlay} onPress={() => setSearchVisible(false)} />
+          <Pressable style={styles.searchOverlay} onPress={() => setSearchVisible(false)} accessibilityLabel="Закрыть поиск" />
         )}
 
         <ScrollView
@@ -1478,73 +1472,40 @@ export function HomeScreen({ navigation }: any) {
         {visibleSets.length === 0 ? (
           <>
           {isTeacher === true && teacherBanner}
-          <View style={styles.emptyStateModern}>
-            <View style={styles.illustrationWrap}>
-              <View style={[styles.illustrationGlow, { backgroundColor: colors.primary + '22' }]} />
-              <View style={[styles.illustrationCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <Library size={56} color={colors.primary} />
-              </View>
-              <View style={[styles.illustrationBadge, styles.badgeStar, { backgroundColor: '#facc15' }]}>
-                <Star size={24} color="#fff" />
-              </View>
-              <View style={[styles.illustrationBadge, styles.badgePlus, { backgroundColor: colors.primary }]}>
-                <Plus size={24} color="#fff" />
-              </View>
-            </View>
-
-            <View style={styles.emptyTextBlock}>
-              <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
-                Пока нет наборов
-              </Text>
-              <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+          <EmptyState
+            icon={Library}
+            title="Пока нет наборов"
+            description={
+              isTeacher
+                ? 'Создай первый набор, чтобы начать учиться и упорядочить материалы по курсам.'
+                : 'Создай свой набор слов или подключись к курсу учителя — его наборы появятся здесь.'
+            }
+            action={{ label: 'Создать набор', icon: Plus, onPress: () => navigation?.navigate('SetEditor', {}) }}
+            // Новичку — второй путь: не создавать, а подключиться к курсу учителя по коду
+            secondaryAction={
+              isTeacher !== true
+                ? {
+                    label: 'Подключиться к курсу',
+                    icon: Users,
+                    onPress: () => {
+                      triggerHaptic('selection');
+                      setJoinByCodeVisible(true);
+                    },
+                  }
+                : undefined
+            }
+          />
+          <SurfaceCard style={[styles.tipCard, { backgroundColor: alpha(colors.primary, 10) }]}>
+            <Lightbulb size={iconSize.s} color={colors.primary} />
+            <View style={styles.flex1}>
+              <Text variant="label" style={[styles.tipTitle, { color: colors.textPrimary }]}>Подсказка</Text>
+              <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
                 {isTeacher
-                  ? 'Создайте первый набор, чтобы начать учиться и упорядочить материалы по курсам.'
-                  : 'Создайте свой набор слов или подключитесь к курсу учителя — его наборы появятся здесь.'}
+                  ? 'Курс пустой? Через «Режим учителя» выше можно пригласить учеников и подключить учебник — наборы для этого не нужны.'
+                  : 'Объединяй несколько наборов в курс — так проще учиться по теме или семестру.'}
               </Text>
             </View>
-
-            <View style={styles.emptyActions}>
-              <Pressable
-                style={[styles.primaryButton, { backgroundColor: colors.primary }]}
-                onPress={() => navigation?.navigate('SetEditor', {})}
-              >
-                <Plus size={20} color="#fff" />
-                <Text style={styles.primaryButtonText}>Создать набор</Text>
-              </Pressable>
-
-              {/* Новичку — второй путь: не создавать, а подключиться к курсу учителя по коду */}
-              {isTeacher !== true && (
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.secondaryButton,
-                    { borderColor: colors.primary, opacity: pressed ? 0.7 : 1 },
-                  ]}
-                  onPress={() => {
-                    triggerHaptic('selection');
-                    setJoinByCodeVisible(true);
-                  }}
-                >
-                  <Users size={20} color={colors.primary} />
-                  <Text style={[styles.secondaryButtonText, { color: colors.primary }]}>
-                    Подключиться к курсу
-                  </Text>
-                </Pressable>
-              )}
-
-
-              <View style={[styles.tipCard, { borderColor: colors.border, backgroundColor: colors.primary + '0D' }]}>
-                <Lightbulb size={18} color={colors.primary} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.tipTitle, { color: colors.textPrimary }]}>Подсказка</Text>
-                  <Text style={[styles.tipText, { color: colors.textSecondary }]}>
-                    {isTeacher
-                      ? 'Курс пустой? Через «Режим учителя» выше можно пригласить учеников и подключить учебник — наборы для этого не нужны.'
-                      : 'Объединяйте несколько наборов в курс — так проще учиться по теме или семестру.'}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </View>
+          </SurfaceCard>
           </>
         ) : (
           <>
@@ -1557,86 +1518,91 @@ export function HomeScreen({ navigation }: any) {
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.challengesScrollContent}
-                  snapToInterval={136 + 12}
+                  snapToInterval={CHALLENGE_CARD_WIDTH + spacing.s}
                   decelerationRate="fast"
                 >
                   {renderChallengeCard({
                     id: 'quick_round',
                     title: 'Быстрый раунд',
                     badge: '2 минуты',
-                    icon: <Ionicons name="flash" size={18} color="#FFFFFF" />,
-                    accent: '#7C3AED',
+                    icon: Zap,
+                    accent: colors.gameViolet,
                     onPlay: handleQuickRound,
                   })}
                   {renderChallengeCard({
                     id: 'sniper',
                     title: 'Снайпер',
                     badge: '5 подряд',
-                    icon: <Ionicons name="locate" size={18} color="#FFFFFF" />,
-                    accent: '#BE123C',
+                    icon: Crosshair,
+                    accent: colors.gameRose,
                     onPlay: handleSniperChallenge,
                   })}
                   {renderChallengeCard({
                     id: 'forgotten',
                     title: 'Вспомни забытое',
                     badge: '7+ дней',
-                    icon: <Ionicons name="time" size={18} color="#FFFFFF" />,
-                    accent: '#0E7490',
+                    icon: Clock,
+                    accent: colors.gameTeal,
                     onPlay: handleForgottenChallenge,
                   })}
                 </ScrollView>
 
                 {ratingTeaser && (
-                  <Pressable
+                  <SurfaceCard
                     onPress={() => openLeaderboard(ratingTeaser.week)}
-                    style={[styles.ratingTeaser, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                    padding="s"
+                    style={styles.ratingTeaser}
                     accessibilityLabel={`${ratingTeaser.title}. ${ratingTeaser.hint}`}
                   >
-                    <View style={styles.ratingTeaserIcon}>
-                      <Ionicons name="trophy" size={18} color="#B45309" />
-                      {ratingTeaser.dot && <View style={[styles.ratingTeaserDot, { borderColor: colors.surface }]} />}
+                    <View style={[styles.ratingTeaserIcon, { backgroundColor: alpha(colors.star, 20) }]}>
+                      <Trophy size={iconSize.s} color={colors.warningText} />
+                      {ratingTeaser.dot && (
+                        <View style={[styles.ratingTeaserDot, { backgroundColor: colors.error, borderColor: colors.surface }]} />
+                      )}
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.ratingTeaserTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                    <View style={styles.flex1}>
+                      <Text variant="body" style={[styles.semibold, { color: colors.textPrimary }]} numberOfLines={1}>
                         {ratingTeaser.title}
                       </Text>
-                      <Text style={[styles.ratingTeaserHint, { color: colors.textSecondary }]} numberOfLines={1}>
+                      <Text variant="caption" style={{ color: colors.textSecondary }} numberOfLines={1}>
                         {ratingTeaser.hint}
                       </Text>
                     </View>
-                    <Text style={[styles.ratingTeaserBadge, { color: colors.primary }]}>{ratingTeaser.badge}</Text>
-                    <ChevronRight size={18} color={colors.textTertiary} />
-                  </Pressable>
+                    <Text variant="h3" style={[styles.bold, { color: colors.primary }]}>{ratingTeaser.badge}</Text>
+                    <ChevronRight size={iconSize.xs} color={colors.textTertiary} />
+                  </SurfaceCard>
                 )}
 
-                <View style={styles.allChallengesButtonContainer}>
+                <View style={styles.reviewActions}>
                   {reviewStats.waiting.length > 0 ? (
-                    <>
-                      <Pressable style={[styles.allChallengesButton, styles.dailyReviewButton]} onPress={handleDailyReview}>
-                        <Text style={styles.dailyReviewTitle}>
-                          Повторение дня · {Math.min(reviewStats.waiting.length, DAILY_REVIEW_MAX)} слов · ~{Math.max(1, Math.round(Math.min(reviewStats.waiting.length, DAILY_REVIEW_MAX) / 4))} мин
+                    <Pressable
+                      accessibilityRole="button"
+                      style={({ pressed }) => [
+                        styles.dailyReviewButton,
+                        { backgroundColor: pressed ? colors.primaryPressed : colors.primaryFill },
+                      ]}
+                      onPress={handleDailyReview}
+                    >
+                      <Text style={[typography.button, styles.noLetterSpacing, { color: colors.onPrimary }]}>
+                        Повторение дня · {Math.min(reviewStats.waiting.length, DAILY_REVIEW_MAX)} слов · ~{Math.max(1, Math.round(Math.min(reviewStats.waiting.length, DAILY_REVIEW_MAX) / 4))} мин
+                      </Text>
+                      {(reviewStats.fading > 0 || reviewStats.waiting.length > DAILY_REVIEW_MAX) && (
+                        <Text variant="bodySmall" style={[styles.onFillMuted, { color: colors.onPrimary }]}>
+                          {[
+                            reviewStats.fading > 0 ? `${reviewStats.fading} начинают забываться` : null,
+                            reviewStats.waiting.length > DAILY_REVIEW_MAX ? `всего ждут ${reviewStats.waiting.length}` : null,
+                          ].filter(Boolean).join(' · ')}
                         </Text>
-                        {(reviewStats.fading > 0 || reviewStats.waiting.length > DAILY_REVIEW_MAX) && (
-                          <Text style={styles.dailyReviewSubtitle}>
-                            {[
-                              reviewStats.fading > 0 ? `${reviewStats.fading} начинают забываться` : null,
-                              reviewStats.waiting.length > DAILY_REVIEW_MAX ? `всего ждут ${reviewStats.waiting.length}` : null,
-                            ].filter(Boolean).join(' · ')}
-                          </Text>
-                        )}
-                      </Pressable>
-                      {/* «Учить все карточки» — только когда повторение дня закончено: сначала старые слова */}
-                    </>
+                      )}
+                    </Pressable>
                   ) : (
                     <>
                       {reviewStats.all.some((c) => (c.learningStep || 0) >= 1) && (
-                        <Text style={[styles.reviewDoneText, { color: colors.textSecondary }]}>
+                        <Text variant="bodySmall" align="center" style={[styles.reviewDoneText, { color: colors.textSecondary }]}>
                           Всё повторено ✓{reviewStats.tomorrow > 0 ? ` · завтра ${reviewStats.tomorrow}` : ''}
                         </Text>
                       )}
-                      <Pressable style={styles.allChallengesButton} onPress={() => setShowStudyModeModal(true)}>
-                        <Text style={styles.allChallengesButtonText}>Учить все карточки</Text>
-                      </Pressable>
+                      <Button title="Учить все карточки" fullWidth onPress={() => setShowStudyModeModal(true)} />
                     </>
                   )}
                 </View>
@@ -1645,16 +1611,18 @@ export function HomeScreen({ navigation }: any) {
 
             {/* Section Header */}
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+              <Text variant="h3" style={[styles.flexShrink, { color: colors.textPrimary }]} numberOfLines={1}>
                 {activeCourseId === null ? 'Мои наборы' : activeCourseTitle}
               </Text>
               <Pressable
                 onPress={() => setSortSheetVisible(true)}
-                hitSlop={8}
-                style={({ pressed }) => [styles.sortButton, pressed && { opacity: 0.6 }]}
+                hitSlop={spacing.s}
+                accessibilityRole="button"
+                accessibilityLabel={`Сортировка: ${setsSortShortLabel}`}
+                style={({ pressed }) => [styles.sortButton, pressed && styles.pressed]}
               >
-                <ArrowUpDown size={16} color={colors.primary} />
-                <Text style={[styles.viewAllButton, { color: colors.primary }]}>
+                <ArrowUpDown size={iconSize.xs} color={colors.primary} />
+                <Text variant="label" style={{ color: colors.primary }}>
                   {setsSortShortLabel}
                 </Text>
               </Pressable>
@@ -1664,13 +1632,13 @@ export function HomeScreen({ navigation }: any) {
             {visibleSets.map((set, index) => {
               const progress = set.cardCount > 0 ? Math.round(((set.masteredCount || 0) / set.cardCount) * 100) : 0;
               const accentColor = getDeckAccentColor(set.id || index);
+              // Низкий прогресс — не «ошибка»: хвалим за прогресс, не ругаем (брендбук, раздел 1)
               const getStatusColor = () => {
-                if (progress === 100) return colors.success;
                 if (progress >= 60) return colors.success;
                 if (progress >= 10) return colors.warning;
-                return colors.error;
+                return colors.primary;
               };
-              
+
               // Дата создания набора
               const getDateDisplay = () => {
                 const date = new Date(set.createdAt);
@@ -1681,66 +1649,54 @@ export function HomeScreen({ navigation }: any) {
                 };
               };
               const dateDisplay = getDateDisplay();
+              const waitingCount = reviewStats.waitingBySet[set.id] || 0;
 
               return (
                 <StaggerCard key={set.id} index={index}>
-                <Pressable
-                  style={[
-                    styles.setCard,
-                    { backgroundColor: colors.surface, borderColor: colors.border },
-                  ]}
+                <SurfaceCard
                   onPress={() => { triggerHaptic('selection'); navigation?.navigate('SetDetail', { setId: set.id }); }}
+                  accessibilityLabel={`${set.title}, ${set.cardCount} ${pluralize(set.cardCount, 'карточка', 'карточки', 'карточек')}, выучено ${progress}%`}
                 >
                   {/* Header with icon, title, status dot, and button */}
                   <View style={styles.setCardHeader}>
                     <View style={styles.setCardLeft}>
                       {/* Date Icon */}
                       <View style={[styles.dateIcon, { backgroundColor: accentColor }]}>
-                        <Text style={[styles.dateMonth, { color: 'rgba(255,255,255,0.8)' }]}>{dateDisplay.month}</Text>
-                        <Text style={[styles.dateDay, { color: '#FFFFFF' }]}>{dateDisplay.day}</Text>
+                        <Text variant="caption" style={[styles.dateMonth, { color: colors.onPrimary }]}>{dateDisplay.month}</Text>
+                        <Text variant="bodyLarge" style={[styles.dateDay, { color: colors.onPrimary }]}>{dateDisplay.day}</Text>
                       </View>
-                      
+
                       {/* Title and Stats */}
-                      <View style={styles.setCardInfo}>
+                      <View style={styles.flex1}>
                         <View style={styles.titleRow}>
-                          <Text style={[styles.setTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                          <Text variant="body" style={[styles.setTitle, { color: colors.textPrimary }]} numberOfLines={1}>
                             {set.title}
                           </Text>
                           <View style={[styles.statusDot, { backgroundColor: getStatusColor() }]} />
                         </View>
-                        <Text style={[styles.setCardCount, { color: colors.textSecondary }]}>
-                          {set.cardCount} cards • {progress}% Mastered
+                        <Text variant="caption" style={{ color: colors.textSecondary }}>
+                          {set.cardCount} {pluralize(set.cardCount, 'карточка', 'карточки', 'карточек')} • {progress}% выучено
                         </Text>
                         {set.isHiddenFromStudents && set.courseId && isTeacher && (
-                          <View style={styles.hiddenBadge}>
-                            <EyeOff size={12} color={colors.textSecondary} />
-                            <Text style={[styles.hiddenBadgeText, { color: colors.textSecondary }]}>
-                              Скрыто
-                            </Text>
-                          </View>
+                          <Badge label="Скрыто" tone="neutral" icon={EyeOff} style={styles.setBadge} />
                         )}
                         {set.isOfficial && (
-                          <View style={styles.hiddenBadge}>
-                            <BookOpen size={12} color={colors.primary} />
-                            <Text style={[styles.hiddenBadgeText, { color: colors.primary }]}>
-                              По учебнику
-                            </Text>
-                          </View>
+                          <Badge label="По учебнику" tone="primary" icon={BookOpen} style={styles.setBadge} />
                         )}
-                        {(reviewStats.waitingBySet[set.id] || 0) > 0 && (
-                          <View style={styles.hiddenBadge}>
-                            <RotateCcw size={12} color={colors.warning} />
-                            <Text style={[styles.hiddenBadgeText, { color: colors.warning }]}>
-                              {reviewStats.waitingBySet[set.id]} ждут повторения
-                            </Text>
-                          </View>
+                        {waitingCount > 0 && (
+                          <Badge label={`${waitingCount} ждут повторения`} tone="warning" icon={RotateCcw} style={styles.setBadge} />
                         )}
                       </View>
                     </View>
 
                     {/* More Menu */}
-                    <Pressable
-                      style={styles.moreButton}
+                    <Button
+                      variant="icon"
+                      icon={MoreVertical}
+                      background="none"
+                      iconSize={iconSize.s}
+                      iconColor={colors.textSecondary}
+                      accessibilityLabel={`Действия с набором «${set.title}»`}
                       onPress={(e) => {
                         e.stopPropagation();
                         // Юнит учебника нельзя редактировать/скрывать — открываем сам набор
@@ -1753,35 +1709,18 @@ export function HomeScreen({ navigation }: any) {
                           navigation?.navigate('SetEditor', { setId: set.id, autoFocusTitle: true });
                         }
                       }}
-                    >
-                      <MoreVertical size={20} color={colors.textSecondary} />
-                    </Pressable>
+                    />
                   </View>
 
                   {/* Progress Section */}
                   <View style={styles.progressSection}>
                     <View style={styles.progressHeader}>
-                      <Text style={[styles.progressLabel, { color: colors.textTertiary }]}>Прогресс</Text>
-                      <Text style={[styles.progressPercentage, { color: colors.textTertiary }]}>{progress}%</Text>
+                      <Text variant="caption" style={[styles.semibold, { color: colors.textSecondary }]}>Прогресс</Text>
+                      <Text variant="caption" style={[styles.semibold, { color: colors.textSecondary }]}>{progress}%</Text>
                     </View>
-                    <View
-                      style={[
-                        styles.progressBar,
-                        { backgroundColor: colors.border },
-                      ]}
-                    >
-                      <View
-                        style={[
-                          styles.progressFill,
-                          {
-                            backgroundColor: getStatusColor(),
-                            width: `${progress}%`
-                          }
-                        ]}
-                      />
-                    </View>
+                    <ProgressBar progress={progress} color={getStatusColor()} animated={false} />
                   </View>
-                </Pressable>
+                </SurfaceCard>
                 </StaggerCard>
               );
             })}
@@ -1791,16 +1730,6 @@ export function HomeScreen({ navigation }: any) {
         </ScrollView>
       </View>
 
-      {/* FAB */}
-      {allSets.length > 0 && (
-        <Pressable 
-          style={[styles.fab, styles.fabHidden, { backgroundColor: colors.primary }]}
-          onPress={() => { triggerHaptic('selection'); navigation?.navigate('SetEditor', {}); }}
-        >
-          <Plus size={28} color="#FFFFFF" />
-        </Pressable>
-      )}
-
       <CoursesDrawer
         mounted={drawerMounted}
         translateX={drawerTranslateX}
@@ -1808,9 +1737,9 @@ export function HomeScreen({ navigation }: any) {
         onGestureSettled={handleDrawerGestureSettled}
         colors={colors}
         isDarkMode={isDarkMode}
-        drawerBackground={drawerBackground}
-        drawerBorder={drawerBorder}
-        backdropColor={backdropColor}
+        drawerBackground={colors.surface}
+        drawerBorder={colors.border}
+        backdropColor={colors.overlay}
         insets={insets}
         courses={courses}
         activeCourseId={activeCourseId}
@@ -1842,397 +1771,210 @@ export function HomeScreen({ navigation }: any) {
       />
 
       {/* Edit Course Modal */}
-      <Modal
+      <Dialog
         visible={isEditModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={cancelCourseEdit}
+        onClose={cancelCourseEdit}
+        title="Переименовать курс"
+        headerRight={closeButton(cancelCourseEdit)}
+        footer={
+          <View style={styles.dialogButtons}>
+            <Button variant="quiet" tone="secondary" title="Отмена" onPress={cancelCourseEdit} style={styles.flex1} />
+            <Button
+              title="Сохранить"
+              onPress={() => editingCourseId && saveCourseTitle(editingCourseId)}
+              style={styles.flex1}
+            />
+          </View>
+        }
       >
-        <Pressable
-          style={[styles.modalOverlay, { backgroundColor: modalOverlayBg }]}
-          onPress={cancelCourseEdit}
-        >
-          <Pressable
-            style={[
-              styles.editModalContent,
-              { backgroundColor: modalSurface, borderColor: modalBorder },
-            ]}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <View style={styles.editModalHeader}>
-              <Text style={[styles.editModalTitle, { color: colors.textPrimary }]}>
-                Переименовать курс
-              </Text>
-              <Pressable onPress={cancelCourseEdit}>
-                <X size={20} color={colors.textSecondary} />
-              </Pressable>
-            </View>
+        <TextField
+          ref={editModalInputRef}
+          icon={Folder}
+          placeholder="Название курса..."
+          value={editingTitle}
+          onChangeText={setEditingTitle}
+          onSubmitEditing={() => editingCourseId && saveCourseTitle(editingCourseId)}
+          inputStyle={Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : undefined}
+        />
+      </Dialog>
 
-            <View
-              style={[
-                styles.editModalInputContainer,
-                { backgroundColor: colors.surfaceVariant || colors.border, borderColor: colors.border },
-              ]}
+      {/* Delete Course Modal */}
+      <Dialog
+        visible={deleteModalCourseId !== null}
+        onClose={closeDeleteModal}
+        title="Удаление курса"
+        headerRight={closeButton(closeDeleteModal)}
+        footer={
+          <View style={styles.dialogButtons}>
+            <Button variant="quiet" tone="secondary" title="Отмена" onPress={closeDeleteModal} style={styles.flex1} />
+            <Button
+              variant="danger"
+              filled
+              title="Удалить"
+              onPress={confirmDeleteCourse}
+              disabled={deleteModalHasSets}
+              style={styles.flex1}
+            />
+          </View>
+        }
+      >
+        <Text variant="body" style={{ color: colors.textPrimary }}>
+          {deleteModalMessage}
+        </Text>
+        {deleteModalHasSets && (
+          <Text variant="bodySmall" style={[styles.semibold, styles.dialogNote, { color: colors.warningText }]}>
+            Удаление недоступно: сначала перемести наборы.
+          </Text>
+        )}
+      </Dialog>
+
+      {/* Leave Course Modal */}
+      <Dialog
+        visible={leaveModalCourseId !== null}
+        onClose={() => !leaveLoading && setLeaveModalCourseId(null)}
+        title="Выйти из курса?"
+        headerRight={closeButton(() => setLeaveModalCourseId(null), leaveLoading)}
+        footer={
+          <View style={styles.dialogButtons}>
+            <Button
+              variant="quiet"
+              tone="secondary"
+              title="Отмена"
+              onPress={() => setLeaveModalCourseId(null)}
+              disabled={leaveLoading}
+              style={styles.flex1}
+            />
+            <Button
+              variant="danger"
+              filled
+              title="Выйти"
+              onPress={handleLeaveCourse}
+              loading={leaveLoading}
+              style={styles.flex1}
+            />
+          </View>
+        }
+      >
+        <Text variant="body" style={{ color: colors.textPrimary }}>
+          {`Ты покинешь курс "${leaveModalCourseTitle}" и потеряешь доступ ко всем его материалам.`}
+        </Text>
+      </Dialog>
+
+      {/* Invite Students Modal */}
+      <Dialog
+        visible={inviteModalCourseId !== null}
+        onClose={closeInviteModal}
+        title="Пригласить учеников"
+        headerRight={closeButton(closeInviteModal)}
+      >
+        <Text variant="bodySmall" style={[styles.inviteDescription, { color: colors.textSecondary }]}>
+          Поделись ссылкой или кодом — ученики смогут присоединиться к курсу.
+        </Text>
+
+        {inviteLoading ? (
+          <ActivityIndicator size="small" color={colors.primary} style={styles.inviteSpinner} />
+        ) : inviteToken ? (
+          <>
+            {/* Код курса */}
+            {inviteJoinCode && (
+              <View style={styles.inviteCodeBlock}>
+                <Text variant="label" style={[styles.inviteCodeLabel, { color: colors.textSecondary }]}>
+                  Код курса
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Код курса ${inviteJoinCode.split('').join(' ')}. Нажми, чтобы скопировать`}
+                  style={[
+                    styles.inviteBox,
+                    styles.inviteCodeBox,
+                    { backgroundColor: colors.surfaceMuted, borderColor: alpha(colors.primary, 40) },
+                  ]}
+                  onPress={() => copyToClipboard(inviteJoinCode)}
+                >
+                  <Text variant="h1" style={[styles.inviteCode, { color: colors.primary }]}>
+                    {inviteJoinCode}
+                  </Text>
+                </Pressable>
+              </View>
+            )}
+
+            <Pressable
+              style={[styles.inviteBox, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}
+              onLongPress={() => {
+                copyToClipboard(`${inviteBaseUrl}/join/${inviteToken}`);
+                setInviteCopied(true);
+              }}
             >
-              <Folder size={20} color={colors.primary} />
-              <TextInput
-                ref={editModalInputRef}
-                style={[styles.editModalInput, { color: colors.textPrimary }]}
-                placeholder="Название курса..."
-                placeholderTextColor={colors.textSecondary}
-                value={editingTitle}
-                onChangeText={setEditingTitle}
-                onSubmitEditing={() => editingCourseId && saveCourseTitle(editingCourseId)}
+              <Text variant="label" style={{ color: colors.primary }} numberOfLines={1} selectable>
+                {`${inviteBaseUrl}/join/${inviteToken}`}
+              </Text>
+            </Pressable>
+
+            <View style={styles.dialogButtons}>
+              <Button
+                title={inviteCopied ? 'Скопировано' : 'Копировать'}
+                icon={inviteCopied ? Check : undefined}
+                onPress={() => {
+                  copyToClipboard(`${inviteBaseUrl}/join/${inviteToken}`);
+                  setInviteCopied(true);
+                }}
+                style={styles.flex1}
+              />
+              <Button
+                variant="secondary"
+                title="Поделиться"
+                onPress={async () => {
+                  try {
+                    await Share.share({ message: `${inviteBaseUrl}/join/${inviteToken}` });
+                  } catch {}
+                }}
+                style={styles.flex1}
               />
             </View>
 
-            <View style={styles.editModalButtons}>
-              <Pressable
-                style={[styles.editModalButton, { backgroundColor: colors.border }]}
-                onPress={cancelCourseEdit}
-              >
-                <Text style={[styles.editModalButtonText, { color: colors.textSecondary }]}>
-                  Отмена
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.editModalButton,
-                  styles.editModalButtonPrimary,
-                  { backgroundColor: colors.primary },
-                ]}
-                onPress={() => editingCourseId && saveCourseTitle(editingCourseId)}
-              >
-                <Text style={[styles.editModalButtonText, { color: '#FFFFFF' }]}>
-                  Сохранить
-                </Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Delete Course Modal */}
-      <Modal
-        visible={deleteModalCourseId !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={closeDeleteModal}
-      >
-        <Pressable style={[styles.modalOverlay, { backgroundColor: modalOverlayBg }]} onPress={closeDeleteModal}>
-          <Pressable
-            style={[
-              styles.editModalContent,
-              { backgroundColor: modalSurface, borderColor: modalBorder },
-            ]}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <View style={styles.editModalHeader}>
-              <Text style={[styles.editModalTitle, { color: colors.textPrimary }]}>
-                Удаление курса
-              </Text>
-              <Pressable onPress={closeDeleteModal}>
-                <X size={20} color={colors.textSecondary} />
-              </Pressable>
-            </View>
-
-            <Text style={[styles.deleteModalMessage, { color: colors.textPrimary }]}>
-              {deleteModalMessage}
-            </Text>
-            {deleteModalHasSets && (
-              <Text style={[styles.deleteModalWarning, { color: colors.warning }]}>
-                Удаление недоступно: сначала переместите наборы.
-              </Text>
-            )}
-
-            <View style={styles.editModalButtons}>
-              <Pressable
-                style={[styles.editModalButton, { backgroundColor: colors.border }]}
-                onPress={closeDeleteModal}
-              >
-                <Text style={[styles.editModalButtonText, { color: colors.textSecondary }]}>
-                  Отмена
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.editModalButton,
-                  styles.deleteModalButton,
-                  deleteModalHasSets
-                    ? { backgroundColor: colors.border }
-                    : { backgroundColor: colors.error },
-                ]}
-                onPress={confirmDeleteCourse}
-                disabled={deleteModalHasSets}
-              >
-                <Text
-                  style={[
-                    styles.editModalButtonText,
-                    deleteModalHasSets
-                      ? { color: colors.textSecondary }
-                      : { color: '#FFFFFF' },
-                  ]}
-                >
-                  Удалить
-                </Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Leave Course Modal */}
-      <Modal
-        visible={leaveModalCourseId !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setLeaveModalCourseId(null)}
-      >
-        <Pressable
-          style={[styles.modalOverlay, { backgroundColor: modalOverlayBg }]}
-          onPress={() => !leaveLoading && setLeaveModalCourseId(null)}
-        >
-          <Pressable
-            style={[styles.editModalContent, { backgroundColor: modalSurface, borderColor: modalBorder }]}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <View style={styles.editModalHeader}>
-              <Text style={[styles.editModalTitle, { color: colors.textPrimary }]}>
-                Выйти из курса?
-              </Text>
-              <Pressable onPress={() => setLeaveModalCourseId(null)} disabled={leaveLoading}>
-                <X size={20} color={colors.textSecondary} />
-              </Pressable>
-            </View>
-
-            <Text style={[styles.deleteModalMessage, { color: colors.textPrimary }]}>
-              {(() => {
-                const c = courses.find(c => c.id === leaveModalCourseId);
-                return `Вы покинете курс "${c?.title ?? ''}" и потеряете доступ ко всем его материалам.`;
-              })()}
-            </Text>
-
-            <View style={styles.editModalButtons}>
-              <Pressable
-                style={[styles.editModalButton, { backgroundColor: colors.border }]}
-                onPress={() => setLeaveModalCourseId(null)}
-                disabled={leaveLoading}
-              >
-                <Text style={[styles.editModalButtonText, { color: colors.textSecondary }]}>Отмена</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.editModalButton, { backgroundColor: colors.error }]}
-                onPress={handleLeaveCourse}
-                disabled={leaveLoading}
-              >
-                {leaveLoading
-                  ? <ActivityIndicator size="small" color="#fff" />
-                  : <Text style={[styles.editModalButtonText, { color: '#FFFFFF' }]}>Выйти</Text>
-                }
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Invite Students Modal */}
-      <Modal
-        visible={inviteModalCourseId !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={closeInviteModal}
-      >
-        <Pressable style={[styles.modalOverlay, { backgroundColor: modalOverlayBg }]} onPress={closeInviteModal}>
-          <Pressable
-            style={[
-              styles.editModalContent,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <View style={styles.editModalHeader}>
-              <Text style={[styles.editModalTitle, { color: colors.textPrimary }]}>Пригласить учеников</Text>
-              <Pressable onPress={closeInviteModal}>
-                <X size={20} color={colors.textSecondary} />
-              </Pressable>
-            </View>
-
-            <Text style={[styles.inviteDescription, { color: colors.textSecondary }]}>
-              Поделитесь ссылкой или кодом — ученики смогут присоединиться к курсу.
-            </Text>
-
-            {inviteLoading ? (
-              <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: spacing.m }} />
-            ) : inviteToken ? (
-              <>
-                {/* Код курса */}
-                {inviteJoinCode && (
-                  <View style={{ marginBottom: spacing.m }}>
-                    <Text style={[styles.inviteDescription, { color: colors.textSecondary, marginBottom: spacing.xs }]}>
-                      Код курса
-                    </Text>
-                    <Pressable
-                      style={[
-                        styles.inviteLinkBox,
-                        { backgroundColor: colors.surfaceVariant || colors.border, borderColor: colors.primary + '55', alignItems: 'center' },
-                      ]}
-                      onPress={() => {
-                        if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
-                          navigator.clipboard.writeText(inviteJoinCode);
-                        } else {
-                          Clipboard.setString(inviteJoinCode);
-                        }
-                      }}
-                    >
-                      <Text style={{ fontSize: 32, fontWeight: '800', letterSpacing: 8, color: colors.primary }}>
-                        {inviteJoinCode}
-                      </Text>
-                    </Pressable>
-                  </View>
-                )}
-
-                <Pressable
-                  style={[
-                    styles.inviteLinkBox,
-                    { backgroundColor: colors.surfaceVariant || colors.border, borderColor: colors.border },
-                  ]}
-                  onLongPress={() => {
-                    const link = `${inviteBaseUrl}/join/${inviteToken}`;
-                    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
-                      navigator.clipboard.writeText(link);
-                    } else {
-                      Clipboard.setString(link);
-                    }
-                    setInviteCopied(true);
-                  }}
-                >
-                  <Text
-                    style={[styles.inviteLinkText, { color: colors.primary }]}
-                    numberOfLines={1}
-                    selectable
-                  >
-                    {`${inviteBaseUrl}/join/${inviteToken}`}
-                  </Text>
-                </Pressable>
-
-                <View style={{ flexDirection: 'row', gap: spacing.s, width: '100%' }}>
-                  <Pressable
-                    style={[
-                      styles.editModalButton,
-                      styles.editModalButtonPrimary,
-                      inviteCopied
-                        ? { backgroundColor: colors.success ?? '#10B981', flex: 1 }
-                        : { backgroundColor: colors.primary, flex: 1 },
-                    ]}
-                    onPress={() => {
-                      const link = `${inviteBaseUrl}/join/${inviteToken}`;
-                      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
-                        navigator.clipboard.writeText(link);
-                      } else {
-                        Clipboard.setString(link);
-                      }
-                      setInviteCopied(true);
-                    }}
-                  >
-                    <Text style={[styles.editModalButtonText, { color: '#FFFFFF' }]}>
-                      {inviteCopied ? '✓ Скопировано' : 'Копировать'}
-                    </Text>
-                  </Pressable>
-
-                  <Pressable
-                    style={[
-                      styles.editModalButton,
-                      styles.editModalButtonPrimary,
-                      { backgroundColor: colors.primary, flex: 1 },
-                    ]}
-                    onPress={async () => {
-                      const link = `${inviteBaseUrl}/join/${inviteToken}`;
-                      try {
-                        await Share.share({ message: link });
-                      } catch {}
-                    }}
-                  >
-                    <Text style={[styles.editModalButtonText, { color: '#FFFFFF' }]}>
-                      Поделиться
-                    </Text>
-                  </Pressable>
-                </View>
-
-                <Pressable
-                  style={[styles.editModalButton, { backgroundColor: 'transparent', marginTop: spacing.s }]}
-                  onPress={handleRegenerateInvite}
-                  disabled={inviteRegenerating}
-                >
-                  {inviteRegenerating ? (
-                    <ActivityIndicator size="small" color={colors.textSecondary} />
-                  ) : (
-                    <Text style={[styles.editModalButtonText, { color: colors.textSecondary }]}>
-                      Обновить код приглашения
-                    </Text>
-                  )}
-                </Pressable>
-              </>
-            ) : (
-              <Text style={[styles.inviteDescription, { color: colors.error || '#EF4444' }]}>
-                Не удалось создать ссылку
-              </Text>
-            )}
-          </Pressable>
-        </Pressable>
-      </Modal>
+            <Button
+              variant="quiet"
+              tone="secondary"
+              title="Обновить код приглашения"
+              onPress={handleRegenerateInvite}
+              loading={inviteRegenerating}
+              fullWidth
+              style={styles.inviteRegenerate}
+            />
+          </>
+        ) : (
+          <Text variant="bodySmall" style={{ color: colors.errorText }}>
+            Не удалось создать ссылку
+          </Text>
+        )}
+      </Dialog>
 
       {/* Sort Sheet */}
-      <Modal
-        visible={sortSheetVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setSortSheetVisible(false)}
-      >
-        <Pressable
-          style={[styles.sortSheetBackdrop, { backgroundColor: modalOverlayBg }]}
-          onPress={() => setSortSheetVisible(false)}
-        >
-          {/* В тёмной теме colors.surface полупрозрачный (rgba 0.05) — окно просвечивало,
-              текст сливался с экраном. Берём непрозрачный фон модалок, как у меню набора. */}
-          <Pressable
-            style={[
-              styles.sortSheet,
-              {
-                backgroundColor: modalSurface,
-                borderColor: modalBorder,
-                paddingBottom: insets.bottom + spacing.m,
-              },
-            ]}
-          >
-            <View style={[styles.sortSheetHandle, { backgroundColor: modalHandleColor }]} />
-            <Text style={[styles.sortSheetTitle, { color: colors.textPrimary }]}>Сортировка</Text>
-            {SETS_SORT_OPTIONS.map((option) => {
-              const selected = option.key === setsSort;
-              return (
-                <Pressable
-                  key={option.key}
-                  onPress={() => selectSetsSort(option.key)}
-                  style={({ pressed }) => [
-                    styles.sortOption,
-                    pressed && { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : colors.border + '55' },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.sortOptionText,
-                      { color: selected ? colors.primary : colors.textPrimary },
-                      selected && { fontWeight: '700' },
-                    ]}
-                  >
-                    {option.label}
-                  </Text>
-                  {selected && <Check size={20} color={colors.primary} />}
-                </Pressable>
-              );
-            })}
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <Sheet visible={sortSheetVisible} onClose={() => setSortSheetVisible(false)} title="Сортировка">
+        {SETS_SORT_OPTIONS.map((option) => {
+          const selected = option.key === setsSort;
+          return (
+            <Pressable
+              key={option.key}
+              onPress={() => selectSetsSort(option.key)}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              style={({ pressed }) => [
+                styles.sortOption,
+                pressed && { backgroundColor: colors.surfaceMuted },
+              ]}
+            >
+              <Text
+                variant="body"
+                style={[{ color: selected ? colors.primary : colors.textPrimary }, selected && styles.semibold]}
+              >
+                {option.label}
+              </Text>
+              {selected && <Check size={iconSize.s} color={colors.primary} />}
+            </Pressable>
+          );
+        })}
+      </Sheet>
 
       {/* Join by Code Modal */}
       <JoinByCodeModal
@@ -2255,213 +1997,137 @@ export function HomeScreen({ navigation }: any) {
       />
 
       {/* Streak Modal */}
-      <Modal
-        visible={streakModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={closeStreakModal}
-      >
-        <View style={[styles.streakOverlay, { paddingTop: insets.top + spacing.xl }]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={closeStreakModal} />
-
+      <Dialog visible={streakModalVisible} onClose={closeStreakModal} placement="top" style={styles.streakCard}>
+        {/* Section 1: Header */}
+        <View style={styles.streakTop}>
           <View
             style={[
-              styles.streakCard,
-              {
-                backgroundColor: isDarkMode ? '#12122b' : '#ffffff',
-                borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : colors.border,
-                shadowOpacity: isDarkMode ? 0.35 : 0.18,
-              },
+              styles.streakTopIcon,
+              todayGoalReached
+                ? { backgroundColor: alpha(colors.streak, 10), borderColor: alpha(colors.streak, 40) }
+                : { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
             ]}
           >
-            <Pressable style={styles.streakClose} onPress={closeStreakModal}>
-              <Ionicons name="close" size={22} color={isDarkMode ? '#9CA3AF' : '#6B7280'} />
-            </Pressable>
-
-            {/* Section 1: Header */}
-            <View style={styles.streakTop}>
-              <View
-                style={[
-                  styles.streakTopIcon,
-                  {
-                    backgroundColor: todayGoalReached
-                      ? (isDarkMode ? 'rgba(234,88,12,0.12)' : '#FFF4E5')
-                      : (isDarkMode ? 'rgba(107,114,128,0.12)' : '#F3F4F6'),
-                    borderColor: todayGoalReached
-                      ? (isDarkMode ? 'rgba(234,88,12,0.2)' : '#FED7AA')
-                      : (isDarkMode ? 'rgba(107,114,128,0.2)' : '#D1D5DB'),
-                  },
-                ]}
-              >
-                <Ionicons
-                  name="flame"
-                  size={42}
-                  color={todayGoalReached ? (isDarkMode ? '#FBBF24' : '#EA580C') : (isDarkMode ? '#6B7280' : '#9CA3AF')}
-                  style={todayGoalReached ? { textShadowColor: 'rgba(249,115,22,0.35)', textShadowRadius: 10 } : undefined}
-                />
-              </View>
-              <View style={styles.streakTopText}>
-                <Text style={[styles.streakModeTitle, { color: colors.textPrimary }]}>
-                  Ударный режим
-                </Text>
-                <Text style={[styles.streakModeValue, { color: colors.textPrimary }]}>
-                  {formatDays(streakValue)}
-                </Text>
-              </View>
-            </View>
-
-            {/* Week grid */}
-            <View style={styles.weekGrid}>
-              {(() => {
-                const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-                const today = new Date();
-                const todayKey = getLocalDateKey();
-                
-                // Форматтер для получения YYYY-MM-DD в правильном timezone
-                const dateFmt = new Intl.DateTimeFormat('en-CA', {
-                  timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                  year: 'numeric',
-                  month: '2-digit',
-                  day: '2-digit',
-                });
-                // Определяем день недели из todayKey (надёжнее чем getDay())
-                const todayParsed = new Date(todayKey + 'T12:00:00');
-                const todayIndex = (todayParsed.getDay() + 6) % 7; // Пн = 0
-                
-                // Создаём Set дат, когда была активность (из реальных данных БД)
-                const activeDates = new Set(
-                  weekActivity
-                    .filter(a => a.cards_studied >= 10)
-                    .map(a => a.local_date)
-                );
-                
-                return weekDays.map((day, idx) => {
-                  const isToday = idx === todayIndex;
-                  // Вычисляем дату для каждой ячейки
-                  const dateForCell = new Date(today);
-                  const diff = idx - todayIndex;
-                  dateForCell.setDate(today.getDate() + diff);
-                  const dayNumber = parseInt(dateFmt.format(dateForCell).split('-')[2], 10);
-                  const dateKey = dateFmt.format(dateForCell); // YYYY-MM-DD в local tz
-                  const isFuture = dateKey > todayKey;
-                  const done = !isFuture && activeDates.has(dateKey);
-                  return (
-                    <View key={day} style={styles.weekItem}>
-                      <Text
-                        style={[
-                          styles.weekLabel,
-                          { color: isToday ? colors.primary : colors.textSecondary },
-                        ]}
-                      >
-                        {day.toUpperCase()}
-                      </Text>
-                      <View
-                        style={[
-                          styles.weekCircle,
-                          done
-                            ? {
-                                backgroundColor: isDarkMode ? colors.success : '#22c55e',
-                                borderColor: 'transparent',
-                              }
-                            : isToday
-                            ? {
-                                backgroundColor: 'transparent',
-                                borderColor: isDarkMode ? colors.primary : colors.primary,
-                              }
-                            : {
-                                backgroundColor: 'transparent',
-                                borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : colors.border,
-                              },
-                        ]}
-                      >
-                        {done ? (
-                          <Ionicons name="checkmark" size={16} color="#fff" />
-                        ) : (
-                          <Text
-                            style={[
-                              styles.weekTodayText,
-                              { color: isToday ? colors.primary : colors.textSecondary },
-                            ]}
-                          >
-                            {dayNumber}
-                          </Text>
-                        )}
-                      </View>
-                    </View>
-                  );
-                });
-              })()}
-            </View>
-
-            {/* Section 3: Progress / goal */}
-            <View
-              style={[
-                styles.goalCard,
-                {
-                  backgroundColor: 'transparent',
-                  borderColor: 'transparent',
-                },
-              ]}
-            >
-              <View style={styles.goalHeader}>
-                <View>
-                  <Text style={[styles.goalLabel, { color: colors.textSecondary }]}>Карточки</Text>
-                  <Text style={[styles.goalValue, { color: colors.textPrimary }]}>
-                    {cardsLearned}
-                    <Text style={{ color: colors.textSecondary }}>
-                      /{dailyGoal}
-                    </Text>
-                  </Text>
-                </View>
-                <Text style={[styles.goalChip, { color: colors.primary }]}>Дневная цель</Text>
-              </View>
-              <View
-                style={[
-                  styles.goalBar,
-                  { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : colors.border },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.goalBarFill,
-                    {
-                      backgroundColor: colors.primary,
-                      width: `${goalProgress}%`,
-                    },
-                  ]}
-                />
-              </View>
-            </View>
-
-            <Text style={[styles.streakQuote, { color: colors.textSecondary }]}>
-              {streakSupportText}
+            <Flame size={iconSize.l} color={todayGoalReached ? colors.streak : colors.textTertiary} />
+          </View>
+          <View style={styles.streakTopText}>
+            <Text variant="overline" style={{ color: colors.textSecondary }}>
+              Ударный режим
             </Text>
-
-            {streakFreezes !== null && (
-              <View style={[styles.freezeRow, { borderColor: colors.border }]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.freezeTitle, { color: colors.textPrimary }]}>
-                    Заморозка серии: {streakFreezes} из {MAX_STREAK_FREEZES}
-                  </Text>
-                  <Text style={[styles.freezeHint, { color: colors.textSecondary }]}>
-                    Спасёт серию, если пропустишь один день
-                  </Text>
-                </View>
-                {streakFreezes < MAX_STREAK_FREEZES && (
-                  <Pressable
-                    onPress={handleBuyStreakFreeze}
-                    disabled={buyingFreeze}
-                    style={[styles.freezeButton, { backgroundColor: colors.primary, opacity: buyingFreeze ? 0.6 : 1 }]}
-                  >
-                    <Ionicons name="diamond" size={14} color="#FFFFFF" />
-                    <Text style={styles.freezeButtonText}>{STREAK_FREEZE_PRICE}</Text>
-                  </Pressable>
-                )}
-              </View>
-            )}
+            <Text variant="h2" style={{ color: colors.textPrimary }}>
+              {formatDays(streakValue)}
+            </Text>
           </View>
         </View>
-      </Modal>
+
+        {/* Week grid */}
+        <View style={styles.weekGrid}>
+          {(() => {
+            const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+            const today = new Date();
+            const todayKey = getLocalDateKey();
+
+            // Форматтер для получения YYYY-MM-DD в правильном timezone
+            const dateFmt = new Intl.DateTimeFormat('en-CA', {
+              timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+            });
+            // Определяем день недели из todayKey (надёжнее чем getDay())
+            const todayParsed = new Date(todayKey + 'T12:00:00');
+            const todayIndex = (todayParsed.getDay() + 6) % 7; // Пн = 0
+
+            // Создаём Set дат, когда была активность (из реальных данных БД)
+            const activeDates = new Set(
+              weekActivity
+                .filter(a => a.cards_studied >= 10)
+                .map(a => a.local_date)
+            );
+
+            return weekDays.map((day, idx) => {
+              const isToday = idx === todayIndex;
+              // Вычисляем дату для каждой ячейки
+              const dateForCell = new Date(today);
+              const diff = idx - todayIndex;
+              dateForCell.setDate(today.getDate() + diff);
+              const dayNumber = parseInt(dateFmt.format(dateForCell).split('-')[2], 10);
+              const dateKey = dateFmt.format(dateForCell); // YYYY-MM-DD в local tz
+              const isFuture = dateKey > todayKey;
+              const done = !isFuture && activeDates.has(dateKey);
+              return (
+                <View key={day} style={styles.weekItem}>
+                  <Text variant="overline" style={{ color: isToday ? colors.primary : colors.textSecondary }}>
+                    {day}
+                  </Text>
+                  <View
+                    accessible
+                    accessibilityLabel={`${day}, ${dayNumber}: ${done ? 'цель выполнена' : isToday ? 'сегодня' : 'нет занятий'}`}
+                    style={[
+                      styles.weekCircle,
+                      done
+                        ? { backgroundColor: colors.success, borderColor: colors.success }
+                        : { borderColor: isToday ? colors.primary : colors.border },
+                    ]}
+                  >
+                    {done ? (
+                      <Check size={iconSize.xs} color={colors.onPrimary} strokeWidth={3} />
+                    ) : (
+                      <Text variant="caption" style={[styles.bold, { color: isToday ? colors.primary : colors.textSecondary }]}>
+                        {dayNumber}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              );
+            });
+          })()}
+        </View>
+
+        {/* Section 3: Progress / goal */}
+        <View style={styles.goalCard}>
+          <View style={styles.goalHeader}>
+            <View>
+              <Text variant="overline" style={{ color: colors.textSecondary }}>Карточки</Text>
+              <Text variant="h3" style={[styles.bold, { color: colors.textPrimary }]}>
+                {cardsLearned}
+                <Text variant="h3" style={{ color: colors.textSecondary }}>
+                  /{dailyGoal}
+                </Text>
+              </Text>
+            </View>
+            <Text variant="overline" style={{ color: colors.primary }}>Дневная цель</Text>
+          </View>
+          <ProgressBar progress={goalProgress} accessibilityLabel="Дневная цель" />
+        </View>
+
+        <Text variant="bodySmall" align="center" style={{ color: colors.textSecondary }}>
+          {streakSupportText}
+        </Text>
+
+        {streakFreezes !== null && (
+          <View style={[styles.freezeRow, { borderColor: colors.border }]}>
+            <View style={styles.flex1}>
+              <Text variant="body" style={[styles.semibold, { color: colors.textPrimary }]}>
+                Заморозка серии: {streakFreezes} из {MAX_STREAK_FREEZES}
+              </Text>
+              <Text variant="caption" style={{ color: colors.textSecondary }}>
+                Спасёт серию, если пропустишь один день
+              </Text>
+            </View>
+            {streakFreezes < MAX_STREAK_FREEZES && (
+              <Button
+                size="s"
+                icon={Gem}
+                title={String(STREAK_FREEZE_PRICE)}
+                accessibilityLabel={`Купить заморозку за ${STREAK_FREEZE_PRICE} алмазов`}
+                onPress={handleBuyStreakFreeze}
+                loading={buyingFreeze}
+              />
+            )}
+          </View>
+        )}
+      </Dialog>
 
       <StudyModeSheet
         visible={showStudyModeModal}
@@ -2479,53 +2145,31 @@ export function HomeScreen({ navigation }: any) {
         }}
       />
       {/* Set Action Sheet */}
-      <Modal
-        visible={!!setMenuTarget}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setSetMenuTarget(null)}
-      >
-        <Pressable
-          style={[styles.modalOverlay, { backgroundColor: modalOverlayBg }]}
-          onPress={() => setSetMenuTarget(null)}
-        >
-          <View
-            style={[
-              styles.setActionSheet,
-              { backgroundColor: modalSurface, borderColor: modalBorder },
-            ]}
-          >
-            <View style={[styles.setActionSheetHandle, { backgroundColor: modalHandleColor }]} />
-            <Pressable
-              style={({ pressed }) => [styles.sheetAction, pressed && { opacity: 0.7 }]}
-              onPress={() => {
-                if (setMenuTarget) {
-                  navigation?.navigate('SetEditor', { setId: setMenuTarget.id, autoFocusTitle: true });
-                  setSetMenuTarget(null);
-                }
-              }}
-            >
-              <Edit2 size={18} color={modalTextPrimary} />
-              <Text style={{ color: modalTextPrimary, marginLeft: 8 }}>Редактировать</Text>
-            </Pressable>
-            {setMenuTarget?.courseId && isTeacher && (
-              <Pressable
-                style={({ pressed }) => [styles.sheetAction, pressed && { opacity: 0.7 }]}
-                onPress={() => setMenuTarget && handleToggleSetHidden(setMenuTarget)}
-              >
-                {setMenuTarget.isHiddenFromStudents ? (
-                  <Eye size={18} color={colors.primary} />
-                ) : (
-                  <EyeOff size={18} color={modalTextSecondary} />
-                )}
-                <Text style={{ color: setMenuTarget.isHiddenFromStudents ? colors.primary : modalTextPrimary, marginLeft: 8 }}>
-                  {setMenuTarget.isHiddenFromStudents ? 'Показать ученикам' : 'Скрыть от учеников'}
-                </Text>
-              </Pressable>
-            )}
-          </View>
-        </Pressable>
-      </Modal>
+      <Sheet visible={!!setMenuTarget} onClose={() => setSetMenuTarget(null)}>
+        <ListRow
+          icon={Edit2}
+          iconColor={colors.textPrimary}
+          title="Редактировать"
+          chevron={false}
+          onPress={() => {
+            if (setMenuTarget) {
+              navigation?.navigate('SetEditor', { setId: setMenuTarget.id, autoFocusTitle: true });
+              setSetMenuTarget(null);
+            }
+          }}
+          style={styles.sheetRow}
+        />
+        {setMenuTarget?.courseId && isTeacher && (
+          <ListRow
+            icon={setMenuTarget.isHiddenFromStudents ? Eye : EyeOff}
+            iconColor={setMenuTarget.isHiddenFromStudents ? colors.primary : colors.textSecondary}
+            title={setMenuTarget.isHiddenFromStudents ? 'Показать ученикам' : 'Скрыть от учеников'}
+            chevron={false}
+            onPress={() => setMenuTarget && handleToggleSetHidden(setMenuTarget)}
+            style={styles.sheetRow}
+          />
+        )}
+      </Sheet>
       <DiamondReward
         ref={diamondRewardRef}
         targetPosition={diamondTargetPos}
@@ -2536,96 +2180,95 @@ export function HomeScreen({ navigation }: any) {
   );
 }
 
+const CHALLENGE_CARD_WIDTH = 136;
+const CHALLENGE_CARD_HEIGHT = 168;
+const ADD_BUTTON_SIZE = 36;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     minHeight: '100%',
   },
-  
+  flex1: {
+    flex: 1,
+  },
+  flexShrink: {
+    flexShrink: 1,
+  },
+  semibold: {
+    fontWeight: '600',
+  },
+  bold: {
+    fontWeight: '700',
+  },
+  noLetterSpacing: {
+    letterSpacing: 0,
+  },
+  // Второстепенный текст на цветной заливке
+  onFillMuted: {
+    opacity: 0.85,
+  },
+  pressed: {
+    opacity: 0.85,
+  },
+
   // Header
   header: {
+    height: heights.header,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.m,
-    paddingVertical: 10,
+    paddingHorizontal: spacing.xs,
     borderBottomWidth: 1,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.s,
   },
   headerCenter: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  menuButton: {
-    padding: spacing.xs,
-    marginRight: spacing.s,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  headerBadges: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: spacing.xs,
   },
-  badge: {
+  headerStat: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: spacing.s,
-    paddingVertical: spacing.xs,
-    borderRadius: 999,
-    borderWidth: 0,
-    backgroundColor: 'transparent',
-    borderColor: 'transparent',
+    gap: spacing.xxs,
+    minHeight: heights.touch,
+    paddingHorizontal: spacing.xs,
   },
-  badgeText: {
-    fontSize: 16,
+  headerStatText: {
+    ...typography.button,
     fontWeight: '700',
+    letterSpacing: 0,
   },
   headerRight: {
     flexDirection: 'row',
-    gap: spacing.xs,
-  },
-  iconButton: {
-    padding: spacing.xs,
+    alignItems: 'center',
+    gap: spacing.xxs,
+    paddingRight: spacing.xs,
   },
   addButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgb(52, 56, 255)',
+    width: ADD_BUTTON_SIZE,
+    height: ADD_BUTTON_SIZE,
+    borderRadius: borderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
   },
+
   // Search
   searchBar: {
-    paddingHorizontal: spacing.m,
+    paddingHorizontal: screenPadding,
     paddingVertical: spacing.s,
-  },
-  searchInput: {
-    fontSize: 16,
-    padding: spacing.s,
   },
   body: {
     flex: 1,
   },
   searchOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'transparent',
     zIndex: 5,
   },
 
   // Content
   content: {
     flex: 1,
-    backgroundColor: 'transparent',
   },
   scrollContent: {
     flexGrow: 1,
@@ -2637,26 +2280,20 @@ const styles = StyleSheet.create({
     paddingTop: spacing.m,
     paddingBottom: spacing.s,
   },
-  challengesSectionTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    paddingHorizontal: spacing.m,
-    marginBottom: spacing.m,
-  },
   challengesScrollContent: {
-    paddingHorizontal: spacing.m,
-    gap: 12,
+    paddingHorizontal: screenPadding,
+    gap: spacing.s,
   },
   challengeCard: {
-    width: 136,
-    height: 168,
-    borderRadius: 22,
-    padding: 14,
+    width: CHALLENGE_CARD_WIDTH,
+    height: CHALLENGE_CARD_HEIGHT,
+    borderRadius: borderRadius.l,
+    padding: spacing.s,
     justifyContent: 'space-between',
   },
   challengeCardPressed: {
-    opacity: 0.9,
-    transform: [{ scale: 0.97 }],
+    opacity: 0.85,
+    transform: [{ scale: 0.98 }],
   },
   challengeTopRow: {
     flexDirection: 'row',
@@ -2664,30 +2301,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   challengeIconCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    width: 36,
+    height: 36,
+    borderRadius: borderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
   },
   challengeTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    lineHeight: 19,
-    letterSpacing: -0.2,
+    ...typography.body,
+    fontWeight: '700',
   },
   challengeBadge: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
-  },
-  challengeBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xxs / 2,
+    borderRadius: borderRadius.full,
   },
   challengeBottomRow: {
     flexDirection: 'row',
@@ -2698,76 +2325,42 @@ const styles = StyleSheet.create({
   challengeReward: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(0,0,0,0.18)',
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  challengeRewardText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#FFFFFF',
+    gap: spacing.xxs,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xxs,
+    borderRadius: borderRadius.full,
   },
   challengePlay: {
     width: 32,
     height: 32,
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
+    borderRadius: borderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  challengeCardCompleted: {
-    backgroundColor: '#059669',
-  },
-  challengeDoneLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  challengeAgainText: {
-    fontSize: 12,
-    fontWeight: '600',
+  // Треугольник «play» визуально смещён влево — выравниваем по центру круга
+  playIconNudge: {
+    marginLeft: spacing.xxs / 2,
   },
   challengeClaimButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    backgroundColor: '#FFFFFF',
-    minHeight: 34,
-    borderRadius: 999,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  challengeClaimText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#059669',
-  },
-  allChallengesButtonContainer: {
-    paddingHorizontal: spacing.m,
-    marginTop: spacing.l,
+    gap: spacing.xxs,
+    minHeight: 36,
+    borderRadius: borderRadius.full,
   },
   ratingTeaser: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginHorizontal: spacing.m,
+    gap: spacing.s,
+    marginHorizontal: screenPadding,
     marginTop: spacing.l,
     minHeight: 56,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
-    borderWidth: 1,
   },
   ratingTeaserIcon: {
     width: 36,
     height: 36,
-    borderRadius: 18,
-    backgroundColor: '#FEF3C7',
+    borderRadius: borderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2777,132 +2370,61 @@ const styles = StyleSheet.create({
     right: 0,
     width: 10,
     height: 10,
-    borderRadius: 5,
-    backgroundColor: '#EF4444',
+    borderRadius: borderRadius.full,
     borderWidth: 2,
   },
-  ratingTeaserTitle: {
-    fontSize: 15,
-    fontWeight: '700',
+  reviewActions: {
+    paddingHorizontal: screenPadding,
+    marginTop: spacing.l,
   },
-  ratingTeaserHint: {
-    fontSize: 12,
-    marginTop: 1,
+  dailyReviewButton: {
+    minHeight: heights.button,
+    paddingVertical: spacing.s,
+    paddingHorizontal: spacing.m,
+    borderRadius: borderRadius.m,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  ratingTeaserBadge: {
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: -0.5,
+  reviewDoneText: {
+    marginBottom: spacing.s,
   },
   freezeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: spacing.s,
     marginTop: spacing.m,
     paddingTop: spacing.m,
     borderTopWidth: 1,
   },
-  freezeTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  freezeHint: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  freezeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    minHeight: 44,
-    paddingHorizontal: 16,
-    borderRadius: 999,
-  },
-  freezeButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  dailyReviewButton: {
-    height: undefined,
-    minHeight: 56,
-    paddingVertical: spacing.s,
-    paddingHorizontal: spacing.m,
-    flexDirection: 'column',
-  },
-  dailyReviewTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  dailyReviewSubtitle: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 13,
-    marginTop: 2,
-  },
-  reviewDoneText: {
-    fontSize: 13,
-    textAlign: 'center',
-    marginBottom: spacing.s,
-  },
-  allChallengesButton: {
-    width: '100%',
-    height: 48,
-    backgroundColor: '#7C3AED',
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 0,
-  },
-  allChallengesButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
 
   // Teacher Mode Banner
+  teacherBannerWrap: {
+    paddingHorizontal: screenPadding,
+    paddingTop: spacing.m,
+    paddingBottom: spacing.s,
+  },
   teacherBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderRadius: 20,
-    padding: 16,
-    backgroundColor: 'rgb(52, 56, 255)',
-    shadowColor: '#1317ec',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 8,
+    gap: spacing.s,
+    borderRadius: borderRadius.l,
+    padding: spacing.m,
   },
   teacherBannerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: spacing.s,
+    flexShrink: 1,
   },
   teacherBannerIcon: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    padding: 8,
-    borderRadius: 10,
-  },
-  teacherBannerTitle: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  teacherBannerSubtitle: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 12,
+    padding: spacing.xs,
+    borderRadius: borderRadius.m,
   },
   teacherBannerButton: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
-  teacherBannerButtonText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: 'rgb(52, 56, 255)',
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.full,
   },
 
   // Section Header
@@ -2910,188 +2432,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.m,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  viewAllButton: {
-    fontSize: 14,
-    fontWeight: '600',
+    gap: spacing.s,
+    paddingHorizontal: screenPadding,
+    marginTop: spacing.l,
   },
   sortButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-  },
-  sortSheetBackdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-  },
-  sortSheet: {
-    borderTopLeftRadius: borderRadius.xl,
-    borderTopRightRadius: borderRadius.xl,
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    paddingTop: spacing.s,
-    paddingHorizontal: spacing.m,
-  },
-  sortSheetHandle: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    marginBottom: spacing.m,
-  },
-  sortSheetTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: spacing.s,
+    gap: spacing.xxs,
   },
   sortOption: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 14,
+    minHeight: heights.listRow,
     paddingHorizontal: spacing.s,
     borderRadius: borderRadius.m,
   },
-  sortOptionText: {
-    fontSize: 16,
-  },
 
-  // Empty State (modern)
-  emptyStateModern: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.l,
-    paddingHorizontal: spacing.l,
-    paddingVertical: spacing.xl,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  emptySubtitle: {
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  illustrationWrap: {
-    width: 220,
-    height: 220,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  illustrationGlow: {
-    position: 'absolute',
-    inset: 0,
-    borderRadius: 999,
-    transform: [{ scale: 1.05 }],
-    // @ts-ignore web blur
-    filter: 'blur(32px)',
-  },
-  illustrationCard: {
-    width: 140,
-    height: 140,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowOffset: { width: 0, height: 8 },
-    shadowRadius: 16,
-    elevation: 6,
-  },
-  illustrationBadge: {
-    position: 'absolute',
-    width: 56,
-    height: 56,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowOffset: { width: 0, height: 8 },
-    shadowRadius: 14,
-    elevation: 8,
-  },
-  badgeStar: { top: 4, right: 12, transform: [{ rotate: '12deg' }] },
-  badgePlus: { bottom: -8, left: 10, transform: [{ rotate: '-12deg' }] },
-  emptyTextBlock: {
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  emptyActions: {
-    width: '100%',
-    gap: spacing.m,
-  },
-  primaryButton: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.m,
-    borderRadius: borderRadius.xl,
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowOffset: { width: 0, height: 10 },
-    shadowRadius: 18,
-    elevation: 8,
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  secondaryButton: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.m - 1.5,
-    borderRadius: borderRadius.xl,
-    borderWidth: 1.5,
-  },
-  secondaryButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
+  // Empty State
   tipCard: {
     flexDirection: 'row',
     gap: spacing.s,
-    padding: spacing.m,
-    borderRadius: borderRadius.l,
-    borderWidth: 1,
+    marginHorizontal: screenPadding,
     alignItems: 'flex-start',
   },
   tipTitle: {
-    fontSize: 13,
-    fontWeight: '700',
     marginBottom: spacing.xxs,
-  },
-  tipText: {
-    fontSize: 12,
-    lineHeight: 16,
   },
 
   // Sets List
   setsList: {
     flex: 1,
-    padding: spacing.m,
-    gap: 0,
-  },
-  setCard: {
-    padding: 14,
-    borderRadius: borderRadius.l,
-    borderWidth: 1,
-    marginTop: 4,
-    marginBottom: 16,
+    padding: screenPadding,
+    gap: spacing.s,
   },
 
   // Card Header
@@ -3104,7 +2478,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    marginRight: spacing.s,
+    gap: spacing.s,
   },
   dateIcon: {
     width: 48,
@@ -3112,276 +2486,89 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.m,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.m,
   },
   dateMonth: {
-    fontSize: 10,
     fontWeight: '600',
-    textTransform: 'uppercase',
-    lineHeight: 12,
+    opacity: 0.85,
   },
   dateDay: {
-    fontSize: 18,
     fontWeight: '700',
     lineHeight: 20,
-  },
-  setCardInfo: {
-    flex: 1,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    gap: spacing.xs,
   },
   setTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginRight: spacing.xs,
+    fontWeight: '600',
+    flexShrink: 1,
   },
   statusDot: {
     width: 8,
     height: 8,
-    borderRadius: 4,
+    borderRadius: borderRadius.full,
   },
-  setCardCount: {
-    fontSize: 12,
-    fontWeight: '400',
+  setBadge: {
+    marginTop: spacing.xxs,
   },
 
   // Progress Section
   progressSection: {
-    marginTop: 4,
+    marginTop: spacing.s,
+    gap: spacing.xs,
   },
   progressHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: spacing.xs,
-  },
-  progressLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  progressPercentage: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  progressBar: {
-    height: 8,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 4,
   },
 
-  // More Button
-  moreButton: {
-    padding: spacing.xs,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // Hidden Badge
-  hiddenBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    backgroundColor: 'rgba(0,0,0,0.06)',
-    marginTop: 4,
-    alignSelf: 'flex-start',
-  },
-  hiddenBadgeText: {
-    fontSize: 11,
-    fontWeight: '500',
-  },
-
-  // Set Action Sheet
-  setActionSheet: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    paddingHorizontal: spacing.m,
-    paddingBottom: 40,
-    paddingTop: spacing.s,
-  },
-  setActionSheetHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: spacing.m,
-  },
-  sheetAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
+  // Sheets
+  sheetRow: {
     paddingHorizontal: spacing.s,
+    borderRadius: borderRadius.m,
   },
 
-  // FAB
-  fab: {
-    position: 'absolute',
-    right: spacing.l,
-    bottom: spacing.xxl,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    // @ts-ignore - boxShadow для web
-    boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 8,
-  },
-  fabHidden: {
-    display: 'none',
-  },
-
-  pillRow: {
-    gap: spacing.xs,
-    paddingVertical: spacing.xs,
-  },
-  pill: {
-    paddingHorizontal: spacing.s,
-    paddingVertical: spacing.xs,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  pillText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  // Edit Course Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.xl,
-  },
-  editModalContent: {
-    width: '100%',
-    maxWidth: 400,
-    borderRadius: borderRadius.l,
-    padding: spacing.xl,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  editModalHeader: {
+  // Dialogs
+  dialogButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.l,
-  },
-  editModalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  editModalInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: spacing.s,
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.m,
-    borderRadius: borderRadius.m,
-    borderWidth: 1.5,
-    marginBottom: spacing.l,
   },
-  editModalInput: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '600',
-    padding: 0,
-    margin: 0,
-    ...Platform.select({ web: { outlineStyle: 'none' } }),
-  },
-  editModalButtons: {
-    flexDirection: 'row',
-    gap: spacing.m,
-  },
-  editModalButton: {
-    flex: 1,
-    paddingVertical: spacing.m,
-    borderRadius: borderRadius.m,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  editModalButtonPrimary: {
-    // Primary button styles
-  },
-  editModalButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
+  dialogNote: {
+    marginTop: spacing.s,
   },
   inviteDescription: {
-    fontSize: 14,
-    lineHeight: 20,
     marginBottom: spacing.m,
   },
-  inviteLinkBox: {
+  inviteSpinner: {
+    marginVertical: spacing.m,
+  },
+  inviteCodeBlock: {
+    marginBottom: spacing.m,
+  },
+  inviteCodeLabel: {
+    marginBottom: spacing.xs,
+  },
+  inviteBox: {
     borderRadius: borderRadius.m,
     borderWidth: 1,
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.m,
-    marginBottom: spacing.l,
-  },
-  inviteLinkText: {
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 0.2,
-  },
-  deleteModalMessage: {
-    fontSize: 15,
-    lineHeight: 20,
+    padding: spacing.m,
     marginBottom: spacing.m,
   },
-  deleteModalWarning: {
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: spacing.m,
+  inviteCodeBox: {
+    alignItems: 'center',
+    marginBottom: 0,
   },
-  deleteModalButton: {
-    borderWidth: 0,
+  inviteCode: {
+    letterSpacing: 8,
+  },
+  inviteRegenerate: {
+    marginTop: spacing.s,
   },
 
   // Streak modal
-  streakOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-    padding: spacing.l,
-  },
   streakCard: {
-    width: '100%',
     maxWidth: 360,
-    borderRadius: borderRadius.xl,
-    padding: spacing.l,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowRadius: 24,
-    elevation: 12,
-  },
-  streakClose: {
-    position: 'absolute',
-    top: spacing.s,
-    right: spacing.s,
-    padding: spacing.xs,
-    display: 'none',
   },
   streakTop: {
     flexDirection: 'row',
@@ -3392,113 +2579,40 @@ const styles = StyleSheet.create({
   streakTopIcon: {
     width: 64,
     height: 64,
-    borderRadius: 20,
+    borderRadius: borderRadius.l,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
   },
   streakTopText: {
     flex: 1,
-    gap: spacing.xs,
-  },
-  streakModeTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 0.6,
-  },
-  streakModeValue: {
-    fontSize: 24,
-    fontWeight: '800',
-    letterSpacing: 0.4,
+    gap: spacing.xxs,
   },
   weekGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: spacing.s,
   },
   weekItem: {
     alignItems: 'center',
     gap: spacing.xs,
   },
-  weekLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
   weekCircle: {
     width: 36,
     height: 36,
-    borderRadius: 18,
+    borderRadius: borderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
   },
-  weekTodayText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
   goalCard: {
-    borderWidth: 0,
-    borderRadius: borderRadius.l,
     padding: spacing.m,
-    marginBottom: spacing.m,
+    marginBottom: spacing.xs,
+    gap: spacing.s,
   },
   goalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    marginBottom: spacing.s,
   },
-  goalLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-  },
-  goalValue: {
-    fontSize: 20,
-    fontWeight: '800',
-  },
-  goalChip: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-  },
-  goalBar: {
-    height: 10,
-    borderRadius: 999,
-    overflow: 'hidden',
-  },
-  goalBarFill: {
-    height: '100%',
-    borderRadius: 999,
-  },
-  streakQuote: {
-    textAlign: 'center',
-    fontSize: 12,
-    fontStyle: 'italic',
-    lineHeight: 18,
-    marginHorizontal: spacing.m,
-  },
-
-  // Study Mode Sheet (1:1 from SetDetailScreen)
 });
-
-/* Debug colors for layout inspection (disabled)
-const debugLayers = StyleSheet.create({
-  container: { backgroundColor: '#e8f5ff' },
-  header: { backgroundColor: '#ffe5ec' },
-  searchBar: { backgroundColor: '#fff8e1' },
-  content: { backgroundColor: '#e7ffed' },
-  scrollContent: { backgroundColor: '#f5e9ff' },
-  summaryCard: { backgroundColor: '#e0f7fa' },
-  sectionHeader: { backgroundColor: '#fff0f5' },
-  emptyState: { backgroundColor: '#e3f2fd' },
-  setsList: { backgroundColor: '#fef3e7' },
-  setCard: { backgroundColor: '#f0fff4' },
-  progressSection: { backgroundColor: '#fbeff5' },
-  progressBar: { backgroundColor: '#ffe0b2' },
-  fab: { backgroundColor: '#f6e0ff' },
-});
-*/
