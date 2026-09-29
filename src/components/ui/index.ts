@@ -5,3 +5,5 @@
 export type { IconComponent } from './types';
 export { Button } from './Button';
 export type { ButtonProps, ButtonVariant } from './Button';
+export { ScreenHeader } from './ScreenHeader';
+export type { ScreenHeaderProps } from './ScreenHeader';
