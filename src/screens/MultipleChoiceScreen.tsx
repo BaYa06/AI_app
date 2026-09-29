@@ -12,6 +12,7 @@ import { spacing, borderRadius } from '@/constants';
 import { ProgressService } from '@/services/ProgressService';
 import { speak, resolveSpeechLang, prefetchSpeech, cardSpeechLangs } from '@/utils/speech';
 import { playCorrectSound, preloadSound } from '@/utils/sound';
+import { buildDistractorPool, pickSimilarDistractors } from '@/utils/choiceDistractors';
 import { Analytics } from '@/services/analytics';
 import { useChallengeStore } from '@/store';
 import type { RootStackScreenProps } from '@/types/navigation';
@@ -211,8 +212,10 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
 
   const options = useMemo(() => {
     if (!currentCard) return [];
-    const others = shuffle(questions.filter((c) => c.id !== currentCard.id));
-    const distractors = others.slice(0, Math.min(3, others.length));
+    // Неверные варианты — из всего набора (не только из порции) и похожие на правильный ответ
+    const { cards: cardsMap, cardsBySet } = useCardsStore.getState();
+    const pool = buildDistractorPool(currentCard, cardsBySet, cardsMap, useSetsStore.getState().sets);
+    const distractors = pickSimilarDistractors(currentCard, pool, 3);
     const baseOptions = shuffle([currentCard, ...distractors]).slice(0, 4);
     const labels = ['A', 'B', 'C', 'D'];
 
