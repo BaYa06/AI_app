@@ -12,7 +12,6 @@
 import React, { memo, useCallback, useEffect } from 'react';
 import {
   View,
-  Text,
   Pressable,
   TextInput,
   StyleSheet,
@@ -46,8 +45,9 @@ import {
   Trash2,
   LogOut,
 } from 'lucide-react-native';
-import { useThemeColors, useSettingsStore } from '@/store';
-import { spacing, borderRadius, getDeckAccentColor } from '@/constants';
+import { useThemeColors } from '@/store';
+import { Text } from '@/components/common/Text';
+import { spacing, borderRadius, heights, iconSize, typography, alpha, getDeckAccentColor } from '@/constants';
 import { triggerHaptic } from '@/utils/haptic';
 import { pluralize } from '@/utils';
 import type { Course } from '@/types';
@@ -118,7 +118,7 @@ const CurtainButton = memo(function CurtainButton({
   return (
     <Animated.View style={[styles.curtainButtonWrap, style]}>
       <Pressable
-        style={({ pressed }) => [styles.curtainButton, { backgroundColor: action.tint }, pressed && { opacity: 0.7 }]}
+        style={({ pressed }) => [styles.curtainButton, { backgroundColor: action.tint }, pressed && styles.pressed]}
         onPress={(e) => {
           e.stopPropagation();
           triggerHaptic('selection');
@@ -128,7 +128,7 @@ const CurtainButton = memo(function CurtainButton({
         accessibilityLabel={action.label}
       >
         {action.icon}
-        <Text style={[styles.curtainButtonText, { color: action.color }]} numberOfLines={1}>
+        <Text variant="caption" style={[styles.semibold, { color: action.color }]} numberOfLines={1}>
           {action.label}
         </Text>
       </Pressable>
@@ -206,7 +206,6 @@ const CourseRow = memo(function CourseRow({
 }: CourseRowProps) {
   const isStudent = course.isStudentCourse === true;
   const courseAccent = getDeckAccentColor(course.id || index);
-  const isDark = useSettingsStore((s) => s.resolvedTheme) === 'dark';
 
   // Три точки поворачиваются, пока шторка открыта
   const dotsRotation = useSharedValue(isMenuOpen ? 1 : 0);
@@ -217,31 +216,31 @@ const CourseRow = memo(function CourseRow({
     transform: [{ rotate: `${dotsRotation.value * 90}deg` }],
   }));
 
-  const dangerTint = isDark ? 'rgba(239,68,68,0.14)' : '#FEF2F2';
-  const neutralTint = isDark ? 'rgba(255,255,255,0.07)' : colors.background;
-  const primaryTint = colors.primary + (isDark ? '26' : '14');
+  const dangerTint = alpha(colors.error, 10);
+  const neutralTint = colors.surfaceMuted;
+  const primaryTint = alpha(colors.primary, 10);
   const actions: CurtainAction[] = isStudent
     ? [{
-        key: 'leave', label: 'Выйти из курса', color: colors.error, tint: dangerTint,
-        icon: <LogOut size={18} color={colors.error} />,
+        key: 'leave', label: 'Выйти из курса', color: colors.errorText, tint: dangerTint,
+        icon: <LogOut size={iconSize.s} color={colors.errorText} />,
         onPress: () => onOpenLeaveModal(course.id),
       }]
     : [
         ...(isTeacher
           ? [{
               key: 'invite', label: 'Пригласить', color: colors.primary, tint: primaryTint,
-              icon: <UserPlus size={18} color={colors.primary} />,
+              icon: <UserPlus size={iconSize.s} color={colors.primary} />,
               onPress: () => onOpenInvite(course.id),
             }]
           : []),
         {
           key: 'rename', label: 'Переименовать', color: colors.textPrimary, tint: neutralTint,
-          icon: <Edit2 size={18} color={colors.textPrimary} />,
+          icon: <Edit2 size={iconSize.s} color={colors.textPrimary} />,
           onPress: () => onOpenEditModal(course.id, course.title),
         },
         {
-          key: 'delete', label: 'Удалить', color: colors.error, tint: dangerTint,
-          icon: <Trash2 size={18} color={colors.error} />,
+          key: 'delete', label: 'Удалить', color: colors.errorText, tint: dangerTint,
+          icon: <Trash2 size={iconSize.s} color={colors.errorText} />,
           onPress: () => onOpenDeleteModal(course.id),
         },
       ];
@@ -251,10 +250,12 @@ const CourseRow = memo(function CourseRow({
       style={[
         styles.courseItem,
         isActive
-          ? { borderLeftColor: courseAccent, backgroundColor: courseAccent + '1A' }
+          ? { borderLeftColor: courseAccent, backgroundColor: alpha(courseAccent, 10) }
           : { borderLeftColor: colors.border },
         { borderColor: colors.border },
       ]}
+      accessibilityRole="button"
+      accessibilityState={{ selected: isActive }}
       onPress={() => {
         if (!isEditing) {
           triggerHaptic('selection');
@@ -265,27 +266,28 @@ const CourseRow = memo(function CourseRow({
       <View style={styles.courseItemHeader}>
         <View style={styles.courseItemLeft}>
           {isStudent ? (
-            <BookOpen size={24} color={isActive ? courseAccent : colors.textPrimary} />
+            <BookOpen size={iconSize.m} color={isActive ? courseAccent : colors.textPrimary} />
           ) : isActive ? (
-            <FolderOpen size={24} color={courseAccent} />
+            <FolderOpen size={iconSize.m} color={courseAccent} />
           ) : (
-            <Folder size={24} color={colors.textPrimary} />
+            <Folder size={iconSize.m} color={colors.textPrimary} />
           )}
-          <View style={{ flex: 1 }}>
+          <View style={styles.flex1}>
             {isEditing && !isStudent ? (
               <View style={styles.editRow}>
                 <View
                   style={[
                     styles.editCourseInputContainer,
-                    { backgroundColor: colors.surfaceVariant || colors.border, borderColor: colors.primary },
+                    { backgroundColor: colors.surface, borderColor: colors.primary },
                   ]}
                 >
-                  <Folder size={18} color={colors.primary} />
+                  <Folder size={iconSize.s} color={colors.primary} />
                   <TextInput
                     ref={editInputRef}
-                    style={[styles.editCourseInput, { color: colors.textPrimary }]}
+                    style={[styles.courseInput, { color: colors.textPrimary }]}
                     placeholder="Название курса..."
-                    placeholderTextColor={colors.textSecondary}
+                    placeholderTextColor={colors.textTertiary}
+                    selectionColor={colors.primary}
                     value={editingTitle}
                     onChangeText={onChangeEditingTitle}
                     maxLength={255}
@@ -293,23 +295,35 @@ const CourseRow = memo(function CourseRow({
                   />
                 </View>
                 <View style={styles.editActions}>
-                  <Pressable style={styles.iconCircle} onPress={() => onSaveEditingTitle(course.id)}>
-                    <CheckCircle size={18} color={colors.success} />
+                  <Pressable
+                    style={[styles.iconCircle, { backgroundColor: colors.surfaceMuted }]}
+                    hitSlop={spacing.xxs}
+                    accessibilityRole="button"
+                    accessibilityLabel="Сохранить название"
+                    onPress={() => onSaveEditingTitle(course.id)}
+                  >
+                    <CheckCircle size={iconSize.s} color={colors.successText} />
                   </Pressable>
-                  <Pressable style={styles.iconCircle} onPress={onCancelEditingTitle}>
-                    <X size={18} color={colors.textSecondary} />
+                  <Pressable
+                    style={[styles.iconCircle, { backgroundColor: colors.surfaceMuted }]}
+                    hitSlop={spacing.xxs}
+                    accessibilityRole="button"
+                    accessibilityLabel="Отменить"
+                    onPress={onCancelEditingTitle}
+                  >
+                    <X size={iconSize.s} color={colors.textSecondary} />
                   </Pressable>
                 </View>
               </View>
             ) : (
-              <Text style={[styles.courseTitle, { color: isActive ? courseAccent : colors.textPrimary }]}>
+              <Text variant="body" numberOfLines={2} style={[styles.semibold, { color: isActive ? courseAccent : colors.textPrimary }]}>
                 {course.title}
               </Text>
             )}
             {isStudent && course.teacherName ? (
-              <Text style={[styles.courseMeta, { color: colors.textSecondary }]}>{course.teacherName}</Text>
+              <Text variant="caption" style={{ color: colors.textSecondary }}>{course.teacherName}</Text>
             ) : (
-              <Text style={[styles.courseMeta, { color: colors.textSecondary }]}>
+              <Text variant="caption" style={{ color: colors.textSecondary }}>
                 {formatCourseStats(stats)}
               </Text>
             )}
@@ -326,7 +340,7 @@ const CourseRow = memo(function CourseRow({
           accessibilityLabel={isMenuOpen ? 'Скрыть действия курса' : 'Действия курса'}
         >
           <Animated.View style={dotsStyle}>
-            <MoreHorizontal size={18} color={isMenuOpen ? colors.textPrimary : colors.textSecondary} />
+            <MoreHorizontal size={iconSize.s} color={isMenuOpen ? colors.textPrimary : colors.textSecondary} />
           </Animated.View>
         </Pressable>
       </View>
@@ -344,10 +358,6 @@ export interface CoursesDrawerProps {
   onGestureSettled: (open: boolean) => void;
 
   colors: ThemeColors;
-  isDarkMode: boolean;
-  drawerBackground: string;
-  drawerBorder: string;
-  backdropColor: string;
   insets: Insets;
 
   courses: Course[];
@@ -391,10 +401,6 @@ export const CoursesDrawer = memo(function CoursesDrawer(props: CoursesDrawerPro
     drawerWidth,
     onGestureSettled,
     colors,
-    isDarkMode,
-    drawerBackground,
-    drawerBorder,
-    backdropColor,
     insets,
     courses,
     activeCourseId,
@@ -499,20 +505,21 @@ export const CoursesDrawer = memo(function CoursesDrawer(props: CoursesDrawerPro
   const allStats = getCourseStats(null);
 
   const listHeader = (
-    <View style={{ gap: spacing.xs, marginBottom: spacing.m }}>
+    <View style={styles.listHeader}>
       {isCreatingCourse ? (
         <View
           style={[
             styles.newCourseInputContainer,
-            { backgroundColor: colors.surfaceVariant || colors.border, borderColor: colors.primary },
+            { backgroundColor: colors.surface, borderColor: colors.primary },
           ]}
         >
-          <Folder size={18} color={colors.primary} />
+          <Folder size={iconSize.s} color={colors.primary} />
           <TextInput
             ref={newCourseInputRef}
-            style={[styles.newCourseInput, { color: colors.textPrimary }]}
+            style={[styles.courseInput, { color: colors.textPrimary }]}
             placeholder="Название курса..."
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.textTertiary}
+            selectionColor={colors.primary}
             value={newCourseTitle}
             onChangeText={onChangeNewCourseTitle}
             maxLength={255}
@@ -522,20 +529,30 @@ export const CoursesDrawer = memo(function CoursesDrawer(props: CoursesDrawerPro
           />
         </View>
       ) : (
-        <View style={{ gap: spacing.xs }}>
+        <View style={styles.listHeaderButtons}>
           <Pressable
-            style={[styles.newCourseButton, { backgroundColor: colors.primary + '1A', borderColor: colors.primary + '33' }]}
+            accessibilityRole="button"
+            style={({ pressed }) => [
+              styles.newCourseButton,
+              { backgroundColor: alpha(colors.primary, 10), borderColor: alpha(colors.primary, 20) },
+              pressed && styles.pressed,
+            ]}
             onPress={onStartCreatingCourse}
           >
-            <Plus size={18} color={colors.primary} />
-            <Text style={[styles.newCourseText, { color: colors.primary }]}>Новый курс</Text>
+            <Plus size={iconSize.s} color={colors.primary} />
+            <Text style={[typography.button, styles.noLetterSpacing, { color: colors.primary }]}>Новый курс</Text>
           </Pressable>
           <Pressable
-            style={[styles.newCourseButton, { backgroundColor: colors.primary + '1A', borderColor: colors.primary + '33' }]}
+            accessibilityRole="button"
+            style={({ pressed }) => [
+              styles.newCourseButton,
+              { backgroundColor: alpha(colors.primary, 10), borderColor: alpha(colors.primary, 20) },
+              pressed && styles.pressed,
+            ]}
             onPress={onJoinByCode}
           >
-            <UserPlus size={18} color={colors.primary} />
-            <Text style={[styles.newCourseText, { color: colors.primary }]}>Войти по коду</Text>
+            <UserPlus size={iconSize.s} color={colors.primary} />
+            <Text style={[typography.button, styles.noLetterSpacing, { color: colors.primary }]}>Войти по коду</Text>
           </Pressable>
         </View>
       )}
@@ -545,20 +562,22 @@ export const CoursesDrawer = memo(function CoursesDrawer(props: CoursesDrawerPro
         style={[
           styles.courseItem,
           activeCourseId === null
-            ? { borderLeftColor: colors.primary, backgroundColor: colors.primary + '0D' }
+            ? { borderLeftColor: colors.primary, backgroundColor: alpha(colors.primary, 10) }
             : { borderLeftColor: colors.border },
           { borderColor: colors.border },
         ]}
+        accessibilityRole="button"
+        accessibilityState={{ selected: activeCourseId === null }}
         onPress={() => onSelectCourse(null)}
       >
         <View style={styles.courseItemHeader}>
           <View style={styles.courseItemLeft}>
-            <Library size={24} color={activeCourseId === null ? colors.primary : colors.textPrimary} />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.courseTitle, { color: activeCourseId === null ? colors.primary : colors.textPrimary }]}>
+            <Library size={iconSize.m} color={activeCourseId === null ? colors.primary : colors.textPrimary} />
+            <View style={styles.flex1}>
+              <Text variant="body" style={[styles.semibold, { color: activeCourseId === null ? colors.primary : colors.textPrimary }]}>
                 Все наборы
               </Text>
-              <Text style={[styles.courseMeta, { color: colors.textSecondary }]}>
+              <Text variant="caption" style={{ color: colors.textSecondary }}>
                 {formatCourseStats(allStats)}
               </Text>
             </View>
@@ -570,7 +589,7 @@ export const CoursesDrawer = memo(function CoursesDrawer(props: CoursesDrawerPro
 
   const listEmpty = courses.length === 0 ? (
     <View style={styles.drawerEmpty}>
-      <Text style={[styles.drawerEmptyText, { color: colors.textSecondary }]}>
+      <Text variant="bodySmall" align="center" style={{ color: colors.textSecondary }}>
         Создай курс, чтобы разложить наборы по темам
       </Text>
     </View>
@@ -582,10 +601,10 @@ export const CoursesDrawer = memo(function CoursesDrawer(props: CoursesDrawerPro
     <Modal visible={mounted} transparent animationType="none" onRequestClose={onRequestClose}>
       {/* Модалка — отдельный нативный root; вложенный GestureHandlerRootView нужен,
           иначе Gesture.Pan() внутри Modal не работает надёжно, особенно на Android. */}
-      <GestureHandlerRootView style={{ flex: 1 }}>
+      <GestureHandlerRootView style={styles.flex1}>
         <View style={styles.modalContainer}>
-          <Animated.View style={[styles.backdrop, { backgroundColor: backdropColor }, backdropAnimStyle]}>
-            <Pressable style={StyleSheet.absoluteFill} onPress={onBackdropPress} />
+          <Animated.View style={[styles.backdrop, { backgroundColor: colors.overlay }, backdropAnimStyle]}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={onBackdropPress} accessibilityLabel="Закрыть список курсов" />
           </Animated.View>
 
           <GestureDetector gesture={panelGesture}>
@@ -593,10 +612,9 @@ export const CoursesDrawer = memo(function CoursesDrawer(props: CoursesDrawerPro
               style={[
                 styles.drawer,
                 {
-                  backgroundColor: drawerBackground,
-                  borderColor: drawerBorder,
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
                   width: drawerWidth,
-                  shadowOpacity: isDarkMode ? 0.35 : 0.2,
                   paddingTop: insets.top + spacing.m,
                   paddingBottom: insets.bottom + spacing.l,
                 },
@@ -604,7 +622,7 @@ export const CoursesDrawer = memo(function CoursesDrawer(props: CoursesDrawerPro
               ]}
             >
               <View style={styles.drawerHeader}>
-                <Text style={[styles.drawerTitle, { color: colors.textPrimary }]}>Курсы</Text>
+                <Text variant="h2" accessibilityRole="header" style={{ color: colors.textPrimary }}>Курсы</Text>
               </View>
 
               <View style={styles.drawerBody}>
@@ -629,18 +647,26 @@ export const CoursesDrawer = memo(function CoursesDrawer(props: CoursesDrawerPro
 });
 
 const styles = StyleSheet.create({
+  flex1: {
+    flex: 1,
+  },
+  semibold: {
+    fontWeight: '600',
+  },
+  noLetterSpacing: {
+    letterSpacing: 0,
+  },
+  pressed: {
+    opacity: 0.85,
+  },
   modalContainer: {
     flex: 1,
-    backgroundColor: 'transparent',
   },
   backdrop: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
+    ...StyleSheet.absoluteFillObject,
     zIndex: 30,
   },
+  // Панель без тени: её отделяет затемнение и граница (в тёмной теме тени не используем)
   drawer: {
     position: 'absolute',
     top: 0,
@@ -652,75 +678,63 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: borderRadius.xl,
     overflow: 'hidden',
     paddingHorizontal: spacing.m,
-    shadowColor: '#000',
-    shadowOffset: { width: 2, height: 0 },
-    shadowRadius: 8,
-    // Android: тень через elevation, а не программный shadow* — дешевле на слабых устройствах.
-    elevation: 12,
   },
   drawerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 20,
-  },
-  drawerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+    marginVertical: spacing.m,
   },
   drawerBody: {
     gap: spacing.m,
     flex: 1,
+  },
+  listHeader: {
+    gap: spacing.xs,
+    marginBottom: spacing.m,
+  },
+  listHeaderButtons: {
+    gap: spacing.xs,
   },
   newCourseButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xs,
-    paddingVertical: spacing.m,
-    borderRadius: borderRadius.l,
+    minHeight: heights.button,
+    borderRadius: borderRadius.m,
     borderWidth: 1,
-  },
-  newCourseText: {
-    fontSize: 15,
-    fontWeight: '600',
   },
   newCourseInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.s,
+    minHeight: heights.button,
     paddingHorizontal: spacing.m,
-    paddingVertical: spacing.m,
-    borderRadius: borderRadius.l,
+    borderRadius: borderRadius.m,
     borderWidth: 1,
   },
-  newCourseInput: {
+  courseInput: {
     flex: 1,
-    fontSize: 15,
+    fontFamily: typography.body.fontFamily,
+    fontSize: typography.body.fontSize,
     fontWeight: '600',
     paddingVertical: 0,
     ...Platform.select({ web: { outlineStyle: 'none' } }),
   },
   editCourseInputContainer: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.s,
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.s,
-    borderRadius: borderRadius.l,
+    gap: spacing.xs,
+    minHeight: heights.input,
+    paddingHorizontal: spacing.s,
+    borderRadius: borderRadius.m,
     borderWidth: 1,
-  },
-  editCourseInput: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '700',
-    paddingVertical: 0,
-    ...Platform.select({ web: { outlineStyle: 'none' } }),
   },
   editRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.s,
+    gap: spacing.xs,
   },
   editActions: {
     flexDirection: 'row',
@@ -728,12 +742,11 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   iconCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 36,
+    height: 36,
+    borderRadius: borderRadius.full,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#00000009',
   },
   drawerList: {
     flex: 1,
@@ -760,18 +773,10 @@ const styles = StyleSheet.create({
     gap: spacing.s,
     flex: 1,
   },
-  courseTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  courseMeta: {
-    fontSize: 11,
-    fontWeight: '500',
-  },
   courseMoreButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: heights.touch,
+    height: heights.touch,
+    borderRadius: borderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -795,22 +800,14 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.m,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    paddingHorizontal: 4,
+    gap: spacing.xxs,
+    paddingHorizontal: spacing.xxs,
     paddingVertical: spacing.s,
-  },
-  curtainButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
   },
   drawerEmpty: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.xl,
     gap: spacing.s,
-  },
-  drawerEmptyText: {
-    fontSize: 13,
-    fontWeight: '600',
   },
 });

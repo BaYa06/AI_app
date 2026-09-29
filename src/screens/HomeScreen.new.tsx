@@ -170,7 +170,6 @@ function pickCardsForGame(cards: Card[], count: number): Card[] {
 
 export function HomeScreen({ navigation }: any) {
   const colors = useThemeColors();
-  const isDarkMode = useSettingsStore((s) => s.resolvedTheme) === 'dark';
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [setsSort, setSetsSort] = useState<SetsSortKey>(loadSetsSort);
@@ -1736,10 +1735,6 @@ export function HomeScreen({ navigation }: any) {
         drawerWidth={drawerWidth}
         onGestureSettled={handleDrawerGestureSettled}
         colors={colors}
-        isDarkMode={isDarkMode}
-        drawerBackground={colors.surface}
-        drawerBorder={colors.border}
-        backdropColor={colors.overlay}
         insets={insets}
         courses={courses}
         activeCourseId={activeCourseId}
