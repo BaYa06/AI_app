@@ -9,7 +9,7 @@ import { typography, TypographyVariant } from '@/constants';
 
 interface TextProps extends RNTextProps {
   variant?: TypographyVariant;
-  color?: 'primary' | 'secondary' | 'tertiary' | 'inverse' | 'error' | 'success';
+  color?: 'primary' | 'secondary' | 'tertiary' | 'inverse' | 'error' | 'success' | 'warning' | 'accent';
   align?: 'left' | 'center' | 'right';
 }
 
@@ -28,8 +28,11 @@ export const Text = memo<TextProps>(function Text({
     secondary: colors.textSecondary,
     tertiary: colors.textTertiary,
     inverse: colors.textInverse,
-    error: colors.error,
-    success: colors.success,
+    // Смысловой текст — «текстовые» токены: заливки #10B981/#F59E0B как текст нечитаемы
+    error: colors.errorText,
+    success: colors.successText,
+    warning: colors.warningText,
+    accent: colors.primary,
   }[color];
 
   // Вариант задаёт lineHeight под свой размер (body: 16/24). Если экран увеличил fontSize, а

@@ -1,5 +1,6 @@
 /**
- * Типографика
+ * Типографика — шкала брендбука (plan/brandbook.md, раздел 3).
+ * Размеры только 12/14/16/18/20/24/32/40, веса только 400/600/700.
  */
 import { Platform, TextStyle } from 'react-native';
 
@@ -10,6 +11,15 @@ const fontFamily = Platform.select({
 });
 
 export const typography = {
+  // Крупные цифры: код игры, счёт, результат теста
+  display: {
+    fontFamily,
+    fontSize: 40,
+    fontWeight: '700',
+    lineHeight: 48,
+    letterSpacing: -0.5,
+  } as TextStyle,
+
   // Заголовки
   h1: {
     fontFamily,
@@ -22,7 +32,7 @@ export const typography = {
   h2: {
     fontFamily,
     fontSize: 24,
-    fontWeight: '600',
+    fontWeight: '700',
     lineHeight: 32,
     letterSpacing: -0.3,
   } as TextStyle,
@@ -86,7 +96,7 @@ export const typography = {
   cardText: {
     fontFamily,
     fontSize: 22,
-    fontWeight: '500',
+    fontWeight: '600',
     lineHeight: 32,
   } as TextStyle,
   
@@ -94,9 +104,19 @@ export const typography = {
   label: {
     fontFamily,
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     lineHeight: 20,
     letterSpacing: 0.2,
+  } as TextStyle,
+
+  // Подписи разделов («АККАУНТ», «ОБУЧЕНИЕ») — единственный вариант капсом
+  overline: {
+    fontFamily,
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 16,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
   } as TextStyle,
 } as const;
 
