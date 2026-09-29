@@ -21,3 +21,5 @@ export { Sheet, Dialog } from './Sheet';
 export type { SheetProps, DialogProps } from './Sheet';
 export { Skeleton, SkeletonText, SkeletonListRow, SkeletonCard, SkeletonList } from './Skeleton';
 export type { SkeletonProps } from './Skeleton';
+export { EmptyState, ErrorState } from './EmptyState';
+export type { EmptyStateProps, ErrorStateProps } from './EmptyState';
