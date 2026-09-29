@@ -23,3 +23,5 @@ export { Skeleton, SkeletonText, SkeletonListRow, SkeletonCard, SkeletonList } f
 export type { SkeletonProps } from './Skeleton';
 export { EmptyState, ErrorState } from './EmptyState';
 export type { EmptyStateProps, ErrorStateProps } from './EmptyState';
+export { Chip, Badge, ProgressBar, Switch } from './Controls';
+export type { ChipProps, BadgeProps, BadgeTone, ProgressBarProps, SwitchProps } from './Controls';
