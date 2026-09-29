@@ -19,3 +19,5 @@ export { confirmDialog } from './ConfirmDialog';
 export type { ConfirmDialogOptions } from './ConfirmDialog';
 export { Sheet, Dialog } from './Sheet';
 export type { SheetProps, DialogProps } from './Sheet';
+export { Skeleton, SkeletonText, SkeletonListRow, SkeletonCard, SkeletonList } from './Skeleton';
+export type { SkeletonProps } from './Skeleton';
