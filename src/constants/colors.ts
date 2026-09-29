@@ -56,6 +56,8 @@ export const colors = {
     streak: '#F97316',  // серия
     diamond: '#10B981', // алмазы
     star: '#F59E0B',    // звёзды оценки, золото в рейтинге
+    silver: '#8A94A6',  // серебро (2-е место)
+    bronze: '#C2703D',  // бронза (3-е место)
     
     // Overlay
     overlay: 'rgba(0, 0, 0, 0.5)',
@@ -116,6 +118,8 @@ export const colors = {
     streak: '#F97316',
     diamond: '#10B981',
     star: '#F59E0B',
+    silver: '#8A94A6',
+    bronze: '#C2703D',
     
     // Overlay
     overlay: 'rgba(0, 0, 0, 0.7)',
