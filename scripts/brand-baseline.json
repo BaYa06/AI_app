@@ -1,0 +1,784 @@
+{
+  "totals": {
+    "hex": 808,
+    "rgba": 351,
+    "isDark": 260,
+    "font": 344,
+    "weight": 180,
+    "radius": 157,
+    "alpha": 156,
+    "alert": 76,
+    "small": 105,
+    "emoji": 63,
+    "ion": 26,
+    "a11y": 106,
+    "en": 23,
+    "total": 2332
+  },
+  "files": {
+    "src/screens/HomeScreen.new.tsx": {
+      "hex": 82,
+      "rgba": 34,
+      "font": 27,
+      "weight": 12,
+      "radius": 20,
+      "alpha": 5,
+      "alert": 15,
+      "small": 9,
+      "ion": 1,
+      "a11y": 10,
+      "total": 195
+    },
+    "src/screens/TeacherCourseStatsScreen.tsx": {
+      "hex": 60,
+      "rgba": 24,
+      "isDark": 27,
+      "font": 21,
+      "weight": 6,
+      "radius": 10,
+      "small": 12,
+      "emoji": 1,
+      "a11y": 2,
+      "total": 148
+    },
+    "src/screens/TeacherStudentsScreen.tsx": {
+      "hex": 35,
+      "rgba": 13,
+      "isDark": 17,
+      "font": 9,
+      "weight": 4,
+      "radius": 8,
+      "alert": 5,
+      "small": 2,
+      "emoji": 2,
+      "a11y": 3,
+      "total": 91
+    },
+    "src/screens/StatisticsScreen.tsx": {
+      "hex": 28,
+      "rgba": 12,
+      "isDark": 13,
+      "font": 16,
+      "weight": 12,
+      "radius": 6,
+      "alpha": 3,
+      "small": 10,
+      "ion": 1,
+      "a11y": 1,
+      "total": 90
+    },
+    "src/screens/TestResultsTeacherScreen.tsx": {
+      "hex": 32,
+      "rgba": 15,
+      "isDark": 11,
+      "font": 13,
+      "weight": 4,
+      "radius": 2,
+      "alpha": 5,
+      "alert": 1,
+      "small": 4,
+      "a11y": 1,
+      "total": 83
+    },
+    "src/screens/TestLobbyScreen.tsx": {
+      "hex": 29,
+      "rgba": 13,
+      "isDark": 8,
+      "font": 11,
+      "weight": 4,
+      "radius": 5,
+      "alpha": 4,
+      "small": 3,
+      "total": 74
+    },
+    "src/screens/LiveTestScreen.tsx": {
+      "hex": 23,
+      "rgba": 9,
+      "isDark": 10,
+      "font": 15,
+      "weight": 5,
+      "radius": 5,
+      "alpha": 6,
+      "small": 4,
+      "emoji": 1,
+      "a11y": 1,
+      "total": 73
+    },
+    "src/screens/AchievementsScreen.tsx": {
+      "hex": 19,
+      "rgba": 12,
+      "isDark": 15,
+      "font": 9,
+      "weight": 4,
+      "radius": 3,
+      "alpha": 3,
+      "small": 3,
+      "ion": 1,
+      "a11y": 1,
+      "total": 65
+    },
+    "src/screens/ExamLobbyScreen.tsx": {
+      "hex": 17,
+      "rgba": 14,
+      "isDark": 12,
+      "font": 7,
+      "weight": 2,
+      "radius": 3,
+      "alpha": 3,
+      "small": 3,
+      "a11y": 3,
+      "total": 58
+    },
+    "src/screens/StudentDetailScreen.tsx": {
+      "hex": 24,
+      "rgba": 7,
+      "isDark": 7,
+      "font": 9,
+      "weight": 3,
+      "radius": 7,
+      "alpha": 1,
+      "small": 7,
+      "emoji": 1,
+      "a11y": 1,
+      "total": 58
+    },
+    "src/screens/LibraryScreen.tsx": {
+      "hex": 20,
+      "rgba": 1,
+      "isDark": 6,
+      "font": 9,
+      "weight": 9,
+      "radius": 1,
+      "alpha": 8,
+      "small": 7,
+      "emoji": 8,
+      "ion": 1,
+      "a11y": 1,
+      "total": 54
+    },
+    "src/screens/SubscriptionScreen.tsx": {
+      "hex": 21,
+      "rgba": 8,
+      "isDark": 6,
+      "font": 7,
+      "weight": 5,
+      "radius": 2,
+      "alpha": 4,
+      "small": 5,
+      "a11y": 1,
+      "en": 1,
+      "total": 53
+    },
+    "src/screens/ContextFillScreen.tsx": {
+      "hex": 20,
+      "rgba": 12,
+      "isDark": 6,
+      "font": 7,
+      "weight": 3,
+      "radius": 1,
+      "alpha": 1,
+      "alert": 2,
+      "small": 1,
+      "emoji": 3,
+      "a11y": 3,
+      "total": 52
+    },
+    "src/screens/SharedSetDetailScreen.tsx": {
+      "hex": 19,
+      "rgba": 3,
+      "isDark": 6,
+      "font": 9,
+      "weight": 10,
+      "alpha": 3,
+      "small": 7,
+      "emoji": 4,
+      "ion": 1,
+      "a11y": 4,
+      "en": 11,
+      "total": 50
+    },
+    "src/screens/ProfileScreen.tsx": {
+      "hex": 9,
+      "rgba": 6,
+      "isDark": 6,
+      "font": 10,
+      "weight": 5,
+      "radius": 2,
+      "alpha": 9,
+      "alert": 1,
+      "small": 4,
+      "ion": 1,
+      "total": 48
+    },
+    "src/screens/AudioLearningScreen.tsx": {
+      "hex": 24,
+      "rgba": 13,
+      "font": 2,
+      "weight": 3,
+      "radius": 2,
+      "alert": 2,
+      "small": 1,
+      "a11y": 3,
+      "total": 46
+    },
+    "src/screens/CourseLeaderboardScreen.tsx": {
+      "hex": 13,
+      "rgba": 2,
+      "isDark": 3,
+      "font": 11,
+      "weight": 6,
+      "radius": 9,
+      "alpha": 2,
+      "ion": 1,
+      "total": 46
+    },
+    "src/screens/TestJoinScreen.tsx": {
+      "hex": 14,
+      "rgba": 9,
+      "isDark": 9,
+      "font": 8,
+      "weight": 2,
+      "radius": 1,
+      "alpha": 3,
+      "small": 1,
+      "emoji": 1,
+      "a11y": 1,
+      "total": 46
+    },
+    "src/screens/PersonalInfoScreen.tsx": {
+      "hex": 12,
+      "rgba": 6,
+      "isDark": 8,
+      "font": 4,
+      "weight": 4,
+      "radius": 1,
+      "alpha": 5,
+      "alert": 5,
+      "small": 1,
+      "a11y": 2,
+      "total": 45
+    },
+    "src/screens/TestWaitingScreen.tsx": {
+      "hex": 13,
+      "rgba": 4,
+      "isDark": 6,
+      "font": 7,
+      "weight": 3,
+      "radius": 6,
+      "alpha": 5,
+      "emoji": 1,
+      "a11y": 1,
+      "total": 44
+    },
+    "src/screens/LibrarySetDetailScreen.tsx": {
+      "hex": 15,
+      "rgba": 3,
+      "isDark": 6,
+      "font": 5,
+      "weight": 6,
+      "radius": 1,
+      "alpha": 3,
+      "alert": 4,
+      "small": 4,
+      "emoji": 1,
+      "ion": 1,
+      "a11y": 4,
+      "total": 43
+    },
+    "src/screens/NotificationSettingsScreen.tsx": {
+      "hex": 13,
+      "rgba": 7,
+      "isDark": 7,
+      "font": 6,
+      "weight": 5,
+      "radius": 3,
+      "alpha": 1,
+      "alert": 1,
+      "small": 1,
+      "ion": 1,
+      "a11y": 3,
+      "total": 43
+    },
+    "src/screens/SetDetailScreen.tsx": {
+      "hex": 5,
+      "rgba": 17,
+      "font": 7,
+      "weight": 1,
+      "radius": 1,
+      "alpha": 4,
+      "alert": 4,
+      "emoji": 1,
+      "a11y": 7,
+      "total": 39
+    },
+    "src/screens/TestDoneScreen.tsx": {
+      "hex": 13,
+      "rgba": 4,
+      "isDark": 4,
+      "font": 6,
+      "weight": 4,
+      "alpha": 8,
+      "a11y": 1,
+      "total": 39
+    },
+    "src/screens/TestExamScreen.tsx": {
+      "hex": 11,
+      "rgba": 9,
+      "isDark": 6,
+      "font": 3,
+      "weight": 3,
+      "radius": 3,
+      "alpha": 3,
+      "small": 1,
+      "total": 38
+    },
+    "src/screens/StudyScreen.tsx": {
+      "hex": 15,
+      "rgba": 3,
+      "font": 7,
+      "weight": 4,
+      "radius": 6,
+      "alpha": 2,
+      "a11y": 5,
+      "total": 37
+    },
+    "src/screens/HomeScreen.tsx": {
+      "hex": 17,
+      "rgba": 7,
+      "font": 4,
+      "weight": 1,
+      "radius": 7,
+      "small": 3,
+      "a11y": 5,
+      "en": 10,
+      "total": 36
+    },
+    "src/screens/OralTestSessionScreen.tsx": {
+      "hex": 10,
+      "rgba": 5,
+      "isDark": 6,
+      "font": 5,
+      "weight": 2,
+      "radius": 2,
+      "alpha": 2,
+      "alert": 1,
+      "a11y": 1,
+      "total": 33
+    },
+    "src/screens/MyPublicationsScreen.tsx": {
+      "hex": 12,
+      "isDark": 1,
+      "font": 4,
+      "weight": 3,
+      "radius": 1,
+      "alpha": 5,
+      "alert": 4,
+      "small": 3,
+      "emoji": 1,
+      "ion": 1,
+      "a11y": 1,
+      "total": 30
+    },
+    "src/screens/OralTestLobbyScreen.tsx": {
+      "hex": 12,
+      "rgba": 5,
+      "isDark": 5,
+      "font": 3,
+      "weight": 1,
+      "radius": 1,
+      "alpha": 2,
+      "alert": 1,
+      "a11y": 1,
+      "total": 30
+    },
+    "src/screens/OralTestResultsScreen.tsx": {
+      "hex": 8,
+      "rgba": 6,
+      "isDark": 6,
+      "font": 4,
+      "radius": 2,
+      "alpha": 4,
+      "emoji": 1,
+      "total": 30
+    },
+    "src/screens/FeedbackScreen.tsx": {
+      "hex": 8,
+      "rgba": 4,
+      "isDark": 4,
+      "font": 4,
+      "weight": 4,
+      "radius": 2,
+      "alpha": 1,
+      "alert": 1,
+      "ion": 1,
+      "a11y": 1,
+      "total": 28
+    },
+    "src/screens/SetEditorScreen.tsx": {
+      "hex": 6,
+      "font": 2,
+      "weight": 3,
+      "radius": 1,
+      "alpha": 6,
+      "alert": 8,
+      "emoji": 7,
+      "a11y": 1,
+      "total": 26
+    },
+    "src/components/books/AttachToCoursesSheet.tsx": {
+      "hex": 9,
+      "rgba": 4,
+      "isDark": 3,
+      "font": 3,
+      "weight": 2,
+      "radius": 4,
+      "total": 25
+    },
+    "src/screens/StudyPlaceholderScreen.tsx": {
+      "hex": 5,
+      "rgba": 5,
+      "isDark": 6,
+      "font": 2,
+      "weight": 4,
+      "alpha": 2,
+      "emoji": 3,
+      "total": 24
+    },
+    "src/screens/TestHistoryScreen.tsx": {
+      "hex": 10,
+      "rgba": 4,
+      "isDark": 4,
+      "font": 5,
+      "alpha": 1,
+      "a11y": 1,
+      "total": 24
+    },
+    "src/components/library/ChooseCourseSheet.tsx": {
+      "hex": 8,
+      "rgba": 4,
+      "isDark": 3,
+      "font": 2,
+      "weight": 1,
+      "radius": 5,
+      "total": 23
+    },
+    "src/screens/ImportFilesScreen.tsx": {
+      "hex": 9,
+      "font": 2,
+      "alpha": 3,
+      "alert": 9,
+      "small": 1,
+      "a11y": 2,
+      "total": 23
+    },
+    "src/screens/CourseBooksScreen.tsx": {
+      "hex": 7,
+      "rgba": 1,
+      "isDark": 2,
+      "font": 5,
+      "weight": 6,
+      "alpha": 1,
+      "emoji": 1,
+      "a11y": 3,
+      "total": 22
+    },
+    "src/screens/SecurityScreen.tsx": {
+      "hex": 3,
+      "rgba": 4,
+      "isDark": 5,
+      "font": 1,
+      "weight": 1,
+      "radius": 1,
+      "alpha": 7,
+      "small": 1,
+      "a11y": 2,
+      "total": 22
+    },
+    "src/screens/SoundSettingsScreen.tsx": {
+      "hex": 7,
+      "rgba": 5,
+      "isDark": 5,
+      "font": 3,
+      "weight": 1,
+      "radius": 1,
+      "ion": 1,
+      "a11y": 1,
+      "total": 22
+    },
+    "src/screens/LearningSettingsScreen.tsx": {
+      "hex": 6,
+      "rgba": 4,
+      "isDark": 4,
+      "font": 5,
+      "weight": 1,
+      "radius": 1,
+      "small": 1,
+      "ion": 1,
+      "a11y": 1,
+      "total": 21
+    },
+    "src/screens/StudyResultsScreen.tsx": {
+      "hex": 7,
+      "rgba": 4,
+      "font": 4,
+      "radius": 3,
+      "alpha": 3,
+      "small": 2,
+      "emoji": 1,
+      "a11y": 3,
+      "total": 21
+    },
+    "src/screens/BookDetailScreen.tsx": {
+      "hex": 6,
+      "rgba": 1,
+      "isDark": 2,
+      "font": 5,
+      "weight": 5,
+      "alpha": 1,
+      "small": 1,
+      "a11y": 1,
+      "total": 20
+    },
+    "src/components/home/CoursesDrawer.tsx": {
+      "hex": 3,
+      "rgba": 2,
+      "isDark": 3,
+      "font": 4,
+      "weight": 1,
+      "radius": 2,
+      "alpha": 1,
+      "small": 1,
+      "a11y": 2,
+      "total": 16
+    },
+    "src/components/RatingPromptModal.tsx": {
+      "hex": 6,
+      "rgba": 3,
+      "isDark": 2,
+      "font": 2,
+      "weight": 2,
+      "ion": 1,
+      "total": 15
+    },
+    "src/screens/MultipleChoiceScreen.tsx": {
+      "hex": 2,
+      "font": 6,
+      "weight": 4,
+      "alpha": 3,
+      "a11y": 1,
+      "total": 15
+    },
+    "src/components/common/StreakCelebrationModal.tsx": {
+      "hex": 3,
+      "rgba": 1,
+      "font": 4,
+      "weight": 1,
+      "radius": 4,
+      "alpha": 1,
+      "total": 14
+    },
+    "src/components/common/NotificationPrompt.tsx": {
+      "hex": 3,
+      "rgba": 2,
+      "font": 4,
+      "weight": 1,
+      "radius": 2,
+      "alpha": 1,
+      "a11y": 1,
+      "total": 13
+    },
+    "src/App.tsx": {
+      "hex": 7,
+      "rgba": 2,
+      "font": 1,
+      "radius": 1,
+      "alert": 1,
+      "total": 12
+    },
+    "src/screens/WordBuilderScreen.tsx": {
+      "font": 1,
+      "weight": 4,
+      "alpha": 7,
+      "a11y": 3,
+      "total": 12
+    },
+    "src/screens/PreviewImportScreen.tsx": {
+      "hex": 6,
+      "font": 1,
+      "alpha": 2,
+      "alert": 2,
+      "a11y": 1,
+      "total": 11
+    },
+    "src/components/common/ErrorBoundary.tsx": {
+      "hex": 7,
+      "rgba": 1,
+      "font": 1,
+      "radius": 1,
+      "small": 1,
+      "total": 10
+    },
+    "src/components/JoinByCodeModal.tsx": {
+      "hex": 6,
+      "rgba": 1,
+      "font": 3,
+      "a11y": 1,
+      "total": 10
+    },
+    "src/screens/WelcomeScreen.tsx": {
+      "hex": 2,
+      "rgba": 6,
+      "weight": 1,
+      "radius": 1,
+      "ion": 1,
+      "total": 10
+    },
+    "src/components/CourseInviteModal.tsx": {
+      "hex": 3,
+      "rgba": 1,
+      "font": 4,
+      "a11y": 1,
+      "total": 8
+    },
+    "src/components/study/StudyModeSheet.tsx": {
+      "hex": 4,
+      "rgba": 4,
+      "a11y": 1,
+      "total": 8
+    },
+    "src/components/study/RecommendedModeCard.tsx": {
+      "hex": 6,
+      "rgba": 1,
+      "total": 7
+    },
+    "src/screens/CardEditorScreen.tsx": {
+      "weight": 1,
+      "alert": 5,
+      "a11y": 1,
+      "total": 6
+    },
+    "src/screens/MatchScreen.tsx": {
+      "hex": 4,
+      "rgba": 2,
+      "emoji": 1,
+      "a11y": 3,
+      "total": 6
+    },
+    "src/utils/bookCover.ts": {
+      "hex": 6,
+      "emoji": 6,
+      "total": 6
+    },
+    "src/components/common/LoadingSplash.tsx": {
+      "hex": 3,
+      "rgba": 1,
+      "weight": 1,
+      "ion": 1,
+      "total": 5
+    },
+    "src/screens/TargetLanguagesScreen.tsx": {
+      "font": 1,
+      "alpha": 2,
+      "alert": 1,
+      "ion": 1,
+      "a11y": 1,
+      "total": 4
+    },
+    "src/screens/DailyGoalScreen.tsx": {
+      "radius": 2,
+      "alpha": 1,
+      "ion": 1,
+      "a11y": 1,
+      "total": 3
+    },
+    "src/screens/NativeLanguageScreen.tsx": {
+      "font": 1,
+      "alpha": 2,
+      "ion": 1,
+      "a11y": 1,
+      "total": 3
+    },
+    "src/screens/TeacherGroupSizeScreen.tsx": {
+      "radius": 2,
+      "alpha": 1,
+      "ion": 1,
+      "a11y": 1,
+      "total": 3
+    },
+    "src/screens/LearningGoalScreen.tsx": {
+      "alpha": 2,
+      "ion": 1,
+      "a11y": 1,
+      "total": 2
+    },
+    "src/screens/RoleSelectionScreen.tsx": {
+      "alpha": 2,
+      "ion": 1,
+      "a11y": 1,
+      "total": 2
+    },
+    "src/screens/TeacherSubjectScreen.tsx": {
+      "alpha": 2,
+      "ion": 1,
+      "a11y": 1,
+      "total": 2
+    },
+    "src/store/coursesStore.ts": {
+      "alert": 2,
+      "total": 2
+    },
+    "src/components/cards/FlashCard.tsx": {
+      "hex": 1,
+      "total": 1
+    },
+    "src/components/cards/SetCard.tsx": {
+      "radius": 1,
+      "emoji": 2,
+      "total": 1
+    },
+    "src/components/common/DiamondReward.tsx": {
+      "font": 1,
+      "emoji": 1,
+      "total": 1
+    },
+    "src/components/common/LottieWrapper.tsx": {
+      "font": 1,
+      "emoji": 1,
+      "total": 1
+    },
+    "src/components/study/GameRow.tsx": {
+      "rgba": 1,
+      "total": 1
+    },
+    "src/navigation/AppNavigator.tsx": {
+      "font": 1,
+      "small": 1,
+      "total": 1
+    },
+    "src/screens/EmailAuthScreen.tsx": {
+      "radius": 1,
+      "ion": 1,
+      "en": 1,
+      "total": 1
+    },
+    "src/screens/OTPVerifyScreen.tsx": {
+      "radius": 1,
+      "ion": 1,
+      "total": 1
+    },
+    "src/utils/dialogs.ts": {
+      "alert": 1,
+      "total": 1
+    },
+    "src/constants/languages.ts": {
+      "emoji": 1
+    },
+    "src/screens/SignInScreen.tsx": {
+      "ion": 1,
+      "a11y": 1
+    },
+    "src/services/DatabaseService.ts": {
+      "emoji": 13
+    }
+  }
+}
