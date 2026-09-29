@@ -21,6 +21,7 @@ import { getBookCover, formatBookMeta } from '@/utils/bookCover';
 import { showMessage, confirmAction } from '@/utils/dialogs';
 import type { BookDetail, BookUnit } from '@/types/books';
 import type { RootStackScreenProps } from '@/types/navigation';
+import { describeError } from '@/utils/userErrors';
 
 type Props = RootStackScreenProps<'BookDetail'>;
 
@@ -73,7 +74,7 @@ export function BookDetailScreen({ navigation, route }: Props) {
     const result = await BookService.attachToCourses(detail.book.id, courseIds);
     setAttaching(false);
     if (!result.ok) {
-      showMessage('Не удалось подключить', result.status === 403 ? 'Можно подключать только к своим курсам.' : result.error);
+      showMessage('Не удалось подключить', result.status === 403 ? 'Можно подключать только к своим курсам.' : describeError(result.error, 'Попробуй ещё раз.'));
       return;
     }
     const attached = [...result.data.attachedCourseIds, ...result.data.alreadyAttachedCourseIds];

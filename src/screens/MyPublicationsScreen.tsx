@@ -19,6 +19,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { supabase } from '@/services/supabaseClient';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { LibrarySet } from '@/types/library';
+import { describeError } from '@/utils/userErrors';
 
 type Props = RootStackScreenProps<'MyPublications'>;
 
@@ -53,7 +54,7 @@ export function MyPublicationsScreen({ navigation }: Props) {
       await fetchMyPublications(userId);
       Alert.alert('Готово', 'Публикация обновлена');
     } catch (err) {
-      Alert.alert('Ошибка', err instanceof Error ? err.message : 'Не удалось обновить');
+      Alert.alert('Ошибка', describeError(err, 'Не удалось обновить'));
     } finally {
       setUpdatingId(null);
     }
@@ -74,7 +75,7 @@ export function MyPublicationsScreen({ navigation }: Props) {
               await unpublishSet(userId, librarySetId);
               Alert.alert('Готово', 'Публикация снята');
             } catch (err) {
-              Alert.alert('Ошибка', err instanceof Error ? err.message : 'Не удалось снять');
+              Alert.alert('Ошибка', describeError(err, 'Не удалось снять'));
             }
           },
         },

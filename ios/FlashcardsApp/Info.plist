@@ -5,7 +5,11 @@
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>en</string>
+	<string>ru</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>ru</string>
+	</array>
 	<key>CFBundleDisplayName</key>
 	<string>Flashly</string>
 	<key>CFBundleExecutable</key>
@@ -53,15 +57,15 @@
 		</dict>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>Flashly needs camera access to let you take photos for your flashcards</string>
+	<string>Камера нужна, чтобы сфотографировать слова для карточек</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Flashly uses your local network to connect to the development server while debugging</string>
+	<string>Локальная сеть нужна только для отладки приложения</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Flashly needs microphone access for audio learning mode</string>
+	<string>Микрофон нужен, чтобы проверять твоё произношение в тренировках</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Flashly needs access to your photo library to let you pick images for your flashcards</string>
+	<string>Доступ к фото нужен, чтобы выбрать снимок со словами для карточек</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Flashly uses speech recognition to check your pronunciation</string>
+	<string>Распознавание речи нужно, чтобы проверять твоё произношение</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>AntDesign.ttf</string>

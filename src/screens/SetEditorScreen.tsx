@@ -23,6 +23,7 @@ import { ArrowLeftRight, ChevronDown, Globe } from 'lucide-react-native';
 import { LibraryService } from '@/services';
 import { supabase } from '@/services/supabaseClient';
 import { LIBRARY_CATEGORIES } from '@/constants/library';
+import { describeError } from '@/utils/userErrors';
 
 type Props = RootStackScreenProps<'SetEditor'>;
 
@@ -284,7 +285,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
       }
       setShowPublishForm(false);
     } catch (error: any) {
-      Alert.alert('Ошибка', error?.message || 'Не удалось опубликовать');
+      Alert.alert('Ошибка', describeError(error, 'Не удалось опубликовать'));
     } finally {
       setIsPublishing(false);
     }
@@ -302,7 +303,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
       setShowPublishForm(false);
       Alert.alert('Готово', 'Публикация снята');
     } catch (error: any) {
-      Alert.alert('Ошибка', error?.message || 'Не удалось снять публикацию');
+      Alert.alert('Ошибка', describeError(error, 'Не удалось снять публикацию'));
     }
   }, [librarySetId]);
 

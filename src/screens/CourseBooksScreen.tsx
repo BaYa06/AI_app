@@ -16,6 +16,7 @@ import { getBookCover, formatBookMeta } from '@/utils/bookCover';
 import { showMessage, confirmAction } from '@/utils/dialogs';
 import type { CoursePlan, CoursePlanBook, CoursePlanUnit } from '@/types/books';
 import type { RootStackScreenProps } from '@/types/navigation';
+import { describeError } from '@/utils/userErrors';
 
 type Props = RootStackScreenProps<'CourseBooks'>;
 
@@ -102,7 +103,7 @@ export function CourseBooksScreen({ navigation, route }: Props) {
     if (!ok) return;
     const result = await BookService.detachFromCourse(book.id, courseId);
     if (!result.ok) {
-      showMessage('Не удалось отключить', result.error);
+      showMessage('Не удалось отключить', describeError(result.error, 'Попробуй ещё раз.'));
       return;
     }
     setPlan((prev) => (prev ? { ...prev, books: prev.books.filter((b) => b.id !== book.id) } : prev));

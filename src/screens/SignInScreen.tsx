@@ -18,6 +18,7 @@ import { Button, Input, Text } from '@/components/common';
 import { spacing, borderRadius } from '@/constants';
 import { useThemeColors } from '@/store';
 import { SUPABASE_OAUTH_REDIRECT, supabase } from '@/services/supabaseClient';
+import { describeError } from '@/utils/userErrors';
 
 type Props = {
   onBack?: () => void;
@@ -78,7 +79,7 @@ export function SignInScreen({ onBack, onSendCode, onCreateAccount }: Props) {
         },
       });
       if (authError) {
-        setError(authError.message);
+        setError(describeError(authError, 'Не удалось войти. Попробуй ещё раз.'));
         setIsLoading(false);
       }
       // Page will navigate away to Google; no finally needed
@@ -96,7 +97,7 @@ export function SignInScreen({ onBack, onSendCode, onCreateAccount }: Props) {
     });
     console.log('[auth] OAuth URL:', data?.url);
     if (authError) {
-      setError(authError.message);
+      setError(describeError(authError, 'Не удалось войти. Попробуй ещё раз.'));
       setIsLoading(false);
       return;
     }
@@ -117,7 +118,7 @@ export function SignInScreen({ onBack, onSendCode, onCreateAccount }: Props) {
               const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
               if (exchangeError) {
                 console.error('[auth] Code exchange failed:', exchangeError.message);
-                setError(exchangeError.message);
+                setError(describeError(exchangeError, 'Не удалось войти. Попробуй ещё раз.'));
               }
             } else {
               const errorDesc = getParamFromCallbackUrl(result.url, 'error_description');

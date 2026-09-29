@@ -28,6 +28,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 
 import { API_BASE } from '@/config/apiBase';
+import { describeError } from '@/utils/userErrors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TestHistory'>;
 
@@ -84,13 +85,13 @@ export function TestHistoryScreen({ navigation, route }: Props) {
       );
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        setError(body.error || `Ошибка ${res.status}`);
+        setError(describeError(body.error, 'Не удалось загрузить историю'));
         return;
       }
       const json = await res.json();
       setItems(json);
     } catch (e: any) {
-      setError(e.message || 'Не удалось загрузить историю');
+      setError(describeError(e, 'Не удалось загрузить историю'));
     } finally {
       setLoading(false);
     }

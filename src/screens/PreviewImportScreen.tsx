@@ -19,6 +19,7 @@ import { useThemeColors, useSetsStore, useCardsStore } from '@/store';
 import { spacing, borderRadius, TOP_LANGUAGES } from '@/constants';
 import type { RootStackScreenProps } from '@/types/navigation';
 import { ArrowLeft, BookOpen } from 'lucide-react-native';
+import { describeError } from '@/utils/userErrors';
 
 type Props = RootStackScreenProps<'PreviewImport'>;
 
@@ -211,7 +212,7 @@ export function PreviewImportScreen({ navigation, route }: Props) {
       updateSetStats(setId, { cardCount: cards.length, newCount: cards.length });
       navigation.replace('SetDetail', { setId });
     } catch (e: any) {
-      Alert.alert('Ошибка', e.message || 'Не удалось сохранить карточки');
+      Alert.alert('Ошибка', describeError(e, 'Не удалось сохранить карточки'));
     } finally {
       setSaving(false);
     }
@@ -229,7 +230,7 @@ export function PreviewImportScreen({ navigation, route }: Props) {
       setModalVisible(false);
       navigation.replace('SetDetail', { setId: newSet.id });
     } catch (e: any) {
-      Alert.alert('Ошибка', e.message || 'Не удалось сохранить набор');
+      Alert.alert('Ошибка', describeError(e, 'Не удалось сохранить набор'));
     } finally {
       setSaving(false);
     }

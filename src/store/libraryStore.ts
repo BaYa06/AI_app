@@ -10,6 +10,7 @@ import type {
   LibraryFilters,
   PublishSetPayload,
 } from '@/types/library';
+import { describeError } from '@/utils/userErrors';
 
 interface LibraryState {
   // Sections
@@ -128,7 +129,7 @@ export const useLibraryStore = create<LibraryState & LibraryActions>()(
       } catch (error) {
         set((s) => {
           s.isLoading = false;
-          s.error = error instanceof Error ? error.message : 'Failed to load library';
+          s.error = describeError(error, 'Не удалось загрузить библиотеку');
         });
       }
     },
@@ -166,7 +167,7 @@ export const useLibraryStore = create<LibraryState & LibraryActions>()(
       } catch (error) {
         set((s) => {
           s.isLoading = false;
-          s.error = error instanceof Error ? error.message : 'Failed to load set';
+          s.error = describeError(error, 'Не удалось загрузить набор');
         });
       }
     },
@@ -253,7 +254,7 @@ export const useLibraryStore = create<LibraryState & LibraryActions>()(
         set((s) => { s.myPublications = pubs; });
       } catch (error) {
         set((s) => {
-          s.error = error instanceof Error ? error.message : 'Failed to load publications';
+          s.error = describeError(error, 'Не удалось загрузить публикации');
         });
       }
     },

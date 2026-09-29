@@ -22,6 +22,7 @@ import { borderRadius, spacing } from '@/constants';
 import { SUPABASE_OAUTH_REDIRECT, supabase } from '@/services/supabaseClient';
 import { Analytics } from '@/services/analytics';
 import { useThemeColors } from '@/store';
+import { describeError } from '@/utils/userErrors';
 
 type Props = {
   onBack?: () => void;
@@ -74,7 +75,7 @@ export function EmailAuthScreen({ onBack }: Props) {
       });
       if (error) {
         console.error('[auth] Google sign-in error', error);
-        setAuthError(error.message);
+        setAuthError(describeError(error, 'Не удалось войти. Попробуй ещё раз.'));
         setIsLoading(false);
       }
       return;
@@ -91,7 +92,7 @@ export function EmailAuthScreen({ onBack }: Props) {
 
     if (error) {
       console.error('[auth] Google sign-in error', error);
-      setAuthError(error.message);
+      setAuthError(describeError(error, 'Не удалось войти. Попробуй ещё раз.'));
       setIsLoading(false);
       return;
     }
@@ -112,7 +113,7 @@ export function EmailAuthScreen({ onBack }: Props) {
               const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
               if (exchangeError) {
                 console.error('[auth] Code exchange failed:', exchangeError.message);
-                setAuthError(exchangeError.message);
+                setAuthError(describeError(exchangeError, 'Не удалось войти. Попробуй ещё раз.'));
               }
             } else {
               const errorDesc = getParamFromCallbackUrl(result.url, 'error_description');
@@ -144,7 +145,7 @@ export function EmailAuthScreen({ onBack }: Props) {
       .getSession()
       .then(({ data, error }) => {
         if (!isMounted) return;
-        if (error) setAuthError(error.message);
+        if (error) setAuthError(describeError(error, 'Не удалось войти. Попробуй ещё раз.'));
         if (data.session) setSession(data.session);
       })
       .finally(() => {
