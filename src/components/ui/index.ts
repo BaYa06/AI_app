@@ -15,3 +15,5 @@ export { TextField } from './TextField';
 export type { TextFieldProps } from './TextField';
 export { toast, ToastHost } from './Toast';
 export type { ToastTone } from './Toast';
+export { confirmDialog } from './ConfirmDialog';
+export type { ConfirmDialogOptions } from './ConfirmDialog';
