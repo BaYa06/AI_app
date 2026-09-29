@@ -31,11 +31,18 @@ export const RatingButtons = memo<RatingButtonsProps>(function RatingButtons({
   const colors = useThemeColors();
   const intervals = getExpectedIntervals(card);
 
+  // Рамка — цвет оценки, текст — «текстовый» токен (янтарь и зелёный как текст нечитаемы)
   const ratingColors: Record<Rating, string> = {
     1: colors.ratingAgain,
     2: colors.ratingHard,
     3: colors.ratingGood,
     4: colors.ratingEasy,
+  };
+  const ratingTextColors: Record<Rating, string> = {
+    1: colors.errorText,
+    2: colors.warningText,
+    3: colors.successText,
+    4: colors.info,
   };
 
   return (
@@ -47,6 +54,7 @@ export const RatingButtons = memo<RatingButtonsProps>(function RatingButtons({
           label={RATING_LABELS[rating]}
           interval={intervals[rating]}
           color={ratingColors[rating]}
+          textColor={ratingTextColors[rating]}
           onPress={onRate}
           disabled={disabled}
         />
@@ -62,6 +70,7 @@ interface RatingButtonProps {
   label: string;
   interval: string;
   color: string;
+  textColor: string;
   onPress: (rating: Rating) => void;
   disabled: boolean;
 }
@@ -71,6 +80,7 @@ const RatingButton = memo<RatingButtonProps>(function RatingButton({
   label,
   interval,
   color,
+  textColor,
   onPress,
   disabled,
 }) {
@@ -86,6 +96,8 @@ const RatingButton = memo<RatingButtonProps>(function RatingButton({
     <Pressable
       onPress={handlePress}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}, следующий показ: ${interval}`}
       style={({ pressed }) => [
         styles.button,
         {
@@ -99,11 +111,11 @@ const RatingButton = memo<RatingButtonProps>(function RatingButton({
         <>
           <Text
             variant="button"
-            style={{ color: pressed ? colors.textInverse : color }}
+            style={{ color: pressed ? colors.onPrimary : textColor }}
           >
             {label}
           </Text>
-          <Caption style={{ color: pressed ? colors.textInverse : colors.textTertiary }}>
+          <Caption style={{ color: pressed ? colors.onPrimary : colors.textSecondary }}>
             {interval}
           </Caption>
         </>

@@ -7,13 +7,16 @@ import { Pressable, View, StyleSheet } from 'react-native';
 import { Sparkles } from 'lucide-react-native';
 import { useThemeColors } from '@/store';
 import { Text } from '@/components/common';
-import { spacing, borderRadius } from '@/constants';
+import { spacing, borderRadius, iconSize, alpha } from '@/constants';
 
-const RATE_LABELS: Array<{ label: string; color: string }> = [
-  { label: 'Не знаю', color: '#EF4444' },
-  { label: 'Сомневаюсь', color: '#F97316' },
-  { label: 'Почти', color: '#2563EB' },
-  { label: 'Уверенно', color: '#10B981' },
+type RateTone = 'ratingAgain' | 'ratingHard' | 'ratingGood' | 'ratingEasy';
+
+// Те же оценки и цвета, что в классическом режиме (Снова / Сложно / Хорошо / Легко)
+const RATE_LABELS: Array<{ label: string; tone: RateTone }> = [
+  { label: 'Не знаю', tone: 'ratingAgain' },
+  { label: 'Сомневаюсь', tone: 'ratingHard' },
+  { label: 'Почти', tone: 'ratingEasy' },
+  { label: 'Уверенно', tone: 'ratingGood' },
 ];
 
 interface Props {
@@ -22,23 +25,36 @@ interface Props {
 
 export const RecommendedModeCard = memo(function RecommendedModeCard({ onPress }: Props) {
   const colors = useThemeColors();
+  // Текст оценок — «текстовые» токены: заливки (янтарь, зелёный) как текст нечитаемы
+  const textTone: Record<RateTone, string> = {
+    ratingAgain: colors.errorText,
+    ratingHard: colors.warningText,
+    ratingEasy: colors.info,
+    ratingGood: colors.successText,
+  };
 
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.card, { borderColor: colors.primary, backgroundColor: colors.surface }]}
+      accessibilityRole="button"
+      accessibilityLabel="Карточки. Рекомендуем. Классический режим"
+      style={({ pressed }) => [
+        styles.card,
+        { borderColor: colors.primary, backgroundColor: colors.surface },
+        pressed && styles.pressed,
+      ]}
     >
-      <View style={styles.badge}>
-        <Text variant="caption" style={{ color: '#fff', fontWeight: '700' }}>
+      <View style={[styles.badge, { backgroundColor: colors.primaryFill }]}>
+        <Text variant="caption" style={[styles.bold, { color: colors.onPrimary }]}>
           Рекомендуем
         </Text>
       </View>
       <View style={styles.header}>
-        <View style={styles.icon}>
-          <Sparkles size={20} color={colors.primary} />
+        <View style={[styles.icon, { backgroundColor: alpha(colors.primary, 10) }]}>
+          <Sparkles size={iconSize.s} color={colors.primary} />
         </View>
-        <View style={{ flex: 1 }}>
-          <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
+        <View style={styles.flex1}>
+          <Text variant="body" style={[styles.bold, { color: colors.textPrimary }]}>
             Карточки
           </Text>
           <Text variant="caption" color="secondary">
@@ -46,8 +62,8 @@ export const RecommendedModeCard = memo(function RecommendedModeCard({ onPress }
           </Text>
         </View>
       </View>
-      <View style={[styles.preview, { borderColor: colors.border, backgroundColor: colors.background }]}>
-        <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
+      <View style={[styles.preview, { borderColor: colors.border, backgroundColor: colors.surfaceMuted }]}>
+        <Text variant="body" style={[styles.bold, { color: colors.textPrimary }]}>
           scharf
         </Text>
         <Text variant="caption" color="secondary">
@@ -55,9 +71,12 @@ export const RecommendedModeCard = memo(function RecommendedModeCard({ onPress }
         </Text>
       </View>
       <View style={styles.rateRow}>
-        {RATE_LABELS.map(({ label, color }) => (
-          <View key={label} style={[styles.ratePill, { borderColor: `${color}33`, backgroundColor: `${color}1A` }]}>
-            <Text variant="caption" style={{ color, fontWeight: '700' }}>
+        {RATE_LABELS.map(({ label, tone }) => (
+          <View
+            key={label}
+            style={[styles.ratePill, { borderColor: alpha(colors[tone], 20), backgroundColor: alpha(colors[tone], 10) }]}
+          >
+            <Text variant="caption" style={[styles.semibold, { color: textTone[tone] }]}>
               {label}
             </Text>
           </View>
@@ -68,21 +87,31 @@ export const RecommendedModeCard = memo(function RecommendedModeCard({ onPress }
 });
 
 const styles = StyleSheet.create({
+  flex1: {
+    flex: 1,
+  },
+  bold: {
+    fontWeight: '700',
+  },
+  semibold: {
+    fontWeight: '600',
+  },
+  pressed: {
+    opacity: 0.85,
+  },
   card: {
     borderWidth: 2,
-    borderRadius: borderRadius.xl,
+    borderRadius: borderRadius.l,
     padding: spacing.m,
-    position: 'relative',
+    overflow: 'hidden',
   },
   badge: {
     position: 'absolute',
     right: 0,
     top: 0,
-    backgroundColor: '#2d65e6',
     paddingHorizontal: spacing.s,
-    paddingVertical: spacing.xs / 2,
-    borderBottomLeftRadius: borderRadius.l,
-    borderTopRightRadius: borderRadius.l,
+    paddingVertical: spacing.xxs,
+    borderBottomLeftRadius: borderRadius.m,
   },
   header: {
     flexDirection: 'row',
@@ -93,26 +122,25 @@ const styles = StyleSheet.create({
   icon: {
     width: 40,
     height: 40,
-    borderRadius: borderRadius.l,
-    backgroundColor: 'rgba(45,101,230,0.1)',
+    borderRadius: borderRadius.m,
     alignItems: 'center',
     justifyContent: 'center',
   },
   preview: {
     borderWidth: 1,
-    borderRadius: borderRadius.l,
+    borderRadius: borderRadius.m,
     padding: spacing.m,
     alignItems: 'center',
     marginBottom: spacing.s,
   },
   rateRow: {
     flexDirection: 'row',
-    gap: spacing.s,
+    gap: spacing.xs,
     flexWrap: 'wrap',
   },
   ratePill: {
     paddingHorizontal: spacing.s,
-    paddingVertical: spacing.xs / 2,
+    paddingVertical: spacing.xxs,
     borderRadius: borderRadius.full,
     borderWidth: 1,
   },
