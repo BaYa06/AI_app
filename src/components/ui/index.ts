@@ -17,3 +17,5 @@ export { toast, ToastHost } from './Toast';
 export type { ToastTone } from './Toast';
 export { confirmDialog } from './ConfirmDialog';
 export type { ConfirmDialogOptions } from './ConfirmDialog';
+export { Sheet, Dialog } from './Sheet';
+export type { SheetProps, DialogProps } from './Sheet';
