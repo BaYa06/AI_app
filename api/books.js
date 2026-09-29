@@ -1,5 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { getAuthedUserId } from './_auth.js';
+import { notifyCoursesChanged } from './_realtime.js';
 
 /**
  * API каталога книг (Книга → Юнит → официальный набор) и планов юнитов курса.
@@ -231,6 +232,7 @@ async function detachFromCourse(req, res, sql, userId) {
     RETURNING course_id
   `;
   if (deleted.length === 0) return res.status(404).json({ error: 'Book is not attached to this course' });
+  await notifyCoursesChanged([courseId]);
   return res.status(200).json({ ok: true });
 }
 
@@ -342,6 +344,7 @@ async function setUnitOpen(req, res, sql, userId) {
       END
     RETURNING is_open, opened_at
   `;
+  await notifyCoursesChanged([courseId]);
   return res.status(200).json({ ok: true, isOpen: rows[0].is_open, openedAt: rows[0].opened_at });
 }
 

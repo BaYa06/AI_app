@@ -4,6 +4,7 @@ import { getAuthedUser } from './_auth.js';
 import { ensureDatabaseInitialized } from './_db-init.js';
 import { HttpError, uuid, assertReadableSet } from './_access.js';
 import { courseSetsForStudent } from './_course.js';
+import { notifyCoursesChanged } from './_realtime.js';
 
 /**
  * API данных пользователя: профиль, наборы, карточки, курсы, прогресс, серия.
@@ -651,6 +652,54 @@ const ACTIONS = {
   deleteAccount,
 };
 
+// ─── Сигнал ученикам об изменениях в курсе ─────────────────────────────────
+
+/**
+ * Курсы, которых касается действие (для сигнала ученикам через Realtime). Считается ДО действия:
+ * у удаляемого набора/карточки курс потом уже не узнать, а при переносе набора нужен и старый курс.
+ */
+async function coursesTouchedBy(sql, action, p) {
+  try {
+    const setCourse = async (setId) => {
+      if (!setId) return [];
+      const rows = await sql`SELECT course_id FROM card_sets WHERE id = ${setId}::uuid`;
+      return rows.map((r) => r.course_id);
+    };
+    const cardCourse = async (cardId) => {
+      if (!cardId) return [];
+      const rows = await sql`
+        SELECT s.course_id FROM cards c JOIN card_sets s ON s.id = c.set_id WHERE c.id = ${cardId}::uuid
+      `;
+      return rows.map((r) => r.course_id);
+    };
+    switch (action) {
+      case 'createSet':
+        return [p.courseId];
+      case 'updateSetMeta':
+      case 'deleteSet':
+        return setCourse(p.setId);
+      case 'updateSetCourse':
+        return [...(await setCourse(p.setId)), p.courseId];
+      case 'updateCard':
+      case 'deleteCard':
+        return cardCourse(p.cardId);
+      case 'createCard':
+        return setCourse(p.card?.setId);
+      case 'createCardsBatch': {
+        const setIds = [...new Set((p.cards || []).map((c) => c?.setId).filter(Boolean))];
+        if (setIds.length === 0) return [];
+        const rows = await sql`SELECT DISTINCT course_id FROM card_sets WHERE id = ANY(${setIds}::uuid[])`;
+        return rows.map((r) => r.course_id);
+      }
+      default:
+        return [];
+    }
+  } catch {
+    // Кривой id и т.п. — действие само вернёт 400, сигнал не нужен
+    return [];
+  }
+}
+
 export default async function handler(req, res) {
   const { action } = req.query;
   if (!Object.hasOwn(ACTIONS, action || '')) return res.status(400).json({ error: 'Unknown action' });
@@ -664,7 +713,10 @@ export default async function handler(req, res) {
 
   const params = req.method === 'GET' ? { ...req.query } : { ...(req.body || {}) };
   try {
+    const touchedCourses = await coursesTouchedBy(sql, action, params);
     const data = await ACTIONS[action](sql, user.id, params, user);
+    // Ждём сигнал до ответа: после ответа Vercel может заморозить функцию (не дольше 2 с)
+    if (touchedCourses.length > 0) await notifyCoursesChanged(touchedCourses);
     return res.status(200).json({ data });
   } catch (error) {
     if (error instanceof HttpError) return res.status(error.status).json({ error: error.message });

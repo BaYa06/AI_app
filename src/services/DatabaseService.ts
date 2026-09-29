@@ -31,6 +31,111 @@ interface PersistedData {
   version: number;
 }
 
+let studentSyncRunning: Promise<void> | null = null;
+let studentSyncAgain = false;
+
+/** Набор из курса учителя, загруженный для ученика (не свой и не официальный — те синхронизирует BookService) */
+const isTeacherCourseSet = (set: CardSet, me: string) =>
+  set.isReadOnly === true && set.isOfficial !== true && set.userId !== me;
+
+async function runStudentCoursesSync(): Promise<void> {
+  const { data } = await supabase.auth.getSession();
+  const me = data.session?.user?.id;
+  if (!me) return;
+
+  const stores = getStores();
+  const strict = { throwOnError: true };
+  let studentCourses: Course[];
+  let setsByCourse: CardSet[][];
+  let serverCards: Card[] = [];
+  try {
+    studentCourses = await NeonService.loadStudentCourses(me, strict);
+    const hadCourseSets = Object.values(stores.useSetsStore.getState().sets as Record<string, CardSet>)
+      .some((s) => isTeacherCourseSet(s, me));
+    // Не ученик ни в одном курсе и нечего убирать — карточки не запрашиваем
+    const needCards = studentCourses.length > 0 || hadCourseSets;
+    [setsByCourse, serverCards] = await Promise.all([
+      Promise.all(studentCourses.map((c) => NeonService.loadCourseSetsByMembership(c.id, strict))),
+      needCards ? NeonService.loadAllCards(me, strict) : Promise.resolve([] as Card[]),
+    ]);
+  } catch (error) {
+    if (error instanceof NetworkLoadError) return; // нет сети — оставляем как есть
+    throw error;
+  }
+
+  // ── Курсы: свои остаются, курсы ученика — как на сервере
+  const coursesState = stores.useCoursesStore.getState();
+  const courses: Course[] = [
+    ...coursesState.courses.filter((c: Course) => !c.isStudentCourse),
+    ...studentCourses,
+  ];
+  const activeCourseId = courses.some((c) => c.id === coursesState.activeCourseId)
+    ? coursesState.activeCourseId
+    : null;
+  stores.useCoursesStore.setState({ courses, activeCourseId });
+
+  // ── Наборы курсов учителя
+  const incoming = new Map<string, CardSet>();
+  setsByCourse.forEach((list) => list.forEach((set) => {
+    if (!set.isOfficial && !incoming.has(set.id)) incoming.set(set.id, set);
+  }));
+
+  const setsState = stores.useSetsStore.getState();
+  const sets: Record<string, CardSet> = { ...setsState.sets };
+  let setsOrder: string[] = [...setsState.setsOrder];
+  const removed = Object.values(sets)
+    .filter((s) => isTeacherCourseSet(s, me) && !incoming.has(s.id))
+    .map((s) => s.id);
+  for (const id of removed) delete sets[id];
+  if (removed.length > 0) {
+    const removedSet = new Set(removed);
+    setsOrder = setsOrder.filter((id) => !removedSet.has(id));
+  }
+
+  const updatedIds: string[] = [];
+  incoming.forEach((set, id) => {
+    const existing = sets[id];
+    if (existing && existing.userId === me) return; // свой набор, положенный в курс, — не трогаем
+    // Локальные поля (статистика, избранное) сохраняем, данные набора — с сервера
+    sets[id] = existing ? { ...existing, ...set } : set;
+    if (!existing) setsOrder.push(id);
+    updatedIds.push(id);
+  });
+  stores.useSetsStore.setState({ sets, setsOrder });
+
+  // ── Карточки этих наборов: с сервера, но более свежий прогресс на устройстве не откатываем
+  const cardsState = stores.useCardsStore.getState();
+  const cards: Record<string, Card> = { ...cardsState.cards };
+  const cardsBySet: Record<string, string[]> = { ...cardsState.cardsBySet };
+  const serverBySet: Record<string, Card[]> = {};
+  for (const card of serverCards) (serverBySet[card.setId] ||= []).push(card);
+
+  for (const setId of [...removed, ...updatedIds]) {
+    const oldIds: string[] = cardsBySet[setId] || [];
+    const local: Record<string, Card> = {};
+    for (const id of oldIds) {
+      if (cards[id]) local[id] = cards[id];
+      delete cards[id];
+    }
+    delete cardsBySet[setId];
+    if (!incoming.has(setId)) continue;
+    const merged = (serverBySet[setId] || []).map((card) => {
+      const prev = local[card.id];
+      return prev && prev.lastReviewDate > card.lastReviewDate
+        ? { ...card, learningStep: prev.learningStep, nextReviewDate: prev.nextReviewDate, lastReviewDate: prev.lastReviewDate, status: prev.status }
+        : card;
+    });
+    for (const card of merged) cards[card.id] = card;
+    cardsBySet[setId] = merged.map((c) => c.id);
+  }
+  stores.useCardsStore.setState({ cards, cardsBySet });
+
+  devLog(`🔄 Курсы ученика синхронизированы: наборов ${incoming.size}, убрано ${removed.length}`);
+
+  // Юниты учебников, открытые/закрытые учителем (без курсов их нет)
+  if (courses.length > 0) await BookService.syncOfficialSets().catch(() => {});
+}
+
 const CURRENT_VERSION = 1;
 const LOCAL_DATA_TTL_MS = 30 * 60 * 1000; // 30 минут — после этого локальные данные считаются устаревшими
 
@@ -363,6 +468,30 @@ export const DatabaseService = {
     stores.useSetsStore.getState().clearSets();
 
     await DatabaseService.loadAll();
+  },
+
+  /**
+   * Тихо подтянуть изменения в курсах, где пользователь — ученик: новые/изменённые/удалённые и
+   * скрытые учителем наборы и их карточки, новые курсы (например, подключился с другого устройства).
+   * В отличие от reloadRemoteDataForUser ничего не стирает заранее — экран не мигает, свои наборы
+   * и несинхронизированный прогресс не трогаются. Без сети — ничего не меняет.
+   * Запускается при возврате в приложение, по сигналу учителя (Realtime), потягиванием главной вниз.
+   */
+  syncStudentCourses(): Promise<void> {
+    // Во время синхронизации пришёл ещё сигнал — после неё запускаем ещё раз, чтобы не потерять изменение
+    if (studentSyncRunning) {
+      studentSyncAgain = true;
+      return studentSyncRunning;
+    }
+    studentSyncRunning = (async () => {
+      do {
+        studentSyncAgain = false;
+        await runStudentCoursesSync().catch((e) => console.warn('⚠️ Синхронизация курсов:', e));
+      } while (studentSyncAgain);
+    })().finally(() => {
+      studentSyncRunning = null;
+    });
+    return studentSyncRunning;
   },
 
   /**

@@ -779,37 +779,17 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
             },
           ]}
         >
-          <View
-            style={[
-              styles.cardTopLine,
-              {
-                backgroundColor: colors.primary,
-                shadowColor: colors.primary,
-              },
-            ]}
-          />
           <View style={styles.cardChip}>
             <Text
               variant="caption"
               style={{ color: colors.primary, fontWeight: '700', letterSpacing: 1 }}
             >
-              Выбери перевод
+              Выбери правильный ответ
             </Text>
           </View>
           <Text variant="h1" style={[styles.word, { color: colors.textPrimary }]}>
             {getFront(currentCard)}
           </Text>
-          <View style={styles.metaRow}>
-            <Text variant="bodySmall" style={{ color: colors.textSecondary, fontWeight: '600' }}>
-              Немецкий
-            </Text>
-            <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
-              →
-            </Text>
-            <Text variant="bodySmall" style={{ color: colors.textSecondary, fontWeight: '600' }}>
-              Русский
-            </Text>
-          </View>
           <Pressable
             style={({ pressed }) => [
               styles.audioButton,
@@ -919,21 +899,11 @@ const styles = StyleSheet.create({
     borderRadius: spacing.xl,
     borderWidth: 1,
     padding: spacing.l,
-    paddingTop: spacing.l + 6,
     shadowOpacity: 0.05,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 12 },
     elevation: 4,
     gap: spacing.s,
-  },
-  cardTopLine: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 6,
-    borderTopLeftRadius: spacing.xl,
-    borderTopRightRadius: spacing.xl,
   },
   cardChip: {
     alignSelf: 'center',
@@ -947,13 +917,6 @@ const styles = StyleSheet.create({
     fontSize: 30,
     fontWeight: '800',
     letterSpacing: -0.5,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.s,
   },
   audioButton: {
     marginTop: spacing.m,

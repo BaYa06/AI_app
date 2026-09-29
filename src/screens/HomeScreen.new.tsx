@@ -3,7 +3,7 @@
  * @description Главная страница с современным дизайном
  */
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { View, StyleSheet, ScrollView, Pressable, TextInput, useWindowDimensions, TextInput as RNTextInput, Modal, Platform, Alert, Clipboard, Share, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable, TextInput, useWindowDimensions, TextInput as RNTextInput, Modal, Platform, Alert, Clipboard, Share, ActivityIndicator, RefreshControl } from 'react-native';
 import { showMessage } from '@/utils/dialogs';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -42,6 +42,7 @@ import {
   Check,
   RotateCcw,
   ChevronRight,
+  Users,
 } from 'lucide-react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { StreakService, getLocalDateKey } from '@/services/StreakService';
@@ -230,6 +231,17 @@ export function HomeScreen({ navigation }: any) {
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteRegenerating, setInviteRegenerating] = useState(false);
   const [joinByCodeVisible, setJoinByCodeVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Потянуть вниз — подтянуть изменения в курсах учителя (новые наборы, карточки, юниты)
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await DatabaseService.syncStudentCourses();
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
   const inviteBaseUrl = 'https://ai-app-seven-zeta.vercel.app';
   const [setMenuTarget, setSetMenuTarget] = useState<CardSet | null>(null);
   const editInputRef = useRef<RNTextInput>(null);
@@ -1454,6 +1466,14 @@ export function HomeScreen({ navigation }: any) {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           bounces
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
         >
         {visibleSets.length === 0 ? (
           <>
@@ -1477,7 +1497,9 @@ export function HomeScreen({ navigation }: any) {
                 Пока нет наборов
               </Text>
               <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-                Создайте первый набор, чтобы начать учиться и упорядочить материалы по курсам.
+                {isTeacher
+                  ? 'Создайте первый набор, чтобы начать учиться и упорядочить материалы по курсам.'
+                  : 'Создайте свой набор слов или подключитесь к курсу учителя — его наборы появятся здесь.'}
               </Text>
             </View>
 
@@ -1489,6 +1511,25 @@ export function HomeScreen({ navigation }: any) {
                 <Plus size={20} color="#fff" />
                 <Text style={styles.primaryButtonText}>Создать набор</Text>
               </Pressable>
+
+              {/* Новичку — второй путь: не создавать, а подключиться к курсу учителя по коду */}
+              {isTeacher !== true && (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.secondaryButton,
+                    { borderColor: colors.primary, opacity: pressed ? 0.7 : 1 },
+                  ]}
+                  onPress={() => {
+                    triggerHaptic('selection');
+                    setJoinByCodeVisible(true);
+                  }}
+                >
+                  <Users size={20} color={colors.primary} />
+                  <Text style={[styles.secondaryButtonText, { color: colors.primary }]}>
+                    Подключиться к курсу
+                  </Text>
+                </Pressable>
+              )}
 
 
               <View style={[styles.tipCard, { borderColor: colors.border, backgroundColor: colors.primary + '0D' }]}>
@@ -2199,15 +2240,14 @@ export function HomeScreen({ navigation }: any) {
         userId={currentUserId}
         onAccepted={(courseId, courseTitle) => {
           setJoinByCodeVisible(false);
-          useCoursesStore.getState().courses.push({
-            id: courseId,
-            title: courseTitle,
-            createdAt: Date.now(),
-            isStudentCourse: true,
-          });
-          if (currentUserId) {
-            DatabaseService.reloadRemoteDataForUser(currentUserId);
+          // Курс сразу в список, наборы курса — тихой синхронизацией (без мигания экрана)
+          const { courses } = useCoursesStore.getState();
+          if (!courses.some((c) => c.id === courseId)) {
+            useCoursesStore.setState({
+              courses: [...courses, { id: courseId, title: courseTitle, createdAt: Date.now(), isStudentCourse: true }],
+            });
           }
+          DatabaseService.syncStudentCourses();
           setActiveCourse(courseId);
           setDrawerOpen(false);
         }}
@@ -3006,6 +3046,19 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  secondaryButton: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.m - 1.5,
+    borderRadius: borderRadius.xl,
+    borderWidth: 1.5,
+  },
+  secondaryButtonText: {
     fontSize: 15,
     fontWeight: '700',
   },

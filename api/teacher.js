@@ -2,6 +2,7 @@ import { neon } from '@neondatabase/serverless';
 import { getAuthedUserId } from './_auth.js';
 import { courseSetIdsSql, courseSetsForStudent } from './_course.js';
 import { sendNotification } from './push.js';
+import { notifyCoursesChanged } from './_realtime.js';
 import crypto from 'crypto';
 
 /**
@@ -545,9 +546,10 @@ async function toggleSetHidden(req, res, sql, userId) {
   const updated = await sql`
     UPDATE card_sets SET is_hidden_from_students = ${hidden}, updated_at = NOW()
     WHERE id = ${setId}::uuid AND user_id = ${userId}::uuid
-    RETURNING id
+    RETURNING id, course_id
   `;
   if (updated.length === 0) return res.status(403).json({ error: 'Not found or not the owner' });
+  await notifyCoursesChanged([updated[0].course_id]);
   return res.status(200).json({ ok: true });
 }
 

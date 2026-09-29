@@ -9,7 +9,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AppNavigator } from '@/navigation';
 import { LoadingSplash } from '@/components/common';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
-import { DatabaseService, setupAutoSave, supabase, NeonService, setAnalyticsUserId, SyncQueueService, Analytics, setAnalyticsUserProperties, BookService } from '@/services';
+import { DatabaseService, setupAutoSave, supabase, NeonService, setAnalyticsUserId, SyncQueueService, Analytics, setAnalyticsUserProperties } from '@/services';
+import { useCourseRealtime } from '@/hooks/useCourseRealtime';
 import { StorageService } from '@/services/StorageService';
 import { CACHE_OWNER_KEY } from '@/services/DatabaseService';
 import { refreshPushToken, subscribeForegroundMessages, requestPushPermission, isPushSupported } from '@/services/pushNotifications';
@@ -322,19 +323,21 @@ export default function App() {
     if (cachedOwnerRef.current) loadedUserIdRef.current = cachedOwnerRef.current;
   }
 
-  // Каталог книг: при возврате в приложение подтягиваем юниты, которые открыли/закрыли в курсах
-  // пользователя (полная загрузка данных идёт только при старте). Не чаще раза в минуту.
+  // При возврате в приложение подтягиваем изменения в курсах: наборы и карточки учителя, юниты
+  // учебников (полная загрузка идёт только при старте). Пока приложение открыто, изменения
+  // приходят сразу по сигналу учителя — useCourseRealtime. Не чаще раза в 30 секунд.
   useEffect(() => {
     if (!currentUserId) return;
     let lastRefreshAt = Date.now();
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state !== 'active' || Date.now() - lastRefreshAt < 60_000) return;
-      if (useCoursesStore.getState().courses.length === 0) return;
+      if (state !== 'active' || Date.now() - lastRefreshAt < 30_000) return;
       lastRefreshAt = Date.now();
-      BookService.syncOfficialSets().catch(() => {});
+      DatabaseService.syncStudentCourses();
     });
     return () => subscription.remove();
   }, [currentUserId]);
+
+  useCourseRealtime(isAuthenticated && !needsOnboarding ? currentUserId : null);
 
   useEffect(() => {
     let isMounted = true;
@@ -747,18 +750,14 @@ export default function App() {
 
   const handleInviteAccepted = useCallback((courseId: string, courseTitle: string) => {
     setPendingInviteToken(null);
-    // Добавить курс в стор и перезагрузить данные
-    const addCourse = useCoursesStore.getState();
-    addCourse.courses.push({
-      id: courseId,
-      title: courseTitle,
-      createdAt: Date.now(),
-      isStudentCourse: true,
-    });
-    // Перезагрузить данные с сервера
-    if (currentUserId) {
-      DatabaseService.reloadRemoteDataForUser(currentUserId);
+    // Курс сразу в список, наборы курса — тихой синхронизацией (без мигания экрана)
+    const { courses } = useCoursesStore.getState();
+    if (!courses.some((c) => c.id === courseId)) {
+      useCoursesStore.setState({
+        courses: [...courses, { id: courseId, title: courseTitle, createdAt: Date.now(), isStudentCourse: true }],
+      });
     }
+    DatabaseService.syncStudentCourses();
     Alert.alert('Готово', `Вы присоединились к курсу "${courseTitle}"`);
   }, [currentUserId]);
 
