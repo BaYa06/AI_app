@@ -1,11 +1,7 @@
 /**
  * Общие типы UI-компонентов брендбука.
  */
-import type React from 'react';
+import type { Star } from 'lucide-react-native';
 
-/** Любая иконка lucide-react-native (тип компонента lucide не экспортируется). */
-export type IconComponent = React.ComponentType<{
-  size?: number;
-  color?: string;
-  strokeWidth?: number;
-}>;
+/** Любая иконка lucide-react-native (сам тип LucideIcon пакет не экспортирует). */
+export type IconComponent = typeof Star;
