@@ -4,10 +4,12 @@
  */
 import React, { memo, useCallback } from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
+import { Star } from 'lucide-react-native';
 import { useThemeColors } from '@/store';
 import { Text, Caption } from '../common/Text';
-import { ProgressBar } from '../common/ProgressBar';
-import { spacing, borderRadius } from '@/constants';
+import { CategoryIcon, ProgressBar } from '../ui';
+import { spacing, borderRadius, iconSize, getDeckAccentColor } from '@/constants';
+import { pluralize } from '@/utils';
 import type { CardSet } from '@/types';
 
 interface SetCardProps {
@@ -45,30 +47,32 @@ export const SetCard = memo<SetCardProps>(function SetCard({
     <Pressable
       onPress={handlePress}
       onLongPress={handleLongPress}
+      accessibilityRole="button"
       style={({ pressed }) => [
         styles.container,
         {
           backgroundColor: colors.surface,
           borderColor: colors.border,
-          opacity: pressed ? 0.9 : 1,
         },
+        pressed && styles.pressed,
       ]}
     >
       {/* Заголовок */}
       <View style={styles.header}>
-        <Text style={styles.icon}>{set.icon || '📚'}</Text>
+        {/* Иконка категории вместо эмодзи из данных набора (брендбук, раздел 6) */}
+        <CategoryIcon category={set.category} size="m" color={getDeckAccentColor(set.id)} background />
         <View style={styles.titleContainer}>
           <Text variant="h3" numberOfLines={1}>
             {set.title}
           </Text>
-          <Caption>{set.cardCount} карточек</Caption>
+          <Caption>{set.cardCount} {pluralize(set.cardCount, 'карточка', 'карточки', 'карточек')}</Caption>
         </View>
-        {set.isFavorite && <Text style={styles.favorite}>⭐</Text>}
+        {set.isFavorite && <Star size={iconSize.s} color={colors.star} fill={colors.star} accessibilityLabel="В избранном" />}
       </View>
 
       {/* Прогресс */}
       <View style={styles.progressSection}>
-        <ProgressBar progress={progress} height={6} />
+        <ProgressBar progress={progress} />
         <Caption style={styles.progressText}>{progress}% изучено</Caption>
       </View>
 
@@ -146,24 +150,19 @@ const styles = StyleSheet.create({
     marginBottom: spacing.m,
   },
 
+  pressed: {
+    opacity: 0.85,
+  },
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.m,
     marginBottom: spacing.m,
-  },
-
-  icon: {
-    fontSize: 32,
-    lineHeight: 42,
-    marginRight: spacing.m,
   },
 
   titleContainer: {
     flex: 1,
-  },
-
-  favorite: {
-    fontSize: 20,
   },
 
   progressSection: {
@@ -190,7 +189,7 @@ const styles = StyleSheet.create({
   statDot: {
     width: 8,
     height: 8,
-    borderRadius: 4,
+    borderRadius: borderRadius.full,
   },
 
   lastStudied: {

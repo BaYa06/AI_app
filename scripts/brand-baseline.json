@@ -1,19 +1,19 @@
 {
   "totals": {
-    "hex": 723,
-    "rgba": 315,
+    "hex": 711,
+    "rgba": 312,
     "isDark": 257,
-    "font": 312,
-    "weight": 158,
-    "radius": 135,
-    "alpha": 150,
+    "font": 300,
+    "weight": 157,
+    "radius": 130,
+    "alpha": 149,
     "alert": 61,
     "small": 94,
-    "emoji": 63,
+    "emoji": 60,
     "ion": 25,
-    "a11y": 94,
+    "a11y": 92,
     "en": 23,
-    "total": 2111
+    "total": 2077
   },
   "files": {
     "src/screens/TeacherCourseStatsScreen.tsx": {
@@ -542,15 +542,6 @@
       "a11y": 1,
       "total": 15
     },
-    "src/components/common/StreakCelebrationModal.tsx": {
-      "hex": 3,
-      "rgba": 1,
-      "font": 4,
-      "weight": 1,
-      "radius": 4,
-      "alpha": 1,
-      "total": 14
-    },
     "src/components/common/NotificationPrompt.tsx": {
       "hex": 3,
       "rgba": 2,
@@ -592,13 +583,6 @@
       "small": 1,
       "total": 10
     },
-    "src/components/JoinByCodeModal.tsx": {
-      "hex": 6,
-      "rgba": 1,
-      "font": 3,
-      "a11y": 1,
-      "total": 10
-    },
     "src/screens/WelcomeScreen.tsx": {
       "hex": 2,
       "rgba": 6,
@@ -606,13 +590,6 @@
       "radius": 1,
       "ion": 1,
       "total": 10
-    },
-    "src/components/CourseInviteModal.tsx": {
-      "hex": 3,
-      "rgba": 1,
-      "font": 4,
-      "a11y": 1,
-      "total": 8
     },
     "src/components/study/StudyModeSheet.tsx": {
       "hex": 4,
@@ -703,16 +680,6 @@
     },
     "src/components/cards/FlashCard.tsx": {
       "hex": 1,
-      "total": 1
-    },
-    "src/components/cards/SetCard.tsx": {
-      "radius": 1,
-      "emoji": 2,
-      "total": 1
-    },
-    "src/components/common/DiamondReward.tsx": {
-      "font": 1,
-      "emoji": 1,
       "total": 1
     },
     "src/components/common/LottieWrapper.tsx": {

@@ -9,8 +9,13 @@ import Animated, {
   runOnJS,
   useAnimatedStyle,
 } from 'react-native-reanimated';
-import { Text } from './Text';
+import { Gem } from 'lucide-react-native';
+import { useThemeColors } from '@/store';
+import { alpha, iconSize } from '@/constants';
 import { triggerHaptic } from '@/utils/haptic';
+
+// Алмаз — иконка Gem в цвете diamond (брендбук: одна валюта — один цвет и одна иконка)
+const GEM_SIZE = iconSize.l;
 
 const DIAMOND_COUNT = 7;
 const SPREAD = 60;
@@ -61,6 +66,7 @@ const SingleDiamond = ({
   targetY: number;
   onFinish: () => void;
 }) => {
+  const colors = useThemeColors();
   const translateX = useSharedValue(fromX);
   const translateY = useSharedValue(fromY);
   const scale = useSharedValue(0);
@@ -120,8 +126,8 @@ const SingleDiamond = ({
     'worklet';
     return {
       position: 'absolute' as const,
-      left: translateX.value - 14,
-      top: translateY.value - 14,
+      left: translateX.value - GEM_SIZE / 2,
+      top: translateY.value - GEM_SIZE / 2,
       transform: [{ scale: scale.value }],
       opacity: opacity.value,
     };
@@ -129,7 +135,7 @@ const SingleDiamond = ({
 
   return (
     <Animated.View style={animStyle}>
-      <Text style={s.emoji}>💎</Text>
+      <Gem size={GEM_SIZE} color={colors.diamond} fill={alpha(colors.diamond, 20)} />
     </Animated.View>
   );
 };
@@ -181,8 +187,3 @@ export const DiamondReward = forwardRef<DiamondRewardRef, Props>(
   },
 );
 
-const s = StyleSheet.create({
-  emoji: {
-    fontSize: 28,
-  },
-});

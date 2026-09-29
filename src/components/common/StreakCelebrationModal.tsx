@@ -7,10 +7,10 @@ import {
   Modal,
   View,
   StyleSheet,
-  Pressable,
-  Platform,
 } from 'react-native';
 import { useThemeColors } from '@/store';
+import { alpha, borderRadius, screenPadding, spacing } from '@/constants';
+import { Button } from '@/components/ui/Button';
 import { Text } from './Text';
 import { LottieStreak } from './LottieWrapper';
 import ReAnimated, {
@@ -22,16 +22,13 @@ import ReAnimated, {
   Easing,
 } from 'react-native-reanimated';
 
-const STREAK_ORANGE = '#FF6B00';
-const STREAK_ORANGE_LIGHT = '#FF8C33';
-
 interface Props {
   visible: boolean;
   streakCount: number;
   onClose: () => void;
 }
 
-function AnimatedCounter({ target, duration = 800 }: { target: number; duration?: number }) {
+function AnimatedCounter({ target, color, duration = 800 }: { target: number; color: string; duration?: number }) {
   const [display, setDisplay] = useState(0);
   const startTime = useRef(0);
   const raf = useRef<number>();
@@ -58,7 +55,7 @@ function AnimatedCounter({ target, duration = 800 }: { target: number; duration?
   }, [target, duration]);
 
   return (
-    <Text style={styles.streakNumber}>{display}</Text>
+    <Text variant="display" align="center" style={{ color }}>{display}</Text>
   );
 }
 
@@ -146,51 +143,26 @@ export function StreakCelebrationModal({ visible, streakCount, onClose }: Props)
   return (
     <Modal transparent visible={visible} animationType="fade" statusBarTranslucent>
       <View style={[styles.backdrop, { backgroundColor: colors.overlay }]}>
-          <ReAnimated.View style={[styles.card, {
-            backgroundColor: colors.background,
-            ...Platform.select({
-              ios: {
-                shadowColor: STREAK_ORANGE,
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: 0.25,
-                shadowRadius: 32,
-              },
-              android: { elevation: 12 },
-              web: {
-                boxShadow: `0 8px 40px ${STREAK_ORANGE}40, 0 2px 16px rgba(0,0,0,0.15)`,
-              },
-            }),
-          }, cardAnimStyle]}>
+          <ReAnimated.View
+            accessibilityViewIsModal
+            style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, cardAnimStyle]}
+          >
 
-            {/* Top accent gradient bar */}
-            <View style={styles.accentBar}>
-              <View style={styles.accentBarGradient} />
-            </View>
+            {/* Top accent bar */}
+            <View style={[styles.accentBar, { backgroundColor: colors.streak }]} />
 
             {/* Fire medallion */}
             <ReAnimated.View style={[styles.medallionOuter, medallionAnimStyle]}>
-              <View style={[styles.medallion, {
-                ...Platform.select({
-                  ios: {
-                    shadowColor: STREAK_ORANGE,
-                    shadowOffset: { width: 0, height: 0 },
-                    shadowOpacity: 0.4,
-                    shadowRadius: 20,
-                  },
-                  web: {
-                    boxShadow: `0 0 24px ${STREAK_ORANGE}66`,
-                  },
-                }),
-              }]}>
+              <View style={styles.medallion}>
                 <LottieStreak />
               </View>
             </ReAnimated.View>
 
             {/* Streak count with day label */}
-            <View style={styles.counterSection}>
-              <AnimatedCounter target={streakCount} />
-              <View style={styles.dayBadge}>
-                <Text style={styles.dayBadgeText}>
+            <View style={styles.counterSection} accessible accessibilityLabel={`${streakCount} ${dayWord} подряд`}>
+              <AnimatedCounter target={streakCount} color={colors.streak} />
+              <View style={[styles.dayBadge, { backgroundColor: alpha(colors.streak, 10) }]}>
+                <Text variant="overline" style={{ color: colors.warningText }}>
                   {dayWord}
                 </Text>
               </View>
@@ -200,41 +172,19 @@ export function StreakCelebrationModal({ visible, streakCount, onClose }: Props)
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
             {/* Title */}
-            <Text style={[styles.title, { color: colors.textPrimary }]}>
+            <Text variant="h2" align="center" accessibilityRole="header" style={{ color: colors.textPrimary }}>
               Серия продолжается!
             </Text>
 
             {/* Subtitle */}
-            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+            <Text variant="body" align="center" style={[styles.subtitle, { color: colors.textSecondary }]}>
               Ты учишься {streakCount} {dayWord} подряд.{'\n'}Так держать!
             </Text>
 
             {/* Continue button */}
             {showButton && (
               <ReAnimated.View style={[styles.buttonWrapper, buttonAnimStyle]}>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.button,
-                    {
-                      backgroundColor: colors.primary,
-                      opacity: pressed ? 0.85 : 1,
-                      ...Platform.select({
-                        ios: {
-                          shadowColor: colors.primary,
-                          shadowOffset: { width: 0, height: 4 },
-                          shadowOpacity: 0.25,
-                          shadowRadius: 8,
-                        },
-                        web: {
-                          boxShadow: `0 4px 12px ${colors.primary}40`,
-                        },
-                      }),
-                    },
-                  ]}
-                  onPress={onClose}
-                >
-                  <Text style={styles.buttonText}>Продолжить</Text>
-                </Pressable>
+                <Button title="Продолжить" onPress={onClose} fullWidth />
               </ReAnimated.View>
             )}
           </ReAnimated.View>
@@ -252,115 +202,64 @@ function getDayWord(n: number): string {
   return 'дней';
 }
 
+const MEDALLION_SIZE = 200;
+
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: screenPadding,
   },
+  // Без тени: окно отделяет затемнение (в тёмной теме тени не используем)
   card: {
-    borderRadius: 24,
-    paddingTop: 0,
-    paddingHorizontal: 32,
-    paddingBottom: 32,
+    borderRadius: borderRadius.xl,
+    borderWidth: 1,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xl,
+    width: '100%',
     maxWidth: 340,
-    width: 340,
     alignItems: 'center',
     overflow: 'hidden',
   },
-
-  // Accent bar
   accentBar: {
-    width: '100%',
+    alignSelf: 'stretch',
+    marginHorizontal: -spacing.xl,
     height: 4,
-    marginBottom: 8,
+    marginBottom: spacing.xs,
   },
-  accentBarGradient: {
-    flex: 1,
-    backgroundColor: STREAK_ORANGE,
-    borderBottomLeftRadius: 4,
-    borderBottomRightRadius: 4,
-  },
-
-  // Medallion
   medallionOuter: {
-    marginTop: 8,
-    marginBottom: 4,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xxs,
   },
   medallion: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
+    width: MEDALLION_SIZE,
+    height: MEDALLION_SIZE,
+    borderRadius: borderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
-
-  // Counter
   counterSection: {
     alignItems: 'center',
-    marginTop: -4,
-  },
-  streakNumber: {
-    fontSize: 72,
-    fontWeight: '800',
-    color: STREAK_ORANGE,
-    textAlign: 'center',
-    letterSpacing: -2,
-    lineHeight: 80,
   },
   dayBadge: {
-    backgroundColor: STREAK_ORANGE + '1A',
-    paddingHorizontal: 16,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginTop: 4,
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.xxs,
+    borderRadius: borderRadius.m,
+    marginTop: spacing.xxs,
   },
-  dayBadgeText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: STREAK_ORANGE,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
-
-  // Divider
   divider: {
     width: 48,
     height: 2,
-    borderRadius: 1,
-    marginVertical: 16,
-  },
-
-  // Text
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-    textAlign: 'center',
-    letterSpacing: -0.3,
+    borderRadius: borderRadius.full,
+    marginVertical: spacing.m,
   },
   subtitle: {
-    fontSize: 15,
-    textAlign: 'center',
-    marginTop: 8,
-    lineHeight: 22,
+    marginTop: spacing.xs,
   },
-
-  // Button
   buttonWrapper: {
     width: '100%',
-    marginTop: 24,
-  },
-  button: {
-    height: 52,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '600',
-    letterSpacing: 0.3,
+    marginTop: spacing.l,
   },
 });

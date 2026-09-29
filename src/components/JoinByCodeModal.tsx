@@ -2,21 +2,14 @@
  * JoinByCodeModal — модалка вступления в курс по короткому коду
  */
 import React, { useState, useRef } from 'react';
-import {
-  View,
-  Modal,
-  Pressable,
-  StyleSheet,
-  ActivityIndicator,
-  TextInput as RNTextInput,
-  Platform,
-} from 'react-native';
+import { View, StyleSheet, TextInput as RNTextInput } from 'react-native';
+import { X } from 'lucide-react-native';
 import { Text } from '@/components/common';
+import { Button, Card, Dialog, TextField } from '@/components/ui';
 import { useThemeColors } from '@/store';
-import { spacing, borderRadius } from '@/constants';
+import { iconSize, spacing, typography } from '@/constants';
 import { NeonService } from '@/services/NeonService';
 import { describeTeacherApiReason } from '@/utils/teacherApiErrors';
-import { X } from 'lucide-react-native';
 
 interface JoinByCodeModalProps {
   visible: boolean;
@@ -50,7 +43,7 @@ export function JoinByCodeModal({ visible, userId, onAccepted, onDismiss }: Join
   const handleLookup = async () => {
     const trimmed = code.trim();
     if (trimmed.length < 6) {
-      setError('Введите 6-значный код');
+      setError('Введи 6-значный код');
       return;
     }
     setLooking(true);
@@ -89,173 +82,84 @@ export function JoinByCodeModal({ visible, userId, onAccepted, onDismiss }: Join
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={handleDismiss}>
-      <Pressable style={[styles.overlay, { backgroundColor: 'rgba(0,0,0,0.6)' }]} onPress={handleDismiss}>
-        <Pressable
-          style={[
-            styles.content,
-            {
-              backgroundColor: colors.background,
-              borderColor: colors.border,
-            },
-          ]}
-          onPress={(e) => e.stopPropagation()}
-        >
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.textPrimary }]}>Войти по коду</Text>
-            <Pressable onPress={handleDismiss}>
-              <X size={20} color={colors.textSecondary} />
-            </Pressable>
-          </View>
+    <Dialog
+      visible={visible}
+      onClose={handleDismiss}
+      title="Войти по коду"
+      headerRight={
+        <Button
+          variant="icon"
+          icon={X}
+          background="none"
+          iconSize={iconSize.s}
+          iconColor={colors.textSecondary}
+          accessibilityLabel="Закрыть"
+          onPress={handleDismiss}
+        />
+      }
+    >
+      <Text variant="bodySmall" style={[styles.hint, { color: colors.textSecondary }]}>
+        Введи 6-значный код от учителя
+      </Text>
 
-          <Text style={[styles.hint, { color: colors.textSecondary }]}>
-            Введите 6-значный код от учителя
+      {/* Код: ошибка — под полем (брендбук, 7.2) */}
+      <TextField
+        ref={inputRef}
+        accessibilityLabel="Код курса"
+        placeholder="000000"
+        value={code}
+        onChangeText={(v) => {
+          setCode(v.replace(/\D/g, '').slice(0, 6));
+          setInfo(null);
+          setError(null);
+        }}
+        keyboardType="numeric"
+        maxLength={6}
+        onSubmitEditing={handleLookup}
+        error={error}
+        inputStyle={styles.codeInput}
+        style={styles.field}
+      />
+      <Button title="Найти" onPress={handleLookup} loading={looking} fullWidth />
+
+      {info && (
+        <Card tone="muted" style={styles.courseCard}>
+          <Text variant="h3" style={[styles.courseTitle, { color: colors.textPrimary }]}>{info.courseTitle}</Text>
+          <Text variant="bodySmall" style={[styles.teacherName, { color: colors.textSecondary }]}>
+            Учитель: {info.teacherName}
           </Text>
 
-          {/* Code input */}
-          <View style={styles.inputRow}>
-            <RNTextInput
-              ref={inputRef}
-              style={[
-                styles.codeInput,
-                {
-                  backgroundColor: colors.surfaceVariant || colors.border,
-                  borderColor: error ? (colors.error || '#EF4444') : colors.border,
-                  color: colors.textPrimary,
-                },
-              ]}
-              placeholder="000000"
-              placeholderTextColor={colors.textSecondary}
-              value={code}
-              onChangeText={(v) => {
-                setCode(v.replace(/\D/g, '').slice(0, 6));
-                setInfo(null);
-                setError(null);
-              }}
-              keyboardType="numeric"
-              maxLength={6}
-              onSubmitEditing={handleLookup}
-            />
+          <View style={styles.buttons}>
+            <Button variant="secondary" title="Отклонить" onPress={handleDismiss} style={styles.button} />
+            <Button title="Вступить" onPress={handleJoin} loading={joining} style={styles.button} />
           </View>
-          <Pressable
-            style={[styles.findButton, { backgroundColor: colors.primary }]}
-            onPress={handleLookup}
-            disabled={looking}
-          >
-            {looking ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Text style={styles.findButtonText}>Найти</Text>
-            )}
-          </Pressable>
-
-          {error && (
-            <Text style={[styles.errorText, { color: colors.error || '#EF4444' }]}>{error}</Text>
-          )}
-
-          {info && (
-            <View style={[styles.courseCard, { backgroundColor: colors.surfaceVariant || colors.border, borderColor: colors.border }]}>
-              <Text style={[styles.courseTitle, { color: colors.textPrimary }]}>{info.courseTitle}</Text>
-              <Text style={[styles.teacherName, { color: colors.textSecondary }]}>Учитель: {info.teacherName}</Text>
-
-              <View style={styles.buttons}>
-                <Pressable
-                  style={[styles.button, { backgroundColor: colors.surfaceVariant || colors.border, borderColor: colors.border, borderWidth: 1 }]}
-                  onPress={handleDismiss}
-                >
-                  <Text style={[styles.buttonText, { color: colors.textPrimary }]}>Отклонить</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.button, { backgroundColor: colors.primary }]}
-                  onPress={handleJoin}
-                  disabled={joining}
-                >
-                  {joining ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Text style={[styles.buttonText, { color: '#fff' }]}>Вступить</Text>
-                  )}
-                </Pressable>
-              </View>
-            </View>
-          )}
-        </Pressable>
-      </Pressable>
-    </Modal>
+        </Card>
+      )}
+    </Dialog>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.l,
-  },
-  content: {
-    width: '100%',
-    maxWidth: 400,
-    borderRadius: borderRadius.xl,
-    borderWidth: 1,
-    padding: spacing.l,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.s,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
   hint: {
-    fontSize: 14,
     marginBottom: spacing.m,
   },
-  inputRow: {
+  field: {
     marginBottom: spacing.s,
   },
   codeInput: {
-    height: 48,
-    borderRadius: borderRadius.m,
-    borderWidth: 1,
-    paddingHorizontal: spacing.m,
-    fontSize: 22,
+    fontSize: typography.h2.fontSize,
     fontWeight: '700',
     letterSpacing: 4,
     textAlign: 'center',
   },
-  findButton: {
-    height: 48,
-    borderRadius: borderRadius.m,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing.s,
-  },
-  findButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 15,
-  },
-  errorText: {
-    fontSize: 14,
-    marginBottom: spacing.s,
-  },
   courseCard: {
-    borderRadius: borderRadius.m,
-    borderWidth: 1,
-    padding: spacing.m,
-    marginTop: spacing.s,
+    marginTop: spacing.m,
   },
   courseTitle: {
-    fontSize: 18,
     fontWeight: '700',
-    marginBottom: 4,
+    marginBottom: spacing.xxs,
   },
   teacherName: {
-    fontSize: 14,
     marginBottom: spacing.m,
   },
   buttons: {
@@ -264,13 +168,5 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
-    height: 44,
-    borderRadius: borderRadius.m,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  buttonText: {
-    fontSize: 15,
-    fontWeight: '600',
   },
 });

@@ -3,19 +3,14 @@
  * Показывается когда ученик открывает ссылку /join/TOKEN
  */
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Modal,
-  Pressable,
-  StyleSheet,
-  ActivityIndicator,
-} from 'react-native';
+import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import { X } from 'lucide-react-native';
 import { Text } from '@/components/common';
+import { Button, Dialog } from '@/components/ui';
 import { useThemeColors } from '@/store';
-import { spacing, borderRadius } from '@/constants';
+import { iconSize, spacing } from '@/constants';
 import { NeonService } from '@/services/NeonService';
 import { describeTeacherApiReason } from '@/utils/teacherApiErrors';
-import { X } from 'lucide-react-native';
 
 interface CourseInviteModalProps {
   token: string | null;
@@ -71,107 +66,62 @@ export function CourseInviteModal({ token, userId, onAccepted, onDismiss }: Cour
   if (!token) return null;
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onDismiss}>
-      <Pressable style={[styles.overlay, { backgroundColor: 'rgba(0,0,0,0.6)' }]} onPress={onDismiss}>
-        <Pressable
-          style={[styles.content, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          onPress={(e) => e.stopPropagation()}
-        >
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.textPrimary }]}>
-              Приглашение в курс
-            </Text>
-            <Pressable onPress={onDismiss}>
-              <X size={20} color={colors.textSecondary} />
-            </Pressable>
+    <Dialog
+      visible
+      onClose={onDismiss}
+      title="Приглашение в курс"
+      headerRight={
+        <Button
+          variant="icon"
+          icon={X}
+          background="none"
+          iconSize={iconSize.s}
+          iconColor={colors.textSecondary}
+          accessibilityLabel="Закрыть"
+          onPress={onDismiss}
+        />
+      }
+    >
+      {loading ? (
+        <ActivityIndicator size="large" color={colors.primary} style={styles.spinner} />
+      ) : error ? (
+        <Text variant="body" align="center" style={[styles.errorText, { color: colors.errorText }]}>{error}</Text>
+      ) : info ? (
+        <>
+          <Text variant="h2" style={[styles.courseTitle, { color: colors.textPrimary }]}>
+            {info.courseTitle}
+          </Text>
+          <Text variant="body" style={[styles.teacherName, { color: colors.textSecondary }]}>
+            Учитель: {info.teacherName}
+          </Text>
+          <Text variant="bodySmall" style={[styles.description, { color: colors.textSecondary }]}>
+            Тебя приглашают присоединиться к курсу и изучать материалы
+          </Text>
+
+          <View style={styles.buttons}>
+            <Button variant="secondary" title="Отклонить" onPress={onDismiss} style={styles.button} />
+            <Button title="Принять" onPress={handleJoin} loading={joining} style={styles.button} />
           </View>
-
-          {loading ? (
-            <ActivityIndicator size="large" color={colors.primary} style={{ marginVertical: spacing.xl }} />
-          ) : error ? (
-            <Text style={[styles.errorText, { color: colors.error || '#EF4444' }]}>{error}</Text>
-          ) : info ? (
-            <>
-              <Text style={[styles.courseTitle, { color: colors.textPrimary }]}>
-                {info.courseTitle}
-              </Text>
-              <Text style={[styles.teacherName, { color: colors.textSecondary }]}>
-                Учитель: {info.teacherName}
-              </Text>
-              <Text style={[styles.description, { color: colors.textSecondary }]}>
-                Вас приглашают присоединиться к курсу и изучать материалы
-              </Text>
-
-              <View style={styles.buttons}>
-                <Pressable
-                  style={[styles.button, { backgroundColor: colors.surfaceVariant || colors.border }]}
-                  onPress={onDismiss}
-                >
-                  <Text style={[styles.buttonText, { color: colors.textPrimary }]}>Отклонить</Text>
-                </Pressable>
-
-                <Pressable
-                  style={[styles.button, styles.buttonPrimary, { backgroundColor: colors.primary }]}
-                  onPress={handleJoin}
-                  disabled={joining}
-                >
-                  {joining ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text style={[styles.buttonText, { color: '#FFFFFF' }]}>Принять</Text>
-                  )}
-                </Pressable>
-              </View>
-            </>
-          ) : null}
-        </Pressable>
-      </Pressable>
-    </Modal>
+        </>
+      ) : null}
+    </Dialog>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.l,
-  },
-  content: {
-    width: '100%',
-    maxWidth: 400,
-    borderRadius: borderRadius.xl,
-    borderWidth: 1,
-    padding: spacing.l,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.m,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
+  spinner: {
+    marginVertical: spacing.xl,
   },
   courseTitle: {
-    fontSize: 22,
-    fontWeight: '700',
     marginBottom: spacing.xs,
   },
   teacherName: {
-    fontSize: 15,
     marginBottom: spacing.m,
   },
   description: {
-    fontSize: 14,
-    lineHeight: 20,
     marginBottom: spacing.l,
   },
   errorText: {
-    fontSize: 15,
-    textAlign: 'center',
     marginVertical: spacing.l,
   },
   buttons: {
@@ -180,14 +130,5 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: borderRadius.m,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonPrimary: {},
-  buttonText: {
-    fontSize: 15,
-    fontWeight: '600',
   },
 });
