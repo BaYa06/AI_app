@@ -6,25 +6,17 @@
  *   «Нет» и 1–3 звезды — необязательное «Что нам улучшить?» (низкая оценка без причины мало что даёт);
  *   «Нет» и 4–5 звёзд — «Спасибо за отзыв!» и окно закрывается само.
  * Внизу всегда «Пропустить». По фону не закрывается — чтобы не закрыли случайно.
+ * Оформление — общий нижний лист Sheet (брендбук, 7.6).
  * Своё окно, а не App Store: из него никуда не ведём (правила Apple запрещают отправлять
  * в App Store только довольных).
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  Modal,
-  Pressable,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-} from 'react-native';
-import Ionicons from 'react-native-vector-icons/Ionicons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, StyleSheet, Pressable } from 'react-native';
+import { Heart, Star } from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { useThemeColors, useSettingsStore } from '@/store';
-import { spacing, borderRadius } from '@/constants';
+import { Button, Chip, Sheet, TextField } from '@/components/ui';
+import { useThemeColors } from '@/store';
+import { heights, iconSize, spacing } from '@/constants';
 import { triggerHaptic } from '@/utils/haptic';
 import {
   FEEDBACK_TAGS,
@@ -36,13 +28,10 @@ import {
 
 type Step = 'stars' | 'problem' | 'details' | 'thanks';
 
-const STAR_COLOR = '#F59E0B';
 const THANKS_CLOSE_MS = 1400;
 
 export function RatingPromptModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const colors = useThemeColors();
-  const isDark = useSettingsStore((s) => s.resolvedTheme) === 'dark';
-  const insets = useSafeAreaInsets();
 
   const [step, setStep] = useState<Step>('stars');
   const [rating, setRating] = useState(0);
@@ -119,195 +108,147 @@ export function RatingPromptModal({ visible, onClose }: { visible: boolean; onCl
     onClose();
   };
 
-  const chipBg = isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9';
-  const inputBg = isDark ? 'rgba(255,255,255,0.04)' : '#F8FAFC';
-
   const renderStars = (interactive: boolean) => (
-    <View style={styles.starsRow}>
-      {[1, 2, 3, 4, 5].map((value) => (
-        <Pressable
-          key={value}
-          disabled={!interactive}
-          onPress={() => handleStar(value)}
-          hitSlop={6}
-          accessibilityLabel={`${value} из 5`}
-        >
-          <Ionicons
-            name={value <= rating ? 'star' : 'star-outline'}
-            size={interactive ? 40 : 24}
-            color={value <= rating ? STAR_COLOR : colors.textTertiary}
-          />
-        </Pressable>
-      ))}
+    <View style={styles.starsRow} accessibilityRole={interactive ? 'adjustable' : undefined}>
+      {[1, 2, 3, 4, 5].map((value) => {
+        const filled = value <= rating;
+        return (
+          <Pressable
+            key={value}
+            disabled={!interactive}
+            onPress={() => handleStar(value)}
+            style={interactive ? styles.starButton : undefined}
+            accessibilityRole="button"
+            accessibilityLabel={`${value} из 5`}
+            accessibilityState={{ selected: filled }}
+          >
+            <Star
+              size={interactive ? iconSize.l : iconSize.m}
+              color={filled ? colors.star : colors.textTertiary}
+              fill={filled ? colors.star : 'transparent'}
+            />
+          </Pressable>
+        );
+      })}
     </View>
   );
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={handleSkip}>
-      <KeyboardAvoidingView
-        style={styles.overlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <View
-          style={[
-            styles.sheet,
-            { backgroundColor: colors.surface, paddingBottom: Math.max(insets.bottom, spacing.m) },
-          ]}
-        >
-          {step === 'stars' && (
-            <>
-              <Text style={[styles.title, { color: colors.textPrimary }]}>Как вам Flashly?</Text>
-              <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                Оцените приложение — это займёт пару секунд
-              </Text>
-              {renderStars(true)}
-            </>
-          )}
+    <Sheet visible={visible} onClose={handleSkip} dismissOnBackdrop={false}>
+      <View style={styles.content}>
+        {step === 'stars' && (
+          <>
+            <Text variant="h3" align="center" accessibilityRole="header" style={{ color: colors.textPrimary }}>
+              Как тебе Flashly?
+            </Text>
+            <Text variant="bodySmall" align="center" style={[styles.subtitle, { color: colors.textSecondary }]}>
+              Оцени приложение — это займёт пару секунд
+            </Text>
+            {renderStars(true)}
+          </>
+        )}
 
-          {step === 'problem' && (
-            <>
-              {renderStars(false)}
-              <Text style={[styles.title, { color: colors.textPrimary }]}>Были ли проблемы в приложении?</Text>
-              <View style={styles.answerRow}>
-                <Pressable
-                  style={({ pressed }) => [styles.answerBtn, { backgroundColor: chipBg, opacity: pressed ? 0.7 : 1 }]}
-                  onPress={() => handleProblemAnswer(true)}
-                  disabled={sending}
-                >
-                  <Text style={[styles.answerText, { color: colors.textPrimary }]}>Да</Text>
-                </Pressable>
-                <Pressable
-                  style={({ pressed }) => [styles.answerBtn, { backgroundColor: chipBg, opacity: pressed ? 0.7 : 1 }]}
-                  onPress={() => handleProblemAnswer(false)}
-                  disabled={sending}
-                >
-                  {sending ? (
-                    <ActivityIndicator color={colors.primary} />
-                  ) : (
-                    <Text style={[styles.answerText, { color: colors.textPrimary }]}>Нет</Text>
-                  )}
-                </Pressable>
-              </View>
-            </>
-          )}
-
-          {step === 'details' && (
-            <>
-              <Text style={[styles.title, { color: colors.textPrimary }]}>
-                {hasProblem ? 'Что случилось?' : 'Что нам улучшить?'}
-              </Text>
-              {hasProblem && (
-                <View style={styles.tagsWrap}>
-                  {FEEDBACK_TAGS.map((tag) => {
-                    const active = tags.includes(tag.value);
-                    return (
-                      <Pressable
-                        key={tag.value}
-                        onPress={() => toggleTag(tag.value)}
-                        style={[styles.tag, { backgroundColor: active ? colors.primary : chipBg }]}
-                      >
-                        <Text style={[styles.tagText, { color: active ? '#FFFFFF' : colors.textPrimary }]}>
-                          {tag.label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              )}
-              <TextInput
-                value={message}
-                onChangeText={setMessage}
-                placeholder={hasProblem ? 'Опишите, что пошло не так' : 'Необязательно'}
-                placeholderTextColor={colors.textTertiary}
-                multiline
-                maxLength={2000}
-                textAlignVertical="top"
-                style={[
-                  styles.input,
-                  { color: colors.textPrimary, backgroundColor: inputBg, borderColor: colors.border },
-                  Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
-                ]}
-              />
-              <Pressable
-                style={({ pressed }) => [
-                  styles.primaryBtn,
-                  { backgroundColor: colors.primary, opacity: sending ? 0.7 : pressed ? 0.85 : 1 },
-                ]}
-                onPress={() => submit({ hasProblem, tags, message })}
+        {step === 'problem' && (
+          <>
+            {renderStars(false)}
+            <Text variant="h3" align="center" accessibilityRole="header" style={{ color: colors.textPrimary }}>
+              Были ли проблемы в приложении?
+            </Text>
+            <View style={styles.answerRow}>
+              <Button
+                variant="secondary"
+                title="Да"
+                onPress={() => handleProblemAnswer(true)}
                 disabled={sending}
-              >
-                {sending ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.primaryBtnText}>{hasProblem ? 'Отправить' : 'Готово'}</Text>
-                )}
-              </Pressable>
-            </>
-          )}
-
-          {step === 'thanks' && (
-            <View style={styles.thanks}>
-              <Ionicons name="heart" size={40} color={colors.primary} />
-              <Text style={[styles.title, { color: colors.textPrimary }]}>Спасибо за отзыв!</Text>
+                style={styles.flex1}
+              />
+              <Button
+                variant="secondary"
+                title="Нет"
+                onPress={() => handleProblemAnswer(false)}
+                loading={sending}
+                style={styles.flex1}
+              />
             </View>
-          )}
+          </>
+        )}
 
-          {step !== 'thanks' && (
-            <Pressable onPress={handleSkip} hitSlop={10} style={styles.skipBtn} disabled={sending}>
-              <Text style={[styles.skipText, { color: colors.textTertiary }]}>Пропустить</Text>
-            </Pressable>
-          )}
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+        {step === 'details' && (
+          <>
+            <Text variant="h3" align="center" accessibilityRole="header" style={{ color: colors.textPrimary }}>
+              {hasProblem ? 'Что случилось?' : 'Что нам улучшить?'}
+            </Text>
+            {hasProblem && (
+              <View style={styles.tagsWrap}>
+                {FEEDBACK_TAGS.map((tag) => (
+                  <Chip
+                    key={tag.value}
+                    label={tag.label}
+                    selected={tags.includes(tag.value)}
+                    onPress={() => toggleTag(tag.value)}
+                  />
+                ))}
+              </View>
+            )}
+            <TextField
+              value={message}
+              onChangeText={setMessage}
+              placeholder={hasProblem ? 'Опиши, что пошло не так' : 'Необязательно'}
+              accessibilityLabel={hasProblem ? 'Что случилось' : 'Что улучшить'}
+              multiline
+              maxLength={2000}
+              inputStyle={styles.input}
+            />
+            <Button
+              title={hasProblem ? 'Отправить' : 'Готово'}
+              onPress={() => submit({ hasProblem, tags, message })}
+              loading={sending}
+              fullWidth
+            />
+          </>
+        )}
+
+        {step === 'thanks' && (
+          <View style={styles.thanks} accessibilityLiveRegion="polite">
+            <Heart size={iconSize.xl} color={colors.primary} fill={colors.primary} />
+            <Text variant="h3" align="center" style={{ color: colors.textPrimary }}>Спасибо за отзыв!</Text>
+          </View>
+        )}
+
+        {step !== 'thanks' && (
+          <Button variant="quiet" tone="secondary" title="Пропустить" onPress={handleSkip} disabled={sending} />
+        )}
+      </View>
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
+  flex1: {
     flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.45)',
   },
-  sheet: {
-    borderTopLeftRadius: borderRadius.xl,
-    borderTopRightRadius: borderRadius.xl,
-    paddingHorizontal: spacing.l,
-    paddingTop: spacing.l,
+  content: {
     gap: spacing.m,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '800',
-    textAlign: 'center',
-    letterSpacing: -0.3,
+    paddingTop: spacing.xs,
   },
   subtitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    textAlign: 'center',
     marginTop: -spacing.xs,
   },
   starsRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: spacing.s,
+    gap: spacing.xxs,
     paddingVertical: spacing.xs,
+  },
+  starButton: {
+    width: heights.button,
+    height: heights.button,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   answerRow: {
     flexDirection: 'row',
     gap: spacing.s,
-  },
-  answerBtn: {
-    flex: 1,
-    height: 52,
-    borderRadius: borderRadius.l,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  answerText: {
-    fontSize: 16,
-    fontWeight: '700',
   },
   tagsWrap: {
     flexDirection: 'row',
@@ -315,45 +256,12 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     justifyContent: 'center',
   },
-  tag: {
-    paddingHorizontal: spacing.s,
-    paddingVertical: 7,
-    borderRadius: borderRadius.full,
-  },
-  tagText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
   input: {
-    minHeight: 96,
     maxHeight: 180,
-    borderWidth: 1,
-    borderRadius: borderRadius.l,
-    padding: spacing.m,
-    fontSize: 15,
-  },
-  primaryBtn: {
-    height: 52,
-    borderRadius: borderRadius.l,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryBtnText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
   },
   thanks: {
     alignItems: 'center',
     gap: spacing.s,
     paddingVertical: spacing.l,
-  },
-  skipBtn: {
-    alignSelf: 'center',
-    paddingVertical: spacing.xs,
-  },
-  skipText: {
-    fontSize: 14,
-    fontWeight: '600',
   },
 });

@@ -1,19 +1,19 @@
 {
   "totals": {
-    "hex": 700,
-    "rgba": 306,
-    "isDark": 257,
-    "font": 300,
-    "weight": 157,
+    "hex": 694,
+    "rgba": 303,
+    "isDark": 255,
+    "font": 298,
+    "weight": 155,
     "radius": 130,
     "alpha": 149,
     "alert": 61,
     "small": 94,
     "emoji": 60,
-    "ion": 25,
+    "ion": 24,
     "a11y": 91,
     "en": 23,
-    "total": 2060
+    "total": 2045
   },
   "files": {
     "src/screens/TeacherCourseStatsScreen.tsx": {
@@ -524,15 +524,6 @@
       "small": 1,
       "a11y": 1,
       "total": 20
-    },
-    "src/components/RatingPromptModal.tsx": {
-      "hex": 6,
-      "rgba": 3,
-      "isDark": 2,
-      "font": 2,
-      "weight": 2,
-      "ion": 1,
-      "total": 15
     },
     "src/screens/MultipleChoiceScreen.tsx": {
       "hex": 2,
