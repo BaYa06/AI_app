@@ -13,3 +13,5 @@ export { Card, ListRow, ListGroup } from './Card';
 export type { CardProps, ListRowProps, ListGroupProps } from './Card';
 export { TextField } from './TextField';
 export type { TextFieldProps } from './TextField';
+export { toast, ToastHost } from './Toast';
+export type { ToastTone } from './Toast';

@@ -8,6 +8,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AppNavigator } from '@/navigation';
 import { LoadingSplash } from '@/components/common';
+import { ToastHost } from '@/components/ui/Toast';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { DatabaseService, setupAutoSave, supabase, NeonService, setAnalyticsUserId, SyncQueueService, Analytics, setAnalyticsUserProperties } from '@/services';
 import { useCourseRealtime } from '@/hooks/useCourseRealtime';
@@ -282,6 +283,9 @@ function AppRoot({
           onDismiss={onInviteDismiss}
         />
       )}
+
+      {/* Тосты (toast.success(...)) — поверх экранов */}
+      <ToastHost />
     </View>
   );
 }
