@@ -1,19 +1,19 @@
 {
   "totals": {
-    "hex": 690,
+    "hex": 688,
     "rgba": 301,
     "isDark": 255,
-    "font": 297,
-    "weight": 151,
+    "font": 291,
+    "weight": 147,
     "radius": 130,
-    "alpha": 142,
+    "alpha": 139,
     "alert": 61,
     "small": 94,
     "emoji": 59,
     "ion": 24,
-    "a11y": 85,
+    "a11y": 84,
     "en": 23,
-    "total": 2027
+    "total": 2012
   },
   "files": {
     "src/screens/TeacherCourseStatsScreen.tsx": {
@@ -524,14 +524,6 @@
       "small": 1,
       "a11y": 1,
       "total": 20
-    },
-    "src/screens/MultipleChoiceScreen.tsx": {
-      "hex": 2,
-      "font": 6,
-      "weight": 4,
-      "alpha": 3,
-      "a11y": 1,
-      "total": 15
     },
     "src/components/common/NotificationPrompt.tsx": {
       "hex": 3,

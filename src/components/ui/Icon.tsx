@@ -3,11 +3,12 @@
  *
  * Icon — размеры из iconSize (xs 16 · s 20 · m 24 · l 32 · xl 48), цвет по умолчанию textSecondary.
  * CategoryIcon — иконка категории набора вместо эмодзи (constants/categoryIcons).
- * CelebrationIcon — медали и празднования вместо 🥇🥈🥉🏆🎯🔥💪, в цветном круге 10 %.
+ * CelebrationIcon — медали и празднования вместо эмодзи (медали, кубок, цель, огонь, сила,
+ * память, время), в цветном круге 10 %.
  */
 import React, { memo } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { Medal, Trophy, Target, Flame, Dumbbell, Star, Gem, PartyPopper } from 'lucide-react-native';
+import { Medal, Trophy, Target, Flame, Dumbbell, Star, Gem, PartyPopper, Brain, Timer } from 'lucide-react-native';
 import { useThemeColors } from '@/store';
 import { alpha, borderRadius, iconSize, type ColorToken } from '@/constants';
 import { getCategoryIcon } from '@/constants/categoryIcons';
@@ -106,7 +107,9 @@ export type CelebrationKind =
   | 'strength'
   | 'star'
   | 'diamond'
-  | 'party';
+  | 'party'
+  | 'memory'
+  | 'time';
 
 const CELEBRATIONS: Record<CelebrationKind, { icon: IconComponent; color: ColorToken }> = {
   gold: { icon: Medal, color: 'star' },
@@ -119,6 +122,8 @@ const CELEBRATIONS: Record<CelebrationKind, { icon: IconComponent; color: ColorT
   star: { icon: Star, color: 'star' },
   diamond: { icon: Gem, color: 'diamond' },
   party: { icon: PartyPopper, color: 'primary' },
+  memory: { icon: Brain, color: 'primary' },
+  time: { icon: Timer, color: 'warning' },
 };
 
 export interface CelebrationIconProps {

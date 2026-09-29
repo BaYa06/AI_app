@@ -3,12 +3,13 @@
  * @description Экран выбора перевода
  */
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { View, StyleSheet, Pressable, ScrollView, AppState, Text as RNText } from 'react-native';
+import { View, StyleSheet, Pressable, ScrollView, AppState } from 'react-native';
 import { triggerHaptic } from '@/utils/haptic';
-import { ArrowLeft, Volume2 } from 'lucide-react-native';
-import { Container, Text, ProgressBar, Loading } from '@/components/common';
+import { Check, Layers, Volume2, X } from 'lucide-react-native';
+import { Container, Text, Loading } from '@/components/common';
+import { Button, CelebrationIcon, EmptyState, ProgressBar, ScreenHeader, type CelebrationKind } from '@/components/ui';
 import { useCardsStore, useSetsStore, useThemeColors, useSettingsStore, selectSetStats } from '@/store';
-import { spacing, borderRadius } from '@/constants';
+import { spacing, borderRadius, heights, iconSize, screenPadding, alpha } from '@/constants';
 import { ProgressService } from '@/services/ProgressService';
 import { speak, resolveSpeechLang, prefetchSpeech, cardSpeechLangs } from '@/utils/speech';
 import { playCorrectSound, preloadSound } from '@/utils/sound';
@@ -532,11 +533,11 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
   }
 
   const screenTitle = sniperMode
-    ? 'Снайпер \uD83C\uDFAF'
+    ? 'Снайпер'
     : forgottenMode
-      ? 'Вспомни забытое \uD83E\uDDE0'
+      ? 'Вспомни забытое'
       : challengeMode
-        ? 'Быстрый раунд \u26A1'
+        ? 'Быстрый раунд'
         : 'Тест';
 
   const handleClose = useCallback(() => {
@@ -548,33 +549,44 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
   if (!totalQuestions) {
     return (
       <Container padded={false}>
-        <View style={[styles.header, { backgroundColor: colors.background }]}>
-          <Pressable
-            aria-label="Назад"
-            onPress={() => navigation.goBack()}
-            style={({ pressed }) => [
-              styles.iconButton,
-              { backgroundColor: pressed ? colors.surface : 'transparent' },
-            ]}
-          >
-            <ArrowLeft size={22} color={colors.textPrimary} />
-          </Pressable>
-          <Text variant="h3" style={{ color: colors.textPrimary }}>
-            {screenTitle}
-          </Text>
-          <View style={styles.iconButton} />
-        </View>
-        <View style={styles.emptyState}>
-          <Text variant="h3" style={{ color: colors.textPrimary, textAlign: 'center' }}>
-            Нет карточек для игры
-          </Text>
-          <Text variant="body" color="secondary" align="center">
-            Добавь карточки в набор, чтобы начать тест
-          </Text>
-        </View>
+        <ScreenHeader title={screenTitle} onBack={() => navigation.goBack()} />
+        <EmptyState
+          icon={Layers}
+          title="Нет карточек для игры"
+          description="Добавь карточки в набор, чтобы начать тест"
+        />
       </Container>
     );
   }
+
+  // Итоговый экран мини-игры: иконка → заголовок → текст → кнопки
+  const renderChallengeResult = ({
+    kind,
+    title,
+    subtitle,
+    onRetry,
+  }: {
+    kind: CelebrationKind;
+    title: string;
+    subtitle: string;
+    onRetry?: () => void;
+  }) => (
+    <Container padded={false}>
+      <View style={styles.challengeResultContainer}>
+        <CelebrationIcon kind={kind} style={styles.challengeResultIcon} />
+        <Text variant="h2" align="center" accessibilityRole="header" style={[styles.challengeResultTitle, { color: colors.textPrimary }]}>
+          {title}
+        </Text>
+        <Text variant="body" align="center" style={[styles.challengeResultSubtitle, { color: colors.textSecondary }]}>
+          {subtitle}
+        </Text>
+        <View style={styles.challengeResultButtons}>
+          {onRetry ? <Button title="Повторить" onPress={onRetry} fullWidth /> : null}
+          <Button variant={onRetry ? 'secondary' : 'primary'} title="Закрыть" onPress={handleClose} fullWidth />
+        </View>
+      </View>
+    </Container>
+  );
 
   // Sniper result screen
   if (sniperMode && challengeResult) {
@@ -588,33 +600,12 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
       setChallengeResult(null);
     };
 
-    return (
-      <Container padded={false}>
-        <View style={styles.challengeResultContainer}>
-          <RNText style={styles.challengeResultEmoji}>{'\uD83C\uDFAF'}</RNText>
-          <RNText style={[styles.challengeResultTitle, { color: colors.textPrimary }]}>
-            Снайпер!
-          </RNText>
-          <RNText style={[styles.challengeResultSubtitle, { color: colors.textSecondary }]}>
-            5 правильных подряд без единой ошибки
-          </RNText>
-          <View style={styles.challengeResultButtons}>
-            <Pressable
-              style={[styles.challengeResultPrimary, { backgroundColor: colors.primary }]}
-              onPress={restartSniper}
-            >
-              <RNText style={styles.challengeResultPrimaryText}>Повторить</RNText>
-            </Pressable>
-            <Pressable
-              style={[styles.challengeResultSecondary, { borderColor: colors.border }]}
-              onPress={handleClose}
-            >
-              <RNText style={[styles.challengeResultSecondaryText, { color: colors.textPrimary }]}>Закрыть</RNText>
-            </Pressable>
-          </View>
-        </View>
-      </Container>
-    );
+    return renderChallengeResult({
+      kind: 'target',
+      title: 'Снайпер!',
+      subtitle: '5 правильных подряд без единой ошибки',
+      onRetry: restartSniper,
+    });
   }
 
   // Forgotten mode result screen
@@ -629,126 +620,57 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
       setChallengeResult(null);
     };
 
-    return (
-      <Container padded={false}>
-        <View style={styles.challengeResultContainer}>
-          <RNText style={styles.challengeResultEmoji}>{forgottenWon ? '\uD83E\uDDE0' : '\uD83D\uDE14'}</RNText>
-          <RNText style={[styles.challengeResultTitle, { color: colors.textPrimary }]}>
-            {forgottenWon ? 'Память освежена!' : 'Почти получилось'}
-          </RNText>
-          <RNText style={[styles.challengeResultSubtitle, { color: colors.textSecondary }]}>
-            {forgottenWon
-              ? `Все ${challengeResult.total} правильно — забери награду на главной`
-              : `Правильно: ${challengeResult.correct} из ${challengeResult.total}. Для награды нужны все ответы без ошибок`}
-          </RNText>
-          <View style={styles.challengeResultButtons}>
-            <Pressable
-              style={[styles.challengeResultPrimary, { backgroundColor: colors.primary }]}
-              onPress={restartForgotten}
-            >
-              <RNText style={styles.challengeResultPrimaryText}>Повторить</RNText>
-            </Pressable>
-            <Pressable
-              style={[styles.challengeResultSecondary, { borderColor: colors.border }]}
-              onPress={handleClose}
-            >
-              <RNText style={[styles.challengeResultSecondaryText, { color: colors.textPrimary }]}>Закрыть</RNText>
-            </Pressable>
-          </View>
-        </View>
-      </Container>
-    );
+    return renderChallengeResult({
+      kind: forgottenWon ? 'memory' : 'strength',
+      title: forgottenWon ? 'Память освежена!' : 'Почти получилось',
+      subtitle: forgottenWon
+        ? `Все ${challengeResult.total} правильно — забери награду на главной`
+        : `Правильно: ${challengeResult.correct} из ${challengeResult.total}. Для награды нужны все ответы без ошибок`,
+      onRetry: restartForgotten,
+    });
   }
 
   // Quick round challenge result screen
   if (challengeMode && challengeResult) {
     const isSuccess = challengeResult.finished && challengeResult.correct === challengeResult.total;
 
-    return (
-      <Container padded={false}>
-        <View style={styles.challengeResultContainer}>
-          <RNText style={styles.challengeResultEmoji}>
-            {isSuccess ? '\uD83C\uDFC6' : challengeResult.timesUp ? '\u23F1\uFE0F' : '\uD83D\uDE14'}
-          </RNText>
-          <RNText style={[styles.challengeResultTitle, { color: colors.textPrimary }]}>
-            {isSuccess
-              ? 'Поздравляем!'
-              : challengeResult.timesUp
-                ? 'Время вышло!'
-                : 'Не получилось...'}
-          </RNText>
-          <RNText style={[styles.challengeResultSubtitle, { color: colors.textSecondary }]}>
-            {isSuccess
-              ? `Все ${challengeResult.total} слов угаданы без ошибок за ${formatTime(challengeResult.timeSpent ?? 0)}! Алмазы ждут тебя на главной.`
-              : challengeResult.timesUp
-                ? `Ты успел ответить на ${currentIndex} из ${totalQuestions}`
-                : 'Чтобы забрать алмазы, угадай все слова за 2 минуты без единой ошибки. Ты справишься! \uD83D\uDCAA'}
-          </RNText>
-
-          <View style={styles.challengeResultButtons}>
-            {!isSuccess && (
-              <Pressable
-                style={[styles.challengeResultPrimary, { backgroundColor: colors.primary }]}
-                onPress={restartChallenge}
-              >
-                <RNText style={styles.challengeResultPrimaryText}>Повторить</RNText>
-              </Pressable>
-            )}
-            <Pressable
-              style={isSuccess
-                ? [styles.challengeResultPrimary, { backgroundColor: '#059669' }]
-                : [styles.challengeResultSecondary, { borderColor: colors.border }]
-              }
-              onPress={handleClose}
-            >
-              <RNText style={isSuccess
-                ? styles.challengeResultPrimaryText
-                : [styles.challengeResultSecondaryText, { color: colors.textPrimary }]
-              }>Закрыть</RNText>
-            </Pressable>
-          </View>
-        </View>
-      </Container>
-    );
+    return renderChallengeResult({
+      kind: isSuccess ? 'trophy' : challengeResult.timesUp ? 'time' : 'strength',
+      title: isSuccess ? 'Поздравляем!' : challengeResult.timesUp ? 'Время вышло!' : 'Не получилось...',
+      subtitle: isSuccess
+        ? `Все ${challengeResult.total} слов угаданы без ошибок за ${formatTime(challengeResult.timeSpent ?? 0)}! Алмазы ждут тебя на главной.`
+        : challengeResult.timesUp
+          ? `Ты успел ответить на ${currentIndex} из ${totalQuestions}`
+          : 'Чтобы забрать алмазы, угадай все слова за 2 минуты без единой ошибки. Ты справишься!',
+      onRetry: isSuccess ? undefined : restartChallenge,
+    });
   }
 
   return (
     <Container padded={false}>
-      <View style={[styles.header, { backgroundColor: colors.background }]}>
-        <Pressable
-          aria-label="Назад"
-          onPress={() => {
-            if (timerRef.current) clearInterval(timerRef.current);
-            finishStudySession();
-            navigation.goBack();
-          }}
-          style={({ pressed }) => [
-            styles.iconButton,
-            { backgroundColor: pressed ? colors.surface : 'transparent' },
-          ]}
-        >
-          <ArrowLeft size={22} color={colors.textPrimary} />
-        </Pressable>
-        <Text variant="h3" style={{ color: colors.textPrimary }}>
-          {screenTitle}
-        </Text>
-        {challengeMode && !sniperMode && !forgottenMode ? (
-          <View style={styles.timerContainer}>
-            <RNText style={[
-              styles.timerText,
-              { color: timeLeft <= 10 ? colors.error : colors.textPrimary },
-            ]}>
+      <ScreenHeader
+        title={screenTitle}
+        onBack={() => {
+          if (timerRef.current) clearInterval(timerRef.current);
+          finishStudySession();
+          navigation.goBack();
+        }}
+        right={
+          challengeMode && !sniperMode && !forgottenMode ? (
+            <Text
+              variant="button"
+              accessibilityLabel={`Осталось ${timeLeft} секунд`}
+              style={[styles.timerText, { color: timeLeft <= 10 ? colors.errorText : colors.textPrimary }]}
+            >
               {formatTime(timeLeft)}
-            </RNText>
-          </View>
-        ) : (
-          <View style={styles.iconButton} />
-        )}
-      </View>
+            </Text>
+          ) : null
+        }
+      />
 
       <View style={styles.progressSection}>
         <View style={styles.progressInfo}>
-          <Text variant="bodySmall" style={{ color: colors.textPrimary, fontWeight: '700' }}>
+          <Text variant="bodySmall" style={[styles.semibold, { color: colors.textPrimary }]}>
             {sniperMode
               ? `Серия: ${sniperStreak}/${TARGET_STREAK}`
               : `Вопрос: ${currentIndex + 1}/${totalQuestions}`}
@@ -758,35 +680,14 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
           progress={sniperMode
             ? Math.round((sniperStreak / TARGET_STREAK) * 100)
             : progressPercent}
-          height={8}
+          accessibilityLabel="Прогресс"
         />
       </View>
 
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          {
-            paddingHorizontal: spacing.m,
-            paddingBottom: spacing.xl * 1.5,
-          },
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        <View
-          style={[
-            styles.card,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-              shadowColor: colors.textPrimary,
-            },
-          ]}
-        >
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={styles.cardChip}>
-            <Text
-              variant="caption"
-              style={{ color: colors.primary, fontWeight: '700', letterSpacing: 1 }}
-            >
+            <Text variant="overline" style={{ color: colors.primary }}>
               Выбери правильный ответ
             </Text>
           </View>
@@ -794,16 +695,18 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
             {getFront(currentCard)}
           </Text>
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Прослушать слово"
             style={({ pressed }) => [
               styles.audioButton,
               {
-                backgroundColor: pressed ? `${colors.primary}22` : colors.surfaceVariant,
+                backgroundColor: pressed ? alpha(colors.primary, 20) : colors.surfaceMuted,
                 borderColor: colors.border,
               },
             ]}
             onPress={() => handleSpeak(getFront(currentCard), getBack(currentCard), cardSpeechLangs(currentCard).front)}
           >
-            <Volume2 size={22} color={colors.primary} />
+            <Volume2 size={iconSize.m} color={colors.primary} />
           </Pressable>
         </View>
 
@@ -815,14 +718,15 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
 
             const baseBorder = isCorrect ? colors.success : isWrong ? colors.error : colors.border;
             const baseBg = isCorrect
-              ? `${colors.success}1A`
+              ? alpha(colors.success, 10)
               : isWrong
-                ? `${colors.error}1A`
+                ? alpha(colors.error, 10)
                 : colors.surface;
+            // Текст ответа — «текстовые» токены: заливки как текст нечитаемы
             const textColor = isCorrect
-              ? colors.success
+              ? colors.successText
               : isWrong
-                ? colors.error
+                ? colors.errorText
                 : colors.textPrimary;
 
             return (
@@ -830,34 +734,29 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
                 key={option.id}
                 onPress={() => handleSelectOption(option)}
                 disabled={showResult}
+                accessibilityRole="button"
+                accessibilityLabel={`${option.label}. ${option.text}${isCorrect ? ', верно' : isWrong ? ', неверно' : ''}`}
                 style={({ pressed }) => [
                   styles.option,
                   {
                     borderColor: baseBorder,
-                    backgroundColor: pressed && !isCorrect && !isWrong ? `${colors.primary}08` : baseBg,
+                    backgroundColor: pressed && !isCorrect && !isWrong ? alpha(colors.primary, 10) : baseBg,
                   },
                 ]}
               >
-                <View
-                  style={[
-                    styles.optionBadge,
-                    {
-                      backgroundColor: `${colors.textSecondary}14`,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                >
-                  <Text style={{ color: colors.textSecondary, fontWeight: '800', fontSize: 13 }}>
+                <View style={[styles.optionBadge, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
+                  <Text variant="label" style={{ color: colors.textSecondary }}>
                     {option.label}
                   </Text>
                 </View>
-                <Text style={[styles.optionText, { color: textColor }]}>{option.text}</Text>
+                <Text variant="bodyLarge" style={[styles.optionText, { color: textColor }]}>{option.text}</Text>
+                {/* Верно/неверно — цвет и иконка, не только цвет (брендбук, 11) */}
                 {isCorrect ? (
-                  <Text style={{ color: colors.success, fontWeight: '800' }}>✓</Text>
+                  <Check size={iconSize.s} color={colors.successText} strokeWidth={3} />
                 ) : isWrong ? (
-                  <Text style={{ color: colors.error, fontWeight: '800' }}>✕</Text>
+                  <X size={iconSize.s} color={colors.errorText} strokeWidth={3} />
                 ) : (
-                  <View style={{ width: 18 }} />
+                  <View style={styles.optionMarkPlaceholder} />
                 )}
               </Pressable>
             );
@@ -870,23 +769,11 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    paddingHorizontal: spacing.m,
-    paddingTop: spacing.m,
-    paddingBottom: spacing.s,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.l,
-    alignItems: 'center',
-    justifyContent: 'center',
+  semibold: {
+    fontWeight: '600',
   },
   progressSection: {
-    paddingHorizontal: spacing.m,
+    paddingHorizontal: screenPadding,
     paddingVertical: spacing.s,
     gap: spacing.xs,
   },
@@ -897,36 +784,30 @@ const styles = StyleSheet.create({
   },
   content: {
     gap: spacing.m,
+    paddingHorizontal: screenPadding,
+    paddingBottom: spacing.xxl,
   },
+  // Рамка без тени (брендбук, 7.3)
   card: {
-    borderRadius: spacing.xl,
+    borderRadius: borderRadius.l,
     borderWidth: 1,
     padding: spacing.l,
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 4,
     gap: spacing.s,
   },
   cardChip: {
     alignSelf: 'center',
     paddingHorizontal: spacing.s,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.full,
-    backgroundColor: 'transparent',
+    paddingVertical: spacing.xxs,
   },
   word: {
     textAlign: 'center',
-    fontSize: 30,
-    fontWeight: '800',
-    letterSpacing: -0.5,
   },
   audioButton: {
     marginTop: spacing.m,
     alignSelf: 'center',
     width: 56,
     height: 56,
-    borderRadius: borderRadius.xl,
+    borderRadius: borderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -938,41 +819,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.s,
-    borderRadius: borderRadius.xl,
+    borderRadius: borderRadius.l,
     borderWidth: 2,
     paddingVertical: spacing.s,
     paddingHorizontal: spacing.m,
   },
   optionBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: borderRadius.l,
+    width: heights.touch,
+    height: heights.touch,
+    borderRadius: borderRadius.m,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
   },
   optionText: {
     flex: 1,
-    fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '600',
   },
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.l,
-    gap: spacing.s,
-  },
-  // Timer
-  timerContainer: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
+  optionMarkPlaceholder: {
+    width: iconSize.s,
   },
   timerText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+    letterSpacing: 0,
   },
   // Challenge result
   challengeResultContainer: {
@@ -981,45 +850,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.l,
   },
-  challengeResultEmoji: {
-    fontSize: 64,
+  challengeResultIcon: {
     marginBottom: spacing.m,
   },
   challengeResultTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    textAlign: 'center',
     marginBottom: spacing.xs,
   },
   challengeResultSubtitle: {
-    fontSize: 16,
-    textAlign: 'center',
     marginBottom: spacing.xl,
   },
   challengeResultButtons: {
     width: '100%',
     gap: spacing.s,
-  },
-  challengeResultPrimary: {
-    height: 52,
-    borderRadius: borderRadius.l,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  challengeResultPrimaryText: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  challengeResultSecondary: {
-    height: 52,
-    borderRadius: borderRadius.l,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  challengeResultSecondaryText: {
-    fontSize: 17,
-    fontWeight: '600',
   },
 });
