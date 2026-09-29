@@ -762,7 +762,7 @@ export function HomeScreen({ navigation }: any) {
   const activeCourseTitle = useMemo(() => {
     if (activeCourseId === null) return null;
     const course = courses.find((c) => c.id === activeCourseId);
-    return course?.title || 'this course';
+    return course?.title || 'этот курс';
   }, [activeCourseId, courses]);
 
   const openLeaderboard = useCallback((week: 'current' | 'previous') => {
@@ -1274,12 +1274,12 @@ export function HomeScreen({ navigation }: any) {
             <Ionicons name="school-outline" size={22} color="#FFFFFF" />
           </View>
           <View>
-            <Text style={styles.teacherBannerTitle}>Teacher Mode</Text>
-            <Text style={styles.teacherBannerSubtitle}>Manage students & sets</Text>
+            <Text style={styles.teacherBannerTitle}>Режим учителя</Text>
+            <Text style={styles.teacherBannerSubtitle}>Ученики, наборы и тесты</Text>
           </View>
         </View>
         <View style={styles.teacherBannerButton}>
-          <Text style={styles.teacherBannerButtonText}>My Classes →</Text>
+          <Text style={styles.teacherBannerButtonText}>Мои курсы →</Text>
         </View>
       </Pressable>
     </View>
@@ -1538,7 +1538,7 @@ export function HomeScreen({ navigation }: any) {
                   <Text style={[styles.tipTitle, { color: colors.textPrimary }]}>Подсказка</Text>
                   <Text style={[styles.tipText, { color: colors.textSecondary }]}>
                     {isTeacher
-                      ? 'Курс пустой? Через Teacher Mode выше можно пригласить учеников и подключить учебник — наборы для этого не нужны.'
+                      ? 'Курс пустой? Через «Режим учителя» выше можно пригласить учеников и подключить учебник — наборы для этого не нужны.'
                       : 'Объединяйте несколько наборов в курс — так проще учиться по теме или семестру.'}
                   </Text>
                 </View>
@@ -1674,7 +1674,7 @@ export function HomeScreen({ navigation }: any) {
               // Дата создания набора
               const getDateDisplay = () => {
                 const date = new Date(set.createdAt);
-                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                const months = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
                 return {
                   month: months[date.getMonth()],
                   day: date.getDate().toString()
@@ -1761,7 +1761,7 @@ export function HomeScreen({ navigation }: any) {
                   {/* Progress Section */}
                   <View style={styles.progressSection}>
                     <View style={styles.progressHeader}>
-                      <Text style={[styles.progressLabel, { color: colors.textTertiary }]}>PROGRESS</Text>
+                      <Text style={[styles.progressLabel, { color: colors.textTertiary }]}>Прогресс</Text>
                       <Text style={[styles.progressPercentage, { color: colors.textTertiary }]}>{progress}%</Text>
                     </View>
                     <View

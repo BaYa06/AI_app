@@ -571,7 +571,7 @@ export const CoursesDrawer = memo(function CoursesDrawer(props: CoursesDrawerPro
   const listEmpty = courses.length === 0 ? (
     <View style={styles.drawerEmpty}>
       <Text style={[styles.drawerEmptyText, { color: colors.textSecondary }]}>
-        Create a course to organize your sets
+        Создай курс, чтобы разложить наборы по темам
       </Text>
     </View>
   ) : null;
