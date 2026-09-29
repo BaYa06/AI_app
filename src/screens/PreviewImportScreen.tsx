@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   FlatList,
@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   TextInput,
   Modal,
+  ScrollView,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -15,7 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Button } from '@/components/common';
 import { useThemeColors, useSetsStore, useCardsStore } from '@/store';
-import { spacing, borderRadius } from '@/constants';
+import { spacing, borderRadius, TOP_LANGUAGES } from '@/constants';
 import type { RootStackScreenProps } from '@/types/navigation';
 import { ArrowLeft, BookOpen } from 'lucide-react-native';
 
@@ -37,19 +38,65 @@ function SaveModal({
   defaultTitle: string;
   saving: boolean;
   colors: ReturnType<typeof useThemeColors>;
-  onConfirm: (title: string) => void;
+  onConfirm: (title: string, languageFrom: string, languageTo: string) => void;
   onCancel: () => void;
 }) {
   const [title, setTitle] = useState(defaultTitle);
-  const inputRef = useRef<TextInput>(null);
+  // Языки выбирает пользователь — без выбора набор не создаётся
+  const [languageFrom, setLanguageFrom] = useState<string | null>(null);
+  const [languageTo, setLanguageTo] = useState<string | null>(null);
+  const [showValidation, setShowValidation] = useState(false);
 
-  // Sync defaultTitle when modal opens
+  // Sync defaultTitle when modal opens. Клавиатуру не открываем сами — только по нажатию на поле
   React.useEffect(() => {
     if (visible) {
       setTitle(defaultTitle);
-      setTimeout(() => inputRef.current?.focus(), 150);
+      setShowValidation(false);
     }
   }, [visible, defaultTitle]);
+
+  const languagesSelected = !!languageFrom && !!languageTo;
+  const handleConfirm = () => {
+    setShowValidation(true);
+    if (!languageFrom || !languageTo) return;
+    onConfirm(title, languageFrom, languageTo);
+  };
+
+  const renderLanguageRow = (
+    label: string,
+    selected: string | null,
+    onSelect: (code: string) => void,
+  ) => (
+    <View style={styles.langBlock}>
+      <Text variant="caption" style={{ color: showValidation && !selected ? colors.error : colors.textSecondary, fontWeight: '600' }}>
+        {label}
+      </Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <View style={styles.langChips}>
+          {TOP_LANGUAGES.map((lang) => {
+            const active = selected === lang.code;
+            return (
+              <Pressable
+                key={lang.code}
+                onPress={() => onSelect(lang.code)}
+                style={[
+                  styles.langChip,
+                  {
+                    backgroundColor: active ? colors.primary : colors.background,
+                    borderColor: active ? colors.primary : showValidation && !selected ? colors.error : colors.border,
+                  },
+                ]}
+              >
+                <Text variant="caption" style={{ color: active ? '#fff' : colors.textPrimary, fontWeight: '600' }}>
+                  {lang.flag} {lang.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </ScrollView>
+    </View>
+  );
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
@@ -65,16 +112,22 @@ function SaveModal({
 
           <View style={[styles.modalInput, { borderColor: colors.border, backgroundColor: colors.background }]}>
             <TextInput
-              ref={inputRef}
               style={[styles.modalInputText, { color: colors.textPrimary }]}
               placeholder="Например: Биология. Митоз"
               placeholderTextColor={colors.textSecondary}
               value={title}
               onChangeText={setTitle}
-              onSubmitEditing={() => onConfirm(title)}
               returnKeyType="done"
             />
           </View>
+
+          {renderLanguageRow('Язык слов *', languageFrom, setLanguageFrom)}
+          {renderLanguageRow('Язык перевода *', languageTo, setLanguageTo)}
+          {showValidation && !languagesSelected && (
+            <Text variant="caption" style={{ color: colors.error, marginTop: spacing.xs }}>
+              Выберите оба языка
+            </Text>
+          )}
 
           <View style={styles.modalActions}>
             <TouchableOpacity
@@ -86,9 +139,9 @@ function SaveModal({
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => onConfirm(title)}
+              onPress={handleConfirm}
               disabled={saving}
-              style={[styles.modalBtn, styles.modalBtnPrimary, { backgroundColor: colors.primary }]}
+              style={[styles.modalBtn, styles.modalBtnPrimary, { backgroundColor: colors.primary, opacity: languagesSelected ? 1 : 0.6 }]}
               activeOpacity={0.8}
             >
               {saving ? (
@@ -166,11 +219,11 @@ export function PreviewImportScreen({ navigation, route }: Props) {
 
   // ── save as new set ───────────────────────────────────────────────────────
 
-  const handleSaveConfirm = useCallback(async (title: string) => {
+  const handleSaveConfirm = useCallback(async (title: string, languageFrom: string, languageTo: string) => {
     const trimmed = title.trim() || 'Импорт';
     setSaving(true);
     try {
-      const newSet = await addSet({ title: trimmed });
+      const newSet = await addSet({ title: trimmed, languageFrom, languageTo });
       addCards(cards.map(c => ({ setId: newSet.id, frontText: c.front, backText: c.back })));
       updateSetStats(newSet.id, { cardCount: cards.length, newCount: cards.length });
       setModalVisible(false);
@@ -369,6 +422,21 @@ const styles = StyleSheet.create({
   modalActions: {
     flexDirection: 'row',
     gap: spacing.s,
+    marginTop: spacing.m,
+  },
+  langBlock: {
+    gap: spacing.xs,
+    marginBottom: spacing.s,
+  },
+  langChips: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  langChip: {
+    paddingHorizontal: spacing.s,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
   },
   modalBtn: {
     flex: 1,

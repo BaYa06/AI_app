@@ -613,10 +613,12 @@ export function HomeScreen({ navigation }: any) {
     const waitingBySet: Record<string, number> = {};
     let fading = 0;
     let tomorrow = 0;
+    const seen = new Set<string>();
     for (const set of filteredSets) {
       for (const id of cardsBySet[set.id] || []) {
         const card = cardsMap[id];
-        if (!card) continue;
+        if (!card || seen.has(id)) continue;
+        seen.add(id);
         all.push(card);
         if (isCardWaitingReview(card, now)) {
           waiting.push(card);
@@ -809,16 +811,6 @@ export function HomeScreen({ navigation }: any) {
 
   const rootGesture = Gesture.Exclusive(edgeOpenGesture, courseSwitchGesture);
 
-  // Фокус на input при начале редактирования
-  useEffect(() => {
-    if (editingCourseId) {
-      const timer = setTimeout(() => {
-        editInputRef.current?.focus();
-      }, 50);
-      return () => clearTimeout(timer);
-    }
-  }, [editingCourseId]);
-  
   // Фокус на input при создании курса
   useEffect(() => {
     if (isCreatingCourse) {
@@ -1850,7 +1842,6 @@ export function HomeScreen({ navigation }: any) {
                 value={editingTitle}
                 onChangeText={setEditingTitle}
                 onSubmitEditing={() => editingCourseId && saveCourseTitle(editingCourseId)}
-                autoFocus
               />
             </View>
 

@@ -189,14 +189,54 @@ const pickWebVoice = (lang: string, voices: SpeechVoice[]) => {
 
 // ----------------- Language detection -----------------
 
-export const detectLanguage = (text: string, counterpart?: string): string => {
+/**
+ * Угадать язык по тексту — только запасной вариант, когда язык набора неизвестен.
+ * Раньше латиница с русским переводом считалась немецким, и английские наборы звучали
+ * немецким голосом. Теперь немецкий — только по умлаутам/ß, иначе английский.
+ */
+export const detectLanguage = (text: string, _counterpart?: string): string => {
   const value = text || '';
-  const pair = counterpart || '';
   if (/[а-яё]/i.test(value)) return 'ru-RU';
   if (/[äöüß]/i.test(value)) return 'de-DE';
-  if (/[а-яё]/i.test(pair)) return 'de-DE';
   return 'en-US';
 };
+
+/** Код языка набора ('en', 'de', …) → код для озвучки ('en-US', 'de-DE', …) */
+const SPEECH_LOCALES: Record<string, string> = {
+  en: 'en-US',
+  de: 'de-DE',
+  ru: 'ru-RU',
+  es: 'es-ES',
+  fr: 'fr-FR',
+  it: 'it-IT',
+  zh: 'zh-CN',
+  ja: 'ja-JP',
+  ko: 'ko-KR',
+  tr: 'tr-TR',
+};
+
+export const toSpeechLang = (code?: string | null): string | undefined => {
+  const value = (code || '').trim();
+  if (!value) return undefined;
+  if (value.includes('-')) return value;
+  return SPEECH_LOCALES[value.toLowerCase()] || value.toLowerCase();
+};
+
+/** Язык озвучки: язык набора, если он известен, иначе — угадываем по тексту */
+export const resolveSpeechLang = (text: string, langHint?: string | null, counterpart?: string): string =>
+  toSpeechLang(langHint) || detectLanguage(text, counterpart);
+
+/**
+ * Языки сторон карточки — из её набора (card.setId). Берём набор самой карточки, а не экрана:
+ * в тренировке с главной карточки из разных наборов идут вперемешку.
+ */
+export function cardSpeechLangs(card?: { setId?: string } | null): { front?: string; back?: string } {
+  if (!card?.setId) return {};
+  // Ленивый require — как в других сервисах, чтобы не было циклических импортов со store
+  const { useSetsStore } = require('@/store/setsStore');
+  const set = useSetsStore.getState().getSet(card.setId);
+  return { front: toSpeechLang(set?.languageFrom), back: toSpeechLang(set?.languageTo) };
+}
 
 // ----------------- Google auth helpers -----------------
 
@@ -445,7 +485,7 @@ const synthesizeToCache = async (
   }
   if (!token && !apiKey) return false;
 
-  const languageCode = (lang || 'en-US').split('-').slice(0, 2).join('-');
+  const languageCode = (lang || 'en-US').split('-').slice(0, 2).join('-').replace(/^zh-CN$/i, 'cmn-CN');
   const url = token ? GOOGLE_TTS_ENDPOINT : `${GOOGLE_TTS_ENDPOINT}?key=${apiKey}`;
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;

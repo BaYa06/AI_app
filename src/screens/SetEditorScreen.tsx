@@ -52,11 +52,11 @@ const LANG_LABEL_TO_CODE: Record<string, string> = Object.fromEntries(
 );
 
 export function SetEditorScreen({ navigation, route }: Props) {
-  const { setId, autoFocusTitle } = route.params || {};
+  // Клавиатура не открывается сама: только когда пользователь нажмёт на поле
+  const { setId } = route.params || {};
   const colors = useThemeColors();
   const theme = useSettingsStore((s) => s.resolvedTheme);
   const isEditing = !!setId;
-  const titleInputRef = useRef<TextInput>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(16)).current;
 
@@ -87,15 +87,20 @@ export function SetEditorScreen({ navigation, route }: Props) {
 
   // Courses store - для назначения courseId при создании набора
   const activeCourseId = useCoursesStore((s) => s.activeCourseId);
-  const courses = useCoursesStore((s) => s.courses);
+  const allCourses = useCoursesStore((s) => s.courses);
+  // Курсы учителя, где пользователь — ученик, не предлагаем: свой набор туда положить нельзя
+  const courses = useMemo(() => allCourses.filter((c) => !c.isStudentCourse), [allCourses]);
+  const defaultCourseId = courses.some((c) => c.id === activeCourseId) ? activeCourseId : null;
 
   // Состояние формы
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<SetCategory>('general');
-  const [courseId, setCourseId] = useState<string | null>(activeCourseId ?? null);
-  const [sourceLanguage, setSourceLanguage] = useState(SOURCE_LANGUAGES[0]);
-  const [targetLanguage, setTargetLanguage] = useState(TARGET_LANGUAGES[0]);
+  const [courseId, setCourseId] = useState<string | null>(defaultCourseId ?? null);
+  // Языки не выбираются за пользователя: без явного выбора набор не создать
+  // (раньше по умолчанию стояло «Английский → Английский», и озвучка/тесты шли не на том языке)
+  const [sourceLanguage, setSourceLanguage] = useState('');
+  const [targetLanguage, setTargetLanguage] = useState('');
   const [sourcePickerOpen, setSourcePickerOpen] = useState(false);
   const [targetPickerOpen, setTargetPickerOpen] = useState(false);
   const [coursePickerOpen, setCoursePickerOpen] = useState(false);
@@ -151,16 +156,6 @@ export function SetEditorScreen({ navigation, route }: Props) {
     })();
   }, [isEditing, setId]);
 
-  // Автофокус на названии при открытии по запросу
-  useEffect(() => {
-    if (autoFocusTitle) {
-      const timer = setTimeout(() => {
-        titleInputRef.current?.focus();
-      }, 220);
-      return () => clearTimeout(timer);
-    }
-  }, [autoFocusTitle]);
-
   // Предзаполнение формы публикации данными набора
   useEffect(() => {
     if (showPublishForm && !publishFormInitialized) {
@@ -190,12 +185,15 @@ export function SetEditorScreen({ navigation, route }: Props) {
 
   const selectedCourseTitle = useMemo(() => {
     if (!courseId) return 'Без курса';
-    return courses.find((c) => c.id === courseId)?.title || 'Без курса';
-  }, [courseId, courses]);
+    return allCourses.find((c) => c.id === courseId)?.title || 'Без курса';
+  }, [courseId, allCourses]);
 
-  const isFormValid = !!title.trim();
+  const isLanguagesSelected = !!sourceLanguage && !!targetLanguage;
+  const isFormValid = !!title.trim() && isLanguagesSelected;
   const titleError = showValidation && !title.trim();
-  const isSaveDisabled = !isFormValid || isSaving;
+  const languageError = showValidation && !isLanguagesSelected;
+  // Кнопка не блокируется, пока форма не заполнена: нажатие подсвечивает, чего не хватает
+  const isSaveDisabled = isSaving;
 
   const toggleCoursePicker = useCallback(() => {
     if (isReadOnly) return;
@@ -312,15 +310,14 @@ export function SetEditorScreen({ navigation, route }: Props) {
   const handleSave = useCallback(async () => {
     setShowValidation(true);
 
-    if (!title.trim()) return;
+    const langFrom = LANG_LABEL_TO_CODE[sourceLanguage];
+    const langTo = LANG_LABEL_TO_CODE[targetLanguage];
+    if (!title.trim() || !langFrom || !langTo) return;
 
     setIsSaving(true);
 
     try {
       const categoryData = CATEGORY_OPTIONS.find((c) => c.value === category);
-      
-      const langFrom = LANG_LABEL_TO_CODE[sourceLanguage] || 'de';
-      const langTo = LANG_LABEL_TO_CODE[targetLanguage] || 'ru';
 
       if (isEditing && setId) {
         updateSet(setId, {
@@ -428,7 +425,6 @@ export function SetEditorScreen({ navigation, route }: Props) {
                 ]}
               >
                 <TextInput
-                  ref={titleInputRef}
                   value={title}
                   onChangeText={setTitle}
                   placeholder="Например: Путешествия (A1)"
@@ -492,14 +488,16 @@ export function SetEditorScreen({ navigation, route }: Props) {
             {/* Языки */}
             <View style={styles.field}>
               <Text variant="label" color="primary" style={styles.fieldLabel}>
-                Языки
+                Языки <Text style={{ color: colors.error }}>*</Text>
               </Text>
               <View style={styles.languageRow}>
                 <View style={styles.languageSelectWrapper}>
                   <SelectPill
                     label={sourceLanguage}
+                    placeholder="Язык слов"
                     onPress={toggleSourcePicker}
                     isOpen={sourcePickerOpen}
+                    hasError={languageError && !sourceLanguage}
                     colors={colors}
                   />
                   {sourcePickerOpen && (
@@ -522,8 +520,10 @@ export function SetEditorScreen({ navigation, route }: Props) {
                 <View style={styles.languageSelectWrapper}>
                   <SelectPill
                     label={targetLanguage}
+                    placeholder="Язык перевода"
                     onPress={toggleTargetPicker}
                     isOpen={targetPickerOpen}
+                    hasError={languageError && !targetLanguage}
                     colors={colors}
                   />
                   {targetPickerOpen && (
@@ -536,8 +536,8 @@ export function SetEditorScreen({ navigation, route }: Props) {
                   )}
                 </View>
               </View>
-              <Text variant="caption" color="tertiary" style={styles.helperText}>
-                Выберите язык источника и язык перевода
+              <Text variant="caption" color={languageError ? 'error' : 'tertiary'} style={styles.helperText}>
+                {languageError ? 'Выберите оба языка' : 'Выберите язык слов и язык перевода'}
               </Text>
             </View>
 
@@ -773,16 +773,20 @@ export function SetEditorScreen({ navigation, route }: Props) {
 
 function SelectPill({
   label,
+  placeholder,
   onPress,
   colors,
   isOpen = false,
   fullWidth = false,
+  hasError = false,
 }: {
   label: string;
+  placeholder?: string;
   onPress: () => void;
   colors: ReturnType<typeof useThemeColors>;
   isOpen?: boolean;
   fullWidth?: boolean;
+  hasError?: boolean;
 }) {
   return (
     <Pressable
@@ -792,17 +796,17 @@ function SelectPill({
         fullWidth && styles.selectFullWidth,
         {
           backgroundColor: colors.surface,
-          borderColor: isOpen ? colors.primary : colors.border,
+          borderColor: hasError ? colors.error : isOpen ? colors.primary : colors.border,
           shadowColor: colors.shadow
         },
       ]}
     >
       <Text
         variant="bodySmall"
-        style={[styles.selectLabel, { color: colors.textPrimary }]}
+        style={[styles.selectLabel, { color: label ? colors.textPrimary : colors.textTertiary }]}
         numberOfLines={1}
       >
-        {label}
+        {label || placeholder}
       </Text>
       <ChevronDown
         size={18}

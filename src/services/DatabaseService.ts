@@ -62,7 +62,9 @@ export const DatabaseService = {
 
       const stores = getStores();
       if (setsData?.sets) {
-        stores.useSetsStore.setState({ sets: setsData.sets, setsOrder: setsData.setsOrder || Object.keys(setsData.sets) });
+        // Кэш старых версий мог сохранить дубли в setsOrder
+        const setsOrder = [...new Set(setsData.setsOrder || Object.keys(setsData.sets))];
+        stores.useSetsStore.setState({ sets: setsData.sets, setsOrder });
       }
       if (cardsData?.cards) {
         stores.useCardsStore.setState({ cards: cardsData.cards, cardsBySet: cardsData.cardsBySet || {} });
@@ -211,6 +213,10 @@ export const DatabaseService = {
             studentCourses.forEach((sc, i) => {
               const teacherSets = setsByCourse[i];
               teacherSets.forEach(ts => {
+                // Набор уже есть (свой набор ученика, положенный в курс учителя, или тот же юнит
+                // в двух курсах) — второй раз не добавляем: дубль в setsOrder удваивал его карточки
+                // в «Повторении дня» и в тестах (одинаковые варианты ответа).
+                if (setsMap[ts.id]) return;
                 setsMap[ts.id] = ts;
                 setsOrder.push(ts.id);
                 // Официальные наборы открытых юнитов: карточки подгружаются ниже через BookService.

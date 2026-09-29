@@ -17,7 +17,7 @@ import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card, Rating } from '@/types';
 import { spacing, borderRadius } from '@/constants';
 import { ProgressService } from '@/services/ProgressService';
-import { speak, detectLanguage, prefetchSpeech } from '@/utils/speech';
+import { speak, resolveSpeechLang, prefetchSpeech, cardSpeechLangs } from '@/utils/speech';
 import { playCorrectSound2 as playCorrectSound, preloadSound } from '@/utils/sound';
 
 type Props = RootStackScreenProps<'WordBuilder'>;
@@ -178,7 +178,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
   // Заранее озвучиваем слово текущей и следующей карточки — кнопка динамика играет сразу
   useEffect(() => {
     const upcoming = [cardsQueue[currentIndex], cardsQueue[currentIndex + 1]].filter(Boolean) as Card[];
-    prefetchSpeech(upcoming.map((c) => ({ text: getFront(c), counterpart: getBack(c) })));
+    prefetchSpeech(upcoming.map((c) => ({ text: getFront(c), counterpart: getBack(c), lang: cardSpeechLangs(c).front })));
   }, [cardsQueue, currentIndex]);
 
   const { promptText, targetWord } = useMemo(() => {
@@ -382,11 +382,11 @@ export function WordBuilderScreen({ navigation, route }: Props) {
 
   // Обработчик озвучивания
   const handleSpeak = useCallback(
-    (text: string, counterpartText?: string) => {
+    (text: string, counterpartText?: string, langHint?: string) => {
       if (!text) return;
       const normalized = text.trim().split(/\r?\n/)[0].trim();
       if (!normalized) return;
-      const lang = detectLanguage(normalized, counterpartText);
+      const lang = resolveSpeechLang(normalized, langHint, counterpartText);
       speak(normalized, lang).catch((error) => {
         console.warn('[WordBuilder] Speech error:', error);
       });
@@ -592,7 +592,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
                   borderColor: colors.border,
                 },
               ]}
-              onPress={() => handleSpeak(targetWord, promptText)}
+              onPress={() => handleSpeak(targetWord, promptText, cardSpeechLangs(currentCard).front)}
             >
               <Volume2 size={22} color={colors.primary} />
             </Pressable>

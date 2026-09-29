@@ -13,7 +13,7 @@ import { DatabaseService, Analytics } from '@/services';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Rating, Card } from '@/types';
 import { ArrowLeft, Settings, Volume2, Check } from 'lucide-react-native';
-import { speak, detectLanguage, prefetchSpeech } from '@/utils/speech';
+import { speak, resolveSpeechLang, prefetchSpeech, cardSpeechLangs } from '@/utils/speech';
 import { triggerHaptic } from '@/utils/haptic';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ReAnimated, {
@@ -56,7 +56,6 @@ export function StudyScreen({ navigation, route }: Props) {
   const updateLastStudied = useSetsStore((s) => s.updateLastStudied);
   const updateSetStats = useSetsStore((s) => s.updateSetStats);
   const getCardsBySet = useCardsStore((s) => s.getCardsBySet);
-  const currentSet = useSetsStore((s) => s.getSet(setId));
   
   // Study store
   const session = useStudyStore((s) => s.session);
@@ -80,22 +79,11 @@ export function StudyScreen({ navigation, route }: Props) {
   const overlayColor = theme === 'dark' ? 'rgba(0, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.55)';
   const settingsSheetBackground = theme === 'dark' ? '#0f172a' : colors.surface;
   const settingsSheetBorder = theme === 'dark' ? 'rgba(255, 255, 255, 0.12)' : colors.border;
-  const normalizeLang = (lang?: string): string | undefined => {
-    if (!lang) return undefined;
-    const lower = lang.toLowerCase();
-    if (lower.startsWith('ru')) return 'ru-RU';
-    if (lower.startsWith('de')) return 'de-DE';
-    if (lower.startsWith('en')) return 'en-US';
-    return lang;
-  };
-
   const handleSpeak = useCallback(
     (text: string, langHint?: string, counterpart?: string) => {
       const normalized = (text || '').trim();
       if (!normalized) return;
-      const lang =
-        normalizeLang(langHint) ||
-        detectLanguage(normalized, counterpart);
+      const lang = resolveSpeechLang(normalized, langHint, counterpart);
       speak(normalized, lang).catch((error) => {
         console.warn('[StudyScreen] TTS error:', error);
       });
@@ -542,19 +530,18 @@ export function StudyScreen({ navigation, route }: Props) {
   useEffect(() => {
     if (!session) return;
     const ids = [session.queue[session.currentIndex], session.queue[session.currentIndex + 1]].filter(Boolean);
-    const frontLang = normalizeLang(currentSet?.languageFrom);
-    const backLang = normalizeLang(currentSet?.languageTo);
     const items: Array<{ text: string; lang: string }> = [];
     for (const id of ids) {
       const card = useCardsStore.getState().cards[id];
       if (!card) continue;
+      const langs = cardSpeechLangs(card);
       const front = (card.frontText ?? (card as any).front ?? '').trim();
       const back = (card.backText ?? (card as any).back ?? '').trim();
-      if (front) items.push({ text: front, lang: frontLang || detectLanguage(front, back) });
-      if (back) items.push({ text: back, lang: backLang || detectLanguage(back, front) });
+      if (front) items.push({ text: front, lang: resolveSpeechLang(front, langs.front, back) });
+      if (back) items.push({ text: back, lang: resolveSpeechLang(back, langs.back, front) });
     }
     prefetchSpeech(items);
-  }, [session?.currentIndex, session?.queue, currentSet?.languageFrom, currentSet?.languageTo]);
+  }, [session?.currentIndex, session?.queue]);
 
   // Загрузка
   if (!currentCard) {
@@ -567,8 +554,7 @@ export function StudyScreen({ navigation, route }: Props) {
 
   const questionText = reverseEnabled ? baseBack : baseFront;
   const answerText = reverseEnabled ? baseFront : baseBack;
-  const frontLang = normalizeLang(currentSet?.languageFrom);
-  const backLang = normalizeLang(currentSet?.languageTo);
+  const { front: frontLang, back: backLang } = cardSpeechLangs(currentCard);
   const questionLang = reverseEnabled ? backLang : frontLang;
   const answerLang = reverseEnabled ? frontLang : backLang;
 

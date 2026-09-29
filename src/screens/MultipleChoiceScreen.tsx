@@ -10,7 +10,7 @@ import { Container, Text, ProgressBar, Loading } from '@/components/common';
 import { useCardsStore, useSetsStore, useThemeColors, useSettingsStore, selectSetStats } from '@/store';
 import { spacing, borderRadius } from '@/constants';
 import { ProgressService } from '@/services/ProgressService';
-import { speak, detectLanguage, prefetchSpeech } from '@/utils/speech';
+import { speak, resolveSpeechLang, prefetchSpeech, cardSpeechLangs } from '@/utils/speech';
 import { playCorrectSound, preloadSound } from '@/utils/sound';
 import { Analytics } from '@/services/analytics';
 import { useChallengeStore } from '@/store';
@@ -167,6 +167,11 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
       pendingCardsInQueueRef.current = 0;
     }
     
+    // Одна карточка — один вопрос: дубли давали повторяющиеся варианты с одинаковым key,
+    // и React не убирал старые кнопки (вариантов становилось 5, 6, …)
+    const seen = new Set<string>();
+    questionCards = questionCards.filter((c) => !seen.has(c.id) && seen.add(c.id));
+
     setQuestions(questionCards);
     setCurrentIndex(0);
     setSelectedOption(null);
@@ -182,11 +187,11 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
 
   // Обработчик озвучивания
   const handleSpeak = React.useCallback(
-    (text: string, counterpartText?: string) => {
+    (text: string, counterpartText?: string, langHint?: string) => {
       if (!text) return;
       const normalized = text.trim().split(/\r?\n/)[0].trim();
       if (!normalized) return;
-      const lang = detectLanguage(normalized, counterpartText);
+      const lang = resolveSpeechLang(normalized, langHint, counterpartText);
       speak(normalized, lang).catch((error) => {
         console.warn('[MultipleChoice] Speech error:', error);
       });
@@ -200,7 +205,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
   // Заранее озвучиваем слово текущей и следующей карточки — кнопка динамика играет сразу
   useEffect(() => {
     const upcoming = [questions[currentIndex], questions[currentIndex + 1]].filter(Boolean) as Card[];
-    prefetchSpeech(upcoming.map((c) => ({ text: getFront(c), counterpart: getBack(c) })));
+    prefetchSpeech(upcoming.map((c) => ({ text: getFront(c), counterpart: getBack(c), lang: cardSpeechLangs(c).front })));
   }, [questions, currentIndex]);
   const progressPercent = totalQuestions ? Math.round(((currentIndex + 1) / totalQuestions) * 100) : 0;
 
@@ -813,7 +818,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
                 borderColor: colors.border,
               },
             ]}
-            onPress={() => handleSpeak(getFront(currentCard), getBack(currentCard))}
+            onPress={() => handleSpeak(getFront(currentCard), getBack(currentCard), cardSpeechLangs(currentCard).front)}
           >
             <Volume2 size={22} color={colors.primary} />
           </Pressable>

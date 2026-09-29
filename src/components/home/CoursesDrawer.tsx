@@ -288,8 +288,6 @@ const CourseRow = memo(function CourseRow({
                     placeholderTextColor={colors.textSecondary}
                     value={editingTitle}
                     onChangeText={onChangeEditingTitle}
-                    autoFocus
-                    selectTextOnFocus
                     maxLength={255}
                     onSubmitEditing={() => onSaveEditingTitle(course.id)}
                   />
