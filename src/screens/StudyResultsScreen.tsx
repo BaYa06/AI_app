@@ -3,16 +3,17 @@
  * @description Экран результатов тренировки после завершения изучения карточек
  */
 import React from 'react';
-import { View, StyleSheet, Pressable, ScrollView, Platform, Modal } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { useThemeColors } from '@/store';
 import { Text, StreakCelebrationModal } from '@/components/common';
 import { Analytics } from '@/services/analytics';
 import { recordSessionForRatingPrompt, markRatingPromptShown } from '@/services/feedback';
 import { RatingPromptModal } from '@/components/RatingPromptModal';
-import { spacing } from '@/constants';
+import { spacing, borderRadius, heights, iconSize, screenPadding, alpha } from '@/constants';
+import { pluralize } from '@/utils';
+import { Badge, Button, Card, ScreenHeader, Sheet, useScreenBottomInset } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
-import { ArrowLeft, Settings, CheckCircle2, List, ArrowRight, RotateCcw, BookOpen, X } from 'lucide-react-native';
+import { Settings, CheckCircle2, List, ArrowRight, RotateCcw, BookOpen, X } from 'lucide-react-native';
 
 type Props = RootStackScreenProps<'StudyResults'>;
 
@@ -37,7 +38,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
     newStreakCount,
   } = route.params;
   const colors = useThemeColors();
-  const insets = useSafeAreaInsets();
+  const bottomInset = useScreenBottomInset();
   const [showErrorsModal, setShowErrorsModal] = React.useState(false);
   const [showStreakModal, setShowStreakModal] = React.useState(streakIncreased === true);
   const [showRatingPrompt, setShowRatingPrompt] = React.useState(false);
@@ -244,149 +245,95 @@ export function StudyResultsScreen({ navigation, route }: Props) {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.background }]}>
-        <Pressable
-          onPress={handleBack}
-          style={({ pressed }) => [
-            styles.headerButton,
-            { backgroundColor: pressed ? colors.surfaceVariant : 'transparent' }
-          ]}
-        >
-          <ArrowLeft size={24} color={colors.textPrimary} />
-        </Pressable>
-        
-        <Text variant="h3" style={styles.headerTitle}>
-          {modeTitle}
-        </Text>
-        
-        <Pressable
-          onPress={handleSettings}
-          style={({ pressed }) => [
-            styles.headerButton,
-            { backgroundColor: pressed ? colors.surfaceVariant : 'transparent' }
-          ]}
-        >
-          <Settings size={24} color={colors.textPrimary} />
-        </Pressable>
-      </View>
+      <ScreenHeader
+        title={modeTitle}
+        onBack={handleBack}
+        right={<Button variant="icon" icon={Settings} accessibilityLabel="Настройки" onPress={handleSettings} />}
+      />
 
       {/* Scrollable Content */}
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Spacer */}
-        <View style={styles.topSpacer} />
-
         {/* Hero Section */}
         <View style={styles.heroSection}>
-          {/* Medallion with glow effect */}
-          <View style={styles.medallionContainer}>
-            <View style={[styles.medallion, { 
-              backgroundColor: colors.primary,
-              borderColor: colors.background,
-            }]}>
-              <CheckCircle2 size={48} color="#FFFFFF" strokeWidth={3} />
-            </View>
+          <View style={[styles.medallion, { backgroundColor: colors.primaryFill, borderColor: alpha(colors.primary, 20) }]}>
+            <CheckCircle2 size={iconSize.xl} color={colors.onPrimary} strokeWidth={3} />
           </View>
 
-          <Text variant="h1" align="center" style={styles.title}>
+          <Text variant="h1" align="center" accessibilityRole="header" style={styles.title}>
             {errors === 0 ? 'Превосходно!' : 'Готово!'}
           </Text>
-          
+
           <Text variant="h2" align="center" style={styles.subtitle}>
-            Выучено <Text style={{ color: colors.primary }}>{learnedCards} слов</Text> из {totalCards}
+            Выучено{' '}
+            <Text variant="h2" style={{ color: colors.primary }}>
+              {learnedCards} {pluralize(learnedCards, 'слово', 'слова', 'слов')}
+            </Text>{' '}
+            из {totalCards}
           </Text>
-          
+
           {/* Прогресс фазы */}
           {phaseId && totalPhaseCards > 0 && (
-            <Text variant="body" color="secondary" align="center" style={{ marginTop: spacing.xs }}>
+            <Text variant="body" color="secondary" align="center" style={styles.phaseProgress}>
               Прогресс фазы: {studiedInPhase}/{totalPhaseCards} ({Math.round((studiedInPhase / totalPhaseCards) * 100)}%)
             </Text>
           )}
-          
+
           <Text variant="body" color="secondary" align="center" style={styles.description}>
-            {errors === 0 
-              ? isPhaseComplete 
-                ? 'Все карточки фазы выучены! Так держать! 🎉'
-                : 'Отличная работа — продолжай серию!'
+            {errors === 0 && isPhaseComplete
+              ? 'Все карточки фазы выучены! Так держать!'
               : 'Отличная работа — продолжай серию!'}
           </Text>
         </View>
 
         {/* Statistics Card */}
-        <View style={[styles.statsCard, { 
-          backgroundColor: colors.surface,
-          ...Platform.select({
-            ios: {
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.04,
-              shadowRadius: 12,
-            },
-            android: {
-              elevation: 2,
-            },
-            web: {
-              boxShadow: '0 2px 12px rgba(0, 0, 0, 0.04)',
-            }
-          })
-        }]}>
+        <Card padding="none" style={styles.statsCard}>
           <View style={styles.statsGrid}>
-            {/* Time */}
-            <View style={styles.statItem}>
-              <Text variant="caption" style={[styles.statLabel, { color: colors.textTertiary }]}>
-                ВРЕМЯ
+            <View style={styles.statItem} accessible accessibilityLabel={`Время: ${formatTime(timeSpent)}`}>
+              <Text variant="overline" color="secondary" style={styles.statLabel}>
+                Время
               </Text>
-              <Text variant="h2" style={[styles.statValue, { color: colors.textPrimary }]}>
+              <Text variant="h3" style={[styles.bold, { color: colors.textPrimary }]}>
                 {formatTime(timeSpent)}
               </Text>
             </View>
 
-            {/* Divider */}
-            <View style={[styles.divider, { backgroundColor: colors.borderLight }]} />
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
-            {/* Errors */}
-            <View style={styles.statItem}>
-              <Text variant="caption" style={[styles.statLabel, { color: colors.textTertiary }]}>
-                ОШИБОК
+            <View style={styles.statItem} accessible accessibilityLabel={`Ошибок: ${errors}`}>
+              <Text variant="overline" color="secondary" style={styles.statLabel}>
+                Ошибок
               </Text>
-              <Text variant="h2" style={[styles.statValue, { color: colors.error }]}>
+              <Text variant="h3" style={[styles.bold, { color: errors > 0 ? colors.errorText : colors.textPrimary }]}>
                 {errors}
               </Text>
             </View>
           </View>
-        </View>
+        </Card>
 
         {/* Detailed Review Button - показываем только если есть ошибки */}
         {errorCards.length > 0 && (
           <Pressable
             onPress={handleViewDetails}
+            accessibilityRole="button"
             style={({ pressed }) => [
               styles.detailButton,
-              { 
-                backgroundColor: colors.surface,
-                borderColor: colors.borderLight,
-              },
-              pressed && { 
-                backgroundColor: colors.surfaceVariant,
-                borderColor: colors.primary + '4D',
-              }
+              { backgroundColor: colors.surface, borderColor: colors.border },
+              pressed && { backgroundColor: colors.surfaceMuted, borderColor: alpha(colors.primary, 40) },
             ]}
           >
-            <View style={styles.detailButtonContent}>
-              <View style={styles.detailButtonMain}>
-                <List size={20} color={colors.primary} />
-                <Text variant="button" style={{ color: colors.primary }}>
-                  Посмотреть результат
-                </Text>
-              </View>
-              <Text variant="caption" color="secondary" style={styles.detailButtonHint}>
-                Список слов, ответы и ошибки
+            <View style={styles.detailButtonMain}>
+              <List size={iconSize.s} color={colors.primary} />
+              <Text variant="button" style={[styles.noLetterSpacing, { color: colors.primary }]}>
+                Посмотреть результат
               </Text>
             </View>
+            <Text variant="caption" color="secondary">
+              Список слов, ответы и ошибки
+            </Text>
           </Pressable>
         )}
 
@@ -395,37 +342,8 @@ export function StudyResultsScreen({ navigation, route }: Props) {
       </ScrollView>
 
       {/* Bottom Actions */}
-      <View style={[styles.bottomActions, { backgroundColor: colors.background }]}>
-        {/* Primary CTA */}
-        <Pressable
-          onPress={handleNextCards}
-          style={({ pressed }) => [
-            styles.primaryButton,
-            { 
-              backgroundColor: colors.primary,
-              ...Platform.select({
-                ios: {
-                  shadowColor: colors.primary,
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.25,
-                  shadowRadius: 8,
-                },
-                android: {
-                  elevation: 4,
-                },
-                web: {
-                  boxShadow: `0 4px 16px ${colors.primary}40`,
-                }
-              })
-            },
-            pressed && { transform: [{ scale: 0.98 }] }
-          ]}
-        >
-          <Text variant="button" style={styles.primaryButtonText}>
-            {primaryButtonLabel}
-          </Text>
-          <ArrowRight size={22} color="#FFFFFF" />
-        </Pressable>
+      <View style={[styles.bottomActions, { backgroundColor: colors.background, paddingBottom: bottomInset + spacing.l }]}>
+        <Button title={primaryButtonLabel} iconRight={ArrowRight} onPress={handleNextCards} fullWidth />
 
         {/* Secondary Actions Stack */}
         <View style={styles.secondaryActions}>
@@ -433,19 +351,15 @@ export function StudyResultsScreen({ navigation, route }: Props) {
           {errorCards.length > 0 && (
             <Pressable
               onPress={handleReviewMistakes}
+              accessibilityRole="button"
               style={({ pressed }) => [
                 styles.secondaryButton,
-                { 
-                  borderColor: colors.error + '1A',
-                },
-                pressed && { 
-                  backgroundColor: colors.error + '0A',
-                  transform: [{ scale: 0.98 }]
-                }
+                { borderColor: alpha(colors.error, 20) },
+                pressed && [styles.pressedScale, { backgroundColor: alpha(colors.error, 10) }],
               ]}
             >
-              <RotateCcw size={20} color={colors.error} />
-              <Text variant="button" style={{ color: colors.error }}>
+              <RotateCcw size={iconSize.s} color={colors.errorText} />
+              <Text variant="button" style={[styles.noLetterSpacing, { color: colors.errorText }]}>
                 Повторить ошибки
               </Text>
             </Pressable>
@@ -454,104 +368,58 @@ export function StudyResultsScreen({ navigation, route }: Props) {
           {/* Review Words */}
           <Pressable
             onPress={handleReviewWords}
+            accessibilityRole="button"
             style={({ pressed }) => [
               styles.secondaryButton,
-              { 
-                borderColor: colors.border,
-              },
-              errorCards.length === 0 && { flex: 1 }, // Занимает всю ширину если нет ошибок
-              pressed && { 
-                backgroundColor: colors.surfaceVariant,
-                borderColor: colors.textTertiary,
-                transform: [{ scale: 0.98 }]
-              }
+              { borderColor: colors.border },
+              pressed && [styles.pressedScale, { backgroundColor: colors.surfaceMuted, borderColor: colors.textTertiary }],
             ]}
           >
-            <BookOpen size={20} color={colors.textSecondary} />
-            <Text variant="button" style={{ color: colors.textSecondary }}>
+            <BookOpen size={iconSize.s} color={colors.textSecondary} />
+            <Text variant="button" style={[styles.noLetterSpacing, { color: colors.textSecondary }]}>
               Повторить слова
             </Text>
           </Pressable>
         </View>
       </View>
 
-      {/* Modal со списком ошибок */}
-      <Modal
+      {/* Список ошибок — нижний лист */}
+      <Sheet
         visible={showErrorsModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowErrorsModal(false)}
+        onClose={() => setShowErrorsModal(false)}
+        title="Ошибки"
+        headerRight={
+          <Button
+            variant="icon"
+            icon={X}
+            background="none"
+            accessibilityLabel="Закрыть"
+            onPress={() => setShowErrorsModal(false)}
+          />
+        }
+        footer={<Button title="Закрыть" onPress={() => setShowErrorsModal(false)} fullWidth />}
       >
-        <View style={styles.modalOverlay}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setShowErrorsModal(false)} />
-          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
-            <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
-
-            {/* Modal Header */}
-            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-              <View style={{ flex: 1 }}>
-                <Text variant="h3">Ошибки</Text>
-                <Text variant="caption" color="secondary">
-                  {errorCards.length} {errorCards.length === 1 ? 'слово' : errorCards.length < 5 ? 'слова' : 'слов'} — повторите их ещё раз
-                </Text>
-              </View>
-              <Pressable
-                onPress={() => setShowErrorsModal(false)}
-                hitSlop={8}
-                style={({ pressed }) => [
-                  styles.closeButton,
-                  { backgroundColor: pressed ? colors.surfaceVariant : 'transparent' }
-                ]}
-              >
-                <X size={24} color={colors.textPrimary} />
-              </Pressable>
-            </View>
-
-            {/* Error Cards List */}
-            <ScrollView
-              style={styles.errorList}
-              contentContainerStyle={styles.errorListContent}
-              showsVerticalScrollIndicator={false}
+        <Text variant="caption" color="secondary" style={styles.sheetSubtitle}>
+          {errorCards.length} {pluralize(errorCards.length, 'слово', 'слова', 'слов')} — повтори их ещё раз
+        </Text>
+        <View style={styles.errorListContent}>
+          {errorCards.map((card, index) => (
+            <View
+              key={card.id ?? index}
+              style={[styles.errorRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
             >
-              {errorCards.map((card, index) => (
-                <View
-                  key={card.id ?? index}
-                  style={[styles.errorRow, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
-                >
-                  <View style={[styles.errorIndex, { backgroundColor: colors.error + '1A' }]}>
-                    <Text style={[styles.errorIndexText, { color: colors.error }]}>{index + 1}</Text>
-                  </View>
-                  <View style={styles.errorBody}>
-                    <Text style={[styles.errorFront, { color: colors.textPrimary }]}>{card.front}</Text>
-                    <Text style={[styles.errorBack, { color: colors.textSecondary }]}>{card.back}</Text>
-                  </View>
-                  {card.rating === 2 && (
-                    <View style={[styles.errorBadge, { backgroundColor: colors.warning + '1A' }]}>
-                      <Text style={[styles.errorBadgeText, { color: colors.warning }]}>Сомневаюсь</Text>
-                    </View>
-                  )}
-                </View>
-              ))}
-            </ScrollView>
-
-            {/* Footer */}
-            <View style={[styles.modalFooter, { paddingBottom: Math.max(insets.bottom, 16), borderTopColor: colors.border }]}>
-              <Pressable
-                onPress={() => setShowErrorsModal(false)}
-                style={({ pressed }) => [
-                  styles.modalCloseButton,
-                  { backgroundColor: colors.primary },
-                  pressed && { transform: [{ scale: 0.98 }] }
-                ]}
-              >
-                <Text variant="button" style={{ color: '#FFFFFF' }}>
-                  Закрыть
-                </Text>
-              </Pressable>
+              <View style={[styles.errorIndex, { backgroundColor: alpha(colors.error, 10) }]}>
+                <Text variant="label" style={[styles.bold, { color: colors.errorText }]}>{index + 1}</Text>
+              </View>
+              <View style={styles.errorBody}>
+                <Text variant="body" style={[styles.semibold, { color: colors.textPrimary }]}>{card.front}</Text>
+                <Text variant="bodySmall" style={{ color: colors.textSecondary }}>{card.back}</Text>
+              </View>
+              {card.rating === 2 && <Badge label="Сомневаюсь" tone="warning" />}
             </View>
-          </View>
+          ))}
         </View>
-      </Modal>
+      </Sheet>
 
       <StreakCelebrationModal
         visible={showStreakModal}
@@ -570,24 +438,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    zIndex: 20,
+  semibold: {
+    fontWeight: '600',
   },
-  headerButton: {
-    width: 48,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
+  bold: {
+    fontWeight: '700',
   },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
+  noLetterSpacing: {
+    letterSpacing: 0,
+  },
+  pressedScale: {
+    transform: [{ scale: 0.98 }],
   },
   scrollView: {
     flex: 1,
@@ -597,51 +458,38 @@ const styles = StyleSheet.create({
     maxWidth: 480,
     width: '100%',
     alignSelf: 'center',
-    paddingHorizontal: 16,
-  },
-  topSpacer: {
-    height: 24,
+    paddingHorizontal: screenPadding,
+    paddingTop: spacing.l,
   },
   heroSection: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: spacing.xl,
   },
-  medallionContainer: {
-    position: 'relative',
-    marginBottom: 24,
-  },
+  // Без свечения: рамка 4 px в тон primary
   medallion: {
     width: 96,
     height: 96,
-    borderRadius: 9999,
+    borderRadius: borderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 4,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#6467f2',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.3,
-        shadowRadius: 20,
-      },
-      web: {
-        boxShadow: '0 0 20px rgba(100, 103, 242, 0.3)',
-      }
-    }),
+    marginBottom: spacing.l,
   },
   title: {
-    marginBottom: 8,
+    marginBottom: spacing.xs,
   },
   subtitle: {
-    marginBottom: 8,
+    marginBottom: spacing.xs,
+  },
+  phaseProgress: {
+    marginTop: spacing.xs,
   },
   description: {
-    marginTop: 4,
+    marginTop: spacing.xxs,
   },
   statsCard: {
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 24,
+    padding: spacing.l,
+    marginBottom: spacing.l,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -650,191 +498,77 @@ const styles = StyleSheet.create({
   statItem: {
     flex: 1,
     alignItems: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: spacing.xxs,
   },
   statLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    marginBottom: 6,
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: '700',
+    marginBottom: spacing.xs,
   },
   divider: {
     width: 1,
     height: 40,
   },
   detailButton: {
-    borderRadius: 16,
+    borderRadius: borderRadius.l,
     borderWidth: 2,
-    padding: 16,
-    marginBottom: 32,
-  },
-  detailButtonContent: {
+    padding: spacing.m,
+    marginBottom: spacing.xl,
     alignItems: 'center',
+    gap: spacing.xxs,
   },
   detailButtonMain: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  detailButtonHint: {
-    fontSize: 12,
-    marginTop: 4,
+    gap: spacing.xs,
   },
   flexSpacer: {
-    minHeight: 20,
+    minHeight: spacing.l,
     flex: 1,
   },
   bottomActions: {
-    paddingHorizontal: 16,
-    paddingBottom: 24,
-    paddingTop: 16,
-    gap: 12,
-  },
-  primaryButton: {
-    height: 56,
-    borderRadius: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    paddingHorizontal: 15,
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
+    paddingHorizontal: screenPadding,
+    paddingTop: spacing.m,
+    gap: spacing.s,
   },
   secondaryActions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: spacing.s,
   },
   secondaryButton: {
     flex: 1,
-    height: 52,
-    borderRadius: 16,
+    height: heights.button,
+    borderRadius: borderRadius.m,
     borderWidth: 2,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: 'transparent',
-    paddingHorizontal: 15,
+    gap: spacing.xs,
+    paddingHorizontal: spacing.s,
   },
-  // Modal styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalBackdrop: {
-    flex: 1,
-  },
-  // Фиксированная высота: с одним maxHeight ScrollView (flex: 1) внутри схлопывался до нуля,
-  // и в окне были видны только заголовок и кнопка — без слов.
-  modalContent: {
-    height: '85%',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    overflow: 'hidden',
-    ...(Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 8,
-      },
-      web: {
-        boxShadow: '0 -8px 40px rgba(0,0,0,0.18)',
-      },
-    }) as object),
-  },
-  modalHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginTop: 10,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-  },
-  closeButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  errorList: {
-    flex: 1,
+  sheetSubtitle: {
+    marginTop: -spacing.xs,
+    marginBottom: spacing.m,
   },
   errorListContent: {
-    padding: 16,
-    gap: 10,
+    gap: spacing.s,
+    paddingBottom: spacing.xs,
   },
   errorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    padding: 14,
-    borderRadius: 16,
+    gap: spacing.s,
+    padding: spacing.s,
+    borderRadius: borderRadius.l,
     borderWidth: 1,
   },
   errorIndex: {
     width: 32,
     height: 32,
-    borderRadius: 16,
+    borderRadius: borderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  errorIndexText: {
-    fontSize: 14,
-    fontWeight: '700',
   },
   errorBody: {
     flex: 1,
-    gap: 4,
-  },
-  errorFront: {
-    fontSize: 17,
-    fontWeight: '700',
-    lineHeight: 22,
-  },
-  errorBack: {
-    fontSize: 15,
-    lineHeight: 20,
-  },
-  errorBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  errorBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  modalFooter: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    borderTopWidth: 1,
-  },
-  modalCloseButton: {
-    height: 52,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
+    gap: spacing.xxs,
   },
 });

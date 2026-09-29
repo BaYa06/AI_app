@@ -1,19 +1,19 @@
 {
   "totals": {
-    "hex": 629,
-    "rgba": 273,
+    "hex": 622,
+    "rgba": 269,
     "isDark": 249,
-    "font": 275,
+    "font": 271,
     "weight": 138,
-    "radius": 121,
-    "alpha": 136,
+    "radius": 118,
+    "alpha": 133,
     "alert": 57,
-    "small": 92,
-    "emoji": 56,
+    "small": 90,
+    "emoji": 55,
     "ion": 24,
-    "a11y": 73,
+    "a11y": 70,
     "en": 23,
-    "total": 1878
+    "total": 1857
   },
   "files": {
     "src/screens/TeacherCourseStatsScreen.tsx": {
@@ -466,17 +466,6 @@
       "small": 1,
       "ion": 1,
       "a11y": 1,
-      "total": 21
-    },
-    "src/screens/StudyResultsScreen.tsx": {
-      "hex": 7,
-      "rgba": 4,
-      "font": 4,
-      "radius": 3,
-      "alpha": 3,
-      "small": 2,
-      "emoji": 1,
-      "a11y": 3,
       "total": 21
     },
     "src/screens/BookDetailScreen.tsx": {
