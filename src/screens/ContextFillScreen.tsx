@@ -8,15 +8,14 @@ import {
   ScrollView,
   StyleSheet,
   Pressable,
-  Platform,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft } from 'lucide-react-native';
+import { Dumbbell, PartyPopper, ThumbsUp } from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { useThemeColors, useCardsStore, useSettingsStore, useContextFillStore } from '@/store';
-import { spacing, borderRadius } from '@/constants';
+import { Button, ProgressBar, ScreenHeader, toast } from '@/components/ui';
+import { useThemeColors, useCardsStore, useContextFillStore } from '@/store';
+import { spacing, borderRadius, iconSize, screenPadding, alpha } from '@/constants';
 import { NeonService } from '@/services/NeonService';
 import { apiService } from '@/services/ApiService';
 import { getDistractors } from '@/utils/distractors';
@@ -66,7 +65,6 @@ function blankWord(example: string, word: string, wordForm?: string): string {
 export function ContextFillScreen({ navigation, route }: Props) {
   const { setId, cardLimit } = route.params;
   const colors = useThemeColors();
-  const isDark = useSettingsStore((s) => s.resolvedTheme) === 'dark';
   const insets = useSafeAreaInsets();
 
   const getCardsBySet = useCardsStore((s) => s.getCardsBySet);
@@ -91,20 +89,14 @@ export function ContextFillScreen({ navigation, route }: Props) {
   const advanceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const correctIdsRef = useRef<string[]>([]);
 
-  const cardBg = isDark ? 'rgba(255,255,255,0.06)' : '#FFFFFF';
-  const cardBorder = isDark ? 'rgba(255,255,255,0.10)' : '#E5E7EB';
-
   // ── Подготовка ──────────────────────────────────────────────────────────
 
   const prep = useCallback(async () => {
     const setCards = getCardsBySet(setId);
 
     if (setCards.length < MIN_CARDS) {
-      Alert.alert(
-        'Мало карточек',
-        `Для этого режима нужно минимум ${MIN_CARDS} карточки в наборе.`,
-        [{ text: 'Понятно', onPress: () => navigation.goBack() }],
-      );
+      toast.info(`Мало карточек: для этого режима нужно минимум ${MIN_CARDS} карточки в наборе`);
+      navigation.goBack();
       return;
     }
 
@@ -155,11 +147,8 @@ export function ContextFillScreen({ navigation, route }: Props) {
     const ready = selected.filter((c) => c.example);
 
     if (ready.length === 0) {
-      Alert.alert(
-        'Нет примеров',
-        'Не удалось загрузить примеры для карточек. Попробуй позже.',
-        [{ text: 'Понятно', onPress: () => navigation.goBack() }],
-      );
+      toast.error('Не удалось загрузить примеры для карточек. Попробуй позже');
+      navigation.goBack();
       return;
     }
 
@@ -245,21 +234,10 @@ export function ContextFillScreen({ navigation, route }: Props) {
   if (prepLoading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { paddingTop: 8 }]}>
-          <Pressable
-            onPress={() => navigation.goBack()}
-            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
-            hitSlop={8}
-          >
-            <ArrowLeft size={22} color={colors.textPrimary} />
-          </Pressable>
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-            Слово в контексте
-          </Text>
-        </View>
+        <ScreenHeader title="Слово в контексте" onBack={() => navigation.goBack()} />
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.prepText, { color: colors.textSecondary }]}>
+          <Text variant="body" align="center" style={[styles.prepText, { color: colors.textSecondary }]}>
             {prepStatus}
           </Text>
         </View>
@@ -273,52 +251,27 @@ export function ContextFillScreen({ navigation, route }: Props) {
     const accuracy = questions.length > 0
       ? Math.round((correctCount / questions.length) * 100)
       : 0;
+    // Вместо эмодзи 🎉 👍 💪 — иконки lucide (брендбук, раздел 6)
+    const ResultIcon = accuracy >= 80 ? PartyPopper : accuracy >= 50 ? ThumbsUp : Dumbbell;
 
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { paddingTop: 8 }]}>
-          <Pressable
-            onPress={() => navigation.goBack()}
-            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
-            hitSlop={8}
-          >
-            <ArrowLeft size={22} color={colors.textPrimary} />
-          </Pressable>
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-            Слово в контексте
-          </Text>
-        </View>
+        <ScreenHeader title="Слово в контексте" onBack={() => navigation.goBack()} />
 
         <View style={styles.centered}>
           <View
-            style={[
-              styles.resultCard,
-              {
-                backgroundColor: colors.primary,
-                ...Platform.select({
-                  web: {
-                    backgroundImage: 'linear-gradient(135deg, #6467f2, #6467f299)',
-                    boxShadow: '0 8px 32px rgba(100,103,242,0.3)',
-                  },
-                }) as any,
-              },
-            ]}
+            accessible
+            accessibilityLabel={`Правильно ${correctCount} из ${questions.length}, точность ${accuracy}%`}
+            style={[styles.resultCard, { backgroundColor: colors.primaryFill }]}
           >
-            <Text style={styles.resultEmoji}>{accuracy >= 80 ? '🎉' : accuracy >= 50 ? '👍' : '💪'}</Text>
-            <Text style={styles.resultScore}>{correctCount}/{questions.length}</Text>
-            <Text style={styles.resultAccuracy}>{accuracy}% точность</Text>
+            <ResultIcon size={iconSize.xl} color={colors.onPrimary} />
+            <Text variant="display" style={{ color: colors.onPrimary }}>{correctCount}/{questions.length}</Text>
+            <Text variant="body" style={[styles.semibold, styles.onFillMuted, { color: colors.onPrimary }]}>
+              {accuracy}% точность
+            </Text>
           </View>
 
-          <Pressable
-            style={({ pressed }) => [
-              styles.doneBtn,
-              { backgroundColor: colors.primary },
-              pressed && { opacity: 0.85 },
-            ]}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.doneBtnText}>Готово</Text>
-          </Pressable>
+          <Button title="Готово" onPress={() => navigation.goBack()} fullWidth style={styles.doneBtn} />
         </View>
       </View>
     );
@@ -332,73 +285,29 @@ export function ContextFillScreen({ navigation, route }: Props) {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View
-        style={[
-          styles.header,
-          {
-            backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.95)',
-            paddingTop: 8,
-          },
-        ]}
-      >
-        <Pressable
-          onPress={() => navigation.goBack()}
-          style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
-          hitSlop={8}
-        >
-          <ArrowLeft size={22} color={colors.textPrimary} />
-        </Pressable>
-        <View style={styles.headerCenter}>
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-            Слово в контексте
-          </Text>
-          <Text style={[styles.headerCounter, { color: colors.textSecondary }]}>
+      <ScreenHeader
+        title="Слово в контексте"
+        onBack={() => navigation.goBack()}
+        right={
+          <Text variant="label" style={{ color: colors.textSecondary }}>
             {currentIndex + 1} / {questions.length}
           </Text>
-        </View>
-      </View>
+        }
+      />
 
       {/* Progress bar */}
-      <View style={[styles.progressTrack, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#E5E7EB' }]}>
-        <View
-          style={[
-            styles.progressBar,
-            {
-              backgroundColor: colors.primary,
-              width: `${Math.round(progress * 100)}%` as any,
-            },
-          ]}
-        />
+      <View style={styles.progressWrap}>
+        <ProgressBar progress={Math.round(progress * 100)} accessibilityLabel="Прогресс" />
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 32 }]}
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + spacing.xl }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Question card */}
-        <View
-          style={[
-            styles.questionCard,
-            {
-              backgroundColor: colors.primary,
-              ...Platform.select({
-                web: {
-                  backgroundImage: 'linear-gradient(135deg, #6467f2, #6467f299)',
-                  boxShadow: '0 8px 24px rgba(100,103,242,0.25)',
-                },
-              }) as any,
-              shadowColor: colors.primary,
-              shadowOpacity: 0.25,
-              shadowRadius: 16,
-              shadowOffset: { width: 0, height: 8 },
-              elevation: 10,
-            },
-          ]}
-        >
-          <Text style={styles.questionLabel}>ЗАПОЛНИ ПРОПУСК</Text>
-          <Text style={styles.sentenceText}>{sentenceWithBlank}</Text>
-
+        <View style={[styles.questionCard, { backgroundColor: colors.primaryFill }]}>
+          <Text variant="overline" style={[styles.onFillMuted, { color: colors.onPrimary }]}>Заполни пропуск</Text>
+          <Text variant="h2" style={{ color: colors.onPrimary }}>{sentenceWithBlank}</Text>
         </View>
 
         {/* Options */}
@@ -412,39 +321,43 @@ export function ContextFillScreen({ navigation, route }: Props) {
               const isSelected = selectedOption === option;
               const isCorrectAnswer = option === currentCard?.frontText;
 
-              let borderColor = cardBorder;
-              let bgColor = cardBg;
-              let labelBg = isDark ? 'rgba(255,255,255,0.10)' : '#F1F5F9';
+              let borderColor = colors.border;
+              let bgColor = colors.surface;
+              let labelBg = colors.surfaceMuted;
               let labelTextColor = colors.textSecondary;
               let textColor = colors.textPrimary;
 
               if (selectedOption !== null) {
                 if (isCorrectAnswer) {
-                  borderColor = '#22C55E';
-                  bgColor = '#22C55E18';
-                  labelBg = '#22C55E';
-                  labelTextColor = '#FFFFFF';
-                  textColor = '#22C55E';
+                  borderColor = colors.success;
+                  bgColor = alpha(colors.success, 10);
+                  labelBg = colors.success;
+                  labelTextColor = colors.onPrimary;
+                  textColor = colors.successText;
                 } else if (isSelected) {
-                  borderColor = '#EF4444';
-                  bgColor = '#EF444418';
-                  labelBg = '#EF4444';
-                  labelTextColor = '#FFFFFF';
-                  textColor = '#EF4444';
+                  borderColor = colors.error;
+                  bgColor = alpha(colors.error, 10);
+                  labelBg = colors.error;
+                  labelTextColor = colors.onPrimary;
+                  textColor = colors.errorText;
                 } else {
-                  bgColor = isDark ? 'rgba(255,255,255,0.03)' : '#FAFAFA';
+                  bgColor = colors.surfaceMuted;
                 }
               } else if (isSelected) {
                 borderColor = colors.primary;
-                bgColor = colors.primary + '15';
-                labelBg = colors.primary;
-                labelTextColor = '#FFFFFF';
+                bgColor = alpha(colors.primary, 10);
+                labelBg = colors.primaryFill;
+                labelTextColor = colors.onPrimary;
                 textColor = colors.primary;
               }
 
               return (
                 <Pressable
                   key={idx}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${OPTION_LABELS[idx]}. ${option}${
+                    selectedOption !== null && isCorrectAnswer ? ', верно' : selectedOption !== null && isSelected ? ', неверно' : ''
+                  }`}
                   style={({ pressed }) => [
                     styles.optionBtn,
                     {
@@ -452,19 +365,20 @@ export function ContextFillScreen({ navigation, route }: Props) {
                       borderColor,
                       borderWidth: isSelected || (selectedOption !== null && isCorrectAnswer) ? 2 : 1,
                     },
-                    selectedOption !== null && !isSelected && !isCorrectAnswer && { opacity: 0.45 },
-                    pressed && selectedOption === null && { opacity: 0.85, transform: [{ scale: 0.99 }] },
+                    selectedOption !== null && !isSelected && !isCorrectAnswer && styles.optionDimmed,
+                    pressed && selectedOption === null && styles.optionPressed,
                   ]}
                   onPress={() => handleSelect(option)}
                   disabled={selectedOption !== null}
                 >
                   <View style={[styles.optionLabel, { backgroundColor: labelBg }]}>
-                    <Text style={[styles.optionLabelText, { color: labelTextColor }]}>
+                    <Text variant="label" style={[styles.bold, { color: labelTextColor }]}>
                       {OPTION_LABELS[idx]}
                     </Text>
                   </View>
                   <Text
-                    style={[styles.optionText, { color: textColor, fontWeight: isSelected ? '700' : '500' }]}
+                    variant="body"
+                    style={[styles.optionText, { color: textColor }, isSelected && styles.semibold]}
                     numberOfLines={2}
                   >
                     {option}
@@ -481,41 +395,13 @@ export function ContextFillScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  semibold: { fontWeight: '600' },
+  bold: { fontWeight: '700' },
+  // Второстепенный текст на цветной заливке
+  onFillMuted: { opacity: 0.85 },
 
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.m,
-    paddingBottom: spacing.s,
-    gap: spacing.s,
-    ...Platform.select({ web: { backdropFilter: 'blur(12px)' } }) as any,
-  },
-  backBtn: {
-    padding: spacing.xs,
-    marginLeft: -spacing.xs,
-  },
-  headerCenter: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    letterSpacing: -0.3,
-  },
-  headerCounter: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-
-  progressTrack: {
-    height: 4,
-    overflow: 'hidden',
-  },
-  progressBar: {
-    height: '100%',
+  progressWrap: {
+    paddingHorizontal: screenPadding,
   },
 
   centered: {
@@ -526,14 +412,11 @@ const styles = StyleSheet.create({
     gap: spacing.m,
   },
   prepText: {
-    fontSize: 15,
-    fontWeight: '500',
-    textAlign: 'center',
     marginTop: spacing.s,
   },
 
   scroll: {
-    paddingHorizontal: spacing.m,
+    paddingHorizontal: screenPadding,
     paddingTop: spacing.l,
     gap: spacing.l,
   },
@@ -542,23 +425,6 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.l,
     padding: spacing.l,
     gap: spacing.m,
-    ...Platform.select({
-      web: {},
-    }) as any,
-  },
-  questionLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.65)',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-  },
-  sentenceText: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    lineHeight: 32,
-    letterSpacing: -0.3,
   },
   optionsLoading: {
     paddingVertical: spacing.xl,
@@ -567,35 +433,31 @@ const styles = StyleSheet.create({
   optionsList: {
     gap: spacing.s,
   },
+  // Рамка без тени (брендбук, 7.3)
   optionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.m,
     padding: spacing.m,
     borderRadius: borderRadius.l,
-    ...Platform.select({ web: { boxShadow: '0 1px 3px rgba(0,0,0,0.04)' } }) as any,
-    shadowColor: '#000',
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
+  },
+  optionDimmed: {
+    opacity: 0.5,
+  },
+  optionPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.98 }],
   },
   optionLabel: {
     width: 36,
     height: 36,
-    borderRadius: 18,
+    borderRadius: borderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
-  optionLabelText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
   optionText: {
     flex: 1,
-    fontSize: 15,
-    lineHeight: 21,
   },
 
   // Result
@@ -606,31 +468,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.s,
   },
-  resultEmoji: {
-    fontSize: 48,
-  },
-  resultScore: {
-    fontSize: 52,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: -2,
-  },
-  resultAccuracy: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.8)',
-  },
   doneBtn: {
-    width: '100%',
-    paddingVertical: 16,
-    borderRadius: borderRadius.l,
-    alignItems: 'center',
     marginTop: spacing.m,
-    ...Platform.select({ web: { boxShadow: '0 4px 16px rgba(100,103,242,0.3)' } }) as any,
-  },
-  doneBtnText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
   },
 });
