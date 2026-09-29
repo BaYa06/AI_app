@@ -8,18 +8,16 @@ import {
   StyleSheet,
   Pressable,
   Dimensions,
-  SafeAreaView,
-  Platform,
   Vibration,
   Animated,
   Modal,
-  Switch,
-  Alert,
 } from 'react-native';
-import { ArrowLeft, Settings, Mic, Check, X, AudioLines } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Settings, Mic, Check, X, AudioLines } from 'lucide-react-native';
 import { useThemeColors, useSettingsStore, useCardsStore, useSetsStore } from '@/store';
-import { Text, Heading2 } from '@/components/common';
-import { spacing, borderRadius } from '@/constants';
+import { Text } from '@/components/common';
+import { Button, ProgressBar, ScreenHeader, Switch, toast, useScreenBottomInset } from '@/components/ui';
+import { spacing, borderRadius, heights, iconSize, screenPadding, alpha } from '@/constants';
 import { DatabaseService } from '@/services';
 import { playCorrectSound, preloadSound } from '@/utils/sound';
 import {
@@ -47,7 +45,6 @@ type Props = RootStackScreenProps<'AudioLearning'>;
 export function AudioLearningScreen({ navigation, route }: Props) {
   const { setId, cardLimit, dueCardIds, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0, phaseFailedIds } = route.params;
   const colors = useThemeColors();
-  const theme = useSettingsStore((s) => s.resolvedTheme);
 
   // Store
   const getCardsBySet = useCardsStore((s) => s.getCardsBySet);
@@ -60,9 +57,9 @@ export function AudioLearningScreen({ navigation, route }: Props) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const sheetTranslate = useRef(new Animated.Value(-220)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
-  const overlayColor = theme === 'dark' ? 'rgba(0, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.55)';
-  const settingsSheetBg = theme === 'dark' ? '#0f172a' : colors.surface;
-  const settingsSheetBorder = theme === 'dark' ? 'rgba(255, 255, 255, 0.12)' : colors.border;
+  // Верхний safe area уже учтён в App.tsx; снизу — свой (экран без панели вкладок)
+  const insets = useSafeAreaInsets();
+  const bottomInset = useScreenBottomInset();
 
   // Phase refs
   const currentPhaseId = useRef(phaseId || `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
@@ -364,10 +361,7 @@ export function AudioLearningScreen({ navigation, route }: Props) {
 
     const hasPermission = await requestMicrophonePermission();
     if (!hasPermission) {
-      Alert.alert(
-        'Нет доступа к микрофону',
-        'Разреши доступ к микрофону в настройках телефона, чтобы заниматься в режиме «Аудио».',
-      );
+      toast.error('Нет доступа к микрофону. Разреши его в настройках телефона, чтобы заниматься в режиме «Аудио»');
       return;
     }
 
@@ -388,10 +382,7 @@ export function AudioLearningScreen({ navigation, route }: Props) {
       console.error('[AudioLearning] Failed to start listening:', e);
       isRunningRef.current = false;
       setIsRunning(false);
-      Alert.alert(
-        'Не удалось запустить микрофон',
-        'Нет доступа к микрофону — разрешите в настройках устройства и попробуйте снова.',
-      );
+      toast.error('Не удалось запустить микрофон. Разреши доступ в настройках устройства и попробуй снова');
     }
   }, [processCard, getAnswerLang]);
 
@@ -468,49 +459,38 @@ export function AudioLearningScreen({ navigation, route }: Props) {
     ? (currentCard?.frontText || '')
     : (currentCard?.backText || '');
 
-  // Border color based on state
+  // Рамка карточки по состоянию: слушаем — warning, верно — success, неверно — error
   const cardBorderColor = useMemo(() => {
     switch (sessionState) {
-      case 'listening': return '#F59E0B';
-      case 'correct': return '#10B981';
-      case 'incorrect': return '#EF4444';
-      default: return theme === 'dark' ? 'rgba(148, 163, 184, 0.2)' : 'rgba(241, 245, 249, 1)';
+      case 'listening': return colors.warning;
+      case 'correct': return colors.success;
+      case 'incorrect': return colors.error;
+      default: return colors.border;
     }
-  }, [sessionState, theme]);
+  }, [sessionState, colors]);
 
   const cardBorderWidth = sessionState === 'idle' ? 1 : 3;
 
-  const Wrapper = Platform.OS === 'web' ? View : SafeAreaView;
-
   return (
-    <Wrapper style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <Pressable onPress={handleBack} style={styles.headerButton} hitSlop={8}>
-          <ArrowLeft size={24} color={colors.textPrimary} />
-        </Pressable>
-
-        <Heading2 style={styles.headerTitle}>Аудио</Heading2>
-
-        <Pressable onPress={openSettings} style={styles.headerButton} hitSlop={8}>
-          <Settings size={24} color={colors.textPrimary} />
-        </Pressable>
-      </View>
+    <View style={[styles.container, { backgroundColor: colors.background, paddingBottom: bottomInset }]}>
+      <ScreenHeader
+        title="Аудио"
+        onBack={handleBack}
+        bordered
+        right={<Button variant="icon" icon={Settings} accessibilityLabel="Настройки" onPress={openSettings} />}
+      />
 
       {/* Progress Section */}
       <View style={styles.progressSection}>
         <View style={styles.progressHeader}>
-          <Text variant="body" style={[styles.progressCounter, { color: colors.primary }]}>
+          <Text variant="label" style={{ color: colors.primary }}>
             ({currentIndex + 1}/{totalCards})
           </Text>
-          <Text variant="caption" color="tertiary" style={styles.sessionLabel}>
+          <Text variant="overline" color="secondary">
             Аудиотренировка
           </Text>
         </View>
-
-        <View style={[styles.progressBar, { backgroundColor: theme === 'dark' ? '#1e293b' : '#f1f5f9' }]}>
-          <View style={[styles.progressFill, { backgroundColor: colors.primary, width: `${progress}%` }]} />
-        </View>
+        <ProgressBar progress={progress} accessibilityLabel="Прогресс" />
       </View>
 
       {/* Main Content Area */}
@@ -522,10 +502,7 @@ export function AudioLearningScreen({ navigation, route }: Props) {
             style={[
               styles.cardBase,
               styles.cardThird,
-              {
-                backgroundColor: theme === 'dark' ? 'rgba(100, 103, 242, 0.1)' : 'rgba(100, 103, 242, 0.2)',
-                borderColor: 'rgba(100, 103, 242, 0.1)',
-              },
+              { backgroundColor: alpha(colors.primary, 10), borderColor: alpha(colors.primary, 10) },
             ]}
           />
 
@@ -534,20 +511,17 @@ export function AudioLearningScreen({ navigation, route }: Props) {
             style={[
               styles.cardBase,
               styles.cardSecond,
-              {
-                backgroundColor: theme === 'dark' ? 'rgba(100, 103, 242, 0.2)' : 'rgba(100, 103, 242, 0.3)',
-                borderColor: 'rgba(100, 103, 242, 0.2)',
-              },
+              { backgroundColor: alpha(colors.primary, 20), borderColor: alpha(colors.primary, 20) },
             ]}
           />
 
           {/* Front Card */}
           <View
+            accessibilityLiveRegion="polite"
             style={[
               styles.cardBase,
-              styles.cardFront,
               {
-                backgroundColor: theme === 'dark' ? '#1e293b' : '#ffffff',
+                backgroundColor: colors.surface,
                 borderColor: cardBorderColor,
                 borderWidth: cardBorderWidth,
               },
@@ -555,20 +529,20 @@ export function AudioLearningScreen({ navigation, route }: Props) {
           >
             <View style={styles.cardContent}>
               {/* Main word (question) */}
-              <Text style={[styles.cardWord, { color: theme === 'dark' ? '#ffffff' : '#0f172a' }]}>
+              <Text variant="h1" style={[styles.cardWord, { color: colors.textPrimary }]}>
                 {questionText}
               </Text>
 
               {/* Partial recognition text (during listening) */}
               {sessionState === 'listening' && partialText ? (
-                <Text style={[styles.partialText, { color: colors.textSecondary }]}>
+                <Text variant="h3" align="center" style={[styles.partialText, { color: colors.textSecondary }]}>
                   {partialText}
                 </Text>
               ) : null}
 
               {/* Recognized text (after result) */}
               {sessionState === 'correct' && recognizedText ? (
-                <Text style={[styles.recognizedText, { color: '#10B981' }]}>
+                <Text variant="bodyLarge" align="center" style={[styles.semibold, { color: colors.successText }]}>
                   {recognizedText}
                 </Text>
               ) : null}
@@ -576,11 +550,11 @@ export function AudioLearningScreen({ navigation, route }: Props) {
               {sessionState === 'incorrect' ? (
                 <View style={styles.incorrectInfo}>
                   {recognizedText ? (
-                    <Text style={[styles.recognizedText, { color: '#EF4444' }]}>
+                    <Text variant="bodyLarge" align="center" style={[styles.semibold, { color: colors.errorText }]}>
                       {recognizedText}
                     </Text>
                   ) : null}
-                  <Text style={[styles.expectedText, { color: colors.textSecondary }]}>
+                  <Text variant="body" align="center" style={{ color: colors.textSecondary }}>
                     {answerText}
                   </Text>
                 </View>
@@ -591,7 +565,7 @@ export function AudioLearningScreen({ navigation, route }: Props) {
 
         {/* Description */}
         <View style={styles.modeDescription}>
-          <Text variant="body" color="secondary" align="center" style={styles.descriptionText}>
+          <Text variant="bodySmall" color="secondary" align="center">
             Произнеси перевод слова
           </Text>
         </View>
@@ -601,51 +575,41 @@ export function AudioLearningScreen({ navigation, route }: Props) {
       <View style={styles.bottomActions}>
         {!isRunning ? (
           /* Кнопка "Начать" — запускает сессию */
-          <Pressable
-            onPress={handleStart}
-            style={[styles.startButton, { backgroundColor: colors.primary }]}
-          >
-            <Mic size={22} color="#ffffff" style={{ marginRight: 8 }} />
-            <Text style={[styles.startButtonText, { color: '#ffffff' }]}>
-              Начать
-            </Text>
-          </Pressable>
+          <Button title="Начать" icon={Mic} onPress={handleStart} fullWidth />
         ) : (
           /* Сессия активна: показываем состояние + кнопки */
           <View style={styles.runningArea}>
             {sessionState === 'listening' ? (
               <>
-                <Animated.View style={[styles.listeningRow, { opacity: pulseAnim }]}>
-                  <AudioLines size={28} color="#F59E0B" />
+                <Animated.View
+                  accessible
+                  accessibilityLabel="Слушаю"
+                  style={[styles.listeningRow, { opacity: pulseAnim }]}
+                >
+                  <AudioLines size={iconSize.l} color={colors.warning} />
                 </Animated.View>
 
-                <Pressable
-                  onPress={handleSkip}
-                  style={[styles.skipButton, { backgroundColor: theme === 'dark' ? '#1e293b' : '#f1f5f9' }]}
-                >
-                  <Text style={[styles.skipButtonText, { color: colors.textPrimary }]}>
-                    Не знаю
-                  </Text>
-                </Pressable>
+                <Button variant="secondary" title="Не знаю" onPress={handleSkip} fullWidth />
               </>
             ) : sessionState === 'correct' ? (
-              <View style={[styles.resultIndicator, { backgroundColor: '#10B9811A' }]}>
-                <Check size={28} color="#10B981" />
+              <View
+                accessible
+                accessibilityLabel="Верно"
+                style={[styles.resultIndicator, { backgroundColor: alpha(colors.success, 10) }]}
+              >
+                <Check size={iconSize.l} color={colors.successText} />
               </View>
             ) : sessionState === 'incorrect' ? (
-              <View style={[styles.resultIndicator, { backgroundColor: '#EF44441A' }]}>
-                <X size={28} color="#EF4444" />
+              <View
+                accessible
+                accessibilityLabel="Неверно"
+                style={[styles.resultIndicator, { backgroundColor: alpha(colors.error, 10) }]}
+              >
+                <X size={iconSize.l} color={colors.errorText} />
               </View>
             ) : null}
 
-            <Pressable
-              onPress={handleStop}
-              style={[styles.stopButton, { borderColor: colors.border }]}
-            >
-              <Text style={[styles.stopButtonText, { color: colors.textSecondary }]}>
-                Стоп
-              </Text>
-            </Pressable>
+            <Button variant="quiet" tone="secondary" title="Стоп" onPress={handleStop} />
           </View>
         )}
       </View>
@@ -659,38 +623,33 @@ export function AudioLearningScreen({ navigation, route }: Props) {
         onRequestClose={closeSettings}
       >
         <View style={styles.modalRoot}>
-          <Pressable style={styles.backdrop} onPress={closeSettings}>
+          <Pressable style={styles.backdrop} onPress={closeSettings} accessibilityLabel="Закрыть настройки">
             <Animated.View
               pointerEvents="none"
-              style={[styles.backdropTint, { opacity: backdropOpacity, backgroundColor: overlayColor }]}
+              style={[styles.backdropTint, { opacity: backdropOpacity, backgroundColor: colors.overlay }]}
             />
           </Pressable>
 
+          {/* Панель настроек выезжает сверху (формат прежний), без тени */}
           <Animated.View
             style={[
               styles.settingsSheet,
               {
-                backgroundColor: settingsSheetBg,
-                borderColor: settingsSheetBorder,
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                paddingTop: insets.top + spacing.m,
                 transform: [{ translateY: sheetTranslate }],
               },
             ]}
           >
             <View style={styles.settingsRow}>
-              <Text style={[styles.settingsLabel, { color: colors.textPrimary }]}>Реверс</Text>
-              <Switch
-                value={reverseEnabled}
-                onValueChange={handleToggleReverse}
-                trackColor={{ false: colors.border, true: colors.primary }}
-                thumbColor={theme === 'dark' ? '#0f172a' : '#ffffff'}
-              />
+              <Text variant="body" style={[styles.semibold, { color: colors.textPrimary }]}>Реверс</Text>
+              <Switch value={reverseEnabled} onValueChange={handleToggleReverse} accessibilityLabel="Реверс" />
             </View>
           </Animated.View>
         </View>
       </Modal>
-
-      <View style={[styles.safeAreaSpacer, { backgroundColor: colors.background }]} />
-    </Wrapper>
+    </View>
   );
 }
 
@@ -698,25 +657,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.m,
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.xs,
-  },
-  headerButton: {
-    width: 48,
-    height: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
+  semibold: {
+    fontWeight: '600',
   },
 
   // Progress
@@ -729,25 +671,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-  },
-  progressCounter: {
-    fontSize: 14,
-    fontWeight: '600',
-    lineHeight: 14,
-  },
-  sessionLabel: {
-    fontSize: 11,
-    fontWeight: '500',
-    letterSpacing: 1.5,
-  },
-  progressBar: {
-    height: 10,
-    borderRadius: borderRadius.full,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: borderRadius.full,
   },
 
   // Content
@@ -768,125 +691,62 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
-    borderRadius: borderRadius.xl * 1.5,
+    borderRadius: borderRadius.xl,
     borderWidth: 1,
   },
   cardThird: {
-    transform: [{ translateY: 32 }, { scale: 0.9 }],
+    transform: [{ translateY: spacing.xl }, { scale: 0.9 }],
   },
   cardSecond: {
-    transform: [{ translateY: 16 }, { scale: 0.95 }],
-  },
-  cardFront: {
-    shadowColor: 'rgba(100, 103, 242, 0.1)',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 25,
-    elevation: 5,
+    transform: [{ translateY: spacing.m }, { scale: 0.95 }],
   },
   cardContent: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: spacing.l,
-    gap: 12,
+    gap: spacing.s,
   },
   cardWord: {
-    fontSize: 32,
-    fontWeight: '700',
     // Запас под умлауты/диакритику над заглавными (см. StudyScreen cardWord)
     lineHeight: 46,
-    paddingTop: 4,
+    paddingTop: spacing.xxs,
     textAlign: 'center',
   },
   partialText: {
-    fontSize: 20,
+    fontWeight: '400',
     fontStyle: 'italic',
-    textAlign: 'center',
-    opacity: 0.7,
-  },
-  recognizedText: {
-    fontSize: 18,
-    fontWeight: '600',
-    textAlign: 'center',
   },
   incorrectInfo: {
     alignItems: 'center',
-    gap: 4,
-  },
-  expectedText: {
-    fontSize: 16,
-    fontWeight: '500',
-    textAlign: 'center',
+    gap: spacing.xxs,
   },
 
   // Mode Description
   modeDescription: {
     maxWidth: 240,
-    marginTop: 64,
-  },
-  descriptionText: {
-    fontSize: 14,
-    lineHeight: 22,
+    marginTop: spacing.xxl + spacing.m,
   },
 
   // Bottom
   bottomActions: {
     paddingHorizontal: spacing.l,
     paddingTop: spacing.m,
-    paddingBottom: spacing.xl,
-  },
-  startButton: {
-    height: 64,
-    borderRadius: borderRadius.l,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: 'rgba(100, 103, 242, 0.3)',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  startButtonText: {
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    paddingBottom: spacing.l,
   },
   listeningRow: {
     height: 48,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  skipButton: {
-    height: 56,
-    borderRadius: borderRadius.l,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  skipButtonText: {
-    fontSize: 17,
-    fontWeight: '600',
-  },
   resultIndicator: {
     height: 48,
-    borderRadius: borderRadius.l,
+    borderRadius: borderRadius.m,
     justifyContent: 'center',
     alignItems: 'center',
   },
   runningArea: {
-    gap: 12,
-  },
-  stopButton: {
-    height: 40,
-    borderRadius: borderRadius.l,
-    borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  stopButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
+    gap: spacing.s,
   },
 
   // Settings modal
@@ -904,29 +764,16 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: spacing.m,
-    paddingTop: 50,
+    paddingHorizontal: screenPadding,
     paddingBottom: spacing.m,
     borderBottomWidth: 1,
-    borderBottomLeftRadius: 18,
-    borderBottomRightRadius: 18,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowOffset: { width: 0, height: 8 },
-    shadowRadius: 12,
-    elevation: 6,
+    borderBottomLeftRadius: borderRadius.l,
+    borderBottomRightRadius: borderRadius.l,
   },
   settingsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  settingsLabel: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-
-  safeAreaSpacer: {
-    height: 8,
+    minHeight: heights.touch,
   },
 });
