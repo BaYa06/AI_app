@@ -13,11 +13,15 @@ import {
   ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import { ArrowLeft } from 'lucide-react-native';
 import InAppBrowser from 'react-native-inappbrowser-reborn';
 import type { Session } from '@supabase/supabase-js';
 
-import { Button, Text } from '@/components/common';
+import { Text } from '@/components/common';
+import { Button, GoogleLogo, type IconComponent } from '@/components/ui';
+
+// Кнопка Google берёт иконку по тем же пропсам size/color, что и lucide
+const GoogleIcon = GoogleLogo as unknown as IconComponent;
 import { borderRadius, spacing } from '@/constants';
 import { SUPABASE_OAUTH_REDIRECT, supabase } from '@/services/supabaseClient';
 import { Analytics } from '@/services/analytics';
@@ -193,13 +197,7 @@ export function EmailAuthScreen({ onBack }: Props) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={[styles.navBar, { paddingTop: 0 }]}>
-          <Button
-            title=""
-            variant="ghost"
-            onPress={onBack}
-            style={styles.backButton}
-            leftIcon={<Ionicons name="chevron-back" size={22} color={colors.textPrimary} />}
-          />
+          <Button variant="icon" icon={ArrowLeft} accessibilityLabel="Назад" onPress={onBack} />
         </View>
 
         <ScrollView
@@ -223,11 +221,11 @@ export function EmailAuthScreen({ onBack }: Props) {
               </View>
 
               <Button
-                title="Continue with Google"
+                title="Войти через Google"
+                icon={GoogleIcon}
                 onPress={signInWithGoogle}
                 fullWidth
                 disabled={isLoading}
-                leftIcon={<Ionicons name="logo-google" size={18} color={colors.surface} />}
               />
 
               {isLoading && (
@@ -279,12 +277,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.s,
     paddingVertical: spacing.xs,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignSelf: 'flex-start',
   },
   scrollContent: {
     flexGrow: 1,

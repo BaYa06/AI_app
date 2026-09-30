@@ -12,12 +12,13 @@ import {
 } from 'react-native';
 import { Text, Container } from '@/components/common';
 import { useThemeColors } from '@/store';
-import { spacing, borderRadius, alpha } from '@/constants';
+import { spacing, borderRadius, alpha, iconSize } from '@/constants';
 import {
   ArrowLeft,
   Share2,
   MoreHorizontal,
   Star,
+  StarHalf,
   Download,
   Heart,
   Languages,
@@ -28,7 +29,6 @@ import {
   ChevronRight,
   Plus,
 } from 'lucide-react-native';
-import Ionicons from 'react-native-vector-icons/Ionicons';
 import type { RootStackScreenProps } from '@/types/navigation';
 
 type Props = RootStackScreenProps<'SharedSetDetail'>;
@@ -134,7 +134,7 @@ export function SharedSetDetailScreen({ navigation }: Props) {
           <View style={s.metricsRow}>
             <View style={[s.metricCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
               <View style={s.metricValue}>
-                <Ionicons name="star" size={16} color="#FACC15" />
+                <Star size={iconSize.xs} color={colors.star} fill={colors.star} />
                 <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
                   {MOCK_SET.rating}
                 </Text>
@@ -285,9 +285,9 @@ export function SharedSetDetailScreen({ navigation }: Props) {
               </Text>
               <View style={s.starsRow}>
                 {[1, 2, 3, 4].map((i) => (
-                  <Ionicons key={i} name="star" size={16} color="#FACC15" />
+                  <Star key={i} size={iconSize.xs} color={colors.star} fill={colors.star} />
                 ))}
-                <Ionicons name="star-half" size={16} color="#FACC15" />
+                <StarHalf size={iconSize.xs} color={colors.star} fill={colors.star} />
               </View>
               <Text style={[s.ratingCountText, { color: colors.textTertiary }]}>
                 {MOCK_SET.ratingCount} оценок
@@ -337,11 +337,11 @@ export function SharedSetDetailScreen({ navigation }: Props) {
                 </View>
                 <View style={s.commentStars}>
                   {Array.from({ length: 5 }).map((_, i) => (
-                    <Ionicons
+                    <Star
                       key={i}
-                      name="star"
                       size={14}
                       color={i < review.rating ? colors.star : colors.surfaceMuted}
+                      fill={i < review.rating ? colors.star : colors.surfaceMuted}
                     />
                   ))}
                 </View>
@@ -390,7 +390,7 @@ export function SharedSetDetailScreen({ navigation }: Props) {
                   {set.cards} карточек
                 </Text>
                 <View style={s.similarCardRating}>
-                  <Ionicons name="star" size={12} color="#FACC15" />
+                  <Star size={12} color={colors.star} fill={colors.star} />
                   <Text style={[s.similarCardRatingText, { color: colors.textPrimary }]}>
                     {set.rating}
                   </Text>
