@@ -7,6 +7,20 @@ import { Text as RNText, TextProps as RNTextProps, StyleSheet } from 'react-nati
 import { useThemeColors } from '@/store';
 import { typography, TypographyVariant } from '@/constants';
 
+/**
+ * Предел системного увеличения шрифта (брендбук, 6.4). Основной текст растёт до ×2, крупные
+ * заголовки — меньше: они и так большие, а на самых крупных системных размерах (до ×3)
+ * выталкивали вёрстку за экран. Экран может передать свой maxFontSizeMultiplier.
+ */
+const MAX_FONT_SCALE: Partial<Record<TypographyVariant, number>> = {
+  display: 1.2,
+  h1: 1.3,
+  h2: 1.4,
+  cardText: 1.4,
+  h3: 1.5,
+};
+const MAX_FONT_SCALE_DEFAULT = 2;
+
 interface TextProps extends RNTextProps {
   variant?: TypographyVariant;
   color?: 'primary' | 'secondary' | 'tertiary' | 'inverse' | 'error' | 'success' | 'warning' | 'accent';
@@ -54,6 +68,7 @@ export const Text = memo<TextProps>(function Text({
         style,
         lineHeightFix,
       ]}
+      maxFontSizeMultiplier={MAX_FONT_SCALE[variant] ?? MAX_FONT_SCALE_DEFAULT}
       {...rest}
     >
       {children}
