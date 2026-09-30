@@ -40,7 +40,7 @@
 | Текущий набор | выбранный вручную → иначе последний изученный (`lastStudiedAt`) с новыми словами → иначе первый в списке по текущей сортировке |
 | Как учить новое | сначала карточки с самооценкой (`Study`, `mode: 'classic'`), потом проверка тестом |
 | Как учить повторение | тест (`MultipleChoice`), как сейчас |
-| Время | `~ round(повторить × 0,25 + новых × 0,4)` минут, минимум 1 |
+| Время | `round((повторить × 15 с + новых × 22 с) / 60)` минут, минимум 1 (`estimateMinutes`) |
 | Какие наборы | текущий курс (`filteredSets`), как сейчас |
 | Учитель | урока нет, остаётся баннер учителя |
 
@@ -76,7 +76,7 @@
 
 ## Этап 1. Логика урока дня (вид главной пока не меняется)
 
-- [ ] **1.1 Сервис урока** — новый `src/services/LessonService.ts`
+- [x] **1.1 Сервис урока** — новый `src/services/LessonService.ts`
   - Чистая функция без React и хранилищ: `buildLessonPlan({ cards, sets, setsOrder, settings, day, now }) → LessonPlan`.
   - `LessonPlan`:
     - `state: 'lesson' | 'first' | 'overdue' | 'mistakes' | 'done' | 'finished' | 'empty'`;
@@ -102,6 +102,7 @@
     - все слова изучены, ничего не ждёт → `finished`;
     - смена курса → считаются только наборы курса.
   - **Готово, когда:** тесты зелёные; главная ещё не пользуется сервисом.
+  - **Сделано:** `src/services/LessonService.ts` — `buildLessonPlan`, `ensureLessonDay` (сброс дня с сохранением выбранного набора), `countWaitingReview` (для утреннего снимка), `estimateMinutes`. В `LessonPlan` добавлены `mistakeIds` (для состояния `mistakes`) и `newQuota`. Jest настроен в `package.json` (`testEnvironment: node`, алиас `@/`), тесты — `npm test`, 17 штук. Время: 15 с на повторение, 22 с на новое слово — так совпадает с таблицей «4 / 6 / 8 / 8 мин».
 
 - [ ] **1.2 Состояние дня** — `src/services/StorageService.ts` (ключ `LESSON_DAY`), новый `src/store/lessonStore.ts`
   - Хранить: `{ date: 'YYYY-MM-DD' (локальная дата), startWaiting, reviewedIds, introducedIds, extraNew, focusSetId }`.
