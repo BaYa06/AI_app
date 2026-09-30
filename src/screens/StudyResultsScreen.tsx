@@ -146,8 +146,19 @@ export function StudyResultsScreen({ navigation, route }: Props) {
       if (lesson) {
         const cards = useCardsStore.getState().cards;
         const next = nextLessonStep(lesson, (id) => cards[id]?.setId);
-        if (next) navigation.replace(next.screen, next.params);
-        else navigation.navigate('Main', { screen: 'Home' });
+        if (next) {
+          navigation.replace(next.screen, next.params);
+          return;
+        }
+        // Пройдена последняя часть урока (6.1)
+        if (lesson.startedAt) {
+          Analytics.lessonCompleted({
+            reviewCount: lesson.reviewCount ?? 0,
+            newCount: lesson.newIds.length,
+            durationSec: Math.round((Date.now() - lesson.startedAt) / 1000),
+          });
+        }
+        navigation.navigate('Main', { screen: 'Home' });
         return;
       }
       if (dueCardIds && dueCardIds.length > 0) {

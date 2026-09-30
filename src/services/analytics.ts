@@ -503,6 +503,53 @@ export const Analytics = {
 
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // УРОК ДНЯ
+  // Зачем: главная метрика редизайна главной — сколько людей начинают и заканчивают урок дня
+  // (plan/home_redesign.md, 6.1). «Ещё 10 новых» и «Сменить набор» — также в home_action.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Карточка урока показана (один раз за заход на главную).
+   * state — lesson / first / overdue / mistakes / done / finished; streak_risk — вечерний вариант «Сохрани серию».
+   */
+  lessonCardViewed: (params: { state: string; reviewCount: number; newCount: number; streakRisk: boolean }) =>
+    log('lesson_card_viewed', {
+      state: params.state,
+      review_count: params.reviewCount,
+      new_count: params.newCount,
+      streak_risk: params.streakRisk,
+    }),
+
+  /**
+   * Урок запущен с главной. Доля lesson_started среди lesson_card_viewed — конверсия карточки.
+   */
+  lessonStarted: (params: { state: string; reviewCount: number; newCount: number; minutes: number }) =>
+    log('lesson_started', {
+      state: params.state,
+      review_count: params.reviewCount,
+      new_count: params.newCount,
+      minutes: params.minutes,
+    }),
+
+  /**
+   * Пройдена последняя часть урока. lesson_completed / lesson_started — доля доведённых до конца;
+   * duration_sec сравниваем с обещанным «~N мин».
+   */
+  lessonCompleted: (params: { reviewCount: number; newCount: number; durationSec: number }) =>
+    log('lesson_completed', {
+      review_count: params.reviewCount,
+      new_count: params.newCount,
+      duration_sec: params.durationSec,
+    }),
+
+  /**
+   * «Сменить набор»: выбран набор вручную или снова «Выбирать автоматически».
+   */
+  lessonFocusChanged: (auto: boolean) =>
+    log('lesson_focus_changed', { auto }),
+
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // ОШИБКИ И ТЕХНИЧЕСКИЕ СОБЫТИЯ
   // Зачем: видим user-facing ошибки до того как они попадут в отзывы.
   // ═══════════════════════════════════════════════════════════════════════════

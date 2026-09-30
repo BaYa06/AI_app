@@ -19,10 +19,16 @@ export type LessonStep =
 /** Набор карточки — для параметра setId (экраны тренировок берут из него название и статистику) */
 type SetIdOf = (cardId: string) => string | undefined;
 
-function stepFor(part: LessonPart, ids: string[], newIds: string[], setIdOf: SetIdOf, now: number): LessonStep | null {
+function stepFor(
+  part: LessonPart,
+  ids: string[],
+  base: Omit<LessonRouteParams, 'part'>,
+  setIdOf: SetIdOf,
+  now: number,
+): LessonStep | null {
   if (ids.length === 0) return null;
   const setId = setIdOf(ids[0]) ?? '';
-  const lesson: LessonRouteParams = { part, newIds };
+  const lesson: LessonRouteParams = { ...base, part };
   const phase = {
     cardLimit: ids.length, // вся часть — одной порцией; ошибки повторяются следующими порциями
     dueCardIds: ids,
@@ -43,23 +49,28 @@ function stepFor(part: LessonPart, ids: string[], newIds: string[], setIdOf: Set
  * такие ответы в урок не записываются (lessonPhaseForAnswer).
  */
 export function firstLessonStep(
-  queue: { reviewIds: string[]; newIds: string[]; mistakeIds?: string[] },
+  queue: {
+    reviewIds: string[];
+    newIds: string[];
+    mistakeIds?: string[];
+    /** Сколько слов на повторение без добора теста (для аналитики); по умолчанию reviewIds.length */
+    reviewCount?: number;
+  },
   setIdOf: SetIdOf,
   now: number = Date.now(),
 ): LessonStep | null {
   if (queue.mistakeIds && queue.mistakeIds.length > 0) {
-    return stepFor('mistakes', queue.mistakeIds, [], setIdOf, now);
+    return stepFor('mistakes', queue.mistakeIds, { newIds: [], startedAt: now, reviewCount: queue.mistakeIds.length }, setIdOf, now);
   }
-  return (
-    stepFor('review', queue.reviewIds, queue.newIds, setIdOf, now) ??
-    stepFor('new', queue.newIds, queue.newIds, setIdOf, now)
-  );
+  const base = { newIds: queue.newIds, startedAt: now, reviewCount: queue.reviewCount ?? queue.reviewIds.length };
+  return stepFor('review', queue.reviewIds, base, setIdOf, now) ?? stepFor('new', queue.newIds, base, setIdOf, now);
 }
 
 /** Следующая часть после завершённой фазы; null — урок окончен, на главную */
 export function nextLessonStep(lesson: LessonRouteParams, setIdOf: SetIdOf, now: number = Date.now()): LessonStep | null {
-  if (lesson.part === 'review') return stepFor('new', lesson.newIds, lesson.newIds, setIdOf, now);
-  if (lesson.part === 'new') return stepFor('check', lesson.newIds, lesson.newIds, setIdOf, now);
+  const { part, ...base } = lesson;
+  if (part === 'review') return stepFor('new', lesson.newIds, base, setIdOf, now);
+  if (part === 'new') return stepFor('check', lesson.newIds, base, setIdOf, now);
   return null;
 }
 

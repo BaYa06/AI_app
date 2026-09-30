@@ -49,6 +49,15 @@ describe('ход урока', () => {
     expect(nextLessonStep({ part: 'check', newIds: fresh }, setIdOf, NOW)).toBeNull();
   });
 
+  it('время начала и число повторений доходят до последней части (для lesson_completed)', () => {
+    const padded = [...review, 'a-9', 'a-8'];
+    const first = firstLessonStep({ reviewIds: padded, newIds: fresh, reviewCount: 2 }, setIdOf, NOW);
+    expect(first?.params.lesson).toMatchObject({ startedAt: NOW, reviewCount: 2 });
+    const second = nextLessonStep(first!.params.lesson!, setIdOf, NOW + 60_000);
+    const third = nextLessonStep(second!.params.lesson!, setIdOf, NOW + 120_000);
+    expect(third?.params.lesson).toMatchObject({ part: 'check', startedAt: NOW, reviewCount: 2, newIds: fresh });
+  });
+
   it('у каждой части свой phaseId — порции разных частей не смешиваются', () => {
     const a = firstLessonStep({ reviewIds: review, newIds: fresh }, setIdOf, NOW);
     const b = nextLessonStep({ part: 'review', newIds: fresh }, setIdOf, NOW);

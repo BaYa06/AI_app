@@ -16,6 +16,9 @@ export interface LessonRouteParams {
   part: LessonPart;
   /** Новые слова урока — для следующих частей */
   newIds: string[];
+  /** Когда урок начат (мс) и сколько в нём слов на повторение — для аналитики lesson_completed (6.1) */
+  startedAt?: number;
+  reviewCount?: number;
 }
 
 // ==================== ROOT STACK ====================

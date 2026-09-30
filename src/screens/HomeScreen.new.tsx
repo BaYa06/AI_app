@@ -684,7 +684,16 @@ export function HomeScreen({ navigation }: any) {
       newCount: reviewStats.all.filter((c) => (c.learningStep || 0) === 0).length,
       setsCount: filteredSets.length,
     });
-  }, [focusTick, isTeacher, filteredSets.length, reviewStats, lessonPlan]);
+    // Урок дня (6.1): что предлагала карточка — у ученика с карточками
+    if (!isTeacher && lessonContent) {
+      Analytics.lessonCardViewed({
+        state: lessonPlan.state,
+        reviewCount: lessonPlan.reviewIds.length,
+        newCount: lessonPlan.newIds.length,
+        streakRisk: streakRiskHours != null && lessonContent.kind === 'start' && lessonPlan.state !== 'mistakes',
+      });
+    }
+  }, [focusTick, isTeacher, filteredSets.length, reviewStats, lessonPlan, lessonContent, streakRiskHours]);
 
   // «Урок дня» (plan/home_redesign.md, 1.4, 2.2): повторение + новые слова из текущего набора (LessonService)
   const startLesson = useCallback((plan: LessonPlan) => {
@@ -701,10 +710,16 @@ export function HomeScreen({ navigation }: any) {
       reviewIds = [...reviewIds, ...extra.map((c) => c.id)];
     }
     const step = firstLessonStep(
-      { reviewIds, newIds: plan.newIds, mistakeIds: plan.mistakeIds },
+      { reviewIds, newIds: plan.newIds, mistakeIds: plan.mistakeIds, reviewCount: plan.reviewIds.length },
       (id) => cardsMap[id]?.setId,
     );
     if (!step) return;
+    Analytics.lessonStarted({
+      state: plan.state,
+      reviewCount: plan.state === 'mistakes' ? plan.mistakeIds.length : plan.reviewIds.length,
+      newCount: plan.newIds.length,
+      minutes: plan.minutes,
+    });
     const rootNav = navigation?.getParent?.() ?? navigation;
     rootNav?.navigate(step.screen, step.params);
   }, [navigation, reviewStats, cardsMap]);
@@ -718,6 +733,7 @@ export function HomeScreen({ navigation }: any) {
   }, []);
   const selectFocusSet = useCallback((setId: string | null) => {
     triggerHaptic('selection');
+    Analytics.lessonFocusChanged(setId === null);
     useLessonStore.getState().setFocusSet(setId);
     setFocusSheetVisible(false);
   }, []);
