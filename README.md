@@ -70,12 +70,36 @@ src/
 
 ## 🧩 Расширение
 
-### Добавление нового экрана
+### Как делать экран
 
-1. Создайте файл в `src/screens/`
-2. Добавьте в `src/screens/index.ts`
-3. Добавьте роут в `src/navigation/AppNavigator.tsx`
-4. Обновите типы в `src/types/navigation.ts`
+Весь интерфейс следует брендбуку: [plan/brandbook.md](plan/brandbook.md) — цвета, шрифты, отступы, иконки, компоненты, тексты.
+
+**Создание:**
+
+```bash
+npm run new:screen -- Achievements   # → src/screens/AchievementsScreen.tsx из шаблона
+```
+
+Шаблон — [src/screens/templates/ScreenTemplate.tsx](src/screens/templates/ScreenTemplate.tsx): каркас, состояния загрузки, ошибки и пустого экрана, закреплённая кнопка. Дальше:
+
+1. Добавьте маршрут и параметры в `src/types/navigation.ts`
+2. Добавьте экран в `src/navigation/AppNavigator.tsx`
+3. При необходимости — экспорт в `src/screens/index.ts`
+
+**Чек-лист перед коммитом:**
+
+- [ ] Каркас — `Screen` + `ScreenHeader`; кнопки, поля, списки, окна — только из `@/components/ui`
+- [ ] Цвета — только токены `useThemeColors()`: никаких `'#…'`, `rgba`, `isDark ? …`; кнопки с текстом — `primaryFill` + `onPrimary`
+- [ ] Текст — `<Text variant="…">`: размеры шкалы (12–40), не меньше 12, веса 400 / 600 / 700
+- [ ] Отступы и скругления — `spacing` и `borderRadius` (только `s` / `m` / `l` / `xl` / `full`)
+- [ ] Иконки — `lucide-react-native`, без эмодзи (исключения — флаги языков и панель вкладок на Ionicons)
+- [ ] Загрузка — `Skeleton`; ошибка — `ErrorState`; пусто — `EmptyState` с подсказкой, что сделать дальше
+- [ ] Успех — `toast`; опасное подтверждение — `confirmDialog`; системный `Alert` — только для вопросов с выбором
+- [ ] Доступность: у иконки-кнопки есть `accessibilityLabel`, у выбора — `accessibilityState`, зона нажатия ≥ 44 (`hitSlop`)
+- [ ] Тексты — на русском и на «ты», числа склоняются через `pluralize` из `@/utils`
+- [ ] Экран проверен в светлой и тёмной теме
+
+**Автопроверка:** `npm run brand:check` — таблица нарушений (`-- --details <путь>` — по строкам). Перед коммитом и в CI (Codemagic, GitHub Actions) запускается `--fail-on-new`: коммит и сборка не проходят, если нарушений стало больше, чем в снимке `scripts/brand-baseline.json`. Хук ставится сам на `npm install` (или `npm run hooks:install`). Когда нарушений стало меньше — обновите снимок: `npm run brand:check -- --update-baseline`.
 
 ### Добавление нового компонента
 
