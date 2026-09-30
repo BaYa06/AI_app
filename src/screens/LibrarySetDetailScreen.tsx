@@ -15,13 +15,14 @@ import { Text, Container } from '@/components/common';
 import { useThemeColors, useSettingsStore, useLibraryStore, useSetsStore, useCardsStore, useCoursesStore } from '@/store';
 import { ChooseCourseSheet } from '@/components/library/ChooseCourseSheet';
 import { showMessage } from '@/utils/dialogs';
-import { spacing, borderRadius, getCategoryLabel, getLanguageDef, formatCount, formatRelativeTime } from '@/constants';
+import { spacing, borderRadius, heights, iconSize, getCategoryLabel, getLanguageDef, formatCount, formatRelativeTime, alpha } from '@/constants';
+import { Button, CategoryIcon, ScreenHeader, toast, useScreenBottomInset } from '@/components/ui';
 import { v4 as uuid } from 'uuid';
 import { LibraryService } from '@/services/LibraryService';
 import type { CardSet } from '@/types';
 import {
-  ArrowLeft,
   MoreHorizontal,
+  Star,
   Download,
   Heart,
   Languages,
@@ -31,19 +32,17 @@ import {
   ArrowRight,
   ExternalLink,
 } from 'lucide-react-native';
-import Ionicons from 'react-native-vector-icons/Ionicons';
 import { supabase } from '@/services/supabaseClient';
 import { DatabaseService } from '@/services/DatabaseService';
 import type { RootStackScreenProps } from '@/types/navigation';
 import { describeError } from '@/utils/userErrors';
+import { pluralize } from '@/utils';
 
 type Props = RootStackScreenProps<'LibrarySetDetail'>;
 
 export function LibrarySetDetailScreen({ navigation, route }: Props) {
   const { setId } = route.params;
   const colors = useThemeColors();
-  const theme = useSettingsStore((s) => s.resolvedTheme);
-  const isDark = theme === 'dark';
 
   const { currentSet, isLoading, fetchSetDetail, toggleLike, rateSet, importSet } = useLibraryStore();
 
@@ -58,8 +57,9 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
   const ownCourses = React.useMemo(() => allCourses.filter((c) => !c.isStudentCourse), [allCourses]);
   const defaultCourseId = ownCourses.some((c) => c.id === activeCourseId) ? activeCourseId : null;
 
-  const surfaceBg = isDark ? 'rgb(24, 26, 38)' : colors.surface;
-  const sectionBorder = isDark ? 'rgba(255,255,255,0.06)' : colors.borderLight;
+  const surfaceBg = colors.surface;
+  const sectionBorder = colors.border;
+  const bottomInset = useScreenBottomInset();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -75,14 +75,14 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
     try {
       await toggleLike(userId, currentSet.id);
     } catch {
-      Alert.alert('Ошибка', 'Не удалось поставить лайк');
+      toast.error('Не удалось поставить лайк');
     }
   }, [userId, currentSet, toggleLike]);
 
   const handleRate = useCallback((rating: number) => {
     if (!userId || !currentSet) return;
     rateSet(userId, currentSet.id, rating).catch(() => {
-      Alert.alert('Ошибка', 'Не удалось поставить оценку');
+      toast.error('Не удалось поставить оценку');
     });
   }, [userId, currentSet, rateSet]);
 
@@ -198,7 +198,7 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
   const handleReport = useCallback(() => {
     Alert.alert(
       'Пожаловаться',
-      'Выберите причину',
+      'Выбери причину',
       [
         { text: 'Спам', onPress: () => reportWithReason('spam') },
         { text: 'Неприемлемый контент', onPress: () => reportWithReason('inappropriate') },
@@ -213,20 +213,16 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
     try {
       const { LibraryService } = await import('@/services/LibraryService');
       await LibraryService.reportSet(userId, currentSet.id, reason);
-      Alert.alert('Спасибо', 'Жалоба отправлена');
+      toast.success('Спасибо, жалоба отправлена');
     } catch {
-      Alert.alert('Ошибка', 'Не удалось отправить жалобу');
+      toast.error('Не удалось отправить жалобу');
     }
   };
 
   if (isLoading || !currentSet) {
     return (
-      <Container padded={false} edges={['top', 'bottom']}>
-        <View style={[s.header, { backgroundColor: isDark ? colors.background : '#FFFFFF', borderBottomColor: colors.border }]}>
-          <Pressable onPress={() => navigation.goBack()} hitSlop={10} style={s.headerIcon}>
-            <ArrowLeft size={22} color={colors.textPrimary} />
-          </Pressable>
-        </View>
+      <Container padded={false}>
+        <ScreenHeader onBack={() => navigation.goBack()} bordered />
         <View style={s.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
@@ -242,27 +238,26 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
     : null;
 
   return (
-    <Container padded={false} edges={['top', 'bottom']}>
-      {/* Header */}
-      <View style={[s.header, { backgroundColor: isDark ? colors.background : '#FFFFFF', borderBottomColor: colors.border }]}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={10} style={s.headerIcon}>
-          <ArrowLeft size={22} color={colors.textPrimary} />
-        </Pressable>
-        <View style={s.headerRight}>
-          <Pressable hitSlop={10} style={s.headerIcon} onPress={handleReport}>
-            <MoreHorizontal size={22} color={colors.textPrimary} />
-          </Pressable>
-        </View>
-      </View>
+    <Container padded={false}>
+      <ScreenHeader
+        onBack={() => navigation.goBack()}
+        bordered
+        right={<Button variant="icon" icon={MoreHorizontal} accessibilityLabel="Пожаловаться" onPress={handleReport} />}
+      />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
         {/* Hero Section */}
         <View style={[s.heroSection, { backgroundColor: surfaceBg }]}>
-          <View style={[s.heroEmoji, { backgroundColor: colors.primary + '15' }]}>
-            <Text style={s.heroEmojiText}>{currentSet.cover_emoji || '📚'}</Text>
+          <View style={[s.heroEmoji, { backgroundColor: alpha(colors.primary, 10) }]}>
+            {/* Иконка категории вместо эмодзи обложки (брендбук, раздел 6) */}
+            <CategoryIcon category={currentSet.category} size="xl" />
             {currentSet.is_featured && (
-              <View style={[s.verifiedBadge, { backgroundColor: colors.primary, borderColor: surfaceBg }]}>
-                <Ionicons name="star" size={13} color="#FFFFFF" />
+              <View
+                accessible
+                accessibilityLabel="Рекомендуем"
+                style={[s.verifiedBadge, { backgroundColor: colors.primaryFill, borderColor: surfaceBg }]}
+              >
+                <Star size={iconSize.xs} color={colors.onPrimary} fill={colors.onPrimary} />
               </View>
             )}
           </View>
@@ -272,8 +267,8 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
 
           {/* Author Row */}
           <View style={s.authorRow}>
-            <View style={[s.authorAvatar, { backgroundColor: colors.primary + '20' }]}>
-              <Text style={s.authorAvatarText}>
+            <View style={[s.authorAvatar, { backgroundColor: alpha(colors.primary, 10) }]}>
+              <Text variant="caption" style={[s.authorAvatarText, { color: colors.primary }]}>
                 {(currentSet.author_name || 'U').charAt(0).toUpperCase()}
               </Text>
             </View>
@@ -289,30 +284,30 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
           <View style={s.metricsRow}>
             <View style={[s.metricCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
               <View style={s.metricValue}>
-                {avgRating !== null && <Ionicons name="star" size={16} color="#FACC15" />}
+                {avgRating !== null && <Star size={iconSize.xs} color={colors.star} fill={colors.star} />}
                 <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
                   {avgRating ?? '—'}
                 </Text>
               </View>
-              <Text style={[s.metricLabel, { color: colors.textTertiary }]}>Рейтинг</Text>
+              <Text variant="overline" color="secondary" style={s.metricLabel}>Рейтинг</Text>
             </View>
             <View style={[s.metricCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
               <View style={s.metricValue}>
-                <Download size={16} color={colors.primary} />
+                <Download size={iconSize.xs} color={colors.primary} />
                 <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
                   {formatCount(currentSet.imports_count)}
                 </Text>
               </View>
-              <Text style={[s.metricLabel, { color: colors.textTertiary }]}>Импорты</Text>
+              <Text variant="overline" color="secondary" style={s.metricLabel}>Импорты</Text>
             </View>
             <View style={[s.metricCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
               <View style={s.metricValue}>
-                <Heart size={16} color="#EC4899" />
+                <Heart size={iconSize.xs} color={colors.like} />
                 <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
                   {formatCount(currentSet.likes_count)}
                 </Text>
               </View>
-              <Text style={[s.metricLabel, { color: colors.textTertiary }]}>Лайки</Text>
+              <Text variant="overline" color="secondary" style={s.metricLabel}>Лайки</Text>
             </View>
           </View>
         </View>
@@ -320,7 +315,7 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
         {/* Description */}
         {currentSet.description && (
           <View style={[s.descSection, { backgroundColor: surfaceBg, borderTopColor: sectionBorder }]}>
-            <Text variant="bodySmall" style={{ color: colors.textSecondary, lineHeight: 22 }}>
+            <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
               {currentSet.description}
             </Text>
           </View>
@@ -332,10 +327,10 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
           <View style={s.detailsGrid}>
             {langDef && (
               <View style={s.detailItem}>
-                <Languages size={20} color={colors.primary} />
+                <Languages size={iconSize.s} color={colors.primary} />
                 <View>
-                  <Text style={[s.detailLabel, { color: colors.textTertiary }]}>Язык</Text>
-                  <Text variant="bodySmall" style={{ color: colors.textPrimary, fontWeight: '500' }}>
+                  <Text variant="overline" color="secondary">Язык</Text>
+                  <Text variant="bodySmall" style={{ color: colors.textPrimary, fontWeight: '600' }}>
                     {langDef.flag} {langDef.label}
                   </Text>
                 </View>
@@ -343,29 +338,29 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
             )}
             {currentSet.category && (
               <View style={s.detailItem}>
-                <LayoutGrid size={20} color={colors.primary} />
+                <LayoutGrid size={iconSize.s} color={colors.primary} />
                 <View>
-                  <Text style={[s.detailLabel, { color: colors.textTertiary }]}>Категория</Text>
-                  <Text variant="bodySmall" style={{ color: colors.textPrimary, fontWeight: '500' }}>
+                  <Text variant="overline" color="secondary">Категория</Text>
+                  <Text variant="bodySmall" style={{ color: colors.textPrimary, fontWeight: '600' }}>
                     {getCategoryLabel(currentSet.category)}
                   </Text>
                 </View>
               </View>
             )}
             <View style={s.detailItem}>
-              <Layers size={20} color={colors.primary} />
+              <Layers size={iconSize.s} color={colors.primary} />
               <View>
-                <Text style={[s.detailLabel, { color: colors.textTertiary }]}>Карточки</Text>
-                <Text variant="bodySmall" style={{ color: colors.textPrimary, fontWeight: '500' }}>
-                  {currentSet.cards_count} карточек
+                <Text variant="overline" color="secondary">Карточки</Text>
+                <Text variant="bodySmall" style={{ color: colors.textPrimary, fontWeight: '600' }}>
+                  {currentSet.cards_count} {pluralize(currentSet.cards_count, 'карточка', 'карточки', 'карточек')}
                 </Text>
               </View>
             </View>
             <View style={s.detailItem}>
-              <Calendar size={20} color={colors.primary} />
+              <Calendar size={iconSize.s} color={colors.primary} />
               <View>
-                <Text style={[s.detailLabel, { color: colors.textTertiary }]}>Опубликовано</Text>
-                <Text variant="bodySmall" style={{ color: colors.textPrimary, fontWeight: '500' }}>
+                <Text variant="overline" color="secondary">Опубликовано</Text>
+                <Text variant="bodySmall" style={{ color: colors.textPrimary, fontWeight: '600' }}>
                   {new Date(currentSet.published_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
                 </Text>
               </View>
@@ -377,7 +372,7 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
             <View style={s.tagsRow}>
               {currentSet.tags.map((tag) => (
                 <View key={tag} style={[s.tag, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                  <Text style={[s.tagText, { color: colors.textSecondary }]}>{tag}</Text>
+                  <Text variant="caption" style={[s.tagText, { color: colors.textSecondary }]}>{tag}</Text>
                 </View>
               ))}
             </View>
@@ -386,25 +381,31 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
 
         {/* Rating Stars */}
         <View style={[s.ratingSection, { backgroundColor: surfaceBg, borderTopColor: sectionBorder }]}>
-          <Text variant="h3" style={{ color: colors.textPrimary, marginBottom: spacing.m }}>Оцените набор</Text>
+          <Text variant="h3" style={{ color: colors.textPrimary, marginBottom: spacing.m }}>Оцени набор</Text>
           <View style={s.starsRow}>
-            {[1, 2, 3, 4, 5].map((star) => (
-              <Pressable key={star} onPress={() => handleRate(star)} hitSlop={8}>
-                <Ionicons
-                  name="star"
-                  size={36}
-                  color={
-                    currentSet.user_rating != null && star <= currentSet.user_rating
-                      ? '#FACC15'
-                      : isDark ? '#374151' : '#E5E7EB'
-                  }
-                />
-              </Pressable>
-            ))}
+            {[1, 2, 3, 4, 5].map((star) => {
+              const filled = currentSet.user_rating != null && star <= currentSet.user_rating;
+              return (
+                <Pressable
+                  key={star}
+                  onPress={() => handleRate(star)}
+                  style={s.starButton}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${star} из 5`}
+                  accessibilityState={{ selected: filled }}
+                >
+                  <Star
+                    size={iconSize.l}
+                    color={filled ? colors.star : colors.textTertiary}
+                    fill={filled ? colors.star : 'transparent'}
+                  />
+                </Pressable>
+              );
+            })}
           </View>
           {currentSet.user_rating != null && (
-            <Text variant="bodySmall" style={{ color: colors.textTertiary, marginTop: spacing.xs }}>
-              Ваша оценка: {currentSet.user_rating}/5
+            <Text variant="bodySmall" style={{ color: colors.textSecondary, marginTop: spacing.xs }}>
+              Твоя оценка: {currentSet.user_rating}/5
             </Text>
           )}
         </View>
@@ -422,14 +423,14 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
               {currentSet.preview_cards.map((card, idx) => (
                 <View key={card.id || idx} style={[s.sampleCard, { backgroundColor: surfaceBg, borderColor: colors.border }]}>
                   <View style={s.sampleCardSide}>
-                    <Text style={[s.sampleCardLabel, { color: colors.textTertiary }]}>Слово</Text>
+                    <Text variant="caption" style={[s.sampleCardLabel, { color: colors.textSecondary }]}>Слово</Text>
                     <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>{card.front}</Text>
                   </View>
                   <View style={s.sampleCardArrow}>
-                    <ArrowRight size={18} color={colors.border} />
+                    <ArrowRight size={iconSize.xs} color={colors.textTertiary} />
                   </View>
                   <View style={[s.sampleCardSide, { paddingLeft: spacing.m }]}>
-                    <Text style={[s.sampleCardLabel, { color: colors.textTertiary }]}>Перевод</Text>
+                    <Text variant="caption" style={[s.sampleCardLabel, { color: colors.textSecondary }]}>Перевод</Text>
                     <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>{card.back}</Text>
                   </View>
                 </View>
@@ -440,29 +441,28 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
       </ScrollView>
 
       {/* Sticky Bottom Action Bar */}
-      <View style={[s.bottomBar, { backgroundColor: isDark ? 'rgb(16, 17, 34)' : colors.surface, borderTopColor: colors.border }]}>
+      <View
+        style={[
+          s.bottomBar,
+          { backgroundColor: colors.surface, borderTopColor: colors.border, paddingBottom: spacing.m + bottomInset },
+        ]}
+      >
         {currentSet.is_imported ? (
-          <Pressable style={[s.addButton, { backgroundColor: colors.textTertiary + '20', borderWidth: 1, borderColor: colors.border }]} onPress={handleOpenMySet}>
-            <ExternalLink size={20} color={colors.textPrimary} />
-            <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>Открыть у себя</Text>
-          </Pressable>
+          <Button variant="secondary" title="Открыть у себя" icon={ExternalLink} onPress={handleOpenMySet} style={s.flex1} />
         ) : (
-          <Pressable style={[s.addButton, { backgroundColor: colors.primary }]} onPress={handleImport} disabled={importing}>
-            {importing ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
-                <Download size={20} color="#FFFFFF" />
-                <Text variant="body" style={{ color: '#FFFFFF', fontWeight: '700' }}>Импортировать</Text>
-              </>
-            )}
-          </Pressable>
+          <Button title="Импортировать" icon={Download} onPress={handleImport} loading={importing} style={s.flex1} />
         )}
-        <Pressable onPress={handleLike} style={[s.likeButton, { borderColor: colors.primary + '33' }]}>
+        <Pressable
+          onPress={handleLike}
+          accessibilityRole="button"
+          accessibilityLabel={currentSet.is_liked ? 'Убрать лайк' : 'Нравится'}
+          accessibilityState={{ selected: !!currentSet.is_liked }}
+          style={[s.likeButton, { borderColor: currentSet.is_liked ? alpha(colors.like, 40) : alpha(colors.primary, 20) }]}
+        >
           <Heart
-            size={22}
-            color={currentSet.is_liked ? '#EC4899' : colors.primary}
-            fill={currentSet.is_liked ? '#EC4899' : 'transparent'}
+            size={iconSize.m}
+            color={currentSet.is_liked ? colors.like : colors.primary}
+            fill={currentSet.is_liked ? colors.like : 'transparent'}
           />
         </Pressable>
       </View>
@@ -484,40 +484,36 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
 // ==================== STYLES ====================
 
 const s = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.s, paddingVertical: spacing.s, borderBottomWidth: 1 },
-  headerIcon: { width: 40, height: 40, borderRadius: borderRadius.full, alignItems: 'center', justifyContent: 'center' },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.xxs },
+  flex1: { flex: 1 },
+  starButton: { width: heights.touch, height: heights.touch, alignItems: 'center', justifyContent: 'center' },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   heroSection: { alignItems: 'center', paddingHorizontal: spacing.l, paddingTop: spacing.xl, paddingBottom: spacing.l },
   heroEmoji: { width: 96, height: 96, borderRadius: borderRadius.xl, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.l, position: 'relative' },
-  verifiedBadge: { position: 'absolute', top: -4, right: -4, width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
-  heroEmojiText: { fontSize: 48 },
+  verifiedBadge: { position: 'absolute', top: -spacing.xxs, right: -spacing.xxs, width: 28, height: 28, borderRadius: borderRadius.full, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
   heroTitle: { textAlign: 'center', marginBottom: spacing.s },
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, marginBottom: spacing.l },
   authorAvatar: { width: 24, height: 24, borderRadius: borderRadius.full, alignItems: 'center', justifyContent: 'center' },
-  authorAvatarText: { fontSize: 10, fontWeight: '700', color: '#6467f2' },
+  authorAvatarText: { fontWeight: '700' },
   metricsRow: { flexDirection: 'row', gap: spacing.s, width: '100%' },
   metricCard: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.s, borderRadius: borderRadius.l, borderWidth: 1 },
   metricValue: { flexDirection: 'row', alignItems: 'center', gap: spacing.xxs },
-  metricLabel: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, marginTop: 2 },
+  metricLabel: { marginTop: spacing.xxs / 2 },
   descSection: { paddingHorizontal: spacing.l, paddingVertical: spacing.m, borderTopWidth: 1 },
   detailsSection: { paddingHorizontal: spacing.l, paddingVertical: spacing.l, borderTopWidth: 1 },
   detailsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.m },
   detailItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, width: '45%' },
-  detailLabel: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.m },
-  tag: { paddingHorizontal: spacing.s, paddingVertical: spacing.xxs + 2, borderRadius: borderRadius.full, borderWidth: 1 },
-  tagText: { fontSize: 12, fontWeight: '700' },
+  tag: { paddingHorizontal: spacing.s, paddingVertical: spacing.xxs, borderRadius: borderRadius.full, borderWidth: 1 },
+  tagText: { fontWeight: '600' },
   ratingSection: { paddingHorizontal: spacing.l, paddingVertical: spacing.l, borderTopWidth: 1, alignItems: 'center' },
-  starsRow: { flexDirection: 'row', gap: spacing.s },
+  starsRow: { flexDirection: 'row', gap: spacing.xxs },
   sampleSection: { paddingHorizontal: spacing.l, paddingVertical: spacing.xl },
   sampleHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.m },
   sampleList: { gap: spacing.s },
-  sampleCard: { flexDirection: 'row', alignItems: 'center', padding: spacing.m, borderRadius: borderRadius.xl, borderWidth: 1 },
+  sampleCard: { flexDirection: 'row', alignItems: 'center', padding: spacing.m, borderRadius: borderRadius.l, borderWidth: 1 },
   sampleCardSide: { flex: 1 },
-  sampleCardLabel: { fontSize: 11, fontWeight: '600', marginBottom: 2 },
+  sampleCardLabel: { fontWeight: '600', marginBottom: spacing.xxs / 2 },
   sampleCardArrow: { width: 32, alignItems: 'center', justifyContent: 'center' },
-  bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingHorizontal: spacing.m, paddingTop: spacing.m, paddingBottom: spacing.xl, borderTopWidth: 1 },
-  addButton: { flex: 1, height: 56, borderRadius: borderRadius.l, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, shadowColor: '#6467f2', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4 },
-  likeButton: { width: 56, height: 56, borderRadius: borderRadius.l, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingHorizontal: spacing.m, paddingTop: spacing.m, borderTopWidth: 1 },
+  likeButton: { width: heights.button, height: heights.button, borderRadius: borderRadius.m, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
 });

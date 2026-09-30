@@ -63,6 +63,7 @@ export const colors = {
     gameRose: '#BE123C',   // «Снайпер»
     gameTeal: '#0E7490',   // «Вспомни забытое»
     gameGreen: '#047857',  // выполненная мини-игра
+    like: '#EC4899',       // лайки в библиотеке
     
     // Overlay
     overlay: 'rgba(0, 0, 0, 0.5)',
@@ -129,6 +130,7 @@ export const colors = {
     gameRose: '#BE123C',
     gameTeal: '#0E7490',
     gameGreen: '#047857',
+    like: '#F472B6',
     
     // Overlay
     overlay: 'rgba(0, 0, 0, 0.7)',
