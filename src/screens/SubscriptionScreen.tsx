@@ -32,8 +32,8 @@ type PlanKey = 'yearly' | 'monthly';
 const BENEFITS = [
   { icon: Infinity, title: 'Безлимитные наборы', desc: 'Создавай сколько угодно наборов' },
   { icon: Sparkles, title: 'AI генерация', desc: 'Автоматическое создание карточек из текста' },
-  { icon: FileDown, title: 'Экспорт в PDF', desc: 'Печатайте и делитесь карточками' },
-  { icon: WifiOff, title: 'Офлайн режим', desc: 'Учитесь без интернета' },
+  { icon: FileDown, title: 'Экспорт в PDF', desc: 'Печатай и делись карточками' },
+  { icon: WifiOff, title: 'Офлайн режим', desc: 'Учись без интернета' },
   { icon: Ban, title: 'Без рекламы', desc: 'Никаких отвлекающих баннеров' },
 ];
 
@@ -101,7 +101,7 @@ export function SubscriptionScreen({ navigation }: Props) {
                     <Text style={s.proBadgeText}>FLASHLY PRO</Text>
                   </View>
                   <Text style={s.heroTitle}>Flashly Premium</Text>
-                  <Text style={s.heroSubtitle}>Раскройте весь потенциал обучения</Text>
+                  <Text style={s.heroSubtitle}>Раскрой весь потенциал обучения</Text>
                 </View>
                 <View style={s.heroBoltWrap}>
                   <Zap size={28} color={colors.primary} fill={colors.primary} />
@@ -235,7 +235,7 @@ export function SubscriptionScreen({ navigation }: Props) {
             </Pressable>
           </View>
           <Text variant="caption" style={[s.footerLegal, { color: isDark ? 'rgba(255,255,255,0.2)' : colors.textTertiary }]}>
-            Оформляя подписку, вы соглашаетесь с Условиями использования и Политикой конфиденциальности Flashly.
+            Оформляя подписку, ты соглашаешься с Условиями использования и Политикой конфиденциальности Flashly.
           </Text>
         </View>
       </ScrollView>

@@ -759,7 +759,7 @@ export default function App() {
       });
     }
     DatabaseService.syncStudentCourses();
-    Alert.alert('Готово', `Вы присоединились к курсу "${courseTitle}"`);
+    Alert.alert('Готово', `Ты присоединился к курсу "${courseTitle}"`);
   }, [currentUserId]);
 
   const handleInviteDismiss = useCallback(() => {

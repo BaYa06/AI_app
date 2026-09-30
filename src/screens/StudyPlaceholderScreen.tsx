@@ -91,7 +91,7 @@ export function StudyPlaceholderScreen() {
 
       {/* Bottom hint */}
       <Text style={[s.hint, { color: colors.textTertiary }]}>
-        А пока используйте режимы из карточек наборов
+        А пока используй режимы из карточек наборов
       </Text>
     </View>
   );

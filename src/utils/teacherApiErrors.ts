@@ -8,9 +8,9 @@ import type { TeacherApiReason } from '@/services/NeonService';
 export function describeTeacherApiReason(reason: TeacherApiReason): string {
   switch (reason) {
     case 'not_found':
-      return 'Код не найден. Проверьте, что ввели его правильно.';
+      return 'Код не найден. Проверь, что ввёл его правильно.';
     case 'expired':
-      return 'Этот код приглашения больше не действует — попросите учителя обновить его.';
+      return 'Этот код приглашения больше не действует — попроси учителя обновить его.';
     case 'own_course':
       return 'Нельзя присоединиться к своему же курсу.';
     case 'unauthorized':
@@ -18,12 +18,12 @@ export function describeTeacherApiReason(reason: TeacherApiReason): string {
     case 'forbidden':
       return 'Недостаточно прав для этого действия.';
     case 'rate_limited':
-      return 'Слишком много попыток. Подождите минуту и попробуйте снова.';
+      return 'Слишком много попыток. Подожди минуту и попробуй снова.';
     case 'network':
-      return 'Нет соединения с сервером. Проверьте интернет и попробуйте снова.';
+      return 'Нет соединения с сервером. Проверь интернет и попробуй снова.';
     case 'bad_request':
     case 'unknown':
     default:
-      return 'Что-то пошло не так. Попробуйте ещё раз.';
+      return 'Что-то пошло не так. Попробуй ещё раз.';
   }
 }

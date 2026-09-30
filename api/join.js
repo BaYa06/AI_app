@@ -47,8 +47,8 @@ function renderPage({ courseTitle, teacherName, token, error }) {
     ? `${courseTitle} — Flashly`
     : 'Приглашение в курс — Flashly';
   const description = courseTitle
-    ? `${teacherName} приглашает вас в курс «${courseTitle}»`
-    : 'Присоединяйтесь к курсу на Flashly';
+    ? `${teacherName} приглашает тебя в курс «${courseTitle}»`
+    : 'Присоединяйся к курсу на Flashly';
 
   const pwaUrl = token ? `https://ai-app-seven-zeta.vercel.app/join/${token}` : 'https://ai-app-seven-zeta.vercel.app';
   const deepLink = token ? `flashly://join/${token}` : 'flashly://';
@@ -168,7 +168,7 @@ function renderPage({ courseTitle, teacherName, token, error }) {
       <div class="badge">Приглашение в курс</div>
       <h1>${esc(courseTitle)}</h1>
       <p class="teacher">Учитель: ${esc(teacherName)}</p>
-      <p class="desc">Присоединяйтесь к курсу, чтобы изучать материалы учителя с интервальным повторением</p>
+      <p class="desc">Присоединяйся к курсу, чтобы изучать материалы учителя с интервальным повторением</p>
       <a href="https://ai-app-seven-zeta.vercel.app/?join=${esc(token)}" class="btn btn-primary">Открыть Flashly</a>
     `}
     <p class="logo">Flashly — учи слова эффективно</p>

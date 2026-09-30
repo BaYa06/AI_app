@@ -217,7 +217,7 @@ export function EmailAuthScreen({ onBack }: Props) {
                   Войти через Google
                 </Text>
                 <Text variant="body" color="secondary">
-                  Мы откроем системный браузер, вы выберете аккаунт Google, и вернётесь в приложение
+                  Мы откроем системный браузер, ты выберешь аккаунт Google и вернёшься в приложение
                   с активной сессией Supabase.
                 </Text>
               </View>
@@ -242,7 +242,7 @@ export function EmailAuthScreen({ onBack }: Props) {
               {session?.user && (
                 <View style={[styles.sessionCard, { borderColor: colors.border }]}>
                   <Text variant="body" style={{ color: colors.textPrimary }}>
-                    Вы вошли
+                    Ты вошёл
                   </Text>
                   <Text variant="bodySmall" color="secondary">
                     User ID: {session.user.id}
