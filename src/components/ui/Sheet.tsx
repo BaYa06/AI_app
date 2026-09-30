@@ -8,7 +8,7 @@
  * По фону закрываем только необязательные окна (меню, выбор); формы с вводом —
  * `dismissOnBackdrop={false}`. Контент монтируется, пока окно видно или закрывается.
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -20,6 +20,7 @@ import {
   StyleSheet,
   View,
   useWindowDimensions,
+  type LayoutChangeEvent,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
@@ -45,34 +46,53 @@ interface OverlayProps {
   style?: StyleProp<ViewStyle>;
 }
 
-/** Монтирует окно на время открытия и анимации закрытия. */
-function useOverlayAnimation(visible: boolean) {
+/**
+ * Монтирует окно на время открытия и анимации закрытия.
+ * Анимация открытия стартует только когда окно уже смонтировано и готово (`ready`),
+ * в следующем кадре: иначе таймер идёт, пока React монтирует содержимое, и первые
+ * кадры теряются — окно появляется рывком.
+ */
+function useOverlayAnimation(
+  visible: boolean,
+  ready: boolean,
+  durations: { open: number; close: number },
+) {
   const [mounted, setMounted] = useState(visible);
   const progress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (visible) {
       setMounted(true);
+      return;
+    }
+    Animated.timing(progress, {
+      toValue: 0,
+      duration: durations.close,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver,
+    }).start(({ finished }) => {
+      if (finished) setMounted(false);
+    });
+  }, [visible, progress, durations.close]);
+
+  useEffect(() => {
+    if (!visible || !mounted || !ready) return;
+    const frame = requestAnimationFrame(() => {
       Animated.timing(progress, {
         toValue: 1,
-        duration: animation.normal,
+        duration: durations.open,
         easing: Easing.out(Easing.cubic),
         useNativeDriver,
       }).start();
-    } else {
-      Animated.timing(progress, {
-        toValue: 0,
-        duration: animation.fast,
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver,
-      }).start(({ finished }) => {
-        if (finished) setMounted(false);
-      });
-    }
-  }, [visible, progress]);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [visible, mounted, ready, progress, durations.open]);
 
   return { mounted, progress };
 }
+
+const SHEET_DURATIONS = { open: animation.sheet, close: animation.normal };
+const DIALOG_DURATIONS = { open: animation.normal, close: animation.fast };
 
 function OverlayHeader({
   title,
@@ -117,11 +137,23 @@ export function Sheet({
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
-  const { mounted, progress } = useOverlayAnimation(visible);
+  // Лист уезжает на свою высоту, а не на высоту экрана: путь короче — движение ровнее.
+  // Пока высота не измерена, лист стоит за экраном и анимация не стартует.
+  const [sheetHeight, setSheetHeight] = useState(0);
+  const { mounted, progress } = useOverlayAnimation(visible, sheetHeight > 0, SHEET_DURATIONS);
+
+  useEffect(() => {
+    if (!mounted) setSheetHeight(0);
+  }, [mounted]);
+
+  const handleLayout = useCallback((e: LayoutChangeEvent) => {
+    const next = Math.ceil(e.nativeEvent.layout.height);
+    setSheetHeight((prev) => (Math.abs(prev - next) > 1 ? next : prev));
+  }, []);
 
   if (!mounted) return null;
 
-  const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [height, 0] });
+  const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [sheetHeight || height, 0] });
   const bottomPadding = Math.max(insets.bottom, spacing.m);
 
   return (
@@ -138,6 +170,7 @@ export function Sheet({
           </Animated.View>
           <Animated.View
             accessibilityViewIsModal
+            onLayout={handleLayout}
             style={[
               styles.sheet,
               { backgroundColor: colors.surface, maxHeight: height * 0.9, transform: [{ translateY }] },
@@ -188,7 +221,7 @@ export function Dialog({
 }: DialogProps) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
-  const { mounted, progress } = useOverlayAnimation(visible);
+  const { mounted, progress } = useOverlayAnimation(visible, true, DIALOG_DURATIONS);
 
   if (!mounted) return null;
 
