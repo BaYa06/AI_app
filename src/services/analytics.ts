@@ -8,8 +8,8 @@
  * Все события задокументированы — что они трекают и зачем.
  */
 
-import { analytics } from './firebase';
-import { logEvent, setUserProperties as fbSetUserProperties } from 'firebase/analytics';
+// Веб — Firebase JS SDK, iOS — @react-native-firebase/analytics (analyticsTransport.native.ts)
+import { sendEvent, sendUserProperties } from './analyticsTransport';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Типы
@@ -41,16 +41,7 @@ type HomeAction =
 // ─────────────────────────────────────────────────────────────────────────────
 
 function log(event: string, params?: Record<string, string | number | boolean>) {
-  if (!analytics) {
-    // На мобиле (React Native) analytics = null, пишем в консоль для отладки
-    if (__DEV__) console.log(`[Analytics] ${event}`, params);
-    return;
-  }
-  try {
-    logEvent(analytics, event, params);
-  } catch (e) {
-    if (__DEV__) console.warn('[Analytics] logEvent error:', e);
-  }
+  sendEvent(event, params);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -66,18 +57,13 @@ export function setAnalyticsUserProperties(props: {
   total_sets_bucket: '0' | '1-5' | '6-20' | '20+';
   has_completed_onboarding: boolean;
 }) {
-  if (!analytics) return;
-  try {
-    fbSetUserProperties(analytics, {
-      subscription_tier: props.subscription_tier,
-      app_language: props.language,
-      days_since_registration: props.days_since_registration,
-      total_sets_bucket: props.total_sets_bucket,
-      has_completed_onboarding: String(props.has_completed_onboarding),
-    });
-  } catch (e) {
-    if (__DEV__) console.warn('[Analytics] setUserProperties error:', e);
-  }
+  sendUserProperties({
+    subscription_tier: props.subscription_tier,
+    app_language: props.language,
+    days_since_registration: props.days_since_registration,
+    total_sets_bucket: props.total_sets_bucket,
+    has_completed_onboarding: String(props.has_completed_onboarding),
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
