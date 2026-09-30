@@ -167,7 +167,7 @@
 | `screens/AchievementsScreen.tsx` | 65 | Ionicons |
 | `screens/CourseLeaderboardScreen.tsx` | 42 | Ionicons |
 
-### 3.5 Экраны учителя
+### 3.5 Экраны учителя ✅
 | Файл | Нарушений | Эмодзи / Ionicons |
 |---|---|---|
 | `screens/TeacherCourseStatsScreen.tsx` | 146 | эмодзи 1 |
