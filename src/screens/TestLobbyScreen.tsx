@@ -173,7 +173,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
             Лобби теста
           </Text>
         </View>
-        <Pressable
+        <Pressable accessibilityRole="button"
           style={({ pressed }) => [
             styles.endBtn,
             {
@@ -202,7 +202,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
           </View>
           <View style={[styles.codeCardShare, { backgroundColor: alpha(colors.onPrimary, 10) }]}>
             <Text style={[styles.shareText, { color: colors.onPrimary }]}>Отправь код ученикам</Text>
-            <Pressable
+            <Pressable accessibilityRole="button"
               style={({ pressed }) => [
                 [styles.copyBtn, { backgroundColor: colors.surface }],
                 pressed && { opacity: 0.7 },
@@ -350,7 +350,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
           },
         ]}
       >
-        <Pressable
+        <Pressable accessibilityRole="button"
           style={({ pressed }) => [
             styles.ctaBtn,
             { backgroundColor: students.length === 0 || starting ? colors.textSecondary : colors.primary },

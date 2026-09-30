@@ -137,7 +137,7 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
           ) : (
             <View>
               {/* Selected value / trigger */}
-              <Pressable
+              <Pressable accessibilityRole="button" accessibilityState={{ expanded: dropdownOpen }}
                 onPress={() => setDropdownOpen(prev => !prev)}
                 style={({ pressed }) => [
                   styles.dropdownTrigger,
@@ -176,7 +176,7 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
                   {sets.map((s, idx) => {
                     const isActive = s.setId === selectedSetId;
                     return (
-                      <Pressable
+                      <Pressable accessibilityRole="button" accessibilityState={{ selected: isActive }}
                         key={s.setId}
                         onPress={() => {
                           setSelectedSetId(s.setId);
@@ -224,7 +224,7 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
               const active = testMode === m.key;
               const Icon = m.icon;
               return (
-                <Pressable
+                <Pressable accessibilityRole="button" accessibilityState={{ selected: active, disabled: !!m.disabled }}
                   key={m.key}
                   style={({ pressed }) => [
                     styles.modeCard,
@@ -338,7 +338,7 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
               {TIME_OPTIONS.map((opt) => {
                 const active = timePerQuestion === opt.value;
                 return (
-                  <Pressable
+                  <Pressable accessibilityRole="button" accessibilityState={{ selected: active }}
                     key={opt.value}
                     style={[
                       styles.timeOption,
@@ -381,7 +381,7 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
           },
         ]}
       >
-        <Pressable
+        <Pressable accessibilityRole="button"
           style={({ pressed }) => [
             styles.ctaBtn,
             { backgroundColor: !selectedSetId || creating ? colors.textSecondary : colors.primary },

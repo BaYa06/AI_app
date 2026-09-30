@@ -1893,7 +1893,7 @@ export function HomeScreen({ navigation }: any) {
               </View>
             )}
 
-            <Pressable
+            <Pressable accessibilityRole="button" accessibilityHint="Удерживай, чтобы скопировать ссылку"
               style={[styles.inviteBox, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}
               onLongPress={() => {
                 copyToClipboard(`${inviteBaseUrl}/join/${inviteToken}`);

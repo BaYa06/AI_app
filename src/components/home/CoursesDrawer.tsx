@@ -256,6 +256,13 @@ const CourseRow = memo(function CourseRow({
       ]}
       accessibilityRole="button"
       accessibilityState={{ selected: isActive }}
+      // В режиме переименования поле и кнопки внутри должны быть доступны VoiceOver —
+      // пункт перестаёт быть одной кнопкой. Иначе меню курса — действием пункта.
+      accessible={!isEditing}
+      accessibilityActions={[{ name: 'menu', label: isMenuOpen ? 'Скрыть действия курса' : 'Действия курса' }]}
+      onAccessibilityAction={(e) => {
+        if (e.nativeEvent.actionName === 'menu') onToggleMenu(course.id);
+      }}
       onPress={() => {
         if (!isEditing) {
           triggerHaptic('selection');

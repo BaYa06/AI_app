@@ -80,7 +80,7 @@ export const FlashCard = memo<FlashCardProps>(function FlashCard({
   };
 
   return (
-    <Pressable onPress={handlePress} style={styles.container}>
+    <Pressable accessibilityRole="button" accessibilityHint="Нажми, чтобы перевернуть" onPress={handlePress} style={styles.container}>
       {/* Передняя сторона */}
       <Animated.View style={[styles.card, cardStyle, frontAnimatedStyle]}>
         <View style={styles.content}>

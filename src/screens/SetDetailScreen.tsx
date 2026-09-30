@@ -902,6 +902,20 @@ export function SetDetailScreen({ navigation, route }: Props) {
   const renderCard = useCallback(
     ({ item }: { item: Card }) => (
       <Pressable
+        accessibilityRole="button"
+        // Вложенные кнопки (изменить, меню) VoiceOver внутри доступного родителя не видит —
+        // отдаём их действиями карточки (жест вверх/вниз)
+        accessibilityLabel={`${item.frontText ?? (item as any).front}. ${item.backText ?? (item as any).back}${isCardLearned(item) ? '. Выучена' : ''}`}
+        accessibilityActions={[
+          { name: 'longpress', label: 'Посмотреть' },
+          ...(isReadOnly ? [] : [{ name: 'edit', label: 'Изменить' }, { name: 'menu', label: 'Действия' }]),
+        ]}
+        onAccessibilityAction={(e) => {
+          const action = e.nativeEvent.actionName;
+          if (action === 'longpress') setPreviewCard(item);
+          else if (action === 'edit') handleEditCard(item.id);
+          else if (action === 'menu') setActionCardId(item.id);
+        }}
         onLongPress={() => {
           triggerHaptic('selection');
           setPreviewCard(item);
@@ -1023,7 +1037,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
         )}
 
         {warmup.waiting.length > 0 && (
-          <Pressable
+          <Pressable accessibilityRole="button"
             onPress={handleWarmup}
             style={[styles.warmupBanner, { backgroundColor: alpha(colors.warning, 10), borderColor: alpha(colors.warning, 40) }]}
           >
@@ -1083,7 +1097,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
               style={[styles.searchInput, { color: colors.textPrimary }, Platform.OS === 'web' && { outlineStyle: 'none' }]}
             />
           </View>
-          <Pressable
+          <Pressable accessibilityRole="button"
             accessibilityLabel="Фильтр"
             style={[
               styles.sortButton,
@@ -1101,7 +1115,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
           {!isReadOnly && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.m }}>
               {Platform.OS !== 'web' && (
-                <Pressable
+                <Pressable accessibilityRole="button"
                   onPress={() => { triggerHaptic('selection'); navigation.navigate('ImportFiles', { setId }); }}
                   hitSlop={8}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
@@ -1112,7 +1126,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                   </Text>
                 </Pressable>
               )}
-              <Pressable onPress={openAddCardSheet} hitSlop={8}>
+              <Pressable accessibilityRole="button" onPress={openAddCardSheet} hitSlop={8}>
                 <Text variant="bodySmall" style={{ color: colors.primary, fontWeight: '700' }}>
                   + Добавить
                 </Text>
@@ -1170,7 +1184,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
           },
         ]}
       >
-        <Pressable
+        <Pressable accessibilityRole="button"
           onPress={() => { triggerHaptic('selection'); openAddCardSheet(); }}
           style={[styles.secondaryAction, { borderColor: colors.border }]}
         >
@@ -1178,7 +1192,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
             Добавить карточку
           </Text>
         </Pressable>
-        <Pressable
+        <Pressable accessibilityRole="button"
           onPress={() => { triggerHaptic('selection'); setShowStudySheet(true); }}
           style={[styles.primaryAction, { backgroundColor: colors.primaryFill }]}
         >
@@ -1203,12 +1217,12 @@ export function SetDetailScreen({ navigation, route }: Props) {
               { backgroundColor: modalSurface, borderColor: modalBorder },
             ]}
           >
-            <Pressable style={styles.sheetAction} onPress={handleDeleteCard}>
+            <Pressable accessibilityRole="button" style={styles.sheetAction} onPress={handleDeleteCard}>
               <Text variant="body" style={{ color: colors.error, fontWeight: '700' }}>
                 Удалить
               </Text>
             </Pressable>
-            <Pressable style={styles.sheetAction} onPress={() => setActionCardId(null)}>
+            <Pressable accessibilityRole="button" style={styles.sheetAction} onPress={() => setActionCardId(null)}>
               <Text variant="body" style={{ color: modalTextPrimary, fontWeight: '700' }}>
                 Отмена
               </Text>
@@ -1237,7 +1251,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
               <Text variant="h3" style={{ color: modalTextPrimary }}>
                 Новая карточка
               </Text>
-              <Pressable
+              <Pressable accessibilityRole="button"
                 onPress={openImportModal}
                 style={[styles.exportButton, { backgroundColor: colors.primaryFill }]}
               >
@@ -1341,12 +1355,12 @@ export function SetDetailScreen({ navigation, route }: Props) {
             </ScrollView>
 
             <View style={styles.addActions}>
-              <Pressable style={[styles.secondaryAction, { borderColor: modalBorder }]} onPress={() => setShowAddCard(false)}>
+              <Pressable accessibilityRole="button" style={[styles.secondaryAction, { borderColor: modalBorder }]} onPress={() => setShowAddCard(false)}>
                 <Text variant="body" style={{ color: modalTextSecondary, fontWeight: '700' }}>
                   Отмена
                 </Text>
               </Pressable>
-              <Pressable
+              <Pressable accessibilityRole="button"
                 style={[
                   styles.primaryAction,
                   {
@@ -1507,7 +1521,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                 <Text variant="body" color="secondary" align="center" style={{ marginTop: spacing.xs, paddingHorizontal: spacing.l }}>
                   {importedCount === 1 ? 'Добавлена 1 карточка' : importedCount < 5 ? `Добавлено ${importedCount} карточки` : `Добавлено ${importedCount} карточек`}
                 </Text>
-                <Pressable
+                <Pressable accessibilityRole="button"
                   onPress={closeImportModal}
                   style={[styles.importSelectButton, { backgroundColor: colors.primaryFill, marginTop: spacing.l }]}
                 >
@@ -1547,7 +1561,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                   </View>
                 )}
 
-                <Pressable
+                <Pressable accessibilityRole="button"
                   onPress={triggerFileSelect}
                   style={[styles.importSelectButton, { backgroundColor: colors.primaryFill }]}
                 >
@@ -1557,7 +1571,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                   </Text>
                 </Pressable>
 
-                <Pressable
+                <Pressable accessibilityRole="button"
                   onPress={triggerImageSelect}
                   style={[styles.importSelectButton, { backgroundColor: colors.primaryFill, marginTop: spacing.s, display: 'none' }]}
                 >
@@ -1640,7 +1654,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                 </ScrollView>
 
                 <View style={styles.importPreviewActions}>
-                  <Pressable
+                  <Pressable accessibilityRole="button"
                     onPress={() => setImportStep('select')}
                     style={[styles.importCancelButton, { borderColor: colors.border }]}
                   >
@@ -1648,7 +1662,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                       Отмена
                     </Text>
                   </Pressable>
-                  <Pressable
+                  <Pressable accessibilityRole="button"
                     onPress={handleImportCards}
                     disabled={importLoading}
                     style={[
@@ -1740,7 +1754,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                   </Text>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
                     {LIBRARY_CATEGORIES.map((cat) => (
-                      <Pressable
+                      <Pressable accessibilityRole="button" accessibilityState={{ selected: publishCategory === cat.key }}
                         key={cat.key}
                         onPress={() => setPublishCategory(cat.key)}
                         style={[
@@ -1788,7 +1802,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
               </ScrollView>
 
               <View style={styles.addActions}>
-                <Pressable
+                <Pressable accessibilityRole="button"
                   style={[styles.secondaryAction, { borderColor: modalBorder }]}
                   onPress={() => !isPublishing && setShowPublishModal(false)}
                 >
@@ -1796,7 +1810,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                     Отмена
                   </Text>
                 </Pressable>
-                <Pressable
+                <Pressable accessibilityRole="button"
                   style={[
                     styles.primaryAction,
                     {
@@ -1832,7 +1846,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
         animationType="fade"
         onRequestClose={() => setPreviewCard(null)}
       >
-        <Pressable
+        <Pressable accessibilityRole="button"
           style={[styles.previewOverlay, { backgroundColor: colors.overlay }]}
           onPress={() => setPreviewCard(null)}
           accessibilityLabel="Закрыть"
@@ -1934,7 +1948,7 @@ function FilterPill({
   colors: ReturnType<typeof useThemeColors>;
 }) {
   return (
-    <Pressable
+    <Pressable accessibilityRole="button" accessibilityState={{ selected: active }}
       onPress={() => { triggerHaptic('selection'); onPress(); }}
       style={[
         styles.filterPill,

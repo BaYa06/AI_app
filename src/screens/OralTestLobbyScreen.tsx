@@ -108,7 +108,7 @@ export function OralTestLobbyScreen({ navigation, route }: Props) {
               {sets.map((set, idx) => {
                 const active = set.id === selectedSetId;
                 return (
-                  <Pressable
+                  <Pressable accessibilityRole="button" accessibilityState={{ selected: active }}
                     key={set.id}
                     onPress={() => setSelectedSetId(set.id)}
                     style={({ pressed }) => [
@@ -165,7 +165,7 @@ export function OralTestLobbyScreen({ navigation, route }: Props) {
           },
         ]}
       >
-        <Pressable
+        <Pressable accessibilityRole="button"
           style={({ pressed }) => [
             styles.ctaBtn,
             { backgroundColor: !selectedSetId ? colors.textSecondary : colors.streak },

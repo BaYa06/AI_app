@@ -623,7 +623,7 @@ export function AudioLearningScreen({ navigation, route }: Props) {
         onRequestClose={closeSettings}
       >
         <View style={styles.modalRoot}>
-          <Pressable style={styles.backdrop} onPress={closeSettings} accessibilityLabel="Закрыть настройки">
+          <Pressable accessibilityRole="button" style={styles.backdrop} onPress={closeSettings} accessibilityLabel="Закрыть настройки">
             <Animated.View
               pointerEvents="none"
               style={[styles.backdropTint, { opacity: backdropOpacity, backgroundColor: colors.overlay }]}

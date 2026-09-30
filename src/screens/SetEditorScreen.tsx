@@ -615,7 +615,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
                     </View>
                   </View>
                 ) : !showPublishForm ? (
-                  <Pressable
+                  <Pressable accessibilityRole="button"
                     onPress={() => setShowPublishForm(true)}
                     style={[styles.publishButton, { backgroundColor: alpha(colors.primary, 10), borderColor: alpha(colors.primary, 20) }]}
                   >
@@ -707,7 +707,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
             )}
 
             {isEditing && !isReadOnly && (
-              <Pressable
+              <Pressable accessibilityRole="button"
                 onPress={handleDelete}
                 style={styles.deleteLink}
                 disabled={isSaving}
@@ -766,7 +766,7 @@ function SelectPill({
   hasError?: boolean;
 }) {
   return (
-    <Pressable
+    <Pressable accessibilityRole="button" accessibilityState={{ expanded: !!isOpen }}
       onPress={onPress}
       style={[
         styles.select,
@@ -829,7 +829,7 @@ function LanguageDropdown({
           const isFirst = index === 0;
           const isLast = index === options.length - 1;
           return (
-            <Pressable
+            <Pressable accessibilityRole="button" accessibilityState={{ selected: isActive }}
               key={option}
               onPress={() => onSelect(option)}
               style={({ pressed }) => [
@@ -903,7 +903,7 @@ function CourseDropdown({
           const isFirst = index === 0;
           const isLast = index === items.length - 1;
           return (
-            <Pressable
+            <Pressable accessibilityRole="button" accessibilityState={{ selected: isActive }}
               key={course.id ?? 'none'}
               onPress={() => onSelect(course.id)}
               style={({ pressed }) => [

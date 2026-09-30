@@ -78,7 +78,7 @@ export const Button = memo<ButtonProps>(function Button({
   ].filter(Boolean) as TextStyle[];
 
   return (
-    <TouchableOpacity
+    <TouchableOpacity accessibilityRole="button"
       activeOpacity={0.7}
       disabled={isDisabled}
       onPress={handlePress}

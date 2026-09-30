@@ -144,7 +144,7 @@ export function TestHistoryScreen({ navigation, route }: Props) {
           <Text style={[styles.emptyTitle, { color: colors.textPrimary, marginTop: 12 }]}>
             {error}
           </Text>
-          <Pressable
+          <Pressable accessibilityRole="button"
             onPress={load}
             style={({ pressed }) => [
               styles.retryBtn,
@@ -177,7 +177,7 @@ export function TestHistoryScreen({ navigation, route }: Props) {
           showsVerticalScrollIndicator={false}
         >
           {items.map((item) => (
-            <Pressable
+            <Pressable accessibilityRole="button"
               key={item.sessionId}
               onPress={() =>
                 navigation.navigate('TestResultsTeacher', {

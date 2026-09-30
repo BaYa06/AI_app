@@ -610,7 +610,7 @@ export function LibraryScreen() {
                 ))}
               </View>
               {hasMoreRecent && (
-                <Pressable
+                <Pressable accessibilityRole="button"
                   style={[s.loadMoreBtn, { borderColor: alpha(colors.primary, 20) }]}
                   onPress={() => fetchMoreRecent(userId)}
                   disabled={isLoadingMore}

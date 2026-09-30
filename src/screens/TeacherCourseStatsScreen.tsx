@@ -333,7 +333,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
         showsVerticalScrollIndicator={false}
       >
         {/* Test Lobby Button */}
-        <Pressable
+        <Pressable accessibilityRole="button"
           style={({ pressed }) => [
             styles.testLobbyBtn,
             {
@@ -358,7 +358,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
         </Pressable>
 
         {/* История тестов */}
-        <Pressable
+        <Pressable accessibilityRole="button"
           style={({ pressed }) => [
             styles.testLobbyBtn,
             {
@@ -386,7 +386,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
         </Pressable>
 
         {/* Рейтинг недели (план, этап 4): места учеников, награды, включение рейтинга */}
-        <Pressable
+        <Pressable accessibilityRole="button"
           style={({ pressed }) => [
             styles.testLobbyBtn,
             {
@@ -414,7 +414,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
         </Pressable>
 
         {/* Учебники курса (каталог книг): план юнитов этой группы */}
-        <Pressable
+        <Pressable accessibilityRole="button"
           style={({ pressed }) => [
             styles.testLobbyBtn,
             {
@@ -444,7 +444,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
         {/* Metric tiles */}
         <View style={styles.metricsGrid}>
           {/* Active today */}
-          <Pressable
+          <Pressable accessibilityRole="button"
             style={[styles.metricCard, { backgroundColor: cardBg, borderColor: cardBorder }]}
             onPress={() => setStudentModal('active')}
           >
@@ -459,7 +459,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
           </Pressable>
 
           {/* Inactive 7d+ */}
-          <Pressable
+          <Pressable accessibilityRole="button"
             style={[styles.metricCard, { backgroundColor: cardBg, borderColor: cardBorder }]}
             onPress={() => setStudentModal('inactive')}
           >
@@ -479,7 +479,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
           <View style={styles.sectionRow}>
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Активность группы</Text>
             <View style={[styles.togglePill, { backgroundColor: colors.surfaceMuted }]}>
-              <Pressable
+              <Pressable accessibilityRole="button" accessibilityState={{ selected: chartPeriod === '7d' }}
                 style={[
                   styles.toggleBtn,
                   chartPeriod === '7d' && { backgroundColor: colors.background,
@@ -491,7 +491,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
                   7д
                 </Text>
               </Pressable>
-              <Pressable
+              <Pressable accessibilityRole="button" accessibilityState={{ selected: chartPeriod === '30d' }}
                 style={[
                   styles.toggleBtn,
                   chartPeriod === '30d' && { backgroundColor: colors.background,
@@ -517,7 +517,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
             <View style={{ height: CHART_HEIGHT + 20, justifyContent: 'center', alignItems: 'center', gap: 8 }}>
               <AlertTriangle size={20} color={colors.textSecondary} />
               <Text style={[styles.emptyMembers, { color: colors.textSecondary }]}>Не удалось загрузить график</Text>
-              <Pressable onPress={() => setRetryTick((t) => t + 1)}>
+              <Pressable accessibilityRole="button" onPress={() => setRetryTick((t) => t + 1)}>
                 <Text style={[styles.viewAll, { color: colors.primary }]}>Повторить</Text>
               </Pressable>
             </View>
@@ -535,7 +535,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
                       <View style={[styles.chartTooltipArrow, { borderTopColor: colors.textPrimary }]} />
                     </View>
                   )}
-                  <Pressable
+                  <Pressable accessibilityRole="button" accessibilityLabel={`${item.day}: ${item.count}`}
                     onPress={() => handleBarPress(idx, item.day, item.count)}
                     hitSlop={8}
                   >
@@ -563,7 +563,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
               Ученики{!membersLoading && ` (${members.length})`}
             </Text>
-            <Pressable onPress={() => navigation.navigate('TeacherStudents', { courseId: route.params.courseId, courseTitle: route.params.courseTitle })}>
+            <Pressable accessibilityRole="button" onPress={() => navigation.navigate('TeacherStudents', { courseId: route.params.courseId, courseTitle: route.params.courseTitle })}>
               <Text style={[styles.viewAll, { color: colors.primary }]}>Все →</Text>
             </Pressable>
           </View>
@@ -574,7 +574,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
               <Text style={[styles.emptyMembers, { color: colors.textSecondary }]}>
                 Не удалось загрузить учеников
               </Text>
-              <Pressable onPress={() => setRetryTick((t) => t + 1)}>
+              <Pressable accessibilityRole="button" onPress={() => setRetryTick((t) => t + 1)}>
                 <Text style={[styles.viewAll, { color: colors.primary }]}>Повторить</Text>
               </Pressable>
             </View>
@@ -607,7 +607,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
               <Text style={[styles.emptyMembers, { color: colors.textSecondary }]}>
                 Не удалось загрузить наборы
               </Text>
-              <Pressable onPress={() => setRetryTick((t) => t + 1)}>
+              <Pressable accessibilityRole="button" onPress={() => setRetryTick((t) => t + 1)}>
                 <Text style={[styles.viewAll, { color: colors.primary }]}>Повторить</Text>
               </Pressable>
             </View>
@@ -673,8 +673,8 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
         animationType="fade"
         onRequestClose={() => setStudentModal(null)}
       >
-        <Pressable style={[styles.modalOverlay, { backgroundColor: colors.overlay }]} onPress={() => setStudentModal(null)}>
-          <Pressable
+        <Pressable accessible={false} style={[styles.modalOverlay, { backgroundColor: colors.overlay }]} onPress={() => setStudentModal(null)}>
+          <Pressable accessible={false}
             style={[styles.modalContent, { backgroundColor: colors.surface }]}
             onPress={() => {}}
           >
@@ -747,8 +747,8 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
         animationType="slide"
         onRequestClose={() => setLobbyModal(false)}
       >
-        <Pressable style={styles.sheetOverlay} onPress={() => setLobbyModal(false)}>
-          <Pressable
+        <Pressable accessible={false} style={styles.sheetOverlay} onPress={() => setLobbyModal(false)}>
+          <Pressable accessible={false}
             style={[
               styles.sheetContent,
               {
@@ -764,7 +764,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
             </Text>
 
             {/* Exam option */}
-            <Pressable
+            <Pressable accessibilityRole="button"
               style={({ pressed }) => [
                 styles.sheetOption,
                 {
@@ -797,7 +797,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
             </Pressable>
 
             {/* Oral test option */}
-            <Pressable
+            <Pressable accessibilityRole="button"
               style={({ pressed }) => [
                 styles.sheetOption,
                 {

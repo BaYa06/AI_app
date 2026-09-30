@@ -121,6 +121,12 @@ function StudentRow({ student, colors, onPress, onRemove }: {
 
   return (
     <Pressable
+      accessibilityRole="button"
+      // «Удалить ученика» внутри строки VoiceOver не видит — даём его действием строки
+      accessibilityActions={[{ name: 'remove', label: 'Удалить ученика' }]}
+      onAccessibilityAction={(e) => {
+        if (e.nativeEvent.actionName === 'remove') onRemove();
+      }}
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,
@@ -514,7 +520,7 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
         </View>
 
         {/* Right: add button */}
-        <Pressable
+        <Pressable accessibilityRole="button"
           style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.6 }]}
           hitSlop={8}
           onPress={openInviteModal}
@@ -549,7 +555,7 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
           {FILTERS.map((f) => {
             const active = activeFilter === f.key;
             return (
-              <Pressable
+              <Pressable accessibilityRole="button" accessibilityState={{ selected: active }}
                 key={f.key}
                 onPress={() => setActiveFilter(f.key)}
                 style={[
@@ -584,7 +590,7 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
           <Text style={[styles.emptyText, { color: colors.textPrimary, marginTop: spacing.s }]}>
             Не удалось загрузить учеников
           </Text>
-          <Pressable
+          <Pressable accessibilityRole="button"
             style={[styles.retryBtn, { backgroundColor: colors.primaryFill }]}
             onPress={() => setRetryTick((t) => t + 1)}
           >
@@ -601,7 +607,7 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
                 <Text style={[styles.remindText, { color: colors.textPrimary }]}>
                   У {studentsWaiting} {studentsWaiting === 1 ? 'ученика' : 'учеников'} есть слова к повторению
                 </Text>
-                <Pressable
+                <Pressable accessibilityRole="button"
                   onPress={handleRemindAll}
                   disabled={reminding}
                   style={[styles.remindBtn, { backgroundColor: colors.primaryFill, opacity: reminding ? 0.6 : 1 }]}
@@ -644,8 +650,8 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
 
       {/* ── Invite Modal ── */}
       <Modal visible={inviteModalOpen} transparent animationType="fade" onRequestClose={() => setInviteModalOpen(false)}>
-        <Pressable style={[styles.modalOverlay, { backgroundColor: colors.overlay }]} onPress={() => setInviteModalOpen(false)}>
-          <Pressable
+        <Pressable accessible={false} style={[styles.modalOverlay, { backgroundColor: colors.overlay }]} onPress={() => setInviteModalOpen(false)}>
+          <Pressable accessible={false}
             style={[styles.inviteCard, { backgroundColor: colors.background }]}
             onPress={(e) => e.stopPropagation()}
           >
@@ -667,7 +673,7 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
                 <View style={[styles.inviteCodeBox, { backgroundColor: colors.surfaceMuted }]}>
                   <Text style={[styles.inviteCodeText, { color: colors.primary }]}>{inviteJoinCode}</Text>
                 </View>
-                <Pressable
+                <Pressable accessibilityRole="button"
                   style={[styles.inviteActionBtn, { backgroundColor: colors.primaryFill }]}
                   onPress={handleCopyInviteCode}
                 >
@@ -675,7 +681,7 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
                     {inviteCopied ? '✓ Скопировано' : 'Копировать код'}
                   </Text>
                 </Pressable>
-                <Pressable onPress={handleRegenerateInvite} style={{ marginTop: spacing.s }}>
+                <Pressable accessibilityRole="button" onPress={handleRegenerateInvite} style={{ marginTop: spacing.s }}>
                   <Text style={[styles.inviteRegenerateText, { color: colors.textSecondary }]}>
                     Обновить код приглашения
                   </Text>

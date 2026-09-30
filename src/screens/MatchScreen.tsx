@@ -420,7 +420,7 @@ export function MatchScreen({ navigation, route }: Props) {
         onRequestClose={closeSettings}
       >
         <View style={styles.modalRoot}>
-          <Pressable style={styles.backdrop} onPress={closeSettings} accessibilityLabel="Закрыть настройки">
+          <Pressable accessibilityRole="button" style={styles.backdrop} onPress={closeSettings} accessibilityLabel="Закрыть настройки">
             <Animated.View
               pointerEvents="none"
               style={[styles.backdropTint, { backgroundColor: colors.overlay, opacity: backdropOpacity }]}

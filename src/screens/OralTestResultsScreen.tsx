@@ -141,7 +141,7 @@ export function OralTestResultsScreen({ navigation, route }: Props) {
           },
         ]}
       >
-        <Pressable
+        <Pressable accessibilityRole="button"
           onPress={() =>
             navigation.replace('OralTestLobby', { courseId, courseTitle })
           }
@@ -156,7 +156,7 @@ export function OralTestResultsScreen({ navigation, route }: Props) {
           </Text>
         </Pressable>
 
-        <Pressable
+        <Pressable accessibilityRole="button"
           onPress={() => navigation.goBack()}
           style={({ pressed }) => [
             styles.primaryBtn,

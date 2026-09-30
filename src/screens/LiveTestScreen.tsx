@@ -218,7 +218,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
           Тест идёт
         </Text>
-        <Pressable
+        <Pressable accessibilityRole="button"
           style={({ pressed }) => [pressed && { opacity: 0.6 }]}
           onPress={handleEndTest}
           disabled={ending}
@@ -372,7 +372,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
           },
         ]}
       >
-        <Pressable
+        <Pressable accessibilityRole="button"
           style={({ pressed }) => [
             styles.endBtn,
             pressed && { opacity: 0.6, backgroundColor: alpha(colors.error, 10) },

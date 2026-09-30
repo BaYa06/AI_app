@@ -168,7 +168,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
           {/* Native Language */}
           <View style={s.field}>
             <Text style={[s.label, { color: colors.textTertiary }]}>Родной язык</Text>
-            <Pressable
+            <Pressable accessibilityRole="button" accessibilityState={{ expanded: showNativeLangPicker }}
               onPress={() => setShowNativeLangPicker(!showNativeLangPicker)}
               style={[s.inputWrap, { backgroundColor: inputBg, borderColor: inputBorder }]}
             >
@@ -180,7 +180,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
             {showNativeLangPicker && (
               <View style={[s.picker, { backgroundColor: colors.surface, borderColor: inputBorder }]}>
                 {TOP_LANGUAGES.map((lang) => (
-                  <Pressable
+                  <Pressable accessibilityRole="button" accessibilityState={{ selected: nativeLang === lang.code }}
                     key={lang.code}
                     style={[
                       s.pickerItem,
@@ -231,7 +231,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
                 </View>
               ))}
               {learningLangs.length < MAX_TARGET_LANGUAGES && (
-                <Pressable
+                <Pressable accessibilityRole="button" accessibilityState={{ expanded: showLearningLangPicker }}
                   style={[s.addChip, { backgroundColor: addChipBg }]}
                   onPress={() => setShowLearningLangPicker((v) => !v)}
                 >
@@ -247,7 +247,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
                 {TOP_LANGUAGES.filter((l) => l.code !== nativeLang).map((lang) => {
                   const active = learningLangs.includes(lang.code);
                   return (
-                    <Pressable
+                    <Pressable accessibilityRole="button" accessibilityState={{ selected: active }}
                       key={lang.code}
                       style={[s.pickerItem, active && { backgroundColor: alpha(colors.primary, 10) }]}
                       onPress={() => toggleLearningLang(lang.code)}

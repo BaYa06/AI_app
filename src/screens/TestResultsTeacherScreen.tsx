@@ -161,7 +161,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
         <Text style={[styles.errorText, { color: colors.textPrimary }]}>
           {error || 'Нет данных'}
         </Text>
-        <Pressable
+        <Pressable accessibilityRole="button"
           style={({ pressed }) => [
             styles.retryBtn,
             { backgroundColor: colors.primaryFill },
@@ -207,7 +207,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
           Результаты теста
         </Text>
-        <Pressable
+        <Pressable accessibilityRole="button"
           style={({ pressed }) => [
             styles.exportHeaderBtn,
             { borderColor: colors.primary },
@@ -440,7 +440,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
         ]}
       >
         <View style={styles.footerRow}>
-          <Pressable
+          <Pressable accessibilityRole="button"
             style={({ pressed }) => [
               styles.backBtn,
               { borderColor: colors.border },
@@ -450,7 +450,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
           >
             <Text style={[styles.backBtnText, { color: colors.textPrimary }]}>К курсу</Text>
           </Pressable>
-          <Pressable
+          <Pressable accessibilityRole="button"
             style={({ pressed }) => [
               styles.ctaBtn,
               { backgroundColor: colors.primaryFill },

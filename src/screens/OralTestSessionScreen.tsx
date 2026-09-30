@@ -296,7 +296,7 @@ export function OralTestSessionScreen({ navigation, route }: Props) {
 
       {/* Finish button */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        <Pressable
+        <Pressable accessibilityRole="button"
           onPress={handleEarlyExit}
           style={({ pressed }) => [
             styles.finishBtn,

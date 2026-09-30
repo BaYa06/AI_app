@@ -372,7 +372,7 @@ export function ImportFilesScreen({ navigation, route }: Props) {
 
         {/* Add button */}
         {canAdd && (
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             onPress={handleAddFiles}
             style={[styles.addBtn, { borderColor: colors.primary, backgroundColor: alpha(colors.primary, 10) }]}
             activeOpacity={0.7}
@@ -386,7 +386,7 @@ export function ImportFilesScreen({ navigation, route }: Props) {
 
         {/* Upload zone (decorative, same action) */}
         {files.length === 0 && (
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             onPress={handleAddFiles}
             style={[styles.dropZone, { borderColor: colors.border, backgroundColor: colors.surface }]}
             activeOpacity={0.7}
@@ -422,7 +422,7 @@ export function ImportFilesScreen({ navigation, route }: Props) {
           contentContainerStyle={styles.quickRow}
         >
           {QUICK_PROMPTS.map(p => (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityState={{ selected: prompt === p }}
               key={p}
               onPress={() => setPrompt(p)}
               style={[
