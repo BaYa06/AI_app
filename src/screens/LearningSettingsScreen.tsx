@@ -3,12 +3,12 @@
  * @description Настройки обучения: размер порции и обратный режим
  */
 import React, { useCallback } from 'react';
-import { View, StyleSheet, ScrollView, Pressable, Switch } from 'react-native';
+import { View, StyleSheet, Pressable } from 'react-native';
 import { useThemeColors, useSettingsStore } from '@/store';
 import { DatabaseService } from '@/services';
 import { Text } from '@/components/common';
-import { spacing, borderRadius } from '@/constants';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import { Card, Screen, ScreenHeader, Switch } from '@/components/ui';
+import { spacing, borderRadius, heights } from '@/constants';
 
 const CARD_LIMIT_OPTIONS: Array<{ value: number | null; label: string }> = [
   { value: 10, label: '10' },
@@ -19,15 +19,9 @@ const CARD_LIMIT_OPTIONS: Array<{ value: number | null; label: string }> = [
 
 export function LearningSettingsScreen({ navigation }: any) {
   const colors = useThemeColors();
-  const resolvedTheme = useSettingsStore((s) => s.resolvedTheme);
   const studyCardLimit = useSettingsStore((s) => s.settings.studyCardLimit);
   const reverseCards = useSettingsStore((s) => s.settings.reverseCards);
   const updateSettings = useSettingsStore((s) => s.updateSettings);
-  const isDark = resolvedTheme === 'dark';
-
-  const cardBg = isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF';
-  const cardBorder = isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9';
-  const chipBg = isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9';
 
   const handleSelectLimit = useCallback(
     (value: number | null) => {
@@ -46,158 +40,88 @@ export function LearningSettingsScreen({ navigation }: any) {
   );
 
   return (
-    <View style={[st.container, { backgroundColor: colors.background }]}>
-      {/* ======== Header ======== */}
-      <View style={[st.header, { backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : '#FFFFFF', borderBottomColor: cardBorder }]}>
-        <Pressable
-          style={[st.backBtn, { backgroundColor: chipBg }]}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
-        </Pressable>
-        <Text style={[st.headerTitle, { color: colors.textPrimary }]}>Настройки обучения</Text>
-        <View style={st.headerSpacer} />
-      </View>
-
-      <ScrollView
-        style={st.scroll}
-        contentContainerStyle={st.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* ======== Card Limit ======== */}
-        <Text style={[st.groupLabel, { color: colors.textTertiary }]}>Тренировка</Text>
-        <View style={[st.card, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-          <Text style={[st.cardTitle, { color: colors.textPrimary }]}>Слов за одну тренировку</Text>
-          <Text style={[st.cardHint, { color: colors.textTertiary }]}>
-            Сколько карточек в одной порции. Остальные будут в следующей.
-          </Text>
-          <View style={st.chipsRow}>
-            {CARD_LIMIT_OPTIONS.map((opt) => {
-              const active = studyCardLimit === opt.value;
-              return (
-                <Pressable
-                  key={opt.label}
-                  onPress={() => handleSelectLimit(opt.value)}
-                  style={[st.chip, { backgroundColor: active ? colors.primary : chipBg }]}
-                >
-                  <Text style={[st.chipText, { color: active ? '#FFFFFF' : colors.textPrimary }]}>
-                    {opt.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+    <Screen
+      header={<ScreenHeader title="Настройки обучения" onBack={() => navigation.goBack()} bordered />}
+      contentStyle={st.content}
+    >
+      {/* ======== Card Limit ======== */}
+      <Text variant="overline" color="secondary" style={st.groupLabel}>Тренировка</Text>
+      <Card style={st.card}>
+        <Text variant="body" style={[st.cardTitle, { color: colors.textPrimary }]}>Слов за одну тренировку</Text>
+        <Text variant="bodySmall" color="secondary" style={st.cardHint}>
+          Сколько карточек в одной порции. Остальные будут в следующей.
+        </Text>
+        <View style={st.chipsRow} accessibilityRole="radiogroup">
+          {CARD_LIMIT_OPTIONS.map((opt) => {
+            const active = studyCardLimit === opt.value;
+            return (
+              <Pressable
+                key={opt.label}
+                onPress={() => handleSelectLimit(opt.value)}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: active }}
+                style={[st.chip, { backgroundColor: active ? colors.primaryFill : colors.surfaceMuted }]}
+              >
+                <Text variant="button" style={[st.chipText, { color: active ? colors.onPrimary : colors.textPrimary }]}>
+                  {opt.label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
+      </Card>
 
-        {/* ======== Reverse ======== */}
-        <View style={[st.card, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-          <View style={st.toggleRow}>
-            <View style={st.toggleInfo}>
-              <Text style={[st.cardTitle, { color: colors.textPrimary }]}>Обратный режим</Text>
-              <Text style={[st.cardHint, { color: colors.textTertiary, marginBottom: 0 }]}>
-                Показывать перевод, а вспоминать слово
-              </Text>
-            </View>
-            <Switch
-              value={reverseCards}
-              onValueChange={handleToggleReverse}
-              trackColor={{ false: colors.border, true: colors.primary }}
-              thumbColor="#FFFFFF"
-            />
+      {/* ======== Reverse ======== */}
+      <Card style={st.card}>
+        <View style={st.toggleRow}>
+          <View style={st.toggleInfo}>
+            <Text variant="body" style={[st.cardTitle, { color: colors.textPrimary }]}>Обратный режим</Text>
+            <Text variant="bodySmall" color="secondary">
+              Показывать перевод, а вспоминать слово
+            </Text>
           </View>
+          <Switch value={reverseCards} onValueChange={handleToggleReverse} accessibilityLabel="Обратный режим" />
         </View>
-      </ScrollView>
-    </View>
+      </Card>
+    </Screen>
   );
 }
 
 // ==================== СТИЛИ ====================
 
 const st = StyleSheet.create({
-  container: {
-    flex: 1,
+  content: {
+    paddingTop: spacing.l,
   },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.s,
-    borderBottomWidth: 1,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 17,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    width: 40,
-  },
-
-  // Scroll
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: spacing.l,
-    paddingBottom: spacing.xxl + 40,
-  },
-
-  // Group label
   groupLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
-    marginBottom: spacing.s,
-    paddingHorizontal: spacing.xxs,
+    marginBottom: spacing.xs,
+    marginLeft: spacing.xxs,
   },
-
-  // Card
   card: {
-    borderRadius: borderRadius.xl,
-    borderWidth: 1,
-    padding: spacing.m,
-    marginBottom: spacing.m,
+    marginBottom: spacing.s,
   },
   cardTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: 4,
+    fontWeight: '600',
+    marginBottom: spacing.xxs,
   },
   cardHint: {
-    fontSize: 13,
-    fontWeight: '500',
     marginBottom: spacing.m,
   },
-
-  // Chips
   chipsRow: {
     flexDirection: 'row',
     gap: spacing.s,
   },
   chip: {
     flex: 1,
-    height: 44,
+    height: heights.touch,
     borderRadius: borderRadius.m,
     alignItems: 'center',
     justifyContent: 'center',
   },
   chipText: {
-    fontSize: 15,
     fontWeight: '700',
+    letterSpacing: 0,
   },
-
-  // Toggle
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',

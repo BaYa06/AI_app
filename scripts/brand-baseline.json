@@ -1,19 +1,19 @@
 {
   "totals": {
-    "hex": 513,
-    "rgba": 238,
-    "isDark": 226,
-    "font": 226,
-    "weight": 104,
-    "radius": 104,
-    "alpha": 100,
-    "alert": 21,
-    "small": 74,
+    "hex": 492,
+    "rgba": 225,
+    "isDark": 213,
+    "font": 159,
+    "weight": 66,
+    "radius": 76,
+    "alpha": 76,
+    "alert": 15,
+    "small": 54,
     "emoji": 30,
-    "ion": 21,
-    "a11y": 48,
+    "ion": 18,
+    "a11y": 45,
     "en": 23,
-    "total": 1532
+    "total": 1322
   },
   "files": {
     "src/screens/TeacherCourseStatsScreen.tsx": {
@@ -40,19 +40,6 @@
       "emoji": 2,
       "a11y": 3,
       "total": 91
-    },
-    "src/screens/StatisticsScreen.tsx": {
-      "hex": 28,
-      "rgba": 12,
-      "isDark": 13,
-      "font": 16,
-      "weight": 12,
-      "radius": 6,
-      "alpha": 3,
-      "small": 10,
-      "ion": 1,
-      "a11y": 1,
-      "total": 90
     },
     "src/screens/TestResultsTeacherScreen.tsx": {
       "hex": 32,
@@ -91,19 +78,6 @@
       "a11y": 1,
       "total": 73
     },
-    "src/screens/AchievementsScreen.tsx": {
-      "hex": 19,
-      "rgba": 12,
-      "isDark": 15,
-      "font": 9,
-      "weight": 4,
-      "radius": 3,
-      "alpha": 3,
-      "small": 3,
-      "ion": 1,
-      "a11y": 1,
-      "total": 65
-    },
     "src/screens/ExamLobbyScreen.tsx": {
       "hex": 17,
       "rgba": 14,
@@ -128,6 +102,14 @@
       "emoji": 1,
       "a11y": 1,
       "total": 58
+    },
+    "src/screens/StatisticsScreen.tsx": {
+      "hex": 28,
+      "rgba": 12,
+      "isDark": 13,
+      "ion": 1,
+      "a11y": 1,
+      "total": 53
     },
     "src/screens/SubscriptionScreen.tsx": {
       "hex": 21,
@@ -156,18 +138,13 @@
       "en": 11,
       "total": 50
     },
-    "src/screens/ProfileScreen.tsx": {
-      "hex": 9,
-      "rgba": 6,
-      "isDark": 6,
-      "font": 10,
-      "weight": 5,
-      "radius": 2,
-      "alpha": 9,
-      "alert": 1,
-      "small": 4,
+    "src/screens/AchievementsScreen.tsx": {
+      "hex": 19,
+      "rgba": 12,
+      "isDark": 15,
       "ion": 1,
-      "total": 48
+      "a11y": 1,
+      "total": 46
     },
     "src/screens/TestJoinScreen.tsx": {
       "hex": 14,
@@ -182,17 +159,6 @@
       "a11y": 1,
       "total": 46
     },
-    "src/screens/CourseLeaderboardScreen.tsx": {
-      "hex": 13,
-      "rgba": 2,
-      "isDark": 3,
-      "font": 11,
-      "weight": 4,
-      "radius": 9,
-      "alpha": 2,
-      "ion": 1,
-      "total": 44
-    },
     "src/screens/TestWaitingScreen.tsx": {
       "hex": 13,
       "rgba": 4,
@@ -204,33 +170,6 @@
       "emoji": 1,
       "a11y": 1,
       "total": 44
-    },
-    "src/screens/NotificationSettingsScreen.tsx": {
-      "hex": 13,
-      "rgba": 7,
-      "isDark": 7,
-      "font": 6,
-      "weight": 5,
-      "radius": 3,
-      "alpha": 1,
-      "alert": 1,
-      "small": 1,
-      "ion": 1,
-      "a11y": 3,
-      "total": 43
-    },
-    "src/screens/PersonalInfoScreen.tsx": {
-      "hex": 12,
-      "rgba": 6,
-      "isDark": 8,
-      "font": 4,
-      "weight": 2,
-      "radius": 1,
-      "alpha": 5,
-      "alert": 5,
-      "small": 1,
-      "a11y": 2,
-      "total": 43
     },
     "src/screens/TestDoneScreen.tsx": {
       "hex": 13,
@@ -298,18 +237,22 @@
       "emoji": 1,
       "total": 30
     },
-    "src/screens/FeedbackScreen.tsx": {
-      "hex": 8,
-      "rgba": 4,
-      "isDark": 4,
-      "font": 4,
-      "weight": 4,
-      "radius": 2,
-      "alpha": 1,
-      "alert": 1,
+    "src/screens/PersonalInfoScreen.tsx": {
+      "hex": 12,
+      "rgba": 6,
+      "isDark": 8,
+      "font": 1,
+      "alert": 2,
+      "a11y": 2,
+      "total": 29
+    },
+    "src/screens/NotificationSettingsScreen.tsx": {
+      "hex": 13,
+      "rgba": 7,
+      "isDark": 7,
       "ion": 1,
-      "a11y": 1,
-      "total": 28
+      "a11y": 3,
+      "total": 27
     },
     "src/screens/StudyPlaceholderScreen.tsx": {
       "hex": 5,
@@ -342,28 +285,19 @@
       "a11y": 2,
       "total": 22
     },
-    "src/screens/SoundSettingsScreen.tsx": {
-      "hex": 7,
-      "rgba": 5,
-      "isDark": 5,
-      "font": 3,
-      "weight": 1,
-      "radius": 1,
+    "src/screens/ProfileScreen.tsx": {
+      "hex": 9,
+      "rgba": 6,
+      "isDark": 6,
       "ion": 1,
-      "a11y": 1,
-      "total": 22
-    },
-    "src/screens/LearningSettingsScreen.tsx": {
-      "hex": 6,
-      "rgba": 4,
-      "isDark": 4,
-      "font": 5,
-      "weight": 1,
-      "radius": 1,
-      "small": 1,
-      "ion": 1,
-      "a11y": 1,
       "total": 21
+    },
+    "src/screens/CourseLeaderboardScreen.tsx": {
+      "hex": 13,
+      "rgba": 2,
+      "isDark": 3,
+      "ion": 1,
+      "total": 18
     },
     "src/components/common/NotificationPrompt.tsx": {
       "hex": 3,
