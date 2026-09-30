@@ -8,28 +8,29 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
-  TextInput,
   Platform,
   ActivityIndicator,
   Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Text } from '@/components/common';
-import { useThemeColors, useSettingsStore, useLibraryStore } from '@/store';
+import { useThemeColors, useLibraryStore } from '@/store';
+import { spacing, borderRadius, heights, iconSize, screenPadding, LIBRARY_CATEGORIES, LIBRARY_LANGUAGES, CARD_COUNT_RANGES, LIBRARY_SORT_OPTIONS, getCategoryLabel, getLanguageDef, formatCount, formatRelativeTime, alpha } from '@/constants';
 import {
-  spacing,
-  borderRadius,
-  LIBRARY_CATEGORIES,
-  LIBRARY_LANGUAGES,
-  CARD_COUNT_RANGES,
-  LIBRARY_SORT_OPTIONS,
-  getCategoryLabel,
-  getLanguageDef,
-  formatCount,
-  formatRelativeTime,
-} from '@/constants';
-import { Search, ArrowDownUp } from 'lucide-react-native';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+  Search,
+  ArrowDownUp,
+  Star,
+  Layers,
+  Download,
+  Heart,
+  CheckCircle2,
+  BookOpen,
+  Library,
+  Flame,
+  Sparkles,
+} from 'lucide-react-native';
+import { Badge, CategoryIcon, EmptyState, ErrorState, SkeletonCard, TextField, type IconComponent } from '@/components/ui';
+import { pluralize } from '@/utils';
 import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'react-native-svg';
 import { supabase } from '@/services/supabaseClient';
 import { BookService } from '@/services/BookService';
@@ -69,6 +70,39 @@ function FadeEdge({ side, bgColor }: { side: 'left' | 'right'; bgColor: string }
 
 // ---- Memoized Card Components ----
 
+/** Звезда «Рекомендуем» в углу иконки набора */
+function FeaturedBadge({ colors }: { colors: ReturnType<typeof useThemeColors> }) {
+  return (
+    <View
+      accessible
+      accessibilityLabel="Рекомендуем"
+      style={[s.verifiedBadge, { backgroundColor: colors.primaryFill, borderColor: colors.surface }]}
+    >
+      <Star size={10} color={colors.onPrimary} fill={colors.onPrimary} />
+    </View>
+  );
+}
+
+/** Заголовок раздела: иконка lucide вместо эмодзи (📚 🔍 🔥 ⭐ ✨) */
+function SectionTitle({
+  icon: Icon,
+  title,
+  color,
+  colors,
+}: {
+  icon: IconComponent;
+  title: string;
+  color: string;
+  colors: ReturnType<typeof useThemeColors>;
+}) {
+  return (
+    <View style={s.sectionTitleRow}>
+      <Icon size={iconSize.s} color={color} />
+      <Text variant="h3" accessibilityRole="header" style={{ color: colors.textPrimary }}>{title}</Text>
+    </View>
+  );
+}
+
 const HorizontalCard = memo(function HorizontalCard({
   item,
   colors,
@@ -88,54 +122,57 @@ const HorizontalCard = memo(function HorizontalCard({
     : null;
 
   return (
-    <Pressable onPress={onPress} style={[s.hCard, fullWidth && { width: '100%' }, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        s.hCard,
+        fullWidth && { width: '100%' },
+        { backgroundColor: colors.surface, borderColor: colors.border },
+        pressed && s.pressed,
+      ]}
+    >
       <View style={s.hCardTop}>
-        <View style={[s.hCardIcon, { backgroundColor: colors.primary + '15' }]}>
-          <Text style={s.hCardEmoji}>{item.cover_emoji || '📚'}</Text>
-          {item.is_featured && (
-            <View style={[s.verifiedBadge, { backgroundColor: colors.primary, borderColor: colors.surface }]}>
-              <Ionicons name="star" size={9} color="#FFFFFF" />
-            </View>
-          )}
+        <View style={[s.hCardIcon, { backgroundColor: alpha(colors.primary, 10) }]}>
+          {/* Иконка категории вместо эмодзи обложки (брендбук, раздел 6) */}
+          <CategoryIcon category={item.category} size="m" />
+          {item.is_featured && <FeaturedBadge colors={colors} />}
         </View>
         {avgRating !== null && (
-          <View style={s.ratingBadge}>
-            <Ionicons name="star" size={12} color="#CA8A04" />
-            <Text style={s.ratingText}>{avgRating}</Text>
+          <View style={[s.ratingBadge, { backgroundColor: alpha(colors.star, 10) }]}>
+            <Star size={iconSize.xs} color={colors.star} fill={colors.star} />
+            <Text variant="caption" style={[s.bold, { color: colors.warningText }]}>{avgRating}</Text>
           </View>
         )}
       </View>
 
-      <View style={{ gap: 2 }}>
-        <Text style={[s.hCardTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+      <View style={s.hCardText}>
+        <Text variant="body" style={[s.semibold, { color: colors.textPrimary }]} numberOfLines={1}>
           {item.title}
         </Text>
-        <Text style={[s.hCardMeta, { color: colors.textTertiary }]} numberOfLines={1}>
+        <Text variant="caption" color="secondary" numberOfLines={1}>
           {item.author_name || 'Автор неизвестен'}{langDef ? ` • ${langDef.flag} ${langDef.label}` : ''}
         </Text>
       </View>
 
       <View style={s.hCardStats}>
         <View style={s.statItem}>
-          <Ionicons name="layers-outline" size={14} color={colors.textTertiary} />
-          <Text style={[s.statText, { color: colors.textTertiary }]}>{item.cards_count} карт</Text>
+          <Layers size={iconSize.xs} color={colors.textTertiary} />
+          <Text variant="caption" color="secondary">
+            {item.cards_count} {pluralize(item.cards_count, 'карточка', 'карточки', 'карточек')}
+          </Text>
         </View>
         <View style={s.statItem}>
-          <Ionicons name="download-outline" size={14} color={colors.textTertiary} />
-          <Text style={[s.statText, { color: colors.textTertiary }]}>{formatCount(item.imports_count)}</Text>
+          <Download size={iconSize.xs} color={colors.textTertiary} />
+          <Text variant="caption" color="secondary">{formatCount(item.imports_count)}</Text>
         </View>
-        <View style={[s.statItem, { marginLeft: 'auto' }]}>
-          <Ionicons name="heart" size={14} color="#EC4899" />
-          <Text style={[s.statText, { color: colors.textTertiary }]}>{formatCount(item.likes_count)}</Text>
+        <View style={[s.statItem, s.statPushRight]}>
+          <Heart size={iconSize.xs} color={colors.like} fill={colors.like} />
+          <Text variant="caption" color="secondary">{formatCount(item.likes_count)}</Text>
         </View>
       </View>
 
-      {item.is_imported && (
-        <View style={[s.importedBadge, { backgroundColor: '#10B981' + '15' }]}>
-          <Ionicons name="checkmark-circle" size={14} color="#10B981" />
-          <Text style={[s.importedText, { color: '#10B981' }]}>Импортировано</Text>
-        </View>
-      )}
+      {item.is_imported && <Badge label="Импортировано" tone="success" icon={CheckCircle2} />}
     </Pressable>
   );
 });
@@ -150,33 +187,33 @@ const RecentCard = memo(function RecentCard({
   onPress?: () => void;
 }) {
   return (
-    <Pressable onPress={onPress} style={[s.rCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <View style={[s.rCardIcon, { backgroundColor: colors.primary + '15' }]}>
-        <Text style={s.rCardEmoji}>{item.cover_emoji || '📚'}</Text>
-        {item.is_featured && (
-          <View style={[s.verifiedBadge, { backgroundColor: colors.primary, borderColor: colors.surface }]}>
-            <Ionicons name="star" size={9} color="#FFFFFF" />
-          </View>
-        )}
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [s.rCard, { backgroundColor: colors.surface, borderColor: colors.border }, pressed && s.pressed]}
+    >
+      <View style={[s.rCardIcon, { backgroundColor: alpha(colors.primary, 10) }]}>
+        <CategoryIcon category={item.category} size="m" />
+        {item.is_featured && <FeaturedBadge colors={colors} />}
       </View>
       <View style={s.rCardBody}>
-        <Text style={[s.rCardTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+        <Text variant="body" style={[s.semibold, { color: colors.textPrimary }]} numberOfLines={1}>
           {item.title}
         </Text>
         <View style={s.rCardMetaRow}>
-          {item.category && (
-            <View style={[s.categoryBadge, { backgroundColor: colors.primary + '0D' }]}>
-              <Text style={[s.categoryText, { color: colors.primary }]}>{getCategoryLabel(item.category)}</Text>
-            </View>
-          )}
-          <Text style={[s.rCardAuthor, { color: colors.textTertiary }]}>{item.author_name || 'Автор неизвестен'}</Text>
+          {item.category && <Badge label={getCategoryLabel(item.category)} tone="primary" />}
+          <Text variant="caption" color="secondary" numberOfLines={1} style={s.flexShrink}>
+            {item.author_name || 'Автор неизвестен'}
+          </Text>
         </View>
       </View>
       <View style={s.rCardRight}>
-        <Text style={[s.rCardCards, { color: colors.textSecondary }]}>{item.cards_count} карт</Text>
-        <Text style={[s.rCardTime, { color: colors.textTertiary }]}>{formatRelativeTime(item.published_at)}</Text>
+        <Text variant="caption" style={[s.bold, { color: colors.textSecondary }]}>
+          {item.cards_count} {pluralize(item.cards_count, 'карточка', 'карточки', 'карточек')}
+        </Text>
+        <Text variant="caption" style={{ color: colors.textTertiary }}>{formatRelativeTime(item.published_at)}</Text>
         {item.is_imported && (
-          <Ionicons name="checkmark-circle" size={16} color="#10B981" style={{ marginTop: 2 }} />
+          <CheckCircle2 size={iconSize.xs} color={colors.successText} accessibilityLabel="Импортировано" />
         )}
       </View>
     </Pressable>
@@ -195,25 +232,27 @@ const BookCard = memo(function BookCard({
   const cover = getBookCover(book.subject);
   const meta = formatBookMeta(book);
   return (
-    <Pressable onPress={onPress} style={[s.bCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <View style={[s.bCardCover, { backgroundColor: cover.color + '1A' }]}>
-        <Text style={s.bCardEmoji}>{cover.emoji}</Text>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [s.bCard, { backgroundColor: colors.surface, borderColor: colors.border }, pressed && s.pressed]}
+    >
+      <View style={[s.bCardCover, { backgroundColor: alpha(cover.color, 10) }]}>
+        <cover.icon size={iconSize.xl} color={cover.color} />
       </View>
-      <Text style={[s.bCardTitle, { color: colors.textPrimary }]} numberOfLines={2}>
+      <Text variant="label" style={[s.bCardTitle, { color: colors.textPrimary }]} numberOfLines={2}>
         {book.title}
       </Text>
       {meta ? (
-        <Text style={[s.hCardMeta, { color: colors.textTertiary }]} numberOfLines={1}>{meta}</Text>
+        <Text variant="caption" color="secondary" numberOfLines={1}>{meta}</Text>
       ) : null}
       <View style={s.statItem}>
-        <Ionicons name="book-outline" size={14} color={colors.textTertiary} />
-        <Text style={[s.statText, { color: colors.textTertiary }]}>{book.unitsCount} юнитов</Text>
+        <BookOpen size={iconSize.xs} color={colors.textTertiary} />
+        <Text variant="caption" color="secondary">
+          {book.unitsCount} {pluralize(book.unitsCount, 'юнит', 'юнита', 'юнитов')}
+        </Text>
       </View>
-      {!book.isPublished && (
-        <View style={[s.importedBadge, { backgroundColor: '#F59E0B1A' }]}>
-          <Text style={[s.importedText, { color: '#B45309' }]}>Черновик</Text>
-        </View>
-      )}
+      {!book.isPublished && <Badge label="Черновик" tone="warning" />}
     </Pressable>
   );
 });
@@ -223,8 +262,6 @@ const BookCard = memo(function BookCard({
 export function LibraryScreen() {
   const navigation = useNavigation();
   const colors = useThemeColors();
-  const resolvedTheme = useSettingsStore((s) => s.resolvedTheme);
-  const isDark = resolvedTheme === 'dark';
 
   const {
     trendingSets,
@@ -349,24 +386,22 @@ export function LibraryScreen() {
   return (
     <View style={[s.container, { backgroundColor: colors.background }]}>
       {/* Search Row */}
-      <View style={[s.header, { backgroundColor: isDark ? colors.background : '#FFFFFF', borderBottomColor: 'transparent' }]}>
+      <View style={[s.header, { backgroundColor: colors.background }]}>
         <View style={s.searchRow}>
-          <View style={[s.searchWrap, { backgroundColor: colors.primary + '0A' }]}>
-            <Search size={18} color={colors.primary} />
-            <TextInput
-              style={[
-                s.searchInput,
-                { color: colors.textPrimary },
-                Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
-              ]}
-              placeholder="Поиск наборов или @ник автора..."
-              placeholderTextColor={colors.textTertiary}
-              value={searchText}
-              onChangeText={onSearchChange}
-            />
-          </View>
+          <TextField
+            variant="search"
+            icon={Search}
+            placeholder="Поиск наборов или @ник автора..."
+            accessibilityLabel="Поиск наборов"
+            value={searchText}
+            onChangeText={onSearchChange}
+            style={s.flex1}
+            inputStyle={Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : undefined}
+          />
           <Pressable
-            style={[s.sortBtn, { backgroundColor: colors.primary + '15' }]}
+            accessibilityRole="button"
+            accessibilityLabel="Сортировка"
+            style={({ pressed }) => [s.sortBtn, { backgroundColor: colors.surfaceMuted }, pressed && s.pressed]}
             onPress={() => {
               Alert.alert(
                 'Сортировка',
@@ -381,32 +416,34 @@ export function LibraryScreen() {
               );
             }}
           >
-            <ArrowDownUp size={20} color={colors.primary} />
+            <ArrowDownUp size={iconSize.s} color={colors.primary} />
           </Pressable>
         </View>
       </View>
 
       {/* Filter Chips */}
-      <View style={[s.filtersContainer, { backgroundColor: isDark ? colors.background : '#FFFFFF', borderBottomColor: colors.border }]}>
+      <View style={[s.filtersContainer, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         {/* Category Chips */}
         <View style={{ position: 'relative' }}>
-          <FadeEdge side="left" bgColor={isDark ? colors.background : '#FFFFFF'} />
-          <FadeEdge side="right" bgColor={isDark ? colors.background : '#FFFFFF'} />
+          <FadeEdge side="left" bgColor={colors.background} />
+          <FadeEdge side="right" bgColor={colors.background} />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipsRow}>
             {LIBRARY_CATEGORIES.map((cat) => {
               const isActive = activeCategory === cat.key;
               return (
                 <Pressable
                   key={cat.key}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isActive }}
                   style={[
                     s.chip,
                     isActive
-                      ? { backgroundColor: colors.primary }
-                      : { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 },
+                      ? { backgroundColor: colors.primaryFill, borderColor: colors.primaryFill }
+                      : { backgroundColor: colors.surface, borderColor: colors.border },
                   ]}
                   onPress={() => onCategoryPress(cat.key)}
                 >
-                  <Text style={[s.chipText, { color: isActive ? '#FFFFFF' : colors.textPrimary }]}>
+                  <Text variant="label" style={{ color: isActive ? colors.onPrimary : colors.textPrimary }}>
                     {cat.label}
                   </Text>
                 </Pressable>
@@ -417,43 +454,47 @@ export function LibraryScreen() {
 
         {/* Language + Card count Chips */}
         <View style={{ position: 'relative' }}>
-          <FadeEdge side="left" bgColor={isDark ? colors.background : '#FFFFFF'} />
-          <FadeEdge side="right" bgColor={isDark ? colors.background : '#FFFFFF'} />
+          <FadeEdge side="left" bgColor={colors.background} />
+          <FadeEdge side="right" bgColor={colors.background} />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipsRow}>
             {LIBRARY_LANGUAGES.map((lang) => {
               const isActive = activeLang === lang.key;
               return (
                 <Pressable
                   key={lang.key}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isActive }}
                   style={[
                     s.langChip,
                     isActive
-                      ? { backgroundColor: colors.primary + '15', borderColor: colors.primary }
+                      ? { backgroundColor: alpha(colors.primary, 10), borderColor: colors.primary }
                       : { backgroundColor: colors.surface, borderColor: colors.border },
                   ]}
                   onPress={() => onLangPress(lang.key)}
                 >
-                  <Text style={s.langFlag}>{lang.flag}</Text>
-                  <Text style={[s.langLabel, { color: isActive ? colors.primary : colors.textPrimary }]}>{lang.label}</Text>
+                  <Text variant="caption">{lang.flag}</Text>
+                  <Text variant="caption" style={[s.semibold, { color: isActive ? colors.primary : colors.textPrimary }]}>{lang.label}</Text>
                 </Pressable>
               );
             })}
-            <View style={s.chipSeparator} />
+            <View style={[s.chipSeparator, { backgroundColor: colors.border }]} />
             {CARD_COUNT_RANGES.map((range) => {
               const isActive = activeCardCount === range.key;
               return (
                 <Pressable
                   key={range.key}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isActive }}
                   style={[
                     s.langChip,
                     isActive
-                      ? { backgroundColor: colors.primary + '15', borderColor: colors.primary }
+                      ? { backgroundColor: alpha(colors.primary, 10), borderColor: colors.primary }
                       : { backgroundColor: colors.surface, borderColor: colors.border },
                   ]}
                   onPress={() => onCardCountPress(range.key)}
                 >
-                  <Ionicons name="layers-outline" size={14} color={isActive ? colors.primary : colors.textSecondary} />
-                  <Text style={[s.langLabel, { color: isActive ? colors.primary : colors.textPrimary }]}>{range.label}</Text>
+                  <Layers size={iconSize.xs} color={isActive ? colors.primary : colors.textSecondary} />
+                  <Text variant="caption" style={[s.semibold, { color: isActive ? colors.primary : colors.textPrimary }]}>{range.label}</Text>
                 </Pressable>
               );
             })}
@@ -463,33 +504,34 @@ export function LibraryScreen() {
 
       {/* Content */}
       {isLoading && nothingToShow ? (
-        <View style={s.centerContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[s.loadingText, { color: colors.textTertiary }]}>Загрузка библиотеки...</Text>
+        // Заготовки в форме карточек вместо спиннера (брендбук, 7.8)
+        <View style={s.skeletons} accessibilityLabel="Загрузка библиотеки" accessibilityRole="progressbar">
+          <SkeletonCard height={160} />
+          <SkeletonCard height={88} />
+          <SkeletonCard height={88} />
+          <SkeletonCard height={88} />
         </View>
       ) : error && nothingToShow ? (
-        <View style={s.centerContainer}>
-          <Ionicons name="cloud-offline-outline" size={48} color={colors.textTertiary} />
-          <Text style={[s.emptyTitle, { color: colors.textPrimary }]}>Ошибка загрузки</Text>
-          <Text style={[s.emptySubtitle, { color: colors.textTertiary }]}>{error}</Text>
-          <Pressable style={[s.retryBtn, { backgroundColor: colors.primary }]} onPress={() => fetchAllSections(userId)}>
-            <Text style={s.retryBtnText}>Попробовать снова</Text>
-          </Pressable>
-        </View>
+        <ErrorState
+          title="Ошибка загрузки"
+          description={error}
+          retryLabel="Попробовать снова"
+          onRetry={() => fetchAllSections(userId)}
+        />
       ) : nothingToShow ? (
-        <View style={s.centerContainer}>
-          <Ionicons name="search-outline" size={48} color={colors.textTertiary} />
-          <Text style={[s.emptyTitle, { color: colors.textPrimary }]}>Ничего не найдено</Text>
-          <Text style={[s.emptySubtitle, { color: colors.textTertiary }]}>Попробуйте изменить фильтры или поисковый запрос</Text>
-        </View>
+        <EmptyState
+          icon={Search}
+          title="Ничего не найдено"
+          description="Попробуй изменить фильтры или поисковый запрос"
+        />
       ) : isSearchActive ? (
         /* Search Results - vertical grid with HorizontalCard design */
         <ScrollView style={s.content} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
           {matchingBooks.length > 0 && (
             <View style={s.section}>
               <View style={s.sectionHeader}>
-                <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>📚 Учебники</Text>
-                <Text style={[s.searchCount, { color: colors.textTertiary }]}>{matchingBooks.length}</Text>
+                <SectionTitle icon={Library} title="Учебники" color={colors.primary} colors={colors} />
+                <Text variant="label" color="secondary">{matchingBooks.length}</Text>
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hScroll}>
                 {matchingBooks.map((book) => (
@@ -501,8 +543,8 @@ export function LibraryScreen() {
           {searchResults.length > 0 && (
             <View style={s.section}>
               <View style={s.sectionHeader}>
-                <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>🔍 Результаты поиска</Text>
-                <Text style={[s.searchCount, { color: colors.textTertiary }]}>{searchResults.length}</Text>
+                <SectionTitle icon={Search} title="Результаты поиска" color={colors.primary} colors={colors} />
+                <Text variant="label" color="secondary">{searchResults.length}</Text>
               </View>
               <View style={s.searchGrid}>
                 {searchResults.map((item) => (
@@ -518,7 +560,7 @@ export function LibraryScreen() {
           {books.length > 0 && (
             <View style={s.section}>
               <View style={s.sectionHeader}>
-                <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>📚 Учебники</Text>
+                <SectionTitle icon={Library} title="Учебники" color={colors.primary} colors={colors} />
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hScroll}>
                 {books.map((book) => (
@@ -532,7 +574,7 @@ export function LibraryScreen() {
           {trendingSets.length > 0 && (
             <View style={s.section}>
               <View style={s.sectionHeader}>
-                <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>🔥 Популярные наборы</Text>
+                <SectionTitle icon={Flame} title="Популярные наборы" color={colors.streak} colors={colors} />
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hScroll}>
                 {trendingSets.map((item) => (
@@ -546,7 +588,7 @@ export function LibraryScreen() {
           {topRatedSets.length > 0 && (
             <View style={s.section}>
               <View style={s.sectionHeader}>
-                <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>⭐ Лучшие по рейтингу</Text>
+                <SectionTitle icon={Star} title="Лучшие по рейтингу" color={colors.star} colors={colors} />
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hScroll}>
                 {topRatedSets.map((item) => (
@@ -560,7 +602,7 @@ export function LibraryScreen() {
           {recentSets.length > 0 && (
             <View style={s.section}>
               <View style={s.sectionHeader}>
-                <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>✨ Недавно добавленные</Text>
+                <SectionTitle icon={Sparkles} title="Недавно добавленные" color={colors.primary} colors={colors} />
               </View>
               <View style={s.recentList}>
                 {recentSets.map((item) => (
@@ -569,14 +611,14 @@ export function LibraryScreen() {
               </View>
               {hasMoreRecent && (
                 <Pressable
-                  style={[s.loadMoreBtn, { borderColor: colors.primary + '33' }]}
+                  style={[s.loadMoreBtn, { borderColor: alpha(colors.primary, 20) }]}
                   onPress={() => fetchMoreRecent(userId)}
                   disabled={isLoadingMore}
                 >
                   {isLoadingMore ? (
                     <ActivityIndicator size="small" color={colors.primary} />
                   ) : (
-                    <Text style={[s.loadMoreText, { color: colors.primary }]}>Показать ещё</Text>
+                    <Text variant="label" style={{ color: colors.primary }}>Показать ещё</Text>
                   )}
                 </Pressable>
               )}
@@ -592,64 +634,44 @@ export function LibraryScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1 },
-  header: { paddingHorizontal: spacing.m, paddingTop: spacing.m, paddingBottom: spacing.xs, gap: spacing.xs },
+  flex1: { flex: 1 },
+  flexShrink: { flexShrink: 1 },
+  semibold: { fontWeight: '600' },
+  bold: { fontWeight: '700' },
+  pressed: { opacity: 0.85 },
+  header: { paddingHorizontal: screenPadding, paddingTop: spacing.m, paddingBottom: spacing.xs, gap: spacing.xs },
   filtersContainer: { paddingBottom: spacing.xs, borderBottomWidth: 1, gap: spacing.xs },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, marginBottom: spacing.xs },
-  searchWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingHorizontal: spacing.s, paddingVertical: spacing.s, borderRadius: borderRadius.l },
-  searchInput: { flex: 1, fontSize: 14, fontWeight: '500', padding: 0, margin: 0 },
-  sortBtn: { width: 44, height: 44, borderRadius: borderRadius.l, alignItems: 'center', justifyContent: 'center' },
-  chipsRow: { flexDirection: 'row', gap: spacing.xs, paddingVertical: spacing.xxs },
-  chip: { paddingHorizontal: 18, paddingVertical: spacing.xs, borderRadius: borderRadius.full },
-  chipText: { fontSize: 13, fontWeight: '600' },
-  langChip: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.s, paddingVertical: 6, borderRadius: borderRadius.full, borderWidth: 1 },
-  langFlag: { fontSize: 12 },
-  langLabel: { fontSize: 12, fontWeight: '600' },
-  chipSeparator: { width: 1, height: 24, backgroundColor: '#D1D5DB', marginHorizontal: spacing.xs, alignSelf: 'center', opacity: 0.4 },
+  sortBtn: { width: heights.input, height: heights.input, borderRadius: borderRadius.m, alignItems: 'center', justifyContent: 'center' },
+  chipsRow: { flexDirection: 'row', gap: spacing.xs, paddingVertical: spacing.xxs, paddingHorizontal: screenPadding },
+  chip: { minHeight: 36, justifyContent: 'center', paddingHorizontal: spacing.m, borderRadius: borderRadius.full, borderWidth: 1 },
+  langChip: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, minHeight: 32, paddingHorizontal: spacing.s, borderRadius: borderRadius.full, borderWidth: 1 },
+  chipSeparator: { width: 1, height: 24, marginHorizontal: spacing.xs, alignSelf: 'center' },
   content: { flex: 1 },
   scrollContent: { paddingTop: spacing.m, paddingBottom: spacing.xxl },
+  skeletons: { padding: screenPadding, gap: spacing.s },
   section: { marginBottom: spacing.l },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.m, marginBottom: spacing.s },
-  sectionTitle: { fontSize: 18, fontWeight: '700' },
-  hScroll: { paddingHorizontal: spacing.m, gap: spacing.s },
-  searchGrid: { paddingHorizontal: spacing.m, gap: spacing.s },
-  searchCount: { fontSize: 14, fontWeight: '600' },
-  bCard: { width: 150, padding: spacing.m, borderRadius: borderRadius.xl, borderWidth: 1, gap: spacing.xs },
-  bCardCover: { width: '100%', height: 88, borderRadius: borderRadius.l, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xxs },
-  bCardEmoji: { fontSize: 40 },
-  bCardTitle: { fontSize: 14, fontWeight: '700', lineHeight: 18, minHeight: 36 },
-  hCard: { width: 260, padding: spacing.m, borderRadius: borderRadius.xl, borderWidth: 1, gap: spacing.s },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: screenPadding, marginBottom: spacing.s },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  hScroll: { paddingHorizontal: screenPadding, gap: spacing.s },
+  searchGrid: { paddingHorizontal: screenPadding, gap: spacing.s },
+  bCard: { width: 150, padding: spacing.m, borderRadius: borderRadius.l, borderWidth: 1, gap: spacing.xs },
+  bCardCover: { width: '100%', height: 88, borderRadius: borderRadius.m, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xxs },
+  bCardTitle: { minHeight: 40 },
+  hCard: { width: 260, padding: spacing.m, borderRadius: borderRadius.l, borderWidth: 1, gap: spacing.s },
   hCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  hCardIcon: { width: 48, height: 48, borderRadius: borderRadius.l, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  hCardEmoji: { fontSize: 24 },
-  ratingBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(250, 204, 21, 0.1)', paddingHorizontal: spacing.xs, paddingVertical: 3, borderRadius: borderRadius.s },
-  ratingText: { fontSize: 11, fontWeight: '800', color: '#CA8A04' },
-  hCardTitle: { fontSize: 16, fontWeight: '700', lineHeight: 20 },
-  hCardMeta: { fontSize: 11, fontWeight: '500' },
+  hCardIcon: { width: 48, height: 48, borderRadius: borderRadius.m, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  hCardText: { gap: spacing.xxs / 2 },
+  ratingBadge: { flexDirection: 'row', alignItems: 'center', gap: spacing.xxs, paddingHorizontal: spacing.xs, paddingVertical: spacing.xxs / 2, borderRadius: borderRadius.s },
   hCardStats: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, marginTop: spacing.xxs },
-  statItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  statText: { fontSize: 11, fontWeight: '500' },
-  importedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: borderRadius.s },
-  verifiedBadge: { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5 },
-  importedText: { fontSize: 10, fontWeight: '700' },
-  recentList: { paddingHorizontal: spacing.m, gap: spacing.s },
-  rCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, padding: spacing.m, borderRadius: borderRadius.xl, borderWidth: 1 },
-  rCardIcon: { width: 52, height: 52, borderRadius: borderRadius.l, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  rCardEmoji: { fontSize: 24 },
-  rCardBody: { flex: 1, gap: 4 },
-  rCardTitle: { fontSize: 15, fontWeight: '700' },
+  statItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.xxs },
+  statPushRight: { marginLeft: 'auto' },
+  verifiedBadge: { position: 'absolute', top: -spacing.xxs, right: -spacing.xxs, width: 18, height: 18, borderRadius: borderRadius.full, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5 },
+  recentList: { paddingHorizontal: screenPadding, gap: spacing.s },
+  rCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, padding: spacing.m, borderRadius: borderRadius.l, borderWidth: 1 },
+  rCardIcon: { width: 52, height: 52, borderRadius: borderRadius.m, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  rCardBody: { flex: 1, gap: spacing.xxs },
   rCardMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  categoryBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: borderRadius.xs },
-  categoryText: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
-  rCardAuthor: { fontSize: 11, fontWeight: '500' },
-  rCardRight: { alignItems: 'flex-end', gap: 2 },
-  rCardCards: { fontSize: 12, fontWeight: '700' },
-  rCardTime: { fontSize: 10, fontWeight: '500' },
-  centerContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.s, paddingHorizontal: spacing.xl },
-  loadingText: { fontSize: 14, fontWeight: '500', marginTop: spacing.s },
-  emptyTitle: { fontSize: 18, fontWeight: '700', textAlign: 'center' },
-  emptySubtitle: { fontSize: 14, fontWeight: '500', textAlign: 'center', lineHeight: 20 },
-  retryBtn: { paddingHorizontal: spacing.l, paddingVertical: spacing.s, borderRadius: borderRadius.l, marginTop: spacing.s },
-  retryBtnText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
-  loadMoreBtn: { marginHorizontal: spacing.m, marginTop: spacing.m, paddingVertical: spacing.m, borderRadius: borderRadius.l, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  loadMoreText: { fontSize: 14, fontWeight: '700' },
+  rCardRight: { alignItems: 'flex-end', gap: spacing.xxs / 2 },
+  loadMoreBtn: { marginHorizontal: screenPadding, marginTop: spacing.m, minHeight: heights.button, borderRadius: borderRadius.m, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
 });
