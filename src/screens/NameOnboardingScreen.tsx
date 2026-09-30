@@ -17,9 +17,7 @@ export function NameOnboardingScreen({ onContinue, onSkip }: Props) {
 
   return (
     <OnboardingStep
-      progressLabel="Шаг 1 из 6"
-      progressValue="17% завершено"
-      progress={17}
+      step={1}
       headline="Как к тебе обращаться?"
       description="Персонализируй опыт. Можно пропустить и изменить позже в настройках."
       keyboard

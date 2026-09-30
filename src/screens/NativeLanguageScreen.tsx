@@ -21,9 +21,7 @@ export function NativeLanguageScreen({ onContinue, onBack }: Props) {
     <OnboardingStep
       onBack={onBack}
       title="Flashly"
-      progressLabel="Шаг 3 из 6"
-      progressValue="50%"
-      progress={50}
+      step={3}
       headline="Какой язык родной?"
       description="Переводы слов будут показываться на этом языке."
       footer={<Button title="Продолжить" onPress={() => onContinue?.(selected)} fullWidth />}

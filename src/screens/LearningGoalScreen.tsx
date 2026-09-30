@@ -39,9 +39,7 @@ export function LearningGoalScreen({ onContinue, onBack }: Props) {
     <OnboardingStep
       onBack={onBack}
       title="Flashly"
-      progressLabel="Шаг 5 из 6"
-      progressValue="83%"
-      progress={83}
+      step={5}
       headline="Зачем ты учишь?"
       description="Мы персонализируем карточки под твои цели."
       footer={

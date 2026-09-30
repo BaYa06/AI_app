@@ -16,13 +16,10 @@ import { screenPadding, spacing } from '@/constants';
 export interface OnboardingStepProps {
   /** Есть — показываем шапку с кнопкой «назад». */
   onBack?: () => void;
-  /** Заголовок шапки («Flashly», «Шаг 6 из 6»). */
+  /** Заголовок шапки («Flashly»). */
   title?: string;
-  /** Подписи над полосой прогресса: слева (primary) и справа (secondary). */
-  progressLabel: string;
-  progressValue: string;
-  /** 0–100 */
-  progress: number;
+  /** Номер шага 1…ONBOARDING_STEPS — по нему считаются подпись «Шаг N из 6» и процент. */
+  step: number;
   headline: string;
   description?: string;
   /** Выравнивание заголовка и пояснения. */
@@ -34,12 +31,16 @@ export interface OnboardingStepProps {
   footer?: React.ReactNode;
 }
 
+/**
+ * Шагов у ученика и учителя одинаково: имя → роль → родной язык → изучаемые языки →
+ * (ученик: цель → дневная норма | учитель: предмет → размер группы).
+ */
+export const ONBOARDING_STEPS = 6;
+
 export function OnboardingStep({
   onBack,
   title,
-  progressLabel,
-  progressValue,
-  progress,
+  step,
   headline,
   description,
   align = 'left',
@@ -50,6 +51,8 @@ export function OnboardingStep({
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const hasHeader = !!onBack || !!title;
+  const progress = Math.round((step / ONBOARDING_STEPS) * 100);
+  const progressLabel = `Шаг ${step} из ${ONBOARDING_STEPS}`;
 
   const body = (
     <>
@@ -93,7 +96,7 @@ export function OnboardingStep({
             {progressLabel}
           </Text>
           <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
-            {progressValue}
+            {progress}%
           </Text>
         </View>
         <ProgressBar progress={progress} animated={false} accessibilityLabel={progressLabel} />

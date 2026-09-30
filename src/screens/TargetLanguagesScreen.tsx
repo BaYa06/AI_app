@@ -40,9 +40,7 @@ export function TargetLanguagesScreen({ nativeLanguage, onContinue, onBack }: Pr
     <OnboardingStep
       onBack={onBack}
       title="Flashly"
-      progressLabel="Шаг 4 из 6"
-      progressValue="67%"
-      progress={67}
+      step={4}
       headline="Какие языки хочешь учить?"
       description="Выбери от 1 до 3 языков — можно изменить позже в настройках."
       footer={

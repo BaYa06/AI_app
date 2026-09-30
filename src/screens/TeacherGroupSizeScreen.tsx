@@ -38,10 +38,8 @@ export function TeacherGroupSizeScreen({ onContinue, onBack }: Props) {
   return (
     <OnboardingStep
       onBack={onBack}
-      title="Шаг 6 из 6"
-      progressLabel="Прогресс онбординга"
-      progressValue="4 / 4"
-      progress={100}
+      title="Flashly"
+      step={6}
       headline="Сколько у тебя учеников?"
       description="Это поможет нам подобрать оптимальные инструменты."
       align="center"

@@ -34,9 +34,7 @@ export function RoleSelectionScreen({ onContinue, onBack }: Props) {
     <OnboardingStep
       onBack={onBack}
       title="Flashly"
-      progressLabel="Шаг 2 из 6"
-      progressValue="33%"
-      progress={33}
+      step={2}
       headline="Кто ты?"
       description="Это поможет нам настроить приложение под тебя."
       footer={<Button title="Продолжить" onPress={() => onContinue?.(selected)} fullWidth />}

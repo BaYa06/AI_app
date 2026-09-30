@@ -37,10 +37,8 @@ export function DailyGoalScreen({ onContinue, onBack }: Props) {
   return (
     <OnboardingStep
       onBack={onBack}
-      title="Шаг 6 из 6"
-      progressLabel="Прогресс онбординга"
-      progressValue="4 / 4"
-      progress={100}
+      title="Flashly"
+      step={6}
       headline="Установи дневную цель"
       description="Сколько новых слов хочешь учить каждый день?"
       align="center"
