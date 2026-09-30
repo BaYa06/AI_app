@@ -6,7 +6,7 @@
  * Без edition ищется книга с пустым изданием.
  */
 
-import { connect } from './lib/db';
+import { connect, describeError } from './lib/db';
 
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
@@ -54,6 +54,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  console.error(`❌ ${error instanceof Error ? error.message : String(error)}`);
+  console.error(`❌ ${describeError(error)}`);
   process.exit(1);
 });

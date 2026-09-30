@@ -17,8 +17,7 @@
 import fs from 'fs';
 import path from 'path';
 import readline from 'readline/promises';
-import type { Client } from 'pg';
-import { connect, getAdminUserId } from './lib/db';
+import { connect, describeError, getAdminUserId, type Db } from './lib/db';
 import { normalizeTerm, parseBookWorkbook, type ParsedBook, type ParsedUnit } from './lib/bookExcel';
 
 interface Args {
@@ -68,7 +67,7 @@ function parseArgs(argv: string[]): Args {
   };
 }
 
-async function upsertBook(db: Client, book: ParsedBook, stats: Stats): Promise<string> {
+async function upsertBook(db: Db, book: ParsedBook, stats: Stats): Promise<string> {
   const existing = await db.query<{
     id: string; level: string | null; subject: string | null; language_from: string;
     language_to: string; publisher: string | null; is_published: boolean;
@@ -105,7 +104,7 @@ async function upsertBook(db: Client, book: ParsedBook, stats: Stats): Promise<s
   return row.id;
 }
 
-async function upsertUnit(db: Client, bookId: string, unit: ParsedUnit, sortOrder: number, stats: Stats): Promise<string> {
+async function upsertUnit(db: Db, bookId: string, unit: ParsedUnit, sortOrder: number, stats: Stats): Promise<string> {
   const existing = await db.query<{ id: string; title: string; pages: string | null; sort_order: number }>(
     'SELECT id, title, pages, sort_order FROM book_units WHERE book_id = $1 AND number = $2',
     [bookId, unit.number],
@@ -132,7 +131,7 @@ async function upsertUnit(db: Client, bookId: string, unit: ParsedUnit, sortOrde
 
 /** Официальный набор юнита. На старте 1 юнит = 1 набор: берём самый ранний, если их несколько. */
 async function upsertOfficialSet(
-  db: Client, unitId: string, unit: ParsedUnit, book: ParsedBook, adminUserId: string,
+  db: Db, unitId: string, unit: ParsedUnit, book: ParsedBook, adminUserId: string,
 ): Promise<string> {
   const title = `Unit ${unit.number} — ${unit.title}`;
   const existing = await db.query<{ id: string; title: string; language_from: string | null; language_to: string | null }>(
@@ -159,7 +158,7 @@ async function upsertOfficialSet(
   return row.id;
 }
 
-async function syncCards(db: Client, setId: string, unit: ParsedUnit, stats: Stats): Promise<void> {
+async function syncCards(db: Db, setId: string, unit: ParsedUnit, stats: Stats): Promise<void> {
   const existing = await db.query<{ id: string; front: string; back: string; example: string | null; sort_order: number | null }>(
     'SELECT id, front, back, example, sort_order FROM cards WHERE set_id = $1 ORDER BY sort_order NULLS LAST, created_at',
     [setId],
@@ -238,7 +237,7 @@ async function confirm(question: string): Promise<boolean> {
   }
 }
 
-async function prune(db: Client, stats: Stats, dryRun: boolean): Promise<void> {
+async function prune(db: Db, stats: Stats, dryRun: boolean): Promise<void> {
   if (stats.missing.length === 0) return;
   const ids = stats.missing.map((m) => m.id);
   const progress = await db.query<{ users: string; rows: string }>(
@@ -373,6 +372,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  console.error(`\n❌ Импорт прерван, изменения откатены: ${error instanceof Error ? error.message : String(error)}`);
+  console.error(`\n❌ Импорт прерван, изменения откатены: ${describeError(error)}`);
   process.exit(1);
 });
