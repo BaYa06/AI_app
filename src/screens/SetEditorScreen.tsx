@@ -13,7 +13,7 @@ import {
   Animated,
   Platform,
 } from 'react-native';
-import { useSetsStore, useCardsStore, useThemeColors, useSettingsStore, useCoursesStore } from '@/store';
+import { useSetsStore, useCardsStore, useThemeColors, useCoursesStore } from '@/store';
 import { Text } from '@/components/common';
 import { spacing, borderRadius, iconSize, TOP_LANGUAGES, alpha } from '@/constants';
 import { Button, CategoryIcon, toast, useScreenBottomInset } from '@/components/ui';
@@ -59,7 +59,6 @@ export function SetEditorScreen({ navigation, route }: Props) {
   const { setId } = route.params || {};
   const colors = useThemeColors();
   const bottomInset = useScreenBottomInset();
-  const theme = useSettingsStore((s) => s.resolvedTheme);
   const isEditing = !!setId;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(16)).current;
