@@ -443,7 +443,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
 
               {titleError ? (
                 <Text variant="caption" color="error" style={styles.helperText}>
-                  Введите название
+                  Введи название
                 </Text>
               ) : (
                 <Text variant="caption" color="tertiary" style={styles.helperText}>
@@ -543,7 +543,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
                 </View>
               </View>
               <Text variant="caption" color={languageError ? 'error' : 'tertiary'} style={styles.helperText}>
-                {languageError ? 'Выберите оба языка' : 'Выберите язык слов и язык перевода'}
+                {languageError ? 'Выбери оба языка' : 'Выбери язык слов и язык перевода'}
               </Text>
             </View>
 
@@ -575,7 +575,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
                 )}
               </View>
               <Text variant="caption" color="tertiary" style={styles.helperText}>
-                Организуйте наборы по курсам для удобного управления
+                Организуй наборы по курсам для удобного управления
               </Text>
             </View>
 

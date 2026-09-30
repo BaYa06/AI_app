@@ -14,7 +14,6 @@ import {
 import { Text, Container } from '@/components/common';
 import { useThemeColors, useSettingsStore, useLibraryStore, useSetsStore, useCardsStore, useCoursesStore } from '@/store';
 import { ChooseCourseSheet } from '@/components/library/ChooseCourseSheet';
-import { showMessage } from '@/utils/dialogs';
 import { spacing, borderRadius, heights, iconSize, getCategoryLabel, getLanguageDef, formatCount, formatRelativeTime, alpha } from '@/constants';
 import { Button, CategoryIcon, ScreenHeader, toast, useScreenBottomInset } from '@/components/ui';
 import { v4 as uuid } from 'uuid';
@@ -153,9 +152,9 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
       DatabaseService.saveCards();
 
       setChooseCourseVisible(false);
-      showMessage('Готово!', 'Набор сохранён на устройстве');
+      toast.success('Набор сохранён на устройстве');
     } catch (err) {
-      showMessage('Ошибка', describeError(err, 'Не удалось импортировать набор'));
+      toast.error(describeError(err, 'Не удалось импортировать набор'));
     } finally {
       setImporting(false);
     }
@@ -171,11 +170,11 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
       await importSet(userId, currentSet.id, courseId);
       setChooseCourseVisible(false);
       const course = courseId ? ownCourses.find((c) => c.id === courseId) : undefined;
-      showMessage('Готово!', course ? `Набор добавлен в «${course.title}»` : 'Набор добавлен на главный экран');
+      toast.success(course ? `Набор добавлен в «${course.title}»` : 'Набор добавлен на главный экран');
       // Reload user data so the set appears
       DatabaseService.loadAll().catch(() => {});
     } catch (err) {
-      showMessage('Ошибка', describeError(err, 'Не удалось импортировать набор'));
+      toast.error(describeError(err, 'Не удалось импортировать набор'));
     } finally {
       setImporting(false);
     }

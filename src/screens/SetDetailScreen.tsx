@@ -5,19 +5,20 @@
 import { isCardLearned, isCardWaitingReview } from '@/services/SRSService';
 import React, { useCallback, useMemo, useState, useRef, useEffect } from 'react';
 import { shallow } from 'zustand/shallow';
-import { View, FlatList, StyleSheet, Pressable, TextInput, ScrollView, ActivityIndicator, Platform, Alert, KeyboardAvoidingView, Modal, Dimensions } from 'react-native';
+import { View, FlatList, StyleSheet, Pressable, TextInput, ScrollView, ActivityIndicator, Platform, KeyboardAvoidingView, Modal, Dimensions } from 'react-native';
 import { triggerHaptic } from '@/utils/haptic';
 import { BlurView } from '@/utils/BlurView';
 import DocumentPicker from 'react-native-document-picker';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useSetsStore, useCardsStore, useThemeColors, selectSetStats, useSettingsStore, useCoursesStore, isSetInCourse } from '@/store';
-import { Container, Text, ProgressBar, Loading, Button } from '@/components/common';
+import { Container, Text, ProgressBar, Loading } from '@/components/common';
 import { StudyModeSheet, type StudyMode } from '@/components/study/StudyModeSheet';
-import { spacing, borderRadius } from '@/constants';
+import { spacing, borderRadius, iconSize, alpha } from '@/constants';
+import { EmptyState, toast } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card, CreateCardInput } from '@/types';
 import { DatabaseService, LibraryService, Analytics, NeonService, BookService } from '@/services';
-import { confirmAction, showMessage } from '@/utils/dialogs';
+import { confirmAction } from '@/utils/dialogs';
 import { apiService } from '@/services/ApiService';
 import { supabase } from '@/services/supabaseClient';
 import { LIBRARY_CATEGORIES } from '@/constants/library';
@@ -39,6 +40,7 @@ import {
   X,
   Image as ImageIcon,
   BookOpen,
+  Layers,
 } from 'lucide-react-native';
 import { describeError } from '@/utils/userErrors';
 
@@ -112,13 +114,14 @@ export function SetDetailScreen({ navigation, route }: Props) {
     return { progress, dueCount };
   }, [set]);
 
-  const backdropColor = 'rgba(0,0,0,0.35)';
-  const modalSurface = theme === 'dark' ? 'rgb(32, 34, 44)' : colors.surface;
-  const modalBorder = theme === 'dark' ? 'rgba(255,255,255,0.08)' : colors.border;
-  const modalTextPrimary = theme === 'dark' ? '#F8FAFC' : colors.textPrimary;
-  const modalTextSecondary = theme === 'dark' ? '#A8B3C1' : colors.textSecondary;
-  const modalPlaceholder = theme === 'dark' ? '#94A3B8' : colors.textTertiary;
-  const modalInputBg = theme === 'dark' ? 'rgba(255,255,255,0.04)' : colors.surface;
+  // Окна и листы — токены: в тёмной теме surface теперь сплошной (брендбук, 2.3)
+  const backdropColor = colors.overlay;
+  const modalSurface = colors.surface;
+  const modalBorder = colors.border;
+  const modalTextPrimary = colors.textPrimary;
+  const modalTextSecondary = colors.textSecondary;
+  const modalPlaceholder = colors.textTertiary;
+  const modalInputBg = colors.surface;
 
   const filteredCards = useMemo(() => {
     const getFront = (card: Card) => card.frontText ?? (card as any).front ?? '';
@@ -417,7 +420,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
         const parsedCards = parseTSV(content);
 
         if (parsedCards.length === 0) {
-          setImportError('Не удалось найти карточки в файле. Проверьте формат TSV (слово[TAB]перевод)');
+          setImportError('Не удалось найти карточки в файле. Проверь формат TSV (слово[TAB]перевод)');
           setImportStep('select');
         } else {
           setImportedCards(parsedCards);
@@ -441,7 +444,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
         const parsedCards = await apiService.extractPdfCards(base64);
 
         if (parsedCards.length === 0) {
-          setImportError('Не удалось найти карточки в PDF. Убедитесь, что файл содержит список слов в формате "слово – перевод".');
+          setImportError('Не удалось найти карточки в PDF. Убедись, что файл содержит список слов в формате "слово – перевод".');
           setImportStep('select');
         } else {
           setImportedCards(parsedCards);
@@ -449,7 +452,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
         }
       }
     } catch (error) {
-      setImportError(isPdf ? 'Ошибка при обработке PDF. Попробуйте ещё раз.' : 'Ошибка при чтении файла');
+      setImportError(isPdf ? 'Ошибка при обработке PDF. Попробуй ещё раз.' : 'Ошибка при чтении файла');
       setImportStep('select');
     } finally {
       setImportLoading(false);
@@ -504,7 +507,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
           const parsedCards = parseTSV(content);
 
           if (parsedCards.length === 0) {
-            setImportError('Не удалось найти карточки в файле. Проверьте формат TSV (слово[TAB]перевод)');
+            setImportError('Не удалось найти карточки в файле. Проверь формат TSV (слово[TAB]перевод)');
             setImportStep('select');
           } else {
             setImportedCards(parsedCards);
@@ -519,7 +522,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
           const parsedCards = await apiService.extractPdfCards(base64);
 
           if (parsedCards.length === 0) {
-            setImportError('Не удалось найти карточки в PDF. Убедитесь, что файл содержит список слов в формате "слово – перевод".');
+            setImportError('Не удалось найти карточки в PDF. Убедись, что файл содержит список слов в формате "слово – перевод".');
             setImportStep('select');
           } else {
             setImportedCards(parsedCards);
@@ -527,7 +530,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
           }
         }
       } catch (error) {
-        setImportError(isPdf ? 'Ошибка при обработке PDF. Попробуйте ещё раз.' : 'Ошибка при чтении файла');
+        setImportError(isPdf ? 'Ошибка при обработке PDF. Попробуй ещё раз.' : 'Ошибка при чтении файла');
         setImportStep('select');
       } finally {
         setImportLoading(false);
@@ -543,7 +546,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
   // Process extracted image cards: translate empty backs, then show preview
   const processImageCards = useCallback(async (parsedCards: Array<{ front: string; back: string }>) => {
     if (parsedCards.length === 0) {
-      setImportError('Не удалось найти слова на фото. Попробуйте другое изображение.');
+      setImportError('Не удалось найти слова на фото. Попробуй другое изображение.');
       setImportStep('select');
       setImportLoading(false);
       return;
@@ -606,7 +609,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
       const parsedCards = await apiService.extractImageCards(base64, file.type, set?.languageFrom, set?.languageTo);
       await processImageCards(parsedCards);
     } catch (error) {
-      setImportError('Ошибка при обработке фото. Попробуйте ещё раз.');
+      setImportError('Ошибка при обработке фото. Попробуй ещё раз.');
       setImportStep('select');
       setImportLoading(false);
     } finally {
@@ -657,7 +660,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
         const parsedCards = await apiService.extractImageCards(base64, mimeType, set?.languageFrom, set?.languageTo);
         await processImageCards(parsedCards);
       } catch (error) {
-        setImportError('Ошибка при обработке фото. Попробуйте ещё раз.');
+        setImportError('Ошибка при обработке фото. Попробуй ещё раз.');
         setImportStep('select');
         setImportLoading(false);
       }
@@ -792,7 +795,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
     if (!ok) return;
     const result = await BookService.forkSet(setId);
     if (!result.ok) {
-      showMessage('Не удалось сделать копию', describeError(result.error, 'Попробуй ещё раз.'));
+      toast.error(`Не удалось сделать копию. ${describeError(result.error, 'Попробуй ещё раз.')}`);
       return;
     }
     const { newSetId } = result.data;
@@ -803,7 +806,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
     ]);
     const newSet = ownSets.find((x) => x.id === newSetId);
     if (!newSet) {
-      showMessage('Копия создана', 'Она появится в ваших наборах после обновления.');
+      toast.success('Копия создана — она появится в твоих наборах после обновления');
       return;
     }
     useSetsStore.getState().mergeSets([newSet]);
@@ -867,14 +870,14 @@ export function SetDetailScreen({ navigation, route }: Props) {
 
   const handlePublish = useCallback(async () => {
     if (!publishCategory) {
-      Alert.alert('Выберите категорию');
+      toast.info('Выбери категорию');
       return;
     }
     setIsPublishing(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user?.id) {
-        Alert.alert('Ошибка', 'Необходимо войти в аккаунт');
+        toast.error('Нужно войти в аккаунт');
         return;
       }
       const tags = publishTags.split(',').map(t => t.trim()).filter(Boolean);
@@ -887,9 +890,9 @@ export function SetDetailScreen({ navigation, route }: Props) {
       setIsPublished(true);
       setLibrarySetId(result.librarySetId);
       setShowPublishModal(false);
-      Alert.alert('Успех', 'Набор успешно опубликован!');
+      toast.success('Набор опубликован в библиотеке');
     } catch (e: any) {
-      Alert.alert('Ошибка', describeError(e, 'Не удалось опубликовать'));
+      toast.error(describeError(e, 'Не удалось опубликовать'));
     } finally {
       setIsPublishing(false);
     }
@@ -919,17 +922,17 @@ export function SetDetailScreen({ navigation, route }: Props) {
               {
                 backgroundColor:
                   isCardLearned(item)
-                    ? 'rgba(16, 185, 129, 0.15)'
-                    : 'rgba(148, 163, 184, 0.15)',
+                    ? alpha(colors.success, 10)
+                    : colors.surfaceMuted,
                 borderColor:
                   isCardLearned(item)
-                    ? 'rgba(16, 185, 129, 0.3)'
+                    ? alpha(colors.success, 40)
                     : colors.border,
               },
             ]}
           >
             {isCardLearned(item) ? (
-              <Check size={16} color={colors.success} strokeWidth={2.5} />
+              <Check size={iconSize.xs} color={colors.successText} strokeWidth={2.5} />
             ) : (
               <Circle size={14} color={colors.textTertiary} strokeWidth={2} />
             )}
@@ -940,8 +943,10 @@ export function SetDetailScreen({ navigation, route }: Props) {
               onPress={() => handleEditCard(item.id)}
               hitSlop={8}
               style={styles.iconButton}
+              accessibilityRole="button"
+              accessibilityLabel="Изменить карточку"
             >
-              <Edit3 size={18} color={colors.textSecondary} />
+              <Edit3 size={iconSize.s} color={colors.textSecondary} />
             </Pressable>
           )}
         </View>
@@ -959,8 +964,14 @@ export function SetDetailScreen({ navigation, route }: Props) {
         </Text>
 
         {!isReadOnly && (
-          <Pressable hitSlop={8} style={styles.menuButton} onPress={() => setActionCardId(item.id)}>
-            <MoreHorizontal size={18} color={colors.textTertiary} />
+          <Pressable
+            hitSlop={8}
+            style={styles.menuButton}
+            onPress={() => setActionCardId(item.id)}
+            accessibilityRole="button"
+            accessibilityLabel="Действия с карточкой"
+          >
+            <MoreHorizontal size={iconSize.s} color={colors.textTertiary} />
           </Pressable>
         )}
       </Pressable>
@@ -975,8 +986,14 @@ export function SetDetailScreen({ navigation, route }: Props) {
     () => (
       <View style={styles.header}>
         <View style={[styles.topBar, { borderBottomColor: colors.border }]}>
-          <Pressable onPress={() => navigation.goBack()} hitSlop={10} style={styles.topIcon}>
-            <ArrowLeft size={20} color={colors.textPrimary} />
+          <Pressable
+            onPress={() => navigation.goBack()}
+            hitSlop={10}
+            style={styles.topIcon}
+            accessibilityRole="button"
+            accessibilityLabel="Назад"
+          >
+            <ArrowLeft size={iconSize.m} color={colors.textPrimary} />
           </Pressable>
           <Text
             variant="body"
@@ -985,13 +1002,19 @@ export function SetDetailScreen({ navigation, route }: Props) {
           >
             {set?.title || 'Набор'}
           </Text>
-          <Pressable onPress={handleSetMenu} hitSlop={10} style={styles.topIcon}>
-            <MoreHorizontal size={22} color={colors.textPrimary} />
+          <Pressable
+            onPress={handleSetMenu}
+            hitSlop={10}
+            style={styles.topIcon}
+            accessibilityRole="button"
+            accessibilityLabel="Действия с набором"
+          >
+            <MoreHorizontal size={iconSize.m} color={colors.textPrimary} />
           </Pressable>
         </View>
 
         {set?.isOfficial && (
-          <View style={[styles.officialBadge, { backgroundColor: colors.primary + '12' }]}>
+          <View style={[styles.officialBadge, { backgroundColor: alpha(colors.primary, 10) }]}>
             <BookOpen size={14} color={colors.primary} />
             <Text style={[styles.officialBadgeText, { color: colors.primary }]} numberOfLines={1}>
               По учебнику{set.bookTitle ? ` · ${set.bookTitle}` : ''}
@@ -1002,7 +1025,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
         {warmup.waiting.length > 0 && (
           <Pressable
             onPress={handleWarmup}
-            style={[styles.warmupBanner, { backgroundColor: colors.warning + '18', borderColor: colors.warning + '55' }]}
+            style={[styles.warmupBanner, { backgroundColor: alpha(colors.warning, 10), borderColor: alpha(colors.warning, 40) }]}
           >
             <View style={{ flex: 1 }}>
               <Text style={[styles.warmupTitle, { color: colors.textPrimary }]}>
@@ -1061,6 +1084,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
             />
           </View>
           <Pressable
+            accessibilityLabel="Фильтр"
             style={[
               styles.sortButton,
               { backgroundColor: colors.surface, borderColor: colors.border, display: 'none' },
@@ -1104,20 +1128,12 @@ export function SetDetailScreen({ navigation, route }: Props) {
   // Пустой список
   const ListEmpty = useMemo(
     () => (
-      <View style={styles.emptyState}>
-        <Text style={styles.emptyIcon}>🃏</Text>
-        <Text variant="body" color="secondary" align="center">
-          {isReadOnly ? 'Учитель пока не добавил карточки' : 'Пока нет карточек'}
-        </Text>
-        {!isReadOnly && (
-          <Button
-            title="Добавить карточку"
-            variant="outline"
-            onPress={openAddCardSheet}
-            style={styles.emptyButton}
-          />
-        )}
-      </View>
+      <EmptyState
+        icon={Layers}
+        compact
+        title={isReadOnly ? 'Учитель пока не добавил карточки' : 'Пока нет карточек'}
+        secondaryAction={!isReadOnly ? { label: 'Добавить карточку', onPress: openAddCardSheet } : undefined}
+      />
     ),
     [openAddCardSheet, isReadOnly]
   );
@@ -1150,7 +1166,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
           styles.bottomBar,
           {
             borderTopColor: colors.border,
-            backgroundColor: theme === 'dark' ? 'rgb(16, 17, 34)' : colors.surface,
+            backgroundColor: colors.surface,
           },
         ]}
       >
@@ -1386,8 +1402,14 @@ export function SetDetailScreen({ navigation, route }: Props) {
             ]}
           >
             <View style={styles.importTopBar}>
-              <Pressable onPress={closeImportModal} hitSlop={10} style={styles.topIcon}>
-                <ArrowLeft size={20} color={modalTextPrimary} />
+              <Pressable
+                onPress={closeImportModal}
+                hitSlop={10}
+                style={styles.topIcon}
+                accessibilityRole="button"
+                accessibilityLabel="Назад"
+              >
+                <ArrowLeft size={iconSize.m} color={modalTextPrimary} />
               </Pressable>
               <Text variant="body" style={[styles.importTitle, { color: modalTextPrimary }]}>
                 {importStep === 'done' ? 'Готово!' : importStep === 'preview' ? `Импорт (${importedCards.length} карточек)` : importStep === 'generating' ? 'Генерация примеров...' : importStep === 'translating' ? 'Перевод слов...' : importStep === 'extracting' ? (importSource === 'image' ? 'Обработка фото...' : 'Обработка PDF...') : 'Импорт из файла'}
@@ -1428,7 +1450,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
             {/* Generating Examples State */}
             {importStep === 'generating' && (
               <View style={styles.importLoadingContainer}>
-                <View style={[styles.importHeroIcon, { backgroundColor: `${colors.primary}1A` }]}>
+                <View style={[styles.importHeroIcon, { backgroundColor: alpha(colors.primary, 10) }]}>
                   <Sparkles size={36} color={colors.primary} />
                 </View>
                 <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '600', marginTop: spacing.m }}>
@@ -1444,7 +1466,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
             {/* Extracting PDF State */}
             {importStep === 'extracting' && (
               <View style={styles.importLoadingContainer}>
-                <View style={[styles.importHeroIcon, { backgroundColor: `${colors.primary}1A` }]}>
+                <View style={[styles.importHeroIcon, { backgroundColor: alpha(colors.primary, 10) }]}>
                   {importSource === 'image' ? <ImageIcon size={36} color={colors.primary} /> : <File size={36} color={colors.primary} />}
                 </View>
                 <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '600', marginTop: spacing.m }}>
@@ -1460,7 +1482,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
             {/* Translating State */}
             {importStep === 'translating' && (
               <View style={styles.importLoadingContainer}>
-                <View style={[styles.importHeroIcon, { backgroundColor: `${colors.primary}1A` }]}>
+                <View style={[styles.importHeroIcon, { backgroundColor: alpha(colors.primary, 10) }]}>
                   <Globe size={36} color={colors.primary} />
                 </View>
                 <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '600', marginTop: spacing.m }}>
@@ -1476,8 +1498,8 @@ export function SetDetailScreen({ navigation, route }: Props) {
             {/* Done State */}
             {importStep === 'done' && (
               <View style={styles.importLoadingContainer}>
-                <View style={[styles.importHeroIcon, { backgroundColor: 'rgba(34,197,94,0.15)' }]}>
-                  <CheckCircle size={36} color="#22C55E" />
+                <View style={[styles.importHeroIcon, { backgroundColor: alpha(colors.success, 10) }]}>
+                  <CheckCircle size={iconSize.l} color={colors.successText} />
                 </View>
                 <Text variant="h3" align="center" style={{ color: colors.textPrimary, marginTop: spacing.m }}>
                   Импорт завершён
@@ -1500,7 +1522,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
             {importStep === 'select' && (
               <>
                 <View style={styles.importHero}>
-                  <View style={[styles.importHeroIcon, { backgroundColor: `${colors.primary}1A` }]}>
+                  <View style={[styles.importHeroIcon, { backgroundColor: alpha(colors.primary, 10) }]}>
                     <File size={36} color={colors.primary} />
                   </View>
                   <Text variant="h3" align="center" style={{ color: colors.textPrimary }}>
@@ -1512,12 +1534,12 @@ export function SetDetailScreen({ navigation, route }: Props) {
                     align="center"
                     style={{ paddingHorizontal: spacing.m }}
                   >
-                    Загрузите файл со словами и переводами для быстрого создания карточек.
+                    Загрузи файл со словами и переводами для быстрого создания карточек.
                   </Text>
                 </View>
 
                 {importError && (
-                  <View style={[styles.importError, { backgroundColor: `${colors.error}15`, borderColor: colors.error }]}>
+                  <View style={[styles.importError, { backgroundColor: alpha(colors.error, 10), borderColor: colors.error }]}>
                     <Info size={18} color={colors.error} />
                     <Text variant="bodySmall" style={{ color: colors.error, flex: 1 }}>
                       {importError}
@@ -1549,8 +1571,8 @@ export function SetDetailScreen({ navigation, route }: Props) {
                   style={[
                     styles.importTips,
                     {
-                      backgroundColor: 'rgba(100, 103, 242, 0.08)',
-                      borderColor: `${colors.primary}1A`,
+                      backgroundColor: alpha(colors.primary, 10),
+                      borderColor: alpha(colors.primary, 10),
                     },
                   ]}
                 >
@@ -1602,7 +1624,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                       style={[
                         styles.importPreviewCard, 
                         { 
-                          backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                          backgroundColor: colors.surfaceMuted,
                           borderColor: colors.border,
                         }
                       ]}
@@ -1668,8 +1690,14 @@ export function SetDetailScreen({ navigation, route }: Props) {
               ]}
             >
               <View style={styles.importTopBar}>
-                <Pressable onPress={() => !isPublishing && setShowPublishModal(false)} hitSlop={10} style={styles.topIcon}>
-                  <X size={20} color={modalTextPrimary} />
+                <Pressable
+                  onPress={() => !isPublishing && setShowPublishModal(false)}
+                  hitSlop={10}
+                  style={styles.topIcon}
+                  accessibilityRole="button"
+                  accessibilityLabel="Закрыть"
+                >
+                  <X size={iconSize.m} color={modalTextPrimary} />
                 </Pressable>
                 <Text variant="body" style={[styles.importTitle, { color: modalTextPrimary }]}>
                   Опубликовать в библиотеке
@@ -1685,7 +1713,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                   <TextInput
                     value={publishDescription}
                     onChangeText={setPublishDescription}
-                    placeholder="Расскажите о наборе..."
+                    placeholder="Расскажи о наборе..."
                     placeholderTextColor={modalPlaceholder}
                     maxLength={500}
                     multiline
@@ -1804,13 +1832,17 @@ export function SetDetailScreen({ navigation, route }: Props) {
         animationType="fade"
         onRequestClose={() => setPreviewCard(null)}
       >
-        <Pressable style={styles.previewOverlay} onPress={() => setPreviewCard(null)}>
+        <Pressable
+          style={[styles.previewOverlay, { backgroundColor: colors.overlay }]}
+          onPress={() => setPreviewCard(null)}
+          accessibilityLabel="Закрыть"
+        >
           {Platform.OS === 'web' ? (
             <View
               style={[
                 styles.previewCard,
                 {
-                  backgroundColor: theme === 'dark' ? 'rgba(30,32,48,0.75)' : 'rgba(255,255,255,0.7)',
+                  backgroundColor: alpha(colors.surface, 40),
                   borderColor: colors.border,
                 },
               ]}
@@ -1957,12 +1989,12 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    borderRadius: 14,
+    borderRadius: borderRadius.m,
     borderWidth: 1,
     minHeight: 44,
   },
   warmupTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
   },
   warmupSubtitle: {
@@ -1970,7 +2002,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   warmupAction: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
   },
   officialBadge: {
@@ -2023,7 +2055,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 16,
   },
   sortButton: {
     width: 46,
@@ -2085,17 +2117,6 @@ const styles = StyleSheet.create({
     bottom: spacing.s,
     padding: spacing.xs,
   },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: spacing.xxl,
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: spacing.m,
-  },
-  emptyButton: {
-    marginTop: spacing.m,
-  },
   bottomBar: {
     position: 'absolute',
     left: 0,
@@ -2131,7 +2152,6 @@ const styles = StyleSheet.create({
   },
   sheetBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.35)',
   },
   sheet: {
     borderTopLeftRadius: borderRadius.xl,
@@ -2327,28 +2347,22 @@ const styles = StyleSheet.create({
   // Card Preview Modal
   previewOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.xl,
   },
   previewCard: {
     width: Math.min(340, Dimensions.get('window').width - 48),
-    borderRadius: 24,
+    borderRadius: borderRadius.xl,
     borderWidth: 1,
     overflow: 'hidden',
+    // Без тени: карточку отделяет затемнение (брендбук, 10)
     ...Platform.select({
       web: {
-        boxShadow: '0 16px 48px rgba(0,0,0,0.25)',
         backdropFilter: 'blur(40px)',
         WebkitBackdropFilter: 'blur(40px)',
       },
     }) as any,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 12,
   },
   previewFrontSection: {
     padding: 28,
@@ -2357,7 +2371,7 @@ const styles = StyleSheet.create({
     minHeight: 140,
   },
   previewFrontText: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: '700',
     textAlign: 'center',
     letterSpacing: -0.5,
@@ -2374,12 +2388,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   previewBackText: {
-    fontSize: 22,
-    fontWeight: '500',
+    fontSize: 24,
+    fontWeight: '600',
     textAlign: 'center',
   },
   previewExample: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '400',
     textAlign: 'center',
     fontStyle: 'italic',

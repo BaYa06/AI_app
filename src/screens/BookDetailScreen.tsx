@@ -20,7 +20,7 @@ import { spacing, borderRadius, iconSize, getLanguageDef, alpha } from '@/consta
 import { pluralize } from '@/utils';
 import { BookService } from '@/services/BookService';
 import { getBookCover, formatBookMeta } from '@/utils/bookCover';
-import { showMessage, confirmAction } from '@/utils/dialogs';
+import { confirmAction } from '@/utils/dialogs';
 import type { BookDetail, BookUnit } from '@/types/books';
 import type { RootStackScreenProps } from '@/types/navigation';
 import { describeError } from '@/utils/userErrors';
@@ -61,7 +61,7 @@ export function BookDetailScreen({ navigation, route }: Props) {
     const ok = await BookService.openOfficialSet(set.id);
     setOpeningSetId(null);
     if (!ok) {
-      showMessage('Не удалось открыть юнит', 'Проверьте подключение к интернету и попробуйте ещё раз.');
+      toast.error('Не удалось открыть юнит. Проверь подключение к интернету и попробуй ещё раз');
       return;
     }
     navigation.navigate('SetDetail', { setId: set.id });
@@ -73,7 +73,7 @@ export function BookDetailScreen({ navigation, route }: Props) {
     const result = await BookService.attachToCourses(detail.book.id, courseIds);
     setAttaching(false);
     if (!result.ok) {
-      showMessage('Не удалось подключить', result.status === 403 ? 'Можно подключать только к своим курсам.' : describeError(result.error, 'Попробуй ещё раз.'));
+      toast.error(`Не удалось подключить. ${result.status === 403 ? 'Можно подключать только к своим курсам.' : describeError(result.error, 'Попробуй ещё раз.')}`);
       return;
     }
     const attached = [...result.data.attachedCourseIds, ...result.data.alreadyAttachedCourseIds];
@@ -82,9 +82,9 @@ export function BookDetailScreen({ navigation, route }: Props) {
 
     const titles = courses.filter((c) => attached.includes(c.id)).map((c) => c.title);
     const single = attached.length === 1 ? courses.find((c) => c.id === attached[0]) : undefined;
-    const message = `${titles.join(', ')}. Все юниты пока закрыты — откройте их в «Учебниках курса».`;
+    const message = `${titles.join(', ')}. Все юниты пока закрыты — открой их в «Учебниках курса».`;
     if (!single) {
-      showMessage('Книга подключена', message);
+      toast.success(`Книга подключена: ${message}`);
       return;
     }
     if (await confirmAction('Книга подключена', message, 'Открыть юниты', { cancelText: 'Позже' })) {

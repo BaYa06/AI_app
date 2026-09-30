@@ -9,13 +9,13 @@ import { View, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'reac
 import { useFocusEffect } from '@react-navigation/native';
 import { Library, MoreHorizontal, Plus, AlertTriangle } from 'lucide-react-native';
 import { Text, Container } from '@/components/common';
-import { Badge, Button, EmptyState, ErrorState, ScreenHeader, Switch } from '@/components/ui';
+import { Badge, Button, EmptyState, ErrorState, ScreenHeader, Switch, toast } from '@/components/ui';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, iconSize, screenPadding, alpha } from '@/constants';
 import { pluralize } from '@/utils';
 import { BookService } from '@/services/BookService';
 import { getBookCover, formatBookMeta } from '@/utils/bookCover';
-import { showMessage, confirmAction } from '@/utils/dialogs';
+import { confirmAction } from '@/utils/dialogs';
 import type { CoursePlan, CoursePlanBook, CoursePlanUnit } from '@/types/books';
 import type { RootStackScreenProps } from '@/types/navigation';
 import { describeError } from '@/utils/userErrors';
@@ -72,7 +72,7 @@ export function CourseBooksScreen({ navigation, route }: Props) {
     setPendingUnitIds((prev) => prev.filter((id) => id !== unit.id));
     if (!result.ok) {
       updateUnit(unit.id, { isOpen: !next });
-      showMessage('Не удалось сохранить', 'Проверьте подключение к интернету и попробуйте ещё раз.');
+      toast.error('Не удалось сохранить. Проверь подключение к интернету и попробуй ещё раз');
       return;
     }
     updateUnit(unit.id, { isOpen: result.data.isOpen, openedAt: result.data.openedAt });
@@ -86,7 +86,7 @@ export function CourseBooksScreen({ navigation, route }: Props) {
     const ok = await BookService.openOfficialSet(unit.set.id);
     setOpeningSetId(null);
     if (!ok) {
-      showMessage('Не удалось открыть юнит', 'Проверьте подключение к интернету и попробуйте ещё раз.');
+      toast.error('Не удалось открыть юнит. Проверь подключение к интернету и попробуй ещё раз');
       return;
     }
     navigation.navigate('SetDetail', { setId: unit.set.id });
@@ -102,7 +102,7 @@ export function CourseBooksScreen({ navigation, route }: Props) {
     if (!ok) return;
     const result = await BookService.detachFromCourse(book.id, courseId);
     if (!result.ok) {
-      showMessage('Не удалось отключить', describeError(result.error, 'Попробуй ещё раз.'));
+      toast.error(`Не удалось отключить. ${describeError(result.error, 'Попробуй ещё раз.')}`);
       return;
     }
     setPlan((prev) => (prev ? { ...prev, books: prev.books.filter((b) => b.id !== book.id) } : prev));
