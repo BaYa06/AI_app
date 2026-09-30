@@ -104,6 +104,9 @@ const SETS_SORT_OPTIONS: { key: SetsSortKey; label: string; short: string }[] = 
 
 const DEFAULT_SETS_SORT: SetsSortKey = 'recent';
 
+/** Месяц создания набора на плитке даты */
+const SHORT_MONTHS = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+
 function loadSetsSort(): SetsSortKey {
   try {
     const saved = StorageService.getString(STORAGE_KEYS.HOME_SETS_SORT);
@@ -1569,65 +1572,56 @@ export function HomeScreen({ navigation }: any) {
             )}
             {visibleSets.map((set, index) => {
               const progress = set.cardCount > 0 ? Math.round(((set.masteredCount || 0) / set.cardCount) * 100) : 0;
+              // Цвет набора — лёгким оттенком плитки даты: помогает узнать набор, но не спорит с «N ждут»
               const accentColor = getDeckAccentColor(set.id || index);
-              // Низкий прогресс — не «ошибка»: хвалим за прогресс, не ругаем (брендбук, раздел 1)
-              const getStatusColor = () => {
-                if (progress >= 60) return colors.success;
-                if (progress >= 10) return colors.warning;
-                return colors.primary;
-              };
-
-              // Дата создания набора
-              const getDateDisplay = () => {
-                const date = new Date(set.createdAt);
-                const months = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
-                return {
-                  month: months[date.getMonth()],
-                  day: date.getDate().toString()
-                };
-              };
-              const dateDisplay = getDateDisplay();
+              const created = new Date(set.createdAt);
               const waitingCount = reviewStats.waitingBySet[set.id] || 0;
+              const cardsLabel = `${set.cardCount} ${pluralize(set.cardCount, 'карточка', 'карточки', 'карточек')}`;
+              const showHidden = !!(set.isHiddenFromStudents && set.courseId && isTeacher);
+              const hasBadges = waitingCount > 0 || !!set.isOfficial || showHidden;
 
               return (
                 <StaggerCard key={set.id} index={index}>
                 <SurfaceCard
                   onPress={() => { triggerHaptic('selection'); Analytics.homeAction('set'); navigation?.navigate('SetDetail', { setId: set.id }); }}
-                  accessibilityLabel={`${set.title}, ${set.cardCount} ${pluralize(set.cardCount, 'карточка', 'карточки', 'карточек')}, выучено ${progress}%`}
+                  accessibilityLabel={[
+                    set.title,
+                    cardsLabel,
+                    `выучено ${progress}%`,
+                    waitingCount > 0 ? `${waitingCount} ждут повторения` : null,
+                  ].filter(Boolean).join(', ')}
                 >
-                  {/* Header with icon, title, status dot, and button */}
+                  {/* Строка набора (plan/home_redesign.md, 5.1): дата, название, «48 карточек · 62%», бейджи, прогресс */}
                   <View style={styles.setCardHeader}>
                     <View style={styles.setCardLeft}>
-                      {/* Date Icon */}
-                      <View style={[styles.dateIcon, { backgroundColor: accentColor }]}>
-                        <Text variant="caption" style={[styles.dateMonth, { color: colors.onPrimary }]}>{dateDisplay.month}</Text>
-                        <Text variant="bodyLarge" style={[styles.dateDay, { color: colors.onPrimary }]}>{dateDisplay.day}</Text>
+                      <View style={[styles.dateIcon, { backgroundColor: alpha(accentColor, 10) }]}>
+                        <Text variant="caption" style={[styles.dateMonth, { color: colors.textSecondary }]}>
+                          {SHORT_MONTHS[created.getMonth()]}
+                        </Text>
+                        <Text variant="bodyLarge" style={[styles.dateDay, { color: colors.textPrimary }]}>{created.getDate()}</Text>
                       </View>
 
-                      {/* Title and Stats */}
                       <View style={styles.flex1}>
-                        <View style={styles.titleRow}>
-                          <Text variant="body" style={[styles.setTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-                            {set.title}
-                          </Text>
-                          <View style={[styles.statusDot, { backgroundColor: getStatusColor() }]} />
-                        </View>
-                        <Text variant="caption" style={{ color: colors.textSecondary }}>
-                          {set.cardCount} {pluralize(set.cardCount, 'карточка', 'карточки', 'карточек')} • {progress}% выучено
+                        <Text variant="body" style={[styles.setTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                          {set.title}
                         </Text>
-                        {set.isHiddenFromStudents && set.courseId && isTeacher && (
-                          <Badge label="Скрыто" tone="neutral" icon={EyeOff} style={styles.setBadge} />
-                        )}
-                        {set.isOfficial && (
-                          <Badge label="По учебнику" tone="primary" icon={BookOpen} style={styles.setBadge} />
-                        )}
-                        {waitingCount > 0 && (
-                          <Badge label={`${waitingCount} ждут повторения`} tone="warning" icon={RotateCcw} style={styles.setBadge} />
+                        <Text variant="caption" style={{ color: colors.textSecondary }}>
+                          {cardsLabel} · {progress}%
+                        </Text>
+                        {hasBadges && (
+                          <View style={styles.setBadges}>
+                            {/* «N ждут» — единственный цветной сигнал строки: здесь есть дело */}
+                            {waitingCount > 0 && (
+                              <Badge label={`${waitingCount} ждут`} tone="warning" icon={RotateCcw} />
+                            )}
+                            {set.isOfficial && <Badge label="По учебнику" tone="neutral" icon={BookOpen} />}
+                            {showHidden && <Badge label="Скрыто" tone="neutral" icon={EyeOff} />}
+                          </View>
                         )}
                       </View>
                     </View>
 
-                    {/* More Menu */}
+
                     <Button
                       variant="icon"
                       icon={MoreVertical}
@@ -1650,14 +1644,7 @@ export function HomeScreen({ navigation }: any) {
                     />
                   </View>
 
-                  {/* Progress Section */}
-                  <View style={styles.progressSection}>
-                    <View style={styles.progressHeader}>
-                      <Text variant="caption" style={[styles.semibold, { color: colors.textSecondary }]}>Прогресс</Text>
-                      <Text variant="caption" style={[styles.semibold, { color: colors.textSecondary }]}>{progress}%</Text>
-                    </View>
-                    <ProgressBar progress={progress} color={getStatusColor()} animated={false} />
-                  </View>
+                  <ProgressBar progress={progress} color={colors.primary} animated={false} style={styles.setProgress} />
                 </SurfaceCard>
                 </StaggerCard>
               );
@@ -2385,32 +2372,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 20,
   },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
   setTitle: {
     fontWeight: '600',
     flexShrink: 1,
   },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: borderRadius.full,
-  },
-  setBadge: {
+  setBadges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xxs,
     marginTop: spacing.xxs,
   },
-
-  // Progress Section
-  progressSection: {
+  setProgress: {
     marginTop: spacing.s,
-    gap: spacing.xs,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
   },
 
   // Sheets
