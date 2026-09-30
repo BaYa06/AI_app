@@ -82,6 +82,8 @@ export interface LessonPlan {
   newLeftTotal: number;
   /** Квота новых на сегодня (с учётом «ещё») */
   newQuota: number;
+  /** Сколько слов урока уже сделано сегодня (повторено + впервые показано) — для кольца прогресса */
+  doneToday: number;
 }
 
 export interface LessonInput {
@@ -267,5 +269,6 @@ export function buildLessonPlan({ sets, cardsBySet, cards, newPerDay, day, now }
     tomorrowCount,
     newLeftTotal,
     newQuota,
+    doneToday: day.reviewedIds.length + day.introducedIds.length,
   };
 }

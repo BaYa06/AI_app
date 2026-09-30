@@ -1,6 +1,8 @@
 import { describe, expect, it } from '@jest/globals';
 import type { LessonPlan } from '@/services/LessonService';
-import { isLessonStartable, lessonComposition, lessonHint, lessonTitle } from '../lessonText';
+import { isLessonStartable, lessonCardContent, lessonComposition, lessonHint, lessonTitle } from '../lessonText';
+
+const opts = { streakDays: 8, extraNewStep: 10 };
 
 const ids = (n: number, p = 'c') => Array.from({ length: n }, (_, i) => `${p}${i}`);
 
@@ -20,6 +22,7 @@ function plan(extra: Partial<LessonPlan>): LessonPlan {
     tomorrowCount: 0,
     newLeftTotal: 100,
     newQuota: 10,
+    doneToday: 0,
     ...extra,
   };
 }
@@ -58,6 +61,54 @@ describe('тексты урока', () => {
     expect(lessonComposition({ reviewIds: [], newIds: ids(1) })).toBe('1 новое слово');
     expect(lessonComposition({ reviewIds: [], newIds: ids(3) })).toBe('3 новых слова');
     expect(lessonComposition({ reviewIds: ids(2), newIds: ids(1) })).toBe('2 повторить + 1 новое');
+  });
+
+  it('карточка: обычный день — заливка, кольцо прогресса дня', () => {
+    const c = lessonCardContent(plan({ reviewIds: ids(10), newIds: ids(10, 'n'), doneToday: 5 }), opts);
+    expect(c).toMatchObject({
+      calm: false,
+      overline: 'Сегодня',
+      title: 'Урок дня',
+      meta: '10 повторить + 10 новых · ~6 мин',
+      hint: 'Английский B1 · 18 из 30',
+      action: 'Начать',
+      kind: 'start',
+      progress: { done: 5, total: 25 },
+    });
+  });
+
+  it('карточка: первый день и накопилось', () => {
+    expect(lessonCardContent(plan({ state: 'first', newIds: ids(10), minutes: 4 }), opts)?.overline).toBe('День 1');
+    const overdue = lessonCardContent(plan({ state: 'overdue', reviewIds: ids(30), minutes: 8, waitingTotal: 30 }), opts);
+    expect(overdue).toMatchObject({ overline: 'Накопилось повторение', meta: '30 повторить · ~8 мин', hint: 'Новые слова вернутся завтра' });
+  });
+
+  it('карточка: ошибки дня', () => {
+    const c = lessonCardContent(plan({ state: 'mistakes', mistakeIds: ids(3), minutes: 1, doneToday: 20 }), opts);
+    expect(c).toMatchObject({ title: 'Исправь ошибки', meta: '3 слова · ~1 мин', action: 'Повторить', progress: { done: 20, total: 23 } });
+  });
+
+  it('карточка: всё сделано — спокойная, «ещё 10 новых», серия и завтра', () => {
+    const c = lessonCardContent(plan({ state: 'done', tomorrowCount: 14, doneToday: 20 }), opts);
+    expect(c).toMatchObject({
+      calm: true,
+      title: 'Готово на сегодня',
+      meta: 'Серия 8 дней',
+      hint: 'Завтра 14 слов',
+      action: 'Ещё 10 новых',
+      kind: 'extraNew',
+      progress: null,
+    });
+    expect(lessonCardContent(plan({ state: 'done' }), { streakDays: 0, extraNewStep: 10 })?.meta).toBeNull();
+  });
+
+  it('карточка: все слова пройдены — найти новый набор', () => {
+    const c = lessonCardContent(plan({ state: 'finished', tomorrowCount: 1 }), opts);
+    expect(c).toMatchObject({ calm: true, title: 'Все слова пройдены', hint: 'Завтра 1 слово', kind: 'findSet' });
+  });
+
+  it('карточка: нет карточек — не показываем', () => {
+    expect(lessonCardContent(plan({ state: 'empty' }), opts)).toBeNull();
   });
 
   it('всё сделано — запускать нечего', () => {
