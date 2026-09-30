@@ -5,12 +5,12 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Text } from '@/components/common';
-import { useThemeColors, useSettingsStore } from '@/store';
-import { spacing, borderRadius } from '@/constants';
+import { useThemeColors } from '@/store';
+import { spacing, borderRadius, alpha } from '@/constants';
 import Svg, { Circle, Path, Rect, Defs, LinearGradient, Stop } from 'react-native-svg';
 
-function StudyIllustration({ color, isDark }: { color: string; isDark: boolean }) {
-  const bgTint = isDark ? 'rgba(255,255,255,0.03)' : '#F8FAFC';
+function StudyIllustration({ color, tint, surface }: { color: string; tint: string; surface: string }) {
+  const bgTint = tint;
   return (
     <View style={s.illustrationWrap}>
       <Svg width={200} height={160} viewBox="0 0 200 160">
@@ -23,7 +23,7 @@ function StudyIllustration({ color, isDark }: { color: string; isDark: boolean }
         {/* Background circle */}
         <Circle cx={100} cy={80} r={70} fill="url(#grad)" />
         {/* Book */}
-        <Rect x={62} y={55} width={76} height={56} rx={6} fill={isDark ? 'rgba(255,255,255,0.06)' : '#FFFFFF'} stroke={color} strokeWidth={2} strokeOpacity={0.3} />
+        <Rect x={62} y={55} width={76} height={56} rx={6} fill={surface} stroke={color} strokeWidth={2} strokeOpacity={0.3} />
         <Path d="M100 55 L100 111" stroke={color} strokeWidth={1.5} strokeOpacity={0.2} />
         {/* Lines on left page */}
         <Rect x={72} y={68} width={20} height={3} rx={1.5} fill={color} opacity={0.25} />
@@ -49,18 +49,16 @@ function StudyIllustration({ color, isDark }: { color: string; isDark: boolean }
 
 export function StudyPlaceholderScreen() {
   const colors = useThemeColors();
-  const resolvedTheme = useSettingsStore((st) => st.resolvedTheme);
-  const isDark = resolvedTheme === 'dark';
 
-  const cardBg = isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF';
-  const cardBorder = isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9';
-  const chipBg = isDark ? colors.primary + '15' : colors.primary + '0D';
+  const cardBg = colors.surface;
+  const cardBorder = colors.border;
+  const chipBg = alpha(colors.primary, 10);
 
   return (
     <View style={[s.container, { backgroundColor: colors.background }]}>
       {/* Main card */}
       <View style={[s.card, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-        <StudyIllustration color={colors.primary} isDark={isDark} />
+        <StudyIllustration color={colors.primary} tint={colors.surfaceMuted} surface={colors.surface} />
 
         <View style={[s.badge, { backgroundColor: chipBg }]}>
           <Text style={[s.badgeText, { color: colors.primary }]}>Скоро</Text>
@@ -81,7 +79,7 @@ export function StudyPlaceholderScreen() {
             { icon: '🎯', label: 'Адаптивные тесты' },
             { icon: '⚡', label: 'Быстрые сессии' },
           ].map((f) => (
-            <View key={f.label} style={[s.featureChip, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#F8FAFC', borderColor: cardBorder }]}>
+            <View key={f.label} style={[s.featureChip, { backgroundColor: colors.surfaceMuted, borderColor: cardBorder }]}>
               <Text style={s.featureIcon}>{f.icon}</Text>
               <Text style={[s.featureLabel, { color: colors.textSecondary }]}>{f.label}</Text>
             </View>

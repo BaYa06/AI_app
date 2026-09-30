@@ -11,8 +11,8 @@ import {
   Image,
 } from 'react-native';
 import { Text, Container } from '@/components/common';
-import { useThemeColors, useSettingsStore } from '@/store';
-import { spacing, borderRadius } from '@/constants';
+import { useThemeColors } from '@/store';
+import { spacing, borderRadius, alpha } from '@/constants';
 import {
   ArrowLeft,
   Share2,
@@ -81,18 +81,16 @@ const MOCK_SET = {
 
 export function SharedSetDetailScreen({ navigation }: Props) {
   const colors = useThemeColors();
-  const theme = useSettingsStore((s) => s.resolvedTheme);
-  const isDark = theme === 'dark';
   const [liked, setLiked] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
 
-  const surfaceBg = isDark ? 'rgb(24, 26, 38)' : colors.surface;
-  const sectionBorder = isDark ? 'rgba(255,255,255,0.06)' : colors.borderLight;
+  const surfaceBg = colors.surface;
+  const sectionBorder = colors.border;
 
   return (
     <Container padded={false} edges={['top', 'bottom']}>
       {/* Header */}
-      <View style={[s.header, { backgroundColor: isDark ? colors.background : '#FFFFFF', borderBottomColor: colors.border }]}>
+      <View style={[s.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={10} style={s.headerIcon}>
           <ArrowLeft size={22} color={colors.textPrimary} />
         </Pressable>
@@ -343,7 +341,7 @@ export function SharedSetDetailScreen({ navigation }: Props) {
                       key={i}
                       name="star"
                       size={14}
-                      color={i < review.rating ? '#FACC15' : isDark ? '#374151' : '#E5E7EB'}
+                      color={i < review.rating ? colors.star : colors.surfaceMuted}
                     />
                   ))}
                 </View>
@@ -378,7 +376,7 @@ export function SharedSetDetailScreen({ navigation }: Props) {
                 key={set.id}
                 style={[s.similarCard, { backgroundColor: surfaceBg, borderColor: colors.border }]}
               >
-                <View style={[s.similarCardIcon, { backgroundColor: isDark ? colors.primary + '15' : set.bgColor }]}>
+                <View style={[s.similarCardIcon, { backgroundColor: alpha(colors.primary, 10) }]}>
                   <Text style={s.similarCardEmoji}>{set.emoji}</Text>
                 </View>
                 <Text
@@ -408,7 +406,7 @@ export function SharedSetDetailScreen({ navigation }: Props) {
         style={[
           s.bottomBar,
           {
-            backgroundColor: isDark ? 'rgb(16, 17, 34)' : colors.surface,
+            backgroundColor: colors.background,
             borderTopColor: colors.border,
           },
         ]}

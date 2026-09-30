@@ -11,7 +11,7 @@ import {
   Switch,
 } from 'react-native';
 import { Text, Container } from '@/components/common';
-import { useThemeColors, useSettingsStore } from '@/store';
+import { useThemeColors } from '@/store';
 import { spacing, borderRadius } from '@/constants';
 import {
   ArrowLeft,
@@ -64,20 +64,18 @@ function SessionIcon({ type, color }: { type: 'phone' | 'laptop' | 'tablet'; col
 
 export function SecurityScreen({ navigation }: Props) {
   const colors = useThemeColors();
-  const theme = useSettingsStore((s) => s.resolvedTheme);
-  const isDark = theme === 'dark';
 
   const [twoFactor, setTwoFactor] = useState(true);
 
-  const cardBg = isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF';
-  const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : colors.primary + '15';
-  const dividerColor = isDark ? 'rgba(255,255,255,0.05)' : colors.primary + '08';
-  const sessionIconBg = isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9';
+  const cardBg = colors.surface;
+  const cardBorder = colors.border;
+  const dividerColor = colors.border;
+  const sessionIconBg = colors.surfaceMuted;
 
   return (
     <Container padded={false} edges={['top', 'bottom']}>
       {/* Header */}
-      <View style={[s.header, { backgroundColor: isDark ? colors.background : colors.background, borderBottomColor: colors.primary + '15' }]}>
+      <View style={[s.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={10} style={s.headerIcon}>
           <ArrowLeft size={22} color={colors.textPrimary} />
         </Pressable>

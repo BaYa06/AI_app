@@ -10,7 +10,7 @@ import {
   Pressable,
 } from 'react-native';
 import { Text, Container } from '@/components/common';
-import { useThemeColors, useSettingsStore } from '@/store';
+import { useThemeColors } from '@/store';
 import { spacing, borderRadius } from '@/constants';
 import {
   ArrowLeft,
@@ -58,20 +58,17 @@ const PLANS = [
 
 export function SubscriptionScreen({ navigation }: Props) {
   const colors = useThemeColors();
-  const theme = useSettingsStore((s) => s.resolvedTheme);
-  const isDark = theme === 'dark';
 
   const [selectedPlan, setSelectedPlan] = useState<PlanKey>('yearly');
 
-  const cardBg = isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF';
-  const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0';
-  const heroBg1 = isDark ? '#1e1b4b' : '#312e81';
+  const cardBg = colors.surface;
+  const cardBorder = colors.border;
   const heroBg2 = colors.primary;
 
   return (
     <Container padded={false} edges={['top', 'bottom']}>
       {/* Header */}
-      <View style={[s.header, { backgroundColor: isDark ? colors.background : colors.background, borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : '#E2E8F0' }]}>
+      <View style={[s.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={10} style={s.headerIcon}>
           <ArrowLeft size={22} color={colors.textPrimary} />
         </Pressable>
@@ -234,7 +231,7 @@ export function SubscriptionScreen({ navigation }: Props) {
               </Text>
             </Pressable>
           </View>
-          <Text variant="caption" style={[s.footerLegal, { color: isDark ? 'rgba(255,255,255,0.2)' : colors.textTertiary }]}>
+          <Text variant="caption" style={[s.footerLegal, { color: colors.textTertiary }]}>
             Оформляя подписку, ты соглашаешься с Условиями использования и Политикой конфиденциальности Flashly.
           </Text>
         </View>
