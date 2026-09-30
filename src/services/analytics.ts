@@ -25,6 +25,8 @@ type HomeState = 'daily_review' | 'study_all' | 'no_sets' | 'teacher';
 /** Что нажали на главной (plan/home_redesign.md, шаг 0.2) */
 type HomeAction =
   | 'daily_review'
+  | 'extra_new'
+  | 'find_set'
   | 'study_all'
   | 'challenge_quick'
   | 'challenge_sniper'

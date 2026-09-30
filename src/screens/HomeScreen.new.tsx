@@ -62,8 +62,9 @@ import { Analytics } from '@/services/analytics';
 import { firstLessonStep } from '@/services/lessonFlow';
 import { useLessonStore } from '@/store/lessonStore';
 import { localDay } from '@/store/challengeStore';
-import { buildLessonPlan, countWaitingReview, ensureLessonDay } from '@/services/LessonService';
-import { isLessonStartable, lessonTitle, lessonHint } from '@/components/home/lessonText';
+import { buildLessonPlan, countWaitingReview, ensureLessonDay, EXTRA_NEW_STEP, type LessonDay, type LessonPlan } from '@/services/LessonService';
+import { isLessonStartable, lessonCardContent } from '@/components/home/lessonText';
+import { LessonCard } from '@/components/home/LessonCard';
 
 const StaggerCard = React.memo(function StaggerCard({
   index,
@@ -210,6 +211,8 @@ export function HomeScreen({ navigation }: any) {
   const [deleteModalCourseId, setDeleteModalCourseId] = useState<string | null>(null);
   const [leaveModalCourseId, setLeaveModalCourseId] = useState<string | null>(null);
   const [leaveLoading, setLeaveLoading] = useState(false);
+  // «Учить все карточки» курса в любом режиме. Кнопка ушла из ленты вместе со старым «Повторением дня» —
+  // вход вернётся в меню «···» секции «Мои наборы» (plan/home_redesign.md, 4.1)
   const [showStudyModeModal, setShowStudyModeModal] = useState(false);
   // Размер порции — общая настройка (Профиль → Настройки обучения)
   const studyCardLimit = useSettingsStore((s) => s.settings.studyCardLimit);
@@ -643,15 +646,20 @@ export function HomeScreen({ navigation }: any) {
   const lessonSets = useMemo(() => [...filteredSets].sort(SETS_COMPARATORS[setsSort]), [filteredSets, setsSort]);
   const lessonDay = useLessonStore((s) => s.day);
   const lessonNewPerDay = useSettingsStore((s) => s.settings.lessonNewPerDay);
-  const lessonPlan = useMemo(() => {
+  const computeLessonPlan = useCallback((stored: LessonDay | null) => {
     const now = Date.now();
     const today = localDay();
     // До снимка дня (или после полуночи) — считаем как будто день начинается сейчас
-    const day = lessonDay?.date === today
-      ? lessonDay
-      : ensureLessonDay(lessonDay, today, countWaitingReview(lessonSets, cardsBySet, cardsMap, now));
+    const day = stored?.date === today
+      ? stored
+      : ensureLessonDay(stored, today, countWaitingReview(lessonSets, cardsBySet, cardsMap, now));
     return buildLessonPlan({ sets: lessonSets, cardsBySet, cards: cardsMap, newPerDay: lessonNewPerDay, day, now });
-  }, [lessonSets, cardsBySet, cardsMap, lessonDay, lessonNewPerDay]);
+  }, [lessonSets, cardsBySet, cardsMap, lessonNewPerDay]);
+  const lessonPlan = useMemo(() => computeLessonPlan(lessonDay), [computeLessonPlan, lessonDay]);
+  const lessonContent = useMemo(
+    () => lessonCardContent(lessonPlan, { streakDays: streakValue, extraNewStep: EXTRA_NEW_STEP }),
+    [lessonPlan, streakValue],
+  );
 
   // Утренний снимок дня — при заходе на главную, когда карточки уже загружены
   // (иначе снимок «0 ждут» дал бы полную квоту новых в день большого повторения)
@@ -684,17 +692,14 @@ export function HomeScreen({ navigation }: any) {
     });
   }, [focusTick, isTeacher, filteredSets.length, reviewStats, lessonPlan]);
 
-  // «Урок дня» (plan/home_redesign.md, 1.4): повторение + новые слова из текущего набора (LessonService)
-  const lessonStartable = isLessonStartable(lessonPlan);
-  const handleDailyReview = useCallback(() => {
-    triggerHaptic('selection');
-    Analytics.homeAction('daily_review');
-    let reviewIds = lessonPlan.reviewIds;
+  // «Урок дня» (plan/home_redesign.md, 1.4, 2.2): повторение + новые слова из текущего набора (LessonService)
+  const startLesson = useCallback((plan: LessonPlan) => {
+    let reviewIds = plan.reviewIds;
     // Тесту нужно хотя бы 4 вопроса — добираем уже изученными словами, которым срок ещё не пришёл
     // (ответ раньше срока уровень не меняет и в урок не записывается). Новые слова для добора не берём:
     // правильный ответ поднял бы их на шаг 1 без показа.
     if (reviewIds.length > 0 && reviewIds.length < 4) {
-      const taken = new Set([...reviewIds, ...lessonPlan.newIds]);
+      const taken = new Set([...reviewIds, ...plan.newIds]);
       const extra = pickCardsForGame(
         reviewStats.all.filter((c) => !taken.has(c.id) && (c.learningStep || 0) >= 1),
         4 - reviewIds.length,
@@ -702,13 +707,33 @@ export function HomeScreen({ navigation }: any) {
       reviewIds = [...reviewIds, ...extra.map((c) => c.id)];
     }
     const step = firstLessonStep(
-      { reviewIds, newIds: lessonPlan.newIds, mistakeIds: lessonPlan.mistakeIds },
+      { reviewIds, newIds: plan.newIds, mistakeIds: plan.mistakeIds },
       (id) => cardsMap[id]?.setId,
     );
     if (!step) return;
     const rootNav = navigation?.getParent?.() ?? navigation;
     rootNav?.navigate(step.screen, step.params);
-  }, [navigation, reviewStats, cardsMap, lessonPlan]);
+  }, [navigation, reviewStats, cardsMap]);
+
+  const handleLessonPress = useCallback(() => {
+    if (!lessonContent) return;
+    triggerHaptic('selection');
+    if (lessonContent.kind === 'findSet') {
+      Analytics.homeAction('find_set');
+      navigation?.navigate('Library');
+      return;
+    }
+    if (lessonContent.kind === 'extraNew') {
+      // «Ещё 10 новых»: квота на сегодня растёт, урок из новых слов стартует сразу
+      Analytics.homeAction('extra_new');
+      const store = useLessonStore.getState();
+      store.addExtraNew();
+      startLesson(computeLessonPlan(useLessonStore.getState().day));
+      return;
+    }
+    Analytics.homeAction('daily_review');
+    startLesson(lessonPlan);
+  }, [lessonContent, lessonPlan, startLesson, computeLessonPlan, navigation]);
 
   // Тизер рейтинга курса (план, этап 4): маленькая кнопка между мини-играми и «Повторением дня»
   const [leaderboard, setLeaderboard] = useState<CourseLeaderboard | null>(null);
@@ -1558,7 +1583,12 @@ export function HomeScreen({ navigation }: any) {
             {isTeacher === null ? null : isTeacher ? (
               teacherBanner
             ) : (
-              /* Challenges Section */
+              <>
+              {/* Урок дня — единственное главное действие главной (plan/home_redesign.md, 2.2) */}
+              {lessonContent && (
+                <LessonCard content={lessonContent} onPress={handleLessonPress} style={styles.lessonCard} />
+              )}
+              {/* Challenges Section */}
               <View style={styles.challengesSection}>
                 <ScrollView
                   horizontal
@@ -1619,37 +1649,8 @@ export function HomeScreen({ navigation }: any) {
                   </SurfaceCard>
                 )}
 
-                <View style={styles.reviewActions}>
-                  {lessonStartable ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      style={({ pressed }) => [
-                        styles.dailyReviewButton,
-                        { backgroundColor: pressed ? colors.primaryPressed : colors.primaryFill },
-                      ]}
-                      onPress={handleDailyReview}
-                    >
-                      <Text style={[typography.button, styles.noLetterSpacing, { color: colors.onPrimary }]}>
-                        {lessonTitle(lessonPlan)}
-                      </Text>
-                      {lessonHint(lessonPlan) && (
-                        <Text variant="bodySmall" style={[styles.onFillMuted, { color: colors.onPrimary }]}>
-                          {lessonHint(lessonPlan)}
-                        </Text>
-                      )}
-                    </Pressable>
-                  ) : (
-                    <>
-                      {reviewStats.all.some((c) => (c.learningStep || 0) >= 1) && (
-                        <Text variant="bodySmall" align="center" style={[styles.reviewDoneText, { color: colors.textSecondary }]}>
-                          Всё повторено ✓{lessonPlan.tomorrowCount > 0 ? ` · завтра ${lessonPlan.tomorrowCount}` : ''}
-                        </Text>
-                      )}
-                      <Button title="Учить все карточки" fullWidth onPress={() => { Analytics.homeAction('study_all'); setShowStudyModeModal(true); }} />
-                    </>
-                  )}
-                </View>
               </View>
+              </>
             )}
 
             {/* Section Header */}
@@ -2240,9 +2241,6 @@ const styles = StyleSheet.create({
   bold: {
     fontWeight: '700',
   },
-  noLetterSpacing: {
-    letterSpacing: 0,
-  },
   // Второстепенный текст на цветной заливке
   onFillMuted: {
     opacity: 0.85,
@@ -2412,20 +2410,11 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.full,
     borderWidth: 2,
   },
-  reviewActions: {
-    paddingHorizontal: screenPadding,
-    marginTop: spacing.l,
-  },
-  dailyReviewButton: {
-    minHeight: heights.button,
-    paddingVertical: spacing.s,
-    paddingHorizontal: spacing.m,
-    borderRadius: borderRadius.m,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  reviewDoneText: {
-    marginBottom: spacing.s,
+  // Урок дня: 16 сверху (как баннер учителя), до мини-игр — 24 вместе с их отступом сверху
+  lessonCard: {
+    marginHorizontal: screenPadding,
+    marginTop: spacing.m,
+    marginBottom: spacing.xs,
   },
   freezeRow: {
     flexDirection: 'row',
