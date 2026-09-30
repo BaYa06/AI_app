@@ -13,8 +13,26 @@ import {
 } from 'react-native';
 import { Text } from '@/components/common';
 import { useThemeColors, useSettingsStore, useCardsStore, useSetsStore, useContextFillStore } from '@/store';
-import { spacing, borderRadius } from '@/constants';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import { spacing, borderRadius, iconSize, screenPadding, alpha, type ColorToken } from '@/constants';
+import { Button, Card, ProgressBar, type IconComponent } from '@/components/ui';
+import { pluralize } from '@/utils';
+import {
+  BookOpen,
+  Calendar,
+  CheckCircle2,
+  ChevronRight,
+  FileText,
+  Flame,
+  Library,
+  Rocket,
+  Settings,
+  Sparkles,
+  Sun,
+  Timer,
+  Trophy,
+  User,
+  Zap,
+} from 'lucide-react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { StreakService } from '@/services';
 import type { DailyActivity, UserStats } from '@/services';
@@ -56,45 +74,41 @@ function getDayLabel(dateStr: string): string {
 
 // ---- Static data for sections we keep as-is ----
 
-const ACHIEVEMENTS = [
+const ACHIEVEMENTS: Array<{ id: string; icon: IconComponent; color: ColorToken; title: string; desc: string; date: string }> = [
   {
     id: '1',
-    icon: 'sunny-outline',
-    iconColor: '#D97706',
-    bgColor: '#FEF3C7',
-    bgColorDark: 'rgba(217,119,6,0.15)',
+    icon: Sun,
+    color: 'warning',
     title: 'Ранняя пташка',
     desc: 'Позанимался до 7:00',
     date: '24 окт',
   },
   {
     id: '2',
-    icon: 'book-outline',
-    iconColor: '#4F46E5',
-    bgColor: '#E0E7FF',
-    bgColorDark: 'rgba(79,70,229,0.15)',
+    icon: BookOpen,
+    color: 'primary',
     title: 'Искатель знаний',
     desc: 'Прошёл 5 наборов за день',
     date: '21 окт',
   },
 ];
 
-const CHALLENGES = [
+const CHALLENGES: Array<{ id: string; icon: IconComponent; color: ColorToken; title: string; progress: string; percent: number }> = [
   {
     id: '1',
-    icon: 'calendar-outline',
+    icon: Calendar,
+    color: 'primary',
     title: 'Идеальная неделя',
     progress: '5/7 дней',
     percent: 71,
-    variant: 'primary' as const,
   },
   {
     id: '2',
-    icon: 'rocket-outline',
+    icon: Rocket,
+    color: 'success',
     title: 'Спринт 100',
     progress: '45/100 карточек',
     percent: 45,
-    variant: 'green' as const,
   },
 ];
 
@@ -104,8 +118,6 @@ const DAILY_GOAL = 10;
 
 export function StatisticsScreen({ navigation }: any) {
   const colors = useThemeColors();
-  const resolvedTheme = useSettingsStore((s) => s.resolvedTheme);
-  const isDark = resolvedTheme === 'dark';
   const todayStatsLocal = useSettingsStore((s) => s.todayStats);
 
   const [chartTab, setChartTab] = useState<'week' | 'month' | 'year'>('week');
@@ -119,8 +131,6 @@ export function StatisticsScreen({ navigation }: any) {
   const [loading, setLoading] = useState(() => userStats === null);
   const [userName, setUserName] = useState('');
 
-  const cardBg = isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF';
-  const cardBorder = isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9';
 
   // Load data on mount
   useEffect(() => {
@@ -213,13 +223,13 @@ export function StatisticsScreen({ navigation }: any) {
     return { newCount, learningCount, masteredCount };
   }, [allCards]);
 
-  const quickStats = useMemo(() => [
-    { icon: 'library-outline', color: '#3B82F6', value: formatNumber(allSets.length), label: 'Наборы' },
-    { icon: 'document-text-outline', color: '#F59E0B', value: formatNumber(totalCardsStudied), label: 'Изучено' },
-    { icon: 'timer-outline', color: '#10B981', value: formatHours(userStats?.total_minutes_learned ?? 0), label: 'Время' },
-    { icon: 'sparkles-outline', color: '#8B5CF6', value: formatNumber(cardStats.newCount), label: 'Новые' },
-    { icon: 'book-outline', color: '#F97316', value: formatNumber(cardStats.learningCount), label: 'Изучаются' },
-    { icon: 'checkmark-circle-outline', color: '#22C55E', value: formatNumber(cardStats.masteredCount), label: 'Выучены' },
+  const quickStats = useMemo((): Array<{ icon: IconComponent; color: ColorToken; value: string; label: string }> => [
+    { icon: Library, color: 'info', value: formatNumber(allSets.length), label: 'Наборы' },
+    { icon: FileText, color: 'warning', value: formatNumber(totalCardsStudied), label: 'Изучено' },
+    { icon: Timer, color: 'success', value: formatHours(userStats?.total_minutes_learned ?? 0), label: 'Время' },
+    { icon: Sparkles, color: 'secondary', value: formatNumber(cardStats.newCount), label: 'Новые' },
+    { icon: BookOpen, color: 'streak', value: formatNumber(cardStats.learningCount), label: 'Изучаются' },
+    { icon: CheckCircle2, color: 'success', value: formatNumber(cardStats.masteredCount), label: 'Выучены' },
   ], [allSets.length, totalCardsStudied, userStats?.total_minutes_learned, cardStats]);
 
   // ---- Heatmap data ----
@@ -301,93 +311,90 @@ export function StatisticsScreen({ navigation }: any) {
         showsVerticalScrollIndicator={false}
       >
         {/* ======== User Hero Card ======== */}
-        <View style={[st.heroCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+        <Card style={st.heroCard}>
           <View style={st.heroTop}>
             {/* Avatar */}
             <View style={st.avatarWrap}>
               <View style={[st.avatarBorder, { borderColor: colors.primary }]}>
-                <View style={[st.avatarPlaceholder, { backgroundColor: colors.primary + '20' }]}>
-                  <Ionicons name="person" size={28} color={colors.primary} />
+                <View style={[st.avatarPlaceholder, { backgroundColor: alpha(colors.primary, 10) }]}>
+                  <User size={iconSize.l} color={colors.primary} />
                 </View>
               </View>
-              <View style={[st.levelBadge, { backgroundColor: colors.primary, borderColor: isDark ? colors.background : '#FFFFFF' }]}>
-                <Text style={st.levelText}>Ур. {level}</Text>
+              <View style={[st.levelBadge, { backgroundColor: colors.primaryFill, borderColor: colors.surface }]}>
+                <Text variant="caption" style={[st.bold, { color: colors.onPrimary }]}>Ур. {level}</Text>
               </View>
             </View>
 
             {/* Name */}
             <View style={st.heroInfo}>
-              <Text style={[st.heroName, { color: colors.textPrimary }]}>
+              <Text variant="h3" style={[st.bold, { color: colors.textPrimary }]}>
                 {userName || 'Гость'}
               </Text>
               <View style={st.proBadgeRow}>
-                <Ionicons name="flash" size={14} color={colors.primary} />
-                <Text style={[st.proLabel, { color: colors.primary }]}>Участник Flashly</Text>
+                <Zap size={iconSize.xs} color={colors.primary} />
+                <Text variant="label" style={{ color: colors.primary }}>Участник Flashly</Text>
               </View>
             </View>
 
             {/* Settings */}
-            <Pressable
-              style={[st.settingsBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9' }]}
+            <Button
+              variant="icon"
+              icon={Settings}
+              iconColor={colors.textSecondary}
+              accessibilityLabel="Настройки"
               onPress={() => navigation?.navigate('Settings')}
-            >
-              <Ionicons name="settings-outline" size={22} color={colors.textSecondary} />
-            </Pressable>
+            />
           </View>
 
           {/* XP Bar */}
           <View style={st.xpSection}>
             <View style={st.xpLabelRow}>
-              <Text style={[st.xpLabel, { color: colors.textTertiary }]}>Опыт</Text>
-              <Text style={[st.xpLabel, { color: colors.textTertiary }]}>
+              <Text variant="overline" color="secondary">Опыт</Text>
+              <Text variant="caption" color="secondary">
                 {xpCurrent} / {XP_PER_LEVEL}
               </Text>
             </View>
-            <View style={[st.xpBarBg, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9' }]}>
-              <View style={[st.xpBarFill, { backgroundColor: colors.primary, width: `${xpPercent}%` }]} />
-            </View>
+            <ProgressBar progress={xpPercent} accessibilityLabel="Опыт до следующего уровня" />
           </View>
 
           {/* Streak + Badges row */}
           <View style={st.heroBadgesRow}>
-            <View style={[st.heroBadgeCard, { backgroundColor: colors.primary + '0D' }]}>
-              <Ionicons name="flame" size={22} color={colors.primary} />
+            <View style={[st.heroBadgeCard, { backgroundColor: alpha(colors.streak, 10) }]}>
+              <Flame size={iconSize.m} color={colors.streak} />
               <View>
-                <Text style={[st.heroBadgeValue, { color: colors.textPrimary }]}>
+                <Text variant="body" style={[st.bold, { color: colors.textPrimary }]}>
                   {pluralizeDays(currentStreak)}
                 </Text>
-                <Text style={[st.heroBadgeMeta, { color: colors.textTertiary }]}>Серия</Text>
+                <Text variant="caption" color="secondary">Серия</Text>
               </View>
             </View>
             <Pressable
-              style={[st.heroBadgeCard, { backgroundColor: colors.primary + '0D' }]}
+              accessibilityRole="button"
+              style={({ pressed }) => [st.heroBadgeCard, { backgroundColor: alpha(colors.star, 10) }, pressed && st.pressed]}
               onPress={() => navigation?.navigate('Achievements')}
             >
-              <Ionicons name="trophy" size={22} color={colors.primary} />
+              <Trophy size={iconSize.m} color={colors.star} />
               <View>
-                <Text style={[st.heroBadgeValue, { color: colors.textPrimary }]}>24</Text>
-                <Text style={[st.heroBadgeMeta, { color: colors.textTertiary }]}>Награды</Text>
+                <Text variant="body" style={[st.bold, { color: colors.textPrimary }]}>24</Text>
+                <Text variant="caption" color="secondary">Награды</Text>
               </View>
             </Pressable>
           </View>
-        </View>
+        </Card>
 
         {/* ======== Daily Goal ======== */}
-        <View style={[st.card, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-          <Text style={[st.cardTitle, { color: colors.textPrimary }]}>Дневная цель</Text>
+        <Card style={st.card}>
+          <Text variant="h3" style={[st.cardTitle, { color: colors.textPrimary }]}>Дневная цель</Text>
 
           <View style={st.goalCenter}>
             {/* Circular progress */}
-            <View style={st.circleWrap}>
-              <Svg width={120} height={120} style={{ position: 'absolute' }}>
-                <Circle
-                  cx={60}
-                  cy={60}
-                  r={52}
-                  stroke={isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9'}
-                  strokeWidth={8}
-                  fill="none"
-                />
+            <View
+              style={st.circleWrap}
+              accessible
+              accessibilityLabel={`Дневная цель: ${todayCards} из ${DAILY_GOAL} карточек`}
+            >
+              <Svg width={120} height={120} style={st.circleSvg}>
+                <Circle cx={60} cy={60} r={52} stroke={colors.surfaceMuted} strokeWidth={8} fill="none" />
                 <Circle
                   cx={60}
                   cy={60}
@@ -402,82 +409,83 @@ export function StatisticsScreen({ navigation }: any) {
                 />
               </Svg>
               <View style={st.circleInner}>
-                <Text style={[st.circleValue, { color: colors.textPrimary }]}>
+                <Text variant="h2" style={{ color: colors.textPrimary }}>
                   {todayCards}/{DAILY_GOAL}
                 </Text>
-                <Text style={[st.circleLabel, { color: colors.textTertiary }]}>Карточек</Text>
+                <Text variant="caption" color="secondary">Карточек</Text>
               </View>
             </View>
           </View>
 
-          <Text style={[st.goalHint, { color: colors.textSecondary }]}>
+          <Text variant="bodySmall" align="center" color="secondary">
             {remaining > 0
-              ? <>Осталось <Text style={{ color: colors.primary, fontWeight: '700' }}>{remaining} карточек</Text> до дневной цели.</>
-              : <Text style={{ color: colors.primary, fontWeight: '700' }}>Цель выполнена! Отличная работа!</Text>
+              ? <>Осталось <Text variant="bodySmall" style={[st.bold, { color: colors.primary }]}>{remaining} {pluralize(remaining, 'карточка', 'карточки', 'карточек')}</Text> до дневной цели.</>
+              : <Text variant="bodySmall" style={[st.bold, { color: colors.primary }]}>Цель выполнена! Отличная работа!</Text>
             }
           </Text>
-        </View>
+        </Card>
 
         {/* ======== Activity Heatmap ======== */}
-        <View style={[st.card, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+        <Card style={st.card}>
           <View style={st.heatmapHeader}>
-            <Text style={[st.cardTitle, { color: colors.textPrimary, marginBottom: 0 }]}>Активность</Text>
+            <Text variant="h3" style={{ color: colors.textPrimary }}>Активность</Text>
             <View style={st.heatmapLegend}>
-              <Text style={[st.legendLabel, { color: colors.textTertiary }]}>Мало</Text>
+              <Text variant="caption" style={{ color: colors.textTertiary }}>Мало</Text>
               {[0.1, 0.4, 0.7, 1.0].map((op) => (
-                <View
-                  key={op}
-                  style={[st.legendDot, { backgroundColor: colors.primary, opacity: op }]}
-                />
+                <View key={op} style={[st.legendDot, { backgroundColor: colors.primary, opacity: op }]} />
               ))}
-              <Text style={[st.legendLabel, { color: colors.textTertiary }]}>Много</Text>
+              <Text variant="caption" style={{ color: colors.textTertiary }}>Много</Text>
             </View>
           </View>
 
-          <View style={st.heatmapGrid}>
+          <View style={st.heatmapGrid} accessibilityLabel="Активность за 6 недель">
             {heatmapData.map((intensity, i) => (
               <View
                 key={i}
-                style={[
-                  st.heatmapCell,
-                  { backgroundColor: colors.primary, opacity: Math.max(intensity, 0.08) },
-                ]}
+                style={[st.heatmapCell, { backgroundColor: colors.primary, opacity: Math.max(intensity, 0.08) }]}
               />
             ))}
           </View>
-        </View>
+        </Card>
 
         {/* ======== Quick Stats ======== */}
-        <Text style={[st.sectionTitle, { color: colors.textPrimary }]}>Статистика</Text>
+        <Text variant="h3" style={[st.sectionTitle, { color: colors.textPrimary }]}>Статистика</Text>
         <View style={st.quickGrid}>
-          {quickStats.map((stat) => (
-            <View key={stat.label} style={[st.quickItem, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-              <Ionicons name={stat.icon as any} size={22} color={stat.color} style={{ marginBottom: 6 }} />
-              <Text style={[st.quickValue, { color: colors.textPrimary }]}>{stat.value}</Text>
-              <Text style={[st.quickLabel, { color: colors.textTertiary }]}>{stat.label}</Text>
-            </View>
-          ))}
+          {quickStats.map((stat) => {
+            const Icon = stat.icon;
+            return (
+              <View
+                key={stat.label}
+                accessible
+                accessibilityLabel={`${stat.label}: ${stat.value}`}
+                style={[st.quickItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              >
+                <Icon size={iconSize.m} color={colors[stat.color]} style={st.quickIcon} />
+                <Text variant="h3" style={[st.bold, { color: colors.textPrimary }]}>{stat.value}</Text>
+                <Text variant="caption" color="secondary">{stat.label}</Text>
+              </View>
+            );
+          })}
         </View>
 
         {/* ======== Cards Learned Chart ======== */}
-        <View style={[st.card, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-          <Text style={[st.cardTitle, { color: colors.textPrimary }]}>Карточки</Text>
+        <Card style={st.card}>
+          <Text variant="h3" style={[st.cardTitle, { color: colors.textPrimary }]}>Карточки</Text>
 
           {/* Tabs */}
-          <View style={[st.tabRow, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9' }]}>
+          <View style={[st.tabRow, { backgroundColor: colors.surfaceMuted }]}>
             {(['week', 'month', 'year'] as const).map((tab) => {
               const isActive = chartTab === tab;
               const labels = { week: 'Неделя', month: 'Месяц', year: 'Год' };
               return (
                 <Pressable
                   key={tab}
-                  style={[
-                    st.tab,
-                    isActive && [st.tabActive, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#FFFFFF' }],
-                  ]}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: isActive }}
+                  style={[st.tab, isActive && { backgroundColor: colors.surface }]}
                   onPress={() => setChartTab(tab)}
                 >
-                  <Text style={[st.tabText, { color: isActive ? colors.textPrimary : colors.textTertiary }]}>
+                  <Text variant="label" style={{ color: isActive ? colors.textPrimary : colors.textSecondary }}>
                     {labels[tab]}
                   </Text>
                 </Pressable>
@@ -493,101 +501,87 @@ export function StatisticsScreen({ navigation }: any) {
                   <View
                     style={[
                       st.barFill,
-                      {
-                        backgroundColor: colors.primary,
-                        opacity: Math.max(bar.value, 0.15),
-                        height: `${bar.value * 100}%`,
-                      },
+                      { backgroundColor: colors.primary, opacity: Math.max(bar.value, 0.15), height: `${bar.value * 100}%` },
                     ]}
                   />
                 </View>
-                <Text style={[st.barLabel, { color: colors.textTertiary }]}>{bar.label}</Text>
+                <Text variant="caption" style={{ color: colors.textTertiary }}>{bar.label}</Text>
               </View>
             ))}
           </View>
-        </View>
+        </Card>
 
         {/* ======== Context Fill Stats ======== */}
         {contextFill.totalAnswered > 0 && (
           <>
-            <Text style={[st.sectionTitle, { color: colors.textPrimary }]}>Слово в контексте</Text>
-            <View style={[st.card, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <View style={{ alignItems: 'center', flex: 1 }}>
-                  <Text style={[st.quickValue, { color: colors.primary }]}>
+            <Text variant="h3" style={[st.sectionTitle, { color: colors.textPrimary }]}>Слово в контексте</Text>
+            <Card style={st.card}>
+              <View style={st.cfRow}>
+                <View style={st.cfItem}>
+                  <Text variant="h3" style={[st.bold, { color: colors.primary }]}>
                     {contextFill.uniqueCorrect}
                   </Text>
-                  <Text style={[st.quickLabel, { color: colors.textTertiary }]}>Угадано слов</Text>
+                  <Text variant="caption" color="secondary">Угадано слов</Text>
                 </View>
-                <View style={{ width: 1, backgroundColor: cardBorder }} />
-                <View style={{ alignItems: 'center', flex: 1 }}>
-                  <Text style={[st.quickValue, { color: '#22C55E' }]}>
+                <View style={[st.cfDivider, { backgroundColor: colors.border }]} />
+                <View style={st.cfItem}>
+                  <Text variant="h3" style={[st.bold, { color: colors.successText }]}>
                     {contextFill.totalAnswered > 0
                       ? Math.round((contextFill.totalCorrect / contextFill.totalAnswered) * 100)
                       : 0}%
                   </Text>
-                  <Text style={[st.quickLabel, { color: colors.textTertiary }]}>Точность</Text>
+                  <Text variant="caption" color="secondary">Точность</Text>
                 </View>
-                <View style={{ width: 1, backgroundColor: cardBorder }} />
-                <View style={{ alignItems: 'center', flex: 1 }}>
-                  <Text style={[st.quickValue, { color: colors.textPrimary }]}>
+                <View style={[st.cfDivider, { backgroundColor: colors.border }]} />
+                <View style={st.cfItem}>
+                  <Text variant="h3" style={[st.bold, { color: colors.textPrimary }]}>
                     {contextFill.totalAnswered}
                   </Text>
-                  <Text style={[st.quickLabel, { color: colors.textTertiary }]}>Всего ответов</Text>
+                  <Text variant="caption" color="secondary">Всего ответов</Text>
                 </View>
               </View>
-            </View>
+            </Card>
           </>
         )}
 
         {/* ======== Recent Achievements ======== */}
-        <Text style={[st.sectionTitle, { color: colors.textPrimary }]}>Последние награды</Text>
+        <Text variant="h3" style={[st.sectionTitle, { color: colors.textPrimary }]}>Последние награды</Text>
         <View style={st.achieveList}>
-          {ACHIEVEMENTS.map((a) => (
-            <View key={a.id} style={[st.achieveCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-              <View style={[st.achieveIcon, { backgroundColor: isDark ? a.bgColorDark : a.bgColor }]}>
-                <Ionicons name={a.icon as any} size={22} color={a.iconColor} />
+          {ACHIEVEMENTS.map((a) => {
+            const Icon = a.icon;
+            return (
+              <View key={a.id} style={[st.achieveCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <View style={[st.achieveIcon, { backgroundColor: alpha(colors[a.color], 20) }]}>
+                  <Icon size={iconSize.m} color={colors[a.color]} />
+                </View>
+                <View style={st.achieveBody}>
+                  <Text variant="body" style={[st.semibold, { color: colors.textPrimary }]}>{a.title}</Text>
+                  <Text variant="caption" color="secondary">{a.desc}</Text>
+                </View>
+                <Text variant="caption" style={{ color: colors.textTertiary }}>{a.date}</Text>
               </View>
-              <View style={st.achieveBody}>
-                <Text style={[st.achieveTitle, { color: colors.textPrimary }]}>{a.title}</Text>
-                <Text style={[st.achieveDesc, { color: colors.textTertiary }]}>{a.desc}</Text>
-              </View>
-              <Text style={[st.achieveDate, { color: colors.textTertiary }]}>{a.date}</Text>
-            </View>
-          ))}
+            );
+          })}
         </View>
 
         {/* ======== Active Challenges ======== */}
-        <Text style={[st.sectionTitle, { color: colors.textPrimary }]}>Активные задания</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={st.challengeScroll}
-        >
+        <Text variant="h3" style={[st.sectionTitle, { color: colors.textPrimary }]}>Активные задания</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.challengeScroll}>
           {CHALLENGES.map((ch) => {
-            const isGreen = ch.variant === 'green';
-            const accentColor = isGreen ? '#10B981' : colors.primary;
-            const bgTint = isGreen
-              ? (isDark ? 'rgba(16,185,129,0.12)' : '#ECFDF5')
-              : (colors.primary + (isDark ? '1A' : '0D'));
-            const borderTint = isGreen
-              ? (isDark ? 'rgba(16,185,129,0.2)' : '#D1FAE5')
-              : (colors.primary + '33');
-
+            const accent = colors[ch.color];
+            const Icon = ch.icon;
             return (
-              <View key={ch.id} style={[st.challengeCard, { backgroundColor: bgTint, borderColor: borderTint }]}>
+              <View key={ch.id} style={[st.challengeCard, { backgroundColor: alpha(accent, 10), borderColor: alpha(accent, 20) }]}>
                 <View style={st.challengeTop}>
-                  <Ionicons name={ch.icon as any} size={20} color={accentColor} />
-                  <Text style={[st.challengeTitle, { color: colors.textPrimary }]}>{ch.title}</Text>
+                  <Icon size={iconSize.s} color={accent} />
+                  <Text variant="body" style={[st.semibold, st.flex1, { color: colors.textPrimary }]}>{ch.title}</Text>
                 </View>
                 <View style={st.challengeProgress}>
                   <View style={st.challengeProgressRow}>
-                    <Text style={[st.challengeProgressLabel, { color: colors.textTertiary }]}>Прогресс</Text>
-                    <Text style={[st.challengeProgressLabel, { color: colors.textTertiary }]}>{ch.progress}</Text>
+                    <Text variant="caption" color="secondary">Прогресс</Text>
+                    <Text variant="caption" color="secondary">{ch.progress}</Text>
                   </View>
-                  <View style={[st.challengeBar, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#FFFFFF' }]}>
-                    <View style={[st.challengeBarFill, { backgroundColor: accentColor, width: `${ch.percent}%` }]} />
-                  </View>
+                  <ProgressBar progress={ch.percent} color={accent} animated={false} />
                 </View>
               </View>
             );
@@ -595,10 +589,7 @@ export function StatisticsScreen({ navigation }: any) {
         </ScrollView>
 
         {/* ======== Detailed Analytics Button ======== */}
-        <Pressable style={[st.detailBtn, { backgroundColor: colors.primary }]}>
-          <Text style={st.detailBtnText}>Подробная аналитика</Text>
-          <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
-        </Pressable>
+        <Button title="Подробная аналитика" iconRight={ChevronRight} fullWidth style={st.detailBtn} />
       </ScrollView>
     </View>
   );
@@ -607,394 +598,65 @@ export function StatisticsScreen({ navigation }: any) {
 // ---- Styles ----
 
 const st = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: spacing.m,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xxl + 40,
-  },
-
-  // Hero Card
-  heroCard: {
-    borderRadius: borderRadius.l,
-    padding: spacing.l,
-    borderWidth: 1,
-    marginBottom: spacing.m,
-  },
-  heroTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.s,
-    marginBottom: spacing.m,
-  },
-  avatarWrap: {
-    position: 'relative',
-  },
-  avatarBorder: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 2,
-    padding: 2,
-  },
-  avatarPlaceholder: {
-    flex: 1,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  container: { flex: 1 },
+  flex1: { flex: 1 },
+  bold: { fontWeight: '700' },
+  semibold: { fontWeight: '600' },
+  pressed: { opacity: 0.85 },
+  scroll: { flex: 1 },
+  scrollContent: { paddingHorizontal: screenPadding, paddingTop: spacing.xl, paddingBottom: spacing.xxl },
+  heroCard: { padding: spacing.l, marginBottom: spacing.l },
+  heroTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.m },
+  avatarWrap: { position: 'relative' },
+  avatarBorder: { width: 72, height: 72, borderRadius: borderRadius.full, borderWidth: 3, padding: 3 },
+  avatarPlaceholder: { flex: 1, borderRadius: borderRadius.full, alignItems: 'center', justifyContent: 'center' },
   levelBadge: {
     position: 'absolute',
-    bottom: -4,
-    right: -4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    bottom: -spacing.xxs,
+    right: -spacing.xxs,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xxs / 2,
     borderRadius: borderRadius.full,
     borderWidth: 2,
   },
-  levelText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  heroInfo: {
-    flex: 1,
-    gap: 4,
-  },
-  heroName: {
-    fontSize: 19,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-  },
-  proBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  proLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  settingsBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // XP
-  xpSection: {
-    marginBottom: spacing.m,
-  },
-  xpLabelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: spacing.xs,
-  },
-  xpLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  xpBarBg: {
-    height: 10,
-    borderRadius: borderRadius.full,
-    overflow: 'hidden',
-  },
-  xpBarFill: {
-    height: '100%',
-    borderRadius: borderRadius.full,
-  },
-
-  // Hero badges
-  heroBadgesRow: {
-    flexDirection: 'row',
-    gap: spacing.s,
-  },
-  heroBadgeCard: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.s,
-    padding: spacing.s,
-    borderRadius: borderRadius.m,
-  },
-  heroBadgeValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    lineHeight: 18,
-  },
-  heroBadgeMeta: {
-    fontSize: 9,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-
-  // Common card
-  card: {
-    borderRadius: borderRadius.l,
-    padding: spacing.l,
-    borderWidth: 1,
-    marginBottom: spacing.m,
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: spacing.m,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: spacing.s,
-    marginTop: spacing.xs,
-  },
-
-  // Daily Goal
-  goalCenter: {
-    alignItems: 'center',
-    marginBottom: spacing.m,
-  },
-  circleWrap: {
-    width: 120,
-    height: 120,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  circleInner: {
-    alignItems: 'center',
-  },
-  circleValue: {
-    fontSize: 22,
-    fontWeight: '800',
-  },
-  circleLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-  },
-  goalHint: {
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-
-  // Heatmap
-  heatmapHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.m,
-  },
-  heatmapLegend: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  legendLabel: {
-    fontSize: 9,
-    fontWeight: '600',
-  },
-  legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 2,
-  },
-  heatmapGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 4,
-  },
-  heatmapCell: {
-    width: '13%',
-    aspectRatio: 1,
-    borderRadius: 3,
-  },
-
-  // Quick Stats
-  quickGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.s,
-    marginBottom: spacing.m,
-  },
-  quickItem: {
-    width: '47.5%',
-    padding: spacing.m,
-    borderRadius: borderRadius.l,
-    borderWidth: 1,
-  },
-  quickValue: {
-    fontSize: 24,
-    fontWeight: '900',
-  },
-  quickLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginTop: 2,
-  },
-
-  // Bar Chart
-  tabRow: {
-    flexDirection: 'row',
-    borderRadius: borderRadius.m,
-    padding: 3,
-    marginBottom: spacing.l,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 6,
-    alignItems: 'center',
-    borderRadius: borderRadius.s,
-  },
-  tabActive: {
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowOffset: { width: 0, height: 1 },
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  tabText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  barChart: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    height: 120,
-    paddingHorizontal: spacing.xs,
-  },
-  barCol: {
-    flex: 1,
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  barTrack: {
-    width: 14,
-    height: '100%',
-    justifyContent: 'flex-end',
-  },
-  barFill: {
-    width: '100%',
-    borderRadius: borderRadius.full,
-    minHeight: 6,
-  },
-  barLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-
-  // Achievements
-  achieveList: {
-    gap: spacing.s,
-    marginBottom: spacing.m,
-  },
-  achieveCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.s,
-    padding: spacing.m,
-    borderRadius: borderRadius.l,
-    borderWidth: 1,
-  },
-  achieveIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  achieveBody: {
-    flex: 1,
-    gap: 2,
-  },
-  achieveTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  achieveDesc: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  achieveDate: {
-    fontSize: 10,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-  },
-
-  // Challenges
-  challengeScroll: {
-    gap: spacing.s,
-    paddingBottom: spacing.m,
-  },
-  challengeCard: {
-    width: 230,
-    padding: spacing.l,
-    borderRadius: borderRadius.xl,
-    borderWidth: 1,
-  },
-  challengeTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.s,
-    marginBottom: spacing.m,
-  },
-  challengeTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  challengeProgress: {
-    gap: spacing.xs,
-  },
-  challengeProgressRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  challengeProgressLabel: {
-    fontSize: 10,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  challengeBar: {
-    height: 7,
-    borderRadius: borderRadius.full,
-    overflow: 'hidden',
-  },
-  challengeBarFill: {
-    height: '100%',
-    borderRadius: borderRadius.full,
-  },
-
-  // Detailed button
-  detailBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.m,
-    borderRadius: borderRadius.l,
-    marginTop: spacing.xs,
-    shadowColor: '#6467f2',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  detailBtnText: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
+  heroInfo: { flex: 1, gap: spacing.xxs },
+  proBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xxs },
+  xpSection: { marginTop: spacing.l, gap: spacing.xs },
+  xpLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  heroBadgesRow: { flexDirection: 'row', gap: spacing.s, marginTop: spacing.m },
+  heroBadgeCard: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.s, padding: spacing.s, borderRadius: borderRadius.m },
+  card: { marginBottom: spacing.l },
+  cardTitle: { marginBottom: spacing.m },
+  sectionTitle: { marginBottom: spacing.s },
+  goalCenter: { alignItems: 'center', marginBottom: spacing.m },
+  circleWrap: { width: 120, height: 120, alignItems: 'center', justifyContent: 'center' },
+  circleSvg: { position: 'absolute' },
+  circleInner: { alignItems: 'center' },
+  heatmapHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.m },
+  heatmapLegend: { flexDirection: 'row', alignItems: 'center', gap: spacing.xxs },
+  legendDot: { width: 10, height: 10, borderRadius: borderRadius.full },
+  heatmapGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xxs },
+  heatmapCell: { width: '13%', aspectRatio: 1, borderRadius: borderRadius.s },
+  quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.s, marginBottom: spacing.l },
+  quickItem: { width: '31%', flexGrow: 1, alignItems: 'center', padding: spacing.m, borderRadius: borderRadius.l, borderWidth: 1 },
+  quickIcon: { marginBottom: spacing.xs },
+  tabRow: { flexDirection: 'row', padding: spacing.xxs, borderRadius: borderRadius.m, marginBottom: spacing.m },
+  tab: { flex: 1, minHeight: 36, alignItems: 'center', justifyContent: 'center', borderRadius: borderRadius.s },
+  barChart: { flexDirection: 'row', alignItems: 'flex-end', height: 140, gap: spacing.xxs },
+  barCol: { flex: 1, alignItems: 'center', gap: spacing.xxs },
+  barTrack: { flex: 1, width: '70%', justifyContent: 'flex-end' },
+  barFill: { width: '100%', borderRadius: borderRadius.s },
+  cfRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  cfItem: { alignItems: 'center', flex: 1 },
+  cfDivider: { width: 1 },
+  achieveList: { gap: spacing.s, marginBottom: spacing.l },
+  achieveCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, padding: spacing.m, borderRadius: borderRadius.l, borderWidth: 1 },
+  achieveIcon: { width: 44, height: 44, borderRadius: borderRadius.m, alignItems: 'center', justifyContent: 'center' },
+  achieveBody: { flex: 1 },
+  challengeScroll: { gap: spacing.s, marginBottom: spacing.l },
+  challengeCard: { width: 220, padding: spacing.m, borderRadius: borderRadius.l, borderWidth: 1, gap: spacing.m },
+  challengeTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  challengeProgress: { gap: spacing.xs },
+  challengeProgressRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  detailBtn: { marginTop: spacing.xs },
 });
