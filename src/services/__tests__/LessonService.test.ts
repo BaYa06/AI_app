@@ -1,10 +1,13 @@
 import { describe, expect, it } from '@jest/globals';
 import type { Card, CardSet } from '@/types';
 import {
+  addExtraNew,
   buildLessonPlan,
   countWaitingReview,
   ensureLessonDay,
   estimateMinutes,
+  recordLessonAnswer,
+  setFocusSet,
   type LessonDay,
   type LessonInput,
 } from '../LessonService';
@@ -255,6 +258,28 @@ describe('ensureLessonDay', () => {
       extraNew: 0,
       focusSetId: 's2',
     });
+  });
+});
+
+describe('переходы дня', () => {
+  const day = ensureLessonDay(null, '2026-10-01', 5);
+
+  it('ответ записывается в свою часть урока один раз', () => {
+    const a = recordLessonAnswer(day, 'review', 'c1');
+    expect(a.reviewedIds).toEqual(['c1']);
+    const b = recordLessonAnswer(a, 'new', 'c2');
+    expect(b.introducedIds).toEqual(['c2']);
+    // Повторный ответ (например, исправление ошибки) — день не меняется
+    expect(recordLessonAnswer(b, 'review', 'c2')).toBe(b);
+    expect(recordLessonAnswer(b, 'review', 'c1')).toBe(b);
+  });
+
+  it('«Ещё 10 новых» и выбор набора', () => {
+    expect(addExtraNew(addExtraNew(day)).extraNew).toBe(20);
+    const focused = setFocusSet(day, 's3');
+    expect(focused.focusSetId).toBe('s3');
+    expect(setFocusSet(focused, 's3')).toBe(focused);
+    expect(setFocusSet(focused, null).focusSetId).toBeNull();
   });
 });
 

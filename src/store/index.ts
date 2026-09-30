@@ -12,3 +12,4 @@ export { useDiamondStore } from './diamondStore';
 export { useChallengeStore } from './challengeStore';
 export type { ChallengeId, ChallengeStatus } from './challengeStore';
 export { useContextFillStore } from './contextFillStore';
+export { useLessonStore } from './lessonStore';

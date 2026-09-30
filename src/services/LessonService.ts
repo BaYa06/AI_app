@@ -146,6 +146,26 @@ export function ensureLessonDay(prev: LessonDay | null, date: string, waitingNow
   };
 }
 
+/** Часть урока, в которой дан ответ: повторение (тест) или новые слова (карточки) */
+export type LessonPhase = 'review' | 'new';
+
+/** Ответ в уроке: слово попадает в повторённые или впервые показанные за день (повторный ответ — без изменений) */
+export function recordLessonAnswer(day: LessonDay, phase: LessonPhase, cardId: string): LessonDay {
+  const key = phase === 'review' ? 'reviewedIds' : 'introducedIds';
+  if (day.reviewedIds.includes(cardId) || day.introducedIds.includes(cardId)) return day;
+  return { ...day, [key]: [...day[key], cardId] };
+}
+
+/** Кнопка «Ещё 10 новых» */
+export function addExtraNew(day: LessonDay): LessonDay {
+  return { ...day, extraNew: day.extraNew + EXTRA_NEW_STEP };
+}
+
+/** «Сменить набор»: null — снова выбирать автоматически */
+export function setFocusSet(day: LessonDay, setId: string | null): LessonDay {
+  return day.focusSetId === setId ? day : { ...day, focusSetId: setId };
+}
+
 export function estimateMinutes(reviewCount: number, newCount: number): number {
   if (reviewCount + newCount === 0) return 0;
   return Math.max(1, Math.round((reviewCount * REVIEW_SEC + newCount * NEW_SEC) / 60));
