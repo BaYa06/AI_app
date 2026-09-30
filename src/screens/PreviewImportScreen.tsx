@@ -3,22 +3,15 @@ import {
   View,
   FlatList,
   StyleSheet,
-  Alert,
-  ActivityIndicator,
-  TextInput,
-  Modal,
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
-  TouchableOpacity,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text, Button } from '@/components/common';
+import { Text } from '@/components/common';
 import { useThemeColors, useSetsStore, useCardsStore } from '@/store';
-import { spacing, borderRadius, TOP_LANGUAGES } from '@/constants';
+import { spacing, borderRadius, iconSize, screenPadding, TOP_LANGUAGES, alpha } from '@/constants';
+import { Button, Dialog, ScreenHeader, TextField, toast, useScreenBottomInset } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
-import { ArrowLeft, BookOpen } from 'lucide-react-native';
+import { BookOpen } from 'lucide-react-native';
 import { describeError } from '@/utils/userErrors';
 
 type Props = RootStackScreenProps<'PreviewImport'>;
@@ -69,7 +62,7 @@ function SaveModal({
     onSelect: (code: string) => void,
   ) => (
     <View style={styles.langBlock}>
-      <Text variant="caption" style={{ color: showValidation && !selected ? colors.error : colors.textSecondary, fontWeight: '600' }}>
+      <Text variant="label" style={{ color: showValidation && !selected ? colors.errorText : colors.textSecondary }}>
         {label}
       </Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -80,15 +73,17 @@ function SaveModal({
               <Pressable
                 key={lang.code}
                 onPress={() => onSelect(lang.code)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
                 style={[
                   styles.langChip,
                   {
-                    backgroundColor: active ? colors.primary : colors.background,
-                    borderColor: active ? colors.primary : showValidation && !selected ? colors.error : colors.border,
+                    backgroundColor: active ? colors.primaryFill : colors.surfaceMuted,
+                    borderColor: active ? colors.primaryFill : showValidation && !selected ? colors.error : colors.surfaceMuted,
                   },
                 ]}
               >
-                <Text variant="caption" style={{ color: active ? '#fff' : colors.textPrimary, fontWeight: '600' }}>
+                <Text variant="label" style={{ color: active ? colors.onPrimary : colors.textPrimary }}>
                   {lang.flag} {lang.label}
                 </Text>
               </Pressable>
@@ -100,61 +95,41 @@ function SaveModal({
   );
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-      <KeyboardAvoidingView
-        style={styles.modalOverlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
-        <View style={[styles.modalCard, { backgroundColor: colors.surface, shadowColor: colors.shadow }]}>
-          <Text variant="h3" style={{ color: colors.textPrimary, fontWeight: '700', marginBottom: spacing.s }}>
-            Название набора
-          </Text>
-
-          <View style={[styles.modalInput, { borderColor: colors.border, backgroundColor: colors.background }]}>
-            <TextInput
-              style={[styles.modalInputText, { color: colors.textPrimary }]}
-              placeholder="Например: Биология. Митоз"
-              placeholderTextColor={colors.textSecondary}
-              value={title}
-              onChangeText={setTitle}
-              returnKeyType="done"
-            />
-          </View>
-
-          {renderLanguageRow('Язык слов *', languageFrom, setLanguageFrom)}
-          {renderLanguageRow('Язык перевода *', languageTo, setLanguageTo)}
-          {showValidation && !languagesSelected && (
-            <Text variant="caption" style={{ color: colors.error, marginTop: spacing.xs }}>
-              Выберите оба языка
-            </Text>
-          )}
-
-          <View style={styles.modalActions}>
-            <TouchableOpacity
-              onPress={onCancel}
-              style={[styles.modalBtn, { borderColor: colors.border }]}
-              activeOpacity={0.7}
-            >
-              <Text variant="body" style={{ color: colors.textSecondary }}>Отмена</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={handleConfirm}
-              disabled={saving}
-              style={[styles.modalBtn, styles.modalBtnPrimary, { backgroundColor: colors.primary, opacity: languagesSelected ? 1 : 0.6 }]}
-              activeOpacity={0.8}
-            >
-              {saving ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text variant="body" style={{ color: '#fff', fontWeight: '600' }}>Сохранить</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+    <Dialog
+      visible={visible}
+      onClose={onCancel}
+      // Форма с вводом — по фону не закрываем (брендбук, 7.6)
+      dismissOnBackdrop={false}
+      title="Название набора"
+      footer={
+        <View style={styles.modalActions}>
+          <Button variant="quiet" tone="secondary" title="Отмена" onPress={onCancel} style={styles.flex1} />
+          <Button
+            title="Сохранить"
+            onPress={handleConfirm}
+            loading={saving}
+            style={[styles.flex1, !languagesSelected && styles.dimmed]}
+          />
         </View>
-      </KeyboardAvoidingView>
-    </Modal>
+      }
+    >
+      <TextField
+        placeholder="Например: Биология. Митоз"
+        accessibilityLabel="Название набора"
+        value={title}
+        onChangeText={setTitle}
+        returnKeyType="done"
+        style={styles.titleField}
+      />
+
+      {renderLanguageRow('Язык слов *', languageFrom, setLanguageFrom)}
+      {renderLanguageRow('Язык перевода *', languageTo, setLanguageTo)}
+      {showValidation && !languagesSelected && (
+        <Text variant="caption" style={{ color: colors.errorText, marginTop: spacing.xs }}>
+          Выбери оба языка
+        </Text>
+      )}
+    </Dialog>
   );
 }
 
@@ -171,7 +146,7 @@ function CardRow({
 }) {
   return (
     <View style={[styles.cardRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <View style={[styles.cardIndex, { backgroundColor: colors.primary + '18' }]}>
+      <View style={[styles.cardIndex, { backgroundColor: alpha(colors.primary, 10) }]}>
         <Text variant="caption" style={{ color: colors.primary, fontWeight: '700' }}>
           {index + 1}
         </Text>
@@ -195,6 +170,7 @@ function CardRow({
 export function PreviewImportScreen({ navigation, route }: Props) {
   const { cards, suggestedTitle = '', setId } = route.params;
   const colors = useThemeColors();
+  const bottomInset = useScreenBottomInset();
 
   const addSet = useSetsStore(s => s.addSet);
   const updateSetStats = useSetsStore(s => s.updateSetStats);
@@ -212,7 +188,7 @@ export function PreviewImportScreen({ navigation, route }: Props) {
       updateSetStats(setId, { cardCount: cards.length, newCount: cards.length });
       navigation.replace('SetDetail', { setId });
     } catch (e: any) {
-      Alert.alert('Ошибка', describeError(e, 'Не удалось сохранить карточки'));
+      toast.error(describeError(e, 'Не удалось сохранить карточки'));
     } finally {
       setSaving(false);
     }
@@ -230,7 +206,7 @@ export function PreviewImportScreen({ navigation, route }: Props) {
       setModalVisible(false);
       navigation.replace('SetDetail', { setId: newSet.id });
     } catch (e: any) {
-      Alert.alert('Ошибка', describeError(e, 'Не удалось сохранить набор'));
+      toast.error(describeError(e, 'Не удалось сохранить набор'));
     } finally {
       setSaving(false);
     }
@@ -239,34 +215,30 @@ export function PreviewImportScreen({ navigation, route }: Props) {
   // ── render ────────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]} edges={['top']}>
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <Pressable
-          hitSlop={10}
-          onPress={() => navigation.goBack()}
-          style={({ pressed }) => [
-            styles.headerBtn,
-            { backgroundColor: pressed ? colors.surfaceVariant : 'transparent' },
-          ]}
-        >
-          <ArrowLeft size={20} color={colors.textPrimary} />
-        </Pressable>
-        <View style={{ flex: 1 }}>
-          <Text variant="h3" style={{ color: colors.textPrimary, fontWeight: '700' }}>
-            Предпросмотр
-          </Text>
-          <Text variant="caption" style={{ color: colors.textSecondary }}>
-            {cards.length} {declCard(cards.length)}
-          </Text>
-        </View>
-        <View style={[styles.countBadge, { backgroundColor: colors.primary + '18' }]}>
-          <BookOpen size={14} color={colors.primary} />
-          <Text variant="caption" style={{ color: colors.primary, fontWeight: '700', marginLeft: 4 }}>
-            {cards.length}
-          </Text>
-        </View>
-      </View>
+    // Верхний safe area уже учтён в App.tsx; снизу — свой (экран без панели вкладок)
+    <View style={[styles.root, { backgroundColor: colors.background, paddingBottom: bottomInset }]}>
+      <ScreenHeader
+        onBack={() => navigation.goBack()}
+        bordered
+        center={
+          <View style={styles.headerTitles} accessibilityRole="header">
+            <Text variant="button" style={[styles.noLetterSpacing, { color: colors.textPrimary }]}>
+              Предпросмотр
+            </Text>
+            <Text variant="caption" color="secondary">
+              {cards.length} {declCard(cards.length)}
+            </Text>
+          </View>
+        }
+        right={
+          <View style={[styles.countBadge, { backgroundColor: alpha(colors.primary, 10) }]}>
+            <BookOpen size={iconSize.xs} color={colors.primary} />
+            <Text variant="caption" style={[styles.bold, { color: colors.primary }]}>
+              {cards.length}
+            </Text>
+          </View>
+        }
+      />
 
       {/* Card list */}
       <FlatList
@@ -284,24 +256,16 @@ export function PreviewImportScreen({ navigation, route }: Props) {
       <View style={[styles.bottom, { borderTopColor: colors.border, backgroundColor: colors.background }]}>
         <Button
           title="Изменить"
-          variant="outline"
+          variant="secondary"
           onPress={() => navigation.goBack()}
-          style={{ flex: 1 }}
+          style={styles.flex1}
         />
-        <TouchableOpacity
+        <Button
+          title={setId ? 'Добавить в набор' : 'Сохранить набор'}
           onPress={setId ? handleSaveToExisting : () => setModalVisible(true)}
-          disabled={saving}
-          style={[styles.saveBtn, { backgroundColor: saving ? colors.border : colors.primary }]}
-          activeOpacity={0.85}
-        >
-          {saving ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text variant="body" style={{ color: '#fff', fontWeight: '600' }}>
-              {setId ? 'Добавить в набор' : 'Сохранить набор'}
-            </Text>
-          )}
-        </TouchableOpacity>
+          loading={saving}
+          style={styles.flex2}
+        />
       </View>
 
       {/* Modal — only for new set flow */}
@@ -315,7 +279,7 @@ export function PreviewImportScreen({ navigation, route }: Props) {
           onCancel={() => !saving && setModalVisible(false)}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -334,30 +298,23 @@ function declCard(n: number): string {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.s,
-    gap: spacing.s,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  headerBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: borderRadius.s,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  flex1: { flex: 1 },
+  flex2: { flex: 2 },
+  bold: { fontWeight: '700' },
+  noLetterSpacing: { letterSpacing: 0 },
+  dimmed: { opacity: 0.6 },
+  headerTitles: { alignItems: 'center' },
+  titleField: { marginBottom: spacing.m },
   countBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.xxs,
     paddingHorizontal: spacing.s,
-    paddingVertical: 4,
+    paddingVertical: spacing.xxs,
     borderRadius: borderRadius.full,
   },
   list: {
-    paddingHorizontal: spacing.m,
+    paddingHorizontal: screenPadding,
     paddingTop: spacing.s,
     paddingBottom: spacing.l,
   },
@@ -383,47 +340,15 @@ const styles = StyleSheet.create({
   bottom: {
     flexDirection: 'row',
     gap: spacing.s,
-    paddingHorizontal: spacing.m,
+    paddingHorizontal: screenPadding,
     paddingTop: spacing.s,
-    paddingBottom: spacing.l,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  saveBtn: {
-    flex: 2,
-    height: 48,
-    borderRadius: borderRadius.m,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingBottom: spacing.m,
+    borderTopWidth: 1,
   },
   // Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: '#00000055',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.l,
-  },
-  modalCard: {
-    borderRadius: borderRadius.l,
-    padding: spacing.l,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  modalInput: {
-    borderWidth: 1,
-    borderRadius: borderRadius.m,
-    paddingHorizontal: spacing.s,
-    marginBottom: spacing.m,
-  },
-  modalInputText: {
-    height: 44,
-    fontSize: 15,
-  },
   modalActions: {
     flexDirection: 'row',
     gap: spacing.s,
-    marginTop: spacing.m,
   },
   langBlock: {
     gap: spacing.xs,
@@ -438,16 +363,5 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.full,
     borderWidth: 1,
-  },
-  modalBtn: {
-    flex: 1,
-    height: 44,
-    borderRadius: borderRadius.m,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  modalBtnPrimary: {
-    borderWidth: 0,
   },
 });

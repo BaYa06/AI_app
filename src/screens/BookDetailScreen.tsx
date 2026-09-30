@@ -11,11 +11,13 @@ import {
   Pressable,
   ActivityIndicator,
 } from 'react-native';
-import { ArrowLeft, ChevronRight, Layers, BookOpen, Link2 } from 'lucide-react-native';
+import { ChevronRight, Layers, BookOpen, Link2 } from 'lucide-react-native';
 import { Text, Container } from '@/components/common';
 import { AttachToCoursesSheet } from '@/components/books/AttachToCoursesSheet';
+import { Badge, Button, ErrorState, ScreenHeader, toast } from '@/components/ui';
 import { useThemeColors, useSettingsStore, useCoursesStore } from '@/store';
-import { spacing, borderRadius, getLanguageDef } from '@/constants';
+import { spacing, borderRadius, iconSize, getLanguageDef, alpha } from '@/constants';
+import { pluralize } from '@/utils';
 import { BookService } from '@/services/BookService';
 import { getBookCover, formatBookMeta } from '@/utils/bookCover';
 import { showMessage, confirmAction } from '@/utils/dialogs';
@@ -28,7 +30,6 @@ type Props = RootStackScreenProps<'BookDetail'>;
 export function BookDetailScreen({ navigation, route }: Props) {
   const { bookId } = route.params;
   const colors = useThemeColors();
-  const isDark = useSettingsStore((s) => s.resolvedTheme) === 'dark';
   const isTeacher = useSettingsStore((s) => s.isTeacher) === true;
   const courses = useCoursesStore((s) => s.courses);
 
@@ -39,8 +40,6 @@ export function BookDetailScreen({ navigation, route }: Props) {
   const [attachVisible, setAttachVisible] = useState(false);
   const [attaching, setAttaching] = useState(false);
 
-  const surfaceBg = isDark ? 'rgb(24, 26, 38)' : colors.surface;
-  const headerBg = isDark ? colors.background : '#FFFFFF';
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -93,13 +92,7 @@ export function BookDetailScreen({ navigation, route }: Props) {
     }
   }, [detail, courses, navigation]);
 
-  const header = (
-    <View style={[s.header, { backgroundColor: headerBg, borderBottomColor: colors.border }]}>
-      <Pressable onPress={() => navigation.goBack()} hitSlop={10} style={s.headerIcon}>
-        <ArrowLeft size={22} color={colors.textPrimary} />
-      </Pressable>
-    </View>
-  );
+  const header = <ScreenHeader onBack={() => navigation.goBack()} bordered />;
 
   if (isLoading || failed || !detail) {
     return (
@@ -109,15 +102,12 @@ export function BookDetailScreen({ navigation, route }: Props) {
           {isLoading ? (
             <ActivityIndicator size="large" color={colors.primary} />
           ) : (
-            <>
-              <Text style={[s.emptyTitle, { color: colors.textPrimary }]}>Книга недоступна</Text>
-              <Text style={[s.emptySubtitle, { color: colors.textTertiary }]}>
-                Не удалось загрузить книгу. Проверьте подключение к интернету.
-              </Text>
-              <Pressable style={[s.retryBtn, { backgroundColor: colors.primary }]} onPress={load}>
-                <Text style={s.retryBtnText}>Попробовать снова</Text>
-              </Pressable>
-            </>
+            <ErrorState
+              title="Книга недоступна"
+              description="Не удалось загрузить книгу. Проверь подключение к интернету."
+              retryLabel="Попробовать снова"
+              onRetry={load}
+            />
           )}
         </View>
       </Container>
@@ -135,9 +125,9 @@ export function BookDetailScreen({ navigation, route }: Props) {
       {header}
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
         {/* Hero */}
-        <View style={[s.heroSection, { backgroundColor: surfaceBg }]}>
-          <View style={[s.heroCover, { backgroundColor: cover.color + '1A' }]}>
-            <Text style={s.heroCoverEmoji}>{cover.emoji}</Text>
+        <View style={[s.heroSection, { backgroundColor: colors.surface }]}>
+          <View style={[s.heroCover, { backgroundColor: alpha(cover.color, 10) }]}>
+            <cover.icon size={iconSize.xl} color={cover.color} />
           </View>
           <Text variant="h1" style={[s.heroTitle, { color: colors.textPrimary }]}>{book.title}</Text>
           {meta ? <Text style={[s.heroMeta, { color: colors.textSecondary }]}>{meta}</Text> : null}
@@ -147,19 +137,11 @@ export function BookDetailScreen({ navigation, route }: Props) {
           </Text>
 
           {!book.isPublished && (
-            <View style={[s.draftBadge, { backgroundColor: '#F59E0B1A' }]}>
-              <Text style={[s.draftText, { color: '#B45309' }]}>Черновик — видно только админу</Text>
-            </View>
+            <Badge label="Черновик — видно только админу" tone="warning" style={s.draftBadge} />
           )}
 
           {isTeacher && book.isPublished && (
-            <Pressable
-              onPress={() => setAttachVisible(true)}
-              style={({ pressed }) => [s.attachBtn, { backgroundColor: colors.primary }, pressed && { opacity: 0.85 }]}
-            >
-              <Link2 size={18} color="#FFFFFF" />
-              <Text style={s.attachBtnText}>Подключить к курсу</Text>
-            </Pressable>
+            <Button title="Подключить к курсу" icon={Link2} onPress={() => setAttachVisible(true)} fullWidth style={s.attachBtn} />
           )}
           {isTeacher && detail.attachedCourseIds.length > 0 && (
             <Text style={[s.heroMeta, { color: colors.textTertiary, marginTop: spacing.xs }]}>
@@ -170,17 +152,17 @@ export function BookDetailScreen({ navigation, route }: Props) {
           <View style={s.metricsRow}>
             <View style={[s.metricCard, { borderColor: colors.border }]}>
               <View style={s.metricValue}>
-                <BookOpen size={16} color={colors.primary} />
+                <BookOpen size={iconSize.xs} color={colors.primary} />
                 <Text style={[s.metricNumber, { color: colors.textPrimary }]}>{units.length}</Text>
               </View>
-              <Text style={[s.metricLabel, { color: colors.textTertiary }]}>Юнитов</Text>
+              <Text variant="overline" color="secondary" style={s.metricLabel}>Юнитов</Text>
             </View>
             <View style={[s.metricCard, { borderColor: colors.border }]}>
               <View style={s.metricValue}>
-                <Layers size={16} color={colors.primary} />
+                <Layers size={iconSize.xs} color={colors.primary} />
                 <Text style={[s.metricNumber, { color: colors.textPrimary }]}>{totalCards}</Text>
               </View>
-              <Text style={[s.metricLabel, { color: colors.textTertiary }]}>Слов</Text>
+              <Text variant="overline" color="secondary" style={s.metricLabel}>Слов</Text>
             </View>
           </View>
         </View>
@@ -189,7 +171,7 @@ export function BookDetailScreen({ navigation, route }: Props) {
         <View style={s.section}>
           <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>Юниты</Text>
           {units.length === 0 ? (
-            <Text style={[s.emptySubtitle, { color: colors.textTertiary }]}>В книге пока нет юнитов</Text>
+            <Text variant="bodySmall" color="secondary">В книге пока нет юнитов</Text>
           ) : (
             <View style={s.unitList}>
               {units.map((unit) => {
@@ -201,26 +183,28 @@ export function BookDetailScreen({ navigation, route }: Props) {
                     key={unit.id}
                     onPress={() => openUnit(unit)}
                     disabled={!set || openingSetId !== null}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Юнит ${unit.number}. ${unit.title}`}
                     style={({ pressed }) => [
                       s.unitRow,
                       { backgroundColor: colors.surface, borderColor: colors.border },
-                      pressed && { opacity: 0.7 },
+                      pressed && { opacity: 0.85 },
                       !set && { opacity: 0.5 },
                     ]}
                   >
-                    <View style={[s.unitNumber, { backgroundColor: colors.primary + '15' }]}>
+                    <View style={[s.unitNumber, { backgroundColor: alpha(colors.primary, 10) }]}>
                       <Text style={[s.unitNumberText, { color: colors.primary }]}>{unit.number}</Text>
                     </View>
                     <View style={s.unitBody}>
                       <Text style={[s.unitTitle, { color: colors.textPrimary }]} numberOfLines={1}>{unit.title}</Text>
-                      <Text style={[s.unitMeta, { color: colors.textTertiary }]} numberOfLines={1}>
-                        {[unit.pages ? `стр. ${unit.pages}` : null, `${words} слов`].filter(Boolean).join(' · ')}
+                      <Text style={[s.unitMeta, { color: colors.textSecondary }]} numberOfLines={1}>
+                        {[unit.pages ? `стр. ${unit.pages}` : null, `${words} ${pluralize(words, 'слово', 'слова', 'слов')}`].filter(Boolean).join(' · ')}
                       </Text>
                     </View>
                     {isOpening ? (
                       <ActivityIndicator size="small" color={colors.primary} />
                     ) : (
-                      <ChevronRight size={20} color={colors.textTertiary} />
+                      <ChevronRight size={iconSize.xs} color={colors.textTertiary} />
                     )}
                   </Pressable>
                 );
@@ -239,7 +223,7 @@ export function BookDetailScreen({ navigation, route }: Props) {
         onSubmit={attachToCourses}
         onCreateCourse={() => {
           setAttachVisible(false);
-          showMessage('Создайте курс', 'Курс создаётся на главном экране в меню курсов. После этого вернитесь к книге.');
+          toast.info('Создай курс в меню курсов на главном экране, а потом вернись к книге');
         }}
       />
     </Container>
@@ -247,34 +231,25 @@ export function BookDetailScreen({ navigation, route }: Props) {
 }
 
 const s = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.s, paddingVertical: spacing.s, borderBottomWidth: 1 },
-  headerIcon: { width: 40, height: 40, borderRadius: borderRadius.full, alignItems: 'center', justifyContent: 'center' },
   centerContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.s, paddingHorizontal: spacing.xl },
-  emptyTitle: { fontSize: 18, fontWeight: '700', textAlign: 'center' },
-  emptySubtitle: { fontSize: 14, fontWeight: '500', textAlign: 'center', lineHeight: 20 },
-  retryBtn: { paddingHorizontal: spacing.l, paddingVertical: spacing.s, borderRadius: borderRadius.l, marginTop: spacing.s },
-  retryBtnText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
   heroSection: { alignItems: 'center', paddingHorizontal: spacing.l, paddingTop: spacing.xl, paddingBottom: spacing.l, gap: spacing.xxs },
   heroCover: { width: 96, height: 96, borderRadius: borderRadius.xl, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.m },
-  heroCoverEmoji: { fontSize: 48 },
   heroTitle: { textAlign: 'center', marginBottom: spacing.xxs },
-  heroMeta: { fontSize: 13, fontWeight: '600', textAlign: 'center' },
-  draftBadge: { marginTop: spacing.s, paddingHorizontal: spacing.s, paddingVertical: 4, borderRadius: borderRadius.s },
-  draftText: { fontSize: 12, fontWeight: '700' },
-  attachBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, alignSelf: 'stretch', height: 48, borderRadius: borderRadius.l, marginTop: spacing.m },
-  attachBtnText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
+  heroMeta: { fontSize: 14, fontWeight: '600', textAlign: 'center' },
+  draftBadge: { marginTop: spacing.s, alignSelf: 'center' },
+  attachBtn: { marginTop: spacing.m },
   metricsRow: { flexDirection: 'row', gap: spacing.s, width: '100%', marginTop: spacing.m },
   metricCard: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.s, borderRadius: borderRadius.l, borderWidth: 1 },
   metricValue: { flexDirection: 'row', alignItems: 'center', gap: spacing.xxs },
-  metricNumber: { fontSize: 18, fontWeight: '800' },
-  metricLabel: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, marginTop: 2 },
+  metricNumber: { fontSize: 18, fontWeight: '700' },
+  metricLabel: { marginTop: spacing.xxs / 2 },
   section: { paddingHorizontal: spacing.m, paddingTop: spacing.l, gap: spacing.s },
   sectionTitle: { fontSize: 18, fontWeight: '700' },
   unitList: { gap: spacing.s },
-  unitRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, padding: spacing.m, borderRadius: borderRadius.xl, borderWidth: 1 },
-  unitNumber: { width: 40, height: 40, borderRadius: borderRadius.l, alignItems: 'center', justifyContent: 'center' },
-  unitNumberText: { fontSize: 16, fontWeight: '800' },
-  unitBody: { flex: 1, gap: 2 },
-  unitTitle: { fontSize: 15, fontWeight: '700' },
-  unitMeta: { fontSize: 12, fontWeight: '500' },
+  unitRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, padding: spacing.m, borderRadius: borderRadius.l, borderWidth: 1 },
+  unitNumber: { width: 40, height: 40, borderRadius: borderRadius.m, alignItems: 'center', justifyContent: 'center' },
+  unitNumberText: { fontSize: 16, fontWeight: '700' },
+  unitBody: { flex: 1, gap: spacing.xxs / 2 },
+  unitTitle: { fontSize: 16, fontWeight: '700' },
+  unitMeta: { fontSize: 12, fontWeight: '600' },
 });

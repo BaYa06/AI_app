@@ -3,12 +3,12 @@
  * @description Экран создания/редактирования карточки
  */
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Alert, Pressable } from 'react-native';
+import { View, StyleSheet, ScrollView } from 'react-native';
 import { useCardsStore, useSetsStore, useThemeColors } from '@/store';
-import { Container, Input, Button, Text } from '@/components/common';
+import { Container, Text } from '@/components/common';
 import { spacing } from '@/constants';
+import { Button, ScreenHeader, TextField, confirmDialog, toast } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
-import { ArrowLeft } from 'lucide-react-native';
 
 type Props = RootStackScreenProps<'CardEditor'>;
 
@@ -35,7 +35,7 @@ export function CardEditorScreen({ navigation, route }: Props) {
   // Блокируем редактирование read-only наборов (курсы учителя)
   useEffect(() => {
     if (cardSet?.isReadOnly) {
-      Alert.alert('Только чтение', 'Этот набор создан учителем');
+      toast.info('Только чтение: этот набор создан учителем');
       navigation.goBack();
     }
   }, [cardSet?.isReadOnly, navigation]);
@@ -68,11 +68,11 @@ export function CardEditorScreen({ navigation, route }: Props) {
   const handleSave = useCallback(async () => {
     // Валидация
     if (!frontText.trim()) {
-      Alert.alert('Ошибка', 'Введите иностранное слово');
+      toast.error('Введи иностранное слово');
       return;
     }
     if (!backText.trim()) {
-      Alert.alert('Ошибка', 'Введите перевод');
+      toast.error('Введи перевод');
       return;
     }
 
@@ -95,7 +95,7 @@ export function CardEditorScreen({ navigation, route }: Props) {
 
       navigation.goBack();
     } catch (error) {
-      Alert.alert('Ошибка', 'Не удалось сохранить карточку');
+      toast.error('Не удалось сохранить карточку');
     } finally {
       setIsSaving(false);
     }
@@ -112,25 +112,19 @@ export function CardEditorScreen({ navigation, route }: Props) {
   ]);
 
   // Удаление
-  const handleDelete = useCallback(() => {
+  const handleDelete = useCallback(async () => {
     if (!cardId) return;
 
-    Alert.alert(
-      'Удалить карточку?',
-      'Это действие нельзя отменить',
-      [
-        { text: 'Отмена', style: 'cancel' },
-        {
-          text: 'Удалить',
-          style: 'destructive',
-          onPress: () => {
-            deleteCard(cardId);
-            decrementCardCount(setId);
-            navigation.goBack();
-          },
-        },
-      ]
-    );
+    const confirmed = await confirmDialog({
+      title: 'Удалить карточку?',
+      message: 'Это действие нельзя отменить',
+      confirmText: 'Удалить',
+      destructive: true,
+    });
+    if (!confirmed) return;
+    deleteCard(cardId);
+    decrementCardCount(setId);
+    navigation.goBack();
   }, [cardId, setId, deleteCard, decrementCardCount, navigation]);
 
   // Создать и добавить еще
@@ -153,7 +147,7 @@ export function CardEditorScreen({ navigation, route }: Props) {
       setFrontText('');
       setBackText('');
     } catch (error) {
-      Alert.alert('Ошибка', 'Не удалось сохранить карточку');
+      toast.error('Не удалось сохранить карточку');
     } finally {
       setIsSaving(false);
     }
@@ -161,60 +155,44 @@ export function CardEditorScreen({ navigation, route }: Props) {
 
   return (
     <Container edges={['top', 'bottom']}>
-      <View
-        style={[
-          styles.header,
-          {
-            backgroundColor: 'transparent',
-            borderBottomColor: 'transparent',
-            shadowColor: colors.shadow,
-          },
-        ]}
-      >
-        <Pressable
-          hitSlop={10}
-          onPress={() => navigation.goBack()}
-          style={({ pressed }) => [
-            styles.headerIcon,
-            { backgroundColor: pressed ? colors.surfaceVariant : 'transparent' },
-          ]}
-        >
-          <ArrowLeft size={20} color={colors.textPrimary} />
-        </Pressable>
-        <View style={styles.headerTitles}>
-          <Text variant="h3" style={{ color: colors.textPrimary, fontWeight: '800' }}>
-            {isEditing ? 'Редактировать' : 'Новая карточка'}
-          </Text>
-          <Text variant="caption" color="secondary">
-            {cardSet?.title || 'Набор'}
-          </Text>
-        </View>
-        <View style={styles.headerPlaceholder} />
-      </View>
+      <ScreenHeader
+        onBack={() => navigation.goBack()}
+        style={styles.header}
+        center={
+          <View style={styles.headerTitles} accessibilityRole="header">
+            <Text variant="button" numberOfLines={1} style={[styles.headerTitle, { color: colors.textPrimary }]}>
+              {isEditing ? 'Редактировать' : 'Новая карточка'}
+            </Text>
+            <Text variant="caption" color="secondary" numberOfLines={1}>
+              {cardSet?.title || 'Набор'}
+            </Text>
+          </View>
+        }
+      />
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <Input
+        <TextField
           label={sourceLabel}
           placeholder="Например: scharf"
           value={frontText}
           onChangeText={setFrontText}
           multiline
           numberOfLines={2}
-          textAlignVertical="top"
           inputStyle={styles.textArea}
+          style={styles.field}
         />
 
-        <Input
+        <TextField
           label={targetLabel}
           placeholder="Например: острый"
           value={backText}
           onChangeText={setBackText}
           multiline
           numberOfLines={2}
-          textAlignVertical="top"
           inputStyle={styles.textArea}
+          style={styles.field}
         />
 
         {/* Кнопки */}
@@ -228,8 +206,8 @@ export function CardEditorScreen({ navigation, route }: Props) {
 
           {!isEditing && (
             <Button
-              title="Сохранить и добавить еще"
-              variant="outline"
+              title="Сохранить и добавить ещё"
+              variant="secondary"
               onPress={handleSaveAndNew}
               disabled={isSaving}
               fullWidth
@@ -239,12 +217,11 @@ export function CardEditorScreen({ navigation, route }: Props) {
           {isEditing && (
             <Button
               title="Удалить карточку"
-              variant="ghost"
+              variant="danger"
               onPress={handleDelete}
               disabled={isSaving}
               fullWidth
-              textStyle={{ color: colors.error }}
-              style={{ display: 'none' }}
+              style={styles.hidden}
             />
           )}
         </View>
@@ -255,40 +232,26 @@ export function CardEditorScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
   textArea: {
-    height: 120,
-    paddingTop: spacing.m,
+    minHeight: 96,
   },
+  field: {
+    marginBottom: spacing.m,
+  },
+  // Шапка внутри Container с отступом 16 — свой боковой отступ не нужен
   header: {
     paddingHorizontal: 0,
-    marginHorizontal: 0,
-    paddingVertical: spacing.m,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.s,
-    borderBottomWidth: 0,
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 0,
-    backgroundColor: 'transparent',
-  },
-  headerIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   headerTitles: {
-    flex: 1,
+    alignItems: 'center',
   },
-  headerPlaceholder: {
-    width: 40,
-    height: 40,
+  headerTitle: {
+    letterSpacing: 0,
   },
-
+  hidden: {
+    display: 'none',
+  },
   buttons: {
-    gap: spacing.m,
+    gap: spacing.s,
     marginTop: spacing.l,
     paddingBottom: spacing.xl,
   },

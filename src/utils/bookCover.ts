@@ -1,18 +1,26 @@
 /**
- * Обложка-заглушка книги каталога: эмодзи и цвет по предмету.
+ * Обложка-заглушка книги каталога: иконка lucide и цвет по предмету.
+ * Эмодзи-обложки (📘 📗 📕 📐 📚) заменены иконками — брендбук, раздел 6.
+ * Цвета — из DECK_ACCENT_COLORS (иконки наборов и книг).
  */
+import { BookOpenText, Ruler, Library } from 'lucide-react-native';
+import { DECK_ACCENT_COLORS } from '@/constants/colors';
 
-const SUBJECT_COVERS: Record<string, { emoji: string; color: string }> = {
-  english: { emoji: '📘', color: '#3B82F6' },
-  german: { emoji: '📗', color: '#10B981' },
-  russian: { emoji: '📕', color: '#EF4444' },
-  kyrgyz: { emoji: '📙', color: '#F59E0B' },
-  math: { emoji: '📐', color: '#8B5CF6' },
+type CoverIcon = typeof Library;
+type Cover = { icon: CoverIcon; color: string };
+
+// Индексы DECK_ACCENT_COLORS: 0 coral, 1 orange, 2 amber, 3 emerald, 4 sky, 5 violet, 6 pink, 7 teal
+const SUBJECT_COVERS: Record<string, Cover> = {
+  english: { icon: BookOpenText, color: DECK_ACCENT_COLORS[4] },
+  german: { icon: BookOpenText, color: DECK_ACCENT_COLORS[3] },
+  russian: { icon: BookOpenText, color: DECK_ACCENT_COLORS[0] },
+  kyrgyz: { icon: BookOpenText, color: DECK_ACCENT_COLORS[2] },
+  math: { icon: Ruler, color: DECK_ACCENT_COLORS[5] },
 };
 
-const DEFAULT_COVER = { emoji: '📚', color: '#6366F1' };
+const DEFAULT_COVER: Cover = { icon: Library, color: DECK_ACCENT_COLORS[7] };
 
-export function getBookCover(subject: string | null | undefined): { emoji: string; color: string } {
+export function getBookCover(subject: string | null | undefined): Cover {
   if (!subject) return DEFAULT_COVER;
   return SUBJECT_COVERS[subject.trim().toLowerCase()] || DEFAULT_COVER;
 }
