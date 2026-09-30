@@ -22,6 +22,7 @@ import { NeonService } from '@/services/NeonService';
 import { supabase } from '@/services/supabaseClient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
+import { pluralize } from '@/utils';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'StudentDetail'>;
 
@@ -46,14 +47,6 @@ interface StudentStats {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function pluralCards(n: number): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod100 >= 11 && mod100 <= 19) return 'карточек';
-  if (mod10 === 1) return 'карточка';
-  if (mod10 >= 2 && mod10 <= 4) return 'карточки';
-  return 'карточек';
-}
 
 function setStatus(set: SetStat): 'done' | 'inProgress' | 'notStarted' {
   if (set.totalCards === 0) return 'notStarted';
@@ -403,7 +396,7 @@ function SetProgressRow({ set, cardBg, cardBorder, colors }: {
       </View>
 
       <Text style={[styles.setMeta, { color: colors.textSecondary }]}>
-        {set.seenCards} / {set.totalCards} {pluralCards(set.seenCards)} просмотрено · {seenPct}%
+        {set.seenCards} / {set.totalCards} {pluralize(set.seenCards, 'карточка', 'карточки', 'карточек')} просмотрено · {seenPct}%
         {set.learnedCards > 0 ? `  ·  выучено: ${set.learnedCards} (${learnedPct}%)` : ''}
       </Text>
     </View>

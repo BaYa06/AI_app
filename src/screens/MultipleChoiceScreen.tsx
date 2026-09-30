@@ -18,6 +18,7 @@ import { Analytics } from '@/services/analytics';
 import { useChallengeStore } from '@/store';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card, Rating } from '@/types';
+import { pluralize } from '@/utils';
 
 type Props = RootStackScreenProps<'MultipleChoice'>;
 
@@ -638,7 +639,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
       kind: isSuccess ? 'trophy' : challengeResult.timesUp ? 'time' : 'strength',
       title: isSuccess ? 'Поздравляем!' : challengeResult.timesUp ? 'Время вышло!' : 'Не получилось...',
       subtitle: isSuccess
-        ? `Все ${challengeResult.total} слов угаданы без ошибок за ${formatTime(challengeResult.timeSpent ?? 0)}! Алмазы ждут тебя на главной.`
+        ? `Все ${challengeResult.total} ${pluralize(challengeResult.total, 'слово', 'слова', 'слов')} угаданы без ошибок за ${formatTime(challengeResult.timeSpent ?? 0)}! Алмазы ждут тебя на главной.`
         : challengeResult.timesUp
           ? `Ты успел ответить на ${currentIndex} из ${totalQuestions}`
           : 'Чтобы забрать алмазы, угадай все слова за 2 минуты без единой ошибки. Ты справишься!',

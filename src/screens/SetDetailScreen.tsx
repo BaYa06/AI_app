@@ -43,6 +43,7 @@ import {
   Layers,
 } from 'lucide-react-native';
 import { describeError } from '@/utils/userErrors';
+import { pluralize } from '@/utils';
 
 type Props = RootStackScreenProps<'SetDetail'>;
 type Filter = 'all' | 'mastered' | 'unmastered';
@@ -1387,7 +1388,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
       <StudyModeSheet
         visible={showStudySheet}
         onClose={() => setShowStudySheet(false)}
-        subtitle={`Набор: ${set?.title || 'Набор'} • ${set?.cardCount || 0} слов`}
+        subtitle={`Набор: ${set?.title || 'Набор'} • ${set?.cardCount || 0} ${pluralize(set?.cardCount || 0, 'слово', 'слова', 'слов')}`}
         onSelectMode={handleSelectStudyMode}
         settings={{
           onlyHard,
@@ -1426,7 +1427,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                 <ArrowLeft size={iconSize.m} color={modalTextPrimary} />
               </Pressable>
               <Text variant="body" style={[styles.importTitle, { color: modalTextPrimary }]}>
-                {importStep === 'done' ? 'Готово!' : importStep === 'preview' ? `Импорт (${importedCards.length} карточек)` : importStep === 'generating' ? 'Генерация примеров...' : importStep === 'translating' ? 'Перевод слов...' : importStep === 'extracting' ? (importSource === 'image' ? 'Обработка фото...' : 'Обработка PDF...') : 'Импорт из файла'}
+                {importStep === 'done' ? 'Готово!' : importStep === 'preview' ? `Импорт (${importedCards.length} ${pluralize(importedCards.length, 'карточка', 'карточки', 'карточек')})` : importStep === 'generating' ? 'Генерация примеров...' : importStep === 'translating' ? 'Перевод слов...' : importStep === 'extracting' ? (importSource === 'image' ? 'Обработка фото...' : 'Обработка PDF...') : 'Импорт из файла'}
               </Text>
               <View style={styles.topIcon} />
             </View>
@@ -1519,7 +1520,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                   Импорт завершён
                 </Text>
                 <Text variant="body" color="secondary" align="center" style={{ marginTop: spacing.xs, paddingHorizontal: spacing.l }}>
-                  {importedCount === 1 ? 'Добавлена 1 карточка' : importedCount < 5 ? `Добавлено ${importedCount} карточки` : `Добавлено ${importedCount} карточек`}
+                  {`${pluralize(importedCount, 'Добавлена', 'Добавлено', 'Добавлено')} ${importedCount} ${pluralize(importedCount, 'карточка', 'карточки', 'карточек')}`}
                 </Text>
                 <Pressable accessibilityRole="button"
                   onPress={closeImportModal}

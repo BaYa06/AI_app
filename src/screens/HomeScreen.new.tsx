@@ -498,14 +498,10 @@ export function HomeScreen({ navigation }: any) {
   const SWIPE_THRESHOLD = 50;
   const SWIPE_VELOCITY = 200;
   const closeStreakModal = useCallback(() => setStreakModalVisible(false), []);
-  const formatDays = useCallback((value: number) => {
-    const mod100 = value % 100;
-    const mod10 = value % 10;
-    if (mod100 >= 11 && mod100 <= 14) return `${value} дней`;
-    if (mod10 === 1) return `${value} день`;
-    if (mod10 >= 2 && mod10 <= 4) return `${value} дня`;
-    return `${value} дней`;
-  }, []);
+  const formatDays = useCallback(
+    (value: number) => `${value} ${pluralize(value, 'день', 'дня', 'дней')}`,
+    [],
+  );
 
   // Fetch backend activity when modal opens
   useEffect(() => {
@@ -599,7 +595,7 @@ export function HomeScreen({ navigation }: any) {
     if (remaining <= 3) {
       return `Осталось всего ${remaining} — ты почти у цели! Ещё чуть-чуть и серия продлена.`;
     }
-    return `Хорошее начало! Осталось ${remaining} слов до цели. Продолжай в том же духе!`;
+    return `Хорошее начало! Осталось ${remaining} ${pluralize(remaining, 'слово', 'слова', 'слов')} до цели. Продолжай в том же духе!`;
   }, [goalProgress, dailyGoal, cardsLearned]);
   
   // Фильтрация наборов по активному курсу
@@ -712,7 +708,7 @@ export function HomeScreen({ navigation }: any) {
       return {
         badge: `#${lastWeekBoard.me.place}`,
         title: 'Итоги недели готовы',
-        hint: mine && mine.reward > 0 ? `Твоя награда: +${mine.reward} алмазов` : 'Посмотри, кто победил',
+        hint: mine && mine.reward > 0 ? `Твоя награда: +${mine.reward} ${pluralize(mine.reward, 'алмаз', 'алмаза', 'алмазов')}` : 'Посмотри, кто победил',
         dot: true,
         week: 'previous' as const,
       };
@@ -917,11 +913,11 @@ export function HomeScreen({ navigation }: any) {
     [allSets]
   );
 
-  const formatSetWord = useCallback((count: number) => {
-    if (count === 1) return 'набор';
-    if (count >= 2 && count <= 4) return 'набора';
-    return 'наборов';
-  }, []);
+  // Раньше считалось только по 1 / 2–4: выходило «21 наборов», «22 наборов»
+  const formatSetWord = useCallback(
+    (count: number) => pluralize(count, 'набор', 'набора', 'наборов'),
+    [],
+  );
 
   // Colбэки для CoursesDrawer — логика 1:1 перенесена из прежних инлайн-обработчиков,
   // трогать поведение не нужно, меняется только то, что оно теперь живёт в пропсах.
@@ -2127,7 +2123,7 @@ export function HomeScreen({ navigation }: any) {
       <StudyModeSheet
         visible={showStudyModeModal}
         onClose={() => setShowStudyModeModal(false)}
-        subtitle={`${activeCourseTitle ? activeCourseTitle : 'Все наборы'} • ${dueCards} карточек`}
+        subtitle={`${activeCourseTitle ? activeCourseTitle : 'Все наборы'} • ${dueCards} ${pluralize(dueCards, 'карточка', 'карточки', 'карточек')}`}
         onSelectMode={handleSelectStudyMode}
         games={homeStudyModeGames}
         settings={{

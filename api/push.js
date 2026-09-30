@@ -57,15 +57,15 @@ function minutesFor(count) {
 function buildMessage(type, name, streak, longest, data = {}) {
   switch (type) {
     case 'streak_reminder':
-      return { title: 'Не теряй серию!', body: `${name}, у тебя ${streak} дней подряд. Позанимайся сегодня!` };
+      return { title: 'Не теряй серию!', body: `${name}, у тебя ${streak} ${plural(streak, 'день', 'дня', 'дней')} подряд. Позанимайся сегодня!` };
     case 'streak_lost':
-      return { title: 'Серия прервана', body: `Серия в ${data.prevStreak} дней потеряна. Начни сегодня заново!` };
+      return { title: 'Серия прервана', body: `Серия в ${data.prevStreak} ${plural(data.prevStreak, 'день', 'дня', 'дней')} потеряна. Начни сегодня заново!` };
     case 'streak_milestone':
-      return { title: `${data.days} дней подряд!`, body: `${name}, это твой личный рекорд! Так держать` };
+      return { title: `${data.days} ${plural(data.days, 'день', 'дня', 'дней')} подряд!`, body: `${name}, это твой личный рекорд! Так держать` };
     case 'reactivation_3d':
       return { title: 'Давно не виделись', body: `${name}, прошло 3 дня. Карточки ждут тебя!` };
     case 'reactivation_7d':
-      return { title: 'Вернись к учёбе', body: `Твой рекорд был ${longest} дней. Начни новую серию!` };
+      return { title: 'Вернись к учёбе', body: `Твой рекорд был ${longest} ${plural(longest, 'день', 'дня', 'дней')}. Начни новую серию!` };
     case 'review_due':
       return { title: 'Пора повторить', body: `${data.count} ${plural(data.count, 'слово ждёт', 'слова ждут', 'слов ждут')} повторения · ~${minutesFor(data.count)} мин` };
     case 'words_fading':
@@ -80,7 +80,7 @@ function buildMessage(type, name, streak, longest, data = {}) {
     case 'weekly_result':
       return {
         title: 'Итоги недели',
-        body: `${data.place}-е место в курсе${data.reward > 0 ? `, +${data.reward} алмазов` : ''}. Новая неделя началась!`,
+        body: `${data.place}-е место в курсе${data.reward > 0 ? `, +${data.reward} ${plural(data.reward, 'алмаз', 'алмаза', 'алмазов')}` : ''}. Новая неделя началась!`,
       };
     case 'teacher_review':
       return { title: `${data.teacher || 'Учитель'} просит повторить слова`, body: `${data.count} ${plural(data.count, 'слово ждёт', 'слова ждут', 'слов ждут')} повторения · ~${minutesFor(data.count)} мин` };

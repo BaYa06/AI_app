@@ -21,6 +21,7 @@ import ReAnimated, {
   withDelay,
   Easing,
 } from 'react-native-reanimated';
+import { pluralize } from '@/utils';
 
 interface Props {
   visible: boolean;
@@ -138,7 +139,7 @@ export function StreakCelebrationModal({ visible, streakCount, onClose }: Props)
 
   if (!visible) return null;
 
-  const dayWord = getDayWord(streakCount);
+  const dayWord = pluralize(streakCount, 'день', 'дня', 'дней');
 
   return (
     <Modal transparent visible={visible} animationType="fade" statusBarTranslucent>
@@ -193,14 +194,6 @@ export function StreakCelebrationModal({ visible, streakCount, onClose }: Props)
   );
 }
 
-function getDayWord(n: number): string {
-  const abs = Math.abs(n) % 100;
-  const lastDigit = abs % 10;
-  if (abs >= 11 && abs <= 19) return 'дней';
-  if (lastDigit === 1) return 'день';
-  if (lastDigit >= 2 && lastDigit <= 4) return 'дня';
-  return 'дней';
-}
 
 const MEDALLION_SIZE = 200;
 

@@ -16,6 +16,7 @@ import { NeonService, type CourseLeaderboard } from '@/services/NeonService';
 import { StorageService } from '@/services/StorageService';
 import { triggerHaptic } from '@/utils/haptic';
 import type { RootStackScreenProps } from '@/types/navigation';
+import { pluralize } from '@/utils';
 
 type Props = RootStackScreenProps<'CourseLeaderboard'>;
 type Week = 'current' | 'previous';
@@ -29,13 +30,6 @@ export type LeaderboardSeen = { weekStart?: string; place?: number | null; resul
 // Пьедестал: подложка — цвет медали 20 %, текст — textPrimary (читаемо в обеих темах)
 const PODIUM: ColorToken[] = ['star', 'silver', 'bronze'];
 
-function pointsWord(n: number): string {
-  const m10 = n % 10, m100 = n % 100;
-  if (m100 >= 11 && m100 <= 19) return 'очков';
-  if (m10 === 1) return 'очко';
-  if (m10 >= 2 && m10 <= 4) return 'очка';
-  return 'очков';
-}
 
 function timeLeft(endsAt: number | null): string | null {
   if (!endsAt) return null;
@@ -220,12 +214,12 @@ export function CourseLeaderboardScreen({ navigation, route }: Props) {
                       <Text variant="label" style={[styles.podiumName, { color: colors.textPrimary }]} numberOfLines={1}>{r.isMe ? 'Ты' : r.name}</Text>
                       <View
                         accessible
-                        accessibilityLabel={`${i + 1} место: ${r.points} ${pointsWord(r.points)}`}
+                        accessibilityLabel={`${i + 1} место: ${r.points} ${pluralize(r.points, 'очко', 'очка', 'очков')}`}
                         style={[styles.podiumBase, { height: podiumHeights[i], backgroundColor: r.isMe ? alpha(colors.primary, 10) : alpha(colors[PODIUM[i]], 20) }]}
                       >
                         <Text variant="h2" style={{ color: r.isMe ? colors.primary : colors.textPrimary }}>{i + 1}</Text>
                         <Text variant="caption" style={[styles.semibold, { color: r.isMe ? colors.primary : colors.textSecondary }]}>
-                          {r.points} {pointsWord(r.points)}
+                          {r.points} {pluralize(r.points, 'очко', 'очка', 'очков')}
                         </Text>
                       </View>
                     </View>
@@ -308,7 +302,7 @@ export function CourseLeaderboardScreen({ navigation, route }: Props) {
                       ? 'Набери первые очки, чтобы занять место'
                       : data.me.place === 1
                         ? 'Ты на 1-м месте — удержи до конца недели'
-                        : `Ты на ${data.me.place}-м месте${data.me.gapToNext != null ? ` · до ${data.me.place! - 1}-го — ${data.me.gapToNext} ${pointsWord(data.me.gapToNext)}` : ''}`}
+                        : `Ты на ${data.me.place}-м месте${data.me.gapToNext != null ? ` · до ${data.me.place! - 1}-го — ${data.me.gapToNext} ${pluralize(data.me.gapToNext, 'очко', 'очка', 'очков')}` : ''}`}
                 </Text>
                 {data.me.learnedTotal != null && (
                   <Text variant="caption" color="secondary">Всего выучено в курсе: {data.me.learnedTotal}</Text>

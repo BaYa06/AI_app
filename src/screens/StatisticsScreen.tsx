@@ -52,14 +52,6 @@ function formatHours(minutes: number): string {
   return h % 1 === 0 ? `${h}ч` : `${h.toFixed(1)}ч`;
 }
 
-function pluralizeDays(n: number): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod100 >= 11 && mod100 <= 19) return `${n} дней`;
-  if (mod10 === 1) return `${n} день`;
-  if (mod10 >= 2 && mod10 <= 4) return `${n} дня`;
-  return `${n} дней`;
-}
 
 const DAY_LABELS_SHORT = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const MONTH_LABELS = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
@@ -321,7 +313,7 @@ export function StatisticsScreen({ navigation }: any) {
               <Flame size={iconSize.m} color={colors.streak} />
               <View>
                 <Text variant="body" style={[st.bold, { color: colors.textPrimary }]}>
-                  {pluralizeDays(currentStreak)}
+                  {currentStreak} {pluralize(currentStreak, 'день', 'дня', 'дней')}
                 </Text>
                 <Text variant="caption" color="secondary">Серия</Text>
               </View>

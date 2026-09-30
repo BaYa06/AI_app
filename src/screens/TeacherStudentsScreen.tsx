@@ -29,6 +29,7 @@ import { NeonService } from '@/services/NeonService';
 import { supabase } from '@/services/supabaseClient';
 import type { RootStackParamList } from '@/types/navigation';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { pluralize } from '@/utils';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TeacherStudents'>;
 
@@ -92,14 +93,6 @@ function formatLastActivity(lastActiveDate: string | null, colors: ReturnType<ty
   return { text: `${months} мес. назад`, color: colors.textTertiary };
 }
 
-function pluralCards(n: number): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod100 >= 11 && mod100 <= 19) return 'карточек';
-  if (mod10 === 1) return 'карточка';
-  if (mod10 >= 2 && mod10 <= 4) return 'карточки';
-  return 'карточек';
-}
 
 // ==================== STUDENT ROW ====================
 
@@ -177,7 +170,7 @@ function StudentRow({ student, colors, onPress, onRemove }: {
           {student.todayCards > 0 && (
             <View style={[styles.cardsBadge, { backgroundColor: alpha(colors.success, 10) }]}>
               <Text style={[styles.cardsBadgeText, { color: colors.successText }]}>
-                {student.todayCards} {pluralCards(student.todayCards)}
+                {student.todayCards} {pluralize(student.todayCards, 'карточка', 'карточки', 'карточек')}
               </Text>
             </View>
           )}

@@ -11,6 +11,7 @@
  * - слово просрочено дольше интервала своего шага («угасает») — сначала шаг −1 (план §3.3).
  */
 import type { Card, Rating, CardStatus } from '@/types';
+import { pluralize } from '@/utils';
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 /** Повторение «вовремя», если до срока осталось не больше 6 часов */
@@ -163,25 +164,6 @@ export function formatInterval(days: number): string {
     const years = Math.round(days / 365);
     return `${years} ${pluralize(years, 'год', 'года', 'лет')}`;
   }
-}
-
-/**
- * Склонение слов
- */
-function pluralize(n: number, one: string, few: string, many: string): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  
-  if (mod100 >= 11 && mod100 <= 19) {
-    return many;
-  }
-  if (mod10 === 1) {
-    return one;
-  }
-  if (mod10 >= 2 && mod10 <= 4) {
-    return few;
-  }
-  return many;
 }
 
 /**
