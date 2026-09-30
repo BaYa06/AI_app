@@ -1,25 +1,24 @@
 {
   "totals": {
-    "hex": 138,
-    "rgba": 65,
-    "isDark": 48,
-    "font": 56,
-    "weight": 35,
-    "radius": 31,
-    "alpha": 48,
-    "alert": 5,
-    "small": 19,
-    "emoji": 24,
-    "ion": 13,
-    "a11y": 24,
-    "en": 23,
-    "total": 426
+    "hex": 45,
+    "rgba": 11,
+    "isDark": 0,
+    "font": 23,
+    "weight": 21,
+    "radius": 10,
+    "alpha": 10,
+    "alert": 4,
+    "small": 16,
+    "emoji": 21,
+    "ion": 0,
+    "a11y": 12,
+    "en": 22,
+    "total": 124
   },
   "files": {
     "src/screens/SubscriptionScreen.tsx": {
-      "hex": 21,
-      "rgba": 8,
-      "isDark": 6,
+      "hex": 16,
+      "rgba": 4,
       "font": 7,
       "weight": 5,
       "radius": 2,
@@ -27,67 +26,7 @@
       "small": 5,
       "a11y": 1,
       "en": 1,
-      "total": 53
-    },
-    "src/screens/SharedSetDetailScreen.tsx": {
-      "hex": 19,
-      "rgba": 3,
-      "isDark": 6,
-      "font": 9,
-      "weight": 10,
-      "alpha": 3,
-      "small": 7,
-      "emoji": 4,
-      "ion": 1,
-      "a11y": 4,
-      "en": 11,
-      "total": 50
-    },
-    "src/screens/TestJoinScreen.tsx": {
-      "hex": 14,
-      "rgba": 9,
-      "isDark": 9,
-      "font": 8,
-      "weight": 2,
-      "radius": 1,
-      "alpha": 3,
-      "small": 1,
-      "emoji": 1,
-      "a11y": 1,
-      "total": 46
-    },
-    "src/screens/TestWaitingScreen.tsx": {
-      "hex": 13,
-      "rgba": 4,
-      "isDark": 6,
-      "font": 7,
-      "weight": 3,
-      "radius": 6,
-      "alpha": 5,
-      "emoji": 1,
-      "a11y": 1,
-      "total": 44
-    },
-    "src/screens/TestDoneScreen.tsx": {
-      "hex": 13,
-      "rgba": 4,
-      "isDark": 4,
-      "font": 6,
-      "weight": 4,
-      "alpha": 8,
-      "a11y": 1,
-      "total": 39
-    },
-    "src/screens/TestExamScreen.tsx": {
-      "hex": 11,
-      "rgba": 9,
-      "isDark": 6,
-      "font": 3,
-      "weight": 2,
-      "radius": 3,
-      "alpha": 3,
-      "small": 1,
-      "total": 37
+      "total": 38
     },
     "src/screens/HomeScreen.tsx": {
       "hex": 17,
@@ -100,134 +39,39 @@
       "en": 10,
       "total": 36
     },
-    "src/screens/StudyPlaceholderScreen.tsx": {
-      "hex": 5,
-      "rgba": 5,
-      "isDark": 6,
-      "font": 2,
-      "weight": 4,
+    "src/screens/SharedSetDetailScreen.tsx": {
+      "hex": 11,
+      "font": 9,
+      "weight": 10,
       "alpha": 2,
-      "emoji": 3,
-      "total": 24
+      "small": 7,
+      "emoji": 4,
+      "a11y": 4,
+      "en": 11,
+      "total": 32
     },
     "src/screens/SecurityScreen.tsx": {
-      "hex": 3,
-      "rgba": 4,
-      "isDark": 5,
+      "hex": 1,
       "font": 1,
       "weight": 1,
       "radius": 1,
-      "alpha": 7,
+      "alpha": 4,
       "small": 1,
       "a11y": 2,
-      "total": 22
+      "total": 8
     },
-    "src/components/common/NotificationPrompt.tsx": {
-      "hex": 3,
-      "rgba": 2,
-      "font": 4,
-      "weight": 1,
-      "radius": 2,
-      "alpha": 1,
-      "a11y": 1,
-      "total": 13
-    },
-    "src/App.tsx": {
-      "hex": 7,
-      "rgba": 2,
-      "font": 1,
-      "radius": 1,
-      "alert": 1,
-      "total": 12
-    },
-    "src/components/common/ErrorBoundary.tsx": {
-      "hex": 7,
-      "rgba": 1,
-      "font": 1,
-      "radius": 1,
-      "small": 1,
-      "total": 10
-    },
-    "src/screens/WelcomeScreen.tsx": {
-      "hex": 2,
-      "rgba": 6,
-      "weight": 1,
-      "radius": 1,
-      "ion": 1,
-      "total": 10
-    },
-    "src/components/common/LoadingSplash.tsx": {
-      "hex": 3,
-      "rgba": 1,
-      "weight": 1,
-      "ion": 1,
-      "total": 5
-    },
-    "src/screens/TargetLanguagesScreen.tsx": {
-      "font": 1,
-      "alpha": 2,
-      "alert": 1,
-      "ion": 1,
-      "a11y": 1,
-      "total": 4
-    },
-    "src/screens/DailyGoalScreen.tsx": {
-      "radius": 2,
-      "alpha": 1,
-      "ion": 1,
-      "a11y": 1,
-      "total": 3
-    },
-    "src/screens/NativeLanguageScreen.tsx": {
-      "font": 1,
-      "alpha": 2,
-      "ion": 1,
-      "a11y": 1,
-      "total": 3
-    },
-    "src/screens/TeacherGroupSizeScreen.tsx": {
-      "radius": 2,
-      "alpha": 1,
-      "ion": 1,
-      "a11y": 1,
-      "total": 3
-    },
-    "src/screens/LearningGoalScreen.tsx": {
-      "alpha": 2,
-      "ion": 1,
-      "a11y": 1,
-      "total": 2
-    },
-    "src/screens/RoleSelectionScreen.tsx": {
-      "alpha": 2,
-      "ion": 1,
-      "a11y": 1,
-      "total": 2
-    },
-    "src/screens/TeacherSubjectScreen.tsx": {
-      "alpha": 2,
-      "ion": 1,
-      "a11y": 1,
-      "total": 2
+    "src/screens/StudyPlaceholderScreen.tsx": {
+      "font": 2,
+      "weight": 4,
+      "emoji": 3,
+      "total": 6
     },
     "src/store/coursesStore.ts": {
       "alert": 2,
       "total": 2
     },
-    "src/components/common/LottieWrapper.tsx": {
-      "font": 1,
-      "emoji": 1,
-      "total": 1
-    },
-    "src/screens/EmailAuthScreen.tsx": {
-      "radius": 1,
-      "ion": 1,
-      "en": 1,
-      "total": 1
-    },
-    "src/screens/OTPVerifyScreen.tsx": {
-      "radius": 1,
-      "ion": 1,
+    "src/App.tsx": {
+      "alert": 1,
       "total": 1
     },
     "src/utils/dialogs.ts": {
@@ -236,10 +80,6 @@
     },
     "src/constants/languages.ts": {
       "emoji": 1
-    },
-    "src/screens/SignInScreen.tsx": {
-      "ion": 1,
-      "a11y": 1
     },
     "src/services/DatabaseService.ts": {
       "emoji": 13

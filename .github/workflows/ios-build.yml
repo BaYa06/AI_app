@@ -27,6 +27,9 @@ jobs:
       - name: Install JS dependencies
         run: npm install
 
+      - name: Brand check
+        run: npm run brand:check -- --fail-on-new
+
       - name: Create .env.local from secrets
         env:
           POSTGRES_URL: ${{ secrets.POSTGRES_URL }}

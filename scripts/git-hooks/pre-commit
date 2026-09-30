@@ -1,0 +1,25 @@
+#!/bin/sh
+# Брендбук: коммит не проходит, если нарушений стало больше, чем в снимке
+# scripts/brand-baseline.json (plan/brandbook_migration.md, шаг 8.1).
+# Ставится командой `npm run hooks:install` (и автоматически при npm install).
+# Обойти в крайнем случае: git commit --no-verify
+
+# Проверяем только когда в коммите есть файлы интерфейса
+if ! git diff --cached --name-only --diff-filter=ACMR | grep -qE '^src/.*\.(ts|tsx)$'; then
+  exit 0
+fi
+
+command -v node >/dev/null 2>&1 || exit 0
+
+repo_root=$(git rev-parse --show-toplevel) || exit 0
+cd "$repo_root" || exit 0
+
+if ! node scripts/brand-check.mjs --fail-on-new >/tmp/brand-check-precommit.log 2>&1; then
+  # таблицу не показываем — только новые нарушения и подсказку
+  sed -n '/✗ Новые нарушения/,$p' /tmp/brand-check-precommit.log
+  echo ""
+  echo "Подробно по строкам: npm run brand:check -- --details <путь к файлу>"
+  exit 1
+fi
+
+exit 0

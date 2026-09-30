@@ -14,7 +14,9 @@
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "type-check": "tsc --noEmit",
     "brand:check": "node scripts/brand-check.mjs",
+    "hooks:install": "node scripts/install-git-hooks.mjs",
     "clean": "cd android && ./gradlew clean && cd .. && cd ios && xcodebuild clean && cd ..",
+    "prepare": "node scripts/install-git-hooks.mjs || true",
     "postinstall": "npx patch-package || true"
   },
   "dependencies": {

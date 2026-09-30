@@ -13,6 +13,8 @@ workflows:
     scripts:
       - name: Install dependencies
         script: npm ci
+      - name: Brand check (plan/brandbook_migration.md, 8.1)
+        script: npm run brand:check -- --fail-on-new
       - name: Create .env.local from secrets
         # POSTGRES_URL/SUPABASE_URL/SUPABASE_ANON_KEY must come from the "app_secrets"
         # environment variable group (create it in Codemagic: Team settings -> Environment
@@ -86,6 +88,8 @@ workflows:
     scripts:
       - name: Install dependencies
         script: npm ci
+      - name: Brand check (plan/brandbook_migration.md, 8.1)
+        script: npm run brand:check -- --fail-on-new
       - name: Apply patches
         script: |
           if [ -f patches/react-native-reanimated+3.5.4.patch ]; then
