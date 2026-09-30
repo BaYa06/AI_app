@@ -56,6 +56,14 @@ export type LessonState =
   | 'done' //     на сегодня всё
   | 'finished'; // на сегодня всё, и новых слов больше нет ни в одном наборе
 
+/** Набор, в котором ещё есть новые слова — для «Сменить набор» */
+export interface NewWordsSet {
+  setId: string;
+  title: string;
+  /** Сколько новых слов ещё ни разу не показывали */
+  newLeft: number;
+}
+
 export interface LessonPlan {
   state: LessonState;
   /** Очередь повторения (тест) */
@@ -84,6 +92,10 @@ export interface LessonPlan {
   newQuota: number;
   /** Сколько слов урока уже сделано сегодня (повторено + впервые показано) — для кольца прогресса */
   doneToday: number;
+  /** Наборы с новыми словами в порядке списка — для «Сменить набор» */
+  newSets: NewWordsSet[];
+  /** Текущий набор выбран вручную («Сменить набор»), а не автоматически */
+  focusManual: boolean;
 }
 
 export interface LessonInput {
@@ -270,5 +282,7 @@ export function buildLessonPlan({ sets, cardsBySet, cards, newPerDay, day, now }
     newLeftTotal,
     newQuota,
     doneToday: day.reviewedIds.length + day.introducedIds.length,
+    newSets: withNew.map((s) => ({ setId: s.set.id, title: s.set.title, newLeft: unseenOf(s.cards).length })),
+    focusManual: !!chosen,
   };
 }

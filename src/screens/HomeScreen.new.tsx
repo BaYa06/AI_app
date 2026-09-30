@@ -65,6 +65,7 @@ import { localDay } from '@/store/challengeStore';
 import { buildLessonPlan, countWaitingReview, ensureLessonDay, EXTRA_NEW_STEP, type LessonDay, type LessonPlan } from '@/services/LessonService';
 import { isLessonStartable, lessonCardContent, streakRiskHoursLeft } from '@/components/home/lessonText';
 import { LessonCard } from '@/components/home/LessonCard';
+import { FocusSetSheet } from '@/components/home/FocusSetSheet';
 
 const StaggerCard = React.memo(function StaggerCard({
   index,
@@ -717,6 +718,19 @@ export function HomeScreen({ navigation }: any) {
     const rootNav = navigation?.getParent?.() ?? navigation;
     rootNav?.navigate(step.screen, step.params);
   }, [navigation, reviewStats, cardsMap]);
+
+  // «Сменить набор» (2.4): откуда урок берёт новые слова
+  const [focusSheetVisible, setFocusSheetVisible] = useState(false);
+  const openFocusSheet = useCallback(() => {
+    triggerHaptic('selection');
+    Analytics.homeAction('change_set');
+    setFocusSheetVisible(true);
+  }, []);
+  const selectFocusSet = useCallback((setId: string | null) => {
+    triggerHaptic('selection');
+    useLessonStore.getState().setFocusSet(setId);
+    setFocusSheetVisible(false);
+  }, []);
 
   const handleLessonPress = useCallback(() => {
     if (!lessonContent) return;
@@ -1589,7 +1603,12 @@ export function HomeScreen({ navigation }: any) {
               <>
               {/* Урок дня — единственное главное действие главной (plan/home_redesign.md, 2.2) */}
               {lessonContent && (
-                <LessonCard content={lessonContent} onPress={handleLessonPress} style={styles.lessonCard} />
+                <LessonCard
+                  content={lessonContent}
+                  onPress={handleLessonPress}
+                  onSecondaryPress={openFocusSheet}
+                  style={styles.lessonCard}
+                />
               )}
               {/* Challenges Section */}
               <View style={styles.challengesSection}>
@@ -2018,6 +2037,15 @@ export function HomeScreen({ navigation }: any) {
           );
         })}
       </Sheet>
+
+      <FocusSetSheet
+        visible={focusSheetVisible}
+        onClose={() => setFocusSheetVisible(false)}
+        sets={lessonPlan.newSets}
+        currentSetId={lessonPlan.focusSetId}
+        manual={lessonPlan.focusManual}
+        onSelect={selectFocusSet}
+      />
 
       {/* Join by Code Modal */}
       <JoinByCodeModal

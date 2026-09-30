@@ -1,7 +1,8 @@
 /**
  * LessonCard — главная карточка «Урок дня» (plan/home_redesign.md, шаг 2.1)
  * @description Единственный залитый элемент главной: надзаголовок, заголовок, состав и время,
- * одна причина начать, кольцо прогресса дня и кнопка во всю ширину. Вся карточка — одна кнопка.
+ * одна причина начать, кольцо прогресса дня и кнопка во всю ширину — всё это одна кнопка.
+ * Под ней — тихое «Сменить набор» (отдельно: вложенную кнопку VoiceOver на iOS не видит).
  * Спокойный вид (урок пройден): surface + рамка, иконка вместо кольца, контурная кнопка.
  * Содержимое готовит lessonCardContent (lessonText.ts), действие по kind выбирает главная.
  */
@@ -21,6 +22,8 @@ const RING_STROKE = 6;
 interface Props {
   content: LessonCardContent;
   onPress: () => void;
+  /** Тихое действие под кнопкой (content.secondary) — «Сменить набор» */
+  onSecondaryPress?: () => void;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -62,9 +65,9 @@ const ProgressRing = memo(function ProgressRing({ done, total, color, track }: {
   );
 });
 
-export const LessonCard = memo(function LessonCard({ content, onPress, style }: Props) {
+export const LessonCard = memo(function LessonCard({ content, onPress, onSecondaryPress, style }: Props) {
   const colors = useThemeColors();
-  const { calm, overline, title, meta, hint, action, kind, progress } = content;
+  const { calm, overline, title, meta, hint, action, kind, progress, secondary } = content;
   const a11yLabel = [title, meta, hint, action].filter(Boolean).join('. ');
 
   if (calm) {
@@ -91,32 +94,39 @@ export const LessonCard = memo(function LessonCard({ content, onPress, style }: 
 
   const on = colors.onPrimary;
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={a11yLabel}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.card,
-        styles.gap,
-        { backgroundColor: pressed ? colors.primaryPressed : colors.primaryFill },
-        pressed && styles.pressedScale,
-        style,
-      ]}
-    >
-      <View style={styles.row}>
-        <View style={styles.texts}>
-          <Text variant="overline" style={[styles.muted, { color: on }]}>{overline}</Text>
-          <Text variant="h3" style={{ color: on }}>{title}</Text>
-          {meta ? <Text variant="body" style={[styles.semibold, { color: on }]}>{meta}</Text> : null}
-          {hint ? <Text variant="bodySmall" style={[styles.muted, { color: on }]}>{hint}</Text> : null}
+    <View style={[styles.card, styles.gapS, { backgroundColor: colors.primaryFill }, style]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={a11yLabel}
+        onPress={onPress}
+        style={({ pressed }) => [styles.gap, pressed && styles.pressed]}
+      >
+        <View style={styles.row}>
+          <View style={styles.texts}>
+            <Text variant="overline" style={[styles.muted, { color: on }]}>{overline}</Text>
+            <Text variant="h3" style={{ color: on }}>{title}</Text>
+            {meta ? <Text variant="body" style={[styles.semibold, { color: on }]}>{meta}</Text> : null}
+            {hint ? <Text variant="bodySmall" style={[styles.muted, { color: on }]}>{hint}</Text> : null}
+          </View>
+          {progress ? <ProgressRing done={progress.done} total={progress.total} color={on} track={alpha(on, 20)} /> : null}
         </View>
-        {progress ? <ProgressRing done={progress.done} total={progress.total} color={on} track={alpha(on, 20)} /> : null}
-      </View>
-      {/* Вид кнопки внутри карточки; нажимается вся карточка */}
-      <View style={[styles.action, { backgroundColor: on }]}>
-        <Text variant="button" style={[styles.noLetterSpacing, { color: colors.primaryFill }]}>{action}</Text>
-      </View>
-    </Pressable>
+        {/* Вид кнопки; нажимается вся верхняя часть карточки */}
+        <View style={[styles.action, { backgroundColor: on }]}>
+          <Text variant="button" style={[styles.noLetterSpacing, { color: colors.primaryFill }]}>{action}</Text>
+        </View>
+      </Pressable>
+      {secondary && onSecondaryPress ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={secondary}
+          onPress={onSecondaryPress}
+          hitSlop={spacing.s}
+          style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}
+        >
+          <Text variant="label" align="center" style={{ color: on }}>{secondary}</Text>
+        </Pressable>
+      ) : null}
+    </View>
   );
 });
 
@@ -127,6 +137,13 @@ const styles = StyleSheet.create({
   },
   gap: {
     gap: spacing.m,
+  },
+  gapS: {
+    gap: spacing.s,
+  },
+  secondary: {
+    alignSelf: 'center',
+    paddingHorizontal: spacing.s,
   },
   row: {
     flexDirection: 'row',
@@ -172,7 +189,7 @@ const styles = StyleSheet.create({
   noLetterSpacing: {
     letterSpacing: 0,
   },
-  pressedScale: {
-    transform: [{ scale: 0.98 }],
+  pressed: {
+    opacity: 0.85,
   },
 });

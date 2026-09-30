@@ -30,6 +30,11 @@ function plan(extra: Partial<LessonPlan>): LessonPlan {
     newLeftTotal: 100,
     newQuota: 10,
     doneToday: 0,
+    newSets: [
+      { setId: 's1', title: 'Английский B1', newLeft: 12 },
+      { setId: 's2', title: 'Глаголы', newLeft: 30 },
+    ],
+    focusManual: false,
     ...extra,
   };
 }
@@ -153,6 +158,17 @@ describe('тексты урока', () => {
       meta: 'Серия 3 дня',
       hint: 'Завтра 21 слово',
     });
+  });
+
+  it('«Сменить набор» — только когда в уроке есть новые и наборов с ними больше одного', () => {
+    const withNew = plan({ reviewIds: ids(5), newIds: ids(10, 'n') });
+    expect(lessonCardContent(withNew, opts)?.secondary).toBe('Сменить набор');
+    expect(lessonCardContent(withNew, { ...opts, streakDays: 7, streakRiskHours: 2 })?.secondary).toBe('Сменить набор');
+    expect(lessonCardContent(plan({ reviewIds: ids(5) }), opts)?.secondary).toBeNull();
+    const oneSet = plan({ newIds: ids(10), newSets: [{ setId: 's1', title: 'Английский B1', newLeft: 12 }] });
+    expect(lessonCardContent(oneSet, opts)?.secondary).toBeNull();
+    expect(lessonCardContent(plan({ state: 'done' }), opts)?.secondary).toBeNull();
+    expect(lessonCardContent(plan({ state: 'mistakes', mistakeIds: ids(2) }), opts)?.secondary).toBeNull();
   });
 
   it('карточка: нет карточек — не показываем', () => {

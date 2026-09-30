@@ -26,6 +26,7 @@ type HomeState = 'daily_review' | 'study_all' | 'no_sets' | 'teacher';
 type HomeAction =
   | 'daily_review'
   | 'extra_new'
+  | 'change_set'
   | 'find_set'
   | 'study_all'
   | 'challenge_quick'

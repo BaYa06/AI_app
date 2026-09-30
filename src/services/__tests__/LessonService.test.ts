@@ -228,6 +228,21 @@ describe('buildLessonPlan', () => {
     expect(buildLessonPlan(input(fx2, { focusSetId: 's2' })).focusSetId).toBe('s1');
   });
 
+  it('наборы с новыми словами — в порядке списка, показанные сегодня не считаются', () => {
+    const fx = freshLibrary(3, 10);
+    fx.cards = fx.cards.filter((c) => c.setId !== 's2');
+    fx.cards.push(studiedCard('s2', 3 * DAY));
+    const base = input(fx);
+    const introduced = fx.cards.filter((c) => c.setId === 's1').slice(0, 4).map((c) => c.id);
+    const plan = buildLessonPlan({ ...base, day: { ...base.day, introducedIds: introduced } });
+    expect(plan.newSets).toEqual([
+      { setId: 's1', title: 'Набор s1', newLeft: 6 },
+      { setId: 's3', title: 'Набор s3', newLeft: 10 },
+    ]);
+    expect(plan.focusManual).toBe(false);
+    expect(buildLessonPlan(input(fx, { focusSetId: 's3' })).focusManual).toBe(true);
+  });
+
   it('считаются только переданные наборы (текущий курс)', () => {
     const fx = freshLibrary(2, 10);
     fx.cards.push(...due('s2', 5));

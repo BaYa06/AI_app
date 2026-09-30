@@ -43,6 +43,8 @@ export interface LessonCardContent {
   kind: 'start' | 'extraNew' | 'findSet';
   /** Прогресс дня для кольца; null — кольцо не показываем */
   progress: { done: number; total: number } | null;
+  /** Тихое действие под кнопкой: «Сменить набор»; null — нет */
+  secondary: string | null;
 }
 
 /** С какого часа вечером предупреждаем о серии */
@@ -96,6 +98,7 @@ export function lessonCardContent(
         action: 'Повторить',
         kind: 'start',
         progress,
+        secondary: null,
       };
     }
     case 'done':
@@ -108,6 +111,7 @@ export function lessonCardContent(
         action: `Ещё ${opts.extraNewStep} новых`,
         kind: 'extraNew',
         progress: null,
+        secondary: null,
       };
     case 'finished':
       return {
@@ -119,9 +123,12 @@ export function lessonCardContent(
         action: 'Найти новый набор',
         kind: 'findSet',
         progress: null,
+        secondary: null,
       };
     default: {
       const risk = opts.streakRiskHours;
+      // Выбирать набор есть смысл, только когда в уроке есть новые слова и наборов с ними больше одного
+      const secondary = plan.newIds.length > 0 && plan.newSets.length > 1 ? 'Сменить набор' : null;
       if (risk != null) {
         // Тот же урок, другой повод: место, цвет и кнопка те же — меняются заголовок и подпись
         return {
@@ -133,6 +140,7 @@ export function lessonCardContent(
           action: 'Начать',
           kind: 'start',
           progress,
+          secondary,
         };
       }
       return {
@@ -144,6 +152,7 @@ export function lessonCardContent(
         action: 'Начать',
         kind: 'start',
         progress,
+        secondary,
       };
     }
   }
