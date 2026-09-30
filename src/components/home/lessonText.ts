@@ -74,6 +74,8 @@ export function lessonCardContent(
     extraNewStep: number;
     /** streakRiskHoursLeft: число — вечером серия под угрозой, заголовок про серию */
     streakRiskHours?: number | null;
+    /** Сейчас — для даты «все слова к…» (по умолчанию текущее время) */
+    now?: Date;
   },
 ): LessonCardContent | null {
   const queued = plan.reviewIds.length + plan.newIds.length + plan.mistakeIds.length;
@@ -148,7 +150,7 @@ export function lessonCardContent(
         overline: plan.state === 'first' ? 'День 1' : plan.state === 'overdue' ? 'Накопилось повторение' : 'Сегодня',
         title: 'Урок дня',
         meta: `${lessonComposition(plan)} · ${time}`,
-        hint: lessonHint(plan),
+        hint: lessonHint(plan, opts.now),
         action: 'Начать',
         kind: 'start',
         progress,
@@ -158,8 +160,23 @@ export function lessonCardContent(
   }
 }
 
+const MONTHS_GENITIVE = [
+  'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+  'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря',
+];
+/** Дату «всё выучишь к…» показываем, только если впереди много слов: «к послезавтра» не мотивирует */
+const FINISH_DATE_MIN_NEW = 20;
+
+/** «Все слова — примерно к 14 ноября» (2.5); null — не показываем */
+export function finishDateText(plan: LessonPlan, now: Date): string | null {
+  if (plan.newLeftTotal <= FINISH_DATE_MIN_NEW || plan.newDaysLeft <= 0) return null;
+  const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + plan.newDaysLeft);
+  const year = date.getFullYear() !== now.getFullYear() ? ` ${date.getFullYear()}` : '';
+  return `Все слова — примерно к ${date.getDate()} ${MONTHS_GENITIVE[date.getMonth()]}${year}`;
+}
+
 /** Подпись под кнопкой — одна-две причины начать; null — подписи нет */
-export function lessonHint(plan: LessonPlan): string | null {
+export function lessonHint(plan: LessonPlan, now: Date = new Date()): string | null {
   const parts: string[] = [];
   if (plan.fadingCount > 0) parts.push(`${plan.fadingCount} начинают забываться`);
   if (plan.state === 'overdue') {
@@ -173,5 +190,10 @@ export function lessonHint(plan: LessonPlan): string | null {
   }
   const left = plan.waitingTotal - plan.reviewIds.length;
   if (plan.state !== 'mistakes' && left > 0 && plan.reviewIds.length > 0) parts.push(`ещё ждут ${left}`);
+  // Последняя по важности — дата, к которой пройдём все слова (только когда новые слова в уроке есть)
+  if ((plan.state === 'lesson' || plan.state === 'first') && plan.newIds.length > 0) {
+    const finish = finishDateText(plan, now);
+    if (finish) parts.push(finish);
+  }
   return parts.length > 0 ? parts.slice(0, 2).join(' · ') : null;
 }

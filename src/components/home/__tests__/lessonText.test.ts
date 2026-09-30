@@ -7,6 +7,7 @@ import {
   lessonHint,
   lessonTitle,
   streakRiskHoursLeft,
+  finishDateText,
 } from '../lessonText';
 
 const opts = { streakDays: 8, extraNewStep: 10 };
@@ -35,6 +36,7 @@ function plan(extra: Partial<LessonPlan>): LessonPlan {
       { setId: 's2', title: 'Глаголы', newLeft: 30 },
     ],
     focusManual: false,
+    newDaysLeft: 0,
     ...extra,
   };
 }
@@ -169,6 +171,28 @@ describe('тексты урока', () => {
     expect(lessonCardContent(oneSet, opts)?.secondary).toBeNull();
     expect(lessonCardContent(plan({ state: 'done' }), opts)?.secondary).toBeNull();
     expect(lessonCardContent(plan({ state: 'mistakes', mistakeIds: ids(2) }), opts)?.secondary).toBeNull();
+  });
+
+  it('дата «все слова к…»: 300 слов по 10 в день — через 29 дней после сегодня', () => {
+    const now = new Date(2026, 9, 1, 10, 0);
+    const p = plan({ state: 'first', newIds: ids(10), newLeftTotal: 300, newDaysLeft: 29 });
+    expect(finishDateText(p, now)).toBe('Все слова — примерно к 30 октября');
+    expect(lessonHint(p, now)).toBe('Начинаем с «Английский B1» · Все слова — примерно к 30 октября');
+    // Переход через год — с годом
+    expect(finishDateText(plan({ newLeftTotal: 300, newDaysLeft: 40 }), new Date(2026, 11, 1))).toBe(
+      'Все слова — примерно к 10 января 2027',
+    );
+  });
+
+  it('дата: не показываем, если слов мало, новых в уроке нет или подпись занята', () => {
+    const now = new Date(2026, 9, 1);
+    expect(finishDateText(plan({ newLeftTotal: 20, newDaysLeft: 2 }), now)).toBeNull();
+    expect(finishDateText(plan({ newLeftTotal: 300, newDaysLeft: 0 }), now)).toBeNull();
+    // Урок без новых — дата не к месту
+    expect(lessonHint(plan({ reviewIds: ids(10), waitingTotal: 10, newLeftTotal: 300, newDaysLeft: 30 }), now)).toBeNull();
+    // Две причины важнее даты
+    const busy = plan({ reviewIds: ids(10), newIds: ids(10, 'n'), fadingCount: 3, waitingTotal: 10, newLeftTotal: 300, newDaysLeft: 29 });
+    expect(lessonHint(busy, now)).toBe('3 начинают забываться · Английский B1 · 18 из 30');
   });
 
   it('карточка: нет карточек — не показываем', () => {

@@ -99,6 +99,9 @@ describe('buildLessonPlan', () => {
     expect(plan.focusSetTotal).toBe(30);
     expect(plan.newLeftTotal).toBe(300);
     expect(plan.minutes).toBe(4);
+    // 290 после сегодняшних 10, по 10 в день — ещё 29 дней
+    expect(plan.newDaysLeft).toBe(29);
+    expect(buildLessonPlan(input(fx, {}, 20)).newDaysLeft).toBe(14);
   });
 
   it('10 ждут + много новых — 10 повторить + 10 новых', () => {

@@ -96,6 +96,11 @@ export interface LessonPlan {
   newSets: NewWordsSet[];
   /** Текущий набор выбран вручную («Сменить набор»), а не автоматически */
   focusManual: boolean;
+  /**
+   * Через сколько дней после сегодняшнего придут последние новые слова при нынешнем темпе
+   * (0 — всё новое уже в сегодняшнем уроке). Оценка: дни большого повторения темп замедляют.
+   */
+  newDaysLeft: number;
 }
 
 export interface LessonInput {
@@ -284,5 +289,6 @@ export function buildLessonPlan({ sets, cardsBySet, cards, newPerDay, day, now }
     doneToday: day.reviewedIds.length + day.introducedIds.length,
     newSets: withNew.map((s) => ({ setId: s.set.id, title: s.set.title, newLeft: unseenOf(s.cards).length })),
     focusManual: !!chosen,
+    newDaysLeft: newPerDay > 0 ? Math.ceil(Math.max(0, newLeftTotal - newCards.length) / newPerDay) : 0,
   };
 }
