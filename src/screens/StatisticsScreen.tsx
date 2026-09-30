@@ -1,6 +1,6 @@
 /**
  * Statistics Screen
- * @description Full statistics page with hero card, goals, heatmap, charts, achievements
+ * @description Full statistics page with hero card, goals, heatmap, charts
  */
 import { isCardLearned } from '@/services/SRSService';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -18,13 +18,11 @@ import { Button, Card, ProgressBar, type IconComponent } from '@/components/ui';
 import { pluralize } from '@/utils';
 import {
   BookOpen,
-  Calendar,
   CheckCircle2,
   ChevronRight,
   FileText,
   Flame,
   Library,
-  Rocket,
   Settings,
   Sparkles,
   Sun,
@@ -71,46 +69,6 @@ function getDayLabel(dateStr: string): string {
   const day = d.getDay(); // 0=Sun
   return DAY_LABELS_SHORT[day === 0 ? 6 : day - 1];
 }
-
-// ---- Static data for sections we keep as-is ----
-
-const ACHIEVEMENTS: Array<{ id: string; icon: IconComponent; color: ColorToken; title: string; desc: string; date: string }> = [
-  {
-    id: '1',
-    icon: Sun,
-    color: 'warning',
-    title: 'Ранняя пташка',
-    desc: 'Позанимался до 7:00',
-    date: '24 окт',
-  },
-  {
-    id: '2',
-    icon: BookOpen,
-    color: 'primary',
-    title: 'Искатель знаний',
-    desc: 'Прошёл 5 наборов за день',
-    date: '21 окт',
-  },
-];
-
-const CHALLENGES: Array<{ id: string; icon: IconComponent; color: ColorToken; title: string; progress: string; percent: number }> = [
-  {
-    id: '1',
-    icon: Calendar,
-    color: 'primary',
-    title: 'Идеальная неделя',
-    progress: '5/7 дней',
-    percent: 71,
-  },
-  {
-    id: '2',
-    icon: Rocket,
-    color: 'success',
-    title: 'Спринт 100',
-    progress: '45/100 карточек',
-    percent: 45,
-  },
-];
 
 const DAILY_GOAL = 10;
 
@@ -368,16 +326,16 @@ export function StatisticsScreen({ navigation }: any) {
                 <Text variant="caption" color="secondary">Серия</Text>
               </View>
             </View>
+            {/* Числа наград пока нет в данных — показываем только переход в «Награды» */}
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel="Награды"
               style={({ pressed }) => [st.heroBadgeCard, { backgroundColor: alpha(colors.star, 10) }, pressed && st.pressed]}
               onPress={() => navigation?.navigate('Achievements')}
             >
               <Trophy size={iconSize.m} color={colors.star} />
-              <View>
-                <Text variant="body" style={[st.bold, { color: colors.textPrimary }]}>24</Text>
-                <Text variant="caption" color="secondary">Награды</Text>
-              </View>
+              <Text variant="body" style={[st.bold, st.flex1, { color: colors.textPrimary }]}>Награды</Text>
+              <ChevronRight size={iconSize.xs} color={colors.textTertiary} />
             </Pressable>
           </View>
         </Card>
@@ -544,50 +502,6 @@ export function StatisticsScreen({ navigation }: any) {
           </>
         )}
 
-        {/* ======== Recent Achievements ======== */}
-        <Text variant="h3" style={[st.sectionTitle, { color: colors.textPrimary }]}>Последние награды</Text>
-        <View style={st.achieveList}>
-          {ACHIEVEMENTS.map((a) => {
-            const Icon = a.icon;
-            return (
-              <View key={a.id} style={[st.achieveCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <View style={[st.achieveIcon, { backgroundColor: alpha(colors[a.color], 20) }]}>
-                  <Icon size={iconSize.m} color={colors[a.color]} />
-                </View>
-                <View style={st.achieveBody}>
-                  <Text variant="body" style={[st.semibold, { color: colors.textPrimary }]}>{a.title}</Text>
-                  <Text variant="caption" color="secondary">{a.desc}</Text>
-                </View>
-                <Text variant="caption" style={{ color: colors.textTertiary }}>{a.date}</Text>
-              </View>
-            );
-          })}
-        </View>
-
-        {/* ======== Active Challenges ======== */}
-        <Text variant="h3" style={[st.sectionTitle, { color: colors.textPrimary }]}>Активные задания</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.challengeScroll}>
-          {CHALLENGES.map((ch) => {
-            const accent = colors[ch.color];
-            const Icon = ch.icon;
-            return (
-              <View key={ch.id} style={[st.challengeCard, { backgroundColor: alpha(accent, 10), borderColor: alpha(accent, 20) }]}>
-                <View style={st.challengeTop}>
-                  <Icon size={iconSize.s} color={accent} />
-                  <Text variant="body" style={[st.semibold, st.flex1, { color: colors.textPrimary }]}>{ch.title}</Text>
-                </View>
-                <View style={st.challengeProgress}>
-                  <View style={st.challengeProgressRow}>
-                    <Text variant="caption" color="secondary">Прогресс</Text>
-                    <Text variant="caption" color="secondary">{ch.progress}</Text>
-                  </View>
-                  <ProgressBar progress={ch.percent} color={accent} animated={false} />
-                </View>
-              </View>
-            );
-          })}
-        </ScrollView>
-
         {/* ======== Detailed Analytics Button ======== */}
         <Button title="Подробная аналитика" iconRight={ChevronRight} fullWidth style={st.detailBtn} />
       </ScrollView>
@@ -649,14 +563,5 @@ const st = StyleSheet.create({
   cfRow: { flexDirection: 'row', justifyContent: 'space-between' },
   cfItem: { alignItems: 'center', flex: 1 },
   cfDivider: { width: 1 },
-  achieveList: { gap: spacing.s, marginBottom: spacing.l },
-  achieveCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, padding: spacing.m, borderRadius: borderRadius.l, borderWidth: 1 },
-  achieveIcon: { width: 44, height: 44, borderRadius: borderRadius.m, alignItems: 'center', justifyContent: 'center' },
-  achieveBody: { flex: 1 },
-  challengeScroll: { gap: spacing.s, marginBottom: spacing.l },
-  challengeCard: { width: 220, padding: spacing.m, borderRadius: borderRadius.l, borderWidth: 1, gap: spacing.m },
-  challengeTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  challengeProgress: { gap: spacing.xs },
-  challengeProgressRow: { flexDirection: 'row', justifyContent: 'space-between' },
   detailBtn: { marginTop: spacing.xs },
 });
