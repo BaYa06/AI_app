@@ -11,6 +11,8 @@ import { recordSessionForRatingPrompt, markRatingPromptShown } from '@/services/
 import { RatingPromptModal } from '@/components/RatingPromptModal';
 import { spacing, borderRadius, heights, iconSize, screenPadding, alpha } from '@/constants';
 import { pluralize } from '@/utils';
+import { nextLessonStep, nextLessonLabel } from '@/services/lessonFlow';
+import { useCardsStore } from '@/store/cardsStore';
 import { Badge, Button, Card, ScreenHeader, Sheet, useScreenBottomInset } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
 import { Settings, CheckCircle2, List, ArrowRight, RotateCcw, BookOpen, X } from 'lucide-react-native';
@@ -36,6 +38,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
     onlyHard,
     streakIncreased,
     newStreakCount,
+    lesson,
   } = route.params;
   const colors = useThemeColors();
   const bottomInset = useScreenBottomInset();
@@ -100,7 +103,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
 
   // Логика кнопки: если фаза завершена - "Закончить", иначе - "Следующие карточки (N осталось)"
   const primaryButtonLabel = isPhaseComplete 
-    ? 'Закончить' 
+    ? (lesson ? nextLessonLabel(lesson, (n) => pluralize(n, 'новое слово', 'новых слова', 'новых слов')) : 'Закончить')
     : remainingInPhase > 0 
       ? `Следующие карточки (${remainingInPhase} ${remainingInPhase === 1 ? 'осталась' : remainingInPhase < 5 ? 'осталось' : 'осталось'})`
       : 'Следующие карточки';
@@ -139,6 +142,14 @@ export function StudyResultsScreen({ navigation, route }: Props) {
     
     // Если фаза завершена — возвращаем к набору или на главную (если запущено из HomeScreen)
     if (isPhaseComplete) {
+      // Урок дня: следующая часть (повторение → новые слова → проверка), в конце — главная
+      if (lesson) {
+        const cards = useCardsStore.getState().cards;
+        const next = nextLessonStep(lesson, (id) => cards[id]?.setId);
+        if (next) navigation.replace(next.screen, next.params);
+        else navigation.navigate('Main', { screen: 'Home' });
+        return;
+      }
       if (dueCardIds && dueCardIds.length > 0) {
         navigation.navigate('Main', { screen: 'Home' });
       } else {
@@ -200,6 +211,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
         studiedInPhase,
         phaseOffset,
         phaseFailedIds,
+        lesson,
       });
       return;
     }
@@ -216,6 +228,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
       studiedInPhase,
       phaseOffset,
       phaseFailedIds,
+      lesson,
     });
   };
 
@@ -234,6 +247,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
       phaseOffset,
       phaseFailedIds,
       cardLimit,
+      lesson,
       studyAll: true,
       onlyHard: true,
     });

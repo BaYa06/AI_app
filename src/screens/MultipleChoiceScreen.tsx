@@ -11,6 +11,8 @@ import { Button, CelebrationIcon, EmptyState, ProgressBar, ScreenHeader, type Ce
 import { useCardsStore, useSetsStore, useThemeColors, useSettingsStore, selectSetStats } from '@/store';
 import { spacing, borderRadius, heights, iconSize, screenPadding, alpha } from '@/constants';
 import { ProgressService } from '@/services/ProgressService';
+import { lessonPhaseForAnswer } from '@/services/lessonFlow';
+import { useLessonStore } from '@/store/lessonStore';
 import { speak, resolveSpeechLang, prefetchSpeech, cardSpeechLangs } from '@/utils/speech';
 import { playCorrectSound, preloadSound } from '@/utils/sound';
 import { buildDistractorPool, pickSimilarDistractors } from '@/utils/choiceDistractors';
@@ -34,7 +36,7 @@ type OptionState = 'neutral' | 'correct' | 'wrong';
 type Option = { id: string; label: string; text: string; isCorrect: boolean };
 
 export function MultipleChoiceScreen({ navigation, route }: Props) {
-  const { setId, cardLimit, dueCardIds, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0, phaseFailedIds, challengeMode, timeLimit: paramTimeLimit, sniperMode, forgottenMode } = route.params;
+  const { setId, cardLimit, dueCardIds, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0, phaseFailedIds, challengeMode, timeLimit: paramTimeLimit, sniperMode, forgottenMode, lesson } = route.params;
   const colors = useThemeColors();
   const set = useSetsStore((s) => s.getSet(setId));
   const updateSetStats = useSetsStore((s) => s.updateSetStats);
@@ -88,6 +90,9 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
   // Ответ в тесте: уровень карточки считает сервер (сверяет выбранный вариант), экран обновляется сразу
   const applySrsUpdate = React.useCallback(
     (card: Card, isCorrect: boolean, chosenCardId: string, timeSpentMs: number) => {
+      // Урок дня: считаем по состоянию карточки до ответа
+      const lessonPhase = lessonPhaseForAnswer(lesson?.part, card);
+      if (lessonPhase) useLessonStore.getState().recordAnswer(lessonPhase, card.id);
       ProgressService.recordAnswer(card, { mode: 'test', correct: isCorrect, chosen: chosenCardId, timeSpentMs });
 
       if (isCorrect) {
@@ -103,7 +108,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
         masteredCount: statsSnapshot.masteredCount,
       });
     },
-    [updateSetStats, incrementTodayCards]
+    [updateSetStats, incrementTodayCards, lesson?.part]
   );
 
   const shuffle = <T,>(arr: T[]): T[] => {
@@ -360,9 +365,10 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
         studiedInPhase: newStudiedInPhase,
         phaseOffset: newPhaseOffset,
         phaseFailedIds: newPhaseFailedIds,
+        lesson,
       });
     },
-    [finishStudySession, navigation, setId, totalQuestions, cardLimit, dueCardIds, studiedInPhase, phaseOffset, phaseFailedList, questions]
+    [finishStudySession, navigation, setId, totalQuestions, cardLimit, dueCardIds, studiedInPhase, phaseOffset, phaseFailedList, questions, lesson]
   );
 
   const handleSelectOption = (option: Option) => {

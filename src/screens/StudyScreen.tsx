@@ -9,6 +9,8 @@ import { Text, Loading } from '@/components/common';
 import { Button, ProgressBar, ScreenHeader, Switch } from '@/components/ui';
 import { buildStudyQueue, isCardLearned } from '@/services/SRSService';
 import { ProgressService } from '@/services/ProgressService';
+import { lessonPhaseForAnswer } from '@/services/lessonFlow';
+import { useLessonStore } from '@/store/lessonStore';
 import { spacing, borderRadius, heights, iconSize, screenPadding, alpha } from '@/constants';
 import { DatabaseService, Analytics } from '@/services';
 import type { RootStackScreenProps } from '@/types/navigation';
@@ -32,7 +34,7 @@ const CARD_HEIGHT = CARD_WIDTH * 1.25;
 type Props = RootStackScreenProps<'Study'>;
 
 export function StudyScreen({ navigation, route }: Props) {
-  const { setId, mode, errorCardsFronts, studyAll, cardLimit, onlyHard, dueCardIds, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0, phaseFailedIds } = route.params;
+  const { setId, mode, errorCardsFronts, studyAll, cardLimit, onlyHard, dueCardIds, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0, phaseFailedIds, lesson } = route.params;
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const settings = useSettingsStore((s) => s.settings);
@@ -283,6 +285,9 @@ export function StudyScreen({ navigation, route }: Props) {
         }]);
       }
 
+      // Урок дня: считаем по состоянию карточки до ответа
+      const lessonPhase = lessonPhaseForAnswer(lesson?.part, currentCard);
+      if (lessonPhase) useLessonStore.getState().recordAnswer(lessonPhase, currentCard.id);
       // Самооценка: уровень считает сервер (очков рейтинга она не даёт — план §1.3), экран обновляется сразу
       ProgressService.recordAnswer(currentCard, {
         mode: 'flashcard',
@@ -406,6 +411,7 @@ export function StudyScreen({ navigation, route }: Props) {
           // Streak celebration
           streakIncreased: streakResult.streakIncreased,
           newStreakCount: streakResult.newStreakCount,
+          lesson,
         });
       } else {
         useStudyStore.setState((s) => ({
@@ -421,7 +427,7 @@ export function StudyScreen({ navigation, route }: Props) {
         });
       }
     },
-    [currentCard, incrementTodayCards, session, setId, updateSetStats, navigation, errorCards, studiedInPhase, phaseOffset, isErrorReview]
+    [currentCard, incrementTodayCards, session, setId, updateSetStats, navigation, errorCards, studiedInPhase, phaseOffset, isErrorReview, lesson]
   );
 
   const openSettings = useCallback(() => {

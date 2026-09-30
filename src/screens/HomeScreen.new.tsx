@@ -59,6 +59,8 @@ import type { Card, CardSet } from '@/types';
 import { isCardWaitingReview, isCardFading } from '@/services/SRSService';
 import { StorageService, STORAGE_KEYS } from '@/services/StorageService';
 import { Analytics } from '@/services/analytics';
+import { firstLessonStep } from '@/services/lessonFlow';
+import { useLessonStore } from '@/store/lessonStore';
 
 const StaggerCard = React.memo(function StaggerCard({
   index,
@@ -672,20 +674,14 @@ export function HomeScreen({ navigation }: any) {
       const taken = new Set(queue.map((c) => c.id));
       queue = [...queue, ...pickCardsForGame(reviewStats.all.filter((c) => !taken.has(c.id)), 4 - queue.length)];
     }
-    const total = queue.length;
+    // Урок дня (plan/home_redesign.md, 1.3): утренний снимок дня и запуск через lessonFlow —
+    // ответы записываются в день урока. Новые слова в урок добавит шаг 1.4.
+    useLessonStore.getState().ensureToday(reviewStats.waiting.length);
+    const step = firstLessonStep({ reviewIds: queue.map((c) => c.id), newIds: [] }, (id) => cardsMap[id]?.setId);
+    if (!step) return;
     const rootNav = navigation?.getParent?.() ?? navigation;
-    rootNav?.navigate('MultipleChoice', {
-      setId: queue[0].setId,
-      cardLimit: total,
-      dueCardIds: queue.map((c) => c.id),
-      questionIndex: 1,
-      totalQuestions: total,
-      phaseId: `review_${Date.now()}`,
-      totalPhaseCards: total,
-      studiedInPhase: 0,
-      phaseOffset: 0,
-    });
-  }, [navigation, reviewStats]);
+    rootNav?.navigate(step.screen, step.params);
+  }, [navigation, reviewStats, cardsMap]);
 
   // Тизер рейтинга курса (план, этап 4): маленькая кнопка между мини-играми и «Повторением дня»
   const [leaderboard, setLeaderboard] = useState<CourseLeaderboard | null>(null);

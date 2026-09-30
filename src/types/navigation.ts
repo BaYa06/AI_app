@@ -6,6 +6,18 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps, NavigatorScreenParams } from '@react-navigation/native';
 import type { StudyMode } from './index';
 
+// ==================== УРОК ДНЯ ====================
+
+/** Часть урока дня: повторение (тест) → новые слова (карточки) → проверка новых (тест); ошибки — отдельно */
+export type LessonPart = 'review' | 'new' | 'check' | 'mistakes';
+
+/** Экран тренировки открыт из урока дня (plan/home_redesign.md, шаг 1.3) */
+export interface LessonRouteParams {
+  part: LessonPart;
+  /** Новые слова урока — для следующих частей */
+  newIds: string[];
+}
+
 // ==================== ROOT STACK ====================
 
 export type RootStackParamList = {
@@ -25,6 +37,7 @@ export type RootStackParamList = {
     studiedInPhase?: number;
     phaseOffset?: number;
     phaseFailedIds?: string[];
+    lesson?: LessonRouteParams;
   };
   StudyResults: {
     setId: string;
@@ -47,6 +60,7 @@ export type RootStackParamList = {
     // Streak celebration
     streakIncreased?: boolean;
     newStreakCount?: number;
+    lesson?: LessonRouteParams;
   };
   CardEditor: { setId: string; cardId?: string };
   SetEditor: { setId?: string; autoFocusTitle?: boolean };
@@ -78,6 +92,7 @@ export type RootStackParamList = {
     timeLimit?: number;
     sniperMode?: boolean;
     forgottenMode?: boolean;
+    lesson?: LessonRouteParams;
   };
   WordBuilder: {
     setId: string;
