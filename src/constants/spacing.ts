@@ -20,8 +20,6 @@ export const screenPadding = spacing.m;
  * l — карточки, xl — окна и нижние листы, full — аватары и круглые кнопки.
  */
 export const borderRadius = {
-  /** @deprecated не входит в брендбук — используй `s`. Уберём на шаге 7.3. */
-  xs: 4,
   s: 8,
   m: 12,
   l: 16,
@@ -62,5 +60,4 @@ export const heights = {
   touch: 44,        // минимальная зона нажатия, кнопка-иконка
   listRow: 52,      // минимальная высота строки списка
   tabBar: 64,
-  card: 120,
 } as const;
