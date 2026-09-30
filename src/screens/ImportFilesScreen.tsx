@@ -2,25 +2,22 @@ import React, { useState, useCallback } from 'react';
 import {
   View,
   ScrollView,
-  TextInput,
   StyleSheet,
   Alert,
-  ActivityIndicator,
   ActionSheetIOS,
   Platform,
-  Pressable,
   TouchableOpacity,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import DocumentPicker from 'react-native-document-picker';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { Text } from '@/components/common';
 import { useThemeColors } from '@/store';
 import { supabase } from '@/services';
-import { spacing, borderRadius } from '@/constants';
+import { spacing, borderRadius, iconSize, screenPadding, alpha } from '@/constants';
+import { pluralize } from '@/utils';
+import { Badge, Button, ScreenHeader, TextField, toast, useScreenBottomInset } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
 import {
-  ArrowLeft,
   Upload,
   Image as ImageIcon,
   FileText,
@@ -81,14 +78,10 @@ function FileChip({
   onRemove: (id: string) => void;
   colors: ReturnType<typeof useThemeColors>;
 }) {
-  const iconBg =
-    file.fileType === 'image'
-      ? '#16a34a22'
-      : file.fileType === 'pdf'
-      ? '#ea580c22'
-      : '#2563eb22';
+  // Тип файла: фото — success, PDF — streak (оранжевый), таблица — info
   const iconColor =
-    file.fileType === 'image' ? '#16a34a' : file.fileType === 'pdf' ? '#ea580c' : '#2563eb';
+    file.fileType === 'image' ? colors.success : file.fileType === 'pdf' ? colors.streak : colors.info;
+  const iconBg = alpha(iconColor, 20);
 
   const Icon =
     file.fileType === 'image' ? ImageIcon : file.fileType === 'pdf' ? FileText : Table;
@@ -96,7 +89,7 @@ function FileChip({
   return (
     <View style={[styles.chip, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={[styles.chipIcon, { backgroundColor: iconBg }]}>
-        <Icon size={14} color={iconColor} />
+        <Icon size={iconSize.xs} color={iconColor} />
       </View>
       <View style={styles.chipText}>
         <Text variant="caption" style={{ color: colors.textPrimary }} numberOfLines={1}>
@@ -106,13 +99,15 @@ function FileChip({
           {formatBytes(file.sizeBytes)}
         </Text>
       </View>
-      <Pressable
+      <Button
+        variant="icon"
+        icon={X}
+        background="none"
+        iconSize={iconSize.xs}
+        iconColor={colors.textSecondary}
+        accessibilityLabel={`Убрать файл ${file.name}`}
         onPress={() => onRemove(file.id)}
-        hitSlop={8}
-        style={({ pressed }) => [styles.chipRemove, { opacity: pressed ? 0.5 : 1 }]}
-      >
-        <X size={14} color={colors.textSecondary} />
-      </Pressable>
+      />
     </View>
   );
 }
@@ -122,6 +117,7 @@ function FileChip({
 export function ImportFilesScreen({ navigation, route }: Props) {
   const { setId } = route.params;
   const colors = useThemeColors();
+  const bottomInset = useScreenBottomInset();
   const [files, setFiles] = useState<AttachedFile[]>([]);
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
@@ -140,17 +136,14 @@ export function ImportFilesScreen({ navigation, route }: Props) {
         toAdd.reduce((s, f) => s + f.sizeBytes, 0);
 
       if (newTotal > MAX_TOTAL_BYTES) {
-        Alert.alert('Превышен лимит', 'Суммарный размер файлов не должен превышать 20 МБ');
+        toast.info('Превышен лимит: суммарный размер файлов не должен превышать 20 МБ');
         return prev;
       }
 
       toAdd
         .filter(f => f.fileType === 'text' && f.sizeBytes > CSV_WARN_BYTES)
         .forEach(f =>
-          Alert.alert(
-            'Большой файл',
-            `${f.name} больше 500 КБ. Обработка может быть неполной.`,
-          )
+          toast.info(`Большой файл: ${f.name} больше 500 КБ. Обработка может быть неполной`)
         );
 
       return [...prev, ...toAdd];
@@ -174,7 +167,7 @@ export function ImportFilesScreen({ navigation, route }: Props) {
       });
       if (result.didCancel || !result.assets?.[0]) return;
       const asset = result.assets[0];
-      if (!asset.base64) { Alert.alert('Ошибка', 'Не удалось прочитать фото'); return; }
+      if (!asset.base64) { toast.error('Не удалось прочитать фото'); return; }
 
       addFiles([{
         id: Math.random().toString(36).slice(2),
@@ -185,7 +178,7 @@ export function ImportFilesScreen({ navigation, route }: Props) {
         sizeBytes: asset.fileSize || asset.base64.length * 0.75,
       }]);
     } catch {
-      Alert.alert('Ошибка', 'Не удалось открыть камеру');
+      toast.error('Не удалось открыть камеру');
     }
   }, [files]);
 
@@ -214,7 +207,7 @@ export function ImportFilesScreen({ navigation, route }: Props) {
 
       addFiles(newFiles);
     } catch {
-      Alert.alert('Ошибка', 'Не удалось открыть галерею');
+      toast.error('Не удалось открыть галерею');
     }
   }, [files]);
 
@@ -232,7 +225,7 @@ export function ImportFilesScreen({ navigation, route }: Props) {
       );
 
       if (filtered.length === 0) {
-        Alert.alert('Неподдерживаемый тип', 'Выберите файл PDF, CSV или TSV');
+        toast.info('Неподдерживаемый тип — выбери файл PDF, CSV или TSV');
         return;
       }
 
@@ -258,7 +251,7 @@ export function ImportFilesScreen({ navigation, route }: Props) {
       addFiles(newFiles);
     } catch (err: any) {
       if (!DocumentPicker.isCancel(err)) {
-        Alert.alert('Ошибка', 'Не удалось выбрать файл');
+        toast.error('Не удалось выбрать файл');
       }
     }
   }, [files]);
@@ -329,7 +322,7 @@ export function ImportFilesScreen({ navigation, route }: Props) {
       const data2 = await res.json();
       if (!res.ok) throw new Error(data2.error || 'Ошибка сервера');
       if (!data2.cards?.length) {
-        Alert.alert('Нет карточек', 'AI не смог извлечь карточки. Попробуйте другую инструкцию.');
+        toast.info('Нет карточек: ИИ не смог их извлечь. Попробуй другую инструкцию');
         return;
       }
 
@@ -339,7 +332,7 @@ export function ImportFilesScreen({ navigation, route }: Props) {
         setId,
       });
     } catch (e: any) {
-      Alert.alert('Ошибка', describeError(e, 'Не удалось создать карточки'));
+      toast.error(describeError(e, 'Не удалось создать карточки'));
     } finally {
       setLoading(false);
     }
@@ -348,28 +341,14 @@ export function ImportFilesScreen({ navigation, route }: Props) {
   // ── render ────────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]} edges={['top']}>
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <Pressable
-          hitSlop={10}
-          onPress={() => navigation.goBack()}
-          style={({ pressed }) => [
-            styles.headerBtn,
-            { backgroundColor: pressed ? colors.surfaceVariant : 'transparent' },
-          ]}
-        >
-          <ArrowLeft size={20} color={colors.textPrimary} />
-        </Pressable>
-        <Text variant="h3" style={{ color: colors.textPrimary, fontWeight: '700', flex: 1 }}>
-          Создать из файлов
-        </Text>
-        <View style={[styles.aiBadge, { backgroundColor: colors.primary + '22' }]}>
-          <Text variant="caption" style={{ color: colors.primary, fontWeight: '700' }}>
-            ИИ
-          </Text>
-        </View>
-      </View>
+    // Верхний safe area уже учтён в App.tsx; снизу — свой (экран без панели вкладок)
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <ScreenHeader
+        title="Создать из файлов"
+        onBack={() => navigation.goBack()}
+        bordered
+        right={<Badge label="ИИ" tone="primary" />}
+      />
 
       <ScrollView
         style={styles.scroll}
@@ -378,7 +357,7 @@ export function ImportFilesScreen({ navigation, route }: Props) {
         showsVerticalScrollIndicator={false}
       >
         {/* ── Files section ── */}
-        <Text variant="body" style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+        <Text variant="overline" color="secondary" style={styles.sectionLabel}>
           Файлы
         </Text>
 
@@ -395,10 +374,10 @@ export function ImportFilesScreen({ navigation, route }: Props) {
         {canAdd && (
           <TouchableOpacity
             onPress={handleAddFiles}
-            style={[styles.addBtn, { borderColor: colors.primary, backgroundColor: colors.primary + '0D' }]}
+            style={[styles.addBtn, { borderColor: colors.primary, backgroundColor: alpha(colors.primary, 10) }]}
             activeOpacity={0.7}
           >
-            <Upload size={16} color={colors.primary} />
+            <Upload size={iconSize.xs} color={colors.primary} />
             <Text variant="body" style={{ color: colors.primary, marginLeft: spacing.xs }}>
               + Добавить файл
             </Text>
@@ -412,39 +391,29 @@ export function ImportFilesScreen({ navigation, route }: Props) {
             style={[styles.dropZone, { borderColor: colors.border, backgroundColor: colors.surface }]}
             activeOpacity={0.7}
           >
-            <Upload size={28} color={colors.textSecondary} />
+            <Upload size={iconSize.l} color={colors.textSecondary} />
             <Text variant="body" style={{ color: colors.textPrimary, marginTop: spacing.xs }}>
               Загрузить файлы
             </Text>
-            <Text variant="caption" style={{ color: colors.textSecondary, marginTop: 2 }}>
+            <Text variant="caption" style={{ color: colors.textSecondary, marginTop: spacing.xxs }}>
               JPG, PNG, PDF, CSV, TSV
             </Text>
           </TouchableOpacity>
         )}
 
         {/* ── Instruction section ── */}
-        <Text
-          variant="body"
-          style={[styles.sectionLabel, { color: colors.textSecondary, marginTop: spacing.l }]}
-        >
+        <Text variant="overline" color="secondary" style={[styles.sectionLabel, { marginTop: spacing.l }]}>
           Что сделать
         </Text>
 
-        <View
-          style={[
-            styles.textAreaWrap,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <TextInput
-            style={[styles.textArea, { color: colors.textPrimary }]}
-            placeholder="Например: возьми только термины и определения, игнорируй примеры"
-            placeholderTextColor={colors.textSecondary}
-            multiline
-            value={prompt}
-            onChangeText={setPrompt}
-          />
-        </View>
+        <TextField
+          placeholder="Например: возьми только термины и определения, игнорируй примеры"
+          accessibilityLabel="Что сделать"
+          multiline
+          value={prompt}
+          onChangeText={setPrompt}
+          inputStyle={styles.textArea}
+        />
 
         {/* Quick prompts */}
         <ScrollView
@@ -459,7 +428,7 @@ export function ImportFilesScreen({ navigation, route }: Props) {
               style={[
                 styles.quickChip,
                 {
-                  backgroundColor: prompt === p ? colors.primary + '22' : colors.surface,
+                  backgroundColor: prompt === p ? alpha(colors.primary, 10) : colors.surface,
                   borderColor: prompt === p ? colors.primary : colors.border,
                 },
               ]}
@@ -480,51 +449,31 @@ export function ImportFilesScreen({ navigation, route }: Props) {
       <View
         style={[
           styles.bottom,
-          { backgroundColor: colors.background, borderTopColor: colors.border },
+          { backgroundColor: colors.background, borderTopColor: colors.border, paddingBottom: spacing.l + bottomInset },
         ]}
       >
         <View style={styles.bottomInfo}>
           <Text variant="caption" style={{ color: colors.textSecondary }}>
-            {files.length} {files.length === 1 ? 'файл' : 'файлов'} · {formatBytes(totalBytes)}
+            {files.length} {pluralize(files.length, 'файл', 'файла', 'файлов')} · {formatBytes(totalBytes)}
           </Text>
           <View style={styles.bottomInfoRight}>
-            <Info size={12} color={colors.textSecondary} />
-            <Text variant="caption" style={{ color: colors.textSecondary, marginLeft: 4 }}>
-              1 запрос к AI
+            <Info size={iconSize.xs} color={colors.textSecondary} />
+            <Text variant="caption" style={{ color: colors.textSecondary, marginLeft: spacing.xxs }}>
+              1 запрос к ИИ
             </Text>
           </View>
         </View>
 
-        <TouchableOpacity
+        {/* Во время обработки — текст «ИИ обрабатывает…», кнопка неактивна */}
+        <Button
+          title={loading ? 'ИИ обрабатывает...' : 'Создать карточки'}
+          icon={Sparkles}
           onPress={handleSubmit}
           disabled={files.length === 0 || loading}
-          style={[
-            styles.submitBtn,
-            {
-              backgroundColor:
-                files.length === 0 || loading ? colors.border : colors.primary,
-            },
-          ]}
-          activeOpacity={0.8}
-        >
-          {loading ? (
-            <>
-              <ActivityIndicator size="small" color="#fff" />
-              <Text variant="body" style={styles.submitText}>
-                AI обрабатывает...
-              </Text>
-            </>
-          ) : (
-            <>
-              <Sparkles size={18} color="#fff" />
-              <Text variant="body" style={styles.submitText}>
-                Создать карточки
-              </Text>
-            </>
-          )}
-        </TouchableOpacity>
+          fullWidth
+        />
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -534,39 +483,15 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.s,
-    gap: spacing.s,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  headerBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: borderRadius.s,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  aiBadge: {
-    paddingHorizontal: spacing.s,
-    paddingVertical: 3,
-    borderRadius: borderRadius.full,
-  },
   scroll: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: spacing.m,
+    paddingHorizontal: screenPadding,
     paddingTop: spacing.m,
   },
   sectionLabel: {
     marginBottom: spacing.s,
-    textTransform: 'uppercase',
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.5,
   },
   chipsWrap: {
     gap: spacing.xs,
@@ -591,9 +516,6 @@ const styles = StyleSheet.create({
   chipText: {
     flex: 1,
   },
-  chipRemove: {
-    padding: 2,
-  },
   addBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -613,17 +535,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xl,
     marginBottom: spacing.s,
   },
-  textAreaWrap: {
-    borderWidth: 1,
-    borderRadius: borderRadius.m,
-    paddingHorizontal: spacing.s,
-    paddingVertical: spacing.xs,
-  },
   textArea: {
     minHeight: 80,
-    fontSize: 15,
-    lineHeight: 22,
-    textAlignVertical: 'top',
   },
   quickRow: {
     paddingVertical: spacing.s,
@@ -640,10 +553,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: spacing.m,
+    paddingHorizontal: screenPadding,
     paddingTop: spacing.s,
-    paddingBottom: spacing.l,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: 1,
   },
   bottomInfo: {
     flexDirection: 'row',
@@ -654,17 +566,5 @@ const styles = StyleSheet.create({
   bottomInfoRight: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  submitBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    borderRadius: borderRadius.m,
-    height: 50,
-  },
-  submitText: {
-    color: '#fff',
-    fontWeight: '600',
   },
 });
