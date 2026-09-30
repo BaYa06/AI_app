@@ -14,9 +14,10 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, AlertTriangle } from 'lucide-react-native';
+import { Badge } from '@/components/ui';
 import { Text } from '@/components/common';
-import { useThemeColors, useSettingsStore } from '@/store';
-import { spacing, borderRadius } from '@/constants';
+import { useThemeColors } from '@/store';
+import { spacing, borderRadius, alpha } from '@/constants';
 import { NeonService } from '@/services/NeonService';
 import { supabase } from '@/services/supabaseClient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -99,8 +100,6 @@ function formatLastActive(lastActiveDate: string | null): string {
 
 export function StudentDetailScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
-  const resolvedTheme = useSettingsStore((s) => s.resolvedTheme);
-  const isDark = resolvedTheme === 'dark';
   const insets = useSafeAreaInsets();
 
   const {
@@ -163,11 +162,11 @@ export function StudentDetailScreen({ navigation, route }: Props) {
   const activeStatus = activityStatus(stats?.lastActiveDate ?? null);
   const isActive = activeStatus === 'online' || activeStatus === 'away';
 
-  const cardBg     = isDark ? 'rgba(255,255,255,0.05)' : '#FFFFFF';
-  const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : '#E5E7EB';
-  const divider    = isDark ? 'rgba(255,255,255,0.08)' : '#E5E7EB';
-  const sectionLabel = isDark ? colors.textSecondary : '#6B7280';
-  const avatarBg   = colors.primary + '22';
+  const cardBg     = colors.surface;
+  const cardBorder = colors.border;
+  const divider    = colors.surfaceMuted;
+  const sectionLabel = colors.textSecondary;
+  const avatarBg   = alpha(colors.primary, 10);
 
   const goBack = () => {
     if (navigation.canGoBack()) {
@@ -193,13 +192,15 @@ export function StudentDetailScreen({ navigation, route }: Props) {
           styles.header,
           {
             paddingTop: 12,
-            backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.92)',
+            backgroundColor: colors.background,
             borderBottomColor: cardBorder,
             ...Platform.select({ web: { backdropFilter: 'blur(12px)' } }) as any,
           },
         ]}
       >
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Назад"
           onPress={goBack}
           style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
           hitSlop={8}
@@ -234,7 +235,7 @@ export function StudentDetailScreen({ navigation, route }: Props) {
                 .finally(() => setLoading(false));
             }}
           >
-            <Text style={styles.retryBtnText}>Повторить</Text>
+            <Text style={[styles.retryBtnText, { color: colors.onPrimary }]}>Повторить</Text>
           </Pressable>
         </View>
       ) : (
@@ -258,15 +259,9 @@ export function StudentDetailScreen({ navigation, route }: Props) {
                   {studentName}
                 </Text>
                 {isActive ? (
-                  <View style={[styles.activeBadge, isDark && { backgroundColor: 'rgba(22,163,74,0.15)' }]}>
-                    <Text style={[styles.activeBadgeText, isDark && { color: '#4ADE80' }]}>Активен</Text>
-                  </View>
+                  <Badge label="Активен" tone="success" />
                 ) : (
-                  <View style={[styles.activeBadge, styles.inactiveBadge, isDark && { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
-                    <Text style={[styles.activeBadgeText, styles.inactiveBadgeText, isDark && { color: colors.textSecondary }]}>
-                      Не в сети
-                    </Text>
-                  </View>
+                  <Badge label="Не в сети" tone="neutral" />
                 )}
               </View>
             </View>
@@ -275,7 +270,7 @@ export function StudentDetailScreen({ navigation, route }: Props) {
             <View style={[styles.statsRow, { borderTopColor: divider }]}>
               <StatCell
                 label="Серия"
-                value={currentStreak > 0 ? `🔥 ${currentStreak}` : '—'}
+                value={currentStreak > 0 ? `${currentStreak}` : '—'}
                 isLast={false}
                 divider={divider}
                 textColor={colors.textPrimary}
@@ -319,7 +314,6 @@ export function StudentDetailScreen({ navigation, route }: Props) {
                     cardBg={cardBg}
                     cardBorder={cardBorder}
                     colors={colors}
-                    isDark={isDark}
                   />
                 ))}
               </View>
@@ -345,6 +339,7 @@ function StatCell({ label, value, isLast, divider, textColor }: {
   divider: string;
   textColor: string;
 }) {
+  const colors = useThemeColors();
   return (
     <View
       style={[
@@ -352,7 +347,7 @@ function StatCell({ label, value, isLast, divider, textColor }: {
         !isLast && { borderRightWidth: 1, borderRightColor: divider },
       ]}
     >
-      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{label}</Text>
       <Text style={[styles.statValue, { color: textColor }]}>{value}</Text>
     </View>
   );
@@ -360,15 +355,14 @@ function StatCell({ label, value, isLast, divider, textColor }: {
 
 // ── Set progress row ──────────────────────────────────────────────────────────
 
-function SetProgressRow({ set, cardBg, cardBorder, colors, isDark }: {
+function SetProgressRow({ set, cardBg, cardBorder, colors }: {
   set: SetStat;
   cardBg: string;
   cardBorder: string;
   colors: any;
-  isDark: boolean;
 }) {
   const status = setStatus(set);
-  const trackColor = isDark ? 'rgba(255,255,255,0.10)' : '#F1F5F9';
+  const trackColor = colors.surfaceMuted;
 
   const seenPct = set.totalCards > 0
     ? Math.round((set.seenCards / set.totalCards) * 100)
@@ -380,17 +374,17 @@ function SetProgressRow({ set, cardBg, cardBorder, colors, isDark }: {
   const badgeStyle =
     status === 'done'       ? styles.badgeDone
     : status === 'inProgress' ? styles.badgeProgress
-    : styles.badgeNotStarted;
+    : [styles.badgeNotStarted, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }];
 
   const badgeTextStyle =
     status === 'done'       ? styles.badgeDoneText
     : status === 'inProgress' ? styles.badgeProgressText
-    : styles.badgeNotStartedText;
+    : [styles.badgeNotStartedText, { color: colors.textTertiary }];
 
   const barColor =
-    status === 'done'       ? '#10B981'
+    status === 'done'       ? colors.success
     : status === 'inProgress' ? colors.primary
-    : '#9CA3AF';
+    : colors.textTertiary;
 
   return (
     <View style={[styles.setRow, { backgroundColor: cardBg, borderColor: cardBorder }]}>
@@ -408,7 +402,7 @@ function SetProgressRow({ set, cardBg, cardBorder, colors, isDark }: {
         <View style={[styles.fill, { backgroundColor: barColor, width: `${seenPct}%` as any }]} />
       </View>
 
-      <Text style={[styles.setMeta, { color: isDark ? colors.textSecondary : '#6B7280' }]}>
+      <Text style={[styles.setMeta, { color: colors.textSecondary }]}>
         {set.seenCards} / {set.totalCards} {pluralCards(set.seenCards)} просмотрено · {seenPct}%
         {set.learnedCards > 0 ? `  ·  выучено: ${set.learnedCards} (${learnedPct}%)` : ''}
       </Text>
@@ -462,7 +456,6 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.m,
   },
   retryBtnText: {
-    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -490,7 +483,7 @@ const styles = StyleSheet.create({
   avatar: {
     width: 56,
     height: 56,
-    borderRadius: 28,
+    borderRadius: borderRadius.xl,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -505,27 +498,16 @@ const styles = StyleSheet.create({
   },
   profileName: {
     fontSize: 20,
-    fontWeight: '800',
+    fontWeight: '700',
     letterSpacing: -0.4,
   },
   activeBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: '#DCFCE7',
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 99,
+    borderRadius: borderRadius.full,
   },
-  activeBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#16A34A',
-  },
-  inactiveBadge: {
-    backgroundColor: '#F3F4F6',
-  },
-  inactiveBadgeText: {
-    color: '#6B7280',
-  },
+
 
   // Stats
   statsRow: {
@@ -542,14 +524,13 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   statLabel: {
-    fontSize: 9,
+    fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.6,
     textTransform: 'uppercase',
-    color: '#6B7280',
   },
   statValue: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
   },
 
@@ -559,7 +540,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   sectionTitle: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     letterSpacing: 1.2,
     textTransform: 'uppercase',
@@ -569,8 +550,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   emptyText: {
-    fontSize: 13,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: '600',
     paddingHorizontal: 4,
     paddingTop: 4,
   },
@@ -596,50 +577,44 @@ const styles = StyleSheet.create({
 
   // Badges
   badgeDone: {
-    backgroundColor: '#F0FDF4',
     borderWidth: 1,
-    borderColor: '#BBF7D0',
+
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: borderRadius.s,
     flexShrink: 0,
   },
   badgeDoneText: {
-    fontSize: 9,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#16A34A',
     letterSpacing: 0.4,
     textTransform: 'uppercase',
   },
   badgeProgress: {
-    backgroundColor: '#EFF6FF',
+
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: borderRadius.s,
     flexShrink: 0,
   },
   badgeProgressText: {
-    fontSize: 9,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#2563EB',
     letterSpacing: 0.4,
     textTransform: 'uppercase',
   },
   badgeNotStarted: {
-    backgroundColor: '#F9FAFB',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: borderRadius.s,
     flexShrink: 0,
   },
   badgeNotStartedText: {
-    fontSize: 9,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#9CA3AF',
     letterSpacing: 0.4,
     textTransform: 'uppercase',
   },
@@ -647,15 +622,15 @@ const styles = StyleSheet.create({
   // Progress bar
   track: {
     height: 4,
-    borderRadius: 2,
+    borderRadius: borderRadius.full,
     overflow: 'hidden',
   },
   fill: {
     height: '100%',
-    borderRadius: 2,
+    borderRadius: borderRadius.full,
   },
   setMeta: {
-    fontSize: 11,
-    fontWeight: '500',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

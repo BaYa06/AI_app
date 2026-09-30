@@ -13,10 +13,10 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, X, GraduationCap, FileText, Mic, Clock, AlertTriangle, BookOpen, Trophy } from 'lucide-react-native';
+import { ArrowLeft, X, GraduationCap, FileText, Mic, Clock, AlertTriangle, BookOpen, Trophy, Flame } from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { useThemeColors, useSettingsStore } from '@/store';
-import { spacing, borderRadius } from '@/constants';
+import { useThemeColors } from '@/store';
+import { spacing, borderRadius, alpha, iconSize } from '@/constants';
 import { NeonService } from '@/services/NeonService';
 import { supabase } from '@/services/supabaseClient';
 import type { RootStackParamList } from '@/types/navigation';
@@ -56,15 +56,15 @@ function getStudentStatus(lastActiveDate: string | null): StudentStatus {
   return 'inactive';
 }
 
-function formatLastActive(lastActiveDate: string | null): { text: string; color: string } | null {
+function formatLastActive(lastActiveDate: string | null, colors: ReturnType<typeof useThemeColors>): { text: string; color: string } | null {
   if (!lastActiveDate) return null;
   const now = new Date();
   const last = new Date(lastActiveDate + 'T12:00:00Z');
   const diffDays = Math.round((now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
-  if (diffDays <= 0) return { text: 'Сегодня', color: '#22C55E' };
-  if (diffDays === 1) return { text: 'Вчера', color: '#F59E0B' };
-  if (diffDays <= 6) return { text: `${diffDays} дн. назад`, color: '#EF4444' };
-  return { text: `${diffDays} дн. назад`, color: '#9CA3AF' };
+  if (diffDays <= 0) return { text: 'Сегодня', color: colors.successText };
+  if (diffDays === 1) return { text: 'Вчера', color: colors.warningText };
+  if (diffDays <= 6) return { text: `${diffDays} дн. назад`, color: colors.errorText };
+  return { text: `${diffDays} дн. назад`, color: colors.textTertiary };
 }
 
 // ==================== CHART HELPER ====================
@@ -132,15 +132,15 @@ function buildChartDays(
 function AvatarPlaceholder({ member, colors }: { member: CourseMember; colors: any }) {
   const isInactive = member.status === 'inactive';
   const dotColor =
-    member.status === 'online'   ? '#22C55E' :
-    member.status === 'away'     ? '#F59E0B' :
-    member.status === 'offline'  ? '#EF4444' : '#D1D5DB';
-  const lastActive = formatLastActive(member.lastActiveDate);
+    member.status === 'online'   ? colors.success :
+    member.status === 'away'     ? colors.warning :
+    member.status === 'offline'  ? colors.error : colors.textTertiary;
+  const lastActive = formatLastActive(member.lastActiveDate, colors);
 
   return (
     <View style={styles.studentItem}>
       <View style={styles.avatarWrap}>
-        <View style={[styles.avatar, { backgroundColor: isInactive ? (colors.border) : colors.primary + '33' }]}>
+        <View style={[styles.avatar, { backgroundColor: isInactive ? (colors.border) : alpha(colors.primary, 20) }]}>
           <Text style={[styles.avatarInitials, { color: isInactive ? colors.textSecondary : colors.primary }]}>
             {member.initials}
           </Text>
@@ -169,8 +169,6 @@ function AvatarPlaceholder({ member, colors }: { member: CourseMember; colors: a
 export function TeacherCourseStatsScreen({ navigation, route }: Props) {
   const { courseTitle } = route.params;
   const colors = useThemeColors();
-  const resolvedTheme = useSettingsStore((s) => s.resolvedTheme);
-  const isDark = resolvedTheme === 'dark';
   const insets = useSafeAreaInsets();
 
   const [chartPeriod, setChartPeriod] = useState<'7d' | '30d'>('7d');
@@ -295,8 +293,8 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
     return () => { mounted = false; };
   }, [route.params.courseId]);
 
-  const cardBg = isDark ? 'rgba(255,255,255,0.06)' : '#FFFFFF';
-  const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : '#E5E7EB';
+  const cardBg = colors.surface;
+  const cardBorder = colors.border;
 
   const CHART_HEIGHT = 96;
   const handleBarPress = (index: number, day: string, count: number) => {
@@ -310,13 +308,15 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
         style={[
           styles.header,
           {
-            backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.85)',
-            borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
+            backgroundColor: colors.background,
+            borderBottomColor: colors.border,
             paddingTop: 12,
           },
         ]}
       >
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Назад"
           onPress={() => navigation.goBack()}
           style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
           hitSlop={8}
@@ -337,15 +337,15 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
           style={({ pressed }) => [
             styles.testLobbyBtn,
             {
-              backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F8F7FF',
-              borderColor: isDark ? 'rgba(99,102,241,0.3)' : '#E0DDFB',
+              backgroundColor: alpha(colors.primary, 10),
+              borderColor: alpha(colors.primary, 10),
             },
             pressed && { opacity: 0.75, transform: [{ scale: 0.985 }] },
           ]}
           onPress={() => setLobbyModal(true)}
         >
-          <View style={[styles.testLobbyIcon, { backgroundColor: isDark ? colors.primary : '#6366F1' }]}>
-            <GraduationCap size={18} color="#FFFFFF" />
+          <View style={[styles.testLobbyIcon, { backgroundColor: colors.primary }]}>
+            <GraduationCap size={18} color={colors.onPrimary} />
           </View>
           <Text style={[styles.testLobbyText, { color: colors.textPrimary }]}>
             Живой тест
@@ -362,8 +362,8 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
           style={({ pressed }) => [
             styles.testLobbyBtn,
             {
-              backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F8F7FF',
-              borderColor: isDark ? 'rgba(99,102,241,0.3)' : '#E0DDFB',
+              backgroundColor: alpha(colors.primary, 10),
+              borderColor: alpha(colors.primary, 10),
             },
             pressed && { opacity: 0.75, transform: [{ scale: 0.985 }] },
           ]}
@@ -372,8 +372,8 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
             courseTitle: route.params.courseTitle,
           })}
         >
-          <View style={[styles.testLobbyIcon, { backgroundColor: isDark ? colors.primary : '#6366F1' }]}>
-            <Clock size={18} color="#FFFFFF" />
+          <View style={[styles.testLobbyIcon, { backgroundColor: colors.primary }]}>
+            <Clock size={18} color={colors.onPrimary} />
           </View>
           <Text style={[styles.testLobbyText, { color: colors.textPrimary }]}>
             История тестов
@@ -390,8 +390,8 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
           style={({ pressed }) => [
             styles.testLobbyBtn,
             {
-              backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F8F7FF',
-              borderColor: isDark ? 'rgba(99,102,241,0.3)' : '#E0DDFB',
+              backgroundColor: alpha(colors.primary, 10),
+              borderColor: alpha(colors.primary, 10),
             },
             pressed && { opacity: 0.75, transform: [{ scale: 0.985 }] },
           ]}
@@ -400,8 +400,8 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
             courseTitle: route.params.courseTitle,
           })}
         >
-          <View style={[styles.testLobbyIcon, { backgroundColor: '#F59E0B' }]}>
-            <Trophy size={18} color="#FFFFFF" />
+          <View style={[styles.testLobbyIcon, { backgroundColor: colors.warning }]}>
+            <Trophy size={18} color={colors.onPrimary} />
           </View>
           <Text style={[styles.testLobbyText, { color: colors.textPrimary }]}>
             Рейтинг недели
@@ -418,8 +418,8 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
           style={({ pressed }) => [
             styles.testLobbyBtn,
             {
-              backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F8F7FF',
-              borderColor: isDark ? 'rgba(99,102,241,0.3)' : '#E0DDFB',
+              backgroundColor: alpha(colors.primary, 10),
+              borderColor: alpha(colors.primary, 10),
             },
             pressed && { opacity: 0.75, transform: [{ scale: 0.985 }] },
           ]}
@@ -428,8 +428,8 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
             courseTitle: route.params.courseTitle,
           })}
         >
-          <View style={[styles.testLobbyIcon, { backgroundColor: isDark ? colors.primary : '#6366F1' }]}>
-            <BookOpen size={18} color="#FFFFFF" />
+          <View style={[styles.testLobbyIcon, { backgroundColor: colors.primary }]}>
+            <BookOpen size={18} color={colors.onPrimary} />
           </View>
           <Text style={[styles.testLobbyText, { color: colors.textPrimary }]}>
             Учебники курса
@@ -478,13 +478,12 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
         <View style={styles.section}>
           <View style={styles.sectionRow}>
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Активность группы</Text>
-            <View style={[styles.togglePill, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F1F5F9' }]}>
+            <View style={[styles.togglePill, { backgroundColor: colors.surfaceMuted }]}>
               <Pressable
                 style={[
                   styles.toggleBtn,
                   chartPeriod === '7d' && { backgroundColor: colors.background,
-                    ...Platform.select({ web: { boxShadow: '0 1px 4px rgba(0,0,0,0.1)' } }) as any,
-                    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
+                     },
                 ]}
                 onPress={() => setChartPeriod('7d')}
               >
@@ -496,8 +495,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
                 style={[
                   styles.toggleBtn,
                   chartPeriod === '30d' && { backgroundColor: colors.background,
-                    ...Platform.select({ web: { boxShadow: '0 1px 4px rgba(0,0,0,0.1)' } }) as any,
-                    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
+                     },
                 ]}
                 onPress={() => setChartPeriod('30d')}
               >
@@ -529,12 +527,12 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
               <View key={idx} style={styles.barCol}>
                 <View style={{ flex: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
                   {chartTooltip?.index === idx && (
-                    <View style={[styles.chartTooltip, { backgroundColor: isDark ? '#1F2937' : '#111827' }]}
+                    <View style={[styles.chartTooltip, { backgroundColor: colors.textPrimary }]}
                     >
-                      <Text style={styles.chartTooltipText}>
+                      <Text style={[styles.chartTooltipText, { color: colors.onPrimary }]}>
                         {chartTooltip.day}: {chartTooltip.count}
                       </Text>
-                      <View style={[styles.chartTooltipArrow, { borderTopColor: isDark ? '#1F2937' : '#111827' }]} />
+                      <View style={[styles.chartTooltipArrow, { borderTopColor: colors.textPrimary }]} />
                     </View>
                   )}
                   <Pressable
@@ -582,7 +580,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
             </View>
           ) : members.length === 0 ? (
             <Text style={[styles.emptyMembers, { color: colors.textSecondary }]}>
-              Пока нет учеников. Отправьте ссылку-приглашение.
+              Пока нет учеников. Отправь ссылку-приглашение.
             </Text>
           ) : (
             <ScrollView
@@ -642,7 +640,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
                   </View>
 
                   {/* Progress bar */}
-                  <View style={[styles.progressBg, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F1F5F9' }]}>
+                  <View style={[styles.progressBg, { backgroundColor: colors.surfaceMuted }]}>
                     <View
                       style={[
                         styles.progressFill,
@@ -675,14 +673,16 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
         animationType="fade"
         onRequestClose={() => setStudentModal(null)}
       >
-        <Pressable style={styles.modalOverlay} onPress={() => setStudentModal(null)}>
+        <Pressable style={[styles.modalOverlay, { backgroundColor: colors.overlay }]} onPress={() => setStudentModal(null)}>
           <Pressable
-            style={[styles.modalContent, { backgroundColor: isDark ? '#1E2030' : '#FFFFFF' }]}
+            style={[styles.modalContent, { backgroundColor: colors.surface }]}
             onPress={() => {}}
           >
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>{modalTitle}</Text>
-              <Pressable onPress={() => setStudentModal(null)} hitSlop={8}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Закрыть" onPress={() => setStudentModal(null)} hitSlop={8}>
                 <X size={20} color={colors.textSecondary} />
               </Pressable>
             </View>
@@ -695,14 +695,14 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
               ) : (
                 modalStudents.map((s) => {
                   const dotColor =
-                    s.status === 'online'   ? '#22C55E' :
-                    s.status === 'away'     ? '#F59E0B' :
-                    s.status === 'offline'  ? '#EF4444' : '#D1D5DB';
-                  const lastActive = formatLastActive(s.lastActiveDate);
+                    s.status === 'online'   ? colors.success :
+                    s.status === 'away'     ? colors.warning :
+                    s.status === 'offline'  ? colors.error : colors.textTertiary;
+                  const lastActive = formatLastActive(s.lastActiveDate, colors);
                   return (
-                    <View key={s.id} style={[styles.modalStudentRow, { borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9' }]}>
+                    <View key={s.id} style={[styles.modalStudentRow, { borderBottomColor: colors.border }]}>
                       <View style={styles.modalAvatarWrap}>
-                        <View style={[styles.avatar, { backgroundColor: colors.primary + '33' }]}>
+                        <View style={[styles.avatar, { backgroundColor: alpha(colors.primary, 20) }]}>
                           <Text style={[styles.avatarInitials, { color: colors.primary }]}>
                             {s.initials}
                           </Text>
@@ -712,7 +712,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
                             styles.onlineDot,
                             {
                               backgroundColor: dotColor,
-                              borderColor: isDark ? '#1E2030' : '#FFFFFF',
+                              borderColor: colors.border,
                             },
                           ]}
                         />
@@ -720,14 +720,15 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.modalStudentName, { color: colors.textPrimary }]}>{s.name}</Text>
                         {lastActive && (
-                          <Text style={{ fontSize: 11, color: lastActive.color, marginTop: 1 }}>
+                          <Text style={{ fontSize: 12, color: lastActive.color, marginTop: 1 }}>
                             {lastActive.text}
                           </Text>
                         )}
                       </View>
                       {s.streak > 0 && (
-                        <View style={styles.modalStreakBadge}>
-                          <Text style={styles.modalStreakText}>🔥 {s.streak}</Text>
+                        <View style={[styles.modalStreakBadge, { backgroundColor: alpha(colors.streak, 10) }]}>
+                          <Flame size={iconSize.xs} color={colors.streak} />
+                          <Text style={[styles.modalStreakText, { color: colors.warningText }]}>{s.streak}</Text>
                         </View>
                       )}
                     </View>
@@ -751,15 +752,15 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
             style={[
               styles.sheetContent,
               {
-                backgroundColor: isDark ? '#1E2030' : '#FFFFFF',
+                backgroundColor: colors.surface,
                 paddingBottom: insets.bottom + 16,
               },
             ]}
             onPress={() => {}}
           >
-            <View style={styles.sheetHandle} />
+            <View style={[styles.sheetHandle, { backgroundColor: alpha(colors.textTertiary, 40) }]} />
             <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>
-              Выберите тип теста
+              Выбери тип теста
             </Text>
 
             {/* Exam option */}
@@ -767,8 +768,8 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
               style={({ pressed }) => [
                 styles.sheetOption,
                 {
-                  backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F8F7FF',
-                  borderColor: isDark ? 'rgba(99,102,241,0.2)' : '#E0DDFB',
+                  backgroundColor: alpha(colors.primary, 10),
+                  borderColor: alpha(colors.primary, 10),
                 },
                 pressed && { opacity: 0.7, transform: [{ scale: 0.98 }] },
               ]}
@@ -777,8 +778,8 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
                 navigation.navigate('ExamLobby', { courseId: route.params.courseId, courseTitle: route.params.courseTitle });
               }}
             >
-              <View style={[styles.sheetOptionIcon, { backgroundColor: '#6366F1' }]}>
-                <FileText size={20} color="#FFFFFF" />
+              <View style={[styles.sheetOptionIcon, { backgroundColor: colors.primaryFill }]}>
+                <FileText size={20} color={colors.onPrimary} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.sheetOptionTitle, { color: colors.textPrimary }]}>
@@ -800,8 +801,8 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
               style={({ pressed }) => [
                 styles.sheetOption,
                 {
-                  backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#FFF7ED',
-                  borderColor: isDark ? 'rgba(249,115,22,0.2)' : '#FED7AA',
+                  backgroundColor: alpha(colors.streak, 10),
+                  borderColor: alpha(colors.streak, 10),
                 },
                 pressed && { opacity: 0.7, transform: [{ scale: 0.98 }] },
               ]}
@@ -810,8 +811,8 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
                 navigation.navigate('OralTestLobby', { courseId: route.params.courseId, courseTitle: route.params.courseTitle });
               }}
             >
-              <View style={[styles.sheetOptionIcon, { backgroundColor: '#F97316' }]}>
-                <Mic size={20} color="#FFFFFF" />
+              <View style={[styles.sheetOptionIcon, { backgroundColor: colors.streak }]}>
+                <Mic size={20} color={colors.onPrimary} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.sheetOptionTitle, { color: colors.textPrimary }]}>
@@ -855,7 +856,7 @@ const styles = StyleSheet.create({
     marginLeft: -spacing.xs,
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '600',
     letterSpacing: -0.3,
     marginLeft: spacing.m,
@@ -879,12 +880,12 @@ const styles = StyleSheet.create({
   testLobbyIcon: {
     width: 36,
     height: 36,
-    borderRadius: 10,
+    borderRadius: borderRadius.s,
     alignItems: 'center',
     justifyContent: 'center',
   },
   testLobbyText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
     letterSpacing: -0.2,
     flex: 1,
@@ -906,13 +907,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   metricLabel: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '600',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
   metricValue: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '700',
     letterSpacing: -0.5,
   },
@@ -927,12 +928,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   sectionTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
     letterSpacing: -0.2,
   },
   viewAll: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
   },
 
@@ -949,7 +950,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.s,
   },
   toggleText: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -970,11 +971,11 @@ const styles = StyleSheet.create({
   },
   bar: {
     width: 18,
-    borderRadius: 3,
+    borderRadius: borderRadius.full,
   },
   barLabel: {
-    fontSize: 9,
-    fontWeight: '500',
+    fontSize: 12,
+    fontWeight: '600',
   },
   chartTooltip: {
     position: 'absolute',
@@ -985,8 +986,7 @@ const styles = StyleSheet.create({
     zIndex: 5,
   },
   chartTooltipText: {
-    color: '#FFFFFF',
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '600',
   },
   chartTooltipArrow: {
@@ -1019,7 +1019,7 @@ const styles = StyleSheet.create({
   avatar: {
     width: 52,
     height: 52,
-    borderRadius: 26,
+    borderRadius: borderRadius.xl,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1033,24 +1033,24 @@ const styles = StyleSheet.create({
     right: 1,
     width: 13,
     height: 13,
-    borderRadius: 7,
+    borderRadius: borderRadius.s,
     borderWidth: 2,
   },
   studentName: {
-    fontSize: 11,
-    fontWeight: '500',
+    fontSize: 12,
+    fontWeight: '600',
     textAlign: 'center',
     maxWidth: 56,
   },
   studentLastActive: {
-    fontSize: 9,
-    fontWeight: '500',
+    fontSize: 12,
+    fontWeight: '600',
     textAlign: 'center',
     marginTop: 1,
   },
   emptyMembers: {
-    fontSize: 13,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: '600',
     textAlign: 'center',
   },
 
@@ -1076,17 +1076,17 @@ const styles = StyleSheet.create({
     marginRight: spacing.s,
   },
   setCardWords: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
   },
   progressBg: {
     height: 4,
-    borderRadius: 2,
+    borderRadius: borderRadius.full,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    borderRadius: 2,
+    borderRadius: borderRadius.full,
   },
   unitTag: {
     flexDirection: 'row',
@@ -1095,7 +1095,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   unitTagText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     flexShrink: 1,
   },
@@ -1104,18 +1104,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   setCardMetaText: {
-    fontSize: 11,
-    fontWeight: '500',
+    fontSize: 12,
+    fontWeight: '600',
   },
   setCardAccuracy: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
   },
 
   // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.xl,
@@ -1125,14 +1124,7 @@ const styles = StyleSheet.create({
     maxHeight: '70%',
     borderRadius: borderRadius.l,
     padding: spacing.l,
-    ...Platform.select({
-      web: { boxShadow: '0 8px 32px rgba(0,0,0,0.2)' },
-    }) as any,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 10,
+    
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1141,7 +1133,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.m,
   },
   modalTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
     letterSpacing: -0.3,
   },
@@ -1159,19 +1151,17 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   modalStudentName: {
-    fontSize: 15,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '600',
   },
   modalStreakBadge: {
-    backgroundColor: '#FFF7ED',
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 6,
+    borderRadius: borderRadius.s,
   },
   modalStreakText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#EA580C',
   },
 
   // Bottom Sheet
@@ -1181,24 +1171,16 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheetContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: borderRadius.l,
+    borderTopRightRadius: borderRadius.l,
     paddingHorizontal: spacing.l,
     paddingTop: 12,
-    ...Platform.select({
-      web: { boxShadow: '0 -8px 40px rgba(0,0,0,0.18)' },
-    }) as any,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: -8 },
-    elevation: 16,
+    
   },
   sheetHandle: {
     width: 36,
     height: 4,
-    borderRadius: 2,
-    backgroundColor: '#D1D5DB',
+    borderRadius: borderRadius.full,
     alignSelf: 'center',
     marginBottom: 16,
   },
@@ -1225,7 +1207,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sheetOptionTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
     letterSpacing: -0.2,
   },

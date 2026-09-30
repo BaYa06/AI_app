@@ -1,108 +1,21 @@
 {
   "totals": {
-    "hex": 398,
-    "rgba": 180,
-    "isDark": 161,
-    "font": 158,
-    "weight": 66,
-    "radius": 76,
-    "alpha": 76,
-    "alert": 13,
-    "small": 54,
-    "emoji": 30,
+    "hex": 138,
+    "rgba": 65,
+    "isDark": 48,
+    "font": 56,
+    "weight": 35,
+    "radius": 31,
+    "alpha": 48,
+    "alert": 5,
+    "small": 19,
+    "emoji": 24,
     "ion": 13,
-    "a11y": 38,
+    "a11y": 24,
     "en": 23,
-    "total": 1128
+    "total": 426
   },
   "files": {
-    "src/screens/TeacherCourseStatsScreen.tsx": {
-      "hex": 60,
-      "rgba": 24,
-      "isDark": 27,
-      "font": 21,
-      "weight": 6,
-      "radius": 10,
-      "small": 12,
-      "emoji": 1,
-      "a11y": 2,
-      "total": 148
-    },
-    "src/screens/TeacherStudentsScreen.tsx": {
-      "hex": 35,
-      "rgba": 13,
-      "isDark": 17,
-      "font": 9,
-      "weight": 4,
-      "radius": 8,
-      "alert": 5,
-      "small": 2,
-      "emoji": 2,
-      "a11y": 3,
-      "total": 91
-    },
-    "src/screens/TestResultsTeacherScreen.tsx": {
-      "hex": 32,
-      "rgba": 15,
-      "isDark": 11,
-      "font": 13,
-      "weight": 4,
-      "radius": 2,
-      "alpha": 5,
-      "alert": 1,
-      "small": 4,
-      "a11y": 1,
-      "total": 83
-    },
-    "src/screens/TestLobbyScreen.tsx": {
-      "hex": 29,
-      "rgba": 13,
-      "isDark": 8,
-      "font": 11,
-      "weight": 4,
-      "radius": 5,
-      "alpha": 4,
-      "small": 3,
-      "total": 74
-    },
-    "src/screens/LiveTestScreen.tsx": {
-      "hex": 23,
-      "rgba": 9,
-      "isDark": 10,
-      "font": 15,
-      "weight": 5,
-      "radius": 5,
-      "alpha": 6,
-      "small": 4,
-      "emoji": 1,
-      "a11y": 1,
-      "total": 73
-    },
-    "src/screens/ExamLobbyScreen.tsx": {
-      "hex": 17,
-      "rgba": 14,
-      "isDark": 12,
-      "font": 7,
-      "weight": 2,
-      "radius": 3,
-      "alpha": 3,
-      "small": 3,
-      "a11y": 3,
-      "total": 58
-    },
-    "src/screens/StudentDetailScreen.tsx": {
-      "hex": 24,
-      "rgba": 7,
-      "isDark": 7,
-      "font": 9,
-      "weight": 3,
-      "radius": 7,
-      "alpha": 1,
-      "small": 7,
-      "emoji": 1,
-      "a11y": 1,
-      "total": 58
-    },
     "src/screens/SubscriptionScreen.tsx": {
       "hex": 21,
       "rgba": 8,
@@ -187,40 +100,6 @@
       "en": 10,
       "total": 36
     },
-    "src/screens/OralTestSessionScreen.tsx": {
-      "hex": 10,
-      "rgba": 5,
-      "isDark": 6,
-      "font": 5,
-      "weight": 2,
-      "radius": 2,
-      "alpha": 2,
-      "alert": 1,
-      "a11y": 1,
-      "total": 33
-    },
-    "src/screens/OralTestLobbyScreen.tsx": {
-      "hex": 12,
-      "rgba": 5,
-      "isDark": 5,
-      "font": 3,
-      "weight": 1,
-      "radius": 1,
-      "alpha": 2,
-      "alert": 1,
-      "a11y": 1,
-      "total": 30
-    },
-    "src/screens/OralTestResultsScreen.tsx": {
-      "hex": 8,
-      "rgba": 6,
-      "isDark": 6,
-      "font": 4,
-      "radius": 2,
-      "alpha": 4,
-      "emoji": 1,
-      "total": 30
-    },
     "src/screens/StudyPlaceholderScreen.tsx": {
       "hex": 5,
       "rgba": 5,
@@ -229,15 +108,6 @@
       "weight": 4,
       "alpha": 2,
       "emoji": 3,
-      "total": 24
-    },
-    "src/screens/TestHistoryScreen.tsx": {
-      "hex": 10,
-      "rgba": 4,
-      "isDark": 4,
-      "font": 5,
-      "alpha": 1,
-      "a11y": 1,
       "total": 24
     },
     "src/screens/SecurityScreen.tsx": {

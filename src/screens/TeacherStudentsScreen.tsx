@@ -20,10 +20,11 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, AlertTriangle, Plus, Trash2, X } from 'lucide-react-native';
+import { ArrowLeft, AlertTriangle, Plus, Trash2, X, Flame, Search } from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { useThemeColors, useSettingsStore } from '@/store';
-import { spacing, borderRadius } from '@/constants';
+import { useThemeColors } from '@/store';
+import { spacing, borderRadius, alpha, iconSize } from '@/constants';
+import { toast } from '@/components/ui';
 import { NeonService } from '@/services/NeonService';
 import { supabase } from '@/services/supabaseClient';
 import type { RootStackParamList } from '@/types/navigation';
@@ -76,19 +77,19 @@ function getStudentStatus(lastActiveDate: string | null): StudentStatus {
   return 'inactive';
 }
 
-function formatLastActivity(lastActiveDate: string | null): { text: string; color: string } {
-  if (!lastActiveDate) return { text: 'Нет активности', color: '#9CA3AF' };
+function formatLastActivity(lastActiveDate: string | null, colors: ReturnType<typeof useThemeColors>): { text: string; color: string } {
+  if (!lastActiveDate) return { text: 'Нет активности', color: colors.textTertiary };
   const now = new Date();
   const last = new Date(lastActiveDate + 'T12:00:00Z');
   const diffDays = Math.round((now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
-  if (diffDays <= 0) return { text: 'Сегодня', color: '#10B981' };
-  if (diffDays === 1) return { text: 'Вчера', color: '#F59E0B' };
-  if (diffDays <= 6) return { text: `${diffDays} дн. назад`, color: '#EF4444' };
-  if (diffDays < 30) return { text: `${diffDays} дн. назад`, color: '#9CA3AF' };
+  if (diffDays <= 0) return { text: 'Сегодня', color: colors.successText };
+  if (diffDays === 1) return { text: 'Вчера', color: colors.warningText };
+  if (diffDays <= 6) return { text: `${diffDays} дн. назад`, color: colors.errorText };
+  if (diffDays < 30) return { text: `${diffDays} дн. назад`, color: colors.textTertiary };
   const weeks = Math.floor(diffDays / 7);
-  if (weeks < 5) return { text: `${weeks} нед. назад`, color: '#9CA3AF' };
+  if (weeks < 5) return { text: `${weeks} нед. назад`, color: colors.textTertiary };
   const months = Math.floor(diffDays / 30);
-  return { text: `${months} мес. назад`, color: '#9CA3AF' };
+  return { text: `${months} мес. назад`, color: colors.textTertiary };
 }
 
 function pluralCards(n: number): string {
@@ -102,10 +103,9 @@ function pluralCards(n: number): string {
 
 // ==================== STUDENT ROW ====================
 
-function StudentRow({ student, colors, isDark, onPress, onRemove }: {
+function StudentRow({ student, colors, onPress, onRemove }: {
   student: Student;
   colors: any;
-  isDark: boolean;
   onPress: () => void;
   onRemove: () => void;
 }) {
@@ -113,10 +113,10 @@ function StudentRow({ student, colors, isDark, onPress, onRemove }: {
   const dotColor = student.lastActivityColor;
 
   const avatarBg = isInactive
-    ? (isDark ? 'rgba(255,255,255,0.10)' : '#E5E7EB')
-    : colors.primary + '33';
+    ? (colors.surfaceMuted)
+    : alpha(colors.primary, 20);
   const avatarTextColor = isInactive
-    ? (isDark ? '#9CA3AF' : '#6B7280')
+    ? (colors.textSecondary)
     : colors.primary;
 
   return (
@@ -125,7 +125,7 @@ function StudentRow({ student, colors, isDark, onPress, onRemove }: {
       style={({ pressed }) => [
         styles.row,
         {
-          borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : '#F3F4F6',
+          borderBottomColor: colors.border,
           opacity: pressed ? 0.7 : isInactive ? 0.7 : 1,
         },
       ]}
@@ -140,7 +140,7 @@ function StudentRow({ student, colors, isDark, onPress, onRemove }: {
         <View
           style={[
             styles.statusDot,
-            { backgroundColor: dotColor, borderColor: isDark ? colors.background : '#FFFFFF' },
+            { backgroundColor: dotColor, borderColor: colors.background },
           ]}
         />
       </View>
@@ -158,8 +158,9 @@ function StudentRow({ student, colors, isDark, onPress, onRemove }: {
             {student.name}
           </Text>
           {student.streak > 0 && (
-            <View style={styles.streakBadge}>
-              <Text style={styles.streakText}>🔥 {student.streak}</Text>
+            <View style={[styles.streakBadge, { backgroundColor: alpha(colors.streak, 10) }]}>
+              <Flame size={iconSize.xs} color={colors.streak} />
+              <Text style={[styles.streakText, { color: colors.warningText }]}>{student.streak}</Text>
             </View>
           )}
         </View>
@@ -168,15 +169,15 @@ function StudentRow({ student, colors, isDark, onPress, onRemove }: {
             {student.lastActivity}
           </Text>
           {student.todayCards > 0 && (
-            <View style={[styles.cardsBadge, { backgroundColor: isDark ? 'rgba(16,185,129,0.12)' : '#ECFDF5' }]}>
-              <Text style={styles.cardsBadgeText}>
+            <View style={[styles.cardsBadge, { backgroundColor: alpha(colors.success, 10) }]}>
+              <Text style={[styles.cardsBadgeText, { color: colors.successText }]}>
                 {student.todayCards} {pluralCards(student.todayCards)}
               </Text>
             </View>
           )}
           {student.waitingReviews > 0 && (
-            <View style={[styles.cardsBadge, { backgroundColor: isDark ? 'rgba(245,158,11,0.14)' : '#FFFBEB' }]}>
-              <Text style={[styles.cardsBadgeText, { color: '#B45309' }]}>
+            <View style={[styles.cardsBadge, { backgroundColor: alpha(colors.warning, 10) }]}>
+              <Text style={[styles.cardsBadgeText, { color: colors.warningText }]}>
                 {student.waitingReviews} ждут повторения
               </Text>
             </View>
@@ -186,15 +187,17 @@ function StudentRow({ student, colors, isDark, onPress, onRemove }: {
 
       {/* Remove button */}
       <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="Удалить ученика"
         onPress={onRemove}
         activeOpacity={0.6}
         hitSlop={8}
         style={[
           styles.removeBtn,
-          { backgroundColor: isDark ? 'rgba(239,68,68,0.1)' : '#FEF2F2' },
+          { backgroundColor: alpha(colors.error, 10) },
         ]}
       >
-        <Trash2 size={16} color="#EF4444" />
+        <Trash2 size={16} color={colors.error} />
       </TouchableOpacity>
     </Pressable>
   );
@@ -204,8 +207,6 @@ function StudentRow({ student, colors, isDark, onPress, onRemove }: {
 
 export function TeacherStudentsScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
-  const resolvedTheme = useSettingsStore((s) => s.resolvedTheme);
-  const isDark = resolvedTheme === 'dark';
   const insets = useSafeAreaInsets();
 
   const [query, setQuery] = useState('');
@@ -287,7 +288,7 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
           setStudents(
             members.map((m) => {
               const status = getStudentStatus(m.lastActiveDate);
-              const activity = formatLastActivity(m.lastActiveDate);
+              const activity = formatLastActivity(m.lastActiveDate, colors);
               return {
                 id: m.id,
                 name: m.displayName,
@@ -369,11 +370,11 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
     const result = await NeonService.remindCourseReview(route.params.courseId);
     setReminding(false);
     if (result === 'rate_limited') {
-      Alert.alert('Уже напомнили', 'Классу можно напоминать не чаще раза в сутки.');
+      toast.info('Уже напомнили: классу можно напоминать не чаще раза в сутки');
     } else if (!result) {
-      Alert.alert('Не получилось', 'Проверь соединение и попробуй ещё раз.');
+      toast.error('Не получилось. Проверь соединение и попробуй ещё раз');
     } else {
-      Alert.alert('Напоминание отправлено', `Ученикам с уведомлениями: ${result.sent} из ${result.students}.`);
+      toast.success(`Напоминание отправлено: ученикам с уведомлениями ${result.sent} из ${result.students}`);
     }
   }, [reminding, route.params.courseId]);
 
@@ -407,17 +408,17 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
         setStudents(prev => prev.filter(s => s.id !== student.id));
       } else {
         if (Platform.OS === 'web') window.alert('Не удалось удалить ученика');
-        else Alert.alert('Ошибка', 'Не удалось удалить ученика');
+        else toast.error('Не удалось удалить ученика');
       }
     } catch {
       if (Platform.OS === 'web') window.alert('Не удалось удалить ученика');
-      else Alert.alert('Ошибка', 'Не удалось удалить ученика');
+      else toast.error('Не удалось удалить ученика');
     }
   }, [route.params.courseId]);
 
-  const inputBg = isDark ? 'rgba(255,255,255,0.07)' : '#F3F4F6';
+  const inputBg = colors.surfaceMuted;
   const pillActiveBg = colors.primary;
-  const pillInactiveBg = isDark ? 'rgba(255,255,255,0.07)' : '#F3F4F6';
+  const pillInactiveBg = colors.surfaceMuted;
 
   const navigateBackToTeacher = useCallback(() => {
     navigation.reset({
@@ -466,8 +467,8 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
           styles.header,
           {
             paddingTop: 12,
-            backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.92)',
-            borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
+            backgroundColor: colors.background,
+            borderBottomColor: colors.border,
             ...Platform.select({ web: { backdropFilter: 'blur(12px)' } }) as any,
           },
         ]}
@@ -475,6 +476,8 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
         {/* Left: back + title */}
         <View style={styles.headerLeft}>
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Назад"
             onPress={() => {
               const target = {
                 name: 'TeacherCourseStats' as const,
@@ -502,7 +505,7 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
           </Pressable>
           <View style={styles.headerTitleRow}>
             <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Ученики</Text>
-            <View style={[styles.countBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F3F4F6' }]}>
+            <View style={[styles.countBadge, { backgroundColor: colors.surfaceMuted }]}>
               <Text style={[styles.countBadgeText, { color: colors.textSecondary }]}>
                 {filtered.length}
               </Text>
@@ -525,12 +528,12 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
       <View style={styles.searchSection}>
         {/* Search input */}
         <View style={[styles.searchBar, { backgroundColor: inputBg }]}>
-          <Text style={[styles.searchIcon, { color: isDark ? '#6B7280' : '#9CA3AF' }]}>🔍</Text>
+          <Search size={iconSize.xs} color={colors.textTertiary} />
           <TextInput
             value={query}
             onChangeText={setQuery}
             placeholder="Поиск..."
-            placeholderTextColor={isDark ? '#6B7280' : '#9CA3AF'}
+            placeholderTextColor={colors.textTertiary}
             style={[styles.searchInput, { color: colors.textPrimary }]}
             returnKeyType="search"
             clearButtonMode="while-editing"
@@ -557,7 +560,7 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
                 <Text
                   style={[
                     styles.pillText,
-                    { color: active ? '#FFFFFF' : colors.textSecondary },
+                    { color: active ? colors.onPrimary : colors.textSecondary },
                   ]}
                 >
                   {f.label}
@@ -585,7 +588,7 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
             style={[styles.retryBtn, { backgroundColor: colors.primary }]}
             onPress={() => setRetryTick((t) => t + 1)}
           >
-            <Text style={styles.retryBtnText}>Повторить</Text>
+            <Text style={[styles.retryBtnText, { color: colors.onPrimary }]}>Повторить</Text>
           </Pressable>
         </View>
       ) : (
@@ -594,7 +597,7 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
           keyExtractor={(item) => item.id}
           ListHeaderComponent={
             studentsWaiting > 0 ? (
-              <View style={[styles.remindBanner, { backgroundColor: isDark ? 'rgba(245,158,11,0.12)' : '#FFFBEB' }]}>
+              <View style={[styles.remindBanner, { backgroundColor: alpha(colors.warning, 10) }]}>
                 <Text style={[styles.remindText, { color: colors.textPrimary }]}>
                   У {studentsWaiting} {studentsWaiting === 1 ? 'ученика' : 'учеников'} есть слова к повторению
                 </Text>
@@ -603,7 +606,7 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
                   disabled={reminding}
                   style={[styles.remindBtn, { backgroundColor: colors.primary, opacity: reminding ? 0.6 : 1 }]}
                 >
-                  <Text style={styles.remindBtnText}>Напомнить</Text>
+                  <Text style={[styles.remindBtnText, { color: colors.onPrimary }]}>Напомнить</Text>
                 </Pressable>
               </View>
             ) : null
@@ -612,7 +615,6 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
             <StudentRow
               student={item}
               colors={colors}
-              isDark={isDark}
               onPress={() =>
                 navigation.navigate('StudentDetail', {
                   courseId: route.params.courseId,
@@ -642,32 +644,34 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
 
       {/* ── Invite Modal ── */}
       <Modal visible={inviteModalOpen} transparent animationType="fade" onRequestClose={() => setInviteModalOpen(false)}>
-        <Pressable style={styles.modalOverlay} onPress={() => setInviteModalOpen(false)}>
+        <Pressable style={[styles.modalOverlay, { backgroundColor: colors.overlay }]} onPress={() => setInviteModalOpen(false)}>
           <Pressable
-            style={[styles.inviteCard, { backgroundColor: isDark ? colors.background : '#FFFFFF' }]}
+            style={[styles.inviteCard, { backgroundColor: colors.background }]}
             onPress={(e) => e.stopPropagation()}
           >
             <View style={styles.inviteHeader}>
               <Text style={[styles.inviteTitle, { color: colors.textPrimary }]}>Пригласить ученика</Text>
-              <Pressable onPress={() => setInviteModalOpen(false)} hitSlop={8}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Закрыть" onPress={() => setInviteModalOpen(false)} hitSlop={8}>
                 <X size={20} color={colors.textSecondary} />
               </Pressable>
             </View>
             <Text style={[styles.inviteDescription, { color: colors.textSecondary }]}>
-              Отправьте код ученику — он введёт его в приложении, чтобы присоединиться к курсу
+              Отправь код ученику — он введёт его в приложении, чтобы присоединиться к курсу
             </Text>
             {inviteLoading ? (
               <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.l }} />
             ) : inviteJoinCode ? (
               <>
-                <View style={[styles.inviteCodeBox, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F3F4F6' }]}>
+                <View style={[styles.inviteCodeBox, { backgroundColor: colors.surfaceMuted }]}>
                   <Text style={[styles.inviteCodeText, { color: colors.primary }]}>{inviteJoinCode}</Text>
                 </View>
                 <Pressable
                   style={[styles.inviteActionBtn, { backgroundColor: colors.primary }]}
                   onPress={handleCopyInviteCode}
                 >
-                  <Text style={styles.inviteActionBtnText}>
+                  <Text style={[styles.inviteActionBtnText, { color: colors.onPrimary }]}>
                     {inviteCopied ? '✓ Скопировано' : 'Копировать код'}
                   </Text>
                 </Pressable>
@@ -728,10 +732,10 @@ const styles = StyleSheet.create({
   countBadge: {
     paddingHorizontal: 10,
     paddingVertical: 2,
-    borderRadius: 99,
+    borderRadius: borderRadius.full,
   },
   countBadgeText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
   },
   addBtn: {
@@ -776,11 +780,11 @@ const styles = StyleSheet.create({
   pill: {
     paddingHorizontal: 16,
     paddingVertical: 6,
-    borderRadius: 99,
+    borderRadius: borderRadius.full,
   },
   pillText: {
-    fontSize: 13,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: '600',
   },
 
   // List row
@@ -798,7 +802,7 @@ const styles = StyleSheet.create({
   avatar: {
     width: 44,
     height: 44,
-    borderRadius: 22,
+    borderRadius: borderRadius.xl,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -812,7 +816,7 @@ const styles = StyleSheet.create({
     right: 1,
     width: 12,
     height: 12,
-    borderRadius: 6,
+    borderRadius: borderRadius.s,
     borderWidth: 2,
   },
   rowInfo: {
@@ -826,20 +830,18 @@ const styles = StyleSheet.create({
     flexWrap: 'nowrap',
   },
   rowName: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
     flexShrink: 1,
   },
   streakBadge: {
-    backgroundColor: '#FFF7ED',
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 6,
+    borderRadius: borderRadius.s,
   },
   streakText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#EA580C',
   },
   rowMetaRow: {
     flexDirection: 'row',
@@ -848,22 +850,21 @@ const styles = StyleSheet.create({
   },
   rowMeta: {
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   cardsBadge: {
     paddingHorizontal: 6,
     paddingVertical: 1,
-    borderRadius: 4,
+    borderRadius: borderRadius.s,
   },
   cardsBadgeText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
-    color: '#059669',
   },
   removeBtn: {
     width: 34,
     height: 34,
-    borderRadius: 17,
+    borderRadius: borderRadius.l,
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: spacing.s,
@@ -876,7 +877,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   retryBtn: {
     marginTop: spacing.m,
@@ -885,7 +886,6 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.m,
   },
   retryBtnText: {
-    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -897,7 +897,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 14,
+    borderRadius: borderRadius.m,
   },
   remindText: {
     flex: 1,
@@ -911,7 +911,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   remindBtnText: {
-    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -919,7 +918,6 @@ const styles = StyleSheet.create({
   // Invite modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.l,
@@ -937,11 +935,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   inviteTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
   },
   inviteDescription: {
-    fontSize: 13,
+    fontSize: 14,
     lineHeight: 18,
   },
   inviteCodeBox: {
@@ -952,7 +950,7 @@ const styles = StyleSheet.create({
   },
   inviteCodeText: {
     fontSize: 32,
-    fontWeight: '800',
+    fontWeight: '700',
     letterSpacing: 6,
   },
   inviteActionBtn: {
@@ -962,12 +960,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   inviteActionBtnText: {
-    color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
   },
   inviteRegenerateText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
   },
