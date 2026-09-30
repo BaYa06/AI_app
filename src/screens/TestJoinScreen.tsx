@@ -13,7 +13,6 @@ import {
   ArrowRight,
   GraduationCap,
   User,
-  QrCode,
 } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import { Button, Screen, ScreenHeader } from '@/components/ui';
@@ -243,16 +242,6 @@ export function TestJoinScreen({ navigation, route }: Props) {
         </View>
       </View>
 
-      {/* Divider */}
-      <View style={styles.dividerRow}>
-        <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-        <Text variant="bodySmall" style={{ color: colors.textSecondary }}>или</Text>
-        <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-      </View>
-
-      {/* Scan QR Button — действие появится на шаге 4.3 */}
-      <Button variant="secondary" title="Сканировать QR-код" icon={QrCode} fullWidth style={styles.qrBtn} />
-
       {/* Error */}
       {error && (
         <View
@@ -346,20 +335,6 @@ const styles = StyleSheet.create({
   },
   nameText: {
     flex: 1,
-  },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
-    gap: spacing.m,
-    marginBottom: spacing.l,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-  },
-  qrBtn: {
-    marginBottom: spacing.xl,
   },
   errorBox: {
     width: '100%',

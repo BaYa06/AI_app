@@ -20,7 +20,6 @@ import {
   UserPlus,
   CheckCircle2,
   ArrowRight,
-  QrCode,
 } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import { useThemeColors } from '@/store';
@@ -199,9 +198,6 @@ export function TestLobbyScreen({ navigation, route }: Props) {
             <View style={styles.codeCardLeft}>
               <Text style={[styles.codeLabel, { color: colors.onPrimary }]}>Код теста</Text>
               <Text style={[styles.codeValue, { color: colors.onPrimary }]}>{gameCode}</Text>
-            </View>
-            <View style={[styles.qrWrap, { backgroundColor: colors.surface }]}>
-              <QrCode size={52} color={colors.primaryFill} />
             </View>
           </View>
           <View style={[styles.codeCardShare, { backgroundColor: alpha(colors.onPrimary, 10) }]}>
@@ -444,10 +440,6 @@ const styles = StyleSheet.create({
     fontSize: 40,
     fontWeight: '700',
     letterSpacing: 6,
-  },
-  qrWrap: {
-    padding: 10,
-    borderRadius: borderRadius.m,
   },
   codeCardShare: {
     flexDirection: 'row',
