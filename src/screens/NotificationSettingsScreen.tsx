@@ -198,7 +198,7 @@ export function NotificationSettingsScreen({ navigation }: any) {
           {DAYS.map((day) => {
             const active = selectedDays[day.key];
             return (
-              <Pressable
+              <Pressable hitSlop={spacing.xxs}
                 key={day.key}
                 onPress={() => toggleDay(day.key)}
                 accessibilityRole="checkbox"

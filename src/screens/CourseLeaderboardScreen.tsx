@@ -164,7 +164,7 @@ export function CourseLeaderboardScreen({ navigation, route }: Props) {
         {(['current', 'previous'] as Week[]).map((w) => {
           const active = week === w;
           return (
-            <Pressable
+            <Pressable hitSlop={{ top: spacing.xxs, bottom: spacing.xxs }}
               key={w}
               onPress={() => { triggerHaptic('selection'); setWeek(w); }}
               accessibilityRole="tab"

@@ -133,7 +133,7 @@ function ClaimButton({ onPress, buttonRef }: { onPress: () => void; buttonRef: (
   const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return (
     <ReanimatedAnimated.View style={style}>
-      <Pressable
+      <Pressable hitSlop={{ top: spacing.xxs, bottom: spacing.xxs }}
         ref={buttonRef}
         style={[styles.challengeClaimButton, { backgroundColor: colors.onPrimary }]}
         onPress={onPress}

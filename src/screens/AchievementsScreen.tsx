@@ -183,7 +183,7 @@ export function AchievementsScreen({ navigation }: any) {
           {TABS.map((tab, i) => {
             const isActive = activeTab === i;
             return (
-              <Pressable
+              <Pressable hitSlop={{ top: spacing.xxs, bottom: spacing.xxs }}
                 key={tab}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: isActive }}

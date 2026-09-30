@@ -268,7 +268,7 @@ export function ProfileScreen({ navigation }: any) {
               {THEME_OPTIONS.map((opt) => {
                 const active = themeMode === opt.value;
                 return (
-                  <Pressable
+                  <Pressable hitSlop={{ top: spacing.xs, bottom: spacing.xs }}
                     key={opt.value}
                     onPress={() => setTheme(opt.value)}
                     accessibilityRole="radio"

@@ -192,7 +192,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
           },
         ]}
       >
-        <Pressable
+        <Pressable hitSlop={spacing.xs}
           accessibilityRole="button"
           accessibilityLabel="Закрыть"
           style={({ pressed }) => [

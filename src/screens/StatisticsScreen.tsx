@@ -436,7 +436,7 @@ export function StatisticsScreen({ navigation }: any) {
               const isActive = chartTab === tab;
               const labels = { week: 'Неделя', month: 'Месяц', year: 'Год' };
               return (
-                <Pressable
+                <Pressable hitSlop={{ top: spacing.xxs, bottom: spacing.xxs }}
                   key={tab}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: isActive }}

@@ -431,7 +431,7 @@ export function LibraryScreen() {
             {LIBRARY_CATEGORIES.map((cat) => {
               const isActive = activeCategory === cat.key;
               return (
-                <Pressable
+                <Pressable hitSlop={{ top: spacing.xxs, bottom: spacing.xxs }}
                   key={cat.key}
                   accessibilityRole="button"
                   accessibilityState={{ selected: isActive }}
@@ -460,7 +460,7 @@ export function LibraryScreen() {
             {LIBRARY_LANGUAGES.map((lang) => {
               const isActive = activeLang === lang.key;
               return (
-                <Pressable
+                <Pressable hitSlop={{ top: spacing.xs, bottom: spacing.xs }}
                   key={lang.key}
                   accessibilityRole="button"
                   accessibilityState={{ selected: isActive }}
@@ -481,7 +481,7 @@ export function LibraryScreen() {
             {CARD_COUNT_RANGES.map((range) => {
               const isActive = activeCardCount === range.key;
               return (
-                <Pressable
+                <Pressable hitSlop={{ top: spacing.xs, bottom: spacing.xs }}
                   key={range.key}
                   accessibilityRole="button"
                   accessibilityState={{ selected: isActive }}

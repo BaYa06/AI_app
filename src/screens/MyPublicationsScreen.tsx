@@ -147,7 +147,7 @@ export function MyPublicationsScreen({ navigation }: Props) {
               loading={isUpdating}
               style={s.actionBtn}
             />
-            <Pressable
+            <Pressable hitSlop={{ top: spacing.xxs, bottom: spacing.xxs }}
               accessibilityRole="button"
               style={({ pressed }) => [
                 s.actionBtn,

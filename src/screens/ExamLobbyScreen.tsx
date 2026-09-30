@@ -299,7 +299,7 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
               </Text>
             </View>
             <View style={[styles.stepper, { backgroundColor: pillBg }]}>
-              <Pressable
+              <Pressable hitSlop={spacing.xs}
                 accessibilityRole="button"
                 accessibilityLabel="Меньше вопросов"
                 style={({ pressed }) => [
@@ -314,7 +314,7 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
               <Text style={[styles.stepperValue, { color: colors.textPrimary }]}>
                 {totalQuestions}
               </Text>
-              <Pressable
+              <Pressable hitSlop={spacing.xs}
                 accessibilityRole="button"
                 accessibilityLabel="Больше вопросов"
                 style={({ pressed }) => [
