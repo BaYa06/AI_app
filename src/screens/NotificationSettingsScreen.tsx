@@ -6,17 +6,14 @@ import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   StyleSheet,
-  ScrollView,
   Pressable,
-  Switch,
   ActivityIndicator,
-  Alert,
-  Platform,
 } from 'react-native';
-import { useThemeColors, useSettingsStore } from '@/store';
+import { Bell, ChevronDown, ChevronUp, Flame } from 'lucide-react-native';
+import { useThemeColors } from '@/store';
 import { Text } from '@/components/common';
-import { spacing, borderRadius } from '@/constants';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import { spacing, borderRadius, alpha } from '@/constants';
+import { Button, Card, ListGroup, ListRow, Screen, ScreenHeader, Switch, toast } from '@/components/ui';
 import {
   requestPushPermission,
   unsubscribePush,
@@ -43,13 +40,6 @@ const DAYS = [
 
 export function NotificationSettingsScreen({ navigation }: any) {
   const colors = useThemeColors();
-  const resolvedTheme = useSettingsStore((s) => s.resolvedTheme);
-  const isDark = resolvedTheme === 'dark';
-
-  const cardBg = isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF';
-  const cardBorder = isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9';
-  const subtleBg = isDark ? 'rgba(255,255,255,0.03)' : '#F8FAFC';
-  const dividerColor = isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9';
 
   // ---- State ----
   const [reminderEnabled, setReminderEnabled] = useState(true);
@@ -124,244 +114,165 @@ export function NotificationSettingsScreen({ navigation }: any) {
 
   const pad = (n: number) => String(n).padStart(2, '0');
 
+  const handleSave = async () => {
+    if (!userId || saving) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/push?action=settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          notifEnabled: reminderEnabled,
+          notifHour: hours,
+          notifMinute: 0,
+          notifDays: Object.entries(selectedDays)
+            .filter(([, v]) => v)
+            .map(([k]) => k)
+            .join(','),
+          notifStreak: streakReminders,
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      navigation.goBack();
+    } catch (e) {
+      console.error('[NotificationSettings] Save error:', e);
+      toast.error('Не удалось сохранить настройки. Проверь интернет и попробуй ещё раз');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const pushOn = pushStatus?.permission === 'granted' && !!pushStatus?.token;
+
   return (
-    <View style={[st.container, { backgroundColor: colors.background }]}>
-      {/* ======== Header ======== */}
-      <View style={[st.header, { backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : '#FFFFFF', borderBottomColor: cardBorder }]}>
-        <Pressable
-          style={[st.backBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9' }]}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
-        </Pressable>
-        <Text style={[st.headerTitle, { color: colors.textPrimary }]}>Уведомления</Text>
-        <View style={st.headerSpacer} />
+    <Screen
+      header={<ScreenHeader title="Уведомления" onBack={() => navigation.goBack()} bordered />}
+      contentStyle={st.content}
+    >
+      {/* ======== Learning Reminder ======== */}
+      <View style={st.sectionHeader}>
+        <Text variant="h3" accessibilityRole="header" style={{ color: colors.textPrimary }}>Напоминание об учёбе</Text>
+        <Switch value={reminderEnabled} onValueChange={setReminderEnabled} accessibilityLabel="Напоминание об учёбе" />
       </View>
 
-      <ScrollView
-        style={st.scroll}
-        contentContainerStyle={st.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* ======== Learning Reminder ======== */}
-        <View style={st.sectionHeader}>
-          <Text style={[st.sectionTitle, { color: colors.textPrimary }]}>Напоминание об учёбе</Text>
-          <Switch
-            value={reminderEnabled}
-            onValueChange={setReminderEnabled}
-            trackColor={{ false: colors.border, true: colors.primary }}
-            thumbColor="#FFFFFF"
-          />
-        </View>
-
-        {/* Time Picker */}
-        <View style={[st.card, { backgroundColor: subtleBg, borderColor: cardBorder }]}>
-          <Text style={[st.cardLabel, { color: colors.textTertiary }]}>Время ежедневного напоминания</Text>
-          <Text style={[st.cardHint, { color: colors.textTertiary }]}>Напоминания приходят с 8:00 до 21:00</Text>
-          <View style={st.timeRow}>
-            <View style={st.timeCol}>
-              <Pressable onPress={incrementHours} style={st.timeArrow}>
-                <Ionicons name="chevron-up" size={24} color={colors.textTertiary} />
-              </Pressable>
-              <View style={[st.timeBox, { backgroundColor: cardBg, borderColor: colors.primary + '30' }]}>
-                <Text style={[st.timeText, { color: colors.primary }]}>{pad(hours)}</Text>
-              </View>
-              <Pressable onPress={decrementHours} style={st.timeArrow}>
-                <Ionicons name="chevron-down" size={24} color={colors.textTertiary} />
-              </Pressable>
+      {/* Time Picker */}
+      <Card tone="muted" style={st.card}>
+        <Text variant="label" color="secondary">Время ежедневного напоминания</Text>
+        <Text variant="caption" color="secondary" style={st.cardHint}>Напоминания приходят с 8:00 до 21:00</Text>
+        <View style={st.timeRow}>
+          <View style={st.timeCol}>
+            <Button
+              variant="icon"
+              icon={ChevronUp}
+              background="none"
+              iconColor={colors.textSecondary}
+              accessibilityLabel="Позже на час"
+              onPress={incrementHours}
+            />
+            <View
+              accessible
+              accessibilityLabel={`Время напоминания: ${hours}:00`}
+              style={[st.timeBox, { backgroundColor: colors.surface, borderColor: alpha(colors.primary, 20) }]}
+            >
+              <Text variant="h1" style={{ color: colors.primary }}>{pad(hours)}</Text>
             </View>
-
-            <Text style={[st.timeSep, { color: colors.textTertiary }]}>:00</Text>
+            <Button
+              variant="icon"
+              icon={ChevronDown}
+              background="none"
+              iconColor={colors.textSecondary}
+              accessibilityLabel="Раньше на час"
+              onPress={decrementHours}
+            />
           </View>
+
+          <Text variant="h1" style={{ color: colors.textTertiary }}>:00</Text>
         </View>
+      </Card>
 
-        {/* Day Selector */}
-        <View style={[st.card, { backgroundColor: subtleBg, borderColor: cardBorder }]}>
-          <Text style={[st.cardLabel, { color: colors.textTertiary, marginBottom: spacing.m }]}>Повторять</Text>
-          <View style={st.daysRow}>
-            {DAYS.map((day) => {
-              const active = selectedDays[day.key];
-              return (
-                <Pressable
-                  key={day.key}
-                  onPress={() => toggleDay(day.key)}
-                  style={[
-                    st.dayBtn,
-                    {
-                      backgroundColor: active ? colors.primary : (isDark ? 'rgba(255,255,255,0.06)' : '#E2E8F0'),
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      st.dayText,
-                      { color: active ? '#FFFFFF' : colors.textTertiary },
-                    ]}
-                  >
-                    {day.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+      {/* Day Selector */}
+      <Card tone="muted" style={st.card}>
+        <Text variant="label" color="secondary" style={st.daysLabel}>Повторять</Text>
+        <View style={st.daysRow}>
+          {DAYS.map((day) => {
+            const active = selectedDays[day.key];
+            return (
+              <Pressable
+                key={day.key}
+                onPress={() => toggleDay(day.key)}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: active }}
+                accessibilityLabel={day.label}
+                style={[st.dayBtn, { backgroundColor: active ? colors.primaryFill : colors.surfaceVariant }]}
+              >
+                <Text variant="caption" style={[st.bold, { color: active ? colors.onPrimary : colors.textSecondary }]}>
+                  {day.label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
+      </Card>
 
-        {/* ======== Divider ======== */}
-        <View style={[st.sectionDivider, { backgroundColor: dividerColor }]} />
-
-        {/* ======== General Preferences ======== */}
-        <Text style={[st.groupLabel, { color: colors.textTertiary }]}>Основные настройки</Text>
-
-        <View style={[st.toggleCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-          {/* Push */}
-          <View style={st.toggleRow}>
-            <Ionicons name="notifications" size={22} color={colors.textTertiary} />
-            <Text style={[st.toggleText, { color: colors.textPrimary }]}>Push-уведомления</Text>
-            {pushLoading ? (
+      {/* ======== General Preferences ======== */}
+      <ListGroup title="Основные настройки" style={st.group}>
+        <ListRow
+          icon={Bell}
+          title="Push-уведомления"
+          right={
+            pushLoading ? (
               <ActivityIndicator color={colors.primary} size="small" />
             ) : (
               <Switch
-                value={pushStatus?.permission === 'granted' && !!pushStatus?.token}
+                value={pushOn}
                 onValueChange={handleTogglePush}
-                trackColor={{ false: colors.border, true: colors.primary }}
-                thumbColor="#FFFFFF"
                 disabled={pushStatus?.permission === 'denied' || pushStatus?.isSupported === false}
+                accessibilityLabel="Push-уведомления"
               />
-            )}
-          </View>
-        </View>
+            )
+          }
+        />
+      </ListGroup>
 
-        {/* ======== Gamification ======== */}
-        <Text style={[st.groupLabel, { color: colors.textTertiary }]}>Геймификация</Text>
+      {/* ======== Gamification ======== */}
+      <ListGroup title="Геймификация" style={st.group}>
+        <ListRow
+          icon={Flame}
+          iconColor={colors.streak}
+          title="Напоминания о серии"
+          right={<Switch value={streakReminders} onValueChange={setStreakReminders} accessibilityLabel="Напоминания о серии" />}
+        />
+      </ListGroup>
 
-        <View style={[st.toggleCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-          {/* Streak */}
-          <View style={st.toggleRow}>
-            <Ionicons name="flame" size={22} color={colors.primary} />
-            <Text style={[st.toggleText, { color: colors.textPrimary }]}>Напоминания о серии</Text>
-            <Switch
-              value={streakReminders}
-              onValueChange={setStreakReminders}
-              trackColor={{ false: colors.border, true: colors.primary }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
-        </View>
-
-        {/* ======== Save Button ======== */}
-        <Pressable
-          style={[st.saveBtn, { backgroundColor: colors.primary, opacity: saving ? 0.7 : 1 }]}
-          onPress={async () => {
-            if (!userId || saving) return;
-            setSaving(true);
-            try {
-              const res = await fetch(`${API_BASE}/push?action=settings`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  userId,
-                  notifEnabled: reminderEnabled,
-                  notifHour: hours,
-                  notifMinute: 0,
-                  notifDays: Object.entries(selectedDays)
-                    .filter(([, v]) => v)
-                    .map(([k]) => k)
-                    .join(','),
-                  notifStreak: streakReminders,
-                }),
-              });
-              if (!res.ok) throw new Error(`HTTP ${res.status}`);
-              navigation.goBack();
-            } catch (e) {
-              console.error('[NotificationSettings] Save error:', e);
-              const msg = 'Не удалось сохранить настройки. Проверьте интернет и попробуйте ещё раз.';
-              if (Platform.OS === 'web') window.alert(msg);
-              else Alert.alert('Ошибка', msg);
-            } finally {
-              setSaving(false);
-            }
-          }}
-        >
-          <Text style={st.saveBtnText}>{saving ? 'Сохранение...' : 'Сохранить настройки'}</Text>
-        </Pressable>
-      </ScrollView>
-    </View>
+      {/* ======== Save Button ======== */}
+      <Button title={saving ? 'Сохранение...' : 'Сохранить настройки'} onPress={handleSave} disabled={saving} fullWidth />
+    </Screen>
   );
 }
 
 // ==================== СТИЛИ ====================
 
 const st = StyleSheet.create({
-  container: {
-    flex: 1,
+  content: {
+    paddingTop: spacing.l,
   },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.s,
-    borderBottomWidth: 1,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 17,
+  bold: {
     fontWeight: '700',
-    textAlign: 'center',
   },
-  headerSpacer: {
-    width: 40,
-  },
-
-  // Scroll
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: spacing.l,
-    paddingBottom: spacing.xxl + 40,
-  },
-
-  // Section header
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.l,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-  },
-
-  // Card
-  card: {
-    borderRadius: borderRadius.xl,
-    padding: spacing.l,
-    borderWidth: 1,
     marginBottom: spacing.m,
   },
-  cardLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginBottom: spacing.xxs,
+  card: {
+    marginBottom: spacing.s,
   },
   cardHint: {
-    fontSize: 12,
-    fontWeight: '500',
-    marginBottom: spacing.m,
+    marginTop: spacing.xxs,
+    marginBottom: spacing.s,
   },
-
-  // Time Picker
   timeRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -371,28 +282,17 @@ const st = StyleSheet.create({
   timeCol: {
     alignItems: 'center',
   },
-  timeArrow: {
-    padding: spacing.xs,
-  },
   timeBox: {
     width: 64,
     height: 76,
-    borderRadius: borderRadius.xl,
+    borderRadius: borderRadius.l,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  timeText: {
-    fontSize: 30,
-    fontWeight: '800',
+  daysLabel: {
+    marginBottom: spacing.s,
   },
-  timeSep: {
-    fontSize: 30,
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-
-  // Days
   daysRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -400,68 +300,12 @@ const st = StyleSheet.create({
   dayBtn: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: borderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dayText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-
-  // Divider
-  sectionDivider: {
-    height: 2,
-    borderRadius: 1,
-    marginBottom: spacing.l,
-  },
-
-  // Group label
-  groupLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
-    marginBottom: spacing.s,
-    paddingHorizontal: spacing.xxs,
-  },
-
-  // Toggle card
-  toggleCard: {
-    borderRadius: borderRadius.xl,
-    borderWidth: 1,
-    overflow: 'hidden',
-    marginBottom: spacing.l,
-  },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.m,
-    paddingVertical: 14,
-    paddingHorizontal: spacing.m,
-  },
-  toggleText: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-
-  // Save button
-  saveBtn: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: borderRadius.xl,
-    marginTop: spacing.xs,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  saveBtnText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#FFFFFF',
+  group: {
+    marginTop: spacing.l,
+    marginBottom: spacing.xs,
   },
 });
