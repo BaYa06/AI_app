@@ -56,11 +56,14 @@ import { BookService } from '@/services/BookService';
 import { JoinByCodeModal } from '@/components/JoinByCodeModal';
 import type { DailyActivity } from '@/services/StreakService';
 import type { Card, CardSet } from '@/types';
-import { isCardWaitingReview, isCardFading } from '@/services/SRSService';
+import { isCardWaitingReview } from '@/services/SRSService';
 import { StorageService, STORAGE_KEYS } from '@/services/StorageService';
 import { Analytics } from '@/services/analytics';
 import { firstLessonStep } from '@/services/lessonFlow';
 import { useLessonStore } from '@/store/lessonStore';
+import { localDay } from '@/store/challengeStore';
+import { buildLessonPlan, countWaitingReview, ensureLessonDay, DEFAULT_NEW_PER_DAY } from '@/services/LessonService';
+import { isLessonStartable, lessonTitle, lessonHint } from '@/components/home/lessonText';
 
 const StaggerCard = React.memo(function StaggerCard({
   index,
@@ -612,17 +615,14 @@ export function HomeScreen({ navigation }: any) {
     return allSets.filter((set) => isSetInCourse(set, activeCourseId));
   }, [allSets, activeCourseId]);
 
-  // Слова к повторению в текущем курсе (план §3.1, §3.3): ждут, угасают, будут завтра
+  // Слова курса и ждущие повторения — для счётчиков «N ждут» у наборов и аналитики (урок — lessonPlan ниже)
   const cardsMap = useCardsStore((s) => s.cards);
   const cardsBySet = useCardsStore((s) => s.cardsBySet);
   const reviewStats = useMemo(() => {
     const now = Date.now();
-    const DAY_MS = 24 * 60 * 60 * 1000;
     const waiting: Card[] = [];
     const all: Card[] = [];
     const waitingBySet: Record<string, number> = {};
-    let fading = 0;
-    let tomorrow = 0;
     const seen = new Set<string>();
     for (const set of filteredSets) {
       for (const id of cardsBySet[set.id] || []) {
@@ -633,16 +633,37 @@ export function HomeScreen({ navigation }: any) {
         if (isCardWaitingReview(card, now)) {
           waiting.push(card);
           waitingBySet[set.id] = (waitingBySet[set.id] || 0) + 1;
-          if (isCardFading(card, now)) fading++;
-        } else if ((card.learningStep || 0) >= 1 && card.nextReviewDate <= now + DAY_MS) {
-          tomorrow++;
         }
       }
     }
-    // Сначала самые просроченные
-    waiting.sort((a, b) => a.nextReviewDate - b.nextReviewDate);
-    return { waiting, all, waitingBySet, fading, tomorrow };
+    return { waiting, all, waitingBySet };
   }, [filteredSets, cardsBySet, cardsMap]);
+
+  // Урок дня: наборы курса в порядке списка (без учёта поиска) — из них берутся новые слова
+  const lessonSets = useMemo(() => [...filteredSets].sort(SETS_COMPARATORS[setsSort]), [filteredSets, setsSort]);
+  const lessonDay = useLessonStore((s) => s.day);
+  const lessonPlan = useMemo(() => {
+    const now = Date.now();
+    const today = localDay();
+    // До снимка дня (или после полуночи) — считаем как будто день начинается сейчас
+    const day = lessonDay?.date === today
+      ? lessonDay
+      : ensureLessonDay(lessonDay, today, countWaitingReview(lessonSets, cardsBySet, cardsMap, now));
+    return buildLessonPlan({ sets: lessonSets, cardsBySet, cards: cardsMap, newPerDay: DEFAULT_NEW_PER_DAY, day, now });
+  }, [lessonSets, cardsBySet, cardsMap, lessonDay]);
+
+  // Утренний снимок дня — при заходе на главную, когда карточки уже загружены
+  // (иначе снимок «0 ждут» дал бы полную квоту новых в день большого повторения)
+  const lessonInputsRef = useRef({ lessonSets, cardsBySet, cardsMap });
+  lessonInputsRef.current = { lessonSets, cardsBySet, cardsMap };
+  const hasLessonCards = reviewStats.all.length > 0;
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasLessonCards) return;
+      const { lessonSets: sets, cardsBySet: bySet, cardsMap: map } = lessonInputsRef.current;
+      useLessonStore.getState().ensureToday(countWaitingReview(sets, bySet, map, Date.now()));
+    }, [hasLessonCards]),
+  );
 
   // Аналитика (plan/home_redesign.md, 0.2): что главная предлагала в момент захода — один раз за заход,
   // когда роль уже известна (до этого главная не знает, показывать ли баннер учителя)
@@ -655,33 +676,38 @@ export function HomeScreen({ navigation }: any) {
     Analytics.homeViewed({
       state: filteredSets.length === 0 ? 'no_sets'
         : isTeacher ? 'teacher'
-        : reviewStats.waiting.length > 0 ? 'daily_review' : 'study_all',
+        : isLessonStartable(lessonPlan) ? 'daily_review' : 'study_all',
       reviewCount: reviewStats.waiting.length,
       newCount: reviewStats.all.filter((c) => (c.learningStep || 0) === 0).length,
       setsCount: filteredSets.length,
     });
-  }, [focusTick, isTeacher, filteredSets.length, reviewStats]);
+  }, [focusTick, isTeacher, filteredSets.length, reviewStats, lessonPlan]);
 
-  // «Повторение дня» (план §3.1): слова курса, которым пришло время, самые просроченные первыми
-  const DAILY_REVIEW_MAX = 30;
+  // «Урок дня» (plan/home_redesign.md, 1.4): повторение + новые слова из текущего набора (LessonService)
+  const lessonStartable = isLessonStartable(lessonPlan);
   const handleDailyReview = useCallback(() => {
     triggerHaptic('selection');
     Analytics.homeAction('daily_review');
-    let queue = reviewStats.waiting.slice(0, DAILY_REVIEW_MAX);
-    if (queue.length === 0) return;
-    // Тесту нужно хотя бы 4 варианта ответа — добираем карточками курса (ответ раньше срока уровень не меняет)
-    if (queue.length < 4) {
-      const taken = new Set(queue.map((c) => c.id));
-      queue = [...queue, ...pickCardsForGame(reviewStats.all.filter((c) => !taken.has(c.id)), 4 - queue.length)];
+    let reviewIds = lessonPlan.reviewIds;
+    // Тесту нужно хотя бы 4 вопроса — добираем уже изученными словами, которым срок ещё не пришёл
+    // (ответ раньше срока уровень не меняет и в урок не записывается). Новые слова для добора не берём:
+    // правильный ответ поднял бы их на шаг 1 без показа.
+    if (reviewIds.length > 0 && reviewIds.length < 4) {
+      const taken = new Set([...reviewIds, ...lessonPlan.newIds]);
+      const extra = pickCardsForGame(
+        reviewStats.all.filter((c) => !taken.has(c.id) && (c.learningStep || 0) >= 1),
+        4 - reviewIds.length,
+      );
+      reviewIds = [...reviewIds, ...extra.map((c) => c.id)];
     }
-    // Урок дня (plan/home_redesign.md, 1.3): утренний снимок дня и запуск через lessonFlow —
-    // ответы записываются в день урока. Новые слова в урок добавит шаг 1.4.
-    useLessonStore.getState().ensureToday(reviewStats.waiting.length);
-    const step = firstLessonStep({ reviewIds: queue.map((c) => c.id), newIds: [] }, (id) => cardsMap[id]?.setId);
+    const step = firstLessonStep(
+      { reviewIds, newIds: lessonPlan.newIds, mistakeIds: lessonPlan.mistakeIds },
+      (id) => cardsMap[id]?.setId,
+    );
     if (!step) return;
     const rootNav = navigation?.getParent?.() ?? navigation;
     rootNav?.navigate(step.screen, step.params);
-  }, [navigation, reviewStats, cardsMap]);
+  }, [navigation, reviewStats, cardsMap, lessonPlan]);
 
   // Тизер рейтинга курса (план, этап 4): маленькая кнопка между мини-играми и «Повторением дня»
   const [leaderboard, setLeaderboard] = useState<CourseLeaderboard | null>(null);
@@ -1593,7 +1619,7 @@ export function HomeScreen({ navigation }: any) {
                 )}
 
                 <View style={styles.reviewActions}>
-                  {reviewStats.waiting.length > 0 ? (
+                  {lessonStartable ? (
                     <Pressable
                       accessibilityRole="button"
                       style={({ pressed }) => [
@@ -1603,14 +1629,11 @@ export function HomeScreen({ navigation }: any) {
                       onPress={handleDailyReview}
                     >
                       <Text style={[typography.button, styles.noLetterSpacing, { color: colors.onPrimary }]}>
-                        Повторение дня · {Math.min(reviewStats.waiting.length, DAILY_REVIEW_MAX)} слов · ~{Math.max(1, Math.round(Math.min(reviewStats.waiting.length, DAILY_REVIEW_MAX) / 4))} мин
+                        {lessonTitle(lessonPlan)}
                       </Text>
-                      {(reviewStats.fading > 0 || reviewStats.waiting.length > DAILY_REVIEW_MAX) && (
+                      {lessonHint(lessonPlan) && (
                         <Text variant="bodySmall" style={[styles.onFillMuted, { color: colors.onPrimary }]}>
-                          {[
-                            reviewStats.fading > 0 ? `${reviewStats.fading} начинают забываться` : null,
-                            reviewStats.waiting.length > DAILY_REVIEW_MAX ? `всего ждут ${reviewStats.waiting.length}` : null,
-                          ].filter(Boolean).join(' · ')}
+                          {lessonHint(lessonPlan)}
                         </Text>
                       )}
                     </Pressable>
@@ -1618,7 +1641,7 @@ export function HomeScreen({ navigation }: any) {
                     <>
                       {reviewStats.all.some((c) => (c.learningStep || 0) >= 1) && (
                         <Text variant="bodySmall" align="center" style={[styles.reviewDoneText, { color: colors.textSecondary }]}>
-                          Всё повторено ✓{reviewStats.tomorrow > 0 ? ` · завтра ${reviewStats.tomorrow}` : ''}
+                          Всё повторено ✓{lessonPlan.tomorrowCount > 0 ? ` · завтра ${lessonPlan.tomorrowCount}` : ''}
                         </Text>
                       )}
                       <Button title="Учить все карточки" fullWidth onPress={() => { Analytics.homeAction('study_all'); setShowStudyModeModal(true); }} />
