@@ -36,7 +36,6 @@ import {
   ArrowUpDown,
   Check,
   RotateCcw,
-  ChevronRight,
   Users,
   Flame,
   Gem,
@@ -722,7 +721,7 @@ export function HomeScreen({ navigation }: any) {
     startLesson(lessonPlan);
   }, [lessonContent, lessonPlan, startLesson, computeLessonPlan, navigation]);
 
-  // Тизер рейтинга курса (план, этап 4): маленькая кнопка между мини-играми и «Повторением дня»
+  // Рейтинг курса: значок-кубок в шапке, точка — есть новости (plan/home_redesign.md, 3.2)
   const [leaderboard, setLeaderboard] = useState<CourseLeaderboard | null>(null);
   const [lastWeekBoard, setLastWeekBoard] = useState<CourseLeaderboard | null>(null);
   useFocusEffect(
@@ -1388,6 +1387,26 @@ export function HomeScreen({ navigation }: any) {
         </View>
 
         <View style={styles.headerRight}>
+          {/* Рейтинг курса (plan/home_redesign.md, 3.2): значок в шапке, точка — есть новости */}
+          {ratingTeaser && (
+            <View>
+              <Button
+                variant="icon"
+                icon={Trophy}
+                background="none"
+                iconSize={iconSize.s}
+                iconColor={colors.warningText}
+                accessibilityLabel={`${ratingTeaser.title}. ${ratingTeaser.hint}`}
+                onPress={() => openLeaderboard(ratingTeaser.week)}
+              />
+              {ratingTeaser.dot && (
+                <View
+                  pointerEvents="none"
+                  style={[styles.ratingDot, { backgroundColor: colors.error, borderColor: colors.background }]}
+                />
+              )}
+            </View>
+          )}
           <Button
             variant="icon"
             icon={Search}
@@ -1518,32 +1537,6 @@ export function HomeScreen({ navigation }: any) {
                   onClaim={handleChallengeClaim}
                   claimRef={setClaimRef}
                 />
-
-                {ratingTeaser && (
-                  <SurfaceCard
-                    onPress={() => openLeaderboard(ratingTeaser.week)}
-                    padding="s"
-                    style={styles.ratingTeaser}
-                    accessibilityLabel={`${ratingTeaser.title}. ${ratingTeaser.hint}`}
-                  >
-                    <View style={[styles.ratingTeaserIcon, { backgroundColor: alpha(colors.star, 20) }]}>
-                      <Trophy size={iconSize.s} color={colors.warningText} />
-                      {ratingTeaser.dot && (
-                        <View style={[styles.ratingTeaserDot, { backgroundColor: colors.error, borderColor: colors.surface }]} />
-                      )}
-                    </View>
-                    <View style={styles.flex1}>
-                      <Text variant="body" style={[styles.semibold, { color: colors.textPrimary }]} numberOfLines={1}>
-                        {ratingTeaser.title}
-                      </Text>
-                      <Text variant="caption" style={{ color: colors.textSecondary }} numberOfLines={1}>
-                        {ratingTeaser.hint}
-                      </Text>
-                    </View>
-                    <Text variant="h3" style={[styles.bold, { color: colors.primary }]}>{ratingTeaser.badge}</Text>
-                    <ChevronRight size={iconSize.xs} color={colors.textTertiary} />
-                  </SurfaceCard>
-                )}
 
               </View>
               </>
@@ -2220,25 +2213,11 @@ const styles = StyleSheet.create({
     paddingTop: spacing.m,
     paddingBottom: spacing.s,
   },
-  ratingTeaser: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.s,
-    marginHorizontal: screenPadding,
-    marginTop: spacing.l,
-    minHeight: 56,
-  },
-  ratingTeaserIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: borderRadius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ratingTeaserDot: {
+  // Точка «есть новости» на значке рейтинга в шапке — у верхнего правого края иконки
+  ratingDot: {
     position: 'absolute',
-    top: 0,
-    right: 0,
+    top: spacing.xs,
+    right: spacing.xs,
     width: 10,
     height: 10,
     borderRadius: borderRadius.full,
