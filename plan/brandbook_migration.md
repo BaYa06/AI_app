@@ -210,7 +210,7 @@
 | `components/common/NotificationPrompt.tsx` | 13 | |
 | `components/common/ErrorBoundary.tsx` | 10 | |
 
-### 3.8 Прочие компоненты
+### 3.8 Прочие компоненты ✅
 `components/common/Container.tsx`, `Loading.tsx`, `ProgressBar.tsx`, `ToggleSwitch.tsx`, `Icons.tsx`, `LottieWrapper*.tsx` (0–1 нарушение) — привести к токенам или заменить компонентами этапа 2 там, где они используются.
 
 ---
@@ -254,7 +254,7 @@
 ## Этап 7. Уборка кода (без изменения интерфейса)
 
 - [ ] **7.1** Ionicons — только в `AppNavigator` (панель вкладок); `brand:check` показывает 0 файлов с Ionicons вне него.
-- [ ] **7.2** Удалить старые компоненты, полностью заменённые компонентами этапа 2 (`common/Button.tsx`, `common/Input.tsx` и т.п.), когда на них не осталось ссылок.
+- [ ] **7.2** Удалить старые компоненты, полностью заменённые компонентами этапа 2 (`common/Button.tsx`, `common/Input.tsx` и т.п.), когда на них не осталось ссылок. Уже без ссылок: `common/ProgressBar.tsx`, `common/ToggleSwitch.tsx`.
 - [ ] **7.3** Убрать устаревшие токены (`borderRadius.xs`, неиспользуемые `heights`).
 - [ ] **7.4** Склонение чисел — везде через `pluralize` из `src/utils` (удалить дубли `pluralCards`, `pointsWord`, `pluralizeDays`).
 
