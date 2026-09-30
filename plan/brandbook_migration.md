@@ -136,7 +136,7 @@
 | `components/cards/RatingButtons.tsx` | 0 | |
 | `components/RatingPromptModal.tsx` | 15 | Ionicons |
 
-### 3.3 Наборы, библиотека, импорт
+### 3.3 Наборы, библиотека, импорт ✅
 | Файл | Нарушений | Эмодзи / Ionicons |
 |---|---|---|
 | `screens/SetDetailScreen.tsx` | 48 | |
