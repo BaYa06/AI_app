@@ -104,12 +104,13 @@
   - **Готово, когда:** тесты зелёные; главная ещё не пользуется сервисом.
   - **Сделано:** `src/services/LessonService.ts` — `buildLessonPlan`, `ensureLessonDay` (сброс дня с сохранением выбранного набора), `countWaitingReview` (для утреннего снимка), `estimateMinutes`. В `LessonPlan` добавлены `mistakeIds` (для состояния `mistakes`) и `newQuota`. Jest настроен в `package.json` (`testEnvironment: node`, алиас `@/`), тесты — `npm test`, 17 штук. Время: 15 с на повторение, 22 с на новое слово — так совпадает с таблицей «4 / 6 / 8 / 8 мин».
 
-- [ ] **1.2 Состояние дня** — `src/services/StorageService.ts` (ключ `LESSON_DAY`), новый `src/store/lessonStore.ts`
+- [x] **1.2 Состояние дня** — новый `src/store/lessonStore.ts` (хранение через `localCache`)
   - Хранить: `{ date: 'YYYY-MM-DD' (локальная дата), startWaiting, reviewedIds, introducedIds, extraNew, focusSetId }`.
   - При первом открытии главной за день — новая запись со «снимком» `startWaiting`; при смене даты — сброс (кроме `focusSetId`).
   - Запись прогресса: после каждого ответа в режимах урока (параметр `lessonPhase`, шаг 1.3) — id в `reviewedIds` или `introducedIds`.
   - Ограничение: состояние дня локальное, на двух устройствах квоты считаются отдельно. Это допустимо (см. «Не входит в план»).
   - **Готово, когда:** после сессии и перезапуска приложения счётчики дня сохраняются, на следующий день обнуляются.
+  - **Сделано:** `useLessonStore` — `ensureToday(waitingNow)`, `recordAnswer(phase, cardId)`, `addExtraNew()`, `setFocusSet(setId)`. Вместо общего ключа `StorageService` — `readCache`/`writeCache` (`lesson_day`): ключ привязан к пользователю, после входа другим аккаунтом чужой урок не подхватится. Переходы дня — чистые функции в `LessonService` (`recordLessonAnswer`, `addExtraNew`, `setFocusSet`). Ответ после полуночи попадает в новый день. Тесты: 24 (`npm test`). **Вызовы `recordAnswer` из экранов тренировок — в шаге 1.3** (там появляется `lessonPhase`); проверка «после сессии и перезапуска» — тоже после 1.3.
 
 - [ ] **1.3 Сессия из двух частей** — `src/types/navigation.ts`, `MultipleChoiceScreen.tsx`, `StudyScreen.tsx`, `StudyResultsScreen.tsx`
   - Новые параметры маршрутов `MultipleChoice`, `Study`, `StudyResults`: `lessonPhase?: 'review' | 'new'`, `lessonNewIds?: string[]`.
