@@ -1425,18 +1425,6 @@ export function HomeScreen({ navigation }: any) {
               )}
             </View>
           )}
-          <Pressable
-            style={({ pressed }) => [
-              styles.addButton,
-              { backgroundColor: pressed ? colors.primaryPressed : colors.primaryFill },
-            ]}
-            hitSlop={spacing.xxs}
-            accessibilityRole="button"
-            accessibilityLabel="Создать набор"
-            onPress={() => { triggerHaptic('selection'); Analytics.homeAction('create_set'); navigation?.navigate('SetEditor', {}); }}
-          >
-            <Plus size={iconSize.s} color={colors.onPrimary} strokeWidth={2.5} />
-          </Pressable>
         </View>
       </View>
 
@@ -1674,6 +1662,16 @@ export function HomeScreen({ navigation }: any) {
                 </StaggerCard>
               );
             })}
+            {/* Создание набора — в конце списка, у самих наборов (plan/home_redesign.md, 4.2) */}
+            <Pressable
+              onPress={() => { triggerHaptic('selection'); Analytics.homeAction('create_set'); navigation?.navigate('SetEditor', {}); }}
+              accessibilityRole="button"
+              accessibilityLabel="Новый набор"
+              style={({ pressed }) => [styles.newSetRow, { borderColor: colors.border }, pressed && styles.pressed]}
+            >
+              <Plus size={iconSize.s} color={colors.primary} />
+              <Text variant="label" style={{ color: colors.primary }}>Новый набор</Text>
+            </Pressable>
           </View>
           </>
         )}
@@ -2158,7 +2156,6 @@ export function HomeScreen({ navigation }: any) {
   );
 }
 
-const ADD_BUTTON_SIZE = 36;
 
 const styles = StyleSheet.create({
   container: {
@@ -2212,18 +2209,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0,
   },
+  // Ширина как у кнопки меню слева — серия и алмазы по центру, даже когда справа пусто
   headerRight: {
+    minWidth: heights.touch,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-end',
     gap: spacing.xxs,
-    paddingRight: spacing.xs,
-  },
-  addButton: {
-    width: ADD_BUTTON_SIZE,
-    height: ADD_BUTTON_SIZE,
-    borderRadius: borderRadius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 
   // Search
@@ -2328,6 +2320,16 @@ const styles = StyleSheet.create({
   },
   noResults: {
     paddingVertical: spacing.l,
+  },
+  newSetRow: {
+    minHeight: heights.listRow,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderRadius: borderRadius.l,
   },
   sortOption: {
     flexDirection: 'row',
