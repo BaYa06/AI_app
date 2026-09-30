@@ -8,35 +8,34 @@ import {
   ScrollView,
   StyleSheet,
   Pressable,
-  Alert,
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Mic, Check } from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { useThemeColors, useSettingsStore, useSetsStore, useCardsStore } from '@/store';
-import { spacing, borderRadius } from '@/constants';
+import { useThemeColors, useSetsStore, useCardsStore } from '@/store';
+import { spacing, borderRadius, alpha } from '@/constants';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
+import { toast } from '@/components/ui';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OralTestLobby'>;
 
 export function OralTestLobbyScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
-  const isDark = useSettingsStore((s) => s.resolvedTheme) === 'dark';
   const insets = useSafeAreaInsets();
 
   const sets = useSetsStore((s) => s.getSetsByCourse(route.params.courseId));
   const [selectedSetId, setSelectedSetId] = useState<string>(sets[0]?.id ?? '');
 
-  const cardBg = isDark ? 'rgba(255,255,255,0.06)' : '#FFFFFF';
-  const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : '#E5E7EB';
+  const cardBg = colors.surface;
+  const cardBorder = colors.border;
 
   function handleStart() {
     if (!selectedSetId) return;
     const cards = useCardsStore.getState().getCardsBySet(selectedSetId);
     if (cards.length === 0) {
-      Alert.alert('Нет карточек', 'В этом наборе пока нет карточек.');
+      toast.info('Нет карточек: в этом наборе их пока нет');
       return;
     }
     const shuffled = [...cards].sort(() => Math.random() - 0.5);
@@ -57,13 +56,15 @@ export function OralTestLobbyScreen({ navigation, route }: Props) {
         style={[
           styles.header,
           {
-            backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.85)',
-            borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
+            backgroundColor: colors.background,
+            borderBottomColor: colors.border,
             paddingTop: 12,
           },
         ]}
       >
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Назад"
           onPress={() => navigation.goBack()}
           style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
           hitSlop={8}
@@ -81,8 +82,8 @@ export function OralTestLobbyScreen({ navigation, route }: Props) {
       >
         {/* Hero */}
         <View style={styles.hero}>
-          <View style={[styles.iconWrap, { backgroundColor: '#F97316' + '18' }]}>
-            <Mic size={32} color="#F97316" />
+          <View style={[styles.iconWrap, { backgroundColor: alpha(colors.streak, 10) }]}>
+            <Mic size={32} color={colors.streak} />
           </View>
           <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>
             Устный тренажёр
@@ -95,7 +96,7 @@ export function OralTestLobbyScreen({ navigation, route }: Props) {
         {/* Set list */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-            Выберите набор карточек
+            Выбери набор карточек
           </Text>
 
           {sets.length === 0 ? (
@@ -112,7 +113,7 @@ export function OralTestLobbyScreen({ navigation, route }: Props) {
                     onPress={() => setSelectedSetId(set.id)}
                     style={({ pressed }) => [
                       styles.setItem,
-                      active && { backgroundColor: '#F97316' + '10' },
+                      active && { backgroundColor: alpha(colors.streak, 10) },
                       idx < sets.length - 1 && {
                         borderBottomWidth: 1,
                         borderBottomColor: cardBorder,
@@ -122,7 +123,7 @@ export function OralTestLobbyScreen({ navigation, route }: Props) {
                   >
                     <View style={styles.setItemLeft}>
                       {active ? (
-                        <Check size={18} color="#F97316" strokeWidth={3} />
+                        <Check size={18} color={colors.streak} strokeWidth={3} />
                       ) : (
                         <View style={styles.emptyCheck} />
                       )}
@@ -130,7 +131,7 @@ export function OralTestLobbyScreen({ navigation, route }: Props) {
                         <Text
                           style={[
                             styles.setTitle,
-                            { color: active ? '#F97316' : colors.textPrimary },
+                            { color: active ? colors.streak : colors.textPrimary },
                           ]}
                           numberOfLines={1}
                         >
@@ -157,9 +158,7 @@ export function OralTestLobbyScreen({ navigation, route }: Props) {
             paddingBottom: insets.bottom + 16,
             ...Platform.select({
               web: {
-                background: isDark
-                  ? 'linear-gradient(to top, #101122 60%, transparent)'
-                  : 'linear-gradient(to top, #f6f6f8 60%, transparent)',
+                background: `linear-gradient(to top, ${colors.background} 60%, transparent)`,
               },
             }) as any,
             backgroundColor: Platform.OS !== 'web' ? colors.background : undefined,
@@ -169,14 +168,14 @@ export function OralTestLobbyScreen({ navigation, route }: Props) {
         <Pressable
           style={({ pressed }) => [
             styles.ctaBtn,
-            { backgroundColor: !selectedSetId ? colors.textSecondary : '#F97316' },
+            { backgroundColor: !selectedSetId ? colors.textSecondary : colors.streak },
             pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
           ]}
           disabled={!selectedSetId}
           onPress={handleStart}
         >
-          <Mic size={20} color="#FFFFFF" />
-          <Text style={styles.ctaText}>Начать тренировку</Text>
+          <Mic size={20} color={colors.onPrimary} />
+          <Text style={[styles.ctaText, { color: colors.onPrimary }]}>Начать тренировку</Text>
         </Pressable>
       </View>
     </View>
@@ -202,7 +201,7 @@ const styles = StyleSheet.create({
     marginLeft: -spacing.xs,
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '600',
     letterSpacing: -0.3,
     marginLeft: spacing.m,
@@ -220,7 +219,7 @@ const styles = StyleSheet.create({
   iconWrap: {
     width: 64,
     height: 64,
-    borderRadius: 18,
+    borderRadius: borderRadius.l,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,
@@ -239,7 +238,7 @@ const styles = StyleSheet.create({
     gap: spacing.s,
   },
   sectionTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
     letterSpacing: -0.2,
   },
@@ -267,13 +266,13 @@ const styles = StyleSheet.create({
     height: 18,
   },
   setTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
     letterSpacing: -0.2,
   },
   setMeta: {
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '600',
     marginTop: 2,
   },
   footer: {
@@ -291,17 +290,9 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: borderRadius.l,
     gap: 8,
-    ...Platform.select({
-      web: { boxShadow: '0 4px 16px rgba(249,115,22,0.3)' },
-    }) as any,
-    shadowColor: '#F97316',
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
+    
   },
   ctaText: {
-    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
   },

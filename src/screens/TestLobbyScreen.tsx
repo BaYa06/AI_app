@@ -23,8 +23,8 @@ import {
   QrCode,
 } from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { useThemeColors, useSettingsStore } from '@/store';
-import { spacing, borderRadius } from '@/constants';
+import { useThemeColors } from '@/store';
+import { spacing, borderRadius, alpha, type ColorToken } from '@/constants';
 import { supabase } from '@/services/supabaseClient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
@@ -41,11 +41,11 @@ type Student = {
   initials: string;
 };
 
-const AVATAR_COLORS = ['#6366F1', '#F59E0B', '#EC4899', '#10B981', '#F97316'];
+// Цвета аватаров участников — имена токенов, значения берутся из темы
+const AVATAR_TOKENS: ColorToken[] = ['primaryFill', 'warning', 'like', 'success', 'streak'];
 
 export function TestLobbyScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
-  const isDark = useSettingsStore((s) => s.resolvedTheme) === 'dark';
   const insets = useSafeAreaInsets();
 
   const { sessionId, code: gameCode } = route.params;
@@ -153,8 +153,8 @@ export function TestLobbyScreen({ navigation, route }: Props) {
     }
   }, [starting, students.length, sessionId, route.params]);
 
-  const cardBg = isDark ? 'rgba(255,255,255,0.06)' : '#FFFFFF';
-  const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : '#F1F5F9';
+  const cardBg = colors.surface;
+  const cardBorder = colors.border;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -163,7 +163,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
         style={[
           styles.header,
           {
-            backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.85)',
+            backgroundColor: colors.background,
             paddingTop: 12,
           },
         ]}
@@ -178,14 +178,14 @@ export function TestLobbyScreen({ navigation, route }: Props) {
           style={({ pressed }) => [
             styles.endBtn,
             {
-              backgroundColor: isDark ? 'rgba(239,68,68,0.12)' : '#FEF2F2',
-              borderColor: isDark ? 'rgba(239,68,68,0.2)' : '#FECACA',
+              backgroundColor: alpha(colors.error, 10),
+              borderColor: alpha(colors.error, 10),
             },
             pressed && { opacity: 0.7 },
           ]}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.endBtnText}>Завершить</Text>
+          <Text style={[styles.endBtnText, { color: colors.errorText }]}>Завершить</Text>
         </Pressable>
       </View>
 
@@ -194,31 +194,31 @@ export function TestLobbyScreen({ navigation, route }: Props) {
         showsVerticalScrollIndicator={false}
       >
         {/* Game Code Card */}
-        <View style={styles.codeCard}>
+        <View style={[styles.codeCard, { backgroundColor: colors.primaryFill }]}>
           <View style={styles.codeCardTop}>
             <View style={styles.codeCardLeft}>
-              <Text style={styles.codeLabel}>Код теста</Text>
-              <Text style={styles.codeValue}>{gameCode}</Text>
+              <Text style={[styles.codeLabel, { color: colors.onPrimary }]}>Код теста</Text>
+              <Text style={[styles.codeValue, { color: colors.onPrimary }]}>{gameCode}</Text>
             </View>
-            <View style={styles.qrWrap}>
-              <QrCode size={52} color="#6366F1" />
+            <View style={[styles.qrWrap, { backgroundColor: colors.surface }]}>
+              <QrCode size={52} color={colors.primaryFill} />
             </View>
           </View>
-          <View style={styles.codeCardShare}>
-            <Text style={styles.shareText}>Отправьте код ученикам</Text>
+          <View style={[styles.codeCardShare, { backgroundColor: alpha(colors.onPrimary, 10) }]}>
+            <Text style={[styles.shareText, { color: colors.onPrimary }]}>Отправь код ученикам</Text>
             <Pressable
               style={({ pressed }) => [
-                styles.copyBtn,
+                [styles.copyBtn, { backgroundColor: colors.surface }],
                 pressed && { opacity: 0.7 },
               ]}
               onPress={handleCopy}
             >
               {copied ? (
-                <CheckCircle2 size={14} color="#22C55E" />
+                <CheckCircle2 size={14} color={colors.success} />
               ) : (
-                <Copy size={14} color="#6366F1" />
+                <Copy size={14} color={colors.primaryFill} />
               )}
-              <Text style={styles.copyBtnText}>{copied ? 'Скопировано' : 'Копировать'}</Text>
+              <Text style={[styles.copyBtnText, { color: colors.primary }]}>{copied ? 'Скопировано' : 'Копировать'}</Text>
             </Pressable>
           </View>
         </View>
@@ -227,14 +227,14 @@ export function TestLobbyScreen({ navigation, route }: Props) {
         <View style={styles.waitingRow}>
           <View style={styles.waitingLeft}>
             <View style={styles.pingWrap}>
-              <View style={styles.pingOuter} />
-              <View style={styles.pingDot} />
+              <View style={[styles.pingOuter, { backgroundColor: colors.success }]} />
+              <View style={[styles.pingDot, { backgroundColor: colors.success }]} />
             </View>
             <Text style={[styles.waitingTitle, { color: colors.textPrimary }]}>
               Ожидание учеников...
             </Text>
           </View>
-          <View style={[styles.joinedBadge, { backgroundColor: colors.primary + '15' }]}>
+          <View style={[styles.joinedBadge, { backgroundColor: alpha(colors.primary, 10) }]}>
             <Text style={[styles.joinedText, { color: colors.primary }]}>
               Подключились: {students.length}
             </Text>
@@ -256,15 +256,15 @@ export function TestLobbyScreen({ navigation, route }: Props) {
                   style={[
                     styles.studentAvatar,
                     {
-                      backgroundColor: AVATAR_COLORS[idx % AVATAR_COLORS.length] + '20',
-                      borderColor: AVATAR_COLORS[idx % AVATAR_COLORS.length] + '40',
+                      backgroundColor: alpha(colors[AVATAR_TOKENS[idx % AVATAR_TOKENS.length]], 20),
+                      borderColor: alpha(colors[AVATAR_TOKENS[idx % AVATAR_TOKENS.length]], 40),
                     },
                   ]}
                 >
                   <Text
                     style={[
                       styles.studentAvatarText,
-                      { color: AVATAR_COLORS[idx % AVATAR_COLORS.length] },
+                      { color: colors[AVATAR_TOKENS[idx % AVATAR_TOKENS.length]] },
                     ]}
                   >
                     {s.initials}
@@ -279,7 +279,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
                   </Text>
                 </View>
               </View>
-              <CheckCircle2 size={22} color="#22C55E" />
+              <CheckCircle2 size={22} color={colors.success} />
             </View>
           ))}
 
@@ -287,13 +287,13 @@ export function TestLobbyScreen({ navigation, route }: Props) {
           <View
             style={[
               styles.emptySlot,
-              { borderColor: isDark ? 'rgba(255,255,255,0.1)' : '#E5E7EB' },
+              { borderColor: colors.border },
             ]}
           >
             <View
               style={[
                 styles.emptyAvatar,
-                { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9' },
+                { backgroundColor: colors.surfaceMuted },
               ]}
             >
               <UserPlus size={18} color={colors.textSecondary} />
@@ -314,7 +314,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
                   style={[
                     styles.crewAvatar,
                     {
-                      backgroundColor: AVATAR_COLORS[idx % AVATAR_COLORS.length] + '30',
+                      backgroundColor: alpha(colors[AVATAR_TOKENS[idx % AVATAR_TOKENS.length]], 20),
                       borderColor: colors.background,
                       marginLeft: idx > 0 ? -10 : 0,
                       zIndex: students.length - idx,
@@ -324,7 +324,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
                   <Text
                     style={[
                       styles.crewAvatarText,
-                      { color: AVATAR_COLORS[idx % AVATAR_COLORS.length] },
+                      { color: colors[AVATAR_TOKENS[idx % AVATAR_TOKENS.length]] },
                     ]}
                   >
                     {s.initials[0]}
@@ -347,9 +347,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
             paddingBottom: insets.bottom + 16,
             ...Platform.select({
               web: {
-                background: isDark
-                  ? 'linear-gradient(to top, #101122 60%, transparent)'
-                  : 'linear-gradient(to top, #f6f6f8 60%, transparent)',
+                background: `linear-gradient(to top, ${colors.background} 60%, transparent)`,
               },
             }) as any,
             backgroundColor: Platform.OS !== 'web' ? colors.background : undefined,
@@ -366,11 +364,11 @@ export function TestLobbyScreen({ navigation, route }: Props) {
           onPress={() => { triggerHaptic('selection'); handleStart(); }}
         >
           {starting ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={colors.onPrimary} />
           ) : (
             <>
-              <Text style={styles.ctaText}>Начать тест</Text>
-              <ArrowRight size={20} color="#FFFFFF" />
+              <Text style={[styles.ctaText, { color: colors.onPrimary }]}>Начать тест</Text>
+              <ArrowRight size={20} color={colors.onPrimary} />
             </>
           )}
         </Pressable>
@@ -401,7 +399,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   headerTitle: {
-    fontSize: 19,
+    fontSize: 20,
     fontWeight: '700',
     letterSpacing: -0.3,
   },
@@ -412,9 +410,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   endBtnText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#EF4444',
   },
 
   scroll: {
@@ -428,18 +425,6 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.l,
     padding: spacing.l,
     overflow: 'hidden',
-    backgroundColor: '#6366F1',
-    ...Platform.select({
-      web: {
-        backgroundImage: 'linear-gradient(135deg, #6467f2, #4c4d9a)',
-        boxShadow: '0 8px 24px rgba(100,103,242,0.25)',
-      },
-    }) as any,
-    shadowColor: '#6366F1',
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 10,
   },
   codeCardTop: {
     flexDirection: 'row',
@@ -450,20 +435,17 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   codeLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.7)',
     letterSpacing: 1.2,
     textTransform: 'uppercase',
   },
   codeValue: {
-    fontSize: 44,
-    fontWeight: '900',
-    color: '#FFFFFF',
+    fontSize: 40,
+    fontWeight: '700',
     letterSpacing: 6,
   },
   qrWrap: {
-    backgroundColor: '#FFFFFF',
     padding: 10,
     borderRadius: borderRadius.m,
   },
@@ -471,21 +453,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.15)',
     padding: spacing.s,
     borderRadius: borderRadius.m,
     marginTop: spacing.l,
   },
   shareText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: 'rgba(255,255,255,0.9)',
+    fontSize: 14,
+    fontWeight: '600',
   },
   copyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#FFFFFF',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: borderRadius.s,
@@ -493,7 +472,6 @@ const styles = StyleSheet.create({
   copyBtnText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#6366F1',
   },
 
   // Waiting
@@ -517,15 +495,13 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 12,
     height: 12,
-    borderRadius: 6,
-    backgroundColor: '#22C55E',
+    borderRadius: borderRadius.s,
     opacity: 0.3,
   },
   pingDot: {
     width: 8,
     height: 8,
-    borderRadius: 4,
-    backgroundColor: '#22C55E',
+    borderRadius: borderRadius.s,
   },
   waitingTitle: {
     fontSize: 16,
@@ -538,7 +514,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   joinedText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
   },
 
@@ -553,14 +529,7 @@ const styles = StyleSheet.create({
     padding: spacing.s,
     borderRadius: borderRadius.m,
     borderWidth: 1,
-    ...Platform.select({
-      web: { boxShadow: '0 1px 3px rgba(0,0,0,0.04)' },
-    }) as any,
-    shadowColor: '#000',
-    shadowOpacity: 0.03,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
+    
   },
   studentLeft: {
     flexDirection: 'row',
@@ -570,7 +539,7 @@ const styles = StyleSheet.create({
   studentAvatar: {
     width: 44,
     height: 44,
-    borderRadius: 22,
+    borderRadius: borderRadius.xl,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
@@ -584,8 +553,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   studentStatus: {
-    fontSize: 11,
-    fontWeight: '500',
+    fontSize: 12,
+    fontWeight: '600',
     marginTop: 1,
   },
 
@@ -603,13 +572,13 @@ const styles = StyleSheet.create({
   emptyAvatar: {
     width: 44,
     height: 44,
-    borderRadius: 22,
+    borderRadius: borderRadius.xl,
     alignItems: 'center',
     justifyContent: 'center',
   },
   emptyText: {
-    fontSize: 13,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: '600',
   },
 
   // Crew avatars
@@ -624,17 +593,17 @@ const styles = StyleSheet.create({
   crewAvatar: {
     width: 44,
     height: 44,
-    borderRadius: 22,
+    borderRadius: borderRadius.xl,
     borderWidth: 3,
     alignItems: 'center',
     justifyContent: 'center',
   },
   crewAvatarText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
   },
   crewLabel: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
@@ -657,18 +626,10 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: borderRadius.l,
     gap: 8,
-    ...Platform.select({
-      web: { boxShadow: '0 4px 16px rgba(100,103,242,0.3)' },
-    }) as any,
-    shadowColor: '#6467F2',
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
+    
   },
   ctaText: {
-    color: '#FFFFFF',
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
   },
 });

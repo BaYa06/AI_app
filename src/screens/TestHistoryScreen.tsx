@@ -21,8 +21,8 @@ import {
   AlertTriangle,
 } from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { useThemeColors, useSettingsStore } from '@/store';
-import { spacing, borderRadius } from '@/constants';
+import { useThemeColors } from '@/store';
+import { spacing, borderRadius, alpha } from '@/constants';
 import { supabase } from '@/services/supabaseClient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
@@ -42,10 +42,10 @@ type HistoryItem = {
   testMode: string;
 };
 
-function scoreColor(score: number): string {
-  if (score >= 70) return '#10B981';
-  if (score >= 50) return '#F59E0B';
-  return '#EF4444';
+function scoreColor(score: number, colors: ReturnType<typeof useThemeColors>): string {
+  if (score >= 70) return colors.success;
+  if (score >= 50) return colors.warning;
+  return colors.error;
 }
 
 function formatDate(iso: string): string {
@@ -58,7 +58,6 @@ function formatDate(iso: string): string {
 
 export function TestHistoryScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
-  const isDark = useSettingsStore((s) => s.resolvedTheme) === 'dark';
 
   const { courseId, courseTitle } = route.params;
 
@@ -66,8 +65,8 @@ export function TestHistoryScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const cardBg = isDark ? 'rgba(255,255,255,0.06)' : '#FFFFFF';
-  const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : '#F1F5F9';
+  const cardBg = colors.surface;
+  const cardBorder = colors.border;
 
   const load = useCallback(async () => {
     setError(null);
@@ -106,13 +105,15 @@ export function TestHistoryScreen({ navigation, route }: Props) {
         style={[
           styles.header,
           {
-            backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.85)',
-            borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
+            backgroundColor: colors.background,
+            borderBottomColor: colors.border,
             paddingTop: 12,
           },
         ]}
       >
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Назад"
           onPress={() => navigation.goBack()}
           style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
           hitSlop={8}
@@ -139,7 +140,7 @@ export function TestHistoryScreen({ navigation, route }: Props) {
       {/* Error */}
       {!loading && error && (
         <View style={styles.centerState}>
-          <AlertTriangle size={40} color="#EF4444" />
+          <AlertTriangle size={40} color={colors.error} />
           <Text style={[styles.emptyTitle, { color: colors.textPrimary, marginTop: 12 }]}>
             {error}
           </Text>
@@ -151,7 +152,7 @@ export function TestHistoryScreen({ navigation, route }: Props) {
               pressed && { opacity: 0.8 },
             ]}
           >
-            <Text style={styles.retryText}>Повторить</Text>
+            <Text style={[styles.retryText, { color: colors.onPrimary }]}>Повторить</Text>
           </Pressable>
         </View>
       )}
@@ -164,7 +165,7 @@ export function TestHistoryScreen({ navigation, route }: Props) {
             Тестов пока нет
           </Text>
           <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-            Проведите первый тест, и он{'\n'}появится здесь
+            Проведи первый тест, и он{'\n'}появится здесь
           </Text>
         </View>
       )}
@@ -192,8 +193,8 @@ export function TestHistoryScreen({ navigation, route }: Props) {
               ]}
             >
               {/* Icon */}
-              <View style={[styles.historyIcon, { backgroundColor: '#6366F1' + '18' }]}>
-                <Trophy size={20} color="#6366F1" />
+              <View style={[styles.historyIcon, { backgroundColor: alpha(colors.primaryFill, 10) }]}>
+                <Trophy size={20} color={colors.primaryFill} />
               </View>
 
               {/* Content */}
@@ -205,7 +206,7 @@ export function TestHistoryScreen({ navigation, route }: Props) {
                   >
                     {item.setTitle}
                   </Text>
-                  <Text style={[styles.cardScore, { color: scoreColor(item.avgScore) }]}>
+                  <Text style={[styles.cardScore, { color: scoreColor(item.avgScore, colors) }]}>
                     {item.avgScore}%
                   </Text>
                   <ChevronRight size={16} color={colors.textSecondary} />
@@ -253,12 +254,12 @@ const styles = StyleSheet.create({
     marginLeft: -spacing.xs,
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '600',
     letterSpacing: -0.3,
   },
   headerSubtitle: {
-    fontSize: 13,
+    fontSize: 14,
     marginTop: 1,
   },
   centerState: {
@@ -285,7 +286,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   retryText: {
-    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -320,15 +320,15 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
     letterSpacing: -0.2,
   },
   cardScore: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
   },
   cardMeta: {
-    fontSize: 13,
+    fontSize: 14,
   },
 });

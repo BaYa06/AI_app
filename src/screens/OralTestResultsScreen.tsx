@@ -12,20 +12,21 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/common';
-import { useThemeColors, useSettingsStore } from '@/store';
-import { spacing, borderRadius } from '@/constants';
+import { useThemeColors } from '@/store';
+import { spacing, borderRadius, alpha } from '@/constants';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
+import { CelebrationIcon } from '@/components/ui';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OralTestResults'>;
 
-const GREEN = '#10B981';
-const RED = '#EF4444';
-const ACCENT = '#F97316';
 
 export function OralTestResultsScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
-  const isDark = useSettingsStore((s) => s.resolvedTheme) === 'dark';
+  // Акцент устного теста — оранжевый (streak), знает / не знает — success / error
+  const ACCENT = colors.streak;
+  const GREEN = colors.success;
+  const RED = colors.error;
   const insets = useSafeAreaInsets();
 
   const { courseId, courseTitle, setTitle, total, known, unknown } = route.params;
@@ -33,8 +34,8 @@ export function OralTestResultsScreen({ navigation, route }: Props) {
   const knownPct = total > 0 ? Math.round((known / total) * 100) : 0;
   const unknownPct = total > 0 ? Math.round((unknown / total) * 100) : 0;
 
-  const cardBg = isDark ? 'rgba(255,255,255,0.06)' : '#FFFFFF';
-  const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : '#E5E7EB';
+  const cardBg = colors.surface;
+  const cardBorder = colors.border;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -43,8 +44,8 @@ export function OralTestResultsScreen({ navigation, route }: Props) {
         style={[
           styles.header,
           {
-            backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.85)',
-            borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
+            backgroundColor: colors.background,
+            borderBottomColor: colors.border,
             paddingTop: 12,
           },
         ]}
@@ -63,7 +64,7 @@ export function OralTestResultsScreen({ navigation, route }: Props) {
       >
         {/* Summary card */}
         <View style={[styles.summaryCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-          <Text style={styles.summaryEmoji}>🎉</Text>
+          <CelebrationIcon kind="party" size="l" style={styles.summaryIcon} />
           <Text style={[styles.summaryTitle, { color: colors.textPrimary }]}>
             Тренировка завершена
           </Text>
@@ -91,14 +92,14 @@ export function OralTestResultsScreen({ navigation, route }: Props) {
           <>
             {/* Known / Unknown blocks */}
             <View style={styles.statsRow}>
-              <View style={[styles.statBlock, { backgroundColor: GREEN + '12', borderColor: GREEN + '30' }]}>
+              <View style={[styles.statBlock, { backgroundColor: alpha(GREEN, 10), borderColor: alpha(GREEN, 20) }]}>
                 <Text style={[styles.statIcon]}>✓</Text>
                 <Text style={[styles.statLabel, { color: GREEN }]}>Знает</Text>
                 <Text style={[styles.statCount, { color: colors.textPrimary }]}>{known}</Text>
                 <Text style={[styles.statPct, { color: GREEN }]}>{knownPct}%</Text>
               </View>
 
-              <View style={[styles.statBlock, { backgroundColor: RED + '12', borderColor: RED + '30' }]}>
+              <View style={[styles.statBlock, { backgroundColor: alpha(RED, 10), borderColor: alpha(RED, 20) }]}>
                 <Text style={[styles.statIcon]}>✗</Text>
                 <Text style={[styles.statLabel, { color: RED }]}>Не знает</Text>
                 <Text style={[styles.statCount, { color: colors.textPrimary }]}>{unknown}</Text>
@@ -111,7 +112,7 @@ export function OralTestResultsScreen({ navigation, route }: Props) {
               <Text style={[styles.finalLabel, { color: colors.textPrimary }]}>
                 Итоговый результат
               </Text>
-              <View style={[styles.progressBar, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#E5E7EB' }]}>
+              <View style={[styles.progressBar, { backgroundColor: colors.surfaceMuted }]}>
                 <View
                   style={[
                     styles.progressFill,
@@ -133,9 +134,7 @@ export function OralTestResultsScreen({ navigation, route }: Props) {
             paddingBottom: insets.bottom + 16,
             ...Platform.select({
               web: {
-                background: isDark
-                  ? 'linear-gradient(to top, #101122 60%, transparent)'
-                  : 'linear-gradient(to top, #f6f6f8 60%, transparent)',
+                background: `linear-gradient(to top, ${colors.background} 60%, transparent)`,
               },
             }) as any,
             backgroundColor: Platform.OS !== 'web' ? colors.background : undefined,
@@ -165,7 +164,7 @@ export function OralTestResultsScreen({ navigation, route }: Props) {
             pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
           ]}
         >
-          <Text style={styles.primaryText}>Готово</Text>
+          <Text style={[styles.primaryText, { color: colors.onPrimary }]}>Готово</Text>
         </Pressable>
       </View>
     </View>
@@ -205,9 +204,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  summaryEmoji: {
-    fontSize: 40,
-    marginBottom: 4,
+  summaryIcon: {
+    marginBottom: spacing.s,
   },
   summaryTitle: {
     fontSize: 18,
@@ -218,7 +216,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   summaryCount: {
-    fontSize: 48,
+    fontSize: 40,
     fontWeight: '700',
     lineHeight: 56,
   },
@@ -244,11 +242,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   statLabel: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
   },
   statCount: {
-    fontSize: 36,
+    fontSize: 40,
     fontWeight: '700',
     lineHeight: 44,
   },
@@ -266,12 +264,12 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: 8,
-    borderRadius: 4,
+    borderRadius: borderRadius.s,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    borderRadius: 4,
+    borderRadius: borderRadius.s,
   },
   finalPct: {
     fontSize: 16,
@@ -294,24 +292,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   outlineText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
   },
   primaryBtn: {
     borderRadius: borderRadius.l,
     paddingVertical: 16,
     alignItems: 'center',
-    ...Platform.select({
-      web: { boxShadow: '0 4px 16px rgba(249,115,22,0.3)' },
-    }) as any,
-    shadowColor: ACCENT,
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
+    
   },
   primaryText: {
-    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
   },

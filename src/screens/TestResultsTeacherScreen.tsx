@@ -11,7 +11,6 @@ import {
   Platform,
   ActivityIndicator,
   Share,
-  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -22,8 +21,9 @@ import {
   X,
 } from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { useThemeColors, useSettingsStore } from '@/store';
-import { spacing, borderRadius } from '@/constants';
+import { useThemeColors } from '@/store';
+import { spacing, borderRadius, alpha, type ColorToken } from '@/constants';
+import { toast } from '@/components/ui';
 import { supabase } from '@/services/supabaseClient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
@@ -59,17 +59,17 @@ type ResultsData = {
   hardestCards: HardCard[];
 };
 
-const PODIUM_COLORS = {
-  first: '#F59E0B',
-  second: '#94A3B8',
-  third: '#D97706',
+// Медали и аватары — имена токенов, значения берутся из темы
+const PODIUM_TOKENS: Record<'first' | 'second' | 'third', ColorToken> = {
+  first: 'star',
+  second: 'silver',
+  third: 'bronze',
 };
 
-const AVATAR_COLORS = ['#6366F1', '#EC4899', '#10B981', '#F59E0B', '#F97316'];
+const AVATAR_TOKENS: ColorToken[] = ['primaryFill', 'like', 'success', 'warning', 'streak'];
 
 export function TestResultsTeacherScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
-  const isDark = useSettingsStore((s) => s.resolvedTheme) === 'dark';
   const insets = useSafeAreaInsets();
   const { sessionId, courseId, courseTitle } = route.params;
 
@@ -134,12 +134,12 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
         title: `Результаты теста — ${data.setTitle}`,
       });
     } catch {
-      Alert.alert('Ошибка', 'Не удалось выгрузить результаты');
+      toast.error('Не удалось выгрузить результаты');
     }
   }, [data]);
 
-  const cardBg = isDark ? 'rgba(255,255,255,0.06)' : '#FFFFFF';
-  const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : '#F1F5F9';
+  const cardBg = colors.surface;
+  const cardBorder = colors.border;
 
   // Loading state
   if (loading) {
@@ -157,7 +157,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
   if (error || !data) {
     return (
       <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
-        <AlertTriangle size={40} color="#F43F5E" />
+        <AlertTriangle size={40} color={colors.error} />
         <Text style={[styles.errorText, { color: colors.textPrimary }]}>
           {error || 'Нет данных'}
         </Text>
@@ -169,7 +169,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
           ]}
           onPress={fetchResults}
         >
-          <Text style={styles.retryText}>Повторить</Text>
+          <Text style={[styles.retryText, { color: colors.onPrimary }]}>Повторить</Text>
         </Pressable>
       </View>
     );
@@ -188,14 +188,16 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
         style={[
           styles.header,
           {
-            backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.85)',
+            backgroundColor: colors.background,
           },
         ]}
       >
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Закрыть"
           style={({ pressed }) => [
             styles.closeBtn,
-            { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F1F5F9' },
+            { backgroundColor: colors.surfaceMuted },
             pressed && { opacity: 0.7 },
           ]}
           onPress={() => navigation.navigate('TeacherCourseStats', { courseId, courseTitle })}
@@ -222,21 +224,21 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
         showsVerticalScrollIndicator={false}
       >
         {/* Summary Card */}
-        <View style={styles.summaryCard}>
+        <View style={[styles.summaryCard, { backgroundColor: colors.primaryFill }]}>
           <View style={styles.summaryTop}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.summaryLabel}>Тест завершён</Text>
-              <Text style={styles.summaryTitle}>{setTitle}</Text>
+              <Text style={[styles.summaryLabel, { color: colors.onPrimary }]}>Тест завершён</Text>
+              <Text style={[styles.summaryTitle, { color: colors.onPrimary }]}>{setTitle}</Text>
             </View>
           </View>
           <View style={styles.summaryBottom}>
             <View>
-              <Text style={styles.summaryScore}>{avgScore}%</Text>
-              <Text style={styles.summaryScoreLabel}>Средний результат</Text>
+              <Text style={[styles.summaryScore, { color: colors.onPrimary }]}>{avgScore}%</Text>
+              <Text style={[styles.summaryScoreLabel, { color: colors.onPrimary }]}>Средний результат</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={styles.summaryStudents}>{participants.length} {pluralize(participants.length, 'ученик', 'ученика', 'учеников')}</Text>
-              <Text style={styles.summaryQuestions}>Всего {totalQuestions} {pluralize(totalQuestions, 'вопрос', 'вопроса', 'вопросов')}</Text>
+              <Text style={[styles.summaryStudents, { color: colors.onPrimary }]}>{participants.length} {pluralize(participants.length, 'ученик', 'ученика', 'учеников')}</Text>
+              <Text style={[styles.summaryQuestions, { color: colors.onPrimary }]}>Всего {totalQuestions} {pluralize(totalQuestions, 'вопрос', 'вопроса', 'вопросов')}</Text>
             </View>
           </View>
         </View>
@@ -245,7 +247,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
         {participants.length >= 2 && (
           <View style={styles.section}>
             <View style={styles.sectionTitleRow}>
-              <Trophy size={20} color="#F59E0B" />
+              <Trophy size={20} color={colors.warning} />
               <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Лучшие</Text>
             </View>
 
@@ -257,11 +259,11 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
                 const avatarSize = isFirst ? 68 : 56;
                 const pedestalHeight = isFirst ? 88 : place === 2 ? 56 : 40;
                 const borderColor = place === 1
-                  ? PODIUM_COLORS.first
-                  : place === 2 ? PODIUM_COLORS.second : PODIUM_COLORS.third + '80';
+                  ? colors[PODIUM_TOKENS.first]
+                  : place === 2 ? colors[PODIUM_TOKENS.second] : colors[PODIUM_TOKENS.third];
                 const pedestalBg = isFirst
-                  ? (isDark ? colors.primary + '25' : colors.primary + '15')
-                  : (isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9');
+                  ? (alpha(colors.primary, 10))
+                  : (colors.surfaceMuted);
                 const placeLabel = place === 1 ? 'Победитель' : place === 2 ? '2-е место' : '3-е место';
                 const globalIdx = participants.indexOf(student);
 
@@ -270,8 +272,8 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
                     {isFirst && (
                       <Crown
                         size={24}
-                        color="#F59E0B"
-                        fill="#F59E0B"
+                        color={colors.warning}
+                        fill={colors.warning}
                         style={{ marginBottom: -4 }}
                       />
                     )}
@@ -283,7 +285,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
                           height: avatarSize,
                           borderRadius: avatarSize / 2,
                           borderColor,
-                          backgroundColor: AVATAR_COLORS[globalIdx % AVATAR_COLORS.length] + '25',
+                          backgroundColor: alpha(colors[AVATAR_TOKENS[globalIdx % AVATAR_TOKENS.length]], 20),
                         },
                       ]}
                     >
@@ -292,7 +294,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
                           styles.podiumInitial,
                           {
                             fontSize: isFirst ? 22 : 18,
-                            color: AVATAR_COLORS[globalIdx % AVATAR_COLORS.length],
+                            color: colors[AVATAR_TOKENS[globalIdx % AVATAR_TOKENS.length]],
                           },
                         ]}
                       >
@@ -350,13 +352,13 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
                 <View
                   style={[
                     styles.leaderAvatar,
-                    { backgroundColor: AVATAR_COLORS[idx % AVATAR_COLORS.length] + '20' },
+                    { backgroundColor: alpha(colors[AVATAR_TOKENS[idx % AVATAR_TOKENS.length]], 20) },
                   ]}
                 >
                   <Text
                     style={[
                       styles.leaderAvatarText,
-                      { color: AVATAR_COLORS[idx % AVATAR_COLORS.length] },
+                      { color: colors[AVATAR_TOKENS[idx % AVATAR_TOKENS.length]] },
                     ]}
                   >
                     {student.initial}
@@ -377,7 +379,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
         {hardestCards.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionTitleRow}>
-              <AlertTriangle size={20} color="#F43F5E" />
+              <AlertTriangle size={20} color={colors.error} />
               <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
                 Самые трудные слова
               </Text>
@@ -389,8 +391,8 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
                   style={[
                     styles.hardCard,
                     {
-                      backgroundColor: isDark ? 'rgba(244,63,94,0.08)' : '#FFF1F2',
-                      borderColor: isDark ? 'rgba(244,63,94,0.15)' : '#FECDD3',
+                      backgroundColor: alpha(colors.error, 10),
+                      borderColor: alpha(colors.error, 10),
                     },
                   ]}
                 >
@@ -406,11 +408,11 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
                     style={[
                       styles.missedBadge,
                       {
-                        backgroundColor: isDark ? 'rgba(244,63,94,0.15)' : '#FFE4E6',
+                        backgroundColor: alpha(colors.error, 10),
                       },
                     ]}
                   >
-                    <Text style={styles.missedText}>
+                    <Text style={[styles.missedText, { color: colors.errorText }]}>
                       Ошибок: {card.missed} из {card.total}
                     </Text>
                   </View>
@@ -430,9 +432,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
             borderTopColor: cardBorder,
             ...Platform.select({
               web: {
-                background: isDark
-                  ? 'linear-gradient(to top, #101122 70%, transparent)'
-                  : 'linear-gradient(to top, #f6f6f8 70%, transparent)',
+                background: `linear-gradient(to top, ${colors.background} 70%, transparent)`,
               },
             }) as any,
             backgroundColor: Platform.OS !== 'web' ? colors.background : undefined,
@@ -443,7 +443,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
           <Pressable
             style={({ pressed }) => [
               styles.backBtn,
-              { borderColor: isDark ? 'rgba(255,255,255,0.15)' : '#E2E8F0' },
+              { borderColor: colors.border },
               pressed && { opacity: 0.7 },
             ]}
             onPress={() => navigation.navigate('TeacherCourseStats', { courseId, courseTitle })}
@@ -458,8 +458,8 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
             ]}
             onPress={handleExportCSV}
           >
-            <Download size={18} color="#FFFFFF" />
-            <Text style={styles.ctaText}>Выгрузить</Text>
+            <Download size={18} color={colors.onPrimary} />
+            <Text style={[styles.ctaText, { color: colors.onPrimary }]}>Выгрузить</Text>
           </Pressable>
         </View>
       </View>
@@ -478,7 +478,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     marginTop: 8,
   },
   errorText: {
@@ -494,7 +494,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   retryText: {
-    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -511,7 +510,7 @@ const styles = StyleSheet.create({
     }) as any,
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
     letterSpacing: -0.3,
   },
@@ -522,7 +521,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   exportHeaderText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
   },
 
@@ -536,18 +535,6 @@ const styles = StyleSheet.create({
   summaryCard: {
     borderRadius: borderRadius.l,
     padding: spacing.l,
-    backgroundColor: '#6366F1',
-    ...Platform.select({
-      web: {
-        backgroundImage: 'linear-gradient(135deg, #6467f2, #6467f299)',
-        boxShadow: '0 8px 24px rgba(100,103,242,0.25)',
-      },
-    }) as any,
-    shadowColor: '#6366F1',
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 10,
   },
   summaryTop: {
     flexDirection: 'row',
@@ -555,16 +542,14 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   summaryLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.7)',
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
   summaryTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#FFFFFF',
     marginTop: 4,
     letterSpacing: -0.3,
   },
@@ -576,23 +561,19 @@ const styles = StyleSheet.create({
   },
   summaryScore: {
     fontSize: 32,
-    fontWeight: '800',
-    color: '#FFFFFF',
+    fontWeight: '700',
   },
   summaryScoreLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: 'rgba(255,255,255,0.7)',
+    fontSize: 14,
+    fontWeight: '600',
   },
   summaryStudents: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFFFFF',
   },
   summaryQuestions: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: 'rgba(255,255,255,0.7)',
+    fontSize: 12,
+    fontWeight: '600',
     marginTop: 2,
   },
 
@@ -606,7 +587,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sectionTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
     letterSpacing: -0.2,
   },
@@ -647,7 +628,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   pedestalPlace: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
   },
 
@@ -662,14 +643,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.l,
     borderWidth: 1,
     gap: 12,
-    ...Platform.select({
-      web: { boxShadow: '0 1px 3px rgba(0,0,0,0.04)' },
-    }) as any,
-    shadowColor: '#000',
-    shadowOpacity: 0.03,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
+    
   },
   leaderRank: {
     width: 24,
@@ -680,12 +654,12 @@ const styles = StyleSheet.create({
   leaderAvatar: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: borderRadius.l,
     alignItems: 'center',
     justifyContent: 'center',
   },
   leaderAvatarText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
   },
   leaderName: {
@@ -694,7 +668,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   leaderScore: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
   },
 
@@ -711,7 +685,7 @@ const styles = StyleSheet.create({
     gap: spacing.s,
   },
   hardWord: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
   },
   hardHint: {
@@ -726,16 +700,15 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.s,
   },
   missedText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#F43F5E',
   },
 
   // Header close button
   closeBtn: {
     width: 34,
     height: 34,
-    borderRadius: 17,
+    borderRadius: borderRadius.l,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -763,7 +736,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   backBtnText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
   },
   ctaBtn: {
@@ -774,18 +747,10 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: borderRadius.l,
     gap: 8,
-    ...Platform.select({
-      web: { boxShadow: '0 4px 16px rgba(100,103,242,0.25)' },
-    }) as any,
-    shadowColor: '#6467F2',
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
+    
   },
   ctaText: {
-    color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
   },
 });

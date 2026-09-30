@@ -12,17 +12,18 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, Users, Check, StopCircle } from 'lucide-react-native';
+import { ArrowLeft, Users, Check, StopCircle, ClipboardList } from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { useThemeColors, useSettingsStore } from '@/store';
-import { spacing, borderRadius } from '@/constants';
+import { useThemeColors } from '@/store';
+import { spacing, borderRadius, alpha, type ColorToken, iconSize } from '@/constants';
 import { supabase } from '@/services/supabaseClient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 
 import { API_BASE } from '@/config/apiBase';
 
-const AVATAR_COLORS = ['#6366F1', '#F59E0B', '#EC4899', '#10B981', '#F97316'];
+// Цвета аватаров участников — имена токенов, значения берутся из темы
+const AVATAR_TOKENS: ColorToken[] = ['primaryFill', 'warning', 'like', 'success', 'streak'];
 
 type Props = NativeStackScreenProps<RootStackParamList, 'LiveTest'>;
 
@@ -37,7 +38,6 @@ interface StudentProgress {
 
 export function LiveTestScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
-  const isDark = useSettingsStore((s) => s.resolvedTheme) === 'dark';
   const insets = useSafeAreaInsets();
   const { sessionId } = route.params;
 
@@ -190,9 +190,9 @@ export function LiveTestScreen({ navigation, route }: Props) {
     : 0;
   const avgQuestion = students.length > 0 ? Math.round(totalAnswered / students.length) : 0;
 
-  const cardBg = isDark ? 'rgba(255,255,255,0.06)' : '#FFFFFF';
-  const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : '#F1F5F9';
-  const barBg = isDark ? 'rgba(255,255,255,0.08)' : '#F1F5F9';
+  const cardBg = colors.surface;
+  const cardBorder = colors.border;
+  const barBg = colors.surfaceMuted;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -201,12 +201,14 @@ export function LiveTestScreen({ navigation, route }: Props) {
         style={[
           styles.header,
           {
-            backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.85)',
+            backgroundColor: colors.background,
             paddingTop: 12,
           },
         ]}
       >
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Назад"
           onPress={() => navigation.goBack()}
           style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
           hitSlop={8}
@@ -221,7 +223,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
           onPress={handleEndTest}
           disabled={ending}
         >
-          <Text style={styles.endHeaderBtn}>{ending ? '...' : 'Завершить'}</Text>
+          <Text style={[styles.endHeaderBtn, { color: colors.errorText }]}>{ending ? '...' : 'Завершить'}</Text>
         </Pressable>
       </View>
 
@@ -231,10 +233,10 @@ export function LiveTestScreen({ navigation, route }: Props) {
       >
         {/* Timer */}
         <View style={styles.timerRow}>
-          <View style={[styles.timerBox, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '30' }]}>
+          <View style={[styles.timerBox, { backgroundColor: alpha(colors.primary, 10), borderColor: alpha(colors.primary, 20) }]}>
             <Text style={[styles.timerValue, { color: colors.primary }]}>{minutes}</Text>
           </View>
-          <View style={[styles.timerBox, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '30' }]}>
+          <View style={[styles.timerBox, { backgroundColor: alpha(colors.primary, 10), borderColor: alpha(colors.primary, 20) }]}>
             <Text style={[styles.timerValue, { color: colors.primary }]}>{seconds}</Text>
           </View>
         </View>
@@ -246,9 +248,9 @@ export function LiveTestScreen({ navigation, route }: Props) {
         {/* Live Status Card */}
         <View style={[styles.statusCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
           {/* Gradient banner placeholder */}
-          <View style={[styles.statusBanner, { backgroundColor: isDark ? 'rgba(99,102,241,0.15)' : '#EEF2FF' }]}>
+          <View style={[styles.statusBanner, { backgroundColor: alpha(colors.primary, 10) }]}>
             <View style={styles.bannerContent}>
-              <Text style={[styles.bannerEmoji, { fontSize: 32 }]}>📝</Text>
+              <ClipboardList size={iconSize.l} color={colors.primary} />
               <Text style={[styles.bannerLabel, { color: colors.primary }]}>Тест идёт</Text>
             </View>
           </View>
@@ -258,8 +260,8 @@ export function LiveTestScreen({ navigation, route }: Props) {
               <Text style={[styles.statusQuestions, { color: colors.textPrimary }]}>
                 {avgQuestion} / {totalQuestions} questions
               </Text>
-              <View style={styles.liveBadge}>
-                <Text style={styles.liveBadgeText}>В эфире</Text>
+              <View style={[styles.liveBadge, { backgroundColor: alpha(colors.success, 10) }]}>
+                <Text style={[styles.liveBadgeText, { color: colors.successText }]}>В эфире</Text>
               </View>
             </View>
 
@@ -300,11 +302,11 @@ export function LiveTestScreen({ navigation, route }: Props) {
         <View style={styles.studentsList}>
           {students.map((st, idx) => {
             const pct = st.total > 0 ? Math.round((st.answered / st.total) * 100) : 0;
-            const accentColor = AVATAR_COLORS[idx % AVATAR_COLORS.length];
+            const accentColor = colors[AVATAR_TOKENS[idx % AVATAR_TOKENS.length]];
             const avatarBg = st.done
-              ? (isDark ? 'rgba(34,197,94,0.15)' : '#DCFCE7')
-              : (isDark ? `${accentColor}20` : `${accentColor}15`);
-            const avatarTextColor = st.done ? '#22C55E' : accentColor;
+              ? (alpha(colors.success, 10))
+              : (alpha(accentColor, 10));
+            const avatarTextColor = st.done ? colors.success : accentColor;
 
             return (
               <View
@@ -315,7 +317,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
                   <View style={styles.studentLeft}>
                     <View style={[styles.studentAvatar, { backgroundColor: avatarBg }]}>
                       {st.done ? (
-                        <Check size={18} color="#22C55E" strokeWidth={3} />
+                        <Check size={18} color={colors.success} strokeWidth={3} />
                       ) : (
                         <Text style={[styles.studentInitial, { color: avatarTextColor }]}>
                           {st.initial}
@@ -328,7 +330,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
                   </View>
                   {st.done ? (
                     <View style={styles.doneRow}>
-                      <Text style={styles.doneText}>Готово</Text>
+                      <Text style={[styles.doneText, { color: colors.successText }]}>Готово</Text>
                     </View>
                   ) : (
                     <Text style={[styles.studentProgress, { color: colors.textSecondary }]}>
@@ -339,13 +341,13 @@ export function LiveTestScreen({ navigation, route }: Props) {
                 <View
                   style={[
                     styles.studentBar,
-                    { backgroundColor: st.done ? (isDark ? 'rgba(34,197,94,0.15)' : '#DCFCE7') : barBg },
+                    { backgroundColor: st.done ? (alpha(colors.success, 10)) : barBg },
                   ]}
                 >
                   <View
                     style={[
                       styles.studentBarFill,
-                      { width: `${pct}%` as any, backgroundColor: st.done ? '#22C55E' : accentColor },
+                      { width: `${pct}%` as any, backgroundColor: st.done ? colors.success : accentColor },
                     ]}
                   />
                 </View>
@@ -363,9 +365,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
             paddingBottom: insets.bottom + 16,
             ...Platform.select({
               web: {
-                background: isDark
-                  ? 'linear-gradient(to top, #101122 60%, transparent)'
-                  : 'linear-gradient(to top, #f6f6f8 60%, transparent)',
+                background: `linear-gradient(to top, ${colors.background} 60%, transparent)`,
               },
             }) as any,
             backgroundColor: Platform.OS !== 'web' ? colors.background : undefined,
@@ -375,17 +375,17 @@ export function LiveTestScreen({ navigation, route }: Props) {
         <Pressable
           style={({ pressed }) => [
             styles.endBtn,
-            pressed && { opacity: 0.6, backgroundColor: isDark ? 'rgba(239,68,68,0.08)' : '#FEF2F2' },
+            pressed && { opacity: 0.6, backgroundColor: alpha(colors.error, 10) },
           ]}
           onPress={handleEndTest}
           disabled={ending}
         >
           {ending ? (
-            <ActivityIndicator color="#EF4444" />
+            <ActivityIndicator color={colors.error} />
           ) : (
             <>
-              <StopCircle size={22} color="#EF4444" />
-              <Text style={styles.endBtnText}>Завершить досрочно</Text>
+              <StopCircle size={22} color={colors.error} />
+              <Text style={[styles.endBtnText, { color: colors.errorText }]}>Завершить досрочно</Text>
             </>
           )}
         </Pressable>
@@ -416,16 +416,15 @@ const styles = StyleSheet.create({
     width: 48,
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
     letterSpacing: -0.3,
     textAlign: 'center',
     flex: 1,
   },
   endHeaderBtn: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#EF4444',
     width: 48,
     textAlign: 'right',
   },
@@ -450,8 +449,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   timerValue: {
-    fontSize: 26,
-    fontWeight: '800',
+    fontSize: 24,
+    fontWeight: '700',
   },
   timerLabels: {
     flexDirection: 'row',
@@ -461,7 +460,7 @@ const styles = StyleSheet.create({
   timerLabel: {
     flex: 1,
     textAlign: 'center',
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '600',
     letterSpacing: 1,
     textTransform: 'uppercase',
@@ -472,14 +471,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.l,
     borderWidth: 1,
     overflow: 'hidden',
-    ...Platform.select({
-      web: { boxShadow: '0 1px 4px rgba(0,0,0,0.04)' },
-    }) as any,
-    shadowColor: '#000',
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
+    
   },
   statusBanner: {
     height: 100,
@@ -494,7 +486,7 @@ const styles = StyleSheet.create({
     lineHeight: 40,
   },
   bannerLabel: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
   },
   statusBody: {
@@ -507,20 +499,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statusQuestions: {
-    fontSize: 19,
+    fontSize: 20,
     fontWeight: '700',
     letterSpacing: -0.3,
   },
   liveBadge: {
-    backgroundColor: '#DCFCE7',
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: 999,
   },
   liveBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#22C55E',
+    fontSize: 12,
+    fontWeight: '700',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
@@ -530,8 +520,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   participantsText: {
-    fontSize: 13,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: '600',
   },
   completionSection: {
     marginTop: 4,
@@ -543,26 +533,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   completionLabel: {
-    fontSize: 11,
-    fontWeight: '500',
+    fontSize: 12,
+    fontWeight: '600',
   },
   completionPct: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
   },
   progressBar: {
     height: 8,
-    borderRadius: 4,
+    borderRadius: borderRadius.s,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    borderRadius: 4,
+    borderRadius: borderRadius.s,
   },
 
   // Section title
   sectionTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
     letterSpacing: -0.2,
     marginTop: spacing.xs,
@@ -591,21 +581,21 @@ const styles = StyleSheet.create({
   studentAvatar: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: borderRadius.l,
     alignItems: 'center',
     justifyContent: 'center',
   },
   studentInitial: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
   },
   studentName: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
   },
   studentProgress: {
-    fontSize: 13,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: '600',
   },
   doneRow: {
     flexDirection: 'row',
@@ -613,18 +603,17 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   doneText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#22C55E',
   },
   studentBar: {
     height: 6,
-    borderRadius: 3,
+    borderRadius: borderRadius.full,
     overflow: 'hidden',
   },
   studentBarFill: {
     height: '100%',
-    borderRadius: 3,
+    borderRadius: borderRadius.full,
   },
 
   // Footer
@@ -647,6 +636,5 @@ const styles = StyleSheet.create({
   endBtnText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#EF4444',
   },
 });

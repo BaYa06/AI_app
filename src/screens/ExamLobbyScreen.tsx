@@ -25,8 +25,8 @@ import {
   ChevronDown,
 } from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { useThemeColors, useSettingsStore } from '@/store';
-import { spacing, borderRadius } from '@/constants';
+import { useThemeColors } from '@/store';
+import { spacing, borderRadius, alpha } from '@/constants';
 import { supabase } from '@/services/supabaseClient';
 import { NeonService } from '@/services/NeonService';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -48,7 +48,6 @@ const TIME_OPTIONS = [
 
 export function ExamLobbyScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
-  const isDark = useSettingsStore((s) => s.resolvedTheme) === 'dark';
   const insets = useSafeAreaInsets();
 
   const [testMode, setTestMode] = useState<TestMode>('multiple');
@@ -82,9 +81,9 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
   const selectedSet = sets.find(s => s.setId === selectedSetId);
   const maxQuestions = Math.min(50, selectedSet?.totalCards || 50);
 
-  const cardBg = isDark ? 'rgba(255,255,255,0.06)' : '#FFFFFF';
-  const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : '#E5E7EB';
-  const pillBg = isDark ? 'rgba(255,255,255,0.08)' : '#F1F5F9';
+  const cardBg = colors.surface;
+  const cardBorder = colors.border;
+  const pillBg = colors.surfaceMuted;
 
   const modes: { key: TestMode; label: string; icon: typeof ListChecks; disabled?: boolean }[] = [
     { key: 'multiple', label: 'Тест', icon: ListChecks },
@@ -99,13 +98,15 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
         style={[
           styles.header,
           {
-            backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.85)',
-            borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
+            backgroundColor: colors.background,
+            borderBottomColor: colors.border,
             paddingTop: 12,
           },
         ]}
       >
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Назад"
           onPress={() => navigation.goBack()}
           style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
           hitSlop={8}
@@ -148,12 +149,12 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
                 ]}
               >
                 <View style={styles.dropdownTriggerLeft}>
-                  <View style={[styles.dropdownIcon, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#E8E7FD' }]}>
+                  <View style={[styles.dropdownIcon, { backgroundColor: alpha(colors.primary, 10) }]}>
                     <ListChecks size={18} color={colors.primary} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.setCardTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-                      {selectedSet?.title || 'Выберите набор'}
+                      {selectedSet?.title || 'Выбери набор'}
                     </Text>
                     {selectedSet && (
                       <Text style={[styles.setCardMeta, { color: colors.textSecondary }]}>
@@ -184,7 +185,7 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
                         }}
                         style={({ pressed }) => [
                           styles.dropdownItem,
-                          isActive && { backgroundColor: colors.primary + '10' },
+                          isActive && { backgroundColor: alpha(colors.primary, 10) },
                           idx < sets.length - 1 && { borderBottomWidth: 1, borderBottomColor: cardBorder },
                           pressed && { opacity: 0.7 },
                         ]}
@@ -234,12 +235,9 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
                     },
                     active && {
                       ...Platform.select({
-                        web: { boxShadow: `0 0 0 4px ${colors.primary}18` },
+                        web: { boxShadow: `0 0 0 4px ${alpha(colors.primary, 10)}` },
                       }) as any,
                       shadowColor: colors.primary,
-                      shadowOpacity: 0.12,
-                      shadowRadius: 8,
-                      shadowOffset: { width: 0, height: 0 },
                     },
                     m.disabled && { opacity: 0.45 },
                     !active && !m.disabled && { opacity: 0.6 },
@@ -249,11 +247,11 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
                 >
                   {active && (
                     <View style={[styles.modeCheck, { backgroundColor: colors.primary }]}>
-                      <Check size={12} color="#FFFFFF" strokeWidth={3} />
+                      <Check size={12} color={colors.onPrimary} strokeWidth={3} />
                     </View>
                   )}
                   {m.disabled && (
-                    <View style={[styles.modeSoon, { backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : '#F1F5F9' }]}>
+                    <View style={[styles.modeSoon, { backgroundColor: colors.surfaceMuted }]}>
                       <Text style={[styles.modeSoonText, { color: colors.textSecondary }]}>Скоро</Text>
                     </View>
                   )}
@@ -262,8 +260,8 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
                       styles.modeIcon,
                       {
                         backgroundColor: active
-                          ? colors.primary + '18'
-                          : isDark ? 'rgba(255,255,255,0.08)' : '#F1F5F9',
+                          ? alpha(colors.primary, 10)
+                          : colors.surfaceMuted,
                       },
                     ]}
                   >
@@ -302,9 +300,11 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
             </View>
             <View style={[styles.stepper, { backgroundColor: pillBg }]}>
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Меньше вопросов"
                 style={({ pressed }) => [
                   styles.stepperBtn,
-                  { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#FFFFFF' },
+                  { backgroundColor: colors.surface },
                   pressed && { opacity: 0.6 },
                 ]}
                 onPress={() => setTotalQuestions((q) => Math.max(5, q - 5))}
@@ -315,9 +315,11 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
                 {totalQuestions}
               </Text>
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Больше вопросов"
                 style={({ pressed }) => [
                   styles.stepperBtn,
-                  { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#FFFFFF' },
+                  { backgroundColor: colors.surface },
                   pressed && { opacity: 0.6 },
                 ]}
                 onPress={() => setTotalQuestions((q) => Math.min(maxQuestions, q + 5))}
@@ -341,15 +343,8 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
                     style={[
                       styles.timeOption,
                       active && {
-                        backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : '#FFFFFF',
-                        ...Platform.select({
-                          web: { boxShadow: '0 1px 4px rgba(0,0,0,0.08)' },
-                        }) as any,
-                        shadowColor: '#000',
-                        shadowOpacity: 0.06,
-                        shadowRadius: 3,
-                        shadowOffset: { width: 0, height: 1 },
-                        elevation: 1,
+                        backgroundColor: colors.surface,
+                        
                       },
                     ]}
                     onPress={() => setTimePerQuestion(opt.value)}
@@ -379,9 +374,7 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
             paddingBottom: insets.bottom + 16,
             ...Platform.select({
               web: {
-                background: isDark
-                  ? 'linear-gradient(to top, #101122 60%, transparent)'
-                  : 'linear-gradient(to top, #f6f6f8 60%, transparent)',
+                background: `linear-gradient(to top, ${colors.background} 60%, transparent)`,
               },
             }) as any,
             backgroundColor: Platform.OS !== 'web' ? colors.background : undefined,
@@ -436,11 +429,11 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
           }}
         >
           {creating ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={colors.onPrimary} />
           ) : (
             <>
-              <Text style={styles.ctaText}>Создать тест</Text>
-              <ArrowRight size={20} color="#FFFFFF" />
+              <Text style={[styles.ctaText, { color: colors.onPrimary }]}>Создать тест</Text>
+              <ArrowRight size={20} color={colors.onPrimary} />
             </>
           )}
         </Pressable>
@@ -468,7 +461,7 @@ const styles = StyleSheet.create({
     marginLeft: -spacing.xs,
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '600',
     letterSpacing: -0.3,
     marginLeft: spacing.m,
@@ -484,7 +477,7 @@ const styles = StyleSheet.create({
     gap: spacing.s,
   },
   sectionTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
     letterSpacing: -0.2,
   },
@@ -525,18 +518,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.m,
   },
   dropdownItemTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
     letterSpacing: -0.2,
   },
   setCardTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
     letterSpacing: -0.2,
   },
   setCardMeta: {
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '600',
     marginTop: 2,
   },
 
@@ -560,7 +553,7 @@ const styles = StyleSheet.create({
     right: -6,
     width: 22,
     height: 22,
-    borderRadius: 11,
+    borderRadius: borderRadius.m,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1,
@@ -571,11 +564,11 @@ const styles = StyleSheet.create({
     right: -6,
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 6,
+    borderRadius: borderRadius.s,
     zIndex: 1,
   },
   modeSoonText: {
-    fontSize: 9,
+    fontSize: 12,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.4,
@@ -583,12 +576,12 @@ const styles = StyleSheet.create({
   modeIcon: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: borderRadius.l,
     alignItems: 'center',
     justifyContent: 'center',
   },
   modeLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     textAlign: 'center',
   },
@@ -604,8 +597,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   settingHint: {
-    fontSize: 11,
-    fontWeight: '500',
+    fontSize: 12,
+    fontWeight: '600',
     marginTop: 2,
   },
 
@@ -626,14 +619,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.s,
     alignItems: 'center',
     justifyContent: 'center',
-    ...Platform.select({
-      web: { boxShadow: '0 1px 2px rgba(0,0,0,0.06)' },
-    }) as any,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 2,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
+    
   },
   stepperValue: {
     fontSize: 18,
@@ -675,17 +661,9 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: borderRadius.l,
     gap: 8,
-    ...Platform.select({
-      web: { boxShadow: '0 4px 16px rgba(100,103,242,0.3)' },
-    }) as any,
-    shadowColor: '#6467F2',
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
+    
   },
   ctaText: {
-    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
   },

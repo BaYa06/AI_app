@@ -15,21 +15,22 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, X, Check } from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { useThemeColors, useSettingsStore, useCardsStore } from '@/store';
-import { spacing, borderRadius } from '@/constants';
+import { useThemeColors, useCardsStore } from '@/store';
+import { spacing, borderRadius, alpha } from '@/constants';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
+import { toast } from '@/components/ui';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OralTestSession'>;
 
 const SWIPE_THRESHOLD = 120;
-const ACCENT = '#F97316';
-const GREEN = '#10B981';
-const RED = '#EF4444';
 
 export function OralTestSessionScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
-  const isDark = useSettingsStore((s) => s.resolvedTheme) === 'dark';
+  // Акцент устного теста — оранжевый (streak), знает / не знает — success / error
+  const ACCENT = colors.streak;
+  const GREEN = colors.success;
+  const RED = colors.error;
   const insets = useSafeAreaInsets();
 
   const cards = route.params.cardIds
@@ -56,7 +57,7 @@ export function OralTestSessionScreen({ navigation, route }: Props) {
   // без какой-либо проверки. См. план, пункт 53.
   useEffect(() => {
     if (cards.length === 0) {
-      Alert.alert('Нет карточек', 'В этом наборе нет карточек для тренировки.');
+      toast.info('Нет карточек: в этом наборе нет карточек для тренировки');
       navigation.goBack();
     }
   }, [cards.length, navigation]);
@@ -172,7 +173,7 @@ export function OralTestSessionScreen({ navigation, route }: Props) {
     extrapolate: 'clamp',
   });
 
-  const cardBg = isDark ? '#1e293b' : '#FFFFFF';
+  const cardBg = colors.surface;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -181,13 +182,15 @@ export function OralTestSessionScreen({ navigation, route }: Props) {
         style={[
           styles.header,
           {
-            backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.85)',
-            borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
+            backgroundColor: colors.background,
+            borderBottomColor: colors.border,
             paddingTop: 12,
           },
         ]}
       >
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Назад"
           onPress={handleEarlyExit}
           style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
           hitSlop={8}
@@ -204,7 +207,7 @@ export function OralTestSessionScreen({ navigation, route }: Props) {
         <Text style={[styles.counterText, { color: colors.textSecondary }]}>
           Карточка {Math.min(currentIndex + 1, total)} из {total}
         </Text>
-        <View style={[styles.progressBar, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#E5E7EB' }]}>
+        <View style={[styles.progressBar, { backgroundColor: colors.surfaceMuted }]}>
           <View
             style={[
               styles.progressFill,
@@ -239,14 +242,8 @@ export function OralTestSessionScreen({ navigation, route }: Props) {
                 ],
               },
               Platform.select({
-                web: { boxShadow: '0 8px 32px rgba(0,0,0,0.12)' },
               }) as any,
               {
-                shadowColor: '#000',
-                shadowOpacity: isDark ? 0.3 : 0.1,
-                shadowRadius: 20,
-                shadowOffset: { width: 0, height: 8 },
-                elevation: 10,
               },
             ]}
             {...panResponder.panHandlers}
@@ -256,11 +253,12 @@ export function OralTestSessionScreen({ navigation, route }: Props) {
               style={[
                 styles.overlay,
                 styles.overlayKnown,
+                { backgroundColor: alpha(GREEN, 10), borderColor: GREEN },
                 { opacity: knownOverlayOpacity },
               ]}
               pointerEvents="none"
             >
-              <Text style={styles.overlayLabel}>ЗНАЕТ ✓</Text>
+              <Text style={[styles.overlayLabel, { color: colors.onPrimary }]}>ЗНАЕТ ✓</Text>
             </Animated.View>
 
             {/* Unknown overlay */}
@@ -268,11 +266,12 @@ export function OralTestSessionScreen({ navigation, route }: Props) {
               style={[
                 styles.overlay,
                 styles.overlayUnknown,
+                { backgroundColor: alpha(RED, 10), borderColor: RED },
                 { opacity: unknownOverlayOpacity },
               ]}
               pointerEvents="none"
             >
-              <Text style={styles.overlayLabel}>НЕ ЗНАЕТ ✗</Text>
+              <Text style={[styles.overlayLabel, { color: colors.onPrimary }]}>НЕ ЗНАЕТ ✗</Text>
             </Animated.View>
 
             {/* Content */}
@@ -280,7 +279,7 @@ export function OralTestSessionScreen({ navigation, route }: Props) {
               {card.frontText}
             </Text>
 
-            <View style={[styles.divider, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#E5E7EB' }]} />
+            <View style={[styles.divider, { backgroundColor: colors.surfaceMuted }]} />
 
             <Text style={[styles.backText, { color: colors.textSecondary }]}>
               {card.backText}
@@ -338,7 +337,7 @@ const styles = StyleSheet.create({
     marginLeft: -spacing.xs,
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '600',
     letterSpacing: -0.3,
     marginLeft: spacing.m,
@@ -352,16 +351,16 @@ const styles = StyleSheet.create({
   counterText: {
     fontSize: 14,
     textAlign: 'center',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   progressBar: {
     height: 4,
-    borderRadius: 2,
+    borderRadius: borderRadius.full,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    borderRadius: 2,
+    borderRadius: borderRadius.full,
   },
   hintsRow: {
     flexDirection: 'row',
@@ -400,25 +399,20 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.xl * 1.5,
   },
   overlayKnown: {
-    backgroundColor: GREEN + '22',
     borderWidth: 3,
-    borderColor: GREEN,
   },
   overlayUnknown: {
-    backgroundColor: RED + '22',
     borderWidth: 3,
-    borderColor: RED,
   },
   overlayLabel: {
-    fontSize: 28,
-    fontWeight: '900',
+    fontSize: 32,
+    fontWeight: '700',
     letterSpacing: 1,
-    color: '#FFFFFF',
   },
   // Явный lineHeight + paddingTop дают запас сверху: без него на iOS обрезаются
   // заглавные с диакритикой (Ä, É, Й) — как на обычной карточке.
   frontText: {
-    fontSize: 36,
+    fontSize: 40,
     lineHeight: 46,
     paddingTop: 4,
     fontWeight: '700',
@@ -429,7 +423,7 @@ const styles = StyleSheet.create({
     width: '60%',
   },
   backText: {
-    fontSize: 22,
+    fontSize: 24,
     lineHeight: 30,
     paddingTop: 2,
     fontWeight: '400',
@@ -451,7 +445,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   finishText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
   },
 });
