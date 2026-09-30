@@ -63,7 +63,7 @@ import { firstLessonStep } from '@/services/lessonFlow';
 import { useLessonStore } from '@/store/lessonStore';
 import { localDay } from '@/store/challengeStore';
 import { buildLessonPlan, countWaitingReview, ensureLessonDay, EXTRA_NEW_STEP, type LessonDay, type LessonPlan } from '@/services/LessonService';
-import { isLessonStartable, lessonCardContent } from '@/components/home/lessonText';
+import { isLessonStartable, lessonCardContent, streakRiskHoursLeft } from '@/components/home/lessonText';
 import { LessonCard } from '@/components/home/LessonCard';
 
 const StaggerCard = React.memo(function StaggerCard({
@@ -656,9 +656,12 @@ export function HomeScreen({ navigation }: any) {
     return buildLessonPlan({ sets: lessonSets, cardsBySet, cards: cardsMap, newPerDay: lessonNewPerDay, day, now });
   }, [lessonSets, cardsBySet, cardsMap, lessonNewPerDay]);
   const lessonPlan = useMemo(() => computeLessonPlan(lessonDay), [computeLessonPlan, lessonDay]);
+  // Вечером при невыполненной цели — «Сохрани серию» (считается при каждой отрисовке: главная
+  // перерисовывается при заходе, так вечер наступает без перезапуска)
+  const streakRiskHours = streakRiskHoursLeft(new Date(), streakValue, todayGoalReached);
   const lessonContent = useMemo(
-    () => lessonCardContent(lessonPlan, { streakDays: streakValue, extraNewStep: EXTRA_NEW_STEP }),
-    [lessonPlan, streakValue],
+    () => lessonCardContent(lessonPlan, { streakDays: streakValue, extraNewStep: EXTRA_NEW_STEP, streakRiskHours }),
+    [lessonPlan, streakValue, streakRiskHours],
   );
 
   // Утренний снимок дня — при заходе на главную, когда карточки уже загружены

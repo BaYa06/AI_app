@@ -45,13 +45,34 @@ export interface LessonCardContent {
   progress: { done: number; total: number } | null;
 }
 
+/** С какого часа вечером предупреждаем о серии */
+const STREAK_RISK_FROM_HOUR = 19;
+/** Какую серию стоит спасать: 1–2 дня терять не так обидно, а напоминание каждый вечер надоедает */
+const STREAK_RISK_MIN_DAYS = 3;
+
+/**
+ * Серия под угрозой: вечер, цель дня ещё не выполнена, серия ≥ 3 дней.
+ * Возвращает, сколько целых часов осталось до полуночи (0 — меньше часа); null — не под угрозой.
+ */
+export function streakRiskHoursLeft(now: Date, streakDays: number, goalReached: boolean): number | null {
+  if (goalReached || streakDays < STREAK_RISK_MIN_DAYS || now.getHours() < STREAK_RISK_FROM_HOUR) return null;
+  const midnight = new Date(now);
+  midnight.setHours(24, 0, 0, 0);
+  return Math.floor((midnight.getTime() - now.getTime()) / (60 * 60 * 1000));
+}
+
 /**
  * Содержимое карточки по плану урока (plan/home_redesign.md, таблица шага 2.3).
  * null — карточку не показываем (нет ни одной карточки: главная показывает своё пустое состояние).
  */
 export function lessonCardContent(
   plan: LessonPlan,
-  opts: { streakDays: number; extraNewStep: number },
+  opts: {
+    streakDays: number;
+    extraNewStep: number;
+    /** streakRiskHoursLeft: число — вечером серия под угрозой, заголовок про серию */
+    streakRiskHours?: number | null;
+  },
 ): LessonCardContent | null {
   const queued = plan.reviewIds.length + plan.newIds.length + plan.mistakeIds.length;
   const progress = queued > 0 ? { done: plan.doneToday, total: plan.doneToday + queued } : null;
@@ -99,7 +120,21 @@ export function lessonCardContent(
         kind: 'findSet',
         progress: null,
       };
-    default:
+    default: {
+      const risk = opts.streakRiskHours;
+      if (risk != null) {
+        // Тот же урок, другой повод: место, цвет и кнопка те же — меняются заголовок и подпись
+        return {
+          calm: false,
+          overline: 'Серия под угрозой',
+          title: `Сохрани серию: ${opts.streakDays} ${pluralize(opts.streakDays, 'день', 'дня', 'дней')}`,
+          meta: `${lessonComposition(plan)} · ${time}`,
+          hint: risk > 0 ? `До полуночи ${risk} ч` : 'До полуночи меньше часа',
+          action: 'Начать',
+          kind: 'start',
+          progress,
+        };
+      }
       return {
         calm: false,
         overline: plan.state === 'first' ? 'День 1' : plan.state === 'overdue' ? 'Накопилось повторение' : 'Сегодня',
@@ -110,6 +145,7 @@ export function lessonCardContent(
         kind: 'start',
         progress,
       };
+    }
   }
 }
 

@@ -1,6 +1,13 @@
 import { describe, expect, it } from '@jest/globals';
 import type { LessonPlan } from '@/services/LessonService';
-import { isLessonStartable, lessonCardContent, lessonComposition, lessonHint, lessonTitle } from '../lessonText';
+import {
+  isLessonStartable,
+  lessonCardContent,
+  lessonComposition,
+  lessonHint,
+  lessonTitle,
+  streakRiskHoursLeft,
+} from '../lessonText';
 
 const opts = { streakDays: 8, extraNewStep: 10 };
 
@@ -105,6 +112,47 @@ describe('тексты урока', () => {
   it('карточка: все слова пройдены — найти новый набор', () => {
     const c = lessonCardContent(plan({ state: 'finished', tomorrowCount: 1 }), opts);
     expect(c).toMatchObject({ calm: true, title: 'Все слова пройдены', hint: 'Завтра 1 слово', kind: 'findSet' });
+  });
+
+  it('серия под угрозой: только вечером, без выполненной цели, серия от 3 дней', () => {
+    const at = (h: number, m = 0) => new Date(2026, 9, 1, h, m);
+    expect(streakRiskHoursLeft(at(19, 30), 7, false)).toBe(4);
+    expect(streakRiskHoursLeft(at(23, 20), 7, false)).toBe(0);
+    expect(streakRiskHoursLeft(at(18, 59), 7, false)).toBeNull();
+    expect(streakRiskHoursLeft(at(21), 7, true)).toBeNull();
+    expect(streakRiskHoursLeft(at(21), 2, false)).toBeNull();
+  });
+
+  it('карточка: серия под угрозой — тот же урок, другой заголовок', () => {
+    const base = plan({ reviewIds: ids(10), newIds: ids(10, 'n') });
+    const c = lessonCardContent(base, { ...opts, streakDays: 7, streakRiskHours: 3 });
+    expect(c).toMatchObject({
+      calm: false,
+      overline: 'Серия под угрозой',
+      title: 'Сохрани серию: 7 дней',
+      meta: '10 повторить + 10 новых · ~6 мин',
+      hint: 'До полуночи 3 ч',
+      action: 'Начать',
+      kind: 'start',
+    });
+    expect(lessonCardContent(base, { ...opts, streakDays: 22, streakRiskHours: 0 })).toMatchObject({
+      title: 'Сохрани серию: 22 дня',
+      hint: 'До полуночи меньше часа',
+    });
+    // Ошибки и «всё сделано» — без серии: урок уже пройден
+    expect(lessonCardContent(plan({ state: 'mistakes', mistakeIds: ids(2) }), { ...opts, streakRiskHours: 3 })?.title).toBe('Исправь ошибки');
+    expect(lessonCardContent(plan({ state: 'done' }), { ...opts, streakRiskHours: 3 })?.title).toBe('Готово на сегодня');
+  });
+
+  it('карточка: склонения в серии и «завтра»', () => {
+    expect(lessonCardContent(plan({ state: 'done', tomorrowCount: 2 }), { ...opts, streakDays: 1 })).toMatchObject({
+      meta: 'Серия 1 день',
+      hint: 'Завтра 2 слова',
+    });
+    expect(lessonCardContent(plan({ state: 'done', tomorrowCount: 21 }), { ...opts, streakDays: 3 })).toMatchObject({
+      meta: 'Серия 3 дня',
+      hint: 'Завтра 21 слово',
+    });
   });
 
   it('карточка: нет карточек — не показываем', () => {
