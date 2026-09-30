@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { useThemeColors } from '@/store';
 import { screenPadding, spacing } from '@/constants';
+import { useEdgeSwipeBack } from '@/hooks/useEdgeSwipeBack';
 
 export interface ScreenProps {
   children?: React.ReactNode;
@@ -39,6 +40,8 @@ export interface ScreenProps {
   scrollProps?: Omit<ScrollViewProps, 'contentContainerStyle' | 'refreshControl'>;
   style?: StyleProp<ViewStyle>;
   contentStyle?: StyleProp<ViewStyle>;
+  /** Веб/PWA: свайп «назад» от левого края (как у Container). */
+  enableSwipeBack?: boolean;
 }
 
 /** Нижний отступ экрана: safe area, если снизу нет панели вкладок. */
@@ -60,8 +63,10 @@ export function Screen({
   scrollProps,
   style,
   contentStyle,
+  enableSwipeBack = true,
 }: ScreenProps) {
   const colors = useThemeColors();
+  useEdgeSwipeBack(enableSwipeBack);
   const bottomInset = useScreenBottomInset();
   const horizontal = padded ? { paddingHorizontal: screenPadding } : null;
 

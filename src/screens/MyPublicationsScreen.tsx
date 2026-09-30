@@ -9,13 +9,12 @@ import {
   Pressable,
   FlatList,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { Text, Container } from '@/components/common';
-import { useThemeColors, useSettingsStore, useLibraryStore } from '@/store';
-import { spacing, borderRadius, getCategoryLabel, formatCount, formatRelativeTime } from '@/constants';
-import { ArrowLeft, RefreshCw, EyeOff, BookOpen } from 'lucide-react-native';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import { useThemeColors, useLibraryStore } from '@/store';
+import { spacing, borderRadius, iconSize, screenPadding, formatCount, formatRelativeTime, alpha } from '@/constants';
+import { Badge, Button, CategoryIcon, EmptyState, ScreenHeader, confirmDialog, toast } from '@/components/ui';
+import { RefreshCw, EyeOff, BookOpen, Star, Download, Heart, Layers } from 'lucide-react-native';
 import { supabase } from '@/services/supabaseClient';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { LibrarySet } from '@/types/library';
@@ -25,8 +24,6 @@ type Props = RootStackScreenProps<'MyPublications'>;
 
 export function MyPublicationsScreen({ navigation }: Props) {
   const colors = useThemeColors();
-  const theme = useSettingsStore((s) => s.resolvedTheme);
-  const isDark = theme === 'dark';
 
   const { myPublications, fetchMyPublications, unpublishSet, updatePublication } = useLibraryStore();
 
@@ -52,35 +49,28 @@ export function MyPublicationsScreen({ navigation }: Props) {
     try {
       await updatePublication(userId, librarySetId);
       await fetchMyPublications(userId);
-      Alert.alert('Готово', 'Публикация обновлена');
+      toast.success('Публикация обновлена');
     } catch (err) {
-      Alert.alert('Ошибка', describeError(err, 'Не удалось обновить'));
+      toast.error(describeError(err, 'Не удалось обновить'));
     } finally {
       setUpdatingId(null);
     }
   }, [userId, updatePublication, fetchMyPublications]);
 
-  const handleUnpublish = useCallback((librarySetId: string) => {
-    Alert.alert(
-      'Снять с публикации',
-      'Набор будет удалён из библиотеки. Продолжить?',
-      [
-        { text: 'Отмена', style: 'cancel' },
-        {
-          text: 'Снять',
-          style: 'destructive',
-          onPress: async () => {
-            if (!userId) return;
-            try {
-              await unpublishSet(userId, librarySetId);
-              Alert.alert('Готово', 'Публикация снята');
-            } catch (err) {
-              Alert.alert('Ошибка', describeError(err, 'Не удалось снять'));
-            }
-          },
-        },
-      ]
-    );
+  const handleUnpublish = useCallback(async (librarySetId: string) => {
+    const confirmed = await confirmDialog({
+      title: 'Снять с публикации',
+      message: 'Набор будет удалён из библиотеки. Продолжить?',
+      confirmText: 'Снять',
+      destructive: true,
+    });
+    if (!confirmed || !userId) return;
+    try {
+      await unpublishSet(userId, librarySetId);
+      toast.success('Публикация снята');
+    } catch (err) {
+      toast.error(describeError(err, 'Не удалось снять'));
+    }
   }, [userId, unpublishSet]);
 
   const renderItem = useCallback(({ item }: { item: LibrarySet }) => {
@@ -93,11 +83,16 @@ export function MyPublicationsScreen({ navigation }: Props) {
     return (
       <View style={[s.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <View style={s.cardHeader}>
-          <View style={[s.emojiBox, { backgroundColor: colors.primary + '15' }]}>
-            <Text style={s.emoji}>{item.cover_emoji || '📚'}</Text>
+          <View style={[s.emojiBox, { backgroundColor: alpha(colors.primary, 10) }]}>
+            {/* Иконка категории вместо эмодзи обложки (брендбук, раздел 6) */}
+            <CategoryIcon category={item.category} size="m" />
             {item.is_featured && (
-              <View style={[s.verifiedBadge, { backgroundColor: colors.primary, borderColor: colors.surface }]}>
-                <Ionicons name="star" size={9} color="#FFFFFF" />
+              <View
+                accessible
+                accessibilityLabel="Рекомендуем"
+                style={[s.verifiedBadge, { backgroundColor: colors.primaryFill, borderColor: colors.surface }]}
+              >
+                <Star size={10} color={colors.onPrimary} fill={colors.onPrimary} />
               </View>
             )}
           </View>
@@ -106,11 +101,7 @@ export function MyPublicationsScreen({ navigation }: Props) {
               {item.title}
             </Text>
             <View style={s.statusRow}>
-              <View style={[s.statusBadge, { backgroundColor: isArchived ? '#EF4444' + '15' : '#10B981' + '15' }]}>
-                <Text style={[s.statusText, { color: isArchived ? '#EF4444' : '#10B981' }]}>
-                  {isArchived ? 'Архивный' : 'Опубликован'}
-                </Text>
-              </View>
+              <Badge label={isArchived ? 'Архивный' : 'Опубликован'} tone={isArchived ? 'error' : 'success'} />
               <Text style={[s.dateText, { color: colors.textTertiary }]}>
                 {formatRelativeTime(item.published_at)}
               </Text>
@@ -121,24 +112,24 @@ export function MyPublicationsScreen({ navigation }: Props) {
         {/* Stats */}
         <View style={s.statsRow}>
           <View style={s.statItem}>
-            <Ionicons name="download-outline" size={16} color={colors.textTertiary} />
+            <Download size={iconSize.xs} color={colors.textTertiary} />
             <Text style={[s.statValue, { color: colors.textPrimary }]}>{formatCount(item.imports_count)}</Text>
             <Text style={[s.statLabel, { color: colors.textTertiary }]}>импортов</Text>
           </View>
           <View style={s.statItem}>
-            <Ionicons name="heart-outline" size={16} color={colors.textTertiary} />
+            <Heart size={iconSize.xs} color={colors.textTertiary} />
             <Text style={[s.statValue, { color: colors.textPrimary }]}>{formatCount(item.likes_count)}</Text>
             <Text style={[s.statLabel, { color: colors.textTertiary }]}>лайков</Text>
           </View>
           {avgRating !== null && (
             <View style={s.statItem}>
-              <Ionicons name="star" size={16} color="#FACC15" />
+              <Star size={iconSize.xs} color={colors.star} fill={colors.star} />
               <Text style={[s.statValue, { color: colors.textPrimary }]}>{avgRating}</Text>
               <Text style={[s.statLabel, { color: colors.textTertiary }]}>рейтинг</Text>
             </View>
           )}
           <View style={s.statItem}>
-            <Ionicons name="layers-outline" size={16} color={colors.textTertiary} />
+            <Layers size={iconSize.xs} color={colors.textTertiary} />
             <Text style={[s.statValue, { color: colors.textPrimary }]}>{item.cards_count}</Text>
             <Text style={[s.statLabel, { color: colors.textTertiary }]}>карт</Text>
           </View>
@@ -147,26 +138,27 @@ export function MyPublicationsScreen({ navigation }: Props) {
         {/* Actions */}
         {!isArchived && (
           <View style={s.actionsRow}>
-            <Pressable
-              style={[s.actionBtn, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '33' }]}
+            <Button
+              variant="secondary"
+              size="s"
+              title="Обновить"
+              icon={RefreshCw}
               onPress={() => handleUpdate(item.id)}
-              disabled={isUpdating}
-            >
-              {isUpdating ? (
-                <ActivityIndicator size="small" color={colors.primary} />
-              ) : (
-                <>
-                  <RefreshCw size={16} color={colors.primary} />
-                  <Text style={[s.actionBtnText, { color: colors.primary }]}>Обновить</Text>
-                </>
-              )}
-            </Pressable>
+              loading={isUpdating}
+              style={s.actionBtn}
+            />
             <Pressable
-              style={[s.actionBtn, { backgroundColor: '#EF4444' + '08', borderColor: '#EF4444' + '33' }]}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                s.actionBtn,
+                s.dangerBtn,
+                { backgroundColor: alpha(colors.error, 10), borderColor: alpha(colors.error, 20) },
+                pressed && s.pressed,
+              ]}
               onPress={() => handleUnpublish(item.id)}
             >
-              <EyeOff size={16} color="#EF4444" />
-              <Text style={[s.actionBtnText, { color: '#EF4444' }]}>Снять</Text>
+              <EyeOff size={iconSize.xs} color={colors.errorText} />
+              <Text variant="label" style={{ color: colors.errorText }}>Снять</Text>
             </Pressable>
           </View>
         )}
@@ -175,38 +167,27 @@ export function MyPublicationsScreen({ navigation }: Props) {
   }, [colors, updatingId, handleUpdate, handleUnpublish]);
 
   return (
-    <Container padded={false} edges={['top', 'bottom']}>
-      {/* Header */}
-      <View style={[s.header, { backgroundColor: isDark ? colors.background : '#FFFFFF', borderBottomColor: colors.border }]}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={10} style={s.headerIcon}>
-          <ArrowLeft size={22} color={colors.textPrimary} />
-        </Pressable>
-        <Text variant="h3" style={{ color: colors.textPrimary }}>Мои публикации</Text>
-        <View style={s.headerIcon} />
-      </View>
+    <Container padded={false}>
+      <ScreenHeader title="Мои публикации" onBack={() => navigation.goBack()} bordered />
 
       {loading ? (
         <View style={s.centerContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : myPublications.length === 0 ? (
-        <View style={s.centerContainer}>
-          <BookOpen size={48} color={colors.textTertiary} />
-          <Text style={[s.emptyTitle, { color: colors.textPrimary }]}>Вы ещё ничего не публиковали</Text>
-          <Text style={[s.emptySubtitle, { color: colors.textTertiary }]}>
-            Поделитесь своими наборами карточек с другими пользователями
-          </Text>
-          <Pressable
-            style={[s.goLibraryBtn, { backgroundColor: colors.primary }]}
-            onPress={() => {
+        <EmptyState
+          icon={BookOpen}
+          title="Ты ещё ничего не публиковал"
+          description="Поделись своими наборами карточек с другими пользователями"
+          action={{
+            label: 'Перейти в библиотеку',
+            onPress: () => {
               navigation.goBack();
               // Navigate to Library tab
               navigation.navigate('Main' as any, { screen: 'Library' });
-            }}
-          >
-            <Text style={s.goLibraryBtnText}>Перейти в библиотеку</Text>
-          </Pressable>
-        </View>
+            },
+          }}
+        />
       ) : (
         <FlatList
           data={myPublications}
@@ -221,30 +202,22 @@ export function MyPublicationsScreen({ navigation }: Props) {
 }
 
 const s = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.s, paddingVertical: spacing.s, borderBottomWidth: 1 },
-  headerIcon: { width: 40, height: 40, borderRadius: borderRadius.full, alignItems: 'center', justifyContent: 'center' },
   centerContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.m, paddingHorizontal: spacing.xl },
-  emptyTitle: { fontSize: 18, fontWeight: '700', textAlign: 'center' },
-  emptySubtitle: { fontSize: 14, fontWeight: '500', textAlign: 'center', lineHeight: 20 },
-  goLibraryBtn: { paddingHorizontal: spacing.l, paddingVertical: spacing.s, borderRadius: borderRadius.l, marginTop: spacing.s },
-  goLibraryBtnText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
-  list: { padding: spacing.m, gap: spacing.m, paddingBottom: spacing.xxl },
-  card: { borderRadius: borderRadius.xl, borderWidth: 1, padding: spacing.m, gap: spacing.m },
+  list: { padding: screenPadding, gap: spacing.s, paddingBottom: spacing.xxl },
+  card: { borderRadius: borderRadius.l, borderWidth: 1, padding: spacing.m, gap: spacing.m },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.m },
-  emojiBox: { width: 48, height: 48, borderRadius: borderRadius.l, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  verifiedBadge: { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5 },
-  emoji: { fontSize: 24 },
-  cardInfo: { flex: 1, gap: 4 },
-  cardTitle: { fontSize: 16, fontWeight: '700' },
+  emojiBox: { width: 48, height: 48, borderRadius: borderRadius.m, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  verifiedBadge: { position: 'absolute', top: -spacing.xxs, right: -spacing.xxs, width: 18, height: 18, borderRadius: borderRadius.full, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5 },
+  cardInfo: { flex: 1, gap: spacing.xxs },
+  cardTitle: { fontSize: 16, fontWeight: '600' },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.s },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: borderRadius.s },
-  statusText: { fontSize: 11, fontWeight: '700' },
-  dateText: { fontSize: 11, fontWeight: '500' },
-  statsRow: { flexDirection: 'row', gap: spacing.m },
-  statItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  dateText: { fontSize: 12 },
+  statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.m },
+  statItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.xxs },
   statValue: { fontSize: 14, fontWeight: '700' },
-  statLabel: { fontSize: 11, fontWeight: '500' },
+  statLabel: { fontSize: 12 },
   actionsRow: { flexDirection: 'row', gap: spacing.s },
-  actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingVertical: spacing.s, borderRadius: borderRadius.l, borderWidth: 1 },
-  actionBtnText: { fontSize: 13, fontWeight: '700' },
+  actionBtn: { flex: 1 },
+  dangerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, minHeight: 36, borderRadius: borderRadius.m, borderWidth: 1 },
+  pressed: { opacity: 0.85 },
 });
