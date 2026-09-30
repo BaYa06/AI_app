@@ -20,6 +20,21 @@ type SubscriptionTier = 'free' | 'premium';
 type PaywallSource = 'ai_limit' | 'stats_screen' | 'settings' | 'onboarding' | 'set_detail';
 type AuthMethod = 'email' | 'google' | 'apple' | 'anonymous';
 type CardRating = 'again' | 'hard' | 'good' | 'easy'; // оценки SRS
+/** Что главная предлагает главным действием в момент показа */
+type HomeState = 'daily_review' | 'study_all' | 'no_sets' | 'teacher';
+/** Что нажали на главной (plan/home_redesign.md, шаг 0.2) */
+type HomeAction =
+  | 'daily_review'
+  | 'study_all'
+  | 'challenge_quick'
+  | 'challenge_sniper'
+  | 'challenge_forgotten'
+  | 'rating'
+  | 'set'
+  | 'create_set'
+  | 'join_course'
+  | 'search'
+  | 'sort';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Внутренний helper
@@ -470,6 +485,31 @@ export const Analytics = {
    */
   languageChanged: (language: 'ru' | 'en') =>
     log('language_changed', { language }),
+
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ГЛАВНЫЙ ЭКРАН
+  // Зачем: понять, с чего люди начинают учёбу и что на главной отвлекает.
+  // Замер «до» и «после» редизайна главной (plan/home_redesign.md, шаги 0.2 и 6.3).
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Главная показана (один раз за каждый заход на экран).
+   * reviewCount — слов ждут повторения, newCount — слов ещё ни разу не учили.
+   */
+  homeViewed: (params: { state: HomeState; reviewCount: number; newCount: number; setsCount: number }) =>
+    log('home_viewed', {
+      state: params.state,
+      review_count: params.reviewCount,
+      new_count: params.newCount,
+      sets_count: params.setsCount,
+    }),
+
+  /**
+   * Нажатие на главной. Доля 'daily_review' среди всех действий — главная метрика редизайна.
+   */
+  homeAction: (action: HomeAction) =>
+    log('home_action', { action }),
 
 
   // ═══════════════════════════════════════════════════════════════════════════

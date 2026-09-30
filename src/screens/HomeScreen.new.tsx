@@ -58,6 +58,7 @@ import type { DailyActivity } from '@/services/StreakService';
 import type { Card, CardSet } from '@/types';
 import { isCardWaitingReview, isCardFading } from '@/services/SRSService';
 import { StorageService, STORAGE_KEYS } from '@/services/StorageService';
+import { Analytics } from '@/services/analytics';
 
 const StaggerCard = React.memo(function StaggerCard({
   index,
@@ -268,6 +269,7 @@ export function HomeScreen({ navigation }: any) {
 
   const handleQuickRound = useCallback(() => {
     triggerHaptic('selection');
+    Analytics.homeAction('challenge_quick');
     const allSets = useSetsStore.getState().getAllSets();
     if (allSets.length === 0) {
       toast.info('Нет наборов — сначала создай набор с карточками');
@@ -348,6 +350,7 @@ export function HomeScreen({ navigation }: any) {
 
   const handleSniperChallenge = useCallback(() => {
     triggerHaptic('selection');
+    Analytics.homeAction('challenge_sniper');
     const allSets = useSetsStore.getState().getAllSets();
     if (allSets.length === 0) {
       toast.info('Нет наборов — сначала создай набор с карточками');
@@ -373,6 +376,7 @@ export function HomeScreen({ navigation }: any) {
 
   const handleForgottenChallenge = useCallback(() => {
     triggerHaptic('selection');
+    Analytics.homeAction('challenge_forgotten');
     const allSets = useSetsStore.getState().getAllSets();
     if (allSets.length === 0) {
       toast.info('Нет наборов — сначала создай набор с карточками');
@@ -638,10 +642,29 @@ export function HomeScreen({ navigation }: any) {
     return { waiting, all, waitingBySet, fading, tomorrow };
   }, [filteredSets, cardsBySet, cardsMap]);
 
+  // Аналитика (plan/home_redesign.md, 0.2): что главная предлагала в момент захода — один раз за заход,
+  // когда роль уже известна (до этого главная не знает, показывать ли баннер учителя)
+  const [focusTick, setFocusTick] = useState(0);
+  useFocusEffect(useCallback(() => { setFocusTick((t) => t + 1); }, []));
+  const loggedFocusTickRef = useRef(0);
+  useEffect(() => {
+    if (focusTick === 0 || loggedFocusTickRef.current === focusTick || isTeacher === null) return;
+    loggedFocusTickRef.current = focusTick;
+    Analytics.homeViewed({
+      state: filteredSets.length === 0 ? 'no_sets'
+        : isTeacher ? 'teacher'
+        : reviewStats.waiting.length > 0 ? 'daily_review' : 'study_all',
+      reviewCount: reviewStats.waiting.length,
+      newCount: reviewStats.all.filter((c) => (c.learningStep || 0) === 0).length,
+      setsCount: filteredSets.length,
+    });
+  }, [focusTick, isTeacher, filteredSets.length, reviewStats]);
+
   // «Повторение дня» (план §3.1): слова курса, которым пришло время, самые просроченные первыми
   const DAILY_REVIEW_MAX = 30;
   const handleDailyReview = useCallback(() => {
     triggerHaptic('selection');
+    Analytics.homeAction('daily_review');
     let queue = reviewStats.waiting.slice(0, DAILY_REVIEW_MAX);
     if (queue.length === 0) return;
     // Тесту нужно хотя бы 4 варианта ответа — добираем карточками курса (ответ раньше срока уровень не меняет)
@@ -760,6 +783,7 @@ export function HomeScreen({ navigation }: any) {
   const openLeaderboard = useCallback((week: 'current' | 'previous') => {
     if (!activeCourseId) return;
     triggerHaptic('selection');
+    Analytics.homeAction('rating');
     const rootNav = navigation?.getParent?.() ?? navigation;
     rootNav?.navigate('CourseLeaderboard', { courseId: activeCourseId, courseTitle: activeCourseTitle ?? undefined, week });
   }, [activeCourseId, activeCourseTitle, navigation]);
@@ -1406,7 +1430,10 @@ export function HomeScreen({ navigation }: any) {
             background="none"
             iconSize={iconSize.s}
             accessibilityLabel="Поиск по наборам"
-            onPress={() => setSearchVisible(!searchVisible)}
+            onPress={() => {
+              if (!searchVisible) Analytics.homeAction('search');
+              setSearchVisible(!searchVisible);
+            }}
           />
           <Pressable
             style={({ pressed }) => [
@@ -1416,7 +1443,7 @@ export function HomeScreen({ navigation }: any) {
             hitSlop={spacing.xxs}
             accessibilityRole="button"
             accessibilityLabel="Создать набор"
-            onPress={() => { triggerHaptic('selection'); navigation?.navigate('SetEditor', {}); }}
+            onPress={() => { triggerHaptic('selection'); Analytics.homeAction('create_set'); navigation?.navigate('SetEditor', {}); }}
           >
             <Plus size={iconSize.s} color={colors.onPrimary} strokeWidth={2.5} />
           </Pressable>
@@ -1475,7 +1502,7 @@ export function HomeScreen({ navigation }: any) {
                 ? 'Создай первый набор, чтобы начать учиться и упорядочить материалы по курсам.'
                 : 'Создай свой набор слов или подключись к курсу учителя — его наборы появятся здесь.'
             }
-            action={{ label: 'Создать набор', icon: Plus, onPress: () => navigation?.navigate('SetEditor', {}) }}
+            action={{ label: 'Создать набор', icon: Plus, onPress: () => { Analytics.homeAction('create_set'); navigation?.navigate('SetEditor', {}); } }}
             // Новичку — второй путь: не создавать, а подключиться к курсу учителя по коду
             secondaryAction={
               isTeacher !== true
@@ -1484,6 +1511,7 @@ export function HomeScreen({ navigation }: any) {
                     icon: Users,
                     onPress: () => {
                       triggerHaptic('selection');
+                      Analytics.homeAction('join_course');
                       setJoinByCodeVisible(true);
                     },
                   }
@@ -1597,7 +1625,7 @@ export function HomeScreen({ navigation }: any) {
                           Всё повторено ✓{reviewStats.tomorrow > 0 ? ` · завтра ${reviewStats.tomorrow}` : ''}
                         </Text>
                       )}
-                      <Button title="Учить все карточки" fullWidth onPress={() => setShowStudyModeModal(true)} />
+                      <Button title="Учить все карточки" fullWidth onPress={() => { Analytics.homeAction('study_all'); setShowStudyModeModal(true); }} />
                     </>
                   )}
                 </View>
@@ -1610,7 +1638,7 @@ export function HomeScreen({ navigation }: any) {
                 {activeCourseId === null ? 'Мои наборы' : activeCourseTitle}
               </Text>
               <Pressable
-                onPress={() => setSortSheetVisible(true)}
+                onPress={() => { Analytics.homeAction('sort'); setSortSheetVisible(true); }}
                 hitSlop={spacing.s}
                 accessibilityRole="button"
                 accessibilityLabel={`Сортировка: ${setsSortShortLabel}`}
@@ -1649,7 +1677,7 @@ export function HomeScreen({ navigation }: any) {
               return (
                 <StaggerCard key={set.id} index={index}>
                 <SurfaceCard
-                  onPress={() => { triggerHaptic('selection'); navigation?.navigate('SetDetail', { setId: set.id }); }}
+                  onPress={() => { triggerHaptic('selection'); Analytics.homeAction('set'); navigation?.navigate('SetDetail', { setId: set.id }); }}
                   accessibilityLabel={`${set.title}, ${set.cardCount} ${pluralize(set.cardCount, 'карточка', 'карточки', 'карточек')}, выучено ${progress}%`}
                 >
                   {/* Header with icon, title, status dot, and button */}
