@@ -252,10 +252,10 @@
 
 ## Этап 7. Уборка кода (без изменения интерфейса)
 
-- [ ] **7.1** Ionicons — только в `AppNavigator` (панель вкладок); `brand:check` показывает 0 файлов с Ionicons вне него.
-- [ ] **7.2** Удалить старые компоненты, полностью заменённые компонентами этапа 2 (`common/Button.tsx`, `common/Input.tsx` и т.п.), когда на них не осталось ссылок. Уже без ссылок: `common/ProgressBar.tsx`, `common/ToggleSwitch.tsx`.
-- [ ] **7.3** Убрать устаревшие токены (`borderRadius.xs`, неиспользуемые `heights`).
-- [ ] **7.4** Склонение чисел — везде через `pluralize` из `src/utils` (удалить дубли `pluralCards`, `pointsWord`, `pluralizeDays`).
+- [x] **7.1** Ionicons — только в `AppNavigator` (панель вкладок); `brand:check` показывает 0 файлов с Ionicons вне него.
+- [x] **7.2** Удалить старые компоненты, полностью заменённые компонентами этапа 2 (`common/Button.tsx`, `common/Input.tsx` и т.п.), когда на них не осталось ссылок. Удалены: `common/Button`, `Input`, `ProgressBar`, `ToggleSwitch`.
+- [x] **7.3** Убрать устаревшие токены (`borderRadius.xs`, неиспользуемые `heights`).
+- [x] **7.4** Склонение чисел — везде через `pluralize` из `src/utils` (удалить дубли `pluralCards`, `pointsWord`, `pluralizeDays`).
 
 ## Этап 8. Удержание результата
 
