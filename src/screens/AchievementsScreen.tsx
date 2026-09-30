@@ -10,10 +10,10 @@ import {
   Pressable,
 } from 'react-native';
 import { Text } from '@/components/common';
-import { useThemeColors, useSettingsStore } from '@/store';
-import { spacing, borderRadius } from '@/constants';
-import Ionicons from 'react-native-vector-icons/Ionicons';
-import { ArrowLeft } from 'lucide-react-native';
+import { Badge, Card, ProgressBar, ScreenHeader, type IconComponent } from '@/components/ui';
+import { useThemeColors } from '@/store';
+import { spacing, borderRadius, iconSize, screenPadding, alpha } from '@/constants';
+import { Award, BookOpen, Flame, GraduationCap, Lock, Timer, Users } from 'lucide-react-native';
 
 // ---- Data ----
 
@@ -21,7 +21,7 @@ const TABS = ['Все', 'Серия', 'Обучение', 'Наборы', 'Со�
 
 type Achievement = {
   id: string;
-  icon: string;
+  icon: IconComponent;
   title: string;
   unlocked: boolean;
   // unlocked-only
@@ -35,7 +35,7 @@ type Achievement = {
 const ACHIEVEMENTS: Achievement[] = [
   {
     id: '1',
-    icon: 'flame',
+    icon: Flame,
     title: 'Огненная неделя',
     unlocked: true,
     description: 'Держи серию 7 дней подряд',
@@ -43,15 +43,15 @@ const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: '2',
-    icon: 'book',
+    icon: BookOpen,
     title: 'Мастер наборов',
     unlocked: true,
-    description: 'Создайте свои первые 10 наборов карточек',
+    description: 'Создай свои первые 10 наборов карточек',
     unlockedLabel: 'Разблокировано: Пн',
   },
   {
     id: '3',
-    icon: 'timer-outline',
+    icon: Timer,
     title: 'Марафонец',
     unlocked: false,
     progressLabel: '15 / 30 дней',
@@ -59,7 +59,7 @@ const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: '4',
-    icon: 'people-outline',
+    icon: Users,
     title: 'Наставник',
     unlocked: false,
     progressLabel: '1 / 5 друзей',
@@ -67,15 +67,15 @@ const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: '5',
-    icon: 'school',
+    icon: GraduationCap,
     title: 'Первые шаги',
     unlocked: true,
-    description: 'Завершите свой первый урок',
+    description: 'Заверши свой первый урок',
     unlockedLabel: 'Разблокировано',
   },
   {
     id: '6',
-    icon: 'ribbon-outline',
+    icon: Award,
     title: 'Коллекционер',
     unlocked: false,
     progressLabel: '750 / 1000 слов',
@@ -85,67 +85,49 @@ const ACHIEVEMENTS: Achievement[] = [
 
 // ---- Components ----
 
-function UnlockedCard({
-  item,
-  colors,
-  isDark,
-}: {
-  item: Achievement;
-  colors: ReturnType<typeof useThemeColors>;
-  isDark: boolean;
-}) {
+function UnlockedCard({ item, colors }: { item: Achievement; colors: ReturnType<typeof useThemeColors> }) {
+  const Icon = item.icon;
   return (
-    <View style={[st.gridCard, st.unlockedCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderTopColor: colors.primary }]}>
-      <View style={[st.iconCircle, { backgroundColor: colors.primary + '20' }]}>
-        <Ionicons name={item.icon as any} size={32} color={colors.primary} />
+    <View
+      accessible
+      accessibilityLabel={`${item.title}. ${item.description ?? ''}. ${item.unlockedLabel ?? ''}`}
+      style={[st.gridCard, st.unlockedCard, { backgroundColor: colors.surface, borderColor: colors.border, borderTopColor: colors.primary }]}
+    >
+      <View style={[st.iconCircle, { backgroundColor: alpha(colors.primary, 10) }]}>
+        <Icon size={iconSize.l} color={colors.primary} />
       </View>
-      <Text style={[st.cardTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+      <Text variant="body" align="center" style={[st.cardTitle, { color: colors.textPrimary }]} numberOfLines={1}>
         {item.title}
       </Text>
-      <Text style={[st.cardDesc, { color: colors.textTertiary }]} numberOfLines={2}>
+      <Text variant="caption" align="center" color="secondary" numberOfLines={2}>
         {item.description}
       </Text>
-      <View style={[st.unlockedBadge, { backgroundColor: isDark ? 'rgba(16,185,129,0.15)' : '#DCFCE7' }]}>
-        <Text style={[st.unlockedBadgeText, { color: isDark ? '#34D399' : '#16A34A' }]}>
-          {item.unlockedLabel}
-        </Text>
-      </View>
+      {item.unlockedLabel ? <Badge label={item.unlockedLabel} tone="success" style={st.unlockedBadge} /> : null}
     </View>
   );
 }
 
-function LockedCard({
-  item,
-  colors,
-  isDark,
-}: {
-  item: Achievement;
-  colors: ReturnType<typeof useThemeColors>;
-  isDark: boolean;
-}) {
-  const lockedBg = isDark ? 'rgba(255,255,255,0.02)' : 'rgba(241,245,249,0.5)';
-  const lockedBorder = isDark ? 'rgba(255,255,255,0.08)' : '#CBD5E1';
-  const greyIcon = isDark ? '#4B5563' : '#9CA3AF';
-  const greyBg = isDark ? 'rgba(255,255,255,0.06)' : '#E2E8F0';
-  const barBg = isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0';
-
+function LockedCard({ item, colors }: { item: Achievement; colors: ReturnType<typeof useThemeColors> }) {
+  const Icon = item.icon;
   return (
-    <View style={[st.gridCard, st.lockedCard, { backgroundColor: lockedBg, borderColor: lockedBorder }]}>
+    <View
+      accessible
+      accessibilityLabel={`${item.title}, закрыто. ${item.progressLabel ?? ''}`}
+      style={[st.gridCard, st.lockedCard, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}
+    >
       <View style={st.lockedIconWrap}>
-        <View style={[st.iconCircle, { backgroundColor: greyBg }]}>
-          <Ionicons name={item.icon as any} size={32} color={greyIcon} />
+        <View style={[st.iconCircle, { backgroundColor: colors.surfaceVariant }]}>
+          <Icon size={iconSize.l} color={colors.textTertiary} />
         </View>
-        <View style={[st.lockBadge, { backgroundColor: greyIcon, borderColor: isDark ? '#101122' : '#F8F6F6' }]}>
-          <Ionicons name="lock-closed" size={10} color="#FFFFFF" />
+        <View style={[st.lockBadge, { backgroundColor: colors.textTertiary, borderColor: colors.surfaceMuted }]}>
+          <Lock size={10} color={colors.onPrimary} />
         </View>
       </View>
-      <Text style={[st.cardTitle, { color: greyIcon }]} numberOfLines={1}>
+      <Text variant="body" align="center" style={[st.cardTitle, { color: colors.textSecondary }]} numberOfLines={1}>
         {item.title}
       </Text>
-      <View style={[st.progressBar, { backgroundColor: barBg }]}>
-        <View style={[st.progressFill, { backgroundColor: greyIcon, width: `${item.progressPercent ?? 0}%` }]} />
-      </View>
-      <Text style={[st.progressLabel, { color: greyIcon }]}>
+      <ProgressBar progress={item.progressPercent ?? 0} color={colors.textTertiary} animated={false} style={st.lockedBar} />
+      <Text variant="caption" color="secondary">
         {item.progressLabel}
       </Text>
     </View>
@@ -156,25 +138,17 @@ function LockedCard({
 
 export function AchievementsScreen({ navigation }: any) {
   const colors = useThemeColors();
-  const resolvedTheme = useSettingsStore((s) => s.resolvedTheme);
-  const isDark = resolvedTheme === 'dark';
-
   const [activeTab, setActiveTab] = useState(0);
 
   return (
     <View style={[st.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[st.header, { backgroundColor: isDark ? colors.background : '#FFFFFF', borderBottomColor: colors.border }]}>
-        <View style={st.headerLeft}>
-          <Pressable style={st.backBtn} onPress={() => navigation?.goBack()}>
-            <ArrowLeft size={22} color={colors.primary} />
-          </Pressable>
-          <Text style={[st.headerTitle, { color: colors.textPrimary }]}>Достижения</Text>
-        </View>
-        <View style={[st.counterBadge, { backgroundColor: colors.primary + '15' }]}>
-          <Text style={[st.counterText, { color: colors.primary }]}>24 / 50</Text>
-        </View>
-      </View>
+      <ScreenHeader
+        variant="root"
+        title="Достижения"
+        onBack={() => navigation?.goBack()}
+        bordered
+        right={<Badge label="24 / 50" tone="primary" />}
+      />
 
       <ScrollView
         style={st.scroll}
@@ -182,25 +156,23 @@ export function AchievementsScreen({ navigation }: any) {
         showsVerticalScrollIndicator={false}
       >
         {/* Overall Progress */}
-        <View style={[st.progressCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: isDark ? 'rgba(255,255,255,0.06)' : colors.primary + '0D' }]}>
+        <Card style={st.progressCard}>
           <View style={st.progressCardTop}>
-            <View style={{ flex: 1 }}>
-              <Text style={[st.progressSubtitle, { color: colors.textTertiary }]}>
-                Ваш путь к мастерству
+            <View style={st.flex1}>
+              <Text variant="overline" color="secondary">
+                Твой путь к мастерству
               </Text>
-              <Text style={[st.progressTitle, { color: colors.textPrimary }]}>
+              <Text variant="h3" style={{ color: colors.textPrimary }}>
                 Общий прогресс
               </Text>
             </View>
-            <Text style={[st.progressPercent, { color: colors.primary }]}>48%</Text>
+            <Text variant="h2" style={{ color: colors.primary }}>48%</Text>
           </View>
-          <View style={[st.totalBar, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0' }]}>
-            <View style={[st.totalBarFill, { backgroundColor: colors.primary, width: '48%' }]} />
-          </View>
-          <Text style={[st.progressHint, { color: colors.textTertiary }]}>
-            Еще 26 достижений до звания «Легенда»
+          <ProgressBar progress={48} accessibilityLabel="Общий прогресс" />
+          <Text variant="caption" color="secondary" style={st.progressHint}>
+            Ещё 26 достижений до звания «Легенда»
           </Text>
-        </View>
+        </Card>
 
         {/* Category Tabs */}
         <ScrollView
@@ -213,15 +185,17 @@ export function AchievementsScreen({ navigation }: any) {
             return (
               <Pressable
                 key={tab}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: isActive }}
                 style={[
                   st.tab,
                   isActive
-                    ? { backgroundColor: colors.primary }
-                    : { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF', borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0', borderWidth: 1 },
+                    ? { backgroundColor: colors.primaryFill, borderColor: colors.primaryFill }
+                    : { backgroundColor: colors.surface, borderColor: colors.border },
                 ]}
                 onPress={() => setActiveTab(i)}
               >
-                <Text style={[st.tabText, { color: isActive ? '#FFFFFF' : colors.textSecondary }]}>
+                <Text variant="label" style={{ color: isActive ? colors.onPrimary : colors.textSecondary }}>
                   {tab}
                 </Text>
               </Pressable>
@@ -233,9 +207,9 @@ export function AchievementsScreen({ navigation }: any) {
         <View style={st.grid}>
           {ACHIEVEMENTS.map((item) =>
             item.unlocked ? (
-              <UnlockedCard key={item.id} item={item} colors={colors} isDark={isDark} />
+              <UnlockedCard key={item.id} item={item} colors={colors} />
             ) : (
-              <LockedCard key={item.id} item={item} colors={colors} isDark={isDark} />
+              <LockedCard key={item.id} item={item} colors={colors} />
             ),
           )}
         </View>
@@ -250,202 +224,88 @@ const st = StyleSheet.create({
   container: {
     flex: 1,
   },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.m,
-    borderBottomWidth: 1,
+  flex1: {
+    flex: 1,
   },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.s,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-  },
-  counterBadge: {
-    paddingHorizontal: spacing.s,
-    paddingVertical: 4,
-    borderRadius: borderRadius.full,
-  },
-  counterText: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-
-  // Scroll
   scroll: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: spacing.m,
-    paddingTop: spacing.l,
-    paddingBottom: spacing.xxl + 20,
+    padding: screenPadding,
+    paddingBottom: spacing.xxl,
+    gap: spacing.l,
   },
-
-  // Overall Progress Card
   progressCard: {
-    padding: spacing.l,
-    borderRadius: borderRadius.l,
-    borderWidth: 1,
-    marginBottom: spacing.l,
+    gap: spacing.s,
   },
   progressCardTop: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'flex-end',
-    marginBottom: spacing.s,
-  },
-  progressSubtitle: {
-    fontSize: 13,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  progressTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-  },
-  progressPercent: {
-    fontSize: 28,
-    fontWeight: '900',
-  },
-  totalBar: {
-    height: 14,
-    borderRadius: borderRadius.full,
-    overflow: 'hidden',
-    marginBottom: spacing.s,
-  },
-  totalBarFill: {
-    height: '100%',
-    borderRadius: borderRadius.full,
+    gap: spacing.s,
   },
   progressHint: {
-    fontSize: 12,
-    fontWeight: '500',
+    marginTop: spacing.xxs,
   },
-
-  // Tabs
   tabsRow: {
-    flexDirection: 'row',
     gap: spacing.xs,
-    marginBottom: spacing.l,
   },
   tab: {
-    paddingHorizontal: 18,
-    paddingVertical: spacing.xs,
+    minHeight: 36,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.m,
     borderRadius: borderRadius.full,
+    borderWidth: 1,
   },
-  tabText: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-
-  // Grid
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.s,
   },
-
-  // Shared card
   gridCard: {
     width: '48%',
+    flexGrow: 1,
+    alignItems: 'center',
     padding: spacing.m,
     borderRadius: borderRadius.l,
-    alignItems: 'center',
+    borderWidth: 1,
+    gap: spacing.xxs,
   },
-  iconCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.s,
-  },
-  cardTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-
-  // Unlocked
   unlockedCard: {
     borderTopWidth: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 6,
-    elevation: 2,
   },
-  cardDesc: {
-    fontSize: 10,
-    textAlign: 'center',
-    lineHeight: 14,
-    marginBottom: spacing.s,
+  lockedCard: {
+    borderStyle: 'dashed',
+  },
+  iconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xs,
+  },
+  cardTitle: {
+    fontWeight: '600',
   },
   unlockedBadge: {
-    marginTop: 'auto',
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 3,
-    borderRadius: borderRadius.xs,
-  },
-  unlockedBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-
-  // Locked
-  lockedCard: {
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    opacity: 0.85,
+    alignSelf: 'center',
+    marginTop: spacing.xs,
   },
   lockedIconWrap: {
     position: 'relative',
-    marginBottom: spacing.s,
   },
   lockBadge: {
     position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    bottom: spacing.xs,
+    right: -spacing.xxs,
+    width: 20,
+    height: 20,
+    borderRadius: borderRadius.full,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
   },
-  progressBar: {
-    width: '100%',
-    height: 5,
-    borderRadius: borderRadius.full,
-    overflow: 'hidden',
+  lockedBar: {
     marginTop: spacing.xs,
-    marginBottom: 4,
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: borderRadius.full,
-  },
-  progressLabel: {
-    fontSize: 10,
-    fontWeight: '700',
   },
 });
