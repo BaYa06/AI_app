@@ -8,17 +8,12 @@ import {
   StyleSheet,
   Animated,
   Easing,
-  Platform,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  ArrowLeft,
-  Play,
-} from 'lucide-react-native';
-import { Pressable } from 'react-native';
+import { BookOpen, Play } from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { useThemeColors, useSettingsStore } from '@/store';
-import { spacing, borderRadius } from '@/constants';
+import { Badge, Card, Screen, ScreenHeader } from '@/components/ui';
+import { useThemeColors } from '@/store';
+import { spacing, borderRadius, alpha, iconSize, type ColorToken } from '@/constants';
 import { supabase } from '@/services/supabaseClient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
@@ -27,7 +22,8 @@ import { pluralize } from '@/utils';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TestWaiting'>;
 
-const AVATAR_COLORS = ['#6366F1', '#F59E0B', '#EC4899', '#10B981', '#F97316'];
+// Цвета аватаров участников — имена токенов, значения берутся из темы
+const AVATAR_TOKENS: ColorToken[] = ['primaryFill', 'warning', 'like', 'success', 'streak'];
 const MAX_VISIBLE_AVATARS = 4;
 
 type Participant = { id: string; initials: string };
@@ -40,8 +36,6 @@ const MODE_LABELS: Record<string, string> = {
 
 export function TestWaitingScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
-  const isDark = useSettingsStore((s) => s.resolvedTheme) === 'dark';
-  const insets = useSafeAreaInsets();
 
   const { sessionId, participantId, setTitle, testMode, questionCount, timePerQuestion } = route.params;
 
@@ -226,35 +220,11 @@ export function TestWaitingScreen({ navigation, route }: Props) {
     ? `${questionCount} ${pluralize(questionCount, 'вопрос', 'вопроса', 'вопросов')} • ${Math.round((timePerQuestion * questionCount) / 60)} мин`
     : `${questionCount} ${pluralize(questionCount, 'вопрос', 'вопроса', 'вопросов')} • Без ограничения времени`;
 
-  const cardBg = isDark ? 'rgba(255,255,255,0.05)' : '#FFFFFF';
-  const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0';
-
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View
-        style={[
-          styles.header,
-          {
-            paddingTop: 8,
-          },
-        ]}
-      >
-        <Pressable
-          style={({ pressed }) => [
-            styles.backBtn,
-            pressed && { opacity: 0.7 },
-          ]}
-          onPress={() => navigation.goBack()}
-        >
-          <ArrowLeft size={22} color={colors.textPrimary} />
-        </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-          Ожидание теста
-        </Text>
-        <View style={{ width: 48 }} />
-      </View>
-
+    <Screen
+      scroll={false}
+      header={<ScreenHeader title="Ожидание теста" onBack={() => navigation.goBack()} />}
+    >
       {/* Main Content */}
       <View style={styles.content}>
         {/* Pulsing Circle */}
@@ -263,7 +233,7 @@ export function TestWaitingScreen({ navigation, route }: Props) {
             style={[
               styles.pulseRing2,
               {
-                backgroundColor: colors.primary + '18',
+                backgroundColor: alpha(colors.primary, 10),
                 transform: [{ scale: pulseAnim }],
                 opacity: pulseOpacity,
               },
@@ -273,35 +243,19 @@ export function TestWaitingScreen({ navigation, route }: Props) {
             style={[
               styles.pulseRing1,
               {
-                backgroundColor: colors.primary + '30',
+                backgroundColor: alpha(colors.primary, 20),
                 transform: [{ scale: pulseAnim }],
                 opacity: pulseOpacity,
               },
             ]}
           />
-          <View
-            style={[
-              styles.pulseCenter,
-              {
-                backgroundColor: colors.primary,
-                ...Platform.select({
-                  ios: {
-                    shadowColor: colors.primary,
-                    shadowOffset: { width: 0, height: 8 },
-                    shadowOpacity: 0.3,
-                    shadowRadius: 16,
-                  },
-                  android: { elevation: 12 },
-                }),
-              },
-            ]}
-          >
-            <Play size={36} color="#FFF" fill="#FFF" />
+          <View style={[styles.pulseCenter, { backgroundColor: colors.primaryFill }]}>
+            <Play size={iconSize.l} color={colors.onPrimary} fill={colors.onPrimary} />
           </View>
         </View>
 
         {/* Title */}
-        <Text style={[styles.title, { color: colors.textPrimary }]}>
+        <Text variant="h2" style={[styles.title, { color: colors.textPrimary }]}>
           Приготовься!
         </Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
@@ -309,90 +263,66 @@ export function TestWaitingScreen({ navigation, route }: Props) {
         </Text>
 
         {/* Set Info Card */}
-        <View
-          style={[
-            styles.card,
-            {
-              backgroundColor: cardBg,
-              borderColor: cardBorder,
-            },
-          ]}
-        >
+        <Card padding="none" style={styles.card}>
           {/* Card Image Placeholder */}
-          <View
-            style={[
-              styles.cardImage,
-              { backgroundColor: colors.primary + '12' },
-            ]}
-          >
-            <Text style={styles.cardImageEmoji}>📚</Text>
+          <View style={[styles.cardImage, { backgroundColor: alpha(colors.primary, 10) }]}>
+            <BookOpen size={iconSize.xl} color={colors.primary} />
           </View>
 
           <View style={styles.cardBody}>
-            <View
-              style={[
-                styles.modeBadge,
-                { backgroundColor: colors.primary + '15' },
-              ]}
-            >
-              <Text style={[styles.modeBadgeText, { color: colors.primary }]}>
-                {MODE_LABELS[testMode] || testMode}
-              </Text>
-            </View>
-            <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>
+            <Badge label={MODE_LABELS[testMode] || testMode} />
+            <Text variant="h3" style={{ color: colors.textPrimary }}>
               {setTitle}
             </Text>
-            <Text style={[styles.cardMeta, { color: colors.textSecondary }]}>
+            <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
               {timeText}
             </Text>
           </View>
-        </View>
+        </Card>
 
         {/* Student Avatars */}
         <View style={styles.avatarsSection}>
           <View style={styles.avatarsRow}>
-            {participants.slice(0, MAX_VISIBLE_AVATARS).map((s, idx) => (
-              <View
-                key={s.id}
-                style={[
-                  styles.avatar,
-                  {
-                    backgroundColor: AVATAR_COLORS[idx % AVATAR_COLORS.length] + '25',
-                    borderColor: isDark ? colors.background : '#FFFFFF',
-                    marginLeft: idx > 0 ? -12 : 0,
-                    zIndex: participants.length - idx,
-                  },
-                ]}
-              >
-                <Text
+            {participants.slice(0, MAX_VISIBLE_AVATARS).map((s, idx) => {
+              const tint = colors[AVATAR_TOKENS[idx % AVATAR_TOKENS.length]];
+              return (
+                <View
+                  key={s.id}
                   style={[
-                    styles.avatarText,
-                    { color: AVATAR_COLORS[idx % AVATAR_COLORS.length] },
+                    styles.avatar,
+                    {
+                      backgroundColor: alpha(tint, 20),
+                      borderColor: colors.background,
+                      marginLeft: idx > 0 ? -spacing.s : 0,
+                      zIndex: participants.length - idx,
+                    },
                   ]}
                 >
-                  {s.initials[0]}
-                </Text>
-              </View>
-            ))}
+                  <Text style={[styles.avatarText, { color: tint }]}>
+                    {s.initials[0]}
+                  </Text>
+                </View>
+              );
+            })}
             {participants.length > MAX_VISIBLE_AVATARS && (
               <View
                 style={[
                   styles.avatar,
                   {
-                    backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0',
-                    borderColor: isDark ? colors.background : '#FFFFFF',
-                    marginLeft: -12,
+                    backgroundColor: colors.surfaceMuted,
+                    borderColor: colors.background,
+                    marginLeft: -spacing.s,
                     zIndex: 0,
                   },
                 ]}
               >
-                <Text style={[styles.avatarOverflow, { color: colors.textSecondary }]}>
+                <Text variant="caption" style={[styles.avatarOverflow, { color: colors.textSecondary }]}>
                   +{participants.length - MAX_VISIBLE_AVATARS}
                 </Text>
               </View>
             )}
           </View>
-          <Text style={[styles.avatarsLabel, { color: colors.textPrimary }]}>
+          <Text variant="label" style={{ color: colors.textPrimary }}>
             {participants.length <= 1
               ? 'Пока подключился только ты'
               : `Ты и ещё ${participants.length - 1} ${pluralize(participants.length - 1, 'ученик', 'ученика', 'учеников')}`}
@@ -402,44 +332,26 @@ export function TestWaitingScreen({ navigation, route }: Props) {
 
       {/* Bottom Waiting State */}
       <View
-        style={[
-          styles.bottomSection,
-          { paddingBottom: insets.bottom + 20 },
-        ]}
+        accessibilityRole="progressbar"
+        accessibilityLabel="Ждём, когда учитель начнёт"
+        style={styles.bottomSection}
       >
         <View style={styles.waitingRow}>
-          <Text style={[styles.waitingText, { color: colors.primary }]}>
+          <Text variant="label" style={{ color: colors.primary }}>
             Ждём, когда учитель начнёт
           </Text>
           <View style={styles.dotsRow}>
-            <Animated.View
-              style={[
-                styles.dot,
-                { backgroundColor: colors.primary, transform: [{ translateY: dot1 }] },
-              ]}
-            />
-            <Animated.View
-              style={[
-                styles.dot,
-                { backgroundColor: colors.primary, transform: [{ translateY: dot2 }] },
-              ]}
-            />
-            <Animated.View
-              style={[
-                styles.dot,
-                { backgroundColor: colors.primary, transform: [{ translateY: dot3 }] },
-              ]}
-            />
+            {[dot1, dot2, dot3].map((dot, i) => (
+              <Animated.View
+                key={i}
+                style={[styles.dot, { backgroundColor: colors.primary, transform: [{ translateY: dot }] }]}
+              />
+            ))}
           </View>
         </View>
 
         {/* Progress bar */}
-        <View
-          style={[
-            styles.progressTrack,
-            { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#E2E8F0' },
-          ]}
-        >
+        <View style={[styles.progressTrack, { backgroundColor: colors.surfaceMuted }]}>
           <Animated.View
             style={[
               styles.progressBar,
@@ -458,38 +370,15 @@ export function TestWaitingScreen({ navigation, route }: Props) {
           />
         </View>
       </View>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.m,
-    paddingBottom: 8,
-  },
-  backBtn: {
-    width: 48,
-    height: 48,
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-    textAlign: 'center',
-  },
   content: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.l,
   },
   // Pulse
   pulseWrap: {
@@ -503,32 +392,27 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 160,
     height: 160,
-    borderRadius: 80,
+    borderRadius: borderRadius.full,
   },
   pulseRing1: {
     position: 'absolute',
     width: 128,
     height: 128,
-    borderRadius: 64,
+    borderRadius: borderRadius.full,
   },
   pulseCenter: {
     width: 96,
     height: 96,
-    borderRadius: 48,
+    borderRadius: borderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
   },
   // Title
   title: {
-    fontSize: 28,
-    fontWeight: '800',
-    letterSpacing: -0.5,
     textAlign: 'center',
-    marginBottom: 6,
+    marginBottom: spacing.xs,
   },
   subtitle: {
-    fontSize: 15,
-    fontWeight: '500',
     textAlign: 'center',
     marginBottom: spacing.xl,
   },
@@ -536,8 +420,6 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 360,
-    borderRadius: borderRadius.l,
-    borderWidth: 1,
     overflow: 'hidden',
     marginBottom: spacing.xl,
   },
@@ -547,36 +429,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cardImageEmoji: {
-    fontSize: 48,
-  },
   cardBody: {
-    padding: spacing.m + 4,
-    gap: 8,
-  },
-  modeBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: borderRadius.full,
-  },
-  modeBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  cardTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-  },
-  cardMeta: {
-    fontSize: 13,
-    fontWeight: '500',
+    padding: spacing.m,
+    gap: spacing.xs,
   },
   // Avatars
   avatarsSection: {
     alignItems: 'center',
-    gap: 12,
+    gap: spacing.s,
     marginBottom: spacing.l,
   },
   avatarsRow: {
@@ -587,59 +447,48 @@ const styles = StyleSheet.create({
   avatar: {
     width: 48,
     height: 48,
-    borderRadius: 24,
+    borderRadius: borderRadius.full,
     borderWidth: 4,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
-    fontSize: 16,
     fontWeight: '700',
   },
   avatarOverflow: {
-    fontSize: 12,
     fontWeight: '700',
-  },
-  avatarsLabel: {
-    fontSize: 13,
-    fontWeight: '600',
   },
   // Bottom
   bottomSection: {
-    paddingHorizontal: spacing.l,
     paddingTop: spacing.l,
+    paddingBottom: spacing.l,
     alignItems: 'center',
-    gap: 16,
+    gap: spacing.m,
   },
   waitingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-  },
-  waitingText: {
-    fontSize: 15,
-    fontWeight: '600',
+    gap: spacing.xs,
   },
   dotsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingTop: 2,
+    gap: spacing.xxs,
   },
   dot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
+    width: 6,
+    height: 6,
+    borderRadius: borderRadius.full,
   },
   progressTrack: {
     width: '100%',
     height: 4,
-    borderRadius: 2,
+    borderRadius: borderRadius.full,
     overflow: 'hidden',
   },
   progressBar: {
     width: 100,
     height: '100%',
-    borderRadius: 2,
+    borderRadius: borderRadius.full,
   },
 });

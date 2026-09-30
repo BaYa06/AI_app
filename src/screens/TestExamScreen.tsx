@@ -5,16 +5,13 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
-  ScrollView,
   StyleSheet,
   Pressable,
-  Platform,
-  ActivityIndicator,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/common';
-import { useThemeColors, useSettingsStore } from '@/store';
-import { spacing, borderRadius } from '@/constants';
+import { Button, ProgressBar, Screen, Skeleton, SkeletonCard } from '@/components/ui';
+import { useThemeColors } from '@/store';
+import { spacing, borderRadius, alpha, heights, screenPadding } from '@/constants';
 import { supabase } from '@/services/supabaseClient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
@@ -41,8 +38,6 @@ type AnswerRecord = {
 
 export function TestExamScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
-  const isDark = useSettingsStore((s) => s.resolvedTheme) === 'dark';
-  const insets = useSafeAreaInsets();
 
   const { sessionId, participantId, questionCount, timePerQuestion, initialQuestionIndex } = route.params;
 
@@ -58,9 +53,6 @@ export function TestExamScreen({ navigation, route }: Props) {
   const correctCountRef = useRef(0);
   const startTimeRef = useRef<number>(Date.now());
   const finishedRef = useRef(false);
-
-  const cardBg = isDark ? 'rgba(255,255,255,0.06)' : '#FFFFFF';
-  const cardBorder = isDark ? 'rgba(255,255,255,0.10)' : '#E5E7EB';
 
   const finishExam = useCallback(() => {
     if (finishedRef.current) return;
@@ -207,100 +199,76 @@ export function TestExamScreen({ navigation, route }: Props) {
   }, [submitting, question, participantId, questionIndex, questionCount, timePerQuestion, finishExam]);
 
   const progress = questionCount > 0 ? questionIndex / questionCount : 0;
-  const timerColor = timeLeft <= 5 && timePerQuestion > 0 ? '#EF4444' : colors.primary;
+  const timerUrgent = timeLeft <= 5 && timePerQuestion > 0;
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View
-        style={[
-          styles.header,
-          {
-            backgroundColor: isDark ? colors.background : 'rgba(255,255,255,0.95)',
-            paddingTop: 8,
-          },
-        ]}
-      >
-        <View style={styles.headerRow}>
-          <Text style={[styles.questionCounter, { color: colors.textSecondary }]}>
-            {questionIndex + 1} / {questionCount}
-          </Text>
-          {timePerQuestion > 0 && (
-            <View style={[styles.timerBadge, { backgroundColor: timerColor + '18', borderColor: timerColor + '30' }]}>
-              <Text style={[styles.timerText, { color: timerColor }]}>
-                {timeLeft}s
-              </Text>
-            </View>
-          )}
-        </View>
+    <Screen
+      enableSwipeBack={false}
+      header={
+        <View style={styles.header}>
+          <View style={styles.headerRow}>
+            <Text variant="label" style={[styles.tabular, { color: colors.textSecondary }]}>
+              {questionIndex + 1} / {questionCount}
+            </Text>
+            {timePerQuestion > 0 && (
+              <View
+                accessibilityLabel={`Осталось ${timeLeft} секунд`}
+                style={[
+                  styles.timerBadge,
+                  { backgroundColor: alpha(timerUrgent ? colors.error : colors.primary, 10) },
+                ]}
+              >
+                <Text
+                  variant="label"
+                  style={[styles.timerText, { color: timerUrgent ? colors.errorText : colors.primary }]}
+                >
+                  {timeLeft} с
+                </Text>
+              </View>
+            )}
+          </View>
 
-        {/* Progress bar */}
-        <View style={[styles.progressTrack, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#E5E7EB' }]}>
-          <View
-            style={[
-              styles.progressBar,
-              {
-                backgroundColor: colors.primary,
-                width: `${Math.round(progress * 100)}%` as any,
-              },
-            ]}
-          />
+          {/* Progress bar */}
+          <ProgressBar progress={Math.round(progress * 100)} accessibilityLabel="Прогресс теста" />
         </View>
-      </View>
-
+      }
+      contentStyle={styles.scroll}
+    >
       {loadingQuestion ? (
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator size="large" color={colors.primary} />
+        <View accessibilityLabel="Загрузка" accessibilityRole="progressbar" style={styles.skeleton}>
+          <SkeletonCard height={140} />
+          {OPTION_LABELS.map((label) => (
+            <Skeleton key={label} height={heights.touch + spacing.m * 2} radius="l" />
+          ))}
         </View>
       ) : question ? (
-        <ScrollView
-          contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 32 }]}
-          showsVerticalScrollIndicator={false}
-        >
+        <>
           {/* Question card */}
-          <View
-            style={[
-              styles.questionCard,
-              {
-                backgroundColor: colors.primary,
-                ...Platform.select({
-                  web: {
-                    backgroundImage: 'linear-gradient(135deg, #6467f2, #6467f299)',
-                    boxShadow: '0 8px 24px rgba(100,103,242,0.25)',
-                  },
-                }) as any,
-                shadowColor: colors.primary,
-                shadowOpacity: 0.25,
-                shadowRadius: 16,
-                shadowOffset: { width: 0, height: 8 },
-                elevation: 10,
-              },
-            ]}
-          >
-            <Text style={styles.questionLabel}>ВОПРОС {questionIndex + 1}</Text>
-            <Text style={styles.questionText}>{question.front}</Text>
+          <View style={[styles.questionCard, { backgroundColor: colors.primaryFill }]}>
+            <Text variant="overline" style={{ color: colors.onPrimary }}>
+              Вопрос {questionIndex + 1}
+            </Text>
+            <Text variant="h2" style={{ color: colors.onPrimary }}>{question.front}</Text>
           </View>
 
           {/* Options */}
-          <View style={styles.optionsList}>
+          <View accessibilityRole="radiogroup" style={styles.optionsList}>
             {question.options.map((option, idx) => {
               const isSelected = selectedOption === option;
               return (
                 <Pressable
                   key={idx}
+                  accessibilityRole="radio"
+                  accessibilityLabel={`${OPTION_LABELS[idx]}. ${option}`}
+                  accessibilityState={{ selected: isSelected, disabled: submitting }}
                   style={({ pressed }) => [
                     styles.optionBtn,
                     {
-                      backgroundColor: isSelected
-                        ? colors.primary + '15'
-                        : cardBg,
-                      borderColor: isSelected
-                        ? colors.primary
-                        : cardBorder,
-                      borderWidth: isSelected ? 2 : 1,
+                      backgroundColor: isSelected ? alpha(colors.primary, 10) : colors.surface,
+                      borderColor: isSelected ? colors.primary : colors.border,
                     },
-                    submitting && !isSelected && { opacity: 0.5 },
-                    pressed && !submitting && { opacity: 0.85, transform: [{ scale: 0.99 }] },
+                    submitting && !isSelected && styles.optionDimmed,
+                    pressed && !submitting && styles.optionPressed,
                   ]}
                   onPress={() => !submitting && setSelectedOption(option)}
                   disabled={submitting}
@@ -308,18 +276,12 @@ export function TestExamScreen({ navigation, route }: Props) {
                   <View
                     style={[
                       styles.optionLabel,
-                      {
-                        backgroundColor: isSelected
-                          ? colors.primary
-                          : isDark ? 'rgba(255,255,255,0.10)' : '#F1F5F9',
-                      },
+                      { backgroundColor: isSelected ? colors.primaryFill : colors.surfaceMuted },
                     ]}
                   >
                     <Text
-                      style={[
-                        styles.optionLabelText,
-                        { color: isSelected ? '#FFFFFF' : colors.textSecondary },
-                      ]}
+                      variant="label"
+                      style={{ color: isSelected ? colors.onPrimary : colors.textSecondary }}
                     >
                       {OPTION_LABELS[idx]}
                     </Text>
@@ -329,7 +291,7 @@ export function TestExamScreen({ navigation, route }: Props) {
                       styles.optionText,
                       {
                         color: isSelected ? colors.primary : colors.textPrimary,
-                        fontWeight: isSelected ? '700' : '500',
+                        fontWeight: isSelected ? '600' : '400',
                       },
                     ]}
                     numberOfLines={3}
@@ -342,86 +304,52 @@ export function TestExamScreen({ navigation, route }: Props) {
           </View>
 
           {/* Confirm button */}
-          <Pressable
-            style={({ pressed }) => [
-              styles.confirmBtn,
-              {
-                backgroundColor: selectedOption
-                  ? colors.primary
-                  : isDark ? 'rgba(255,255,255,0.08)' : '#E5E7EB',
-                opacity: pressed && selectedOption ? 0.85 : 1,
-              },
-            ]}
+          <Button
+            title="Подтвердить"
+            fullWidth
+            style={styles.confirmBtn}
+            disabled={!selectedOption}
+            loading={submitting}
             onPress={() => selectedOption && handleSubmit(selectedOption)}
-            disabled={!selectedOption || submitting}
-          >
-            {submitting ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={[styles.confirmBtnText, { color: selectedOption ? '#FFFFFF' : colors.textSecondary }]}>
-                Подтвердить
-              </Text>
-            )}
-          </Pressable>
-        </ScrollView>
+          />
+        </>
       ) : null}
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-
   // Header
   header: {
-    paddingHorizontal: spacing.m,
+    paddingHorizontal: screenPadding,
+    paddingTop: spacing.xs,
     paddingBottom: spacing.s,
     gap: spacing.s,
-    ...Platform.select({
-      web: { backdropFilter: 'blur(12px)' },
-    }) as any,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    minHeight: heights.touch,
   },
-  questionCounter: {
-    fontSize: 14,
-    fontWeight: '700',
-    letterSpacing: 0.2,
+  tabular: {
+    fontVariant: ['tabular-nums'],
   },
   timerBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 999,
-    borderWidth: 1,
+    paddingHorizontal: spacing.s,
+    paddingVertical: spacing.xxs,
+    borderRadius: borderRadius.full,
   },
   timerText: {
-    fontSize: 14,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  progressTrack: {
-    height: 4,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  progressBar: {
-    height: '100%',
-    borderRadius: 2,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
   },
 
-  loadingWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+  skeleton: {
+    gap: spacing.s,
   },
 
   scroll: {
-    paddingHorizontal: spacing.m,
     paddingTop: spacing.l,
     gap: spacing.l,
   },
@@ -432,21 +360,7 @@ const styles = StyleSheet.create({
     padding: spacing.l,
     minHeight: 140,
     justifyContent: 'center',
-    gap: 8,
-  },
-  questionLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.65)',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-  },
-  questionText: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: -0.5,
-    lineHeight: 34,
+    gap: spacing.xs,
   },
 
   // Options
@@ -456,44 +370,31 @@ const styles = StyleSheet.create({
   optionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.m,
-    padding: spacing.m,
+    gap: spacing.s,
+    paddingVertical: spacing.s,
+    paddingHorizontal: spacing.m,
     borderRadius: borderRadius.l,
-    ...Platform.select({
-      web: { boxShadow: '0 1px 3px rgba(0,0,0,0.04)' },
-    }) as any,
-    shadowColor: '#000',
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
+    // Толщина рамки одинаковая в обоих состояниях — вариант не «прыгает» при выборе
+    borderWidth: 2,
+  },
+  optionDimmed: {
+    opacity: 0.5,
+  },
+  optionPressed: {
+    opacity: 0.85,
   },
   optionLabel: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: heights.touch,
+    height: heights.touch,
+    borderRadius: borderRadius.m,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
-  optionLabelText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
   optionText: {
     flex: 1,
-    fontSize: 15,
-    lineHeight: 21,
   },
   confirmBtn: {
     marginTop: spacing.s,
-    paddingVertical: 16,
-    borderRadius: borderRadius.l,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  confirmBtnText: {
-    fontSize: 16,
-    fontWeight: '700',
   },
 });
