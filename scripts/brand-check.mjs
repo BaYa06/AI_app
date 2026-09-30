@@ -25,6 +25,8 @@
  *   npm run brand:check -- --details       — с номерами строк нарушений
  *   npm run brand:check -- --update-baseline  — сохранить снимок
  *   npm run brand:check -- --fail-on-new   — код 1, если где-то стало больше, чем в снимке
+ *
+ * Пометка `// brand:data` в конце строки — это сохраняемые данные, а не интерфейс (не считаются).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -141,8 +143,15 @@ const PRESSABLE_RE = /<(TouchableOpacity|TouchableHighlight|TouchableWithoutFeed
 // ---------------------------------------------------------------- checks
 function check(rel, raw) {
   const src = stripComments(raw);
+  const rawLines = raw.split('\n');
   const hits = Object.fromEntries(ALL.map((k) => [k, []]));
-  const add = (key, idx, note) => hits[key].push({ line: lineOf(src, idx), note });
+  // Строка с пометкой `// brand:data` — сохраняемые данные (например, эмодзи-обложка набора
+  // в базе), а не интерфейс: план перехода запрещает их менять, поэтому не считаем.
+  const add = (key, idx, note) => {
+    const line = lineOf(src, idx);
+    if (rawLines[line - 1]?.includes('brand:data')) return;
+    hits[key].push({ line, note });
+  };
   let m;
 
   // Цвета '#…'

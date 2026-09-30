@@ -13,13 +13,13 @@ import {
   Animated,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSetsStore, useCardsStore, useThemeColors, useSettingsStore, useCoursesStore } from '@/store';
 import { Text } from '@/components/common';
-import { spacing, borderRadius, TOP_LANGUAGES } from '@/constants';
+import { spacing, borderRadius, iconSize, TOP_LANGUAGES, alpha } from '@/constants';
+import { Button, CategoryIcon, toast, useScreenBottomInset } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { SetCategory } from '@/types';
-import { ArrowLeftRight, ChevronDown, Globe } from 'lucide-react-native';
+import { ArrowLeftRight, Check, ChevronDown, Globe } from 'lucide-react-native';
 import { LibraryService } from '@/services';
 import { supabase } from '@/services/supabaseClient';
 import { LIBRARY_CATEGORIES } from '@/constants/library';
@@ -27,14 +27,16 @@ import { describeError } from '@/utils/userErrors';
 
 type Props = RootStackScreenProps<'SetEditor'>;
 
+// icon — эмодзи-обложка, которая сохраняется в набор и публикацию (данные, не интерфейс).
+// В интерфейсе категорию показываем иконкой lucide (CategoryIcon).
 const CATEGORY_OPTIONS: { value: SetCategory; label: string; icon: string }[] = [
-  { value: 'general', label: 'Общие', icon: '⭐️' },
-  { value: 'travel', label: 'Путешествия', icon: '✈️' },
-  { value: 'food', label: 'Еда', icon: '🍽️' },
-  { value: 'study', label: 'Учёба', icon: '📚' },
-  { value: 'work', label: 'Работа', icon: '💼' },
-  { value: 'grammar', label: 'Грамматика', icon: '✏️' },
-  { value: 'custom', label: 'Свой вариант…', icon: '✨' },
+  { value: 'general', label: 'Общие', icon: '⭐️' }, // brand:data
+  { value: 'travel', label: 'Путешествия', icon: '✈️' }, // brand:data
+  { value: 'food', label: 'Еда', icon: '🍽️' }, // brand:data
+  { value: 'study', label: 'Учёба', icon: '📚' }, // brand:data
+  { value: 'work', label: 'Работа', icon: '💼' }, // brand:data
+  { value: 'grammar', label: 'Грамматика', icon: '✏️' }, // brand:data
+  { value: 'custom', label: 'Свой вариант…', icon: '✨' }, // brand:data
 ];
 
 // Единый источник — тот же список из 10 языков, что и в онбординге/настройках
@@ -56,6 +58,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
   // Клавиатура не открывается сама: только когда пользователь нажмёт на поле
   const { setId } = route.params || {};
   const colors = useThemeColors();
+  const bottomInset = useScreenBottomInset();
   const theme = useSettingsStore((s) => s.resolvedTheme);
   const isEditing = !!setId;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -190,7 +193,6 @@ export function SetEditorScreen({ navigation, route }: Props) {
   }, [courseId, allCourses]);
 
   const isLanguagesSelected = !!sourceLanguage && !!targetLanguage;
-  const isFormValid = !!title.trim() && isLanguagesSelected;
   const titleError = showValidation && !title.trim();
   const languageError = showValidation && !isLanguagesSelected;
   // Кнопка не блокируется, пока форма не заполнена: нажатие подсвечивает, чего не хватает
@@ -249,7 +251,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
 
     const cards = getCardsBySet(setId);
     if (cards.length < 5) {
-      Alert.alert('Недостаточно карточек', 'Для публикации нужно минимум 5 карточек в наборе.');
+      toast.info('Недостаточно карточек: для публикации нужно минимум 5 карточек в наборе');
       return;
     }
 
@@ -257,7 +259,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user?.id) {
-        Alert.alert('Ошибка', 'Необходимо войти в аккаунт');
+        toast.error('Нужно войти в аккаунт');
         return;
       }
 
@@ -270,7 +272,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
           category: publishCategory || undefined,
           coverEmoji,
         });
-        Alert.alert('Готово', 'Публикация обновлена!');
+        toast.success('Публикация обновлена');
       } else {
         const tags = publishTags.split(',').map(t => t.trim()).filter(Boolean);
         await LibraryService.publishSet(session.user.id, {
@@ -281,11 +283,11 @@ export function SetEditorScreen({ navigation, route }: Props) {
           coverEmoji,
         });
         setIsPublished(true);
-        Alert.alert('Готово', 'Набор опубликован в библиотеке!');
+        toast.success('Набор опубликован в библиотеке');
       }
       setShowPublishForm(false);
     } catch (error: any) {
-      Alert.alert('Ошибка', describeError(error, 'Не удалось опубликовать'));
+      toast.error(describeError(error, 'Не удалось опубликовать'));
     } finally {
       setIsPublishing(false);
     }
@@ -301,9 +303,9 @@ export function SetEditorScreen({ navigation, route }: Props) {
       setIsPublished(false);
       setLibrarySetId(null);
       setShowPublishForm(false);
-      Alert.alert('Готово', 'Публикация снята');
+      toast.success('Публикация снята');
     } catch (error: any) {
-      Alert.alert('Ошибка', describeError(error, 'Не удалось снять публикацию'));
+      toast.error(describeError(error, 'Не удалось снять публикацию'));
     }
   }, [librarySetId]);
 
@@ -349,7 +351,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
 
       closeSheet();
     } catch (error) {
-      Alert.alert('Ошибка', 'Не удалось сохранить набор');
+      toast.error('Не удалось сохранить набор');
     } finally {
       setIsSaving(false);
     }
@@ -392,7 +394,8 @@ export function SetEditorScreen({ navigation, route }: Props) {
   }, [setId, deleteCardsBySet, deleteSet, navigation]);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    // Верхний safe area уже учтён в App.tsx; снизу — свой (экран без панели вкладок)
+    <View style={[styles.container, { backgroundColor: colors.background, paddingBottom: bottomInset }]}>
       <Animated.View style={[styles.animatedWrapper, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
           <View style={styles.headerRow}>
             <Text variant="h2" style={[styles.headerTitle, { color: colors.textPrimary }]}>
@@ -513,9 +516,11 @@ export function SetEditorScreen({ navigation, route }: Props) {
 
                 <Pressable
                   onPress={swapLanguages}
+                  accessibilityRole="button"
+                  accessibilityLabel="Поменять языки местами"
                   style={[styles.swapButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
                 >
-                  <ArrowLeftRight size={20} color={colors.primary} />
+                  <ArrowLeftRight size={iconSize.s} color={colors.primary} />
                 </Pressable>
 
                 <View style={styles.languageSelectWrapper}>
@@ -583,7 +588,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
 
                 {isPublished && !showPublishForm ? (
                   <View style={{ gap: spacing.s }}>
-                    <View style={[styles.publishedBadge, { backgroundColor: colors.success + '15', borderColor: colors.success + '30' }]}>
+                    <View style={[styles.publishedBadge, { backgroundColor: alpha(colors.success, 10), borderColor: alpha(colors.success, 20) }]}>
                       <Globe size={16} color={colors.success} />
                       <Text variant="bodySmall" style={{ color: colors.success, fontWeight: '600' }}>
                         Опубликовано в библиотеке
@@ -592,6 +597,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
                     <View style={{ flexDirection: 'row', gap: spacing.s }}>
                       <Pressable
                         onPress={() => setShowPublishForm(true)}
+                        accessibilityRole="button"
                         style={[styles.publishActionBtn, { borderColor: colors.primary }]}
                       >
                         <Text variant="bodySmall" style={{ color: colors.primary, fontWeight: '600' }}>
@@ -600,9 +606,10 @@ export function SetEditorScreen({ navigation, route }: Props) {
                       </Pressable>
                       <Pressable
                         onPress={handleUnpublish}
-                        style={[styles.publishActionBtn, { borderColor: colors.error }]}
+                        accessibilityRole="button"
+                        style={[styles.publishActionBtn, { borderColor: alpha(colors.error, 40) }]}
                       >
-                        <Text variant="bodySmall" style={{ color: colors.error, fontWeight: '600' }}>
+                        <Text variant="bodySmall" style={{ color: colors.errorText, fontWeight: '600' }}>
                           Снять
                         </Text>
                       </Pressable>
@@ -611,7 +618,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
                 ) : !showPublishForm ? (
                   <Pressable
                     onPress={() => setShowPublishForm(true)}
-                    style={[styles.publishButton, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}
+                    style={[styles.publishButton, { backgroundColor: alpha(colors.primary, 10), borderColor: alpha(colors.primary, 20) }]}
                   >
                     <Globe size={18} color={colors.primary} />
                     <Text variant="body" style={{ color: colors.primary, fontWeight: '600' }}>
@@ -641,16 +648,24 @@ export function SetEditorScreen({ navigation, route }: Props) {
                           <Pressable
                             key={cat.key}
                             onPress={() => setPublishCategory(publishCategory === cat.key ? '' : cat.key)}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: publishCategory === cat.key }}
                             style={[
                               styles.publishChip,
                               {
-                                backgroundColor: publishCategory === cat.key ? colors.primary : colors.background,
-                                borderColor: publishCategory === cat.key ? colors.primary : colors.border,
+                                backgroundColor: publishCategory === cat.key ? colors.primaryFill : colors.surfaceMuted,
+                                borderColor: publishCategory === cat.key ? colors.primaryFill : colors.surfaceMuted,
                               },
                             ]}
                           >
-                            <Text variant="caption" style={{ color: publishCategory === cat.key ? '#fff' : colors.textPrimary }}>
-                              {cat.icon} {cat.label}
+                            {/* Раньше здесь выводилось имя иконки Ionicons текстом («text-outline») */}
+                            <CategoryIcon
+                              category={cat.key}
+                              size="xs"
+                              color={publishCategory === cat.key ? colors.onPrimary : colors.textSecondary}
+                            />
+                            <Text variant="label" style={{ color: publishCategory === cat.key ? colors.onPrimary : colors.textPrimary }}>
+                              {cat.label}
                             </Text>
                           </Pressable>
                         ))}
@@ -666,24 +681,22 @@ export function SetEditorScreen({ navigation, route }: Props) {
                       maxLength={200}
                     />
 
-                    <View style={{ flexDirection: 'row', gap: spacing.s, marginTop: spacing.m }}>
-                      <Pressable
+                    <View style={styles.publishActions}>
+                      <Button
+                        variant="quiet"
+                        tone="secondary"
+                        size="s"
+                        title="Отмена"
                         onPress={() => setShowPublishForm(false)}
-                        style={[styles.publishActionBtn, { borderColor: colors.border, flex: 1 }]}
-                      >
-                        <Text variant="bodySmall" style={{ color: colors.textSecondary, fontWeight: '600' }}>
-                          Отмена
-                        </Text>
-                      </Pressable>
-                      <Pressable
+                        style={styles.flex1}
+                      />
+                      <Button
+                        size="s"
+                        title={isPublishing ? 'Публикация...' : isPublished ? 'Обновить' : 'Опубликовать'}
                         onPress={handlePublish}
                         disabled={isPublishing}
-                        style={[styles.publishSubmitBtn, { backgroundColor: colors.primary, flex: 1, opacity: isPublishing ? 0.6 : 1 }]}
-                      >
-                        <Text variant="bodySmall" style={{ color: '#fff', fontWeight: '700' }}>
-                          {isPublishing ? 'Публикация...' : isPublished ? 'Обновить' : 'Опубликовать'}
-                        </Text>
-                      </Pressable>
+                        style={styles.flex1}
+                      />
                     </View>
                   </View>
                 )}
@@ -715,58 +728,22 @@ export function SetEditorScreen({ navigation, route }: Props) {
             ]}
           >
             {isReadOnly ? (
-              <Pressable
-                style={[
-                  styles.primaryAction,
-                  { backgroundColor: colors.primary, flex: 1 },
-                ]}
-                onPress={() => navigation.goBack()}
-              >
-                <Text variant="body" style={{ color: '#ffffff', fontWeight: '700' }}>
-                  Назад
-                </Text>
-              </Pressable>
+              <Button title="Назад" onPress={() => navigation.goBack()} style={styles.flex1} />
             ) : (
               <>
-                <Pressable
-                  style={[
-                    styles.secondaryAction,
-                    { borderColor: colors.border },
-                  ]}
+                <Button
+                  variant="secondary"
+                  title="Отмена"
                   onPress={() => navigation.goBack()}
                   disabled={isSaving}
-                >
-                  <Text variant="body" style={{ color: colors.textSecondary, fontWeight: '600' }}>
-                    Отмена
-                  </Text>
-                </Pressable>
-
-                <Pressable
-                  style={[
-                    styles.primaryAction,
-                    {
-                      backgroundColor: isFormValid ? colors.primary : colors.border,
-                      opacity: isSaveDisabled ? 0.75 : 1,
-                    },
-                  ]}
-                  onPress={handleSave}
-                  disabled={isSaveDisabled}
-                >
-                  <Text
-                    variant="body"
-                    style={{
-                      color: isSaveDisabled ? colors.textSecondary : '#ffffff',
-                      fontWeight: '700',
-                    }}
-                  >
-                    Сохранить
-                  </Text>
-                </Pressable>
+                  style={styles.flex1}
+                />
+                <Button title="Сохранить" onPress={handleSave} disabled={isSaveDisabled} style={styles.flex1} />
               </>
             )}
           </View>
       </Animated.View>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -862,7 +839,7 @@ function LanguageDropdown({
                   backgroundColor: pressed && !isActive
                     ? colors.surfaceVariant
                     : isActive
-                    ? colors.primary + '12'
+                    ? alpha(colors.primary, 10)
                     : colors.surface,
                   borderBottomColor: colors.border,
                 },
@@ -875,69 +852,20 @@ function LanguageDropdown({
                 style={{
                   color: isActive ? colors.primary : colors.textPrimary,
                   fontWeight: isActive ? '700' : '600',
-                  fontSize: 15,
+                  fontSize: 16,
                 }}
               >
                 {option}
               </Text>
               {isActive && (
-                <View style={[styles.checkmark, { backgroundColor: colors.primary }]}>
-                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>✓</Text>
+                <View style={[styles.checkmark, { backgroundColor: colors.primaryFill }]}>
+                  <Check size={iconSize.xs} color={colors.onPrimary} strokeWidth={3} />
                 </View>
               )}
             </Pressable>
           );
         })}
       </ScrollView>
-    </View>
-  );
-}
-
-function CategoryDropdown({
-  options,
-  selected,
-  onSelect,
-  colors,
-}: {
-  options: typeof CATEGORY_OPTIONS;
-  selected: SetCategory;
-  onSelect: (value: SetCategory) => void;
-  colors: ReturnType<typeof useThemeColors>;
-}) {
-  return (
-    <View
-      style={[
-        styles.dropdown,
-        {
-          backgroundColor: colors.surface,
-          borderColor: colors.border,
-          shadowColor: colors.shadow,
-        },
-      ]}
-    >
-      {options.map((option) => {
-        const isActive = option.value === selected;
-        return (
-          <Pressable
-            key={option.value}
-            onPress={() => onSelect(option.value)}
-            style={[
-              styles.dropdownOption,
-              isActive && { backgroundColor: colors.surfaceVariant },
-            ]}
-          >
-            <Text
-              variant="body"
-              style={{
-                color: isActive ? colors.primary : colors.textPrimary,
-                fontWeight: isActive ? '700' : '600',
-              }}
-            >
-              {`${option.icon} ${option.label}`}
-            </Text>
-          </Pressable>
-        );
-      })}
     </View>
   );
 }
@@ -985,7 +913,7 @@ function CourseDropdown({
                   backgroundColor: pressed && !isActive
                     ? colors.surfaceVariant
                     : isActive
-                    ? colors.primary + '12'
+                    ? alpha(colors.primary, 10)
                     : colors.surface,
                   borderBottomColor: colors.border,
                 },
@@ -998,14 +926,14 @@ function CourseDropdown({
                 style={{
                   color: isActive ? colors.primary : colors.textPrimary,
                   fontWeight: isActive ? '700' : '600',
-                  fontSize: 15,
+                  fontSize: 16,
                 }}
               >
                 {course.title}
               </Text>
               {isActive && (
-                <View style={[styles.checkmark, { backgroundColor: colors.primary }]}>
-                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>✓</Text>
+                <View style={[styles.checkmark, { backgroundColor: colors.primaryFill }]}>
+                  <Check size={iconSize.xs} color={colors.onPrimary} strokeWidth={3} />
                 </View>
               )}
             </Pressable>
@@ -1223,7 +1151,7 @@ const styles = StyleSheet.create({
   checkmark: {
     width: 22,
     height: 22,
-    borderRadius: 11,
+    borderRadius: borderRadius.m,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1263,20 +1191,25 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.s,
     minHeight: 40,
   },
+  flex1: {
+    flex: 1,
+  },
   publishChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxs,
     paddingHorizontal: spacing.s,
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.full,
     borderWidth: 1,
   },
+  publishActions: {
+    flexDirection: 'row',
+    gap: spacing.s,
+    marginTop: spacing.m,
+  },
   publishActionBtn: {
     borderWidth: 1,
-    borderRadius: borderRadius.m,
-    paddingVertical: spacing.s,
-    paddingHorizontal: spacing.m,
-    alignItems: 'center',
-  },
-  publishSubmitBtn: {
     borderRadius: borderRadius.m,
     paddingVertical: spacing.s,
     paddingHorizontal: spacing.m,
@@ -1289,20 +1222,5 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.l,
     paddingTop: spacing.m,
     borderTopWidth: 1,
-  },
-  secondaryAction: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: borderRadius.l,
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 52,
-  },
-  primaryAction: {
-    flex: 1,
-    borderRadius: borderRadius.l,
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 52,
   },
 });
