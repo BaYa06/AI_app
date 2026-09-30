@@ -10,15 +10,13 @@ import {
   Pressable,
   TextInput,
   Platform,
-  Alert,
-  ActivityIndicator,
 } from 'react-native';
 import { Text, Container } from '@/components/common';
-import { useThemeColors, useSettingsStore } from '@/store';
+import { useThemeColors } from '@/store';
 import { supabase, NeonService } from '@/services';
-import { spacing, borderRadius, TOP_LANGUAGES, MAX_TARGET_LANGUAGES, getLanguageLabel, getLanguageFlag } from '@/constants';
+import { spacing, borderRadius, TOP_LANGUAGES, MAX_TARGET_LANGUAGES, getLanguageLabel, getLanguageFlag, alpha } from '@/constants';
+import { Button, ScreenHeader, toast, useScreenBottomInset } from '@/components/ui';
 import {
-  ArrowLeft,
   ChevronDown,
   X,
   Plus,
@@ -30,8 +28,6 @@ type Props = RootStackScreenProps<'PersonalInfo'>;
 
 export function PersonalInfoScreen({ navigation }: Props) {
   const colors = useThemeColors();
-  const theme = useSettingsStore((s) => s.resolvedTheme);
-  const isDark = theme === 'dark';
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -64,11 +60,12 @@ export function PersonalInfoScreen({ navigation }: Props) {
     });
   }, []);
 
-  const inputBg = isDark ? 'rgba(255,255,255,0.04)' : '#F8FAFC';
-  const inputBorder = isDark ? 'rgba(255,255,255,0.1)' : '#E2E8F0';
-  const chipBg = isDark ? colors.primary + '20' : colors.primary + '15';
-  const chipBorder = colors.primary + '30';
-  const addChipBg = isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0';
+  const inputBg = colors.surface;
+  const inputBorder = colors.border;
+  const chipBg = alpha(colors.primary, 10);
+  const chipBorder = alpha(colors.primary, 20);
+  const addChipBg = colors.surfaceMuted;
+  const bottomInset = useScreenBottomInset();
 
   const removeLang = (code: string) => {
     setLearningLangs((prev) => prev.filter((l) => l !== code));
@@ -80,7 +77,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
         return prev.filter((l) => l !== code);
       }
       if (prev.length >= MAX_TARGET_LANGUAGES) {
-        Alert.alert('Можно выбрать до 3 языков', 'Сначала уберите один из выбранных, чтобы добавить другой.');
+        toast.info('Можно выбрать до 3 языков — сначала убери один из выбранных');
         return prev;
       }
       return [...prev, code];
@@ -88,17 +85,8 @@ export function PersonalInfoScreen({ navigation }: Props) {
   };
 
   return (
-    <Container padded={false} edges={['top', 'bottom']}>
-      {/* Header */}
-      <View style={[s.header, { backgroundColor: isDark ? colors.background : '#FFFFFF', borderBottomColor: inputBorder }]}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={10} style={s.headerIcon}>
-          <ArrowLeft size={22} color={colors.textPrimary} />
-        </Pressable>
-        <Text variant="body" style={[s.headerTitle, { color: colors.textPrimary }]}>
-          Личные данные
-        </Text>
-        <View style={s.headerIcon} />
-      </View>
+    <Container padded={false}>
+      <ScreenHeader title="Личные данные" onBack={() => navigation.goBack()} bordered />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -108,8 +96,8 @@ export function PersonalInfoScreen({ navigation }: Props) {
         {/* Avatar Section */}
         <View style={s.avatarSection}>
           <View style={s.avatarWrap}>
-            <View style={[s.avatar, { backgroundColor: colors.primary }]}>
-              <Text style={s.avatarText}>{(firstName?.[0] || '').toUpperCase()}{(lastName?.[0] || '').toUpperCase()}</Text>
+            <View style={[s.avatar, { backgroundColor: colors.primaryFill }]}>
+              <Text variant="display" style={{ color: colors.onPrimary }}>{(firstName?.[0] || '').toUpperCase()}{(lastName?.[0] || '').toUpperCase()}</Text>
             </View>
           </View>
         </View>
@@ -164,7 +152,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
               <TextInput
                 value={userName.replace(/^@/, '')}
                 onChangeText={(text) => setUserName('@' + text.toLowerCase().replace(/[^a-z0-9._-]/g, ''))}
-                placeholder="username"
+                placeholder="ник"
                 placeholderTextColor={colors.textTertiary}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -190,13 +178,13 @@ export function PersonalInfoScreen({ navigation }: Props) {
               <ChevronDown size={20} color={colors.textTertiary} />
             </Pressable>
             {showNativeLangPicker && (
-              <View style={[s.picker, { backgroundColor: isDark ? 'rgb(32, 34, 44)' : '#FFFFFF', borderColor: inputBorder }]}>
+              <View style={[s.picker, { backgroundColor: colors.surface, borderColor: inputBorder }]}>
                 {TOP_LANGUAGES.map((lang) => (
                   <Pressable
                     key={lang.code}
                     style={[
                       s.pickerItem,
-                      nativeLang === lang.code && { backgroundColor: colors.primary + '10' },
+                      nativeLang === lang.code && { backgroundColor: alpha(colors.primary, 10) },
                     ]}
                     onPress={() => {
                       setNativeLang(lang.code);
@@ -209,7 +197,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
                       variant="bodySmall"
                       style={{
                         color: nativeLang === lang.code ? colors.primary : colors.textPrimary,
-                        fontWeight: nativeLang === lang.code ? '700' : '500',
+                        fontWeight: nativeLang === lang.code ? '700' : '400',
                       }}
                     >
                       {lang.flag} {lang.label}
@@ -232,7 +220,12 @@ export function PersonalInfoScreen({ navigation }: Props) {
                   <Text variant="bodySmall" style={{ color: colors.primary, fontWeight: '600' }}>
                     {getLanguageFlag(code)} {getLanguageLabel(code)}
                   </Text>
-                  <Pressable onPress={() => removeLang(code)} hitSlop={6}>
+                  <Pressable
+                    onPress={() => removeLang(code)}
+                    hitSlop={spacing.xs}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Убрать язык: ${getLanguageLabel(code)}`}
+                  >
                     <X size={16} color={colors.primary} />
                   </Pressable>
                 </View>
@@ -250,20 +243,20 @@ export function PersonalInfoScreen({ navigation }: Props) {
               )}
             </View>
             {showLearningLangPicker && (
-              <View style={[s.picker, { backgroundColor: isDark ? 'rgb(32, 34, 44)' : '#FFFFFF', borderColor: inputBorder }]}>
+              <View style={[s.picker, { backgroundColor: colors.surface, borderColor: inputBorder }]}>
                 {TOP_LANGUAGES.filter((l) => l.code !== nativeLang).map((lang) => {
                   const active = learningLangs.includes(lang.code);
                   return (
                     <Pressable
                       key={lang.code}
-                      style={[s.pickerItem, active && { backgroundColor: colors.primary + '10' }]}
+                      style={[s.pickerItem, active && { backgroundColor: alpha(colors.primary, 10) }]}
                       onPress={() => toggleLearningLang(lang.code)}
                     >
                       <Text
                         variant="bodySmall"
                         style={{
                           color: active ? colors.primary : colors.textPrimary,
-                          fontWeight: active ? '700' : '500',
+                          fontWeight: active ? '700' : '400',
                         }}
                       >
                         {lang.flag} {lang.label}
@@ -283,23 +276,26 @@ export function PersonalInfoScreen({ navigation }: Props) {
         style={[
           s.bottomBar,
           {
-            backgroundColor: isDark ? 'rgb(16, 17, 34)' : '#FFFFFF',
+            backgroundColor: colors.surface,
             borderTopColor: inputBorder,
+            paddingBottom: spacing.m + bottomInset,
           },
         ]}
       >
-        <Pressable
-          style={[s.saveButton, { backgroundColor: colors.primary, opacity: saving ? 0.7 : 1 }]}
-          disabled={saving}
+        <Button
+          title="Сохранить изменения"
+          icon={CheckCircle}
+          loading={saving}
+          fullWidth
           onPress={async () => {
             const { data } = await supabase.auth.getSession();
             const userId = data.session?.user?.id;
             if (!userId) {
-              Alert.alert('Ошибка', 'Необходимо войти в аккаунт');
+              toast.error('Нужно войти в аккаунт');
               return;
             }
             if (!userName || userName.length < 2) {
-              Alert.alert('Ошибка', 'Имя пользователя слишком короткое');
+              toast.error('Имя пользователя слишком короткое');
               return;
             }
             setSaving(true);
@@ -314,21 +310,12 @@ export function PersonalInfoScreen({ navigation }: Props) {
             ]);
             setSaving(false);
             if (nameOk && userNameOk && langOk) {
-              Alert.alert('Готово', 'Данные сохранены');
+              toast.success('Данные сохранены');
             } else {
-              Alert.alert('Ошибка', 'Не удалось сохранить. Возможно, имя уже занято.');
+              toast.error('Не удалось сохранить. Возможно, имя уже занято.');
             }
           }}
-        >
-          {saving ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <CheckCircle size={20} color="#FFFFFF" />
-          )}
-          <Text variant="body" style={{ color: '#FFFFFF', fontWeight: '700' }}>
-            Сохранить изменения
-          </Text>
-        </Pressable>
+        />
       </View>
     </Container>
   );
@@ -338,25 +325,6 @@ export function PersonalInfoScreen({ navigation }: Props) {
 
 const s = StyleSheet.create({
   // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.s,
-    paddingVertical: spacing.s,
-    borderBottomWidth: 1,
-  },
-  headerIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontWeight: '700',
-    fontSize: 18,
-  },
 
   // Avatar
   avatarSection: {
@@ -370,14 +338,9 @@ const s = StyleSheet.create({
   avatar: {
     width: 128,
     height: 128,
-    borderRadius: 64,
+    borderRadius: borderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  avatarText: {
-    fontSize: 42,
-    fontWeight: '700',
-    color: '#FFFFFF',
   },
 
   // Form
@@ -389,7 +352,7 @@ const s = StyleSheet.create({
     gap: spacing.xs,
   },
   label: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 1,
@@ -400,8 +363,8 @@ const s = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: borderRadius.xl,
     borderWidth: 1,
-    fontSize: 15,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '600',
   },
   inputWrap: {
     flexDirection: 'row',
@@ -414,8 +377,8 @@ const s = StyleSheet.create({
   },
   inputInner: {
     flex: 1,
-    fontSize: 15,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '600',
     padding: 0,
     margin: 0,
   },
@@ -480,20 +443,6 @@ const s = StyleSheet.create({
     bottom: 0,
     paddingHorizontal: spacing.l,
     paddingTop: spacing.m,
-    paddingBottom: spacing.xl,
     borderTopWidth: 1,
-  },
-  saveButton: {
-    height: 56,
-    borderRadius: borderRadius.xl,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    shadowColor: '#6467f2',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
   },
 });
