@@ -11,10 +11,10 @@ import { BlurView } from '@/utils/BlurView';
 import DocumentPicker from 'react-native-document-picker';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useSetsStore, useCardsStore, useThemeColors, selectSetStats, useSettingsStore, useCoursesStore, isSetInCourse } from '@/store';
-import { Container, Text, ProgressBar, Loading } from '@/components/common';
+import { Container, Text, Loading } from '@/components/common';
 import { StudyModeSheet, type StudyMode } from '@/components/study/StudyModeSheet';
 import { spacing, borderRadius, iconSize, alpha } from '@/constants';
-import { EmptyState, toast } from '@/components/ui';
+import { EmptyState, ProgressBar, toast } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card, CreateCardInput } from '@/types';
 import { DatabaseService, LibraryService, Analytics, NeonService, BookService } from '@/services';
@@ -1040,7 +1040,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
         )}
 
         <View style={styles.progressBlock}>
-          <ProgressBar progress={stats.progress} height={8} />
+          <ProgressBar progress={stats.progress} accessibilityLabel="Прогресс набора" />
         </View>
 
         <View style={styles.segmented}>

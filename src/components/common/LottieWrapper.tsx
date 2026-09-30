@@ -1,10 +1,17 @@
 /**
  * LottieWrapper - Web fallback (no Lottie on web)
+ * Вместо анимации Lottie — иконка огня серии (lucide, цвет streak) с пружинным появлением.
  */
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet } from 'react-native';
+import { Flame } from 'lucide-react-native';
+import { useThemeColors } from '@/store';
+
+// Иконка крупнее шкалы iconSize: заменяет полноэкранную анимацию 240×240
+const FLAME_SIZE = 120;
 
 export function LottieStreak({ style }: { style?: any }) {
+  const colors = useThemeColors();
   const scale = useRef(new Animated.Value(0.3)).current;
 
   useEffect(() => {
@@ -17,8 +24,12 @@ export function LottieStreak({ style }: { style?: any }) {
   }, []);
 
   return (
-    <Animated.View style={[styles.container, style, { transform: [{ scale }] }]}>
-      <Animated.Text style={styles.emoji}>🔥</Animated.Text>
+    <Animated.View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={[styles.container, style, { transform: [{ scale }] }]}
+    >
+      <Flame size={FLAME_SIZE} color={colors.streak} fill={colors.streak} />
     </Animated.View>
   );
 }
@@ -29,9 +40,5 @@ const styles = StyleSheet.create({
     height: 240,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  emoji: {
-    fontSize: 120,
-    textAlign: 'center',
   },
 });

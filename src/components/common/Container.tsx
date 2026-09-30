@@ -6,6 +6,7 @@ import React, { memo, ReactNode } from 'react';
 import { View, StyleSheet, ViewStyle, StatusBar } from 'react-native';
 import { useThemeColors, useSettingsStore } from '@/store';
 import { useEdgeSwipeBack } from '@/hooks/useEdgeSwipeBack';
+import { screenPadding } from '@/constants';
 
 interface ContainerProps {
   children: ReactNode;
@@ -52,6 +53,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   padded: {
-    paddingHorizontal: 16,
+    paddingHorizontal: screenPadding,
   },
 });
