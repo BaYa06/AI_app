@@ -225,7 +225,7 @@ export function StudentDetailScreen({ navigation, route }: Props) {
             Не удалось загрузить данные
           </Text>
           <Pressable
-            style={[styles.retryBtn, { backgroundColor: colors.primary }]}
+            style={[styles.retryBtn, { backgroundColor: colors.primaryFill }]}
             onPress={() => {
               setLoading(true);
               setError(false);

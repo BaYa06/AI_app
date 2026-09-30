@@ -88,8 +88,8 @@ export const FlashCard = memo<FlashCardProps>(function FlashCard({
             {front}
           </Text>
         </View>
-        <View style={[styles.label, { backgroundColor: colors.primary }]}>
-          <Text variant="caption" color="inverse">
+        <View style={[styles.label, { backgroundColor: colors.primaryFill }]}>
+          <Text variant="caption" style={{ color: colors.onPrimary }}>
             Вопрос
           </Text>
         </View>
@@ -102,7 +102,8 @@ export const FlashCard = memo<FlashCardProps>(function FlashCard({
             {back}
           </Text>
         </View>
-        <View style={[styles.label, { backgroundColor: colors.success }]}>
+        {/* successText + textInverse: контраст ≥ 4,5 в обеих темах (success с белым — 2,5) */}
+        <View style={[styles.label, { backgroundColor: colors.successText }]}>
           <Text variant="caption" color="inverse">
             Ответ
           </Text>

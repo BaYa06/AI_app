@@ -148,7 +148,7 @@ export function TestHistoryScreen({ navigation, route }: Props) {
             onPress={load}
             style={({ pressed }) => [
               styles.retryBtn,
-              { backgroundColor: colors.primary },
+              { backgroundColor: colors.primaryFill },
               pressed && { opacity: 0.8 },
             ]}
           >

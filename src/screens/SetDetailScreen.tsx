@@ -1180,12 +1180,12 @@ export function SetDetailScreen({ navigation, route }: Props) {
         </Pressable>
         <Pressable
           onPress={() => { triggerHaptic('selection'); setShowStudySheet(true); }}
-          style={[styles.primaryAction, { backgroundColor: colors.primary }]}
+          style={[styles.primaryAction, { backgroundColor: colors.primaryFill }]}
         >
-          <Text variant="body" style={{ color: colors.textInverse, fontWeight: '700' }}>
+          <Text variant="body" style={{ color: colors.onPrimary, fontWeight: '700' }}>
             Учить всё
           </Text>
-          <Text variant="caption" style={{ color: colors.textInverse, opacity: 0.85 }}>
+          <Text variant="caption" style={{ color: colors.onPrimary, opacity: 0.85 }}>
             Будет включено: {filteredCards.length || set.cardCount}
           </Text>
         </Pressable>
@@ -1239,10 +1239,10 @@ export function SetDetailScreen({ navigation, route }: Props) {
               </Text>
               <Pressable
                 onPress={openImportModal}
-                style={[styles.exportButton, { backgroundColor: colors.primary }]}
+                style={[styles.exportButton, { backgroundColor: colors.primaryFill }]}
               >
-                <File size={18} color={colors.textInverse} />
-                <Text variant="bodySmall" style={{ color: colors.textInverse, fontWeight: '700' }}>
+                <File size={18} color={colors.onPrimary} />
+                <Text variant="bodySmall" style={{ color: colors.onPrimary, fontWeight: '700' }}>
                   Импорт
                 </Text>
               </Pressable>
@@ -1351,7 +1351,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                   styles.primaryAction,
                   {
                     backgroundColor: newFront.trim() && newBack.trim() && !isAdding
-                      ? colors.primary
+                      ? colors.primaryFill
                       : modalBorder,
                   },
                 ]}
@@ -1360,7 +1360,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
               >
                 <Text
                   variant="body"
-                  style={{ color: colors.textInverse, fontWeight: '700' }}
+                  style={{ color: colors.onPrimary, fontWeight: '700' }}
                 >
                   Сохранить
                 </Text>
@@ -1509,9 +1509,9 @@ export function SetDetailScreen({ navigation, route }: Props) {
                 </Text>
                 <Pressable
                   onPress={closeImportModal}
-                  style={[styles.importSelectButton, { backgroundColor: colors.primary, marginTop: spacing.l }]}
+                  style={[styles.importSelectButton, { backgroundColor: colors.primaryFill, marginTop: spacing.l }]}
                 >
-                  <Text variant="body" style={{ color: colors.textInverse, fontWeight: '700' }}>
+                  <Text variant="body" style={{ color: colors.onPrimary, fontWeight: '700' }}>
                     Отлично
                   </Text>
                 </Pressable>
@@ -1549,20 +1549,20 @@ export function SetDetailScreen({ navigation, route }: Props) {
 
                 <Pressable
                   onPress={triggerFileSelect}
-                  style={[styles.importSelectButton, { backgroundColor: colors.primary }]}
+                  style={[styles.importSelectButton, { backgroundColor: colors.primaryFill }]}
                 >
-                  <Upload size={20} color={colors.textInverse} />
-                  <Text variant="body" style={{ color: colors.textInverse, fontWeight: '700' }}>
+                  <Upload size={20} color={colors.onPrimary} />
+                  <Text variant="body" style={{ color: colors.onPrimary, fontWeight: '700' }}>
                     Выбрать файл
                   </Text>
                 </Pressable>
 
                 <Pressable
                   onPress={triggerImageSelect}
-                  style={[styles.importSelectButton, { backgroundColor: colors.primary, marginTop: spacing.s, display: 'none' }]}
+                  style={[styles.importSelectButton, { backgroundColor: colors.primaryFill, marginTop: spacing.s, display: 'none' }]}
                 >
-                  <ImageIcon size={20} color={colors.textInverse} />
-                  <Text variant="body" style={{ color: colors.textInverse, fontWeight: '700' }}>
+                  <ImageIcon size={20} color={colors.onPrimary} />
+                  <Text variant="body" style={{ color: colors.onPrimary, fontWeight: '700' }}>
                     Выбрать фото
                   </Text>
                 </Pressable>
@@ -1653,15 +1653,15 @@ export function SetDetailScreen({ navigation, route }: Props) {
                     disabled={importLoading}
                     style={[
                       styles.importConfirmButton, 
-                      { backgroundColor: colors.primary, opacity: importLoading ? 0.7 : 1 }
+                      { backgroundColor: colors.primaryFill, opacity: importLoading ? 0.7 : 1 }
                     ]}
                   >
                     {importLoading ? (
-                      <ActivityIndicator size="small" color={colors.textInverse} />
+                      <ActivityIndicator size="small" color={colors.onPrimary} />
                     ) : (
                       <>
-                        <Check size={18} color={colors.textInverse} />
-                        <Text variant="body" style={{ color: colors.textInverse, fontWeight: '700' }}>
+                        <Check size={18} color={colors.onPrimary} />
+                        <Text variant="body" style={{ color: colors.onPrimary, fontWeight: '700' }}>
                           Импортировать
                         </Text>
                       </>
@@ -1746,15 +1746,15 @@ export function SetDetailScreen({ navigation, route }: Props) {
                         style={[
                           styles.wordChip,
                           {
-                            backgroundColor: publishCategory === cat.key ? colors.primary : 'transparent',
-                            borderColor: publishCategory === cat.key ? colors.primary : modalBorder,
+                            backgroundColor: publishCategory === cat.key ? colors.primaryFill : 'transparent',
+                            borderColor: publishCategory === cat.key ? colors.primaryFill : modalBorder,
                           },
                         ]}
                       >
                         <Text
                           variant="caption"
                           style={{
-                            color: publishCategory === cat.key ? colors.textInverse : modalTextSecondary,
+                            color: publishCategory === cat.key ? colors.onPrimary : modalTextSecondary,
                             fontWeight: '700',
                           }}
                         >
@@ -1800,7 +1800,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                   style={[
                     styles.primaryAction,
                     {
-                      backgroundColor: publishCategory && !isPublishing ? colors.primary : modalBorder,
+                      backgroundColor: publishCategory && !isPublishing ? colors.primaryFill : modalBorder,
                       flexDirection: 'row',
                       gap: spacing.xs,
                     },
@@ -1809,11 +1809,11 @@ export function SetDetailScreen({ navigation, route }: Props) {
                   onPress={handlePublish}
                 >
                   {isPublishing ? (
-                    <ActivityIndicator size="small" color={colors.textInverse} />
+                    <ActivityIndicator size="small" color={colors.onPrimary} />
                   ) : (
                     <>
-                      <Globe size={18} color={colors.textInverse} />
-                      <Text variant="body" style={{ color: colors.textInverse, fontWeight: '700' }}>
+                      <Globe size={18} color={colors.onPrimary} />
+                      <Text variant="body" style={{ color: colors.onPrimary, fontWeight: '700' }}>
                         Опубликовать
                       </Text>
                     </>
@@ -1939,14 +1939,14 @@ function FilterPill({
       style={[
         styles.filterPill,
         {
-          backgroundColor: active ? colors.primary : 'transparent',
-          borderColor: active ? colors.primary : colors.border,
+          backgroundColor: active ? colors.primaryFill : 'transparent',
+          borderColor: active ? colors.primaryFill : colors.border,
         },
       ]}
     >
       <Text
         variant="bodySmall"
-        style={{ color: active ? colors.textInverse : colors.textSecondary, fontWeight: '700' }}
+        style={{ color: active ? colors.onPrimary : colors.textSecondary, fontWeight: '700' }}
       >
         {label}
       </Text>

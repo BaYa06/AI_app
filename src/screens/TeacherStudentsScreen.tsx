@@ -585,7 +585,7 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
             Не удалось загрузить учеников
           </Text>
           <Pressable
-            style={[styles.retryBtn, { backgroundColor: colors.primary }]}
+            style={[styles.retryBtn, { backgroundColor: colors.primaryFill }]}
             onPress={() => setRetryTick((t) => t + 1)}
           >
             <Text style={[styles.retryBtnText, { color: colors.onPrimary }]}>Повторить</Text>
@@ -604,7 +604,7 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
                 <Pressable
                   onPress={handleRemindAll}
                   disabled={reminding}
-                  style={[styles.remindBtn, { backgroundColor: colors.primary, opacity: reminding ? 0.6 : 1 }]}
+                  style={[styles.remindBtn, { backgroundColor: colors.primaryFill, opacity: reminding ? 0.6 : 1 }]}
                 >
                   <Text style={[styles.remindBtnText, { color: colors.onPrimary }]}>Напомнить</Text>
                 </Pressable>
@@ -668,7 +668,7 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
                   <Text style={[styles.inviteCodeText, { color: colors.primary }]}>{inviteJoinCode}</Text>
                 </View>
                 <Pressable
-                  style={[styles.inviteActionBtn, { backgroundColor: colors.primary }]}
+                  style={[styles.inviteActionBtn, { backgroundColor: colors.primaryFill }]}
                   onPress={handleCopyInviteCode}
                 >
                   <Text style={[styles.inviteActionBtnText, { color: colors.onPrimary }]}>

@@ -164,7 +164,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
         <Pressable
           style={({ pressed }) => [
             styles.retryBtn,
-            { backgroundColor: colors.primary },
+            { backgroundColor: colors.primaryFill },
             pressed && { opacity: 0.8 },
           ]}
           onPress={fetchResults}
@@ -453,7 +453,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
           <Pressable
             style={({ pressed }) => [
               styles.ctaBtn,
-              { backgroundColor: colors.primary },
+              { backgroundColor: colors.primaryFill },
               pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
             ]}
             onPress={handleExportCSV}

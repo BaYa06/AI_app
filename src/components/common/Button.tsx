@@ -88,7 +88,7 @@ export const Button = memo<ButtonProps>(function Button({
       {loading ? (
         <ActivityIndicator
           size="small"
-          color={variant === 'primary' ? colors.textInverse : colors.primary}
+          color={variant === 'primary' ? colors.onPrimary : colors.primary}
         />
       ) : (
         <>
@@ -107,7 +107,7 @@ function getVariantStyle(variant: ButtonVariant, colors: any): ViewStyle {
   switch (variant) {
     case 'primary':
       return {
-        backgroundColor: colors.primary,
+        backgroundColor: colors.primaryFill,
       };
     case 'secondary':
       return {
@@ -136,7 +136,7 @@ function getTextStyle(variant: ButtonVariant, colors: any): TextStyle {
     case 'secondary':
     case 'danger':
       return {
-        color: colors.textInverse,
+        color: colors.onPrimary,
       };
     case 'outline':
     case 'ghost':

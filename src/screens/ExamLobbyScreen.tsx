@@ -246,7 +246,7 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
                   onPress={() => { if (!m.disabled) { triggerHaptic('selection'); setTestMode(m.key); } }}
                 >
                   {active && (
-                    <View style={[styles.modeCheck, { backgroundColor: colors.primary }]}>
+                    <View style={[styles.modeCheck, { backgroundColor: colors.primaryFill }]}>
                       <Check size={12} color={colors.onPrimary} strokeWidth={3} />
                     </View>
                   )}

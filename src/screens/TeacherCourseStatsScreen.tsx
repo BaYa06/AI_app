@@ -344,7 +344,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
           ]}
           onPress={() => setLobbyModal(true)}
         >
-          <View style={[styles.testLobbyIcon, { backgroundColor: colors.primary }]}>
+          <View style={[styles.testLobbyIcon, { backgroundColor: colors.primaryFill }]}>
             <GraduationCap size={18} color={colors.onPrimary} />
           </View>
           <Text style={[styles.testLobbyText, { color: colors.textPrimary }]}>
@@ -372,7 +372,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
             courseTitle: route.params.courseTitle,
           })}
         >
-          <View style={[styles.testLobbyIcon, { backgroundColor: colors.primary }]}>
+          <View style={[styles.testLobbyIcon, { backgroundColor: colors.primaryFill }]}>
             <Clock size={18} color={colors.onPrimary} />
           </View>
           <Text style={[styles.testLobbyText, { color: colors.textPrimary }]}>
@@ -428,7 +428,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
             courseTitle: route.params.courseTitle,
           })}
         >
-          <View style={[styles.testLobbyIcon, { backgroundColor: colors.primary }]}>
+          <View style={[styles.testLobbyIcon, { backgroundColor: colors.primaryFill }]}>
             <BookOpen size={18} color={colors.onPrimary} />
           </View>
           <Text style={[styles.testLobbyText, { color: colors.textPrimary }]}>

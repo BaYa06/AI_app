@@ -3,7 +3,7 @@
  * @description Главный компонент приложения
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Linking, Platform, View, StyleSheet, Alert, Text } from 'react-native';
+import { AppState, Linking, Platform, View, StyleSheet, Alert } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AppNavigator } from '@/navigation';
@@ -15,7 +15,10 @@ import { useCourseRealtime } from '@/hooks/useCourseRealtime';
 import { StorageService } from '@/services/StorageService';
 import { CACHE_OWNER_KEY } from '@/services/DatabaseService';
 import { refreshPushToken, subscribeForegroundMessages, requestPushPermission, isPushSupported } from '@/services/pushNotifications';
-import { useThemeColors, useSettingsStore } from '@/store';
+import { useThemeColors } from '@/store';
+import { X } from 'lucide-react-native';
+import { Text as ThemedText } from '@/components/common/Text';
+import { borderRadius, colors as palette, iconSize, screenPadding, spacing } from '@/constants';
 import { CourseInviteModal } from '@/components/CourseInviteModal';
 import { useCoursesStore } from '@/store';
 import { WelcomeScreen } from '@/screens/WelcomeScreen';
@@ -105,7 +108,6 @@ function AppRoot({
   nativeLanguage,
 }: AppRootProps) {
   const colors = useThemeColors();
-  const resolvedTheme = useSettingsStore((state) => state.resolvedTheme);
   const insets = useSafeAreaInsets();
   const [showPushBanner, setShowPushBanner] = useState(false);
   const [pushBannerLoading, setPushBannerLoading] = useState(false);
@@ -137,7 +139,7 @@ function AppRoot({
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof document === 'undefined') return;
     const meta = document.querySelector('meta[name=\"theme-color\"]');
-    const themeColor = resolvedTheme === 'dark' ? '#101122' : '#FFFFFF';
+    const themeColor = colors.background;
 
     if (meta) {
       meta.setAttribute('content', themeColor);
@@ -147,7 +149,7 @@ function AppRoot({
       newMeta.content = themeColor;
       document.head.appendChild(newMeta);
     }
-  }, [resolvedTheme]);
+  }, [colors.background]);
 
   // Контент приложения
   const appContent = (
@@ -209,9 +211,9 @@ function AppRoot({
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: isReady ? colors.background : '#ffffff' }}>
-      {/* Safe-area зона сверху под цвет темы (белая на загрузке) */}
-      <View style={{ height: top, backgroundColor: isReady ? colors.background : '#ffffff' }} />
+    <View style={{ flex: 1, backgroundColor: isReady ? colors.background : palette.light.background }}>
+      {/* Safe-area зона сверху под цвет темы (светлая на загрузке — как заставка LoadingSplash) */}
+      <View style={{ height: top, backgroundColor: isReady ? colors.background : palette.light.background }} />
 
       <GestureHandlerRootView style={{ flex: 1 }}>
         {Platform.OS === 'web' ? (
@@ -227,28 +229,33 @@ function AppRoot({
 
       {/* Push notification banner */}
       {showPushBanner && (
-        <View style={{
-          position: 'absolute' as any,
-          bottom: 90,
-          left: 16,
-          right: 16,
-          backgroundColor: colors.primary,
-          borderRadius: 16,
-          padding: 16,
-          flexDirection: 'row',
-          alignItems: 'center',
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.2,
-          shadowRadius: 12,
-          elevation: 8,
-          gap: 12,
-        }}>
+        <View
+          style={{
+            position: 'absolute' as any,
+            bottom: 90,
+            left: screenPadding,
+            right: screenPadding,
+            // primaryFill + onPrimary: в тёмной теме primary слишком светлый под белый текст
+            backgroundColor: colors.primaryFill,
+            borderRadius: borderRadius.l,
+            padding: spacing.m,
+            flexDirection: 'row',
+            alignItems: 'center',
+            shadowColor: colors.shadow,
+            shadowOffset: { width: 0, height: spacing.xxs },
+            shadowOpacity: 1,
+            shadowRadius: spacing.s,
+            elevation: 8,
+            gap: spacing.s,
+          }}
+        >
           <View style={{ flex: 1 }}>
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Включи уведомления</Text>
-            <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12, marginTop: 2 }}>Напомним когда пора заниматься и сохранить серию</Text>
+            <ThemedText variant="label" style={{ color: colors.onPrimary, fontWeight: '700' }}>Включи уведомления</ThemedText>
+            <ThemedText variant="caption" style={{ color: colors.onPrimary, marginTop: spacing.xxs / 2 }}>Напомним когда пора заниматься и сохранить серию</ThemedText>
           </View>
           <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Разрешить уведомления"
             onPress={async () => {
               setPushBannerLoading(true);
               const status = await requestPushPermission(currentUserId);
@@ -256,20 +263,23 @@ function AppRoot({
               setShowPushBanner(false);
               localStorage.setItem('flashly_push_banner_dismissed', '1');
             }}
-            style={{ backgroundColor: '#fff', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 }}
+            style={{ backgroundColor: colors.onPrimary, borderRadius: borderRadius.m, paddingHorizontal: spacing.s, paddingVertical: spacing.xs }}
           >
-            <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>
+            <ThemedText variant="label" style={{ color: colors.primaryFill, fontWeight: '700' }}>
               {pushBannerLoading ? '...' : 'Разрешить'}
-            </Text>
+            </ThemedText>
           </TouchableOpacity>
           <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Закрыть"
+            hitSlop={spacing.s}
             onPress={() => {
               setShowPushBanner(false);
               localStorage.setItem('flashly_push_banner_dismissed', '1');
             }}
-            style={{ padding: 4 }}
+            style={{ padding: spacing.xxs }}
           >
-            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 18, lineHeight: 18 }}>×</Text>
+            <X size={iconSize.s} color={colors.onPrimary} />
           </TouchableOpacity>
         </View>
       )}
