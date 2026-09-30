@@ -16,17 +16,17 @@ import { StudyModeSheet, DEFAULT_STUDY_MODE_GAMES, type StudyMode } from '@/comp
 import { CoursesDrawer } from '@/components/home/CoursesDrawer';
 import { animateDrawerTo, clampTranslateX, resolveDrawerOpen } from '@/components/home/drawerAnimation';
 import ReanimatedAnimated, { useSharedValue, withTiming, withSequence, useAnimatedStyle, Easing, withDelay, runOnJS } from 'react-native-reanimated';
-import { spacing, borderRadius, heights, iconSize, typography, screenPadding, alpha, getDeckAccentColor } from '@/constants';
+import { spacing, borderRadius, heights, iconSize, typography, screenPadding, alpha, getDeckAccentColor, animation } from '@/constants';
 import { triggerHaptic } from '@/utils/haptic';
 import { pluralize } from '@/utils';
 import { Button, Card as SurfaceCard, Badge, Dialog, EmptyState, ListRow, ProgressBar, Sheet, TextField, confirmDialog, toast } from '@/components/ui';
 import {
   Menu,
-  Search,
   Plus,
   Library,
   Lightbulb,
   MoreVertical,
+  MoreHorizontal,
   X,
   Eye,
   EyeOff,
@@ -65,6 +65,7 @@ import { isLessonStartable, lessonCardContent, streakRiskHoursLeft } from '@/com
 import { LessonCard } from '@/components/home/LessonCard';
 import { FocusSetSheet } from '@/components/home/FocusSetSheet';
 import { ChallengeTiles, type ChallengeTile } from '@/components/home/ChallengeTiles';
+import { SetsSectionMenu } from '@/components/home/SetsSectionMenu';
 
 const StaggerCard = React.memo(function StaggerCard({
   index,
@@ -93,7 +94,7 @@ const StaggerCard = React.memo(function StaggerCard({
 type SetsSortKey = 'recent' | 'due' | 'progress' | 'newest' | 'alpha' | 'size';
 
 const SETS_SORT_OPTIONS: { key: SetsSortKey; label: string; short: string }[] = [
-  { key: 'recent', label: 'Недавно изучал', short: 'Недавние' },
+  { key: 'recent', label: 'Недавно изученные', short: 'Недавние' },
   { key: 'due', label: 'Нужно повторить', short: 'Повторить' },
   { key: 'progress', label: 'Прогресс: меньше → больше', short: 'Прогресс' },
   { key: 'newest', label: 'Новые', short: 'Новые' },
@@ -101,12 +102,14 @@ const SETS_SORT_OPTIONS: { key: SetsSortKey; label: string; short: string }[] = 
   { key: 'size', label: 'Больше карточек', short: 'Размер' },
 ];
 
+const DEFAULT_SETS_SORT: SetsSortKey = 'recent';
+
 function loadSetsSort(): SetsSortKey {
   try {
     const saved = StorageService.getString(STORAGE_KEYS.HOME_SETS_SORT);
     if (SETS_SORT_OPTIONS.some((o) => o.key === saved)) return saved as SetsSortKey;
   } catch {}
-  return 'recent';
+  return DEFAULT_SETS_SORT;
 }
 
 const byRecent = (a: CardSet, b: CardSet) =>
@@ -149,6 +152,22 @@ export function HomeScreen({ navigation }: any) {
   const colors = useThemeColors();
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const closeSearch = useCallback(() => {
+    setSearchVisible(false);
+    setSearchQuery('');
+  }, []);
+  // Меню «···» секции «Мои наборы» (plan/home_redesign.md, 4.1). Следующее окно — после закрытия
+  // меню: одновременно не больше одного окна (брендбук, 7.6)
+  const [setsMenuVisible, setSetsMenuVisible] = useState(false);
+  const openSetsMenu = useCallback(() => {
+    triggerHaptic('selection');
+    Analytics.homeAction('sets_menu');
+    setSetsMenuVisible(true);
+  }, []);
+  const afterSetsMenu = useCallback((next: () => void) => {
+    setSetsMenuVisible(false);
+    setTimeout(next, animation.sheet);
+  }, []);
   const [setsSort, setSetsSort] = useState<SetsSortKey>(loadSetsSort);
   const [sortSheetVisible, setSortSheetVisible] = useState(false);
 
@@ -181,8 +200,7 @@ export function HomeScreen({ navigation }: any) {
   const [deleteModalCourseId, setDeleteModalCourseId] = useState<string | null>(null);
   const [leaveModalCourseId, setLeaveModalCourseId] = useState<string | null>(null);
   const [leaveLoading, setLeaveLoading] = useState(false);
-  // «Учить все карточки» курса в любом режиме. Кнопка ушла из ленты вместе со старым «Повторением дня» —
-  // вход вернётся в меню «···» секции «Мои наборы» (plan/home_redesign.md, 4.1)
+  // «Учить все карточки» курса в любом режиме — вход из меню «···» секции «Мои наборы» (4.1)
   const [showStudyModeModal, setShowStudyModeModal] = useState(false);
   // Размер порции — общая настройка (Профиль → Настройки обучения)
   const studyCardLimit = useSettingsStore((s) => s.settings.studyCardLimit);
@@ -1407,17 +1425,6 @@ export function HomeScreen({ navigation }: any) {
               )}
             </View>
           )}
-          <Button
-            variant="icon"
-            icon={Search}
-            background="none"
-            iconSize={iconSize.s}
-            accessibilityLabel="Поиск по наборам"
-            onPress={() => {
-              if (!searchVisible) Analytics.homeAction('search');
-              setSearchVisible(!searchVisible);
-            }}
-          />
           <Pressable
             style={({ pressed }) => [
               styles.addButton,
@@ -1433,33 +1440,7 @@ export function HomeScreen({ navigation }: any) {
         </View>
       </View>
 
-      {/* Search Bar */}
-      {searchVisible && (
-        <View style={styles.searchBar}>
-          <TextField
-            variant="search"
-            placeholder="Поиск по наборам..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            // Поиск — исключение из правила «клавиатура не открывается сама»
-            autoFocus
-            inputStyle={Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : undefined}
-          />
-        </View>
-      )}
-
-      {/*
-        Обёртка занимает всё оставшееся место под header/searchBar через обычный flex —
-        оверлей закрытия поиска покрывает именно и только эту область (StyleSheet.absoluteFillObject
-        относительно неё), без ручного вычисления пиксельных отступов через onLayout/useState
-        (это раньше вызывало заметный "прыжок" контента после первого измерения).
-      */}
       <View style={styles.body}>
-        {/* Overlay to close search when tapping outside */}
-        {searchVisible && (
-          <Pressable style={styles.searchOverlay} onPress={() => setSearchVisible(false)} accessibilityLabel="Закрыть поиск" />
-        )}
-
         <ScrollView
           style={styles.content}
           contentContainerStyle={styles.scrollContent}
@@ -1474,7 +1455,7 @@ export function HomeScreen({ navigation }: any) {
             />
           }
         >
-        {visibleSets.length === 0 ? (
+        {filteredSets.length === 0 ? (
           <>
           {isTeacher === true && teacherBanner}
           <EmptyState
@@ -1547,21 +1528,57 @@ export function HomeScreen({ navigation }: any) {
               <Text variant="h3" style={[styles.flexShrink, { color: colors.textPrimary }]} numberOfLines={1}>
                 {activeCourseId === null ? 'Мои наборы' : activeCourseTitle}
               </Text>
-              <Pressable
-                onPress={() => { Analytics.homeAction('sort'); setSortSheetVisible(true); }}
-                hitSlop={spacing.s}
-                accessibilityRole="button"
-                accessibilityLabel={`Сортировка: ${setsSortShortLabel}`}
-                style={({ pressed }) => [styles.sortButton, pressed && styles.pressed]}
-              >
-                <ArrowUpDown size={iconSize.xs} color={colors.primary} />
-                <Text variant="label" style={{ color: colors.primary }}>
-                  {setsSortShortLabel}
-                </Text>
-              </Pressable>
+              <View style={styles.sectionActions}>
+                {/* Порядок показываем, только если он не по умолчанию — иначе список кажется перемешанным */}
+                {setsSort !== DEFAULT_SETS_SORT && (
+                  <Pressable
+                    onPress={() => { Analytics.homeAction('sort'); setSortSheetVisible(true); }}
+                    hitSlop={spacing.s}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Сортировка: ${setsSortShortLabel}`}
+                    style={({ pressed }) => [styles.sortButton, pressed && styles.pressed]}
+                  >
+                    <ArrowUpDown size={iconSize.xs} color={colors.primary} />
+                    <Text variant="label" style={{ color: colors.primary }}>
+                      {setsSortShortLabel}
+                    </Text>
+                  </Pressable>
+                )}
+                <Button
+                  variant="icon"
+                  icon={MoreHorizontal}
+                  background="none"
+                  iconSize={iconSize.s}
+                  iconColor={colors.textSecondary}
+                  accessibilityLabel="Действия с наборами"
+                  onPress={openSetsMenu}
+                />
+              </View>
             </View>
 
+            {/* Поиск по наборам — у самих наборов (plan/home_redesign.md, 4.1) */}
+            {searchVisible && (
+              <View style={styles.searchRow}>
+                <TextField
+                  variant="search"
+                  placeholder="Поиск по наборам"
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  // Поиск — исключение из правила «клавиатура не открывается сама»
+                  autoFocus
+                  style={styles.flex1}
+                  inputStyle={Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : undefined}
+                />
+                <Button variant="quiet" size="s" title="Отмена" onPress={closeSearch} />
+              </View>
+            )}
+
           <View style={styles.setsList}>
+            {visibleSets.length === 0 && (
+              <Text variant="bodySmall" color="secondary" align="center" style={styles.noResults}>
+                Ничего не нашлось по запросу «{searchQuery.trim()}»
+              </Text>
+            )}
             {visibleSets.map((set, index) => {
               const progress = set.cardCount > 0 ? Math.round(((set.masteredCount || 0) / set.cardCount) * 100) : 0;
               const accentColor = getDeckAccentColor(set.id || index);
@@ -1905,6 +1922,29 @@ export function HomeScreen({ navigation }: any) {
         })}
       </Sheet>
 
+      <SetsSectionMenu
+        visible={setsMenuVisible}
+        onClose={() => setSetsMenuVisible(false)}
+        sortLabel={setsSortShortLabel ?? ''}
+        onSort={() => afterSetsMenu(() => { Analytics.homeAction('sort'); setSortSheetVisible(true); })}
+        onSearch={() => {
+          setSetsMenuVisible(false);
+          Analytics.homeAction('search');
+          setSearchVisible(true);
+        }}
+        onStudyAll={reviewStats.all.length > 0
+          ? () => afterSetsMenu(() => { Analytics.homeAction('study_all'); setShowStudyModeModal(true); })
+          : null}
+        onCreateSet={() => {
+          setSetsMenuVisible(false);
+          Analytics.homeAction('create_set');
+          navigation?.navigate('SetEditor', {});
+        }}
+        onJoinCourse={isTeacher === true
+          ? null
+          : () => afterSetsMenu(() => { Analytics.homeAction('join_course'); setJoinByCodeVisible(true); })}
+      />
+
       <FocusSetSheet
         visible={focusSheetVisible}
         onClose={() => setFocusSheetVisible(false)}
@@ -2187,16 +2227,8 @@ const styles = StyleSheet.create({
   },
 
   // Search
-  searchBar: {
-    paddingHorizontal: screenPadding,
-    paddingVertical: spacing.s,
-  },
   body: {
     flex: 1,
-  },
-  searchOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 5,
   },
 
   // Content
@@ -2281,6 +2313,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xxs,
+  },
+  sectionActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: screenPadding,
+    marginTop: spacing.s,
+  },
+  noResults: {
+    paddingVertical: spacing.l,
   },
   sortOption: {
     flexDirection: 'row',

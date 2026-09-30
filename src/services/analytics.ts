@@ -37,7 +37,8 @@ type HomeAction =
   | 'create_set'
   | 'join_course'
   | 'search'
-  | 'sort';
+  | 'sort'
+  | 'sets_menu';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Внутренний helper
