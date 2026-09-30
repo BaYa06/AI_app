@@ -15,7 +15,7 @@ import type { DiamondRewardRef } from '@/components/common';
 import { StudyModeSheet, DEFAULT_STUDY_MODE_GAMES, type StudyMode } from '@/components/study/StudyModeSheet';
 import { CoursesDrawer } from '@/components/home/CoursesDrawer';
 import { animateDrawerTo, clampTranslateX, resolveDrawerOpen } from '@/components/home/drawerAnimation';
-import ReanimatedAnimated, { useSharedValue, withTiming, withSequence, withRepeat, useAnimatedStyle, Easing, withDelay, runOnJS } from 'react-native-reanimated';
+import ReanimatedAnimated, { useSharedValue, withTiming, withSequence, useAnimatedStyle, Easing, withDelay, runOnJS } from 'react-native-reanimated';
 import { spacing, borderRadius, heights, iconSize, typography, screenPadding, alpha, getDeckAccentColor } from '@/constants';
 import { triggerHaptic } from '@/utils/haptic';
 import { pluralize } from '@/utils';
@@ -43,7 +43,6 @@ import {
   Zap,
   Crosshair,
   Clock,
-  Play,
   GraduationCap,
   Trophy,
 } from 'lucide-react-native';
@@ -66,6 +65,7 @@ import { buildLessonPlan, countWaitingReview, ensureLessonDay, EXTRA_NEW_STEP, t
 import { isLessonStartable, lessonCardContent, streakRiskHoursLeft } from '@/components/home/lessonText';
 import { LessonCard } from '@/components/home/LessonCard';
 import { FocusSetSheet } from '@/components/home/FocusSetSheet';
+import { ChallengeTiles, type ChallengeTile } from '@/components/home/ChallengeTiles';
 
 const StaggerCard = React.memo(function StaggerCard({
   index,
@@ -124,36 +124,6 @@ const SETS_COMPARATORS: Record<SetsSortKey, (a: CardSet, b: CardSet) => number> 
   alpha: (a, b) => (a.title || '').localeCompare(b.title || '', 'ru', { sensitivity: 'base', numeric: true }),
   size: (a, b) => (b.cardCount || 0) - (a.cardCount || 0) || byRecent(a, b),
 };
-
-/** «Забрать +10» на выполненной мини-игре — мягко пульсирует, пока награду не забрали */
-function ClaimButton({ onPress, buttonRef }: { onPress: () => void; buttonRef: (el: View | null) => void }) {
-  const colors = useThemeColors();
-  const scale = useSharedValue(1);
-  useEffect(() => {
-    scale.value = withRepeat(
-      withSequence(
-        withTiming(1.06, { duration: 650, easing: Easing.inOut(Easing.quad) }),
-        withTiming(1, { duration: 650, easing: Easing.inOut(Easing.quad) }),
-      ),
-      -1,
-    );
-  }, [scale]);
-  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-  return (
-    <ReanimatedAnimated.View style={style}>
-      <Pressable hitSlop={{ top: spacing.xxs, bottom: spacing.xxs }}
-        ref={buttonRef}
-        style={[styles.challengeClaimButton, { backgroundColor: colors.onPrimary }]}
-        onPress={onPress}
-        accessibilityRole="button"
-        accessibilityLabel="Забрать 10 алмазов"
-      >
-        <Text variant="label" style={{ color: colors.gameGreen }}>Забрать +10</Text>
-        <Gem size={iconSize.xs} color={colors.gameGreen} />
-      </Pressable>
-    </ReanimatedAnimated.View>
-  );
-}
 
 /**
  * Карточки для мини-игры (план §3.2): сначала слова, которым пришло время повторения — самые
@@ -1343,86 +1313,15 @@ export function HomeScreen({ navigation }: any) {
     const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     return Math.max(1, Math.ceil((midnight.getTime() - now.getTime()) / 3_600_000));
   })();
-  const renderChallengeCard = ({ id, title, badge, icon: ChallengeIcon, accent, onPlay }: {
-    id: ChallengeId;
-    title: string;
-    badge: string;
-    icon: typeof Zap;
-    accent: string;
-    onPlay: () => void;
-  }) => {
-    const status = challengeStatuses[id];
-    const onFillSoft = alpha(colors.onPrimary, 20);
-    if (status === 'pending') {
-      return (
-        <Pressable
-          key={id}
-          style={({ pressed }) => [styles.challengeCard, { backgroundColor: accent }, pressed && styles.challengeCardPressed]}
-          onPress={onPlay}
-          accessibilityRole="button"
-          accessibilityLabel={`${title}. ${badge}. Награда 10 алмазов`}
-        >
-          <View style={styles.challengeTopRow}>
-            <View style={[styles.challengeIconCircle, { backgroundColor: onFillSoft }]}>
-              <ChallengeIcon size={iconSize.s} color={colors.onPrimary} />
-            </View>
-            <View style={[styles.challengeBadge, { backgroundColor: onFillSoft }]}>
-              <Text variant="caption" style={[styles.semibold, { color: colors.onPrimary }]}>{badge}</Text>
-            </View>
-          </View>
-          <Text style={[styles.challengeTitle, { color: colors.onPrimary }]} numberOfLines={2}>{title}</Text>
-          <View style={styles.challengeBottomRow}>
-            <View style={[styles.challengeReward, { backgroundColor: onFillSoft }]}>
-              <Gem size={iconSize.xs} color={colors.onPrimary} />
-              <Text variant="caption" style={[styles.bold, { color: colors.onPrimary }]}>+10</Text>
-            </View>
-            <View style={[styles.challengePlay, { backgroundColor: colors.onPrimary }]}>
-              <Play size={iconSize.xs} color={accent} fill={accent} style={styles.playIconNudge} />
-            </View>
-          </View>
-        </Pressable>
-      );
-    }
-    if (status === 'completed') {
-      return (
-        <View key={id} style={[styles.challengeCard, { backgroundColor: colors.gameGreen }]}>
-          <View style={styles.challengeTopRow}>
-            <View style={[styles.challengeIconCircle, { backgroundColor: colors.onPrimary }]}>
-              <Check size={iconSize.s} color={colors.gameGreen} />
-            </View>
-            <View style={[styles.challengeBadge, { backgroundColor: onFillSoft }]}>
-              <Text variant="caption" style={[styles.semibold, { color: colors.onPrimary }]}>Выполнено</Text>
-            </View>
-          </View>
-          <Text style={[styles.challengeTitle, { color: colors.onPrimary }]} numberOfLines={2}>{title}</Text>
-          <ClaimButton
-            buttonRef={(el) => { claimBtnRefs.current[id] = el; }}
-            onPress={() => handleChallengeClaim(id)}
-          />
-        </View>
-      );
-    }
-    return (
-      <View
-        key={id}
-        style={[styles.challengeCard, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]}
-        accessibilityLabel={`${title}: награда получена, снова через ${hoursUntilTomorrow} ч`}
-      >
-        <View style={styles.challengeTopRow}>
-          <View style={[styles.challengeIconCircle, { backgroundColor: alpha(colors.success, 10) }]}>
-            <Check size={iconSize.s} color={colors.successText} />
-          </View>
-          <Text variant="caption" style={[styles.semibold, { color: colors.successText }]}>Получено</Text>
-        </View>
-        <Text style={[styles.challengeTitle, { color: colors.textSecondary }]} numberOfLines={2}>{title}</Text>
-        <View style={styles.challengeBottomRow}>
-          <Text variant="caption" style={{ color: colors.textTertiary }}>
-            Снова через {hoursUntilTomorrow} ч
-          </Text>
-        </View>
-      </View>
-    );
-  };
+  // Мини-игры «Разминка» (plan/home_redesign.md, 3.1): плитки — ChallengeTiles
+  const challengeTiles: ChallengeTile[] = [
+    { id: 'quick_round', title: 'Быстрый раунд', badge: '2 минуты', icon: Zap, accent: colors.gameViolet, onPlay: handleQuickRound },
+    { id: 'sniper', title: 'Снайпер', badge: '5 подряд', icon: Crosshair, accent: colors.gameRose, onPlay: handleSniperChallenge },
+    { id: 'forgotten', title: 'Вспомни забытое', badge: '7+ дней', icon: Clock, accent: colors.gameTeal, onPlay: handleForgottenChallenge },
+  ];
+  const setClaimRef = useCallback((id: ChallengeId, el: View | null) => {
+    claimBtnRefs.current[id] = el;
+  }, []);
 
   // Кнопки закрытия окон — одна и та же «тихая» кнопка-иконка
   const closeButton = (onPress: () => void, disabled?: boolean) => (
@@ -1612,38 +1511,13 @@ export function HomeScreen({ navigation }: any) {
               )}
               {/* Challenges Section */}
               <View style={styles.challengesSection}>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.challengesScrollContent}
-                  snapToInterval={CHALLENGE_CARD_WIDTH + spacing.s}
-                  decelerationRate="fast"
-                >
-                  {renderChallengeCard({
-                    id: 'quick_round',
-                    title: 'Быстрый раунд',
-                    badge: '2 минуты',
-                    icon: Zap,
-                    accent: colors.gameViolet,
-                    onPlay: handleQuickRound,
-                  })}
-                  {renderChallengeCard({
-                    id: 'sniper',
-                    title: 'Снайпер',
-                    badge: '5 подряд',
-                    icon: Crosshair,
-                    accent: colors.gameRose,
-                    onPlay: handleSniperChallenge,
-                  })}
-                  {renderChallengeCard({
-                    id: 'forgotten',
-                    title: 'Вспомни забытое',
-                    badge: '7+ дней',
-                    icon: Clock,
-                    accent: colors.gameTeal,
-                    onPlay: handleForgottenChallenge,
-                  })}
-                </ScrollView>
+                <ChallengeTiles
+                  tiles={challengeTiles}
+                  statuses={challengeStatuses}
+                  hoursUntilTomorrow={hoursUntilTomorrow}
+                  onClaim={handleChallengeClaim}
+                  claimRef={setClaimRef}
+                />
 
                 {ratingTeaser && (
                   <SurfaceCard
@@ -2251,8 +2125,6 @@ export function HomeScreen({ navigation }: any) {
   );
 }
 
-const CHALLENGE_CARD_WIDTH = 136;
-const CHALLENGE_CARD_HEIGHT = 168;
 const ADD_BUTTON_SIZE = 36;
 
 const styles = StyleSheet.create({
@@ -2347,75 +2219,6 @@ const styles = StyleSheet.create({
   challengesSection: {
     paddingTop: spacing.m,
     paddingBottom: spacing.s,
-  },
-  challengesScrollContent: {
-    paddingHorizontal: screenPadding,
-    gap: spacing.s,
-  },
-  challengeCard: {
-    width: CHALLENGE_CARD_WIDTH,
-    height: CHALLENGE_CARD_HEIGHT,
-    borderRadius: borderRadius.l,
-    padding: spacing.s,
-    justifyContent: 'space-between',
-  },
-  challengeCardPressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.98 }],
-  },
-  challengeTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  challengeIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: borderRadius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  challengeTitle: {
-    ...typography.body,
-    fontWeight: '700',
-  },
-  challengeBadge: {
-    paddingHorizontal: spacing.xs,
-    paddingVertical: spacing.xxs / 2,
-    borderRadius: borderRadius.full,
-  },
-  challengeBottomRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    minHeight: 32,
-  },
-  challengeReward: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xxs,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: spacing.xxs,
-    borderRadius: borderRadius.full,
-  },
-  challengePlay: {
-    width: 32,
-    height: 32,
-    borderRadius: borderRadius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // Треугольник «play» визуально смещён влево — выравниваем по центру круга
-  playIconNudge: {
-    marginLeft: spacing.xxs / 2,
-  },
-  challengeClaimButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xxs,
-    minHeight: 36,
-    borderRadius: borderRadius.full,
   },
   ratingTeaser: {
     flexDirection: 'row',
