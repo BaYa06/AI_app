@@ -1,11 +1,11 @@
 {
   "totals": {
-    "hex": 622,
-    "rgba": 269,
-    "isDark": 249,
-    "font": 271,
-    "weight": 138,
-    "radius": 118,
+    "hex": 605,
+    "rgba": 261,
+    "isDark": 243,
+    "font": 266,
+    "weight": 135,
+    "radius": 109,
     "alpha": 133,
     "alert": 57,
     "small": 90,
@@ -13,7 +13,7 @@
     "ion": 24,
     "a11y": 70,
     "en": 23,
-    "total": 1857
+    "total": 1809
   },
   "files": {
     "src/screens/TeacherCourseStatsScreen.tsx": {
@@ -366,15 +366,6 @@
       "a11y": 1,
       "total": 28
     },
-    "src/components/books/AttachToCoursesSheet.tsx": {
-      "hex": 9,
-      "rgba": 4,
-      "isDark": 3,
-      "font": 3,
-      "weight": 2,
-      "radius": 4,
-      "total": 25
-    },
     "src/screens/StudyPlaceholderScreen.tsx": {
       "hex": 5,
       "rgba": 5,
@@ -393,15 +384,6 @@
       "alpha": 1,
       "a11y": 1,
       "total": 24
-    },
-    "src/components/library/ChooseCourseSheet.tsx": {
-      "hex": 8,
-      "rgba": 4,
-      "isDark": 3,
-      "font": 2,
-      "weight": 1,
-      "radius": 5,
-      "total": 23
     },
     "src/screens/ImportFilesScreen.tsx": {
       "hex": 9,
