@@ -1,5 +1,9 @@
 import React, { Component, ErrorInfo } from 'react';
-import { View, Text, Modal, TouchableOpacity, StyleSheet, ScrollView, Platform } from 'react-native';
+import { View, Modal, StyleSheet, ScrollView, Platform } from 'react-native';
+import { Button } from '@/components/ui/Button';
+import { useThemeColors } from '@/store';
+import { borderRadius, spacing } from '@/constants';
+import { Text } from './Text';
 
 interface Props {
   children: React.ReactNode;
@@ -33,37 +37,10 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
-      const { error, errorInfo } = this.state;
-
       return (
         <>
           {this.props.children}
-          <Modal
-            visible
-            transparent
-            animationType="fade"
-            onRequestClose={this.handleDismiss}
-          >
-            <View style={styles.overlay}>
-              <View style={styles.modal}>
-                <Text style={styles.title}>Что-то пошло не так</Text>
-                <ScrollView style={styles.scroll}>
-                  {/* Технический текст ошибки — только разработчику */}
-                  <Text style={styles.errorText}>
-                    {__DEV__ ? error?.toString() : 'Закрой это окно и попробуй ещё раз. Если повторится — напиши нам: Профиль → «Написать нам».'}
-                  </Text>
-                  {__DEV__ && errorInfo?.componentStack && (
-                    <Text style={styles.stackText}>
-                      {errorInfo.componentStack}
-                    </Text>
-                  )}
-                </ScrollView>
-                <TouchableOpacity style={styles.button} onPress={this.handleDismiss}>
-                  <Text style={styles.buttonText}>Закрыть</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </Modal>
+          <ErrorDialog error={this.state.error} errorInfo={this.state.errorInfo} onDismiss={this.handleDismiss} />
         </>
       );
     }
@@ -72,62 +49,69 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 }
 
+/**
+ * Окно ошибки. Границу ставим выше SafeAreaProvider, поэтому здесь свой Modal,
+ * а не Dialog (он читает safe area). Оформление — как у Dialog.
+ */
+function ErrorDialog({
+  error,
+  errorInfo,
+  onDismiss,
+}: {
+  error: Error | null;
+  errorInfo: ErrorInfo | null;
+  onDismiss: () => void;
+}) {
+  const colors = useThemeColors();
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onDismiss}>
+      <View style={[styles.overlay, { backgroundColor: colors.overlay }]}>
+        <View accessibilityViewIsModal style={[styles.modal, { backgroundColor: colors.surface }]}>
+          <Text variant="h3" accessibilityRole="header" style={[styles.title, { color: colors.errorText }]}>
+            Что-то пошло не так
+          </Text>
+          <ScrollView style={styles.scroll}>
+            {/* Технический текст ошибки — только разработчику */}
+            <Text variant="bodySmall" style={{ color: colors.textPrimary }}>
+              {__DEV__ ? error?.toString() : 'Закрой это окно и попробуй ещё раз. Если повторится — напиши нам: Профиль → «Написать нам».'}
+            </Text>
+            {__DEV__ && errorInfo?.componentStack && (
+              <Text variant="caption" style={[styles.stackText, { color: colors.textTertiary }]}>
+                {errorInfo.componentStack}
+              </Text>
+            )}
+          </ScrollView>
+          <Button title="Закрыть" onPress={onDismiss} fullWidth />
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: spacing.l,
   },
   modal: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: borderRadius.xl,
+    padding: spacing.l,
     width: '100%',
     maxWidth: 400,
     maxHeight: '70%',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-      },
-      android: { elevation: 8 },
-    }),
   },
   title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#E53935',
-    marginBottom: 12,
+    marginBottom: spacing.s,
   },
   scroll: {
     maxHeight: 250,
-    marginBottom: 16,
-  },
-  errorText: {
-    fontSize: 14,
-    color: '#333',
-    lineHeight: 20,
+    marginBottom: spacing.m,
   },
   stackText: {
-    fontSize: 11,
-    color: '#888',
-    marginTop: 8,
-    lineHeight: 16,
+    marginTop: spacing.xs,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-  },
-  button: {
-    backgroundColor: '#E53935',
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
 });

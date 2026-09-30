@@ -1,47 +1,31 @@
 /**
  * LoadingSplash Component
- * @description Экран загрузки приложения при старте
+ * @description Экран загрузки приложения при старте.
+ * Всегда в светлой палитре: тема ещё не определена, а системный экран запуска — белый,
+ * поэтому тёмная заставка мигнула бы между ними.
  */
 import React from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
-import Ionicons from 'react-native-vector-icons/Ionicons';
-import { useThemeColors } from '@/store';
-import { spacing } from '@/constants';
+import { Zap } from 'lucide-react-native';
+import { borderRadius, colors, iconSize, spacing } from '@/constants';
 import { Text } from './Text';
 
-export function LoadingSplash() {
-  const colors = useThemeColors();
+const palette = colors.light;
 
+export function LoadingSplash() {
   return (
-    <View
-      style={[
-        styles.container,
-        { backgroundColor: '#ffffff' },
-      ]}
-    >
+    <View style={[styles.container, { backgroundColor: palette.background }]}>
       <View style={styles.content}>
-        <View style={[styles.logoCircle, { backgroundColor: 'rgba(243, 244, 246, 0.8)' }]}>
-          <Ionicons name="flash" size={48} color={colors.primary} />
+        <View style={[styles.logoCircle, { backgroundColor: palette.surfaceMuted }]}>
+          <Zap size={iconSize.xl} color={palette.primary} fill={palette.primary} />
         </View>
-        <Text
-          variant="h1"
-          align="center"
-          style={[styles.title, { color: '#1a1a1a' }]}
-        >
+        <Text variant="h1" align="center" style={[styles.title, { color: palette.textPrimary }]}>
           Flashly
         </Text>
-        <Text
-          variant="bodyLarge"
-          align="center"
-          style={[styles.subtitle, { color: '#6b7280' }]}
-        >
+        <Text variant="bodyLarge" align="center" style={[styles.subtitle, { color: palette.textSecondary }]}>
           Учись умнее. Запоминай надолго.
         </Text>
-        <ActivityIndicator
-          size="large"
-          color={colors.primary}
-          style={styles.spinner}
-        />
+        <ActivityIndicator size="large" color={palette.primary} accessibilityLabel="Загрузка" style={styles.spinner} />
       </View>
     </View>
   );
@@ -59,12 +43,10 @@ const styles = StyleSheet.create({
   },
   logoCircle: {
     padding: spacing.l,
-    borderRadius: 24,
+    borderRadius: borderRadius.xl,
     marginBottom: spacing.m,
   },
   title: {
-    fontWeight: '800',
-    letterSpacing: -0.5,
     marginBottom: spacing.xs,
   },
   subtitle: {

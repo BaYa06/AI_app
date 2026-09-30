@@ -3,17 +3,18 @@
  * @description Шаг 2: выбор роли (ученик / учитель).
  */
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
-import Ionicons from 'react-native-vector-icons/Ionicons';
-import { Button, Text } from '@/components/common';
-import { spacing, borderRadius } from '@/constants';
-import { useThemeColors } from '@/store';
+import { StyleSheet, View } from 'react-native';
+import { GraduationCap, Users } from 'lucide-react-native';
+import { Button, type IconComponent } from '@/components/ui';
+import { OnboardingOption } from '@/components/onboarding/OnboardingOption';
+import { OnboardingStep } from '@/components/onboarding/OnboardingStep';
+import { spacing } from '@/constants';
 
 type RoleOption = {
   id: string;
   title: string;
   description: string;
-  icon: string;
+  icon: IconComponent;
 };
 
 type Props = {
@@ -22,237 +23,42 @@ type Props = {
 };
 
 const OPTIONS: RoleOption[] = [
-  { id: 'student', title: 'Я учусь', description: 'Создавайте карточки и учите новое', icon: 'school' },
-  { id: 'teacher', title: 'Я преподаю', description: 'Создавайте курсы для учеников', icon: 'people' },
+  { id: 'student', title: 'Я учусь', description: 'Создавай карточки и учи новое', icon: GraduationCap },
+  { id: 'teacher', title: 'Я преподаю', description: 'Создавай курсы для учеников', icon: Users },
 ];
 
 export function RoleSelectionScreen({ onContinue, onBack }: Props) {
-  const colors = useThemeColors();
   const [selected, setSelected] = useState<string>('student');
 
-  const renderOption = (option: RoleOption) => {
-    const active = selected === option.id;
-    return (
-      <Pressable
-        key={option.id}
-        onPress={() => setSelected(option.id)}
-        style={[
-          styles.option,
-          {
-            borderColor: active ? colors.primary : colors.border,
-            backgroundColor: active ? `${colors.primary}0D` : colors.surface,
-          },
-        ]}
-      >
-        <View
-          style={[
-            styles.optionIcon,
-            { backgroundColor: active ? colors.primary : `${colors.surface}99` },
-          ]}
-        >
-          <Ionicons
-            name={option.icon as any}
-            size={26}
-            color={active ? colors.textInverse : colors.primary}
-          />
-        </View>
-        <View style={styles.optionText}>
-          <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
-            {option.title}
-          </Text>
-          <Text variant="bodySmall" color="secondary">
-            {option.description}
-          </Text>
-        </View>
-        <View
-          style={[
-            styles.optionRadio,
-            {
-              borderColor: active ? colors.primary : colors.border,
-              backgroundColor: active ? colors.primary : 'transparent',
-            },
-          ]}
-        >
-          {active && <Ionicons name="checkmark" size={14} color={colors.textInverse} />}
-        </View>
-      </Pressable>
-    );
-  };
-
   return (
-    <View
-      style={[
-        styles.screen,
-        { backgroundColor: colors.background },
-      ]}
+    <OnboardingStep
+      onBack={onBack}
+      title="Flashly"
+      progressLabel="Шаг 2 из 6"
+      progressValue="33%"
+      progress={33}
+      headline="Кто ты?"
+      description="Это поможет нам настроить приложение под тебя."
+      footer={<Button title="Продолжить" onPress={() => onContinue?.(selected)} fullWidth />}
     >
-      <View
-        style={[
-          styles.shell,
-          {
-            backgroundColor: colors.background,
-            shadowColor: colors.shadow,
-            borderColor: colors.border,
-          },
-        ]}
-      >
-        {/* Top bar */}
-        <View style={styles.topBar}>
-          <Pressable onPress={onBack} hitSlop={12} style={styles.backHit}>
-            <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
-          </Pressable>
-          <Text variant="h3" align="center" style={{ flex: 1, color: colors.textPrimary }}>
-            Flashly
-          </Text>
-          <View style={styles.backHit} />
-        </View>
-
-        {/* Progress */}
-        <View style={styles.progressBlock}>
-          <View style={styles.progressHeader}>
-            <Text variant="bodySmall" color="primary">
-              Шаг 2 из 6
-            </Text>
-            <Text variant="bodySmall" color="secondary">
-              33%
-            </Text>
-          </View>
-          <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-            <View
-              style={[
-                styles.progressFill,
-                { backgroundColor: colors.primary, width: '33%' },
-              ]}
-            />
-          </View>
-        </View>
-
-        {/* Content */}
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <View style={styles.headlineBlock}>
-            <Text variant="h1" style={[styles.headline, { color: colors.textPrimary }]}>
-              Кто вы?
-            </Text>
-            <Text variant="body" color="secondary" style={styles.bodyText}>
-              Это поможет нам настроить приложение под вас.
-            </Text>
-          </View>
-
-          <View style={styles.options}>{OPTIONS.map(renderOption)}</View>
-        </ScrollView>
-
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Button
-            title="Продолжить"
-            onPress={() => onContinue?.(selected)}
-            fullWidth
+      <View accessibilityRole="radiogroup" style={styles.options}>
+        {OPTIONS.map((option) => (
+          <OnboardingOption
+            key={option.id}
+            title={option.title}
+            description={option.description}
+            icon={option.icon}
+            selected={selected === option.id}
+            onPress={() => setSelected(option.id)}
           />
-        </View>
+        ))}
       </View>
-    </View>
+    </OnboardingStep>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    alignItems: 'center',
-    paddingHorizontal: 0,
-  },
-  shell: {
-    flex: 1,
-    width: '100%',
-    maxWidth: '100%',
-    borderRadius: 0,
-    borderWidth: 0,
-    overflow: 'hidden',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
-  },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.m,
-    paddingTop: spacing.m,
-    paddingBottom: spacing.s,
-  },
-  backHit: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  progressBlock: {
-    paddingHorizontal: spacing.l,
-    paddingTop: spacing.s,
-    paddingBottom: spacing.l,
-    gap: spacing.s,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  progressBar: {
-    height: 8,
-    borderRadius: borderRadius.full,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: borderRadius.full,
-  },
-  content: {
-    paddingHorizontal: spacing.l,
-    paddingBottom: spacing.xl,
-    paddingTop: spacing.l,
-    gap: spacing.l,
-  },
-  headlineBlock: {
-    gap: spacing.s,
-  },
-  headline: {
-    letterSpacing: -0.4,
-  },
-  bodyText: {
-    lineHeight: 22,
-  },
   options: {
     gap: spacing.m,
-  },
-  option: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.m,
-    borderWidth: 2,
-    borderRadius: borderRadius.l,
-    padding: spacing.m,
-  },
-  optionIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: borderRadius.m,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  optionText: {
-    flex: 1,
-    gap: 2,
-  },
-  optionRadio: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  footer: {
-    paddingHorizontal: spacing.l,
-    paddingVertical: spacing.xl,
-    gap: spacing.s,
   },
 });

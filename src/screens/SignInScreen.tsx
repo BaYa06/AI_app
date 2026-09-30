@@ -10,15 +10,18 @@ import {
   KeyboardAvoidingView,
   Linking,
   ScrollView,
-  Pressable,
 } from 'react-native';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import InAppBrowser from 'react-native-inappbrowser-reborn';
-import { Button, Input, Text } from '@/components/common';
-import { spacing, borderRadius } from '@/constants';
+import { Text } from '@/components/common';
+import { Button, GoogleLogo, ScreenHeader, type IconComponent } from '@/components/ui';
+import { spacing, screenPadding } from '@/constants';
 import { useThemeColors } from '@/store';
 import { SUPABASE_OAUTH_REDIRECT, supabase } from '@/services/supabaseClient';
 import { describeError } from '@/utils/userErrors';
+
+// Кнопка Google берёт иконку по тем же пропсам size/color, что и lucide
+const GoogleIcon = GoogleLogo as unknown as IconComponent;
 
 type Props = {
   onBack?: () => void;
@@ -28,6 +31,7 @@ type Props = {
 
 export function SignInScreen({ onBack, onSendCode, onCreateAccount }: Props) {
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,7 +62,7 @@ export function SignInScreen({ onBack, onSendCode, onCreateAccount }: Props) {
       const { error: authError } = await supabase.auth.signInAnonymously();
       if (authError) throw authError;
     } catch (e: any) {
-      setError('Не удалось войти. Попробуйте ещё раз.');
+      setError('Не удалось войти. Попробуй ещё раз.');
     } finally {
       setIsLoading(false);
     }
@@ -141,78 +145,55 @@ export function SignInScreen({ onBack, onSendCode, onCreateAccount }: Props) {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <KeyboardAvoidingView
-        style={{ flex: 1, width: '100%' }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <View
-          style={[
-            styles.shell,
-            { backgroundColor: colors.background, shadowColor: colors.shadow, borderColor: colors.border },
-          ]}
-        >
-          {/* Top app bar */}
-          <View style={styles.topBar}>
-            <Pressable onPress={onBack} hitSlop={12} style={styles.backHit}>
-              <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
-            </Pressable>
-            <View style={styles.backHit} />
+      <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        {/* Top app bar */}
+        <ScreenHeader onBack={onBack} />
+
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.headerText}>
+            <Text variant="h1" align="center" accessibilityRole="header" style={{ color: colors.textPrimary }}>
+              С возвращением
+            </Text>
+            <Text variant="body" align="center" style={[styles.subheader, { color: colors.textSecondary }]}>
+              Войди, чтобы продолжить обучение в Flashly
+            </Text>
           </View>
 
-          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-            <View style={styles.headerText}>
-              <Text variant="h1" align="center" style={{ color: colors.textPrimary }}>
-                С возвращением
+          <View style={styles.ctaBlock}>
+            <Button
+              title="Войти через Google"
+              icon={GoogleIcon}
+              onPress={signInWithGoogle}
+              fullWidth
+              disabled={isLoading}
+            />
+            {error && (
+              <Text variant="bodySmall" align="center" accessibilityRole="alert" style={{ color: colors.errorText }}>
+                {error}
               </Text>
-              <Text
-                variant="body"
-                color="secondary"
-                align="center"
-                style={styles.subheader}
-              >
-                Войдите, чтобы продолжить обучение в Flashly
-              </Text>
+            )}
+            {/* Guest login */}
+            <View style={styles.dividerRow}>
+              <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+              <Text variant="bodySmall" style={{ color: colors.textTertiary }}>или</Text>
+              <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
             </View>
-
-            <View style={styles.ctaBlock}>
-              <Button
-                title="Войти через Google"
-                onPress={signInWithGoogle}
-                fullWidth
-                disabled={isLoading}
-                leftIcon={<Ionicons name="logo-google" size={18} color={colors.primaryLight} />}
-              />
-              {error && (
-                <Text variant="bodySmall" color="error" align="center">
-                  {error}
-                </Text>
-              )}
-              {/* Guest login */}
-              <View style={styles.dividerRow}>
-                <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-                <Text variant="bodySmall" color="tertiary">или</Text>
-                <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-              </View>
-              <Pressable onPress={handleGuestLogin} disabled={isLoading} style={styles.guestButton}>
-                <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
-                  Попробовать без регистрации
-                </Text>
-              </Pressable>
-            </View>
-          </ScrollView>
-
-          <View style={styles.footer}>
-            <View style={styles.footerRow}>
-              <Text variant="bodySmall" color="tertiary">
-                Нет аккаунта?
-              </Text>
-              <Pressable onPress={onCreateAccount} hitSlop={8}>
-                <Text variant="bodySmall" style={{ color: colors.primary, fontWeight: '700' }}>
-                  Создать
-                </Text>
-              </Pressable>
-            </View>
+            <Button
+              title="Попробовать без регистрации"
+              variant="quiet"
+              tone="secondary"
+              onPress={handleGuestLogin}
+              disabled={isLoading}
+              fullWidth
+            />
           </View>
+        </ScrollView>
+
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.l) }]}>
+          <Text variant="bodySmall" style={{ color: colors.textTertiary }}>
+            Нет аккаунта?
+          </Text>
+          <Button title="Создать" variant="quiet" size="s" onPress={onCreateAccount} />
         </View>
       </KeyboardAvoidingView>
     </View>
@@ -222,36 +203,9 @@ export function SignInScreen({ onBack, onSendCode, onCreateAccount }: Props) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    alignItems: 'center',
-    paddingHorizontal: 0,
-  },
-  shell: {
-    flex: 1,
-    width: '100%',
-    maxWidth: '100%',
-    borderRadius: 0,
-    borderWidth: 0,
-    overflow: 'hidden',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
-  },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.m,
-    paddingTop: spacing.m,
-    paddingBottom: spacing.s,
-  },
-  backHit: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   content: {
-    paddingHorizontal: spacing.l,
+    paddingHorizontal: screenPadding,
     paddingTop: spacing.xl,
     paddingBottom: spacing.xl,
     gap: spacing.l,
@@ -261,12 +215,6 @@ const styles = StyleSheet.create({
   },
   subheader: {
     paddingHorizontal: spacing.s,
-  },
-  inputContainer: {
-    marginTop: spacing.s,
-  },
-  input: {
-    height: 56,
   },
   ctaBlock: {
     gap: spacing.s,
@@ -281,22 +229,12 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 1,
   },
-  guestButton: {
-    alignItems: 'center',
-    paddingVertical: spacing.s,
-  },
-  hint: {
-    lineHeight: 16,
-  },
   footer: {
-    paddingHorizontal: spacing.l,
-    paddingBottom: spacing.xl,
-    paddingTop: spacing.s,
-  },
-  footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
     justifyContent: 'center',
+    gap: spacing.xxs,
+    paddingHorizontal: screenPadding,
+    paddingTop: spacing.s,
   },
 });

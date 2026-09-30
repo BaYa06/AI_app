@@ -7,18 +7,17 @@ import {
   View,
   StyleSheet,
   ScrollView,
-  Modal,
-  TouchableOpacity,
   Platform,
   Linking,
   ActivityIndicator,
 } from 'react-native';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import { Zap, Sparkles, BookOpen, Lightbulb, Download, Share, PlusSquare, CheckCircle2 } from 'lucide-react-native';
 import InAppBrowser from 'react-native-inappbrowser-reborn';
 import appleAuth, { AppleButton } from '@invertase/react-native-apple-authentication';
-import { Button, Text } from '@/components/common';
+import { Text } from '@/components/common';
+import { Button, Dialog, GoogleLogo, type IconComponent } from '@/components/ui';
 import { useThemeColors } from '@/store';
-import { spacing, borderRadius } from '@/constants';
+import { spacing, borderRadius, alpha, heights, iconSize, screenPadding } from '@/constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePwaInstall } from '@/hooks/usePwaInstall';
 import { SUPABASE_OAUTH_REDIRECT, supabase } from '@/services/supabaseClient';
@@ -27,6 +26,24 @@ import { describeError } from '@/utils/userErrors';
 type Props = {
   isLoading?: boolean;
 };
+
+// Декоративные плитки: насыщенные — заливка primaryFill, светлые — подложка primary 10 / 20 %
+type Tile = { icon: IconComponent; fill: 'solid' | 10 | 20; rotate: string; offset: number };
+const TILES: Tile[] = [
+  { icon: Sparkles, fill: 'solid', rotate: '-6deg', offset: 0 },
+  { icon: BookOpen, fill: 10, rotate: '12deg', offset: spacing.s },
+  { icon: Zap, fill: 'solid', rotate: '5deg', offset: -spacing.s },
+  { icon: Lightbulb, fill: 20, rotate: '-8deg', offset: spacing.xs },
+];
+
+const INSTALL_STEPS: { icon: IconComponent; text: string }[] = [
+  { icon: Share, text: 'Нажми кнопку «Поделиться»' },
+  { icon: PlusSquare, text: 'Выбери «На экран Домой»' },
+  { icon: CheckCircle2, text: 'Нажми «Добавить»' },
+];
+
+// Кнопка Google берёт иконку по тем же пропсам size/color, что и lucide
+const GoogleIcon = GoogleLogo as unknown as IconComponent;
 
 export function WelcomeScreen({ isLoading: externalLoading }: Props) {
   const colors = useThemeColors();
@@ -39,12 +56,6 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
   const loading = isLoading || externalLoading;
   const canUseAppleSignIn = Platform.OS === 'ios' && appleAuth.isSupported;
 
-  const tiles = [
-    { icon: 'sparkles', color: 'rgba(100, 103, 242, 0.55)', rotate: '-6deg', iconColor: '#fff', offset: 0 },
-    { icon: 'book-outline', color: 'rgba(100, 103, 242, 0.18)', rotate: '12deg', iconColor: colors.primary, offset: 12 },
-    { icon: 'flash', color: 'rgba(100, 103, 242, 0.70)', rotate: '5deg', iconColor: '#fff', offset: -10 },
-    { icon: 'bulb-outline', color: 'rgba(100, 103, 242, 0.28)', rotate: '-8deg', iconColor: colors.primary, offset: 6 },
-  ];
 
   const getParamFromCallbackUrl = useCallback((rawUrl: string, name: string): string | null => {
     if (!rawUrl || !name) return null;
@@ -175,173 +186,115 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
   }, [canUseAppleSignIn]);
 
   return (
-    <View
-      style={[
-        styles.screen,
-        {
-          backgroundColor: colors.background,
-        },
-      ]}
-    >
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          {
-            paddingTop: 10,
-            paddingBottom: insets.bottom,
-          },
+          { paddingTop: spacing.s, paddingBottom: insets.bottom },
         ]}
         showsVerticalScrollIndicator={false}
       >
-      <View
-        style={[
-          styles.shell,
-          {
-            backgroundColor: colors.background,
-            shadowColor: colors.shadow,
-          },
-        ]}
-      >
-        <View style={styles.header}>
-          <View style={styles.logoCircle}>
-            <Ionicons name="flash" size={36} color={colors.primary} />
-          </View>
-          <Text
-            variant="h1"
-            align="center"
-            style={[styles.title, { color: colors.textPrimary }]}
-          >
-            Flashly
-          </Text>
-          <Text
-            variant="bodyLarge"
-            color="secondary"
-            align="center"
-            style={styles.subtitle}
-          >
-            Учись умнее. Запоминай надолго.
-          </Text>
-        </View>
-
-        <View style={styles.illustration}>
-          <View style={styles.tilesGrid}>
-            {tiles.map((tile, idx) => (
-              <View
-                key={tile.icon + idx}
-                style={[
-                  styles.tile,
-                  {
-                    backgroundColor: tile.color,
-                    transform: [{ rotate: tile.rotate }],
-                    marginTop: tile.offset,
-                    shadowColor: colors.shadow,
-                  },
-                ]}
-              >
-                <Ionicons name={tile.icon as any} size={30} color={tile.iconColor} />
-              </View>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.actions}>
-          {loading ? (
-            <ActivityIndicator size="large" color={colors.primary} style={{ marginVertical: spacing.m }} />
-          ) : (
-            <>
-              <Button
-                title="Войти через Google"
-                onPress={signInWithGoogle}
-                fullWidth
-                leftIcon={<Ionicons name="logo-google" size={20} color={colors.textInverse} />}
-                style={styles.actionButton}
-              />
-              {canUseAppleSignIn && (
-                <AppleButton
-                  buttonStyle={AppleButton.Style.BLACK}
-                  buttonType={AppleButton.Type.SIGN_IN}
-                  style={styles.appleButton}
-                  onPress={signInWithApple}
-                />
-              )}
-            </>
-          )}
-          {authError && (
-            <Text variant="bodySmall" align="center" style={{ color: colors.error, marginTop: spacing.s }}>
-              {authError}
+        <View style={styles.shell}>
+          <View style={styles.header}>
+            <View style={[styles.logoCircle, { backgroundColor: colors.surfaceMuted }]}>
+              <Zap size={iconSize.l} color={colors.primary} fill={colors.primary} />
+            </View>
+            <Text variant="h1" align="center" accessibilityRole="header" style={{ color: colors.textPrimary }}>
+              Flashly
             </Text>
-          )}
-          {(canInstall || isIosSafari) && (
-            <Button
-              title="Скачать приложение"
-              variant="ghost"
-              onPress={canInstall ? promptInstall : () => setShowIosModal(true)}
-              fullWidth
-              leftIcon={<Ionicons name="download-outline" size={20} color={colors.primary} />}
-              style={styles.actionButton}
-            />
-          )}
-        </View>
+            <Text variant="bodyLarge" align="center" style={[styles.subtitle, { color: colors.textSecondary }]}>
+              Учись умнее. Запоминай надолго.
+            </Text>
+          </View>
 
-        <View style={styles.footer}>
-          <Text variant="caption" color="secondary" align="center" style={styles.footerLine}>
-            Продолжая, вы соглашаетесь с нашими
-          </Text>
-          <Text variant="caption" color="secondary" align="center" style={styles.footerLine}>
-            Условиями использования и Политикой конфиденциальности
-          </Text>
-        </View>
+          <View style={styles.illustration} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+            <View style={styles.tilesGrid}>
+              {TILES.map(({ icon: Glyph, fill, rotate, offset }, idx) => (
+                <View
+                  key={idx}
+                  style={[
+                    styles.tile,
+                    {
+                      backgroundColor: fill === 'solid' ? colors.primaryFill : alpha(colors.primary, fill),
+                      transform: [{ rotate }],
+                      marginTop: offset,
+                    },
+                  ]}
+                >
+                  <Glyph size={iconSize.l} color={fill === 'solid' ? colors.onPrimary : colors.primary} />
+                </View>
+              ))}
+            </View>
+          </View>
 
-        <View style={[styles.homeIndicator, { backgroundColor: colors.border }]} />
-      </View>
+          <View style={styles.actions}>
+            {loading ? (
+              <ActivityIndicator
+                size="large"
+                color={colors.primary}
+                accessibilityLabel="Входим"
+                style={styles.spinner}
+              />
+            ) : (
+              <>
+                <Button title="Войти через Google" icon={GoogleIcon} onPress={signInWithGoogle} fullWidth />
+                {canUseAppleSignIn && (
+                  <AppleButton
+                    buttonStyle={AppleButton.Style.BLACK}
+                    buttonType={AppleButton.Type.SIGN_IN}
+                    cornerRadius={borderRadius.m}
+                    style={styles.appleButton}
+                    onPress={signInWithApple}
+                  />
+                )}
+              </>
+            )}
+            {authError && (
+              <Text variant="bodySmall" align="center" accessibilityRole="alert" style={{ color: colors.errorText }}>
+                {authError}
+              </Text>
+            )}
+            {(canInstall || isIosSafari) && (
+              <Button
+                title="Скачать приложение"
+                variant="quiet"
+                icon={Download}
+                onPress={canInstall ? promptInstall : () => setShowIosModal(true)}
+                fullWidth
+              />
+            )}
+          </View>
+
+          <View style={styles.footer}>
+            <Text variant="caption" align="center" style={{ color: colors.textSecondary }}>
+              Продолжая, ты соглашаешься с нашими
+            </Text>
+            <Text variant="caption" align="center" style={{ color: colors.textSecondary }}>
+              Условиями использования и Политикой конфиденциальности
+            </Text>
+          </View>
+
+          <View style={[styles.homeIndicator, { backgroundColor: colors.border }]} />
+        </View>
       </ScrollView>
 
-      <Modal
+      <Dialog
         visible={showIosModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowIosModal(false)}
+        onClose={() => setShowIosModal(false)}
+        title="Установить приложение"
+        footer={<Button title="Понятно" onPress={() => setShowIosModal(false)} fullWidth />}
       >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowIosModal(false)}
-        >
-          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
-            <Text variant="h3" align="center" style={{ color: colors.textPrimary, marginBottom: spacing.m }}>
-              Установить приложение
-            </Text>
-
-            <View style={styles.modalStep}>
-              <Ionicons name="share-outline" size={24} color={colors.primary} />
-              <Text variant="body" style={{ color: colors.textPrimary, marginLeft: spacing.s, flex: 1 }}>
-                Нажмите кнопку «Поделиться»
+        <View style={styles.modalSteps}>
+          {INSTALL_STEPS.map(({ icon: Glyph, text }) => (
+            <View key={text} style={styles.modalStep}>
+              <Glyph size={iconSize.m} color={colors.primary} />
+              <Text variant="body" style={[styles.modalStepText, { color: colors.textPrimary }]}>
+                {text}
               </Text>
             </View>
-
-            <View style={styles.modalStep}>
-              <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
-              <Text variant="body" style={{ color: colors.textPrimary, marginLeft: spacing.s, flex: 1 }}>
-                Выберите «На экран Домой»
-              </Text>
-            </View>
-
-            <View style={styles.modalStep}>
-              <Ionicons name="checkmark-circle-outline" size={24} color={colors.primary} />
-              <Text variant="body" style={{ color: colors.textPrimary, marginLeft: spacing.s, flex: 1 }}>
-                Нажмите «Добавить»
-              </Text>
-            </View>
-
-            <Button
-              title="Понятно"
-              onPress={() => setShowIosModal(false)}
-              fullWidth
-              style={{ marginTop: spacing.m }}
-            />
-          </View>
-        </TouchableOpacity>
-      </Modal>
+          ))}
+        </View>
+      </Dialog>
     </View>
   );
 }
@@ -358,27 +311,15 @@ const styles = StyleSheet.create({
   shell: {
     width: '100%',
     maxWidth: 480,
-    borderRadius: 0,
-    paddingHorizontal: spacing.l,
-    paddingVertical: 0,
-    overflow: 'hidden',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
+    paddingHorizontal: screenPadding,
   },
   header: {
     alignItems: 'center',
     marginBottom: spacing.l,
   },
   logoCircle: {
-    backgroundColor: 'rgba(243, 244, 246, 0.8)',
     padding: spacing.m,
-    borderRadius: 18,
-  },
-  title: {
-    fontWeight: '800',
-    letterSpacing: -0.5,
+    borderRadius: borderRadius.l,
   },
   subtitle: {
     marginTop: spacing.xs,
@@ -401,53 +342,40 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.l,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 18,
-    elevation: 10,
     marginBottom: spacing.m,
   },
   actions: {
+    gap: spacing.s,
     marginBottom: spacing.l,
   },
-  actionButton: {
-    marginBottom: spacing.s,
+  spinner: {
+    marginVertical: spacing.m,
   },
   appleButton: {
     width: '100%',
-    height: 48,
-    marginBottom: spacing.s,
+    height: heights.button,
   },
   footer: {
+    gap: spacing.xxs / 2,
     marginBottom: spacing.m,
-  },
-  footerLine: {
-    marginBottom: 2,
   },
   homeIndicator: {
     alignSelf: 'center',
     width: 110,
     height: 6,
-    borderRadius: 999,
+    borderRadius: borderRadius.full,
     opacity: 0.6,
     marginTop: spacing.s,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.l,
-  },
-  modalContent: {
-    width: '100%',
-    maxWidth: 340,
-    borderRadius: borderRadius.l,
-    padding: spacing.l,
+  modalSteps: {
+    gap: spacing.m,
   },
   modalStep: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.m,
+    gap: spacing.s,
+  },
+  modalStepText: {
+    flex: 1,
   },
 });

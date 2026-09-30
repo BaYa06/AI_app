@@ -1,33 +1,20 @@
 /**
  * NotificationPrompt
- * @description Bottom-sheet модал для запроса разрешения на push-уведомления.
+ * @description Нижний лист с запросом разрешения на push-уведомления.
  * Показывается один раз при первом входе на HomeScreen.
  */
-import React, { useCallback, useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  Pressable,
-  Modal,
-  Platform,
-  Text as RNText,
-} from 'react-native';
-import ReAnimated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  Easing,
-  runOnJS,
-} from 'react-native-reanimated';
-import { Bell } from '@/components/common/Icons';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, StyleSheet } from 'react-native';
+import { Bell, Flame } from 'lucide-react-native';
+import { Button, Sheet } from '@/components/ui';
 import { useThemeColors } from '@/store';
 import { requestPushPermission } from '@/services/pushNotifications';
 import { StorageService } from '@/services/StorageService';
 import { supabase } from '@/services';
-import { spacing, borderRadius } from '@/constants';
+import { spacing, borderRadius, alpha, iconSize } from '@/constants';
+import { Text } from './Text';
 
 const STORAGE_KEY = 'notification_prompt_shown';
-const ANIMATION_DURATION = 300;
 
 interface Props {
   visible: boolean;
@@ -39,40 +26,14 @@ export function NotificationPrompt({ visible, onDismiss }: Props) {
   const [resultText, setResultText] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const translateY = useSharedValue(400);
-  const backdropOpacity = useSharedValue(0);
-
-  const markShown = useCallback(() => {
-    StorageService.setString(STORAGE_KEY, 'true');
-  }, []);
+  useEffect(() => {
+    if (visible) setResultText(null);
+  }, [visible]);
 
   const close = useCallback(() => {
-    markShown();
-    translateY.value = withTiming(400, {
-      duration: ANIMATION_DURATION,
-      easing: Easing.in(Easing.ease),
-    }, () => {
-      runOnJS(onDismiss)();
-    });
-    backdropOpacity.value = withTiming(0, { duration: ANIMATION_DURATION });
-  }, [onDismiss, markShown]);
-
-  // Animate in when modal becomes visible
-  React.useEffect(() => {
-    if (visible) {
-      setResultText(null);
-      translateY.value = 400;
-      backdropOpacity.value = 0;
-      // Start entrance animation on next frame
-      requestAnimationFrame(() => {
-        translateY.value = withTiming(0, {
-          duration: ANIMATION_DURATION,
-          easing: Easing.out(Easing.ease),
-        });
-        backdropOpacity.value = withTiming(1, { duration: ANIMATION_DURATION });
-      });
-    }
-  }, [visible]);
+    StorageService.setString(STORAGE_KEY, 'true');
+    onDismiss();
+  }, [onDismiss]);
 
   const handleAllow = useCallback(async () => {
     setLoading(true);
@@ -82,7 +43,7 @@ export function NotificationPrompt({ visible, onDismiss }: Props) {
       const status = await requestPushPermission(userId);
 
       if (status.permission === 'granted') {
-        setResultText('Уведомления включены \u2713');
+        setResultText('Уведомления включены ✓');
       } else if (status.permission === 'denied') {
         setResultText('Разреши в настройках телефона');
       }
@@ -90,176 +51,74 @@ export function NotificationPrompt({ visible, onDismiss }: Props) {
       setResultText('Не удалось включить');
     } finally {
       setLoading(false);
-      // Close after showing result briefly
+      // Закрываем, показав результат
       setTimeout(close, 1200);
     }
   }, [close]);
 
-  const handleDismiss = useCallback(() => {
-    close();
-  }, [close]);
-
-  const sheetStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
-  }));
-
-  const backdropStyle = useAnimatedStyle(() => ({
-    opacity: backdropOpacity.value,
-  }));
-
-  if (!visible) return null;
-
   return (
-    <Modal transparent visible={visible} statusBarTranslucent animationType="none">
-      <View style={styles.container}>
-        {/* Backdrop */}
-        <ReAnimated.View style={[styles.backdrop, backdropStyle]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={handleDismiss} />
-        </ReAnimated.View>
+    <Sheet visible={visible} onClose={close} scroll={false}>
+      <View style={styles.body}>
+        {/* Bell icon */}
+        <View style={[styles.iconCircle, { backgroundColor: alpha(colors.primary, 10) }]}>
+          <Bell size={iconSize.xl} color={colors.primary} />
+        </View>
 
-        {/* Bottom sheet */}
-        <ReAnimated.View
-          style={[
-            styles.sheet,
-            {
-              backgroundColor: colors.background,
-              ...Platform.select({
-                ios: {
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: -4 },
-                  shadowOpacity: 0.15,
-                  shadowRadius: 16,
-                },
-                android: { elevation: 16 },
-                web: { boxShadow: '0 -4px 24px rgba(0,0,0,0.15)' },
-              }),
-            },
-            sheetStyle,
-          ]}
-        >
-          {/* Handle */}
-          <View style={[styles.handle, { backgroundColor: colors.border }]} />
+        <Text variant="h3" align="center" accessibilityRole="header" style={{ color: colors.textPrimary }}>
+          Включи уведомления
+        </Text>
 
-          {/* Bell icon */}
-          <View style={[styles.iconCircle, { backgroundColor: colors.primary + '15' }]}>
-            <Bell size={64} color={colors.primary} />
+        <Text variant="body" align="center" style={[styles.subtitle, { color: colors.textSecondary }]}>
+          {'Напомним когда пора повторить карточки\nи не дадим пропустить серию '}
+          <Flame size={iconSize.xs} color={colors.streak} />
+        </Text>
+
+        {/* Result text (after action) */}
+        {resultText ? (
+          <Text variant="button" align="center" accessibilityRole="alert" style={[styles.result, { color: colors.primary }]}>
+            {resultText}
+          </Text>
+        ) : (
+          /* Buttons (hidden after action) */
+          <View style={styles.actions}>
+            <Button
+              title={loading ? 'Запрашиваем...' : 'Разрешить уведомления'}
+              icon={Bell}
+              onPress={handleAllow}
+              disabled={loading}
+              fullWidth
+            />
+            <Button title="Не сейчас" variant="quiet" tone="secondary" onPress={close} fullWidth />
           </View>
-
-          {/* Title */}
-          <RNText style={[styles.title, { color: colors.textPrimary }]}>
-            Включи уведомления
-          </RNText>
-
-          {/* Subtitle */}
-          <RNText style={[styles.subtitle, { color: colors.textSecondary }]}>
-            {'Напомним когда пора повторить карточки\nи не дадим пропустить streak \uD83D\uDD25'}
-          </RNText>
-
-          {/* Result text (after action) */}
-          {resultText && (
-            <RNText style={[styles.resultText, { color: colors.primary }]}>
-              {resultText}
-            </RNText>
-          )}
-
-          {/* Buttons (hidden after action) */}
-          {!resultText && (
-            <>
-              {/* Primary button */}
-              <Pressable
-                style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: loading ? 0.7 : 1 }]}
-                onPress={handleAllow}
-                disabled={loading}
-              >
-                <Bell size={20} color="#FFFFFF" />
-                <RNText style={styles.primaryButtonText}>
-                  {loading ? 'Запрашиваем...' : 'Разрешить уведомления'}
-                </RNText>
-              </Pressable>
-
-              {/* Secondary button */}
-              <Pressable style={styles.secondaryButton} onPress={handleDismiss}>
-                <RNText style={[styles.secondaryButtonText, { color: colors.textSecondary }]}>
-                  Не сейчас
-                </RNText>
-              </Pressable>
-            </>
-          )}
-        </ReAnimated.View>
+        )}
       </View>
-    </Modal>
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  sheet: {
-    borderTopLeftRadius: borderRadius.xl,
-    borderTopRightRadius: borderRadius.xl,
-    paddingHorizontal: spacing.l,
-    paddingTop: spacing.s,
-    paddingBottom: spacing.xxl,
+  body: {
     alignItems: 'center',
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    marginBottom: spacing.l,
+    paddingTop: spacing.xs,
   },
   iconCircle: {
     width: 96,
     height: 96,
-    borderRadius: 48,
+    borderRadius: borderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.m,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: spacing.xs,
   },
   subtitle: {
-    fontSize: 15,
-    textAlign: 'center',
-    lineHeight: 22,
+    marginTop: spacing.xs,
     marginBottom: spacing.l,
   },
-  resultText: {
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
+  result: {
+    letterSpacing: 0,
     marginBottom: spacing.m,
   },
-  primaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.s,
-    width: '100%',
-    height: 52,
-    borderRadius: borderRadius.l,
-    marginBottom: spacing.s,
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  secondaryButton: {
-    paddingVertical: spacing.m,
-  },
-  secondaryButtonText: {
-    fontSize: 15,
-    fontWeight: '500',
+  actions: {
+    alignSelf: 'stretch',
+    gap: spacing.xs,
   },
 });
