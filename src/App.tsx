@@ -20,7 +20,8 @@ import { X } from 'lucide-react-native';
 import { Text as ThemedText } from '@/components/common/Text';
 import { borderRadius, colors as palette, iconSize, screenPadding, spacing } from '@/constants';
 import { CourseInviteModal } from '@/components/CourseInviteModal';
-import { useCoursesStore } from '@/store';
+import { useCoursesStore, useSettingsStore } from '@/store';
+import { NEW_PER_DAY_OPTIONS } from '@/services/LessonService';
 import { WelcomeScreen } from '@/screens/WelcomeScreen';
 import { NameOnboardingScreen } from '@/screens/NameOnboardingScreen';
 import { RoleSelectionScreen } from '@/screens/RoleSelectionScreen';
@@ -743,6 +744,12 @@ export default function App() {
   }, [currentUserId]);
 
   const handleSubmitDaily = useCallback((dailyId: string) => {
+    // Выбор «5 / 10 / 20 слов в день» — квота новых слов урока дня (plan/home_redesign.md, 1.5)
+    const perDay = Number(dailyId);
+    if ((NEW_PER_DAY_OPTIONS as readonly number[]).includes(perDay)) {
+      useSettingsStore.getState().updateSettings({ lessonNewPerDay: perDay });
+      DatabaseService.saveSettings();
+    }
     const finalData = { ...onboardingData, dailyGoal: dailyId };
     setOnboardingData(finalData);
     finishOnboarding(finalData);

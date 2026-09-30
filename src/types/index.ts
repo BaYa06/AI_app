@@ -328,6 +328,8 @@ export type ThemeMode = 'light' | 'dark' | 'system';
 export interface UserSettings {
   // Изучение
   dailyNewCardsLimit: number;
+  /** Урок дня: сколько новых слов добавлять в день (5 / 10 / 20) — plan/home_redesign.md, 1.5 */
+  lessonNewPerDay: number;
   dailyReviewLimit: number;
   studyCardLimit: number | null; // null = все карты
 

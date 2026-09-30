@@ -1,6 +1,6 @@
 /**
  * Learning Settings Screen
- * @description Настройки обучения: размер порции и обратный режим
+ * @description Настройки обучения: новые слова в уроке дня, размер порции и обратный режим
  */
 import React, { useCallback } from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
@@ -9,6 +9,8 @@ import { DatabaseService } from '@/services';
 import { Text } from '@/components/common';
 import { Card, Screen, ScreenHeader, Switch } from '@/components/ui';
 import { spacing, borderRadius, heights } from '@/constants';
+import { NEW_PER_DAY_OPTIONS } from '@/services/LessonService';
+import { pluralize } from '@/utils';
 
 const CARD_LIMIT_OPTIONS: Array<{ value: number | null; label: string }> = [
   { value: 10, label: '10' },
@@ -19,6 +21,7 @@ const CARD_LIMIT_OPTIONS: Array<{ value: number | null; label: string }> = [
 
 export function LearningSettingsScreen({ navigation }: any) {
   const colors = useThemeColors();
+  const lessonNewPerDay = useSettingsStore((s) => s.settings.lessonNewPerDay);
   const studyCardLimit = useSettingsStore((s) => s.settings.studyCardLimit);
   const reverseCards = useSettingsStore((s) => s.settings.reverseCards);
   const updateSettings = useSettingsStore((s) => s.updateSettings);
@@ -26,6 +29,14 @@ export function LearningSettingsScreen({ navigation }: any) {
   const handleSelectLimit = useCallback(
     (value: number | null) => {
       updateSettings({ studyCardLimit: value });
+      DatabaseService.saveSettings();
+    },
+    [updateSettings],
+  );
+
+  const handleSelectNewPerDay = useCallback(
+    (value: number) => {
+      updateSettings({ lessonNewPerDay: value });
       DatabaseService.saveSettings();
     },
     [updateSettings],
@@ -44,8 +55,36 @@ export function LearningSettingsScreen({ navigation }: any) {
       header={<ScreenHeader title="Настройки обучения" onBack={() => navigation.goBack()} bordered />}
       contentStyle={st.content}
     >
+      {/* ======== Урок дня ======== */}
+      <Text variant="overline" color="secondary" style={st.groupLabel}>Урок дня</Text>
+      <Card style={st.card}>
+        <Text variant="body" style={[st.cardTitle, { color: colors.textPrimary }]}>Новых слов в день</Text>
+        <Text variant="bodySmall" color="secondary" style={st.cardHint}>
+          Сколько новых слов добавлять в урок на главной. Больше — быстрее пройдёшь наборы, но урок дольше.
+        </Text>
+        <View style={st.chipsRow} accessibilityRole="radiogroup">
+          {NEW_PER_DAY_OPTIONS.map((value) => {
+            const active = lessonNewPerDay === value;
+            return (
+              <Pressable
+                key={value}
+                onPress={() => handleSelectNewPerDay(value)}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: active }}
+                accessibilityLabel={`${value} ${pluralize(value, 'новое слово', 'новых слова', 'новых слов')} в день`}
+                style={[st.chip, { backgroundColor: active ? colors.primaryFill : colors.surfaceMuted }]}
+              >
+                <Text variant="button" style={[st.chipText, { color: active ? colors.onPrimary : colors.textPrimary }]}>
+                  {value}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </Card>
+
       {/* ======== Card Limit ======== */}
-      <Text variant="overline" color="secondary" style={st.groupLabel}>Тренировка</Text>
+      <Text variant="overline" color="secondary" style={[st.groupLabel, st.groupLabelSpaced]}>Тренировка</Text>
       <Card style={st.card}>
         <Text variant="body" style={[st.cardTitle, { color: colors.textPrimary }]}>Слов за одну тренировку</Text>
         <Text variant="bodySmall" color="secondary" style={st.cardHint}>
@@ -96,6 +135,9 @@ const st = StyleSheet.create({
   groupLabel: {
     marginBottom: spacing.xs,
     marginLeft: spacing.xxs,
+  },
+  groupLabelSpaced: {
+    marginTop: spacing.l,
   },
   card: {
     marginBottom: spacing.s,

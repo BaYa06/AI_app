@@ -1,6 +1,7 @@
 /**
  * DailyGoalScreen
- * @description Шаг 5: выбор дневной цели (сколько слов в день). Только UI, без сохранения.
+ * @description Шаг 5: выбор дневной цели (сколько слов в день). Выбор сохраняет App (handleSubmitDaily)
+ * в настройку lessonNewPerDay — квоту новых слов урока дня; id вариантов — числа из NEW_PER_DAY_OPTIONS.
  */
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';

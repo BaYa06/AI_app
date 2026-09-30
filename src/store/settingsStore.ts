@@ -11,6 +11,7 @@ import { colors, ColorScheme } from '@/constants';
 import { StreakService } from '@/services/StreakService';
 import { NeonService } from '@/services/NeonService';
 import { supabase } from '@/services';
+import { DEFAULT_NEW_PER_DAY } from '@/services/LessonService';
 
 interface SettingsState {
   // Настройки пользователя
@@ -67,6 +68,7 @@ interface SettingsActions {
 
 const defaultSettings: UserSettings = {
   dailyNewCardsLimit: 20,
+  lessonNewPerDay: DEFAULT_NEW_PER_DAY,
   dailyReviewLimit: 100,
   studyCardLimit: 20,
   reminderEnabled: false,

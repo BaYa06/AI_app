@@ -62,7 +62,7 @@ import { Analytics } from '@/services/analytics';
 import { firstLessonStep } from '@/services/lessonFlow';
 import { useLessonStore } from '@/store/lessonStore';
 import { localDay } from '@/store/challengeStore';
-import { buildLessonPlan, countWaitingReview, ensureLessonDay, DEFAULT_NEW_PER_DAY } from '@/services/LessonService';
+import { buildLessonPlan, countWaitingReview, ensureLessonDay } from '@/services/LessonService';
 import { isLessonStartable, lessonTitle, lessonHint } from '@/components/home/lessonText';
 
 const StaggerCard = React.memo(function StaggerCard({
@@ -642,6 +642,7 @@ export function HomeScreen({ navigation }: any) {
   // Урок дня: наборы курса в порядке списка (без учёта поиска) — из них берутся новые слова
   const lessonSets = useMemo(() => [...filteredSets].sort(SETS_COMPARATORS[setsSort]), [filteredSets, setsSort]);
   const lessonDay = useLessonStore((s) => s.day);
+  const lessonNewPerDay = useSettingsStore((s) => s.settings.lessonNewPerDay);
   const lessonPlan = useMemo(() => {
     const now = Date.now();
     const today = localDay();
@@ -649,8 +650,8 @@ export function HomeScreen({ navigation }: any) {
     const day = lessonDay?.date === today
       ? lessonDay
       : ensureLessonDay(lessonDay, today, countWaitingReview(lessonSets, cardsBySet, cardsMap, now));
-    return buildLessonPlan({ sets: lessonSets, cardsBySet, cards: cardsMap, newPerDay: DEFAULT_NEW_PER_DAY, day, now });
-  }, [lessonSets, cardsBySet, cardsMap, lessonDay]);
+    return buildLessonPlan({ sets: lessonSets, cardsBySet, cards: cardsMap, newPerDay: lessonNewPerDay, day, now });
+  }, [lessonSets, cardsBySet, cardsMap, lessonDay, lessonNewPerDay]);
 
   // Утренний снимок дня — при заходе на главную, когда карточки уже загружены
   // (иначе снимок «0 ждут» дал бы полную квоту новых в день большого повторения)
