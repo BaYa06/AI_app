@@ -1578,7 +1578,9 @@ export function HomeScreen({ navigation }: any) {
               const waitingCount = reviewStats.waitingBySet[set.id] || 0;
               const cardsLabel = `${set.cardCount} ${pluralize(set.cardCount, 'карточка', 'карточки', 'карточек')}`;
               const showHidden = !!(set.isHiddenFromStudents && set.courseId && isTeacher);
-              const hasBadges = waitingCount > 0 || !!set.isOfficial || showHidden;
+              // Набор, из которого урок дня берёт новые слова (5.2) — связывает список с карточкой урока
+              const isFocus = isTeacher !== true && lessonPlan.focusSetId === set.id;
+              const hasBadges = isFocus || waitingCount > 0 || !!set.isOfficial || showHidden;
 
               return (
                 <StaggerCard key={set.id} index={index}>
@@ -1589,6 +1591,7 @@ export function HomeScreen({ navigation }: any) {
                     cardsLabel,
                     `выучено ${progress}%`,
                     waitingCount > 0 ? `${waitingCount} ждут повторения` : null,
+                    isFocus ? 'сейчас учишь' : null,
                   ].filter(Boolean).join(', ')}
                 >
                   {/* Строка набора (plan/home_redesign.md, 5.1): дата, название, «48 карточек · 62%», бейджи, прогресс */}
@@ -1610,6 +1613,7 @@ export function HomeScreen({ navigation }: any) {
                         </Text>
                         {hasBadges && (
                           <View style={styles.setBadges}>
+                            {isFocus && <Badge label="Сейчас учишь" tone="primary" />}
                             {/* «N ждут» — единственный цветной сигнал строки: здесь есть дело */}
                             {waitingCount > 0 && (
                               <Badge label={`${waitingCount} ждут`} tone="warning" icon={RotateCcw} />
