@@ -43,6 +43,26 @@ target 'FlashcardsApp' do
       # :ccache_enabled => true
     )
 
+    # RN 0.73 добавляет «-Wl -ld_classic» для любого Xcode ≥ 15 — обход бага нового линковщика Xcode 15.0.
+    # На свежем Xcode (Codemagic: xcode latest) классический ld64 падает на бинарном Firebase Analytics:
+    # «ld: Assertion failed: (it != _dylibToOrdinal.end())». С Xcode 15.1 новый линковщик исправлен —
+    # снимаем флаг (в новых версиях RN его тоже больше не добавляют).
+    xcode = `xcodebuild -version`.match(/Xcode (\d+)\.(\d+)/)
+    if xcode && (xcode[1].to_i > 15 || (xcode[1].to_i == 15 && xcode[2].to_i >= 1))
+      projects = [installer.pods_project] + installer.aggregate_targets.map(&:user_project).compact.uniq
+      projects.each do |project|
+        project.build_configurations.each do |build_config|
+          flags = build_config.build_settings['OTHER_LDFLAGS']
+          if flags.is_a?(Array)
+            build_config.build_settings['OTHER_LDFLAGS'] = flags.reject { |f| f == '-ld_classic' || f == '-Wl' }
+          elsif flags.is_a?(String)
+            build_config.build_settings['OTHER_LDFLAGS'] = flags.gsub(/\s*-Wl\s+-ld_classic\b/, '').strip
+          end
+        end
+        project.save
+      end
+    end
+
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
         if config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'].to_f < 13.0
