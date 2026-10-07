@@ -550,6 +550,52 @@ export const Analytics = {
 
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // ВИДЖЕТ НА ЭКРАНЕ БЛОКИРОВКИ
+  // Зачем: понять, учит ли виджет и приводит ли в урок (plan/widgets.md, «Аналитика»).
+  // family — accessoryRectangular / accessoryInline / accessoryCircular.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * При открытии приложения нашли виджет, которого раньше не было.
+   */
+  widgetInstalled: (family: string) =>
+    log('widget_installed', { family }),
+
+  /**
+   * Виджет пропал. days_kept — сколько дней он простоял; много удалений в первые 7 дней — виджет раздражает.
+   */
+  widgetRemoved: (params: { family: string; daysKept: number }) =>
+    log('widget_removed', { family: params.family, days_kept: params.daysKept }),
+
+  /**
+   * Приложение открыто по ссылке из виджета. state — состояние виджета в момент нажатия, target — lesson / set.
+   */
+  widgetOpenedApp: (params: { state: string; family: string; target: string }) =>
+    log('widget_opened_app', { state: params.state, family: params.family, target: params.target }),
+
+  /**
+   * Нажатия «Показать» на виджете (iOS 17+), забранные при открытии приложения.
+   */
+  widgetReveals: (count: number) =>
+    log('widget_reveals', { count }),
+
+  /**
+   * Подсказка «Учи слова прямо с экрана блокировки» показана / нажата.
+   */
+  widgetPromptShown: (place: string) =>
+    log('widget_prompt_shown', { place }),
+  widgetPromptClicked: (place: string) =>
+    log('widget_prompt_clicked', { place }),
+
+  /**
+   * Ответ в уроке на слово, подходившее в пул виджета. in_widget — слово было в виджете (иначе контрольная
+   * половина). Точность двух групп — главная метрика виджета.
+   */
+  widgetWordReviewed: (params: { inWidget: boolean; correct: boolean }) =>
+    log('widget_word_reviewed', { in_widget: params.inWidget, correct: params.correct }),
+
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // ОШИБКИ И ТЕХНИЧЕСКИЕ СОБЫТИЯ
   // Зачем: видим user-facing ошибки до того как они попадут в отзывы.
   // ═══════════════════════════════════════════════════════════════════════════

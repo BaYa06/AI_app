@@ -201,7 +201,7 @@ widgetBridge.ios.ts ──────────────────▶   
   - `prefixes: ['flashly://']`, `filter` только для `lesson` и `set/`. `lesson` открывает главную с `from=widget`, главная запускает урок, если он не пройден (`kind: 'start'`). `set/:setId` — существующий маршрут набора.
   - **Готово, когда:** `flashly://lesson?from=widget` открывает урок, `flashly://set/<id>?from=widget` — набор, вход через `flashly://auth-callback` работает как раньше.
 
-- [ ] **0.4 События аналитики** — `src/services/analytics.ts`
+- [x] **0.4 События аналитики** — `src/services/analytics.ts`
   - Объявить события из таблицы выше.
   - **Готово, когда:** события есть в коде с параметрами, вызовы добавляются в шагах ниже.
 
