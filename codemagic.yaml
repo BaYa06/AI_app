@@ -10,6 +10,7 @@ workflows:
         - app_secrets
       vars:
         BUNDLE_ID: "com.baiirbek.flashly"
+        WIDGET_BUNDLE_ID: "com.baiirbek.flashly.widget"
     scripts:
       - name: Install dependencies
         script: npm ci
@@ -45,6 +46,17 @@ workflows:
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
             --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
             --create
+          # Виджет на экране блокировки (plan/widgets.md, 0.2) — свой bundle ID и профиль.
+          # Пока таргета FlashlyWidget нет в проекте, профиль не запрашиваем: иначе сборка
+          # падает, если bundle ID ещё не зарегистрирован в Apple Developer.
+          if grep -q "$WIDGET_BUNDLE_ID" ios/FlashcardsApp.xcodeproj/project.pbxproj; then
+            app-store-connect fetch-signing-files $WIDGET_BUNDLE_ID \
+              --type IOS_APP_STORE \
+              --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
+              --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+              --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
+              --create
+          fi
           keychain add-certificates
           xcode-project use-profiles \
             --project ios/FlashcardsApp.xcodeproj \
