@@ -9,6 +9,7 @@
 
 import WidgetKit
 import SwiftUI
+import AppIntents
 
 // MARK: - Снимок от приложения (формат — WidgetSnapshot в src/services/WidgetPlanner.ts)
 
@@ -21,7 +22,7 @@ struct WidgetSnapshot: Decodable {
 struct SnapshotEntry: Decodable {
   let at: Double
   let state: String
-  let phase: String?
+  var phase: String?
   let reverse: Bool?
   let prompt: String?
   let answer: String?
@@ -43,10 +44,18 @@ struct SnapshotEntry: Decodable {
 enum SnapshotStore {
   static let appGroup = "group.com.baiirbek.flashly"
   static let snapshotKey = "widgetSnapshot"
+  /// Нажатия «Показать» — приложение забирает их в аналитику (FlashlyWidgetBridge.readReveals)
+  static let revealsKey = "widgetReveals"
+  /// Вопрос, перевод которого уже открыли нажатием: "<cardId>|<at>"
+  static let revealedKey = "widgetRevealed"
+
+  static var defaults: UserDefaults? { UserDefaults(suiteName: appGroup) }
+
+  static func revealedId(cardId: String, at: Double) -> String { "\(cardId)|\(Int64(at))" }
 
   static func load() -> WidgetSnapshot? {
     guard
-      let json = UserDefaults(suiteName: appGroup)?.string(forKey: snapshotKey),
+      let json = defaults?.string(forKey: snapshotKey),
       let data = json.data(using: .utf8)
     else { return nil }
     return try? JSONDecoder().decode(WidgetSnapshot.self, from: data)
@@ -87,8 +96,15 @@ struct Provider: TimelineProvider {
     let nowMs = now.timeIntervalSince1970 * 1000
     let sorted = snapshot.entries.sorted { $0.at < $1.at }
     let currentIndex = sorted.lastIndex { $0.at <= nowMs } ?? 0
-    return sorted[currentIndex...].map { item in
-      FlashlyEntry(date: Date(timeIntervalSince1970: max(item.at, nowMs) / 1000), item: item)
+    let revealed = SnapshotStore.defaults?.string(forKey: SnapshotStore.revealedKey)
+    return sorted[currentIndex...].map { original in
+      var item = original
+      // Перевод открыли нажатием (iOS 17) — до конца вопроса показываем ответ
+      if item.phase == "question", let cardId = item.cardId,
+         SnapshotStore.revealedId(cardId: cardId, at: item.at) == revealed {
+        item.phase = "answer"
+      }
+      return FlashlyEntry(date: Date(timeIntervalSince1970: max(item.at, nowMs) / 1000), item: item)
     }
   }
 
@@ -144,7 +160,16 @@ struct FlashlyWidgetEntryView: View {
     case .accessoryCircular:
       CircularView(item: entry.item)
     default:
-      RectangularView(item: entry.item)
+      if #available(iOSApplicationExtension 17.0, *), let item = entry.item,
+         item.phase == "question", let cardId = item.cardId {
+        // Нажатие на вопрос сразу показывает перевод, не открывая приложение (план, 2.2)
+        Button(intent: RevealWordIntent(cardId: cardId, at: item.at)) {
+          RectangularView(item: entry.item)
+        }
+        .buttonStyle(.plain)
+      } else {
+        RectangularView(item: entry.item)
+      }
     }
   }
 
@@ -294,6 +319,37 @@ private extension View {
     } else {
       self
     }
+  }
+}
+
+// MARK: - «Показать» по нажатию (iOS 17)
+
+@available(iOS 17.0, *)
+struct RevealWordIntent: AppIntent {
+  static var title: LocalizedStringResource = "Показать перевод"
+  static var isDiscoverable: Bool = false
+  /// Перевод открывается и на заблокированном iPhone, без Face ID: ничего личного действие не меняет
+  static var authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
+
+  @Parameter(title: "Слово")
+  var cardId: String
+
+  @Parameter(title: "Время вопроса")
+  var at: Double
+
+  init() {}
+
+  init(cardId: String, at: Double) {
+    self.cardId = cardId
+    self.at = at
+  }
+
+  func perform() async throws -> some IntentResult {
+    let defaults = SnapshotStore.defaults
+    defaults?.set(SnapshotStore.revealedId(cardId: cardId, at: at), forKey: SnapshotStore.revealedKey)
+    defaults?.set((defaults?.integer(forKey: SnapshotStore.revealsKey) ?? 0) + 1, forKey: SnapshotStore.revealsKey)
+    // После perform WidgetKit сам перечитывает расписание — вопрос станет ответом
+    return .result()
   }
 }
 
