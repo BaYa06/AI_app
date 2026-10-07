@@ -15,7 +15,37 @@
 		AA000001AAAA000000000001 /* correct.wav in Resources */ = {isa = PBXBuildFile; fileRef = AA000001AAAA000000000002 /* correct.wav */; };
 		AA000001AAAA000000000003 /* correct2.wav in Resources */ = {isa = PBXBuildFile; fileRef = AA000001AAAA000000000004 /* correct2.wav */; };
 		EDF3C2BA2A6E9C8B54328699 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = F21748F2D7B422E320F4F52B /* GoogleService-Info.plist */; };
+		FA25C05C307605970001D4E5 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FA25C05B307605960001D4E5 /* WidgetKit.framework */; };
+		FA25C05E307605970001D4E5 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FA25C05D307605970001D4E5 /* SwiftUI.framework */; };
+		FA25C061307605970001D4E5 /* FlashlyWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA25C060307605970001D4E5 /* FlashlyWidgetBundle.swift */; };
+		FA25C063307605970001D4E5 /* FlashlyWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA25C062307605970001D4E5 /* FlashlyWidget.swift */; };
+		FA25C065307605990001D4E5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = FA25C064307605990001D4E5 /* Assets.xcassets */; };
+		FA25C069307605990001D4E5 /* FlashlyWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = FA25C05A307605960001D4E5 /* FlashlyWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		FA25C067307605990001D4E5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = FA25C059307605960001D4E5;
+			remoteInfo = FlashlyWidgetExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		FA25C06A307605990001D4E5 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				FA25C069307605990001D4E5 /* FlashlyWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		100B5DA60BD87A0B62C81809 /* FlashcardsApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = FlashcardsApp.entitlements; path = FlashcardsApp/FlashcardsApp.entitlements; sourceTree = "<group>"; };
@@ -32,8 +62,16 @@
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = FlashcardsApp/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		AA000001AAAA000000000002 /* correct.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = correct.wav; path = FlashcardsApp/correct.wav; sourceTree = "<group>"; };
 		AA000001AAAA000000000004 /* correct2.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = correct2.wav; path = FlashcardsApp/correct2.wav; sourceTree = "<group>"; };
+		B67EA28DB52588A4B1214301 /* FlashlyWidget.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = FlashlyWidget.entitlements; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F21748F2D7B422E320F4F52B /* GoogleService-Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; name = "GoogleService-Info.plist"; path = "FlashcardsApp/GoogleService-Info.plist"; sourceTree = "<group>"; };
+		FA25C05A307605960001D4E5 /* FlashlyWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FlashlyWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		FA25C05B307605960001D4E5 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		FA25C05D307605970001D4E5 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		FA25C060307605970001D4E5 /* FlashlyWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashlyWidgetBundle.swift; sourceTree = "<group>"; };
+		FA25C062307605970001D4E5 /* FlashlyWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashlyWidget.swift; sourceTree = "<group>"; };
+		FA25C064307605990001D4E5 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		FA25C066307605990001D4E5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -42,6 +80,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				0C80B921A6F3F58F76C31292 /* libPods-FlashcardsApp.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FA25C057307605960001D4E5 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FA25C05E307605970001D4E5 /* SwiftUI.framework in Frameworks */,
+				FA25C05C307605970001D4E5 /* WidgetKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -71,6 +118,8 @@
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
 				5DCACB8F33CDC322A6C60F78 /* libPods-FlashcardsApp.a */,
+				FA25C05B307605960001D4E5 /* WidgetKit.framework */,
+				FA25C05D307605970001D4E5 /* SwiftUI.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -87,6 +136,7 @@
 			children = (
 				13B07FAE1A68108700A75B9A /* FlashcardsApp */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
+				FA25C05F307605970001D4E5 /* FlashlyWidget */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				BBD78D7AC51CEA395F1C20DB /* Pods */,
@@ -100,6 +150,7 @@
 			isa = PBXGroup;
 			children = (
 				13B07F961A680F5B00A75B9A /* FlashcardsApp.app */,
+				FA25C05A307605960001D4E5 /* FlashlyWidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -113,6 +164,18 @@
 			path = Pods;
 			sourceTree = "<group>";
 		};
+		FA25C05F307605970001D4E5 /* FlashlyWidget */ = {
+			isa = PBXGroup;
+			children = (
+				FA25C060307605970001D4E5 /* FlashlyWidgetBundle.swift */,
+				FA25C062307605970001D4E5 /* FlashlyWidget.swift */,
+				FA25C064307605990001D4E5 /* Assets.xcassets */,
+				FA25C066307605990001D4E5 /* Info.plist */,
+				B67EA28DB52588A4B1214301 /* FlashlyWidget.entitlements */,
+			);
+			path = FlashlyWidget;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -124,6 +187,7 @@
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
+				FA25C06A307605990001D4E5 /* Embed Foundation Extensions */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				00EEFC60759A1932668264C0 /* [CP] Embed Pods Frameworks */,
 				E235C05ADACE081382539298 /* [CP] Copy Pods Resources */,
@@ -132,11 +196,29 @@
 			buildRules = (
 			);
 			dependencies = (
+				FA25C068307605990001D4E5 /* PBXTargetDependency */,
 			);
 			name = FlashcardsApp;
 			productName = FlashcardsApp;
 			productReference = 13B07F961A680F5B00A75B9A /* FlashcardsApp.app */;
 			productType = "com.apple.product-type.application";
+		};
+		FA25C059307605960001D4E5 /* FlashlyWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FA25C06D307605990001D4E5 /* Build configuration list for PBXNativeTarget "FlashlyWidgetExtension" */;
+			buildPhases = (
+				FA25C056307605960001D4E5 /* Sources */,
+				FA25C057307605960001D4E5 /* Frameworks */,
+				FA25C058307605960001D4E5 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = FlashlyWidgetExtension;
+			productName = FlashlyWidgetExtension;
+			productReference = FA25C05A307605960001D4E5 /* FlashlyWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -144,7 +226,13 @@
 		83CBB9F71A601CBA00E9B192 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
+				LastSwiftUpdateCheck = 1520;
 				LastUpgradeCheck = 1210;
+				TargetAttributes = {
+					FA25C059307605960001D4E5 = {
+						CreatedOnToolsVersion = 15.2;
+					};
+				};
 			};
 			buildConfigurationList = 83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "FlashcardsApp" */;
 			compatibilityVersion = "Xcode 12.0";
@@ -161,6 +249,7 @@
 			projectRoot = "";
 			targets = (
 				13B07F861A680F5B00A75B9A /* FlashcardsApp */,
+				FA25C059307605960001D4E5 /* FlashlyWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -175,6 +264,14 @@
 				AA000001AAAA000000000001 /* correct.wav in Resources */,
 				AA000001AAAA000000000003 /* correct2.wav in Resources */,
 				EDF3C2BA2A6E9C8B54328699 /* GoogleService-Info.plist in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FA25C058307605960001D4E5 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FA25C065307605990001D4E5 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -278,13 +375,31 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		FA25C056307605960001D4E5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FA25C061307605970001D4E5 /* FlashlyWidgetBundle.swift in Sources */,
+				FA25C063307605970001D4E5 /* FlashlyWidget.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		FA25C068307605990001D4E5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = FA25C059307605960001D4E5 /* FlashlyWidgetExtension */;
+			targetProxy = FA25C067307605990001D4E5 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 3B4392A12AC88292D35C810B /* Pods-FlashcardsApp.debug.xcconfig */;
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = FlashcardsApp/FlashcardsApp.entitlements;
@@ -313,6 +428,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 5709B34CF0A7D63546082F79 /* Pods-FlashcardsApp.release.xcconfig */;
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = FlashcardsApp/FlashcardsApp.entitlements;
@@ -483,6 +599,93 @@
 			};
 			name = Release;
 		};
+		FA25C06B307605990001D4E5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_ENTITLEMENTS = FlashlyWidget/FlashlyWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 38;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = QY39YM9ZQ2;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = FlashlyWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Flashly;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.3.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.baiirbek.flashly.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		FA25C06C307605990001D4E5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_ENTITLEMENTS = FlashlyWidget/FlashlyWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 38;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = QY39YM9ZQ2;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = FlashlyWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Flashly;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.3.0;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.baiirbek.flashly.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -500,6 +703,15 @@
 			buildConfigurations = (
 				83CBBA201A601CBA00E9B192 /* Debug */,
 				83CBBA211A601CBA00E9B192 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		FA25C06D307605990001D4E5 /* Build configuration list for PBXNativeTarget "FlashlyWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FA25C06B307605990001D4E5 /* Debug */,
+				FA25C06C307605990001D4E5 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -187,7 +187,7 @@ widgetBridge.ios.ts ──────────────────▶   
 
 ## Этап 0. Подготовка
 
-- [ ] **0.1 Apple Developer и Xcode** (делает владелец аккаунта)
+- [x] **0.1 Apple Developer и Xcode** (делает владелец аккаунта)
   - Создать App Group `group.com.baiirbek.flashly`, включить его у `com.baiirbek.flashly`.
   - Зарегистрировать `com.baiirbek.flashly.widget` с тем же App Group.
   - В Xcode: File → New → Target → Widget Extension `FlashlyWidget`, iOS 16.0, без Live Activity. Добавить App Group в оба таргета.
