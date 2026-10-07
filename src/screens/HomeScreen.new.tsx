@@ -780,8 +780,16 @@ export function HomeScreen({ navigation, route }: any) {
   widgetInputRef.current = () => {
     if (isTeacher === null || !hasLessonCards) return null;
     const stored = useLessonStore.getState().day;
+    const { widgetSetId, widgetDirection, widgetHideAnswer } = useSettingsStore.getState().settings;
+    // Набор из настроек виджета (2.3); удалён или пуст — слова как в уроке дня
+    const setCards = widgetSetId
+      ? (cardsBySet[widgetSetId] || []).map((id) => cardsMap[id]).filter((c): c is Card => !!c)
+      : [];
     return {
       cards: reviewStats.all,
+      poolCards: setCards.length > 0 ? setCards : undefined,
+      direction: widgetDirection,
+      hideAnswer: widgetHideAnswer,
       day: stored?.date === localDay() ? stored : null,
       plan: computeLessonPlan(stored),
       newPerDay: lessonNewPerDay,
@@ -790,9 +798,12 @@ export function HomeScreen({ navigation, route }: any) {
       now: Date.now(),
     };
   };
+  const widgetSettingsKey = useSettingsStore(
+    (s) => `${s.settings.widgetSetId}|${s.settings.widgetDirection}|${s.settings.widgetHideAnswer}`,
+  );
   useEffect(() => {
     syncWidget(() => widgetInputRef.current());
-  }, [reviewStats, lessonDay, lessonPlan, lessonNewPerDay, streakValue, todayGoalReached, isTeacher, focusTick]);
+  }, [reviewStats, lessonDay, lessonPlan, lessonNewPerDay, streakValue, todayGoalReached, isTeacher, focusTick, widgetSettingsKey]);
   useEffect(() => {
     checkWidgetUsage();
   }, []);

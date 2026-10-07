@@ -16,6 +16,8 @@ import AppIntents
 struct WidgetSnapshot: Decodable {
   let version: Int
   let generatedAt: Double
+  /// Скрывать перевод, пока iPhone заблокирован (настройка в приложении)
+  let hideAnswerLocked: Bool?
   let entries: [SnapshotEntry]
 }
 
@@ -68,6 +70,7 @@ struct FlashlyEntry: TimelineEntry {
   let date: Date
   /// nil — снимка нет (новая установка, выход из аккаунта, ещё нет слов)
   let item: SnapshotEntry?
+  var hideAnswer: Bool = false
 }
 
 struct Provider: TimelineProvider {
@@ -104,7 +107,11 @@ struct Provider: TimelineProvider {
          SnapshotStore.revealedId(cardId: cardId, at: item.at) == revealed {
         item.phase = "answer"
       }
-      return FlashlyEntry(date: Date(timeIntervalSince1970: max(item.at, nowMs) / 1000), item: item)
+      return FlashlyEntry(
+        date: Date(timeIntervalSince1970: max(item.at, nowMs) / 1000),
+        item: item,
+        hideAnswer: snapshot.hideAnswerLocked ?? false
+      )
     }
   }
 
@@ -164,11 +171,11 @@ struct FlashlyWidgetEntryView: View {
          item.phase == "question", let cardId = item.cardId {
         // Нажатие на вопрос сразу показывает перевод, не открывая приложение (план, 2.2)
         Button(intent: RevealWordIntent(cardId: cardId, at: item.at)) {
-          RectangularView(item: entry.item)
+          RectangularView(item: entry.item, hideAnswer: entry.hideAnswer)
         }
         .buttonStyle(.plain)
       } else {
-        RectangularView(item: entry.item)
+        RectangularView(item: entry.item, hideAnswer: entry.hideAnswer)
       }
     }
   }
@@ -176,7 +183,8 @@ struct FlashlyWidgetEntryView: View {
   private var inlineText: String {
     guard let item = entry.item else { return "Открой Flashly" }
     if item.hasWord, let prompt = item.prompt, let answer = item.answer {
-      return item.isAnswer ? "\(prompt) — \(answer)" : "\(prompt) → ?"
+      // В одной строке перевод не скрыть отдельно — при «скрывать» показываем только вопрос
+      return item.isAnswer && !entry.hideAnswer ? "\(prompt) — \(answer)" : "\(prompt) → ?"
     }
     switch item.state {
     case "first": return "Первый урок · \(Copy.minutes(item.minutes))"
@@ -201,6 +209,7 @@ struct FlashlyWidgetEntryView: View {
 /// Прямоугольник — главный размер: метка, крупная строка, подпись
 struct RectangularView: View {
   let item: SnapshotEntry?
+  var hideAnswer: Bool = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 1) {
@@ -216,6 +225,8 @@ struct RectangularView: View {
         .lineLimit(1)
         .minimumScaleFactor(0.8)
         .opacity(0.85)
+        // Пока iPhone заблокирован, система заменяет перевод заглушкой
+        .privacySensitive(hideAnswer && item?.isAnswer == true && item?.state == "review")
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }

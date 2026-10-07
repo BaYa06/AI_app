@@ -69,6 +69,9 @@ interface SettingsActions {
 const defaultSettings: UserSettings = {
   dailyNewCardsLimit: 20,
   lessonNewPerDay: DEFAULT_NEW_PER_DAY,
+  widgetSetId: null,
+  widgetDirection: 'auto',
+  widgetHideAnswer: false,
   dailyReviewLimit: 100,
   studyCardLimit: 20,
   reminderEnabled: false,

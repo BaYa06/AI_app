@@ -330,6 +330,12 @@ export interface UserSettings {
   dailyNewCardsLimit: number;
   /** Урок дня: сколько новых слов добавлять в день (5 / 10 / 20) — plan/home_redesign.md, 1.5 */
   lessonNewPerDay: number;
+  /** Виджет на экране блокировки (plan/widgets.md, 2.3): набор для слов; null — как в уроке дня */
+  widgetSetId: string | null;
+  /** auto — шаг 2+ иногда «перевод → слово»; forward — только «слово → перевод»; reverse — только наоборот */
+  widgetDirection: 'auto' | 'forward' | 'reverse';
+  /** Скрывать перевод, пока iPhone заблокирован */
+  widgetHideAnswer: boolean;
   dailyReviewLimit: number;
   studyCardLimit: number | null; // null = все карты
 

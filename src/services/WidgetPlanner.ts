@@ -78,15 +78,25 @@ export interface WidgetEntry {
   fading: number;
 }
 
+export type WidgetDirection = 'auto' | 'forward' | 'reverse';
+
 export interface WidgetSnapshot {
   version: number;
   generatedAt: number;
+  /** Скрывать перевод, пока iPhone заблокирован (настройка виджета) */
+  hideAnswerLocked: boolean;
   entries: WidgetEntry[];
 }
 
 export interface WidgetPlanInput {
-  /** Карточки наборов урока (текущий курс), без повторов */
+  /** Карточки наборов урока (текущий курс), без повторов — для счётчиков урока */
   cards: Card[];
+  /** Откуда брать слова для виджета, если выбран набор в настройках; по умолчанию — cards */
+  poolCards?: Card[];
+  /** Направление (настройка виджета), по умолчанию auto */
+  direction?: WidgetDirection;
+  /** Скрывать перевод, пока iPhone заблокирован */
+  hideAnswer?: boolean;
   /** Сегодняшний день урока (null — главную сегодня ещё не открывали) */
   day: LessonDay | null;
   /** План урока на сейчас (buildLessonPlan) */
@@ -190,8 +200,10 @@ class Rotation {
   }
 }
 
-function cardFields(card: Card, showIndex: number, phase: 'question' | 'answer') {
-  const reverse = stepOf(card) >= 2 && showIndex % REVERSE_EVERY === REVERSE_EVERY - 1;
+function cardFields(card: Card, showIndex: number, phase: 'question' | 'answer', direction: WidgetDirection) {
+  const reverse =
+    direction === 'reverse' ||
+    (direction === 'auto' && stepOf(card) >= 2 && showIndex % REVERSE_EVERY === REVERSE_EVERY - 1);
   const front = card.frontText.trim();
   const back = card.backText.trim();
   return {
@@ -207,6 +219,8 @@ function cardFields(card: Card, showIndex: number, phase: 'question' | 'answer')
 /** Расписание виджета на WIDGET_HORIZON_MS вперёд от now */
 export function buildTimeline(input: WidgetPlanInput): WidgetEntry[] {
   const { cards, day, plan, newPerDay, streakDays, goalReached, now } = input;
+  const poolCards = input.poolCards ?? cards;
+  const direction = input.direction ?? 'auto';
   const today = startOfDay(now);
   const end = now + WIDGET_HORIZON_MS;
   const entries: WidgetEntry[] = [];
@@ -232,7 +246,7 @@ export function buildTimeline(input: WidgetPlanInput): WidgetEntry[] {
     const wakeFrom = atHour(dayStart, QUIET_TO_HOUR);
     const quietFrom = atHour(dayStart, QUIET_FROM_HOUR);
     const poolAt = Math.max(now, wakeFrom);
-    const rotation = new Rotation(pickPool(cards, answered, dayStart, isToday ? now : poolAt));
+    const rotation = new Rotation(pickPool(poolCards, answered, dayStart, isToday ? now : poolAt));
 
     // Ночь до 07:00 (только если сейчас ещё ночь) — итог вчерашнего дня не знаем, показываем сегодняшний
     if (isToday && now < wakeFrom) {
@@ -267,10 +281,10 @@ export function buildTimeline(input: WidgetPlanInput): WidgetEntry[] {
         continue;
       }
       const extra = state === 'streak' && hoursLeft !== null ? { hoursLeft } : {};
-      entries.push({ at: slot, state, ...base, ...extra, ...cardFields(pick.card, pick.showIndex, 'question') });
+      entries.push({ at: slot, state, ...base, ...extra, ...cardFields(pick.card, pick.showIndex, 'question', direction) });
       const answerAt = slot + CYCLE_QUESTION_MIN * MINUTE;
       if (answerAt < end) {
-        entries.push({ at: answerAt, state, ...base, ...extra, ...cardFields(pick.card, pick.showIndex, 'answer') });
+        entries.push({ at: answerAt, state, ...base, ...extra, ...cardFields(pick.card, pick.showIndex, 'answer', direction) });
       }
     }
 
@@ -301,5 +315,10 @@ function nightEntry(at: number, done: number, streak: number): WidgetEntry {
 }
 
 export function buildWidgetSnapshot(input: WidgetPlanInput): WidgetSnapshot {
-  return { version: WIDGET_SNAPSHOT_VERSION, generatedAt: input.now, entries: buildTimeline(input) };
+  return {
+    version: WIDGET_SNAPSHOT_VERSION,
+    generatedAt: input.now,
+    hideAnswerLocked: !!input.hideAnswer,
+    entries: buildTimeline(input),
+  };
 }

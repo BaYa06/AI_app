@@ -198,6 +198,22 @@ describe('buildTimeline', () => {
     expect(entries[1].at).toBe(at(7));
   });
 
+  it('настройки: слова из выбранного набора, направление, скрытие перевода', () => {
+    const lessonWord = studied(3, 5 * DAY);
+    const setWord = studied(1, 2 * DAY, 20 * HOUR, { setId: 's2' });
+    const base = input([lessonWord], { reviewedIds: [lessonWord.id] });
+    const fromSet = buildTimeline({ ...base, poolCards: [setWord] });
+    expect([...wordsOf(fromSet.filter((e) => e.at < at(23)))]).toEqual([setWord.id]);
+
+    const reversed = buildTimeline({ ...base, direction: 'reverse' }).find((e) => e.cardId)!;
+    expect(reversed).toMatchObject({ reverse: true, prompt: lessonWord.backText, answer: lessonWord.frontText });
+    const auto3 = buildTimeline({ ...base, direction: 'forward' }).filter((e) => e.phase === 'question' && e.at < at(23));
+    expect(auto3.every((e) => !e.reverse)).toBe(true);
+
+    expect(buildWidgetSnapshot({ ...base, hideAnswer: true }).hideAnswerLocked).toBe(true);
+    expect(buildWidgetSnapshot(base).hideAnswerLocked).toBe(false);
+  });
+
   it('снимок 150 карточек меньше 200 КБ', () => {
     const cards = Array.from({ length: 150 }, (_, i) => studied(1 + (i % 4), (i % 10) * DAY - HOUR));
     const json = JSON.stringify(buildWidgetSnapshot(input(cards)));
