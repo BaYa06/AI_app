@@ -13,6 +13,9 @@ import { Text } from '@/components/common';
 import { Card, ListGroup, ListRow, Screen, ScreenHeader, Sheet, Switch } from '@/components/ui';
 import { spacing, borderRadius, heights, iconSize } from '@/constants';
 import type { UserSettings } from '@/types';
+import { WidgetHowToSheet } from '@/components/widget/WidgetHowToSheet';
+import { isLockScreenWidgetAvailable } from '@/services/widgetPrompt';
+import { Analytics } from '@/services/analytics';
 import { NEW_PER_DAY_OPTIONS } from '@/services/LessonService';
 import { pluralize } from '@/utils';
 
@@ -53,6 +56,7 @@ export function LearningSettingsScreen({ navigation }: any) {
   // Выбранный набор удалён — виджет и так берёт слова урока дня (HomeScreen), подпись та же
   const widgetSetTitle = (widgetSetId && setsMap[widgetSetId]?.title) || 'Как в уроке дня';
   const [widgetSetSheetVisible, setWidgetSetSheetVisible] = useState(false);
+  const [widgetHowToVisible, setWidgetHowToVisible] = useState(false);
 
   const handleSelectLimit = useCallback(
     (value: number | null) => {
@@ -163,6 +167,15 @@ export function LearningSettingsScreen({ navigation }: any) {
       {isWidgetSupported ? (
         <>
           <ListGroup title="Виджет на экране блокировки" style={st.groupLabelSpaced}>
+            {isLockScreenWidgetAvailable() ? (
+              <ListRow
+                title="Как добавить виджет"
+                onPress={() => {
+                  Analytics.widgetPromptClicked('settings');
+                  setWidgetHowToVisible(true);
+                }}
+              />
+            ) : null}
             <ListRow
               title="Слова"
               value={widgetSetTitle}
@@ -210,6 +223,8 @@ export function LearningSettingsScreen({ navigation }: any) {
               />
             </View>
           </Card>
+
+          <WidgetHowToSheet visible={widgetHowToVisible} onClose={() => setWidgetHowToVisible(false)} />
 
           <Sheet
             visible={widgetSetSheetVisible}
