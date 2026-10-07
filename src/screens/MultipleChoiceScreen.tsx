@@ -13,6 +13,7 @@ import { spacing, borderRadius, heights, iconSize, screenPadding, alpha } from '
 import { ProgressService } from '@/services/ProgressService';
 import { lessonPhaseForAnswer } from '@/services/lessonFlow';
 import { useLessonStore } from '@/store/lessonStore';
+import { reportWidgetReview } from '@/services/WidgetService';
 import { speak, resolveSpeechLang, prefetchSpeech, cardSpeechLangs } from '@/utils/speech';
 import { playCorrectSound, preloadSound } from '@/utils/sound';
 import { buildDistractorPool, pickSimilarDistractors } from '@/utils/choiceDistractors';
@@ -93,6 +94,8 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
       // Урок дня: считаем по состоянию карточки до ответа
       const lessonPhase = lessonPhaseForAnswer(lesson?.part, card);
       if (lessonPhase) useLessonStore.getState().recordAnswer(lessonPhase, card.id);
+      // Замер виджета (plan/widgets.md, 4.1): точность на словах из виджета и контрольной половины
+      if (lessonPhase === 'review') reportWidgetReview(card.id, isCorrect);
       ProgressService.recordAnswer(card, { mode: 'test', correct: isCorrect, chosen: chosenCardId, timeSpentMs });
 
       if (isCorrect) {

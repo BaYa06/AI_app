@@ -4,7 +4,9 @@ import { buildLessonPlan, ensureLessonDay, type LessonDay } from '../LessonServi
 import {
   buildTimeline,
   buildWidgetSnapshot,
+  isControlCard,
   pickPool,
+  pickPoolSplit,
   WIDGET_HORIZON_MS,
   WIDGET_POOL_MAX,
   type WidgetEntry,
@@ -93,6 +95,27 @@ describe('pickPool', () => {
   it('не больше 8 слов', () => {
     const cards = Array.from({ length: 12 }, () => studied(3, 5 * DAY));
     expect(pickPool(cards, noAnswers, TODAY, NOW)).toHaveLength(WIDGET_POOL_MAX);
+  });
+});
+
+describe('контрольная половина (замер 4.1)', () => {
+  it('половина постоянна для слова и делит слова примерно поровну', () => {
+    const ids = Array.from({ length: 400 }, (_, i) => `card-${i}`);
+    const control = ids.filter(isControlCard).length;
+    expect(control).toBeGreaterThan(160);
+    expect(control).toBeLessThan(240);
+    expect(ids.map(isControlCard)).toEqual(ids.map(isControlCard));
+  });
+
+  it('контрольные слова не попадают в виджет', () => {
+    const cards = Array.from({ length: 30 }, () => studied(3, 5 * DAY));
+    const { pool, control } = pickPoolSplit(cards, noAnswers, TODAY, NOW);
+    expect(pool.length).toBeGreaterThan(0);
+    expect(control.length).toBeGreaterThan(0);
+    expect(pool.every((c) => !isControlCard(c.id))).toBe(true);
+    expect(control.every((c) => isControlCard(c.id))).toBe(true);
+    const shown = wordsOf(buildTimeline({ ...input(cards), controlGroup: true }));
+    expect(control.some((c) => shown.has(c.id))).toBe(false);
   });
 });
 

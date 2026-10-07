@@ -13,6 +13,8 @@
  *   показ того же слова подряд — зубрёжка, а не повторение с паузами;
  * - шаг 1 — «слово → перевод»; шаг 2+ — третий показ за день наоборот;
  * - тихие часы 23:00–07:00: одна запись с итогом дня, без смены слов.
+ * - замер (план, 4.1): подходящие слова делятся пополам по хешу id — половина идёт в виджет,
+ *   вторая остаётся контрольной; на следующем повторении сравниваем точность двух половин.
  * Уровень слов (SRS) здесь не меняется: показ на виджете — не повторение.
  */
 import type { Card } from '@/types';
@@ -97,6 +99,8 @@ export interface WidgetPlanInput {
   direction?: WidgetDirection;
   /** Скрывать перевод, пока iPhone заблокирован */
   hideAnswer?: boolean;
+  /** Контрольная половина слов не идёт в виджет (замер, план 4.1) */
+  controlGroup?: boolean;
   /** Сегодняшний день урока (null — главную сегодня ещё не открывали) */
   day: LessonDay | null;
   /** План урока на сейчас (buildLessonPlan) */
@@ -110,7 +114,7 @@ export interface WidgetPlanInput {
 }
 
 /** Слова, отвеченные в уроке в этот день */
-interface Answered {
+export interface Answered {
   reviewed: Set<string>;
   introduced: Set<string>;
 }
@@ -137,11 +141,42 @@ const fits = (card: Card) =>
   card.frontText.trim().length <= WIDGET_MAX_TEXT &&
   card.backText.trim().length <= WIDGET_MAX_TEXT;
 
+/** Постоянная для слова половина: true — контрольная (в виджет не идёт). FNV-1a от id. */
+export function isControlCard(cardId: string): boolean {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < cardId.length; i++) {
+    hash ^= cardId.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0) % 2 === 1;
+}
+
+export interface PoolSplit {
+  /** Слова для виджета */
+  pool: Card[];
+  /** Такие же по приоритету слова контрольной половины — в виджет не идут */
+  control: Card[];
+}
+
 /**
  * Пул слов на день, в порядке приоритета (не больше WIDGET_POOL_MAX).
  * now — момент, на который решаем, «ждёт ли слово повторения» (для будущих дней — их утро).
  */
 export function pickPool(cards: Card[], answered: Answered, dayStart: number, now: number): Card[] {
+  return rankCandidates(cards, answered, dayStart, now).slice(0, WIDGET_POOL_MAX);
+}
+
+/** Пул с контрольной половиной: каждая половина — первые WIDGET_POOL_MAX своих слов по приоритету */
+export function pickPoolSplit(cards: Card[], answered: Answered, dayStart: number, now: number): PoolSplit {
+  const ranked = rankCandidates(cards, answered, dayStart, now);
+  return {
+    pool: ranked.filter((c) => !isControlCard(c.id)).slice(0, WIDGET_POOL_MAX),
+    control: ranked.filter((c) => isControlCard(c.id)).slice(0, WIDGET_POOL_MAX),
+  };
+}
+
+/** Все подходящие слова в порядке приоритета */
+function rankCandidates(cards: Card[], answered: Answered, dayStart: number, now: number): Card[] {
   const yesterday = addDays(dayStart, -1);
   const isAnswered = (c: Card) => answered.reviewed.has(c.id) || answered.introduced.has(c.id);
   const groups: Card[][] = [[], [], [], []];
@@ -162,7 +197,7 @@ export function pickPool(cards: Card[], answered: Answered, dayStart: number, no
   }
 
   const recentFirst = (a: Card, b: Card) => b.lastReviewDate - a.lastReviewDate || a.id.localeCompare(b.id);
-  return groups.flatMap((g) => g.sort(recentFirst)).slice(0, WIDGET_POOL_MAX);
+  return groups.flatMap((g) => g.sort(recentFirst));
 }
 
 /** Сколько слов ждут повторения в момент t (не считая уже повторённых сегодня) */
@@ -246,7 +281,12 @@ export function buildTimeline(input: WidgetPlanInput): WidgetEntry[] {
     const wakeFrom = atHour(dayStart, QUIET_TO_HOUR);
     const quietFrom = atHour(dayStart, QUIET_FROM_HOUR);
     const poolAt = Math.max(now, wakeFrom);
-    const rotation = new Rotation(pickPool(poolCards, answered, dayStart, isToday ? now : poolAt));
+    const poolNow = isToday ? now : poolAt;
+    const rotation = new Rotation(
+      input.controlGroup
+        ? pickPoolSplit(poolCards, answered, dayStart, poolNow).pool
+        : pickPool(poolCards, answered, dayStart, poolNow),
+    );
 
     // Ночь до 07:00 (только если сейчас ещё ночь) — итог вчерашнего дня не знаем, показываем сегодняшний
     if (isToday && now < wakeFrom) {
@@ -312,6 +352,15 @@ export function buildTimeline(input: WidgetPlanInput): WidgetEntry[] {
 
 function nightEntry(at: number, done: number, streak: number): WidgetEntry {
   return { at, state: 'night', waiting: 0, newCount: 0, minutes: 0, streak, done, total: done, fading: 0 };
+}
+
+/** Сегодняшний пул и контрольная половина — для учёта замера (widgetExperiment) */
+export function todayPoolSplit(input: WidgetPlanInput): PoolSplit {
+  const { day, now } = input;
+  const answered: Answered = day
+    ? { reviewed: new Set(day.reviewedIds), introduced: new Set(day.introducedIds) }
+    : { reviewed: new Set(), introduced: new Set() };
+  return pickPoolSplit(input.poolCards ?? input.cards, answered, startOfDay(now), now);
 }
 
 export function buildWidgetSnapshot(input: WidgetPlanInput): WidgetSnapshot {

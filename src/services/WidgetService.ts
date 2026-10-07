@@ -7,7 +7,8 @@
  * На Android и в вебе мост ничего не делает (widgetBridge.ts), сервис тоже.
  */
 import { AppState } from 'react-native';
-import { buildWidgetSnapshot, type WidgetPlanInput } from './WidgetPlanner';
+import { buildWidgetSnapshot, todayPoolSplit, type WidgetPlanInput } from './WidgetPlanner';
+import { recordExposures, takeReview, type ExposureMap } from './widgetExperiment';
 import {
   clearWidget,
   installedWidgets,
@@ -19,8 +20,19 @@ import { readCache, writeCache } from './localCache';
 import { Analytics } from './analytics';
 
 const SYNC_DELAY_MS = 5000;
+/** Локальная дата YYYY-MM-DD (как localDay в challengeStore — без зависимости от store) */
+const localDay = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 const DAY_MS = 24 * 60 * 60 * 1000;
 const INSTALLED_CACHE = 'widget_installed';
+const EXPOSURE_CACHE = 'widget_exposure';
+/**
+ * Замер (план, 4.1): половина подходящих слов не идёт в виджет. Выключить после решения
+ * в шаге 4.2, если виджет учит, — тогда все подходящие слова снова идут в пул.
+ */
+const WIDGET_CONTROL_GROUP = true;
 
 type InputGetter = () => WidgetPlanInput | null;
 
@@ -37,7 +49,8 @@ async function flush(): Promise<void> {
   }
   const input = getInput?.();
   if (!input) return;
-  const snapshot = buildWidgetSnapshot(input);
+  const snapshot = buildWidgetSnapshot({ ...input, controlGroup: WIDGET_CONTROL_GROUP });
+  if (WIDGET_CONTROL_GROUP) rememberExposures(input);
   // Последняя запись («давно не заходил») сдвигается с каждой секундой — без неё и generatedAt
   // расписание меняется только при новых ответах, карточках или переходе в следующий слот
   const key = JSON.stringify(snapshot.entries.slice(0, -1));
@@ -92,6 +105,29 @@ export async function resetWidget(): Promise<void> {
   } catch (e) {
     console.warn('[widget] Не удалось очистить виджет:', e);
   }
+}
+
+/** Какие слова сегодня в виджете, а какие — контрольные (только пока виджет стоит) */
+function rememberExposures(input: WidgetPlanInput) {
+  const installed = readCache<Record<string, number>>(INSTALLED_CACHE) ?? {};
+  if (Object.keys(installed).length === 0) return;
+  const map = readCache<ExposureMap>(EXPOSURE_CACHE) ?? {};
+  const next = recordExposures(map, todayPoolSplit(input), localDay());
+  if (next !== map) writeCache(EXPOSURE_CACHE, next);
+}
+
+/**
+ * Ответ в тесте урока дня (MultipleChoiceScreen). Слово было в виджете или в контрольной половине
+ * в прошлые дни — отправляем widget_word_reviewed; первое повторение после попадания в группу.
+ */
+export function reportWidgetReview(cardId: string, correct: boolean): void {
+  if (!isWidgetSupported || !WIDGET_CONTROL_GROUP) return;
+  const map = readCache<ExposureMap>(EXPOSURE_CACHE);
+  if (!map) return;
+  const taken = takeReview(map, cardId, localDay());
+  if (!taken) return;
+  writeCache(EXPOSURE_CACHE, taken.map);
+  Analytics.widgetWordReviewed({ inWidget: taken.exposure.inWidget, correct });
 }
 
 /** Поставленные и убранные виджеты, нажатия «Показать» — в аналитику */
