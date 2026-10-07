@@ -1,0 +1,124 @@
+# План: пройти App Review без новых отказов
+
+Цель — следующая отправка на проверку проходит с первого раза. Закрываем отказ по Guideline 4 (Sign in with Apple) и заранее всё, к чему рецензент придерётся следующим.
+
+## Почему
+
+- Отказ 1.3.2: после входа через Apple приложение спрашивало имя, хотя Apple его уже отдал (Guideline 4, HIG → Sign in with Apple).
+- Аудит по App Review Guidelines (07.10.2026) нашёл ещё 4 места, где отказ почти гарантирован, и 4 рискованных. Каждый отказ — это ещё несколько дней ожидания, поэтому исправляем всё за одну отправку.
+
+Источники правил:
+- App Review Guidelines — https://developer.apple.com/app-store/review/guidelines/
+- HIG, Sign in with Apple — https://developer.apple.com/design/human-interface-guidelines/sign-in-with-apple
+- Удаление аккаунта — https://developer.apple.com/support/offering-account-deletion-in-your-app/
+
+## Как работать с планом
+
+- Шаги идут по порядку. **Этапы 0–2 обязательны до отправки**, этап 3 желателен, этап 4 срочный, но к проверке не относится.
+- Один шаг = один коммит. В сообщении — номер шага: `Review 1.2: …`.
+- После каждого шага:
+  - типы без новых ошибок: проверять только `src/` (временный конфиг с `include: ["src", "*.d.ts"]`), старых ошибок 64, новых быть не должно;
+  - `npm run brand:check` — нарушений не больше, чем до шага (новые тексты на «ты» по брендбуку);
+  - долгие локальные сборки iOS не запускаем, проверяем через TestFlight.
+- Отмечать `[x]` по мере выполнения.
+
+---
+
+## Аудит (07.10.2026)
+
+| # | Проблема | Правило | Где | Риск |
+|---|---|---|---|---|
+| 0 | После Apple-входа спрашиваем имя | 4 / HIG | `App.tsx`, `WelcomeScreen.tsx` | 🔴 текущий отказ |
+| 1 | Нет политики конфиденциальности и условий в приложении; текст «соглашаешься с Условиями…» без ссылок | 5.1.1(i) | `ProfileScreen.tsx:42-43`, `WelcomeScreen.tsx` (футер) | 🔴 |
+| 2 | Публичная библиотека без модерации: жалобы никто не видит, нет блокировки автора, нет условий с запретом контента | 1.2 | `api/library.js` (`reportSet`), `LibrarySetDetailScreen.tsx` | 🔴 |
+| 3 | При удалении аккаунта не отзывается токен Sign in with Apple | 5.1.1(v) | `api/data.js` (`deleteAccount`) | 🔴 |
+| 4 | Фото, PDF и слова уходят в Google Gemini без предупреждения и согласия | 5.1.2(i) | `ImportFilesScreen.tsx`, `SetDetailScreen.tsx`, `api/ai.js` | 🔴 |
+| 5 | Импорт файлов по HTTP на IP `34.9.20.41:3001`, исключение ATS в Info.plist | 2.1, 5.1.1 | `ImportFilesScreen.tsx:47`, `Info.plist` | 🟠 |
+| 6 | Своё окно «Оцени приложение» со звёздами | 5.6.1 | `RatingPromptModal.tsx` | 🟠 |
+| 7 | Режим экзамена с плашкой «Скоро» | 2.1 | `ExamLobbyScreen.tsx:255` | 🟠 |
+| 8 | Скрытый экран подписки (цены, «+10k», «Без рекламы») открывается по `flashly://subscription` | 2.3.1, 3.1.1 | `SubscriptionScreen.tsx`, `AppNavigator.tsx` | 🟠 |
+| 9 | Альбомная ориентация на iPhone не проверена | 4 | `Info.plist` | 🟡 |
+| 10 | Описание доступа к локальной сети «только для отладки» в релизе | 5.1.1 | `Info.plist` | 🟡 |
+| 11 | Ключ сервисного аккаунта Google (`GCLOUD_TTS_SA`) встроен в сборку | безопасность | `babel.config.cjs`, `src/utils/speech.ts` | ⚠️ |
+| 12 | Сервер импорта (`/import-files`) принимает запросы без проверки входа | безопасность | сервер `34.9.20.41:3001` | ⚠️ |
+
+Что уже в порядке: удаление аккаунта есть и легко находится (Профиль), жалоба на набор есть, Firebase без IDFA (ATT не нужен), описания разрешений камеры/фото/микрофона/речи понятные, кнопка Apple не меньше кнопки Google, обложек чужих учебников нет.
+
+---
+
+## Что нужно от тебя
+
+| Для шага | Что | Куда |
+|---|---|---|
+| 1.1 | Email для связи (в политику и условия) | написать в чат |
+| 1.3 | Ключ Sign in with Apple `.p8`, его Key ID, Team ID, Services ID / Bundle ID | переменные окружения Vercel: `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`, `APPLE_CLIENT_ID`; мне ключ не присылать |
+| 2.1 | Домен для сервера `34.9.20.41` (или решение переехать на Vercel с лимитом ~4,5 МБ) | написать в чат |
+| 4.1 | Отозвать старый ключ Google Cloud после переноса озвучки | Google Cloud Console → IAM → Service Accounts |
+
+---
+
+## Этап 0. Текущий отказ: Sign in with Apple
+
+- [x] **0.1 Не спрашивать имя после входа через Apple.**
+  - `src/services/appleSignInName.ts` — передача имени из Apple в `App.tsx`, `isAppleUser()`;
+  - `WelcomeScreen.tsx` — сохраняем `fullName` из ответа Apple до входа в Supabase;
+  - `App.tsx` — имя уходит в `ensureUserExists`, онбординг для Apple начинается с роли, «назад» с роли ведёт на приветствие.
+  - Проверка в TestFlight: Настройки → Apple ID → Вход с Apple → Flashly → «Прекратить использование», затем новый вход — экрана «Как к тебе обращаться?» нет, имя в профиле от Apple.
+
+## Этап 1. Обязательно до отправки
+
+- [x] **1.1 Политика конфиденциальности и условия использования.** Ссылки: `/privacy`, `/terms`, константы в `src/config/legal.ts`.
+  - Страницы `public/privacy.html` и `public/terms.html` (русский, на «ты»), маршруты `/privacy`, `/terms` в `vercel.json`.
+  - Политика: какие данные собираем (email, имя, ID, карточки, фото для импорта, push-токен, аналитика Firebase), кому передаём (Supabase, Neon, Vercel, Google Gemini/TTS, Firebase), сколько храним, как удалить аккаунт, контакт.
+  - Условия: правила библиотеки — **нулевая терпимость к недопустимому контенту и оскорбительным пользователям**, удаление такого контента и блокировка авторов (требование 1.2).
+  - `ProfileScreen.tsx`: заполнить `PRIVACY_POLICY_URL`, `TERMS_URL`.
+  - `WelcomeScreen.tsx`: «Условиями использования» и «Политикой конфиденциальности» — ссылки.
+  - [ ] **Вручную:** URL политики вписать в App Store Connect → App Privacy → Privacy Policy URL (после деплоя на Vercel).
+- [ ] **1.2 Модерация библиотеки (1.2).**
+  - Жалоба сразу скрывает набор у того, кто пожаловался.
+  - Набор с 3+ жалобами от разных людей автоматически скрывается у всех (`status = 'hidden'`) до проверки.
+  - Кнопка «Заблокировать автора» в меню набора: наборы автора больше не показываются этому пользователю (таблица `user_blocks`, фильтр в `getLibrarySets` / `getSetDetail`). Разблокировка — в профиле.
+  - Админка (`public/admin.html`): список жалоб, кнопки «Скрыть набор» / «Оставить».
+  - Перед первой публикацией набора — согласие с условиями (ссылка на `/terms`).
+  - Контакт для жалоб есть: «Написать нам» (`FeedbackScreen`) + email в условиях.
+- [ ] **1.3 Отзыв токена Apple при удалении аккаунта.**
+  - При входе через Apple отправлять на сервер `authorizationCode` из ответа Apple; сервер обменивает его на refresh-токен (`https://appleid.apple.com/auth/token`, client secret — JWT, подписанный `.p8`) и хранит его у пользователя.
+  - `deleteAccount`: если есть Apple refresh-токен — `POST https://appleid.apple.com/auth/revoke`, затем удаление как сейчас.
+  - Для старых Apple-пользователей без сохранённого токена: при удалении запросить повторный вход через Apple, чтобы получить свежий `authorizationCode`.
+- [ ] **1.4 Согласие на передачу данных ИИ (5.1.2(i)).**
+  - Одно окно перед первым использованием любой ИИ-функции (импорт файлов, фото, генерация примеров, перевод): что отправляется (текст, фото, PDF), кому (Google Gemini), зачем; кнопки «Разрешить» / «Не сейчас».
+  - Без согласия ИИ-функция не вызывается. Согласие хранится локально и в профиле; отозвать — в настройках.
+  - Упомянуть Google Gemini в политике (шаг 1.1).
+
+## Этап 2. Рискованное — тоже до отправки
+
+- [ ] **2.1 Импорт файлов только по HTTPS.**
+  - Вариант А (нужен домен): HTTPS на сервере `34.9.20.41` (Caddy/nginx + Let's Encrypt), `GCP_URL` → `https://…`.
+  - Вариант Б: импорт через функцию Vercel; лимит запроса ~4,5 МБ → уменьшить `MAX_TOTAL_BYTES`, сжимать фото перед отправкой.
+  - Убрать исключение `34.9.20.41` из `NSAppTransportSecurity` в `Info.plist`.
+  - Заодно — проверка входа на сервере импорта (Supabase JWT в заголовке), `userId` брать из токена, а не из тела (закрывает пункт 12 аудита).
+- [ ] **2.2 Окно оценки без звёзд (5.6.1).** `RatingPromptModal` → вопрос «Как тебе тренировка?» с вариантами ответа, без 5 звёзд. Оценку в App Store, если нужна, — только через системный `SKStoreReviewController` (`react-native-rate` / нативный модуль).
+- [ ] **2.3 Убрать «Скоро» из экзамена.** Неготовый режим в `ExamLobbyScreen` не показываем совсем.
+- [ ] **2.4 Удалить экран подписки.** Убрать `Subscription` из `AppNavigator` (экран и deep link `subscription`), из `types/navigation.ts`; файл `SubscriptionScreen.tsx` удалить.
+
+## Этап 3. Мелочи
+
+- [ ] **3.1 Только портретная ориентация на iPhone.** В `Info.plist` оставить `UIInterfaceOrientationPortrait` (если альбомный режим не нужен специально).
+- [ ] **3.2 Локальная сеть только в Debug.** Убрать `NSLocalNetworkUsageDescription` и `NSAllowsLocalNetworking` из релизного `Info.plist` (Metro они нужны только в отладке).
+- [ ] **3.3 Гостевой вход — в запасе.** Не включаем. Если рецензент сошлётся на 5.1.1(v) («нельзя требовать вход»), показать «Продолжить без входа» на `WelcomeScreen` (`signInAnonymously` уже есть в `SignInScreen.tsx`).
+
+## Этап 4. Безопасность (к проверке не относится, но срочно)
+
+- [ ] **4.1 Озвучка через сервер.** Google TTS вызывать из `api/` (ключ в переменных Vercel), клиент получает только аудио. Убрать `GCLOUD_TTS_SA` из `babel.config.cjs`, `webpack.config.cjs`, `src/utils/speech.ts`. После выкладки — отозвать старый ключ в Google Cloud и выпустить новый.
+
+## Этап 5. Отправка
+
+- [ ] **5.1 App Store Connect.**
+  - Privacy Policy URL и Support URL открываются.
+  - App Privacy (анкета): email, имя, ID пользователя, данные использования (Firebase Analytics), пользовательский контент (карточки, фото), push-токен; связаны с пользователем, не для трекинга.
+  - Age Rating: в новой анкете отметить пользовательский контент.
+  - Скриншоты и описание: без Premium, цен и функций, которых нет.
+- [ ] **5.2 Review Notes** (английский), примерно:
+  > Sign in with Apple no longer asks for a name or email: the app uses the name provided by Apple. Account deletion: Profile → Delete account (also revokes Sign in with Apple tokens). Public library has reporting, author blocking and automatic hiding of reported sets; terms with zero tolerance for objectionable content are accepted before publishing. AI features ask for consent before sending data to Google Gemini. To test teacher features, sign in with the demo account: … / course code: …
+- [ ] **5.3 Демо-аккаунт учителя** с курсом и кодом для подключения — чтобы рецензент проверил курсы и тесты.
+- [ ] **5.4 Поднять версию**, сборка в TestFlight, пройти этапы 0–3 руками на устройстве, отправить.

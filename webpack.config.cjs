@@ -131,6 +131,9 @@ module.exports = (env, argv) => {
           { from: 'public/sw.js', to: 'sw.js' },
           // Админка по ссылке (/admin): вход Google-аккаунтом, данные только для users.is_admin
           { from: 'public/dashboard.html', to: 'admin.html' },
+          // Политика конфиденциальности и условия (/privacy, /terms): ссылки в приложении и в App Store Connect
+          { from: 'public/privacy.html', to: 'privacy.html' },
+          { from: 'public/terms.html', to: 'terms.html' },
           // Universal Links: iOS открывает /join/* сразу в приложении
           { from: 'public/.well-known/apple-app-site-association', to: '.well-known/apple-app-site-association', toType: 'file' },
           { from: 'public/icons', to: 'icons' },

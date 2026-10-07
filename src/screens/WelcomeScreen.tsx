@@ -23,6 +23,7 @@ import { usePwaInstall } from '@/hooks/usePwaInstall';
 import { SUPABASE_OAUTH_REDIRECT, supabase } from '@/services/supabaseClient';
 import { describeError } from '@/utils/userErrors';
 import { setAppleSignInName } from '@/services/appleSignInName';
+import { PRIVACY_POLICY_URL, TERMS_URL } from '@/config/legal';
 
 type Props = {
   isLoading?: boolean;
@@ -276,7 +277,23 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
               Продолжая, ты соглашаешься с нашими
             </Text>
             <Text variant="caption" align="center" style={{ color: colors.textSecondary }}>
-              Условиями использования и Политикой конфиденциальности
+              <Text
+                variant="caption"
+                accessibilityRole="link"
+                style={[styles.legalLink, { color: colors.primary }]}
+                onPress={() => Linking.openURL(TERMS_URL)}
+              >
+                Условиями использования
+              </Text>
+              {' и '}
+              <Text
+                variant="caption"
+                accessibilityRole="link"
+                style={[styles.legalLink, { color: colors.primary }]}
+                onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}
+              >
+                Политикой конфиденциальности
+              </Text>
             </Text>
           </View>
 
@@ -364,6 +381,9 @@ const styles = StyleSheet.create({
   footer: {
     gap: spacing.xxs / 2,
     marginBottom: spacing.m,
+  },
+  legalLink: {
+    textDecorationLine: 'underline',
   },
   homeIndicator: {
     alignSelf: 'center',

@@ -35,12 +35,7 @@ import type { ThemeMode } from '@/types';
 import { useFocusEffect } from '@react-navigation/native';
 import { version as APP_VERSION } from '../../package.json';
 import { getLevelProgress, XP_PER_LEVEL } from '@/utils/level';
-
-// ==================== ПРАВОВАЯ ИНФОРМАЦИЯ ====================
-
-// Пустая ссылка — пункт не показывается
-const PRIVACY_POLICY_URL = '';
-const TERMS_URL = '';
+import { PRIVACY_POLICY_URL, TERMS_URL } from '@/config/legal';
 
 const THEME_OPTIONS: Array<{ value: ThemeMode; label: string }> = [
   { value: 'light', label: 'Светлая' },
@@ -293,28 +288,22 @@ export function ProfileScreen({ navigation }: any) {
       </ListGroup>
 
       {/* ======== Legal ======== */}
-      {(PRIVACY_POLICY_URL || TERMS_URL) ? (
-        <ListGroup title="Правовая информация" style={st.group}>
-          {PRIVACY_POLICY_URL ? (
-            <ListRow
-              icon={ShieldCheck}
-              title="Политика конфиденциальности"
-              chevron={false}
-              right={<ExternalLink size={iconSize.xs} color={colors.textTertiary} />}
-              onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}
-            />
-          ) : null}
-          {TERMS_URL ? (
-            <ListRow
-              icon={FileText}
-              title="Условия использования"
-              chevron={false}
-              right={<ExternalLink size={iconSize.xs} color={colors.textTertiary} />}
-              onPress={() => Linking.openURL(TERMS_URL)}
-            />
-          ) : null}
-        </ListGroup>
-      ) : null}
+      <ListGroup title="Правовая информация" style={st.group}>
+        <ListRow
+          icon={ShieldCheck}
+          title="Политика конфиденциальности"
+          chevron={false}
+          right={<ExternalLink size={iconSize.xs} color={colors.textTertiary} />}
+          onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}
+        />
+        <ListRow
+          icon={FileText}
+          title="Условия использования"
+          chevron={false}
+          right={<ExternalLink size={iconSize.xs} color={colors.textTertiary} />}
+          onPress={() => Linking.openURL(TERMS_URL)}
+        />
+      </ListGroup>
 
       {/* ======== Logout ======== */}
       {session && (
