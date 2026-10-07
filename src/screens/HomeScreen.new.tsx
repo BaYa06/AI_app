@@ -151,7 +151,7 @@ function pickCardsForGame(cards: Card[], count: number): Card[] {
   return shuffle([...waiting, ...rest].slice(0, count));
 }
 
-export function HomeScreen({ navigation }: any) {
+export function HomeScreen({ navigation, route }: any) {
   const colors = useThemeColors();
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -757,6 +757,19 @@ export function HomeScreen({ navigation }: any) {
     Analytics.homeAction('daily_review');
     startLesson(lessonPlan);
   }, [lessonContent, lessonPlan, startLesson, computeLessonPlan, navigation]);
+
+  // Ссылка из виджета на экране блокировки (plan/widgets.md, 0.3): flashly://lesson?from=widget.
+  // Ждём, пока загрузятся карточки и станет известна роль, и запускаем урок, только если он не пройден:
+  // «Ещё 10 новых» и «Найти набор» по нажатию на виджет не делаем. Параметр сбрасываем сразу,
+  // чтобы следующее нажатие на виджет снова сработало, а возврат на главную урок не запускал.
+  const widgetFrom = route?.params?.from;
+  useEffect(() => {
+    if (widgetFrom !== 'widget' || isTeacher === null) return;
+    if (!isTeacher && !lessonContent && !hasLessonCards) return;
+    navigation?.setParams?.({ from: undefined, state: undefined, family: undefined });
+    if (isTeacher || lessonContent?.kind !== 'start') return;
+    startLesson(lessonPlan);
+  }, [widgetFrom, isTeacher, lessonContent, hasLessonCards, lessonPlan, startLesson, navigation]);
 
   // Рейтинг курса: значок-кубок в шапке, точка — есть новости (plan/home_redesign.md, 3.2)
   const [leaderboard, setLeaderboard] = useState<CourseLeaderboard | null>(null);

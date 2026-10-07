@@ -11,6 +11,7 @@ import { LoadingSplash } from '@/components/common';
 import { ToastHost } from '@/components/ui/Toast';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { DatabaseService, setupAutoSave, supabase, NeonService, setAnalyticsUserId, SyncQueueService, Analytics, setAnalyticsUserProperties } from '@/services';
+import { isWidgetUrl, parseWidgetUrl } from '@/services/widgetLinks';
 import { useCourseRealtime } from '@/hooks/useCourseRealtime';
 import { StorageService } from '@/services/StorageService';
 import { CACHE_OWNER_KEY } from '@/services/DatabaseService';
@@ -605,6 +606,14 @@ export default function App() {
 
     const handleUrl = async (url: string) => {
       try {
+        // Ссылка из виджета (plan/widgets.md, 0.3): экран открывает React Navigation, здесь только аналитика
+        const widgetLink = parseWidgetUrl(url);
+        if (widgetLink) {
+          Analytics.widgetOpenedApp(widgetLink);
+          return;
+        }
+        if (isWidgetUrl(url)) return;
+
         // Обработка приглашения: /join/TOKEN
         const joinMatch = url.match(/\/join\/([a-f0-9]{64})/);
         if (joinMatch) {

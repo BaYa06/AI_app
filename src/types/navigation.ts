@@ -229,7 +229,8 @@ export type RootStackParamList = {
 // ==================== MAIN TABS ====================
 
 export type MainTabParamList = {
-  Home: undefined;
+  /** from: 'widget' — открыто ссылкой виджета, главная запускает урок дня (plan/widgets.md, 0.3) */
+  Home: { from?: string; state?: string; family?: string } | undefined;
   Library: undefined;
   TestTab: undefined;
   Statistics: undefined;
