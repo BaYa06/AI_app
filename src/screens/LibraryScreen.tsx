@@ -37,6 +37,7 @@ import { BookService } from '@/services/BookService';
 import { getBookCover, formatBookMeta } from '@/utils/bookCover';
 import type { LibrarySet } from '@/types/library';
 import type { BookListItem } from '@/types/books';
+import { COMMUNITY_LIBRARY_ENABLED } from '@/config/features';
 
 // ---- Fade edge overlay for horizontal scroll ----
 const FADE_WIDTH = 24;
@@ -282,6 +283,7 @@ export function LibraryScreen() {
   const [activeCardCount, setActiveCardCount] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | undefined>();
   const [books, setBooks] = useState<BookListItem[]>([]);
+  const [booksLoading, setBooksLoading] = useState(true);
 
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -292,8 +294,9 @@ export function LibraryScreen() {
     });
   }, []);
 
-  // Initial load
+  // Initial load (наборы сообщества выключены — во вкладке только учебники)
   useEffect(() => {
+    if (!COMMUNITY_LIBRARY_ENABLED) return;
     fetchAllSections(userId);
   }, [userId]);
 
@@ -301,9 +304,13 @@ export function LibraryScreen() {
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
-    BookService.listBooks().then((list) => {
-      if (!cancelled) setBooks(list);
-    });
+    BookService.listBooks()
+      .then((list) => {
+        if (!cancelled) setBooks(list);
+      })
+      .finally(() => {
+        if (!cancelled) setBooksLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -313,6 +320,7 @@ export function LibraryScreen() {
   const onSearchChange = useCallback((text: string) => {
     setSearchText(text);
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    if (!COMMUNITY_LIBRARY_ENABLED) return;
     searchTimeout.current = setTimeout(() => {
       setFilters({ search: text || undefined }, userId);
     }, 400);
@@ -391,119 +399,123 @@ export function LibraryScreen() {
           <TextField
             variant="search"
             icon={Search}
-            placeholder="Поиск наборов или @ник автора..."
-            accessibilityLabel="Поиск наборов"
+            placeholder={COMMUNITY_LIBRARY_ENABLED ? 'Поиск наборов или @ник автора...' : 'Поиск учебников'}
+            accessibilityLabel={COMMUNITY_LIBRARY_ENABLED ? 'Поиск наборов' : 'Поиск учебников'}
             value={searchText}
             onChangeText={onSearchChange}
             style={s.flex1}
             inputStyle={Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : undefined}
           />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Сортировка"
-            style={({ pressed }) => [s.sortBtn, { backgroundColor: colors.surfaceMuted }, pressed && s.pressed]}
-            onPress={() => {
-              Alert.alert(
-                'Сортировка',
-                undefined,
-                [
-                  ...LIBRARY_SORT_OPTIONS.map(opt => ({
-                    text: opt.label,
-                    onPress: () => onSortSelect(opt.key),
-                  })),
-                  { text: 'Отмена', style: 'cancel' as const },
-                ]
-              );
-            }}
-          >
-            <ArrowDownUp size={iconSize.s} color={colors.primary} />
-          </Pressable>
+          {COMMUNITY_LIBRARY_ENABLED && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Сортировка"
+              style={({ pressed }) => [s.sortBtn, { backgroundColor: colors.surfaceMuted }, pressed && s.pressed]}
+              onPress={() => {
+                Alert.alert(
+                  'Сортировка',
+                  undefined,
+                  [
+                    ...LIBRARY_SORT_OPTIONS.map(opt => ({
+                      text: opt.label,
+                      onPress: () => onSortSelect(opt.key),
+                    })),
+                    { text: 'Отмена', style: 'cancel' as const },
+                  ]
+                );
+              }}
+            >
+              <ArrowDownUp size={iconSize.s} color={colors.primary} />
+            </Pressable>
+          )}
         </View>
       </View>
 
       {/* Filter Chips */}
-      <View style={[s.filtersContainer, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-        {/* Category Chips */}
-        <View style={{ position: 'relative' }}>
-          <FadeEdge side="left" bgColor={colors.background} />
-          <FadeEdge side="right" bgColor={colors.background} />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipsRow}>
-            {LIBRARY_CATEGORIES.map((cat) => {
-              const isActive = activeCategory === cat.key;
-              return (
-                <Pressable hitSlop={{ top: spacing.xxs, bottom: spacing.xxs }}
-                  key={cat.key}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: isActive }}
-                  style={[
-                    s.chip,
-                    isActive
-                      ? { backgroundColor: colors.primaryFill, borderColor: colors.primaryFill }
-                      : { backgroundColor: colors.surface, borderColor: colors.border },
-                  ]}
-                  onPress={() => onCategoryPress(cat.key)}
-                >
-                  <Text variant="label" style={{ color: isActive ? colors.onPrimary : colors.textPrimary }}>
-                    {cat.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
+      {COMMUNITY_LIBRARY_ENABLED && (
+        <View style={[s.filtersContainer, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+          {/* Category Chips */}
+          <View style={{ position: 'relative' }}>
+            <FadeEdge side="left" bgColor={colors.background} />
+            <FadeEdge side="right" bgColor={colors.background} />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipsRow}>
+              {LIBRARY_CATEGORIES.map((cat) => {
+                const isActive = activeCategory === cat.key;
+                return (
+                  <Pressable hitSlop={{ top: spacing.xxs, bottom: spacing.xxs }}
+                    key={cat.key}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isActive }}
+                    style={[
+                      s.chip,
+                      isActive
+                        ? { backgroundColor: colors.primaryFill, borderColor: colors.primaryFill }
+                        : { backgroundColor: colors.surface, borderColor: colors.border },
+                    ]}
+                    onPress={() => onCategoryPress(cat.key)}
+                  >
+                    <Text variant="label" style={{ color: isActive ? colors.onPrimary : colors.textPrimary }}>
+                      {cat.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
 
-        {/* Language + Card count Chips */}
-        <View style={{ position: 'relative' }}>
-          <FadeEdge side="left" bgColor={colors.background} />
-          <FadeEdge side="right" bgColor={colors.background} />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipsRow}>
-            {LIBRARY_LANGUAGES.map((lang) => {
-              const isActive = activeLang === lang.key;
-              return (
-                <Pressable hitSlop={{ top: spacing.xs, bottom: spacing.xs }}
-                  key={lang.key}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: isActive }}
-                  style={[
-                    s.langChip,
-                    isActive
-                      ? { backgroundColor: alpha(colors.primary, 10), borderColor: colors.primary }
-                      : { backgroundColor: colors.surface, borderColor: colors.border },
-                  ]}
-                  onPress={() => onLangPress(lang.key)}
-                >
-                  <Text variant="caption">{lang.flag}</Text>
-                  <Text variant="caption" style={[s.semibold, { color: isActive ? colors.primary : colors.textPrimary }]}>{lang.label}</Text>
-                </Pressable>
-              );
-            })}
-            <View style={[s.chipSeparator, { backgroundColor: colors.border }]} />
-            {CARD_COUNT_RANGES.map((range) => {
-              const isActive = activeCardCount === range.key;
-              return (
-                <Pressable hitSlop={{ top: spacing.xs, bottom: spacing.xs }}
-                  key={range.key}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: isActive }}
-                  style={[
-                    s.langChip,
-                    isActive
-                      ? { backgroundColor: alpha(colors.primary, 10), borderColor: colors.primary }
-                      : { backgroundColor: colors.surface, borderColor: colors.border },
-                  ]}
-                  onPress={() => onCardCountPress(range.key)}
-                >
-                  <Layers size={iconSize.xs} color={isActive ? colors.primary : colors.textSecondary} />
-                  <Text variant="caption" style={[s.semibold, { color: isActive ? colors.primary : colors.textPrimary }]}>{range.label}</Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+          {/* Language + Card count Chips */}
+          <View style={{ position: 'relative' }}>
+            <FadeEdge side="left" bgColor={colors.background} />
+            <FadeEdge side="right" bgColor={colors.background} />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipsRow}>
+              {LIBRARY_LANGUAGES.map((lang) => {
+                const isActive = activeLang === lang.key;
+                return (
+                  <Pressable hitSlop={{ top: spacing.xs, bottom: spacing.xs }}
+                    key={lang.key}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isActive }}
+                    style={[
+                      s.langChip,
+                      isActive
+                        ? { backgroundColor: alpha(colors.primary, 10), borderColor: colors.primary }
+                        : { backgroundColor: colors.surface, borderColor: colors.border },
+                    ]}
+                    onPress={() => onLangPress(lang.key)}
+                  >
+                    <Text variant="caption">{lang.flag}</Text>
+                    <Text variant="caption" style={[s.semibold, { color: isActive ? colors.primary : colors.textPrimary }]}>{lang.label}</Text>
+                  </Pressable>
+                );
+              })}
+              <View style={[s.chipSeparator, { backgroundColor: colors.border }]} />
+              {CARD_COUNT_RANGES.map((range) => {
+                const isActive = activeCardCount === range.key;
+                return (
+                  <Pressable hitSlop={{ top: spacing.xs, bottom: spacing.xs }}
+                    key={range.key}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isActive }}
+                    style={[
+                      s.langChip,
+                      isActive
+                        ? { backgroundColor: alpha(colors.primary, 10), borderColor: colors.primary }
+                        : { backgroundColor: colors.surface, borderColor: colors.border },
+                    ]}
+                    onPress={() => onCardCountPress(range.key)}
+                  >
+                    <Layers size={iconSize.xs} color={isActive ? colors.primary : colors.textSecondary} />
+                    <Text variant="caption" style={[s.semibold, { color: isActive ? colors.primary : colors.textPrimary }]}>{range.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
         </View>
-      </View>
+      )}
 
       {/* Content */}
-      {isLoading && nothingToShow ? (
+      {(isLoading || (!COMMUNITY_LIBRARY_ENABLED && booksLoading)) && nothingToShow ? (
         // Заготовки в форме карточек вместо спиннера (брендбук, 7.8)
         <View style={s.skeletons} accessibilityLabel="Загрузка библиотеки" accessibilityRole="progressbar">
           <SkeletonCard height={160} />
@@ -522,7 +534,7 @@ export function LibraryScreen() {
         <EmptyState
           icon={Search}
           title="Ничего не найдено"
-          description="Попробуй изменить фильтры или поисковый запрос"
+          description={COMMUNITY_LIBRARY_ENABLED ? 'Попробуй изменить фильтры или поисковый запрос' : 'Попробуй другой запрос'}
         />
       ) : isSearchActive ? (
         /* Search Results - vertical grid with HorizontalCard design */

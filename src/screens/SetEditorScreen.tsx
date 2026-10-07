@@ -24,6 +24,7 @@ import { LibraryService } from '@/services';
 import { supabase } from '@/services/supabaseClient';
 import { LIBRARY_CATEGORIES } from '@/constants/library';
 import { describeError } from '@/utils/userErrors';
+import { COMMUNITY_LIBRARY_ENABLED } from '@/config/features';
 
 type Props = RootStackScreenProps<'SetEditor'>;
 
@@ -579,7 +580,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
             </View>
 
             {/* Публикация в библиотеку */}
-            {isEditing && !isReadOnly && (
+            {COMMUNITY_LIBRARY_ENABLED && isEditing && !isReadOnly && (
               <View style={styles.field}>
                 <Text variant="label" color="primary" style={styles.fieldLabel}>
                   Библиотека

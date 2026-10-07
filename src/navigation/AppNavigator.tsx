@@ -71,6 +71,7 @@ import { LibrarySetDetailScreen } from '@/screens/LibrarySetDetailScreen';
 import { BookDetailScreen } from '@/screens/BookDetailScreen';
 import { CourseBooksScreen } from '@/screens/CourseBooksScreen';
 import { MyPublicationsScreen } from '@/screens/MyPublicationsScreen';
+import { COMMUNITY_LIBRARY_ENABLED } from '@/config/features';
 import { PersonalInfoScreen } from '@/screens/PersonalInfoScreen';
 import { SecurityScreen } from '@/screens/SecurityScreen';
 import { SubscriptionScreen } from '@/screens/SubscriptionScreen';
@@ -246,10 +247,10 @@ const NATIVE_LINKING: LinkingOptions<RootStackParamList> = {
       LearningSettings: 'learning-settings',
       SoundSettings: 'sound-settings',
       Feedback: 'feedback',
-      LibrarySetDetail: 'library-set/:setId',
+      ...(COMMUNITY_LIBRARY_ENABLED ? { LibrarySetDetail: 'library-set/:setId' } : null),
       BookDetail: 'book/:bookId',
       CourseBooks: 'course-books/:courseId',
-      MyPublications: 'my-publications',
+      ...(COMMUNITY_LIBRARY_ENABLED ? { MyPublications: 'my-publications' } : null),
       PersonalInfo: 'personal-info',
       Security: 'security',
       Subscription: 'subscription',
@@ -405,11 +406,13 @@ export function AppNavigator() {
             animationDuration: 300,
           }}
         />
-        <Stack.Screen
-          name="LibrarySetDetail"
-          component={LibrarySetDetailScreen}
-          options={{ headerShown: false }}
-        />
+        {COMMUNITY_LIBRARY_ENABLED && (
+          <Stack.Screen
+            name="LibrarySetDetail"
+            component={LibrarySetDetailScreen}
+            options={{ headerShown: false }}
+          />
+        )}
         <Stack.Screen
           name="BookDetail"
           component={BookDetailScreen}
@@ -420,11 +423,13 @@ export function AppNavigator() {
           component={CourseBooksScreen}
           options={{ headerShown: false }}
         />
-        <Stack.Screen
-          name="MyPublications"
-          component={MyPublicationsScreen}
-          options={{ headerShown: false }}
-        />
+        {COMMUNITY_LIBRARY_ENABLED && (
+          <Stack.Screen
+            name="MyPublications"
+            component={MyPublicationsScreen}
+            options={{ headerShown: false }}
+          />
+        )}
         <Stack.Screen
           name="PersonalInfo"
           component={PersonalInfoScreen}

@@ -27,6 +27,12 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const isUuid = (v) => typeof v === 'string' && UUID_RE.test(v);
 
 const MUTATION_ACTIONS = new Set(['like', 'rate', 'report', 'import', 'publish']);
+
+// Библиотека сообщества выключена (plan/app_review_fixes.md, шаг 1.2): чужие наборы без модерации —
+// отказ App Review 1.2. Включить обратно — COMMUNITY_LIBRARY_ENABLED=true в переменных Vercel
+// (и COMMUNITY_LIBRARY_ENABLED в src/config/features.ts). Свои публикации автор по-прежнему видит и снимает.
+const COMMUNITY_LIBRARY_ENABLED = process.env.COMMUNITY_LIBRARY_ENABLED === 'true';
+const DISABLED_ACTIONS = new Set(['like', 'rate', 'import', 'cards']);
 const OWN_READ_ACTIONS = new Set(['my-publications', 'check-published']);
 
 export default async function handler(req, res) {
@@ -62,6 +68,18 @@ export default async function handler(req, res) {
   await ensureDatabaseInitialized(sql);
 
   try {
+    if (!COMMUNITY_LIBRARY_ENABLED) {
+      const isPublishWrite = action === 'publish' && (req.method === 'POST' || req.method === 'PUT');
+      if (DISABLED_ACTIONS.has(action) || isPublishWrite) {
+        return res.status(403).json({ error: 'Community library is disabled' });
+      }
+      if (!action && req.method === 'GET') {
+        return id
+          ? res.status(404).json({ error: 'Set not found' })
+          : res.status(200).json({ sets: [], has_more: false });
+      }
+    }
+
     // ── Action-based routing (sub-endpoints consolidated here) ──────────────
     if (action === 'my-publications') return await getMyPublications(req, res, sql);
     if (action === 'check-published') return await checkPublished(req, res, sql);

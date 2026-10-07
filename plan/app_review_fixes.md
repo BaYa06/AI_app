@@ -30,7 +30,7 @@
 |---|---|---|---|---|
 | 0 | После Apple-входа спрашиваем имя | 4 / HIG | `App.tsx`, `WelcomeScreen.tsx` | 🔴 текущий отказ |
 | 1 | Нет политики конфиденциальности и условий в приложении; текст «соглашаешься с Условиями…» без ссылок | 5.1.1(i) | `ProfileScreen.tsx:42-43`, `WelcomeScreen.tsx` (футер) | 🔴 |
-| 2 | Публичная библиотека без модерации: жалобы никто не видит, нет блокировки автора, нет условий с запретом контента | 1.2 | `api/library.js` (`reportSet`), `LibrarySetDetailScreen.tsx` | 🔴 |
+| 2 | Публичная библиотека без модерации: жалобы никто не видит, нет блокировки автора, нет условий с запретом контента | 1.2 | `api/library.js` (`reportSet`), `LibrarySetDetailScreen.tsx` | 🔴 → библиотека отключена |
 | 3 | При удалении аккаунта не отзывается токен Sign in with Apple | 5.1.1(v) | `api/data.js` (`deleteAccount`) | 🔴 |
 | 4 | Фото, PDF и слова уходят в Google Gemini без предупреждения и согласия | 5.1.2(i) | `ImportFilesScreen.tsx`, `SetDetailScreen.tsx`, `api/ai.js` | 🔴 |
 | 5 | Импорт файлов по HTTP на IP `34.9.20.41:3001`, исключение ATS в Info.plist | 2.1, 5.1.1 | `ImportFilesScreen.tsx:47`, `Info.plist` | 🟠 |
@@ -70,17 +70,16 @@
 - [x] **1.1 Политика конфиденциальности и условия использования.** Ссылки: `/privacy`, `/terms`, константы в `src/config/legal.ts`.
   - Страницы `public/privacy.html` и `public/terms.html` (русский, на «ты»), маршруты `/privacy`, `/terms` в `vercel.json`.
   - Политика: какие данные собираем (email, имя, ID, карточки, фото для импорта, push-токен, аналитика Firebase), кому передаём (Supabase, Neon, Vercel, Google Gemini/TTS, Firebase), сколько храним, как удалить аккаунт, контакт.
-  - Условия: правила библиотеки — **нулевая терпимость к недопустимому контенту и оскорбительным пользователям**, удаление такого контента и блокировка авторов (требование 1.2).
+  - Условия: **нулевая терпимость к недопустимому контенту и оскорбительным пользователям**, удаление такого контента и блокировка нарушителей.
   - `ProfileScreen.tsx`: заполнить `PRIVACY_POLICY_URL`, `TERMS_URL`.
   - `WelcomeScreen.tsx`: «Условиями использования» и «Политикой конфиденциальности» — ссылки.
   - [ ] **Вручную:** URL политики вписать в App Store Connect → App Privacy → Privacy Policy URL (после деплоя на Vercel).
-- [ ] **1.2 Модерация библиотеки (1.2).**
-  - Жалоба сразу скрывает набор у того, кто пожаловался.
-  - Набор с 3+ жалобами от разных людей автоматически скрывается у всех (`status = 'hidden'`) до проверки.
-  - Кнопка «Заблокировать автора» в меню набора: наборы автора больше не показываются этому пользователю (таблица `user_blocks`, фильтр в `getLibrarySets` / `getSetDetail`). Разблокировка — в профиле.
-  - Админка (`public/admin.html`): список жалоб, кнопки «Скрыть набор» / «Оставить».
-  - Перед первой публикацией набора — согласие с условиями (ссылка на `/terms`).
-  - Контакт для жалоб есть: «Написать нам» (`FeedbackScreen`) + email в условиях.
+- [x] **1.2 Отключить библиотеку сообщества (1.2).** Вместо модерации (решение 07.10.2026): без чужих наборов нет публичного пользовательского контента, требования 1.2 не применяются.
+  - Сервер: `COMMUNITY_LIBRARY_ENABLED` (переменная Vercel, по умолчанию выключено) в `api/library.js` — список пустой, детали и карточки 404, публикация, лайки, оценки, импорт — 403. Свои публикации автор по-прежнему может снять.
+  - Приложение: `src/config/features.ts` — во вкладке «Библиотека» только учебники (без сортировки и фильтров), нет блока публикации в редакторе набора, «Мои публикации» и `LibrarySetDetail` убраны из навигации и ссылок.
+  - Условия и политика: убраны библиотека, блокировка автора и срок 24 часа; жалобы — через «Написать нам» и email.
+  - Остаточный риск — курсы (закрытые, по приглашению учителя). Если рецензент придерётся: кнопка «Пожаловаться» у курса.
+  - **Вернуть библиотеку позже** — с премодерацией: набор виден всем только после одобрения в админке, жалоба скрывает набор у пожаловавшегося, «Заблокировать автора», согласие с условиями перед первой публикацией. Затем включить оба флага.
 - [ ] **1.3 Отзыв токена Apple при удалении аккаунта.**
   - При входе через Apple отправлять на сервер `authorizationCode` из ответа Apple; сервер обменивает его на refresh-токен (`https://appleid.apple.com/auth/token`, client secret — JWT, подписанный `.p8`) и хранит его у пользователя.
   - `deleteAccount`: если есть Apple refresh-токен — `POST https://appleid.apple.com/auth/revoke`, затем удаление как сейчас.
@@ -119,6 +118,6 @@
   - Age Rating: в новой анкете отметить пользовательский контент.
   - Скриншоты и описание: без Premium, цен и функций, которых нет.
 - [ ] **5.2 Review Notes** (английский), примерно:
-  > Sign in with Apple no longer asks for a name or email: the app uses the name provided by Apple. Account deletion: Profile → Delete account (also revokes Sign in with Apple tokens). Public library has reporting, author blocking and automatic hiding of reported sets; terms with zero tolerance for objectionable content are accepted before publishing. AI features ask for consent before sending data to Google Gemini. To test teacher features, sign in with the demo account: … / course code: …
+  > Sign in with Apple no longer asks for a name or email: the app uses the name provided by Apple. Account deletion: Profile → Delete account (also revokes Sign in with Apple tokens). There is no public user-generated content: users cannot publish sets to other users; courses are private and invite-only, and users can report abuse via Profile → Contact us. AI features ask for consent before sending data to Google Gemini. To test teacher features, sign in with the demo account: … / course code: …
 - [ ] **5.3 Демо-аккаунт учителя** с курсом и кодом для подключения — чтобы рецензент проверил курсы и тесты.
 - [ ] **5.4 Поднять версию**, сборка в TestFlight, пройти этапы 0–3 руками на устройстве, отправить.

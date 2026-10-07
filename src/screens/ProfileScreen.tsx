@@ -36,6 +36,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { version as APP_VERSION } from '../../package.json';
 import { getLevelProgress, XP_PER_LEVEL } from '@/utils/level';
 import { PRIVACY_POLICY_URL, TERMS_URL } from '@/config/legal';
+import { COMMUNITY_LIBRARY_ENABLED } from '@/config/features';
 
 const THEME_OPTIONS: Array<{ value: ThemeMode; label: string }> = [
   { value: 'light', label: 'Светлая' },
@@ -244,7 +245,9 @@ export function ProfileScreen({ navigation }: any) {
       {/* ======== Account ======== */}
       <ListGroup title="Аккаунт" style={st.group}>
         <ListRow icon={User} title="Личные данные" onPress={() => navigation?.navigate('PersonalInfo')} />
-        <ListRow icon={BookOpen} title="Мои публикации" onPress={() => navigation?.navigate('MyPublications')} />
+        {COMMUNITY_LIBRARY_ENABLED && (
+          <ListRow icon={BookOpen} title="Мои публикации" onPress={() => navigation?.navigate('MyPublications')} />
+        )}
       </ListGroup>
 
       {/* ======== Learning ======== */}
