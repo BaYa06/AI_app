@@ -15,6 +15,18 @@ import { nextLessonStep, nextLessonLabel } from '@/services/lessonFlow';
 import { useCardsStore } from '@/store/cardsStore';
 import { Badge, Button, Card, ScreenHeader, Sheet, useScreenBottomInset } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
+import { WidgetPromptCard } from '@/components/widget/WidgetPromptCard';
+import { WidgetHowToSheet } from '@/components/widget/WidgetHowToSheet';
+import {
+  addLessonDay,
+  isLockScreenWidgetAvailable,
+  loadPromptState,
+  markPromptShown,
+  savePromptState,
+  shouldShowWidgetPrompt,
+} from '@/services/widgetPrompt';
+import { installedWidgets } from '@/services/widgetBridge';
+import { localDay } from '@/store/challengeStore';
 import { Settings, CheckCircle2, List, ArrowRight, RotateCcw, BookOpen, X } from 'lucide-react-native';
 
 type Props = RootStackScreenProps<'StudyResults'>;
@@ -64,6 +76,38 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   const hasFailedCards = phaseFailedIds && phaseFailedIds.length > 0;
   const isPhaseComplete = phaseId && totalPhaseCards > 0 && allCardsViewed && !hasFailedCards;
   
+  // Последняя часть урока дня: дальше урок закончится и вернёт на главную
+  const isLessonEnd = React.useMemo(() => {
+    if (!isPhaseComplete || !lesson) return false;
+    const cards = useCardsStore.getState().cards;
+    return !nextLessonStep(lesson, (id) => cards[id]?.setId);
+  }, []);
+
+  // Подсказка о виджете на экране блокировки (plan/widgets.md, 3.1): день с пройденным уроком
+  // запоминаем всегда, а карточку показываем по правилам services/widgetPrompt.ts
+  const [showWidgetPrompt, setShowWidgetPrompt] = React.useState(false);
+  const [showWidgetHowTo, setShowWidgetHowTo] = React.useState(false);
+  React.useEffect(() => {
+    if (!isLessonEnd) return;
+    const today = localDay();
+    const state = addLessonDay(loadPromptState(), today);
+    savePromptState(state);
+    const supported = isLockScreenWidgetAvailable();
+    if (!shouldShowWidgetPrompt(state, today, { supported, installed: false })) return;
+    let cancelled = false;
+    installedWidgets()
+      .then((families) => {
+        if (cancelled || !shouldShowWidgetPrompt(state, today, { supported, installed: families.length > 0 })) return;
+        savePromptState(markPromptShown(state, today));
+        Analytics.widgetPromptShown('lesson_results');
+        setShowWidgetPrompt(true);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isLessonEnd]);
+
   // Осталось = карточки которые еще не просмотрены + ошибочные карточки
   const remainingNewCards = phaseId && totalPhaseCards > 0 ? Math.max(0, totalPhaseCards - phaseOffset) : 0;
   const remainingFailedCards = phaseFailedIds?.length || 0;
@@ -362,9 +406,21 @@ export function StudyResultsScreen({ navigation, route }: Props) {
           </Pressable>
         )}
 
+        {showWidgetPrompt && (
+          <WidgetPromptCard
+            onHowTo={() => {
+              Analytics.widgetPromptClicked('lesson_results');
+              setShowWidgetHowTo(true);
+            }}
+            onDismiss={() => setShowWidgetPrompt(false)}
+          />
+        )}
+
         {/* Flexible Spacer */}
         <View style={styles.flexSpacer} />
       </ScrollView>
+
+      <WidgetHowToSheet visible={showWidgetHowTo} onClose={() => setShowWidgetHowTo(false)} />
 
       {/* Bottom Actions */}
       <View style={[styles.bottomActions, { backgroundColor: colors.background, paddingBottom: bottomInset + spacing.l }]}>
