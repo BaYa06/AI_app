@@ -11,6 +11,7 @@
 
 import type { Card } from '@/types';
 import { API_BASE } from '@/config/apiBase';
+import { hasAiConsent } from '@/services/aiConsent';
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -67,6 +68,8 @@ async function generateAIDistractors(
   card: Card,
   count: number,
 ): Promise<string[]> {
+  // Фоновый запрос в ИИ — только с уже данным согласием, окно здесь не показываем
+  if (!hasAiConsent()) return [];
   try {
     const res = await fetch(`${API_BASE}/context?action=distractors`, {
       method: 'POST',

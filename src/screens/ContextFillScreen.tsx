@@ -21,6 +21,7 @@ import { apiService } from '@/services/ApiService';
 import { getDistractors } from '@/utils/distractors';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card } from '@/types';
+import { ensureAiConsent } from '@/services/aiConsent';
 
 type Props = RootStackScreenProps<'ContextFill'>;
 
@@ -105,7 +106,8 @@ export function ContextFillScreen({ navigation, route }: Props) {
 
     // Карточки без примеров — генерируем на лету
     const noExample = selected.filter((c) => !c.example);
-    if (noExample.length > 0) {
+    // Примеры пишет ИИ — без согласия режим работает только с карточками, где пример уже есть
+    if (noExample.length > 0 && (await ensureAiConsent())) {
       setPrepStatus('AI готовит задания...');
       try {
         const results = await apiService.generateExamples(

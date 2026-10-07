@@ -16,7 +16,7 @@ import { supabase, NeonService, Analytics, StreakService, DatabaseService } from
 import type { UserStats } from '@/services';
 import { Text } from '@/components/common';
 import { spacing, borderRadius, iconSize, alpha } from '@/constants';
-import { Button, Card, ListGroup, ListRow, ProgressBar, Screen, toast } from '@/components/ui';
+import { Button, Card, ListGroup, ListRow, ProgressBar, Screen, Switch, toast } from '@/components/ui';
 import {
   User,
   BookOpen,
@@ -27,6 +27,7 @@ import {
   MessageSquare,
   ShieldCheck,
   FileText,
+  Sparkles,
   ExternalLink,
   LogOut,
 } from 'lucide-react-native';
@@ -38,6 +39,7 @@ import { getLevelProgress, XP_PER_LEVEL } from '@/utils/level';
 import { PRIVACY_POLICY_URL, TERMS_URL } from '@/config/legal';
 import { COMMUNITY_LIBRARY_ENABLED } from '@/config/features';
 import { isAppleUser, requestAppleAuthorizationCode } from '@/services/appleSignInName';
+import { ensureAiConsent, hasAiConsent, setAiConsent } from '@/services/aiConsent';
 
 const THEME_OPTIONS: Array<{ value: ThemeMode; label: string }> = [
   { value: 'light', label: 'Светлая' },
@@ -85,8 +87,20 @@ export function ProfileScreen({ navigation }: any) {
 
   // Имя и статистика из БД (обновляем при каждом фокусе экрана)
   const sessionUserId = session?.user?.id;
+  // Согласие на передачу данных ИИ (App Review 5.1.2(i)): даётся при первом использовании ИИ, здесь — отзыв
+  const [aiConsent, setAiConsentState] = useState(hasAiConsent);
+  const handleToggleAiConsent = useCallback(async (value: boolean) => {
+    if (value) {
+      await ensureAiConsent();
+    } else {
+      setAiConsent(false);
+    }
+    setAiConsentState(hasAiConsent());
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
+      setAiConsentState(hasAiConsent());
       if (!sessionUserId) {
         setUserNameHandle(null);
         setDisplayName(null);
@@ -310,6 +324,13 @@ export function ProfileScreen({ navigation }: any) {
 
       {/* ======== Legal ======== */}
       <ListGroup title="Правовая информация" style={st.group}>
+        <ListRow
+          icon={Sparkles}
+          title="Данные для ИИ"
+          subtitle="Фото, файлы и слова для Google Gemini"
+          chevron={false}
+          right={<Switch value={aiConsent} onValueChange={handleToggleAiConsent} accessibilityLabel="Передавать данные ИИ" />}
+        />
         <ListRow
           icon={ShieldCheck}
           title="Политика конфиденциальности"

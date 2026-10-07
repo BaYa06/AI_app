@@ -27,6 +27,7 @@ import {
   Info,
 } from 'lucide-react-native';
 import { describeError } from '@/utils/userErrors';
+import { ensureAiConsent } from '@/services/aiConsent';
 
 type Props = RootStackScreenProps<'ImportFiles'>;
 
@@ -285,6 +286,8 @@ export function ImportFilesScreen({ navigation, route }: Props) {
 
   const handleSubmit = useCallback(async () => {
     if (files.length === 0 || loading) return;
+    // Файлы разбирает ИИ — сначала согласие на передачу данных
+    if (!(await ensureAiConsent())) return;
     setLoading(true);
 
     try {

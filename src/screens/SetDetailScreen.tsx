@@ -44,6 +44,7 @@ import {
 } from 'lucide-react-native';
 import { describeError } from '@/utils/userErrors';
 import { pluralize } from '@/utils';
+import { ensureAiConsent } from '@/services/aiConsent';
 
 type Props = RootStackScreenProps<'SetDetail'>;
 type Filter = 'all' | 'mastered' | 'unmastered';
@@ -411,6 +412,12 @@ export function SetDetailScreen({ navigation, route }: Props) {
       return;
     }
 
+    // PDF разбирает ИИ — сначала согласие (TSV читаем сами)
+    if (isPdf && !(await ensureAiConsent())) {
+      if (event.target) event.target.value = '';
+      return;
+    }
+
     setImportLoading(true);
     setImportError(null);
 
@@ -494,6 +501,9 @@ export function SetDetailScreen({ navigation, route }: Props) {
         setImportError('PDF файл слишком большой. Максимум 4 МБ.');
         return;
       }
+
+      // PDF разбирает ИИ — сначала согласие (TSV читаем сами)
+      if (isPdf && !(await ensureAiConsent())) return;
 
       setImportLoading(true);
       setImportError(null);
@@ -620,6 +630,8 @@ export function SetDetailScreen({ navigation, route }: Props) {
 
   // Trigger image picker
   const triggerImageSelect = useCallback(async () => {
+    // Слова с фото распознаёт ИИ — согласие до выбора фото
+    if (!(await ensureAiConsent())) return;
     setImportError(null);
     setImportSource('image');
 
@@ -680,20 +692,23 @@ export function SetDetailScreen({ navigation, route }: Props) {
     try {
       // Генерируем примеры через Gemini
       let cardsWithExamples = importedCards;
-      try {
-        const result = await apiService.generateExamples(
-          importedCards.map(c => ({ front: c.front, back: c.back }))
-        );
-        if (result.length > 0) {
-          cardsWithExamples = importedCards.map((card, i) => ({
-            ...card,
-            example: result[i]?.example || '',
-            wordType: result[i]?.wordType,
-          }));
+      // Без согласия на ИИ импортируем без примеров
+      if (await ensureAiConsent()) {
+        try {
+          const result = await apiService.generateExamples(
+            importedCards.map(c => ({ front: c.front, back: c.back }))
+          );
+          if (result.length > 0) {
+            cardsWithExamples = importedCards.map((card, i) => ({
+              ...card,
+              example: result[i]?.example || '',
+              wordType: result[i]?.wordType,
+            }));
+          }
+        } catch (aiError) {
+          console.warn('Gemini examples failed, importing without examples:', aiError);
+          // Продолжаем импорт без примеров
         }
-      } catch (aiError) {
-        console.warn('Gemini examples failed, importing without examples:', aiError);
-        // Продолжаем импорт без примеров
       }
 
       for (const card of cardsWithExamples) {

@@ -3,6 +3,7 @@
  */
 
 import { API_BASE } from '@/config/apiBase';
+import { hasAiConsent } from './aiConsent';
 
 // Раньше был отдельный относительный '/api' — не резолвится в fetch() на нативном React
 // Native (в отличие от веба), см. plan/teacher_access_fix_plan.md, пункт 55. Затрагивало как
@@ -16,6 +17,10 @@ const API_BASE_URL = API_BASE;
 const AI_BASE_URL = __DEV__
   ? 'http://localhost:3000/api'
   : 'https://ai-app-seven-zeta.vercel.app/ai';
+
+function requireAiConsent(): void {
+  if (!hasAiConsent()) throw new Error('AI consent required');
+}
 
 class ApiService {
   /**
@@ -40,11 +45,14 @@ class ApiService {
   }
 
   // ==================== AI ====================
+  // Без согласия на передачу данных ИИ запрос не уходит (App Review 5.1.2(i), services/aiConsent.ts).
+  // Окно согласия показывают экраны до действия — здесь только страховка.
 
   /**
    * Сгенерировать примеры для слов через Gemini
    */
   async generateExamples(words: Array<{ front: string; back: string }>): Promise<Array<{ front: string; back: string; example: string; wordForm?: string; wordType?: string }>> {
+    requireAiConsent();
     const response = await fetch(`${AI_BASE_URL}/generate-examples`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -61,6 +69,7 @@ class ApiService {
    * Извлечь карточки из PDF через Gemini
    */
   async extractPdfCards(base64: string): Promise<Array<{ front: string; back: string }>> {
+    requireAiConsent();
     const response = await fetch(`${AI_BASE_URL}/extract-pdf`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -83,6 +92,7 @@ class ApiService {
     languageFrom?: string,
     languageTo?: string,
   ): Promise<Array<{ front: string; back: string }>> {
+    requireAiConsent();
     const response = await fetch(`${API_BASE_URL}/extract-image`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -104,6 +114,7 @@ class ApiService {
     languageFrom?: string,
     languageTo?: string,
   ): Promise<Array<{ front: string; back: string }>> {
+    requireAiConsent();
     const response = await fetch(`${AI_BASE_URL}/translate-words`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
