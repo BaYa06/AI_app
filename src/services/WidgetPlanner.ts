@@ -55,6 +55,8 @@ export interface WidgetEntry {
   state: WidgetState;
   /** Слово записи: в 'review' — главное, в 'waiting'/'streak' — для строки над часами */
   phase?: 'question' | 'answer';
+  /** «Перевод → слово»: prompt — перевод, answer — слово */
+  reverse?: boolean;
   prompt?: string;
   answer?: string;
   cardId?: string;
@@ -194,6 +196,7 @@ function cardFields(card: Card, showIndex: number, phase: 'question' | 'answer')
   const back = card.backText.trim();
   return {
     phase,
+    reverse,
     prompt: reverse ? back : front,
     answer: reverse ? front : back,
     cardId: card.id,

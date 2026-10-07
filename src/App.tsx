@@ -12,6 +12,7 @@ import { ToastHost } from '@/components/ui/Toast';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { DatabaseService, setupAutoSave, supabase, NeonService, setAnalyticsUserId, SyncQueueService, Analytics, setAnalyticsUserProperties } from '@/services';
 import { isWidgetUrl, parseWidgetUrl } from '@/services/widgetLinks';
+import { resetWidget } from '@/services/WidgetService';
 import { useCourseRealtime } from '@/hooks/useCourseRealtime';
 import { StorageService } from '@/services/StorageService';
 import { CACHE_OWNER_KEY } from '@/services/DatabaseService';
@@ -527,6 +528,8 @@ export default function App() {
         }, 0);
       } else {
         Analytics.logout();
+        // Виджет на экране блокировки не должен показывать слова прошлого аккаунта (plan/widgets.md, 1.2)
+        resetWidget();
         // Сохранённые данные больше не показываем мгновенно — следующий вошедший может быть другим
         StorageService.delete(CACHE_OWNER_KEY);
         cachedOwnerRef.current = null;

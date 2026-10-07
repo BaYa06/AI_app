@@ -63,6 +63,8 @@ import { localDay } from '@/store/challengeStore';
 import { buildLessonPlan, countWaitingReview, ensureLessonDay, EXTRA_NEW_STEP, type LessonDay, type LessonPlan } from '@/services/LessonService';
 import { isLessonStartable, lessonCardContent, streakRiskHoursLeft } from '@/components/home/lessonText';
 import { LessonCard } from '@/components/home/LessonCard';
+import { syncWidget, checkWidgetUsage } from '@/services/WidgetService';
+import type { WidgetPlanInput } from '@/services/WidgetPlanner';
 import { FocusSetSheet } from '@/components/home/FocusSetSheet';
 import { ChallengeTiles, type ChallengeTile } from '@/components/home/ChallengeTiles';
 import { SetsSectionMenu } from '@/components/home/SetsSectionMenu';
@@ -770,6 +772,30 @@ export function HomeScreen({ navigation, route }: any) {
     if (isTeacher || lessonContent?.kind !== 'start') return;
     startLesson(lessonPlan);
   }, [widgetFrom, isTeacher, lessonContent, hasLessonCards, lessonPlan, startLesson, navigation]);
+
+  // Виджет на экране блокировки (plan/widgets.md, 1.2): расписание пересчитывается при любом изменении
+  // карточек, урока или серии и при каждом заходе на главную. Данные собираются в момент записи
+  // (WidgetService ждёт 5 секунд), поэтому план урока считаем заново — на «сейчас», с учётом нового дня.
+  const widgetInputRef = useRef<() => WidgetPlanInput | null>(() => null);
+  widgetInputRef.current = () => {
+    if (isTeacher === null || !hasLessonCards) return null;
+    const stored = useLessonStore.getState().day;
+    return {
+      cards: reviewStats.all,
+      day: stored?.date === localDay() ? stored : null,
+      plan: computeLessonPlan(stored),
+      newPerDay: lessonNewPerDay,
+      streakDays: streakValue,
+      goalReached: todayGoalReached,
+      now: Date.now(),
+    };
+  };
+  useEffect(() => {
+    syncWidget(() => widgetInputRef.current());
+  }, [reviewStats, lessonDay, lessonPlan, lessonNewPerDay, streakValue, todayGoalReached, isTeacher, focusTick]);
+  useEffect(() => {
+    checkWidgetUsage();
+  }, []);
 
   // Рейтинг курса: значок-кубок в шапке, точка — есть новости (plan/home_redesign.md, 3.2)
   const [leaderboard, setLeaderboard] = useState<CourseLeaderboard | null>(null);
