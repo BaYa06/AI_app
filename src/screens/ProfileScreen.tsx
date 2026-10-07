@@ -37,6 +37,7 @@ import { version as APP_VERSION } from '../../package.json';
 import { getLevelProgress, XP_PER_LEVEL } from '@/utils/level';
 import { PRIVACY_POLICY_URL, TERMS_URL } from '@/config/legal';
 import { COMMUNITY_LIBRARY_ENABLED } from '@/config/features';
+import { isAppleUser, requestAppleAuthorizationCode } from '@/services/appleSignInName';
 
 const THEME_OPTIONS: Array<{ value: ThemeMode; label: string }> = [
   { value: 'light', label: 'Светлая' },
@@ -155,8 +156,24 @@ export function ProfileScreen({ navigation }: any) {
   // Удаление аккаунта (требование App Store): сервер удаляет данные и пользователя,
   // затем чистим устройство и выходим — App.tsx по SIGNED_OUT вернёт на экран приветствия
   const doDeleteAccount = useCallback(async () => {
+    // Аккаунт через Apple: подтверждаем входом через Apple, сервер по коду отзывает токен Apple
+    let appleAuthorizationCode: string | undefined;
+    if (session?.user && isAppleUser(session.user)) {
+      const apple = await requestAppleAuthorizationCode();
+      if (apple.status === 'canceled') return;
+      if (apple.status !== 'ok') {
+        const msg = apple.status === 'unsupported'
+          ? 'Аккаунт, созданный через Apple, можно удалить в приложении Flashly на iPhone.'
+          : 'Не удалось подтвердить вход через Apple. Попробуй ещё раз.';
+        if (Platform.OS === 'web') window.alert(msg);
+        else toast.error(msg);
+        return;
+      }
+      appleAuthorizationCode = apple.code;
+    }
+
     setDeleting(true);
-    const ok = await NeonService.deleteAccount();
+    const ok = await NeonService.deleteAccount(appleAuthorizationCode);
     if (!ok) {
       setDeleting(false);
       const msg = 'Не удалось удалить аккаунт. Проверь интернет и попробуй ещё раз.';
@@ -166,15 +183,16 @@ export function ProfileScreen({ navigation }: any) {
     }
     DatabaseService.clearAll();
     await doSignOut('local');
-  }, [doSignOut]);
+  }, [session, doSignOut]);
 
   const handleDeleteAccount = useCallback(() => {
     if (deleting) return;
     const title = 'Удалить аккаунт?';
     const message =
-      'Будут безвозвратно удалены все твои наборы, прогресс, серия, алмазы и публикации в библиотеке.' +
+      'Будут безвозвратно удалены все твои наборы, прогресс, серия и алмазы.' +
       (isTeacher ? ' Твои курсы тоже будут удалены, и ученики потеряют к ним доступ.' : '') +
-      ' Отменить это нельзя.';
+      ' Отменить это нельзя.' +
+      (session?.user && isAppleUser(session.user) ? ' Для подтверждения войди через Apple.' : '');
     if (Platform.OS === 'web') {
       if (window.confirm(`${title}\n\n${message}`)) doDeleteAccount();
       return;
@@ -183,7 +201,7 @@ export function ProfileScreen({ navigation }: any) {
       { text: 'Отмена', style: 'cancel' },
       { text: 'Удалить', style: 'destructive', onPress: doDeleteAccount },
     ]);
-  }, [deleting, isTeacher, doDeleteAccount]);
+  }, [deleting, isTeacher, session, doDeleteAccount]);
 
   return (
     <Screen contentStyle={st.content}>

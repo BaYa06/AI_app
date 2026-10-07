@@ -6,6 +6,7 @@ import { HttpError, uuid, assertReadableSet } from './_access.js';
 import { courseSetsForStudent } from './_course.js';
 import { notifyCoursesChanged } from './_realtime.js';
 import { getAdminStats, getAdminFeedback, markAdminFeedbackRead } from './_admin.js';
+import { isAppleUser, isAppleRevokeConfigured, revokeAppleAuthorization } from './_apple.js';
 
 /**
  * API данных пользователя: профиль, наборы, карточки, курсы, прогресс, серия.
@@ -671,14 +672,29 @@ async function adminMarkFeedbackRead(sql, me, p) {
  * Почти всё уходит каскадом от users (наборы, курсы, прогресс, серия, награды, тесты). Таблицы без
  * внешнего ключа на users чистим сами, заодно откатываем лайки и оценки в чужих наборах библиотеки.
  * Если Supabase не ответит, данные в Neon уже удалены — повтор запроса безопасен.
+ *
+ * Аккаунт Sign in with Apple: сначала отзываем токен Apple (p.appleAuthorizationCode — свежий код
+ * из повторного входа через Apple в приложении, api/_apple.js). Не вышло — ничего не удаляем.
  */
-async function deleteAccount(sql, me, p) {
+async function deleteAccount(sql, me, p, user) {
   if (p.confirm !== 'DELETE') throw new HttpError(400, 'confirm required');
   if (process.env.ADMIN_USER_ID && me === process.env.ADMIN_USER_ID) {
     throw new HttpError(403, 'Admin account cannot be deleted from the app');
   }
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceKey) throw new HttpError(503, 'Account deletion is not configured');
+
+  if (isAppleUser(user)) {
+    if (!isAppleRevokeConfigured()) throw new HttpError(503, 'Apple token revocation is not configured');
+    const code = optString(p.appleAuthorizationCode, 2000);
+    if (!code) throw new HttpError(400, 'Apple authorization required');
+    try {
+      await revokeAppleAuthorization(code);
+    } catch (e) {
+      console.error('[data] deleteAccount: Apple revoke failed:', e);
+      throw new HttpError(502, 'Failed to revoke Apple authorization');
+    }
+  }
 
   await sql.transaction([
     sql`

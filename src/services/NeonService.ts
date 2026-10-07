@@ -410,10 +410,11 @@ export const NeonService = {
   },
 
   /**
-   * Безвозвратно удалить аккаунт: все данные в Neon и пользователя в Supabase (api/data.js deleteAccount)
+   * Безвозвратно удалить аккаунт: все данные в Neon и пользователя в Supabase (api/data.js deleteAccount).
+   * Для аккаунта Sign in with Apple нужен свежий appleAuthorizationCode — по нему сервер отзывает токен Apple.
    */
-  async deleteAccount(): Promise<boolean> {
-    return (await callDataApi<boolean>('deleteAccount', { confirm: 'DELETE' })) === true;
+  async deleteAccount(appleAuthorizationCode?: string): Promise<boolean> {
+    return (await callDataApi<boolean>('deleteAccount', { confirm: 'DELETE', appleAuthorizationCode })) === true;
   },
 
   async updateDisplayName(_userId: string, displayName: string): Promise<boolean> {
