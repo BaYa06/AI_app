@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePwaInstall } from '@/hooks/usePwaInstall';
 import { SUPABASE_OAUTH_REDIRECT, supabase } from '@/services/supabaseClient';
 import { describeError } from '@/utils/userErrors';
+import { setAppleSignInName } from '@/services/appleSignInName';
 
 type Props = {
   isLoading?: boolean;
@@ -152,11 +153,15 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
         requestedScopes: [appleAuth.Scope.EMAIL, appleAuth.Scope.FULL_NAME],
       });
 
-      const { identityToken, nonce } = response;
+      const { identityToken, nonce, fullName } = response;
       if (!identityToken) {
         setAuthError('Apple не вернул токен авторизации');
         return;
       }
+
+      // Имя приходит только при первом входе — запоминаем до входа, его заберёт App
+      const appleName = [fullName?.givenName, fullName?.familyName].filter(Boolean).join(' ').trim() || null;
+      setAppleSignInName(appleName);
 
       const { error } = await supabase.auth.signInWithIdToken({
         provider: 'apple',
@@ -165,6 +170,7 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
       });
 
       if (error) {
+        setAppleSignInName(null);
         console.error('[auth] Apple sign-in error', error);
         setAuthError(describeError(error, 'Не удалось войти. Попробуй ещё раз.'));
       }

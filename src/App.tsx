@@ -13,6 +13,7 @@ import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { DatabaseService, setupAutoSave, supabase, NeonService, setAnalyticsUserId, SyncQueueService, Analytics, setAnalyticsUserProperties } from '@/services';
 import { isWidgetUrl, parseWidgetUrl } from '@/services/widgetLinks';
 import { resetWidget } from '@/services/WidgetService';
+import { isAppleUser, takeAppleSignInName } from '@/services/appleSignInName';
 import { useCourseRealtime } from '@/hooks/useCourseRealtime';
 import { StorageService } from '@/services/StorageService';
 import { CACHE_OWNER_KEY } from '@/services/DatabaseService';
@@ -323,6 +324,8 @@ export default function App() {
   const [pendingInviteToken, setPendingInviteToken] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const ensuredUserIdRef = useRef<string | null>(null);
+  // Вход через Apple: шага «Как к тебе обращаться?» нет, «назад» с выбора роли — на приветствие
+  const skipNameStepRef = useRef(false);
   const loadedUserIdRef = useRef<string | null>(null);
   const processedOAuthCodeRef = useRef<string | null>(null);
   // Guard: не отправляем push токен повторно для того же userId
@@ -423,12 +426,18 @@ export default function App() {
       return;
     }
 
+    // Sign in with Apple: имя уже дано Apple — не спрашиваем его повторно (App Review, Guideline 4)
+    const signedInWithApple = isAppleUser(user as any);
+    skipNameStepRef.current = signedInWithApple;
+    const appleName = takeAppleSignInName();
+    const displayName = (user.user_metadata as any)?.full_name || appleName || undefined;
+
     if (ensuredUserIdRef.current !== user.id) {
       ensuredUserIdRef.current = user.id;
       await NeonService.ensureUserExists({
         id: user.id,
         email: user.email,
-        displayName: (user.user_metadata as any)?.full_name,
+        displayName,
       });
     }
 
@@ -470,7 +479,12 @@ export default function App() {
       // Новый пользователь — начинаем онбординг
       setIsAuthenticated(true);
       setNeedsOnboarding(true);
-      setAuthStep('name');
+      if (signedInWithApple) {
+        setOnboardingData((prev) => ({ ...prev, displayName }));
+        setAuthStep('role');
+      } else {
+        setAuthStep('name');
+      }
     }
   }, []);
 
@@ -677,8 +691,12 @@ export default function App() {
   }, []);
 
   const handleBackToName = useCallback(() => {
+    if (skipNameStepRef.current) {
+      handleBackToWelcome();
+      return;
+    }
     setAuthStep('name');
-  }, []);
+  }, [handleBackToWelcome]);
 
   const handleBackToRole = useCallback(() => {
     setAuthStep('role');
