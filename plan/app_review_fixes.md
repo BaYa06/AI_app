@@ -100,7 +100,7 @@
   - Заодно — проверка входа на сервере импорта (Supabase JWT в заголовке), `userId` брать из токена, а не из тела (закрывает пункт 12 аудита).
 - [ ] **2.2 Окно оценки без звёзд (5.6.1).** `RatingPromptModal` → вопрос «Как тебе тренировка?» с вариантами ответа, без 5 звёзд. Оценку в App Store, если нужна, — только через системный `SKStoreReviewController` (`react-native-rate` / нативный модуль).
 - [ ] **2.3 Убрать «Скоро» из экзамена.** Неготовый режим в `ExamLobbyScreen` не показываем совсем.
-- [ ] **2.4 Удалить экран подписки.** Убрать `Subscription` из `AppNavigator` (экран и deep link `subscription`), из `types/navigation.ts`; файл `SubscriptionScreen.tsx` удалить.
+- [x] **2.4 Удалить экран подписки.** Убрать `Subscription` из `AppNavigator` (экран и deep link `subscription`), из `types/navigation.ts`; файл `SubscriptionScreen.tsx` удалить.
 
 ## Этап 3. Мелочи
 

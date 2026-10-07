@@ -74,7 +74,6 @@ import { MyPublicationsScreen } from '@/screens/MyPublicationsScreen';
 import { COMMUNITY_LIBRARY_ENABLED } from '@/config/features';
 import { PersonalInfoScreen } from '@/screens/PersonalInfoScreen';
 import { SecurityScreen } from '@/screens/SecurityScreen';
-import { SubscriptionScreen } from '@/screens/SubscriptionScreen';
 import { TeacherCourseStatsScreen } from '@/screens/TeacherCourseStatsScreen';
 import { TeacherStudentsScreen } from '@/screens/TeacherStudentsScreen';
 import { StudentDetailScreen } from '@/screens/StudentDetailScreen';
@@ -253,7 +252,6 @@ const NATIVE_LINKING: LinkingOptions<RootStackParamList> = {
       ...(COMMUNITY_LIBRARY_ENABLED ? { MyPublications: 'my-publications' } : null),
       PersonalInfo: 'personal-info',
       Security: 'security',
-      Subscription: 'subscription',
       SetEditor: 'set-editor',
       TeacherCourseStats: 'teacher/:courseId',
       TeacherStudents: 'teacher/:courseId/students',
@@ -438,11 +436,6 @@ export function AppNavigator() {
         <Stack.Screen
           name="Security"
           component={SecurityScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="Subscription"
-          component={SubscriptionScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen

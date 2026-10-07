@@ -23,7 +23,6 @@ export { FeedbackScreen } from './FeedbackScreen';
 export { SharedSetDetailScreen } from './SharedSetDetailScreen';
 export { PersonalInfoScreen } from './PersonalInfoScreen';
 export { SecurityScreen } from './SecurityScreen';
-export { SubscriptionScreen } from './SubscriptionScreen';
 export { TeacherStudentsScreen } from './TeacherStudentsScreen';
 export { ExamLobbyScreen } from './ExamLobbyScreen';
 export { TestHistoryScreen } from './TestHistoryScreen';

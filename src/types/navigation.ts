@@ -125,7 +125,6 @@ export type RootStackParamList = {
   MyPublications: undefined;
   PersonalInfo: undefined;
   Security: undefined;
-  Subscription: undefined;
   Achievements: undefined;
   NotificationSettings: undefined;
   LearningSettings: undefined;
