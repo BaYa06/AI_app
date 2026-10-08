@@ -1,22 +1,23 @@
 /**
- * Окно оценки приложения — появляется само после удачной тренировки (правила — services/feedback.ts).
+ * Опрос «Как тебе Flashly?» — появляется сам после удачной тренировки (правила — services/feedback.ts).
  *
- * Шаги: звёзды → «Были ли проблемы?» →
+ * Шаги: «Нравится / Нормально / Не нравится» → «Были ли проблемы?» →
  *   «Да» — что случилось (подсказки + текст) → отправить;
- *   «Нет» и 1–3 звезды — необязательное «Что нам улучшить?» (низкая оценка без причины мало что даёт);
- *   «Нет» и 4–5 звёзд — «Спасибо за отзыв!» и окно закрывается само.
+ *   «Нет» и «Нормально» / «Не нравится» — необязательное «Что нам улучшить?»;
+ *   «Нет» и «Нравится» — «Спасибо за отзыв!» и окно закрывается само.
  * Внизу всегда «Пропустить». По фону не закрывается — чтобы не закрыли случайно.
  * Оформление — общий нижний лист Sheet (брендбук, 7.6).
- * Своё окно, а не App Store: из него никуда не ведём (правила Apple запрещают отправлять
- * в App Store только довольных).
+ * Без звёзд: своё окно со звёздами похоже на оценку App Store, а такие окна Apple запрещает
+ * (App Review 5.6.1). В App Store отсюда не ведём. На сервер по-прежнему уходит число 1–5
+ * (SATISFACTION.score) — статистика в админке не меняется.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, Pressable } from 'react-native';
-import { Heart, Star } from 'lucide-react-native';
+import { View, StyleSheet } from 'react-native';
+import { Heart, Meh, ThumbsDown, ThumbsUp } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import { Button, Chip, Sheet, TextField } from '@/components/ui';
 import { useThemeColors } from '@/store';
-import { heights, iconSize, spacing } from '@/constants';
+import { iconSize, spacing } from '@/constants';
 import { triggerHaptic } from '@/utils/haptic';
 import {
   FEEDBACK_TAGS,
@@ -26,14 +27,20 @@ import {
   type FeedbackTag,
 } from '@/services/feedback';
 
-type Step = 'stars' | 'problem' | 'details' | 'thanks';
+type Step = 'mood' | 'problem' | 'details' | 'thanks';
+
+const SATISFACTION = [
+  { score: 5, label: 'Нравится', icon: ThumbsUp },
+  { score: 3, label: 'Нормально', icon: Meh },
+  { score: 1, label: 'Не нравится', icon: ThumbsDown },
+] as const;
 
 const THANKS_CLOSE_MS = 1400;
 
 export function RatingPromptModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const colors = useThemeColors();
 
-  const [step, setStep] = useState<Step>('stars');
+  const [step, setStep] = useState<Step>('mood');
   const [rating, setRating] = useState(0);
   const [hasProblem, setHasProblem] = useState<boolean | null>(null);
   const [tags, setTags] = useState<FeedbackTag[]>([]);
@@ -43,7 +50,7 @@ export function RatingPromptModal({ visible, onClose }: { visible: boolean; onCl
 
   useEffect(() => {
     if (visible) {
-      setStep('stars');
+      setStep('mood');
       setRating(0);
       setHasProblem(null);
       setTags([]);
@@ -72,7 +79,7 @@ export function RatingPromptModal({ visible, onClose }: { visible: boolean; onCl
     [rating, showThanks],
   );
 
-  const handleStar = (value: number) => {
+  const handleMood = (value: number) => {
     triggerHaptic('selection');
     setRating(value);
     setStep('problem');
@@ -92,7 +99,7 @@ export function RatingPromptModal({ visible, onClose }: { visible: boolean; onCl
     setTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
   };
 
-  // Звёзды уже поставили — сохраняем их и при «Пропустить»: это уже полезные данные
+  // Ответ уже выбрали — сохраняем его и при «Пропустить»: это уже полезные данные
   const handleSkip = () => {
     if (sending) return;
     if (step === 'thanks') {
@@ -108,49 +115,34 @@ export function RatingPromptModal({ visible, onClose }: { visible: boolean; onCl
     onClose();
   };
 
-  const renderStars = (interactive: boolean) => (
-    <View style={styles.starsRow} accessibilityRole={interactive ? 'adjustable' : undefined}>
-      {[1, 2, 3, 4, 5].map((value) => {
-        const filled = value <= rating;
-        return (
-          <Pressable
-            key={value}
-            disabled={!interactive}
-            onPress={() => handleStar(value)}
-            style={interactive ? styles.starButton : undefined}
-            accessibilityRole="button"
-            accessibilityLabel={`${value} из 5`}
-            accessibilityState={{ selected: filled }}
-          >
-            <Star
-              size={interactive ? iconSize.l : iconSize.m}
-              color={filled ? colors.star : colors.textTertiary}
-              fill={filled ? colors.star : 'transparent'}
-            />
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-
   return (
     <Sheet visible={visible} onClose={handleSkip} dismissOnBackdrop={false}>
       <View style={styles.content}>
-        {step === 'stars' && (
+        {step === 'mood' && (
           <>
             <Text variant="h3" align="center" accessibilityRole="header" style={{ color: colors.textPrimary }}>
               Как тебе Flashly?
             </Text>
             <Text variant="bodySmall" align="center" style={[styles.subtitle, { color: colors.textSecondary }]}>
-              Оцени приложение — это займёт пару секунд
+              Ответь в одно касание — так мы поймём, что улучшить
             </Text>
-            {renderStars(true)}
+            <View style={styles.moodList}>
+              {SATISFACTION.map((option) => (
+                <Button
+                  key={option.score}
+                  variant="secondary"
+                  icon={option.icon}
+                  title={option.label}
+                  onPress={() => handleMood(option.score)}
+                  fullWidth
+                />
+              ))}
+            </View>
           </>
         )}
 
         {step === 'problem' && (
           <>
-            {renderStars(false)}
             <Text variant="h3" align="center" accessibilityRole="header" style={{ color: colors.textPrimary }}>
               Были ли проблемы в приложении?
             </Text>
@@ -234,17 +226,8 @@ const styles = StyleSheet.create({
   subtitle: {
     marginTop: -spacing.xs,
   },
-  starsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: spacing.xxs,
-    paddingVertical: spacing.xs,
-  },
-  starButton: {
-    width: heights.button,
-    height: heights.button,
-    alignItems: 'center',
-    justifyContent: 'center',
+  moodList: {
+    gap: spacing.s,
   },
   answerRow: {
     flexDirection: 'row',
