@@ -6,7 +6,12 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { useCardsStore, useSetsStore, useThemeColors } from '@/store';
 import { Container, Text } from '@/components/common';
-import { spacing } from '@/constants';
+import { spacing, config } from '@/constants';
+
+const { maxCardFrontLength, maxCardBackLength } = config.limits;
+
+// Счётчик символов — когда до лимита осталось ≤ 20%
+const counterHint = (text: string, max: number) => (text.length >= max * 0.8 ? `${text.length}/${max}` : undefined);
 import { Button, ScreenHeader, TextField, confirmDialog, toast } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
 
@@ -178,6 +183,8 @@ export function CardEditorScreen({ navigation, route }: Props) {
           placeholder="Например: scharf"
           value={frontText}
           onChangeText={setFrontText}
+          maxLength={maxCardFrontLength}
+          hint={counterHint(frontText, maxCardFrontLength)}
           multiline
           numberOfLines={2}
           inputStyle={styles.textArea}
@@ -189,6 +196,8 @@ export function CardEditorScreen({ navigation, route }: Props) {
           placeholder="Например: острый"
           value={backText}
           onChangeText={setBackText}
+          maxLength={maxCardBackLength}
+          hint={counterHint(backText, maxCardBackLength)}
           multiline
           numberOfLines={2}
           inputStyle={styles.textArea}

@@ -344,6 +344,9 @@ export function MatchScreen({ navigation, route }: Props) {
                           },
                         ]}
                         numberOfLines={2}
+                        // Две строки фиксированы: длинное слово — шрифт до 14 pt, дальше многоточие
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.875}
                       >
                         {getFront(card)}
                       </Text>
@@ -400,6 +403,9 @@ export function MatchScreen({ navigation, route }: Props) {
                           },
                         ]}
                         numberOfLines={2}
+                        // Две строки фиксированы: длинное слово — шрифт до 14 pt, дальше многоточие
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.875}
                       >
                         {getBack(card)}
                       </Text>

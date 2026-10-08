@@ -3,7 +3,7 @@
  * @description Экран изучения карточек с CSS-анимациями для web
  */
 import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
-import { View, StyleSheet, Pressable, Dimensions, Animated, Modal, AppState } from 'react-native';
+import { View, StyleSheet, Pressable, Dimensions, Animated, Modal, AppState, type LayoutChangeEvent } from 'react-native';
 import { useCardsStore, useSetsStore, useStudyStore, useThemeColors, useSettingsStore, selectSetStats } from '@/store';
 import { Text, Loading } from '@/components/common';
 import { Button, ProgressBar, ScreenHeader, Switch } from '@/components/ui';
@@ -18,6 +18,7 @@ import type { Rating, Card } from '@/types';
 import { Settings, Volume2, Check } from 'lucide-react-native';
 import { speak, resolveSpeechLang, prefetchSpeech, cardSpeechLangs } from '@/utils/speech';
 import { triggerHaptic } from '@/utils/haptic';
+import { fitText, fitWordWithExample } from '@/utils/fitText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ReAnimated, {
   useSharedValue,
@@ -30,6 +31,20 @@ import ReAnimated, {
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = Math.min(340, SCREEN_WIDTH - 32);
 const CARD_HEIGHT = CARD_WIDTH * 1.25;
+const CARD_BOX_HEIGHT = Math.min(CARD_HEIGHT, 420);
+
+// Рамка текста на карточке до первого onLayout: без отступов 24×2 и рамки, верхней строки (32),
+// низа (24 + подпись 20 на лице, 24 на обороте) и запаса над словом (4)
+const DEFAULT_TEXT_BOX = {
+  width: CARD_WIDTH - spacing.l * 2 - 2,
+  front: CARD_BOX_HEIGHT - spacing.l * 2 - 2 - 32 - 44 - spacing.xxs,
+  back: CARD_BOX_HEIGHT - spacing.l * 2 - 2 - 32 - spacing.l - spacing.xxs,
+};
+// Слово: h2 (24) → не мельче 18; пример: bodyLarge (18) → не мельче 15 (utils/fitText.ts)
+const WORD_FIT = { sizes: [24, 22, 20, 18], lineHeightRatio: 1.5 };
+const EXAMPLE_FIT = { sizes: [18, 16, 15], lineHeightRatio: 1.45 };
+// Между словом и примером: два отступа cardContent + разделитель
+const EXAMPLE_GAP = spacing.m * 2 + 2;
 
 type Props = RootStackScreenProps<'Study'>;
 
@@ -70,6 +85,7 @@ export function StudyScreen({ navigation, route }: Props) {
 
   // Локальное состояние
   const [currentCard, setCurrentCard] = useState<Card | null>(null);
+  const [textBox, setTextBox] = useState(DEFAULT_TEXT_BOX);
   const [errorCards, setErrorCards] = useState<Array<{ id: string; front: string; back: string; rating: number }>>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [cardVisible, setCardVisible] = useState(true);
@@ -557,6 +573,20 @@ export function StudyScreen({ navigation, route }: Props) {
 
   const questionText = reverseEnabled ? baseBack : baseFront;
   const answerText = reverseEnabled ? baseFront : baseBack;
+  // Длинный текст — шрифт мельче, чтобы не выходил за карточку
+  const questionFit = fitText(questionText, { width: textBox.width, height: textBox.front, weight: 'bold', ...WORD_FIT });
+  const answerFit = fitWordWithExample(answerText, example, {
+    width: textBox.width,
+    height: textBox.back,
+    gap: EXAMPLE_GAP,
+    word: WORD_FIT,
+    example: EXAMPLE_FIT,
+  });
+  const measureTextBox = (side: 'front' | 'back') => (e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    const sideHeight = height - spacing.xxs;
+    setTextBox((box) => (box.width === width && box[side] === sideHeight ? box : { ...box, width, [side]: sideHeight }));
+  };
   const { front: frontLang, back: backLang } = cardSpeechLangs(currentCard);
   const questionLang = reverseEnabled ? backLang : frontLang;
   const answerLang = reverseEnabled ? frontLang : backLang;
@@ -628,8 +658,12 @@ export function StudyScreen({ navigation, route }: Props) {
             <View style={[styles.cardInner, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               {renderCardTop(() => handleSpeak(questionText, questionLang, answerText))}
 
-              <View style={styles.cardContent}>
-                <Text variant="h2" style={[styles.cardWord, { color: colors.textPrimary }]}>
+              <View style={styles.cardContent} onLayout={measureTextBox('front')}>
+                <Text
+                  variant="h2"
+                  numberOfLines={questionFit.numberOfLines}
+                  style={[styles.cardWord, { color: colors.textPrimary, fontSize: questionFit.fontSize, lineHeight: questionFit.lineHeight }]}
+                >
                   {questionText}
                 </Text>
               </View>
@@ -647,13 +681,22 @@ export function StudyScreen({ navigation, route }: Props) {
             <View style={[styles.cardInner, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               {renderCardTop(() => handleSpeak(answerText, answerLang, questionText))}
 
-              <View style={styles.cardContent}>
-                <Text variant="h2" style={[styles.cardWord, { color: colors.textPrimary }]}>
+              <View style={styles.cardContent} onLayout={measureTextBox('back')}>
+                <Text
+                  variant="h2"
+                  numberOfLines={answerFit.word.numberOfLines}
+                  style={[styles.cardWord, { color: colors.textPrimary, fontSize: answerFit.word.fontSize, lineHeight: answerFit.word.lineHeight }]}
+                >
                   {answerText}
                 </Text>
                 <View style={[styles.divider, { backgroundColor: colors.border }]} />
                 {example ? (
-                  <Text variant="bodyLarge" align="center" style={{ color: colors.textSecondary }}>
+                  <Text
+                    variant="bodyLarge"
+                    align="center"
+                    numberOfLines={answerFit.example.numberOfLines}
+                    style={{ color: colors.textSecondary, fontSize: answerFit.example.fontSize, lineHeight: answerFit.example.lineHeight }}
+                  >
                     {example}
                   </Text>
                 ) : null}

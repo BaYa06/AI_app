@@ -23,7 +23,13 @@ export const config = {
     maxSets: 100,
     maxTitleLength: 100,
     maxDescriptionLength: 500,
-    maxCardTextLength: 5000,
+    // Длина полей карточки при вводе. Посчитано по раскладке SF Pro на самом узком экране
+    // (320 pt): оборот карточки (перевод + пример) помещается целиком при шрифте не мельче
+    // 18 pt у слова и 15 pt у примера. Лицо и оборот одинаковые — в обратном режиме они меняются.
+    // Подбор шрифта — utils/fitText.ts.
+    maxCardFrontLength: 50,
+    maxCardBackLength: 50,
+    maxCardExampleLength: 120,
     maxImageSize: 5 * 1024 * 1024,  // 5 MB
     maxAudioSize: 10 * 1024 * 1024, // 10 MB
   },

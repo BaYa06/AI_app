@@ -13,7 +13,7 @@ import { launchImageLibrary } from 'react-native-image-picker';
 import { useSetsStore, useCardsStore, useThemeColors, selectSetStats, useSettingsStore, useCoursesStore, isSetInCourse } from '@/store';
 import { Container, Text, Loading } from '@/components/common';
 import { StudyModeSheet, type StudyMode } from '@/components/study/StudyModeSheet';
-import { spacing, borderRadius, iconSize, alpha } from '@/constants';
+import { spacing, borderRadius, iconSize, alpha, config } from '@/constants';
 import { EmptyState, ProgressBar, toast } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card, CreateCardInput } from '@/types';
@@ -1290,6 +1290,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                 <TextInput
                   value={newFront}
                   onChangeText={setNewFront}
+                  maxLength={config.limits.maxCardFrontLength}
                   placeholder="Например: scharf"
                   placeholderTextColor={modalPlaceholder}
                   style={[
@@ -1311,6 +1312,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                 <TextInput
                   value={newBack}
                   onChangeText={setNewBack}
+                  maxLength={config.limits.maxCardBackLength}
                   placeholder="Например: острый"
                   placeholderTextColor={modalPlaceholder}
                   style={[
@@ -1332,6 +1334,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
                 <TextInput
                   value={newExample}
                   onChangeText={setNewExample}
+                  maxLength={config.limits.maxCardExampleLength}
                   placeholder="Например: Der scharfe Pfeffer..."
                   placeholderTextColor={modalPlaceholder}
                   style={[

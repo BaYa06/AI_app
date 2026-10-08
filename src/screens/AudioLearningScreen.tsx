@@ -32,11 +32,17 @@ import {
 import type { RecognitionResult } from '@/utils/speechRecognition';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card } from '@/types';
+import { estimateLines, fitText } from '@/utils/fitText';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = Math.min(280, SCREEN_WIDTH - 64);
 const CARD_ASPECT_RATIO = 5 / 4;
 const CARD_HEIGHT = CARD_WIDTH * CARD_ASPECT_RATIO;
+
+// Слово на карточке: h1 (32) → не мельче 18 (utils/fitText.ts). Рамка — без отступов 24×2 и рамки,
+// снизу — место под ответ: распознанное (bodyLarge, до 2 строк) + правильный ответ (body)
+const AUDIO_TEXT_WIDTH = CARD_WIDTH - spacing.l * 2 - 2;
+const AUDIO_WORD_FIT = { sizes: [32, 28, 24, 20, 18], lineHeightRatio: 1.44 };
 
 type SessionState = 'idle' | 'listening' | 'correct' | 'incorrect';
 
@@ -458,6 +464,13 @@ export function AudioLearningScreen({ navigation, route }: Props) {
   const answerText = reverseEnabled
     ? (currentCard?.frontText || '')
     : (currentCard?.backText || '');
+  const answerReserve = spacing.s + 26 * 2 + spacing.xxs + estimateLines(answerText, 16, AUDIO_TEXT_WIDTH, 'regular') * 24;
+  const questionFit = fitText(questionText, {
+    width: AUDIO_TEXT_WIDTH,
+    height: CARD_HEIGHT - 2 - spacing.xxs - answerReserve,
+    weight: 'bold',
+    ...AUDIO_WORD_FIT,
+  });
 
   // Рамка карточки по состоянию: слушаем — warning, верно — success, неверно — error
   const cardBorderColor = useMemo(() => {
@@ -529,7 +542,11 @@ export function AudioLearningScreen({ navigation, route }: Props) {
           >
             <View style={styles.cardContent}>
               {/* Main word (question) */}
-              <Text variant="h1" style={[styles.cardWord, { color: colors.textPrimary }]}>
+              <Text
+                variant="h1"
+                numberOfLines={questionFit.numberOfLines}
+                style={[styles.cardWord, { color: colors.textPrimary, fontSize: questionFit.fontSize, lineHeight: questionFit.lineHeight }]}
+              >
                 {questionText}
               </Text>
 
