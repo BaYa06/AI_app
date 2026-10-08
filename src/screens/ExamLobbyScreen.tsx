@@ -85,11 +85,12 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
   const cardBorder = colors.border;
   const pillBg = colors.surfaceMuted;
 
-  const modes: { key: TestMode; label: string; icon: typeof ListChecks; disabled?: boolean }[] = [
+  // disabled — режим ещё не готов: в списке его нет (плашка «Скоро» — отказ App Review 2.1)
+  const modes = ([
     { key: 'multiple', label: 'Тест', icon: ListChecks },
     { key: 'writing', label: 'Письменный', icon: PenLine, disabled: true },
     { key: 'mixed', label: 'Смешанный', icon: Layers, disabled: true },
-  ];
+  ] as { key: TestMode; label: string; icon: typeof ListChecks; disabled?: boolean }[]).filter((m) => !m.disabled);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -214,73 +215,75 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
           )}
         </View>
 
-        {/* Test Mode */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-            Тип теста
-          </Text>
-          <View style={styles.modesGrid}>
-            {modes.map((m) => {
-              const active = testMode === m.key;
-              const Icon = m.icon;
-              return (
-                <Pressable accessibilityRole="button" accessibilityState={{ selected: active, disabled: !!m.disabled }}
-                  key={m.key}
-                  style={({ pressed }) => [
-                    styles.modeCard,
-                    {
-                      backgroundColor: cardBg,
-                      borderColor: active ? colors.primary : cardBorder,
-                      borderWidth: active ? 2 : 1,
-                    },
-                    active && {
-                      ...Platform.select({
-                        web: { boxShadow: `0 0 0 4px ${alpha(colors.primary, 10)}` },
-                      }) as any,
-                      shadowColor: colors.primary,
-                    },
-                    m.disabled && { opacity: 0.45 },
-                    !active && !m.disabled && { opacity: 0.6 },
-                    pressed && !m.disabled && { opacity: 0.5 },
-                  ]}
-                  onPress={() => { if (!m.disabled) { triggerHaptic('selection'); setTestMode(m.key); } }}
-                >
-                  {active && (
-                    <View style={[styles.modeCheck, { backgroundColor: colors.primaryFill }]}>
-                      <Check size={12} color={colors.onPrimary} strokeWidth={3} />
-                    </View>
-                  )}
-                  {m.disabled && (
-                    <View style={[styles.modeSoon, { backgroundColor: colors.surfaceMuted }]}>
-                      <Text style={[styles.modeSoonText, { color: colors.textSecondary }]}>Скоро</Text>
-                    </View>
-                  )}
-                  <View
-                    style={[
-                      styles.modeIcon,
+        {/* Test Mode — выбор показываем, когда готово больше одного режима (неготовые не показываем, App Review 2.1) */}
+        {modes.length > 1 && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+              Тип теста
+            </Text>
+            <View style={styles.modesGrid}>
+              {modes.map((m) => {
+                const active = testMode === m.key;
+                const Icon = m.icon;
+                return (
+                  <Pressable accessibilityRole="button" accessibilityState={{ selected: active, disabled: !!m.disabled }}
+                    key={m.key}
+                    style={({ pressed }) => [
+                      styles.modeCard,
                       {
-                        backgroundColor: active
-                          ? alpha(colors.primary, 10)
-                          : colors.surfaceMuted,
+                        backgroundColor: cardBg,
+                        borderColor: active ? colors.primary : cardBorder,
+                        borderWidth: active ? 2 : 1,
                       },
+                      active && {
+                        ...Platform.select({
+                          web: { boxShadow: `0 0 0 4px ${alpha(colors.primary, 10)}` },
+                        }) as any,
+                        shadowColor: colors.primary,
+                      },
+                      m.disabled && { opacity: 0.45 },
+                      !active && !m.disabled && { opacity: 0.6 },
+                      pressed && !m.disabled && { opacity: 0.5 },
                     ]}
+                    onPress={() => { if (!m.disabled) { triggerHaptic('selection'); setTestMode(m.key); } }}
                   >
-                    <Icon size={22} color={active ? colors.primary : colors.textSecondary} />
-                  </View>
-                  <Text
-                    style={[
-                      styles.modeLabel,
-                      { color: active ? colors.textPrimary : colors.textSecondary },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {m.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
+                    {active && (
+                      <View style={[styles.modeCheck, { backgroundColor: colors.primaryFill }]}>
+                        <Check size={12} color={colors.onPrimary} strokeWidth={3} />
+                      </View>
+                    )}
+                    {m.disabled && (
+                      <View style={[styles.modeSoon, { backgroundColor: colors.surfaceMuted }]}>
+                        <Text style={[styles.modeSoonText, { color: colors.textSecondary }]}>Скоро</Text>
+                      </View>
+                    )}
+                    <View
+                      style={[
+                        styles.modeIcon,
+                        {
+                          backgroundColor: active
+                            ? alpha(colors.primary, 10)
+                            : colors.surfaceMuted,
+                        },
+                      ]}
+                    >
+                      <Icon size={22} color={active ? colors.primary : colors.textSecondary} />
+                    </View>
+                    <Text
+                      style={[
+                        styles.modeLabel,
+                        { color: active ? colors.textPrimary : colors.textSecondary },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {m.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Settings */}
         <View style={styles.section}>
