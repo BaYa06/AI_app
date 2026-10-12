@@ -11,8 +11,10 @@ import { notifyCoursesChanged } from './_realtime.js';
  * Книги загружаются только скриптом scripts/import-book.ts — здесь записи в books/book_units/
  * официальные наборы нет (их к тому же защищает триггер из миграции 018).
  *
- * GET  /api/books?action=list-books          ?subject=&level=&q=   опубликованные книги (админ видит и черновики)
+ * GET  /api/books?action=list-books          ?subject=&level=&q=   опубликованные книги (админ видит и черновики);
+ *                                                                   только учителям и админам, ученику — пустой список
  * GET  /api/books?action=book-detail         ?bookId=              юниты + официальные наборы + мои курсы с этой книгой
+ *                                                                   (только учителям и админам)
  * POST /api/books?action=attach-to-courses   { bookId, courseIds } подключить книгу к своим курсам
  * POST /api/books?action=detach-from-course  { bookId, courseId }  отключить книгу от своего курса
  * GET  /api/books?action=course-plan         ?courseId=            книги курса и юниты; ученику — только открытые
@@ -77,6 +79,17 @@ async function isAdmin(sql, userId) {
   return rows[0]?.is_admin === true;
 }
 
+/**
+ * Каталог книг (вкладка «Библиотека» → учебники) видят только учителя и админы: учитель
+ * подключает книгу к курсу и открывает юниты, ученик учит их в курсе (course-plan /
+ * official-sets — там отдельная проверка). Ученику список пустой, а детали книги — 404.
+ */
+async function catalogAccess(sql, userId) {
+  const rows = await sql`SELECT is_admin, teacher FROM users WHERE id = ${userId}::uuid`;
+  const admin = rows[0]?.is_admin === true;
+  return { admin, canBrowse: admin || rows[0]?.teacher === true };
+}
+
 /** Книга, видимая вызывающему: опубликованная, либо любая — для админа. */
 async function findVisibleBook(sql, bookId, admin) {
   const rows = await sql`
@@ -106,7 +119,8 @@ async function listBooks(req, res, sql, userId) {
   const subject = (req.query.subject || '').trim() || null;
   const level = (req.query.level || '').trim() || null;
   const q = (req.query.q || '').trim().slice(0, 100) || null;
-  const admin = await isAdmin(sql, userId);
+  const { admin, canBrowse } = await catalogAccess(sql, userId);
+  if (!canBrowse) return res.status(200).json({ ok: true, books: [] });
 
   const rows = await sql`
     SELECT b.id, b.title, b.edition, b.level, b.subject, b.language_from, b.language_to,
@@ -139,7 +153,8 @@ async function bookDetail(req, res, sql, userId) {
   const { bookId } = req.query;
   if (!isUuid(bookId)) return res.status(400).json({ error: 'bookId required' });
 
-  const admin = await isAdmin(sql, userId);
+  const { admin, canBrowse } = await catalogAccess(sql, userId);
+  if (!canBrowse) return res.status(404).json({ error: 'Book not found' });
   const book = await findVisibleBook(sql, bookId, admin);
   if (!book) return res.status(404).json({ error: 'Book not found' });
 
