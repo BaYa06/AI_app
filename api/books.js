@@ -12,9 +12,9 @@ import { notifyCoursesChanged } from './_realtime.js';
  * официальные наборы нет (их к тому же защищает триггер из миграции 018).
  *
  * GET  /api/books?action=list-books          ?subject=&level=&q=   опубликованные книги (админ видит и черновики);
- *                                                                   только учителям и админам, ученику — пустой список
+ *                                                                   ученику — только книги с student_visible
  * GET  /api/books?action=book-detail         ?bookId=              юниты + официальные наборы + мои курсы с этой книгой
- *                                                                   (только учителям и админам)
+ *                                                                   (ученику — только книги с student_visible)
  * POST /api/books?action=attach-to-courses   { bookId, courseIds } подключить книгу к своим курсам
  * POST /api/books?action=detach-from-course  { bookId, courseId }  отключить книгу от своего курса
  * GET  /api/books?action=course-plan         ?courseId=            книги курса и юниты; ученику — только открытые
@@ -80,20 +80,21 @@ async function isAdmin(sql, userId) {
 }
 
 /**
- * Каталог книг (вкладка «Библиотека» → учебники) видят только учителя и админы: учитель
- * подключает книгу к курсу и открывает юниты, ученик учит их в курсе (course-plan /
- * official-sets — там отдельная проверка). Ученику список пустой, а детали книги — 404.
+ * Каталог книг (вкладка «Библиотека» → учебники): учителя и админы видят все опубликованные
+ * книги (админ — и черновики), ученик — только книги с student_visible (переключатель на
+ * каждую книгу, scripts/publish-book.ts --students). Юниты, открытые учителем в курсе,
+ * ученик получает независимо от флага (course-plan / official-sets).
  */
 async function catalogAccess(sql, userId) {
   const rows = await sql`SELECT is_admin, teacher FROM users WHERE id = ${userId}::uuid`;
   const admin = rows[0]?.is_admin === true;
-  return { admin, canBrowse: admin || rows[0]?.teacher === true };
+  return { admin, allBooks: admin || rows[0]?.teacher === true };
 }
 
 /** Книга, видимая вызывающему: опубликованная, либо любая — для админа. */
 async function findVisibleBook(sql, bookId, admin) {
   const rows = await sql`
-    SELECT id, title, edition, level, subject, language_from, language_to, publisher, is_published
+    SELECT id, title, edition, level, subject, language_from, language_to, publisher, is_published, student_visible
     FROM books WHERE id = ${bookId}::uuid AND (is_published = true OR ${admin}::boolean)
   `;
   return rows[0] || null;
@@ -119,8 +120,7 @@ async function listBooks(req, res, sql, userId) {
   const subject = (req.query.subject || '').trim() || null;
   const level = (req.query.level || '').trim() || null;
   const q = (req.query.q || '').trim().slice(0, 100) || null;
-  const { admin, canBrowse } = await catalogAccess(sql, userId);
-  if (!canBrowse) return res.status(200).json({ ok: true, books: [] });
+  const { admin, allBooks } = await catalogAccess(sql, userId);
 
   const rows = await sql`
     SELECT b.id, b.title, b.edition, b.level, b.subject, b.language_from, b.language_to,
@@ -132,6 +132,7 @@ async function listBooks(req, res, sql, userId) {
              WHERE u.book_id = b.id) AS cards_count
     FROM books b
     WHERE (b.is_published = true OR ${admin}::boolean)
+      AND (${allBooks}::boolean OR b.student_visible = true)
       AND (${subject}::text IS NULL OR lower(b.subject) = lower(${subject}::text))
       AND (${level}::text IS NULL OR lower(b.level) = lower(${level}::text))
       AND (${q}::text IS NULL OR b.title ILIKE '%' || ${q}::text || '%' OR b.publisher ILIKE '%' || ${q}::text || '%')
@@ -153,10 +154,9 @@ async function bookDetail(req, res, sql, userId) {
   const { bookId } = req.query;
   if (!isUuid(bookId)) return res.status(400).json({ error: 'bookId required' });
 
-  const { admin, canBrowse } = await catalogAccess(sql, userId);
-  if (!canBrowse) return res.status(404).json({ error: 'Book not found' });
+  const { admin, allBooks } = await catalogAccess(sql, userId);
   const book = await findVisibleBook(sql, bookId, admin);
-  if (!book) return res.status(404).json({ error: 'Book not found' });
+  if (!book || !(allBooks || book.student_visible)) return res.status(404).json({ error: 'Book not found' });
 
   // На старте 1 юнит = 1 набор, но отдаём массив — схема допускает несколько наборов в юните.
   const units = await sql`
@@ -429,7 +429,7 @@ async function officialSets(req, res, sql, userId) {
   if (requested.length > 100 || !requested.every(isUuid)) {
     return res.status(400).json({ error: 'setIds must be up to 100 comma-separated uuids' });
   }
-  const admin = await isAdmin(sql, userId);
+  const { admin, allBooks } = await catalogAccess(sql, userId);
 
   const sets = await sql`
     WITH my_open_units AS (
@@ -454,7 +454,7 @@ async function officialSets(req, res, sql, userId) {
     JOIN books b ON b.id = u.book_id AND (b.is_published = true OR ${admin}::boolean)
     WHERE cs.is_official = true
       AND (
-        cs.id = ANY(${requested}::uuid[])
+        (cs.id = ANY(${requested}::uuid[]) AND (${allBooks}::boolean OR b.student_visible = true))
         OR u.id IN (SELECT unit_id FROM my_open_units)
         OR EXISTS (
           SELECT 1 FROM cards c JOIN card_progress p ON p.card_id = c.id AND p.user_id = ${userId}::uuid

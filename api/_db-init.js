@@ -4,7 +4,7 @@ import { neon } from '@neondatabase/serverless';
  * Версия схемы: при добавлении миграции в applyMigrations увеличить (и дописать файл в
  * database/migrations). Пока в app_migrations есть отметка этой версии, миграции не выполняются.
  */
-const SCHEMA_VERSION = 'schema_023';
+const SCHEMA_VERSION = 'schema_024';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -324,6 +324,13 @@ async function applyMigrations(sql) {
     await sql`CREATE INDEX IF NOT EXISTS idx_app_feedback_user_created ON app_feedback(user_id, created_at DESC)`;
   } catch (e) {
     console.error('Migration 023_app_feedback failed:', e);
+  }
+
+  // Migration 024: книга видна ученикам — переключатель на каждую книгу (api/books.js)
+  try {
+    await sql`ALTER TABLE books ADD COLUMN IF NOT EXISTS student_visible BOOLEAN NOT NULL DEFAULT false`;
+  } catch (e) {
+    console.error('Migration 024_book_student_visible failed:', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)
