@@ -3,23 +3,20 @@
  * @description Экран детали набора карточек
  */
 import { isCardLearned, isCardWaitingReview } from '@/services/SRSService';
-import React, { useCallback, useMemo, useState, useRef, useEffect } from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { shallow } from 'zustand/shallow';
 import { View, FlatList, StyleSheet, Pressable, TextInput, ScrollView, ActivityIndicator, Platform, KeyboardAvoidingView, Modal, Dimensions } from 'react-native';
 import { triggerHaptic } from '@/utils/haptic';
 import { BlurView } from '@/utils/BlurView';
-import DocumentPicker from 'react-native-document-picker';
-import { launchImageLibrary } from 'react-native-image-picker';
 import { useSetsStore, useCardsStore, useThemeColors, selectSetStats, useSettingsStore, useCoursesStore, isSetInCourse } from '@/store';
 import { Container, Text, Loading } from '@/components/common';
 import { StudyModeSheet, type StudyMode } from '@/components/study/StudyModeSheet';
 import { spacing, borderRadius, iconSize, alpha, config } from '@/constants';
 import { EmptyState, ProgressBar, toast } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
-import type { Card, CreateCardInput } from '@/types';
+import type { Card } from '@/types';
 import { DatabaseService, LibraryService, Analytics, NeonService, BookService } from '@/services';
 import { confirmAction } from '@/utils/dialogs';
-import { apiService } from '@/services/ApiService';
 import { supabase } from '@/services/supabaseClient';
 import { LIBRARY_CATEGORIES } from '@/constants/library';
 import {
@@ -30,21 +27,14 @@ import {
   Edit3,
   Check,
   Circle,
-  Sparkles,
-  File,
-  Upload,
-  Lightbulb,
-  CheckCircle,
-  Info,
+  Camera,
   Globe,
   X,
-  Image as ImageIcon,
   BookOpen,
   Layers,
 } from 'lucide-react-native';
 import { describeError } from '@/utils/userErrors';
 import { pluralize } from '@/utils';
-import { ensureAiConsent } from '@/services/aiConsent';
 
 type Props = RootStackScreenProps<'SetDetail'>;
 type Filter = 'all' | 'mastered' | 'unmastered';
@@ -70,7 +60,6 @@ export function SetDetailScreen({ navigation, route }: Props) {
   const [search, setSearch] = useState('');
   const [actionCardId, setActionCardId] = useState<string | null>(null);
   const [showAddCard, setShowAddCard] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
   const [newFront, setNewFront] = useState('');
   const [newBack, setNewBack] = useState('');
   const [newExample, setNewExample] = useState('');
@@ -87,15 +76,6 @@ export function SetDetailScreen({ navigation, route }: Props) {
     return '20';
   });
 
-  // Import states
-  const [importLoading, setImportLoading] = useState(false);
-  const [importedCards, setImportedCards] = useState<Array<{ front: string; back: string; example?: string }>>([]);
-  const [importError, setImportError] = useState<string | null>(null);
-  const [importStep, setImportStep] = useState<'select' | 'loading' | 'extracting' | 'translating' | 'preview' | 'generating' | 'done'>('select');
-  const [importedCount, setImportedCount] = useState(0);
-  const [importSource, setImportSource] = useState<'file' | 'image'>('file');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
 
   // Publish states
   const [isPublished, setIsPublished] = useState(false);
@@ -351,395 +331,6 @@ export function SetDetailScreen({ navigation, route }: Props) {
     setShowAddCard(true);
   }, []);
 
-  const openImportModal = useCallback(() => {
-    setShowAddCard(false);
-    setImportStep('select');
-    setImportSource('file');
-    setImportedCards([]);
-    setImportError(null);
-    setImportedCount(0);
-    setShowImportModal(true);
-  }, []);
-
-  const closeImportModal = useCallback(() => {
-    setShowImportModal(false);
-    setImportStep('select');
-    setImportSource('file');
-    setImportedCards([]);
-    setImportError(null);
-    setImportedCount(0);
-  }, []);
-
-  // Parse TSV file content
-  const parseTSV = useCallback((content: string): Array<{ front: string; back: string }> => {
-    const lines = content.trim().split('\n');
-    const cards: Array<{ front: string; back: string }> = [];
-    
-    for (const line of lines) {
-      const trimmedLine = line.trim();
-      if (!trimmedLine) continue;
-      
-      // Split by tab
-      const parts = trimmedLine.split('\t');
-      if (parts.length >= 2) {
-        const front = parts[0].trim();
-        const back = parts[1].trim();
-        if (front && back) {
-          cards.push({ front, back });
-        }
-      }
-    }
-    
-    return cards;
-  }, []);
-
-  // Handle file selection (web)
-  const handleFileSelect = useCallback(async (event: any) => {
-    const file = event.target?.files?.[0];
-    if (!file) return;
-
-    const fileName = file.name.toLowerCase();
-    const isPdf = fileName.endsWith('.pdf');
-    const isTsv = fileName.endsWith('.tsv');
-
-    if (!isPdf && !isTsv) {
-      setImportError('Поддерживаются только файлы .tsv и .pdf');
-      return;
-    }
-
-    if (isPdf && file.size > 4 * 1024 * 1024) {
-      setImportError('PDF файл слишком большой. Максимум 4 МБ.');
-      return;
-    }
-
-    // PDF разбирает ИИ — сначала согласие (TSV читаем сами)
-    if (isPdf && !(await ensureAiConsent())) {
-      if (event.target) event.target.value = '';
-      return;
-    }
-
-    setImportLoading(true);
-    setImportError(null);
-
-    try {
-      if (isTsv) {
-        setImportStep('loading');
-        const content = await file.text();
-        const parsedCards = parseTSV(content);
-
-        if (parsedCards.length === 0) {
-          setImportError('Не удалось найти карточки в файле. Проверь формат TSV (слово[TAB]перевод)');
-          setImportStep('select');
-        } else {
-          setImportedCards(parsedCards);
-          setImportStep('preview');
-        }
-      } else {
-        // PDF
-        setImportStep('extracting');
-        const base64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            const result = reader.result as string;
-            // Remove data:application/pdf;base64, prefix
-            const base64Data = result.split(',')[1] || result;
-            resolve(base64Data);
-          };
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-
-        const parsedCards = await apiService.extractPdfCards(base64);
-
-        if (parsedCards.length === 0) {
-          setImportError('Не удалось найти карточки в PDF. Убедись, что файл содержит список слов в формате "слово – перевод".');
-          setImportStep('select');
-        } else {
-          setImportedCards(parsedCards);
-          setImportStep('preview');
-        }
-      }
-    } catch (error) {
-      setImportError(isPdf ? 'Ошибка при обработке PDF. Попробуй ещё раз.' : 'Ошибка при чтении файла');
-      setImportStep('select');
-    } finally {
-      setImportLoading(false);
-      if (event.target) {
-        event.target.value = '';
-      }
-    }
-  }, [parseTSV]);
-
-  // Trigger file input click
-  const triggerFileSelect = useCallback(async () => {
-    if (Platform.OS === 'web') {
-      if (fileInputRef.current) {
-        (fileInputRef.current as any).click();
-      }
-      return;
-    }
-
-    // Native (Android / iOS)
-    try {
-      const result = await DocumentPicker.pick({
-        type: [DocumentPicker.types.allFiles],
-        copyTo: 'cachesDirectory',
-      });
-      const file = result[0];
-      if (!file) return;
-
-      const fileName = (file.name || '').toLowerCase();
-      const isPdf = fileName.endsWith('.pdf');
-      const isTsv = fileName.endsWith('.tsv');
-
-      if (!isPdf && !isTsv) {
-        setImportError('Поддерживаются только файлы .tsv и .pdf');
-        return;
-      }
-
-      if (isPdf && file.size && file.size > 4 * 1024 * 1024) {
-        setImportError('PDF файл слишком большой. Максимум 4 МБ.');
-        return;
-      }
-
-      // PDF разбирает ИИ — сначала согласие (TSV читаем сами)
-      if (isPdf && !(await ensureAiConsent())) return;
-
-      setImportLoading(true);
-      setImportError(null);
-
-      try {
-        const fileUri = (file as any).fileCopyUri || file.uri;
-
-        if (isTsv) {
-          setImportStep('loading');
-          const response = await fetch(fileUri);
-          const content = await response.text();
-          const parsedCards = parseTSV(content);
-
-          if (parsedCards.length === 0) {
-            setImportError('Не удалось найти карточки в файле. Проверь формат TSV (слово[TAB]перевод)');
-            setImportStep('select');
-          } else {
-            setImportedCards(parsedCards);
-            setImportStep('preview');
-          }
-        } else {
-          // PDF — read as base64 via react-native-fs
-          setImportStep('extracting');
-          const RNFS = (await import('react-native-fs')).default;
-          const base64 = await RNFS.readFile(fileUri, 'base64');
-
-          const parsedCards = await apiService.extractPdfCards(base64);
-
-          if (parsedCards.length === 0) {
-            setImportError('Не удалось найти карточки в PDF. Убедись, что файл содержит список слов в формате "слово – перевод".');
-            setImportStep('select');
-          } else {
-            setImportedCards(parsedCards);
-            setImportStep('preview');
-          }
-        }
-      } catch (error) {
-        setImportError(isPdf ? 'Ошибка при обработке PDF. Попробуй ещё раз.' : 'Ошибка при чтении файла');
-        setImportStep('select');
-      } finally {
-        setImportLoading(false);
-      }
-    } catch (err: any) {
-      if (!DocumentPicker.isCancel(err)) {
-        setImportError('Ошибка при выборе файла');
-      }
-    }
-  }, [parseTSV]);
-
-  // Handle image file select on web
-  // Process extracted image cards: translate empty backs, then show preview
-  const processImageCards = useCallback(async (parsedCards: Array<{ front: string; back: string }>) => {
-    if (parsedCards.length === 0) {
-      setImportError('Не удалось найти слова на фото. Попробуй другое изображение.');
-      setImportStep('select');
-      setImportLoading(false);
-      return;
-    }
-
-    const emptyBacks = parsedCards.filter(c => !c.back);
-
-    if (emptyBacks.length > 0) {
-      setImportStep('translating');
-      try {
-        const translations = await apiService.translateWords(
-          emptyBacks.map(c => c.front),
-          set?.languageFrom,
-          set?.languageTo,
-        );
-        const translationMap = new Map(translations.map(t => [t.front, t.back]));
-        parsedCards = parsedCards.map(c => c.back ? c : { ...c, back: translationMap.get(c.front) || '' });
-      } catch {
-        // Non-fatal: continue with empty translations
-      }
-    }
-
-    setImportedCards(parsedCards);
-    setImportStep('preview');
-    setImportLoading(false);
-  }, [set?.languageFrom, set?.languageTo]);
-
-  const handleImageFileSelect = useCallback(async (event: any) => {
-    const file = event.target?.files?.[0];
-    if (!file) return;
-
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
-    if (!validTypes.includes(file.type)) {
-      setImportError('Поддерживаются только изображения (JPG, PNG, WebP, HEIC)');
-      return;
-    }
-
-    if (file.size > 4 * 1024 * 1024) {
-      setImportError('Изображение слишком большое. Максимум 4 МБ.');
-      return;
-    }
-
-    setImportLoading(true);
-    setImportError(null);
-    setImportSource('image');
-    setImportStep('extracting');
-
-    try {
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result as string;
-          const base64Data = result.split(',')[1] || result;
-          resolve(base64Data);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-
-      const parsedCards = await apiService.extractImageCards(base64, file.type, set?.languageFrom, set?.languageTo);
-      await processImageCards(parsedCards);
-    } catch (error) {
-      setImportError('Ошибка при обработке фото. Попробуй ещё раз.');
-      setImportStep('select');
-      setImportLoading(false);
-    } finally {
-      if (event.target) event.target.value = '';
-    }
-  }, [set?.languageFrom, set?.languageTo, processImageCards]);
-
-  // Trigger image picker
-  const triggerImageSelect = useCallback(async () => {
-    // Слова с фото распознаёт ИИ — согласие до выбора фото
-    if (!(await ensureAiConsent())) return;
-    setImportError(null);
-    setImportSource('image');
-
-    if (Platform.OS === 'web') {
-      if (imageInputRef.current) {
-        (imageInputRef.current as any).click();
-      }
-      return;
-    }
-
-    // Native (Android / iOS)
-    try {
-      const result = await launchImageLibrary({
-        mediaType: 'photo',
-        includeBase64: true,
-        quality: 0.8,
-      });
-
-      if (result.didCancel || !result.assets?.[0]) return;
-
-      const asset = result.assets[0];
-      const base64 = asset.base64;
-      const mimeType = asset.type || 'image/jpeg';
-
-      if (!base64) {
-        setImportError('Не удалось прочитать изображение');
-        return;
-      }
-
-      if (asset.fileSize && asset.fileSize > 4 * 1024 * 1024) {
-        setImportError('Изображение слишком большое. Максимум 4 МБ.');
-        return;
-      }
-
-      setImportLoading(true);
-      setImportStep('extracting');
-
-      try {
-        const parsedCards = await apiService.extractImageCards(base64, mimeType, set?.languageFrom, set?.languageTo);
-        await processImageCards(parsedCards);
-      } catch (error) {
-        setImportError('Ошибка при обработке фото. Попробуй ещё раз.');
-        setImportStep('select');
-        setImportLoading(false);
-      }
-    } catch (err: any) {
-      setImportError('Ошибка при выборе фото');
-    }
-  }, [set?.languageFrom, set?.languageTo, processImageCards]);
-
-  // Generate examples via Gemini then import all cards
-  const handleImportCards = useCallback(async () => {
-    if (importedCards.length === 0) return;
-
-    setImportLoading(true);
-    setImportStep('generating');
-
-    try {
-      // Генерируем примеры через Gemini
-      let cardsWithExamples = importedCards;
-      // Без согласия на ИИ импортируем без примеров
-      if (await ensureAiConsent()) {
-        try {
-          const result = await apiService.generateExamples(
-            importedCards.map(c => ({ front: c.front, back: c.back })),
-            set?.languageFrom,
-            set?.languageTo,
-          );
-          if (result.length > 0) {
-            cardsWithExamples = importedCards.map((card, i) => ({
-              ...card,
-              example: result[i]?.example || '',
-              wordType: result[i]?.wordType,
-            }));
-          }
-        } catch (aiError) {
-          console.warn('Gemini examples failed, importing without examples:', aiError);
-          // Продолжаем импорт без примеров
-        }
-      }
-
-      for (const card of cardsWithExamples) {
-        addCard({ setId, frontText: card.front, backText: card.back, example: card.example, wordType: card.wordType as CreateCardInput['wordType'] });
-      }
-
-      // Update stats
-      const statsSnapshot = selectSetStats(setId);
-      updateSetStats(setId, {
-        cardCount: statsSnapshot.total,
-        newCount: statsSnapshot.newCount,
-        learningCount: statsSnapshot.learningCount,
-        reviewCount: statsSnapshot.reviewCount,
-        masteredCount: statsSnapshot.masteredCount,
-      });
-
-      // Save to database
-      await DatabaseService.saveCards();
-      await DatabaseService.saveSets();
-
-      setImportedCount(cardsWithExamples.length);
-      setImportStep('done');
-    } catch (error) {
-      setImportError('Ошибка при создании карточек');
-      setImportStep('preview');
-    } finally {
-      setImportLoading(false);
-    }
-  }, [importedCards, addCard, setId, updateSetStats, closeImportModal, set?.languageFrom, set?.languageTo]);
 
   const handleEditCard = useCallback(
     (cardId: string) => {
@@ -1132,18 +723,17 @@ export function SetDetailScreen({ navigation, route }: Props) {
           </Text>
           {!isReadOnly && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.m }}>
-              {Platform.OS !== 'web' && (
-                <Pressable accessibilityRole="button"
-                  onPress={() => { triggerHaptic('selection'); navigation.navigate('ImportFiles', { setId }); }}
-                  hitSlop={8}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
-                >
-                  <Upload size={14} color={colors.primary} />
-                  <Text variant="bodySmall" style={{ color: colors.primary, fontWeight: '700' }}>
-                    ИИ
-                  </Text>
-                </Pressable>
-              )}
+              <Pressable accessibilityRole="button"
+                accessibilityLabel="Создать карточки из фото или файла"
+                onPress={() => { triggerHaptic('selection'); navigation.navigate('ImportFiles', { setId }); }}
+                hitSlop={8}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xxs }}
+              >
+                <Camera size={iconSize.xs} color={colors.primary} />
+                <Text variant="bodySmall" style={{ color: colors.primary, fontWeight: '700' }}>
+                  Из фото
+                </Text>
+              </Pressable>
               <Pressable accessibilityRole="button" onPress={openAddCardSheet} hitSlop={8}>
                 <Text variant="bodySmall" style={{ color: colors.primary, fontWeight: '700' }}>
                   + Добавить
@@ -1160,14 +750,21 @@ export function SetDetailScreen({ navigation, route }: Props) {
   // Пустой список
   const ListEmpty = useMemo(
     () => (
-      <EmptyState
-        icon={Layers}
-        compact
-        title={isReadOnly ? 'Учитель пока не добавил карточки' : 'Пока нет карточек'}
-        secondaryAction={!isReadOnly ? { label: 'Добавить карточку', onPress: openAddCardSheet } : undefined}
-      />
+      isReadOnly ? (
+        <EmptyState icon={Layers} compact title="Учитель пока не добавил карточки" />
+      ) : (
+        // Самый удобный момент попробовать фото — набор только что создан и пуст
+        <EmptyState
+          icon={Camera}
+          compact
+          title="Пока нет карточек"
+          description="Сфотографируй страницу учебника — карточки появятся сами"
+          action={{ label: 'Из фото или файла', onPress: () => navigation.navigate('ImportFiles', { setId }) }}
+          secondaryAction={{ label: 'Добавить вручную', onPress: openAddCardSheet }}
+        />
+      )
     ),
-    [openAddCardSheet, isReadOnly]
+    [openAddCardSheet, isReadOnly, navigation, setId]
   );
 
   if (!set) {
@@ -1270,12 +867,12 @@ export function SetDetailScreen({ navigation, route }: Props) {
                 Новая карточка
               </Text>
               <Pressable accessibilityRole="button"
-                onPress={openImportModal}
+                onPress={() => { setShowAddCard(false); navigation.navigate('ImportFiles', { setId }); }}
                 style={[styles.exportButton, { backgroundColor: colors.primaryFill }]}
               >
-                <File size={18} color={colors.onPrimary} />
+                <Camera size={iconSize.xs} color={colors.onPrimary} />
                 <Text variant="bodySmall" style={{ color: colors.onPrimary, fontWeight: '700' }}>
-                  Импорт
+                  Из фото или файла
                 </Text>
               </Pressable>
             </View>
@@ -1420,294 +1017,6 @@ export function SetDetailScreen({ navigation, route }: Props) {
         }}
       />
 
-      {showImportModal && (
-        <View style={[styles.importOverlay, { backgroundColor: backdropColor }]} pointerEvents="box-none">
-          <Pressable
-            style={[styles.sheetBackdrop, { backgroundColor: backdropColor }]}
-            onPress={closeImportModal}
-          />
-          <View
-            style={[
-              styles.importCard,
-              {
-                backgroundColor: modalSurface,
-                borderColor: modalBorder,
-                maxHeight: importStep === 'preview' || importStep === 'generating' || importStep === 'extracting' ? '80%' : undefined,
-              },
-            ]}
-          >
-            <View style={styles.importTopBar}>
-              <Pressable
-                onPress={closeImportModal}
-                hitSlop={10}
-                style={styles.topIcon}
-                accessibilityRole="button"
-                accessibilityLabel="Назад"
-              >
-                <ArrowLeft size={iconSize.m} color={modalTextPrimary} />
-              </Pressable>
-              <Text variant="body" style={[styles.importTitle, { color: modalTextPrimary }]}>
-                {importStep === 'done' ? 'Готово!' : importStep === 'preview' ? `Импорт (${importedCards.length} ${pluralize(importedCards.length, 'карточка', 'карточки', 'карточек')})` : importStep === 'generating' ? 'Генерация примеров...' : importStep === 'translating' ? 'Перевод слов...' : importStep === 'extracting' ? (importSource === 'image' ? 'Обработка фото...' : 'Обработка PDF...') : 'Импорт из файла'}
-              </Text>
-              <View style={styles.topIcon} />
-            </View>
-
-            {/* Hidden file inputs for web */}
-            {Platform.OS === 'web' && (
-              <>
-                <input
-                  ref={fileInputRef as any}
-                  type="file"
-                  accept=".tsv,.pdf"
-                  onChange={handleFileSelect as any}
-                  style={{ display: 'none' }}
-                />
-                <input
-                  ref={imageInputRef as any}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/heic"
-                  onChange={handleImageFileSelect as any}
-                  style={{ display: 'none' }}
-                />
-              </>
-            )}
-
-            {/* Loading State */}
-            {importStep === 'loading' && (
-              <View style={styles.importLoadingContainer}>
-                <ActivityIndicator size="large" color={colors.primary} />
-                <Text variant="body" color="secondary" style={{ marginTop: spacing.m }}>
-                  Загрузка файла...
-                </Text>
-              </View>
-            )}
-
-            {/* Generating Examples State */}
-            {importStep === 'generating' && (
-              <View style={styles.importLoadingContainer}>
-                <View style={[styles.importHeroIcon, { backgroundColor: alpha(colors.primary, 10) }]}>
-                  <Sparkles size={36} color={colors.primary} />
-                </View>
-                <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '600', marginTop: spacing.m }}>
-                  AI генерирует примеры...
-                </Text>
-                <Text variant="bodySmall" color="secondary" style={{ marginTop: spacing.xs, textAlign: 'center', paddingHorizontal: spacing.l }}>
-                  Gemini создаёт короткие примеры для {importedCards.length} карточек
-                </Text>
-                <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: spacing.l }} />
-              </View>
-            )}
-
-            {/* Extracting PDF State */}
-            {importStep === 'extracting' && (
-              <View style={styles.importLoadingContainer}>
-                <View style={[styles.importHeroIcon, { backgroundColor: alpha(colors.primary, 10) }]}>
-                  {importSource === 'image' ? <ImageIcon size={36} color={colors.primary} /> : <File size={36} color={colors.primary} />}
-                </View>
-                <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '600', marginTop: spacing.m }}>
-                  {importSource === 'image' ? 'Обрабатываем фото...' : 'Обрабатываем PDF...'}
-                </Text>
-                <Text variant="bodySmall" color="secondary" style={{ marginTop: spacing.xs, textAlign: 'center', paddingHorizontal: spacing.l }}>
-                  {importSource === 'image' ? 'AI извлекает слова и переводы из фото' : 'AI извлекает слова и переводы из документа'}
-                </Text>
-                <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: spacing.l }} />
-              </View>
-            )}
-
-            {/* Translating State */}
-            {importStep === 'translating' && (
-              <View style={styles.importLoadingContainer}>
-                <View style={[styles.importHeroIcon, { backgroundColor: alpha(colors.primary, 10) }]}>
-                  <Globe size={36} color={colors.primary} />
-                </View>
-                <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '600', marginTop: spacing.m }}>
-                  Переводим слова...
-                </Text>
-                <Text variant="bodySmall" color="secondary" style={{ marginTop: spacing.xs, textAlign: 'center', paddingHorizontal: spacing.l }}>
-                  AI переводит слова без перевода
-                </Text>
-                <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: spacing.l }} />
-              </View>
-            )}
-
-            {/* Done State */}
-            {importStep === 'done' && (
-              <View style={styles.importLoadingContainer}>
-                <View style={[styles.importHeroIcon, { backgroundColor: alpha(colors.success, 10) }]}>
-                  <CheckCircle size={iconSize.l} color={colors.successText} />
-                </View>
-                <Text variant="h3" align="center" style={{ color: colors.textPrimary, marginTop: spacing.m }}>
-                  Импорт завершён
-                </Text>
-                <Text variant="body" color="secondary" align="center" style={{ marginTop: spacing.xs, paddingHorizontal: spacing.l }}>
-                  {`${pluralize(importedCount, 'Добавлена', 'Добавлено', 'Добавлено')} ${importedCount} ${pluralize(importedCount, 'карточка', 'карточки', 'карточек')}`}
-                </Text>
-                <Pressable accessibilityRole="button"
-                  onPress={closeImportModal}
-                  style={[styles.importSelectButton, { backgroundColor: colors.primaryFill, marginTop: spacing.l }]}
-                >
-                  <Text variant="body" style={{ color: colors.onPrimary, fontWeight: '700' }}>
-                    Отлично
-                  </Text>
-                </Pressable>
-              </View>
-            )}
-
-            {/* Select File State */}
-            {importStep === 'select' && (
-              <>
-                <View style={styles.importHero}>
-                  <View style={[styles.importHeroIcon, { backgroundColor: alpha(colors.primary, 10) }]}>
-                    <File size={36} color={colors.primary} />
-                  </View>
-                  <Text variant="h3" align="center" style={{ color: colors.textPrimary }}>
-                    Импорт карточек
-                  </Text>
-                  <Text
-                    variant="body"
-                    color="secondary"
-                    align="center"
-                    style={{ paddingHorizontal: spacing.m }}
-                  >
-                    Загрузи файл со словами и переводами для быстрого создания карточек.
-                  </Text>
-                </View>
-
-                {importError && (
-                  <View style={[styles.importError, { backgroundColor: alpha(colors.error, 10), borderColor: colors.error }]}>
-                    <Info size={18} color={colors.error} />
-                    <Text variant="bodySmall" style={{ color: colors.error, flex: 1 }}>
-                      {importError}
-                    </Text>
-                  </View>
-                )}
-
-                <Pressable accessibilityRole="button"
-                  onPress={triggerFileSelect}
-                  style={[styles.importSelectButton, { backgroundColor: colors.primaryFill }]}
-                >
-                  <Upload size={20} color={colors.onPrimary} />
-                  <Text variant="body" style={{ color: colors.onPrimary, fontWeight: '700' }}>
-                    Выбрать файл
-                  </Text>
-                </Pressable>
-
-                <Pressable accessibilityRole="button"
-                  onPress={triggerImageSelect}
-                  style={[styles.importSelectButton, { backgroundColor: colors.primaryFill, marginTop: spacing.s, display: 'none' }]}
-                >
-                  <ImageIcon size={20} color={colors.onPrimary} />
-                  <Text variant="body" style={{ color: colors.onPrimary, fontWeight: '700' }}>
-                    Выбрать фото
-                  </Text>
-                </Pressable>
-
-                <View
-                  style={[
-                    styles.importTips,
-                    {
-                      backgroundColor: alpha(colors.primary, 10),
-                      borderColor: alpha(colors.primary, 10),
-                    },
-                  ]}
-                >
-                  <View style={styles.importTipsHeader}>
-                    <Lightbulb size={18} color={colors.primary} />
-                    <Text variant="bodySmall" style={{ color: colors.primary, fontWeight: '700' }}>
-                      Поддерживаемые форматы
-                    </Text>
-                  </View>
-
-                  <View style={styles.tipRow}>
-                    <CheckCircle size={16} color={colors.primary} style={styles.tipIcon} />
-                    <Text variant="caption" color="secondary" style={styles.tipText}>
-                      <Text style={{ fontWeight: '700', color: colors.textPrimary }}>.pdf</Text> — словарь из PDF (AI извлечение)
-                    </Text>
-                  </View>
-                  <View style={styles.tipRow}>
-                    <CheckCircle size={16} color={colors.primary} style={styles.tipIcon} />
-                    <Text variant="caption" color="secondary" style={styles.tipText}>
-                      <Text style={{ fontWeight: '700', color: colors.textPrimary }}>.tsv</Text> — табличный формат (слово[TAB]перевод)
-                    </Text>
-                  </View>
-                  {/* <View style={styles.tipRow}>
-                    <CheckCircle size={16} color={colors.primary} style={styles.tipIcon} />
-                    <Text variant="caption" color="secondary" style={styles.tipText}>
-                      <Text style={{ fontWeight: '700', color: colors.textPrimary }}>.jpg / .png</Text> — фото страницы учебника (AI извлечение)
-                    </Text>
-                  </View> */}
-                  <View style={styles.tipRow}>
-                    <Info size={16} color={colors.primary} style={styles.tipIcon} />
-                    <Text variant="caption" color="secondary" style={styles.tipText}>
-                      Максимальный размер PDF: 10 МБ
-                    </Text>
-                  </View>
-                </View>
-              </>
-            )}
-
-            {/* Preview State */}
-            {importStep === 'preview' && (
-              <>
-                <ScrollView 
-                  style={styles.importPreviewList}
-                  showsVerticalScrollIndicator={true}
-                >
-                  {importedCards.map((card, index) => (
-                    <View 
-                      key={index} 
-                      style={[
-                        styles.importPreviewCard, 
-                        { 
-                          backgroundColor: colors.surfaceMuted,
-                          borderColor: colors.border,
-                        }
-                      ]}
-                    >
-                      <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '600' }}>
-                        {card.front}
-                      </Text>
-                      <Text variant="bodySmall" color="secondary" style={!card.back ? { fontStyle: 'italic', opacity: 0.5 } : undefined}>
-                        {card.back || 'без перевода'}
-                      </Text>
-                    </View>
-                  ))}
-                </ScrollView>
-
-                <View style={styles.importPreviewActions}>
-                  <Pressable accessibilityRole="button"
-                    onPress={() => setImportStep('select')}
-                    style={[styles.importCancelButton, { borderColor: colors.border }]}
-                  >
-                    <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '600' }}>
-                      Отмена
-                    </Text>
-                  </Pressable>
-                  <Pressable accessibilityRole="button"
-                    onPress={handleImportCards}
-                    disabled={importLoading}
-                    style={[
-                      styles.importConfirmButton, 
-                      { backgroundColor: colors.primaryFill, opacity: importLoading ? 0.7 : 1 }
-                    ]}
-                  >
-                    {importLoading ? (
-                      <ActivityIndicator size="small" color={colors.onPrimary} />
-                    ) : (
-                      <>
-                        <Check size={18} color={colors.onPrimary} />
-                        <Text variant="body" style={{ color: colors.onPrimary, fontWeight: '700' }}>
-                          Импортировать
-                        </Text>
-                      </>
-                    )}
-                  </Pressable>
-                </View>
-              </>
-            )}
-          </View>
-        </View>
-      )}
       {showPublishModal && (
         <View style={[styles.importOverlay, { backgroundColor: backdropColor }]} pointerEvents="box-none">
           <Pressable
@@ -2280,18 +1589,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 16,
   },
-  importHero: {
-    alignItems: 'center',
-    gap: spacing.s,
-  },
-  importHeroIcon: {
-    width: 90,
-    height: 90,
-    borderRadius: borderRadius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.xs,
-  },
   importButton: {
     height: 56,
     borderRadius: borderRadius.l,
@@ -2299,84 +1596,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.s,
-  },
-  importSelectButton: {
-    height: 56,
-    borderRadius: borderRadius.l,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.s,
-  },
-  importTips: {
-    borderWidth: 1,
-    borderRadius: borderRadius.l,
-    padding: spacing.m,
-    gap: spacing.s,
-  },
-  importTipsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.xs,
-  },
-  tipRow: {
-    flexDirection: 'row',
-    gap: spacing.s,
-    alignItems: 'flex-start',
-  },
-  tipIcon: {
-    marginTop: 2,
-  },
-  tipText: {
-    flex: 1,
-    lineHeight: 18,
-  },
-  importLoadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.xxl,
-  },
-  importError: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.s,
-    padding: spacing.m,
-    borderRadius: borderRadius.m,
-    borderWidth: 1,
-  },
-  importPreviewList: {
-    maxHeight: 400,
-    marginVertical: spacing.s,
-  },
-  importPreviewCard: {
-    padding: spacing.m,
-    borderRadius: borderRadius.m,
-    borderWidth: 1,
-    marginBottom: spacing.s,
-    gap: spacing.xs,
-  },
-  importPreviewActions: {
-    flexDirection: 'row',
-    gap: spacing.s,
-    marginTop: spacing.s,
-  },
-  importCancelButton: {
-    flex: 1,
-    height: 48,
-    borderRadius: borderRadius.l,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  importConfirmButton: {
-    flex: 2,
-    height: 48,
-    borderRadius: borderRadius.l,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
   },
 
   // Card Preview Modal
