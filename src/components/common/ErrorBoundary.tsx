@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { useThemeColors } from '@/store';
 import { borderRadius, spacing } from '@/constants';
 import { Text } from './Text';
+import { reportError } from '@/services/crashReporting';
 
 interface Props {
   children: React.ReactNode;
@@ -29,6 +30,7 @@ export class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     this.setState({ errorInfo });
     console.error('ErrorBoundary caught:', error, errorInfo);
+    reportError(error, 'ErrorBoundary');
   }
 
   handleDismiss = () => {

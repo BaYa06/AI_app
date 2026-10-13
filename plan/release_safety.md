@@ -52,8 +52,19 @@ TestFlight, а в деплое сервера: старые версии при�
 Осторожно: тестовая база — копия рабочей, в ней push-токены реальных пользователей. Действия на
 тестовом сервере, которые шлют push (напоминания учителя и т.п.), дойдут до реальных людей.
 
-## Release 4 — Crashlytics ⬜
-Firebase уже подключён (push). Добавить Crashlytics, чтобы видеть падения раньше пользователей.
+## Release 4 — Crashlytics ✅ (код) / ⬜ (проверка на устройстве)
+- `@react-native-firebase/crashlytics` 22.4.0 (как остальной Firebase), Podfile: modular headers
+  для FirebaseCoreExtension/PromisesObjC; pod install добавил шаг «[RNFB] Crashlytics
+  Configuration» — загрузка dSYM в Firebase при сборке.
+- src/services/crashReporting(.native).ts: метка `app_env` (staging/production), UUID
+  пользователя, ошибки из ErrorBoundary. Только iOS; в режиме разработки не собирается.
+- Политика конфиденциальности: «Отчёты о сбоях», Firebase Crashlytics в таблице сервисов.
+- ⬜ App Store Connect → Конфиденциальность приложения: добавить «Диагностика → Данные о сбоях»
+  (связаны с пользователем: да — UUID; отслеживание: нет; цель: функциональность приложения).
+  Сделать ДО отправки версии с Crashlytics в ревью.
+- ⬜ Первая staging-сборка: Firebase Console → Crashlytics → приложение появилось.
+- JS-ошибки приходят с номерами строк минифицированного бандла; при необходимости — загрузка
+  source maps (отдельная задача).
 
 ## Release 5 — minVersion ⬜
 API отдаёт минимальную поддерживаемую версию; приложение ниже неё показывает «Обновите
