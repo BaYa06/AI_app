@@ -235,7 +235,15 @@ export type RootStackParamList = {
   };
   ImportFiles: { setId: string };
   PreviewImport: {
-    cards: Array<{ front: string; back: string }>;
+    /** example/wordForm/wordType — у «незнакомых слов» из текста, confidence — неуверенно распознано */
+    cards: Array<{
+      front: string;
+      back: string;
+      example?: string;
+      wordForm?: string;
+      wordType?: 'noun' | 'verb' | 'adjective' | 'adverb' | 'other';
+      confidence?: 'low';
+    }>;
     suggestedTitle?: string;
     setId: string;
   };

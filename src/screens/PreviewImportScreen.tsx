@@ -10,7 +10,8 @@ import { Text } from '@/components/common';
 import { useThemeColors, useSetsStore, useCardsStore } from '@/store';
 import { spacing, borderRadius, iconSize, screenPadding, TOP_LANGUAGES, alpha } from '@/constants';
 import { Button, Dialog, ScreenHeader, TextField, toast, useScreenBottomInset } from '@/components/ui';
-import type { RootStackScreenProps } from '@/types/navigation';
+import type { RootStackParamList, RootStackScreenProps } from '@/types/navigation';
+import type { CreateCardInput } from '@/types';
 import { BookOpen } from 'lucide-react-native';
 import { describeError } from '@/utils/userErrors';
 
@@ -167,6 +168,16 @@ function CardRow({
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
+/** «Незнакомые слова» из текста приходят с примером — сохраняем его, карточка сразу готова для «Слова в контексте» */
+function toCardInput(setId: string, c: RootStackParamList['PreviewImport']['cards'][number]): CreateCardInput {
+  return {
+    setId,
+    frontText: c.front,
+    backText: c.back,
+    ...(c.example ? { example: c.example, wordForm: c.wordForm, wordType: c.wordType } : {}),
+  };
+}
+
 export function PreviewImportScreen({ navigation, route }: Props) {
   const { cards, suggestedTitle = '', setId } = route.params;
   const colors = useThemeColors();
@@ -184,7 +195,7 @@ export function PreviewImportScreen({ navigation, route }: Props) {
   const handleSaveToExisting = useCallback(async () => {
     setSaving(true);
     try {
-      addCards(cards.map(c => ({ setId, frontText: c.front, backText: c.back })));
+      addCards(cards.map(c => toCardInput(setId, c)));
       updateSetStats(setId, { cardCount: cards.length, newCount: cards.length });
       navigation.replace('SetDetail', { setId });
     } catch (e: any) {
@@ -201,7 +212,7 @@ export function PreviewImportScreen({ navigation, route }: Props) {
     setSaving(true);
     try {
       const newSet = await addSet({ title: trimmed, languageFrom, languageTo });
-      addCards(cards.map(c => ({ setId: newSet.id, frontText: c.front, backText: c.back })));
+      addCards(cards.map(c => toCardInput(newSet.id, c)));
       updateSetStats(newSet.id, { cardCount: cards.length, newCount: cards.length });
       setModalVisible(false);
       navigation.replace('SetDetail', { setId: newSet.id });
