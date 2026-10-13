@@ -28,6 +28,9 @@ target 'FlashcardsApp' do
   pod 'FirebaseInstallations', :modular_headers => true
   pod 'GoogleDataTransport', :modular_headers => true
   pod 'nanopb', :modular_headers => true
+  # Crashlytics (plan/release_safety.md, Release 4): Swift-под FirebaseSessions
+  pod 'FirebaseCoreExtension', :modular_headers => true
+  pod 'PromisesObjC', :modular_headers => true
 
   use_react_native!(
     :path => config[:reactNativePath],

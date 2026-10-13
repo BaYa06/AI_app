@@ -18,6 +18,7 @@ import { isAppleUser, takeAppleSignInName } from '@/services/appleSignInName';
 import { useCourseRealtime } from '@/hooks/useCourseRealtime';
 import { StorageService } from '@/services/StorageService';
 import { CACHE_OWNER_KEY } from '@/services/DatabaseService';
+import { initCrashReporting, setCrashUserId } from '@/services/crashReporting';
 import { refreshPushToken, subscribeForegroundMessages, requestPushPermission, isPushSupported } from '@/services/pushNotifications';
 import { useThemeColors } from '@/store';
 import { X } from 'lucide-react-native';
@@ -305,6 +306,9 @@ function AppRoot({
   );
 }
 
+// Метка сервера для отчётов о падениях (plan/release_safety.md, Release 4)
+initCrashReporting();
+
 export default function App() {
   const [isReady, setIsReady] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
@@ -455,6 +459,7 @@ export default function App() {
         DatabaseService.reloadRemoteDataForUser(user.id);
       }
       setAnalyticsUserId(user.id);
+      setCrashUserId(user.id);
 
       // Analytics: login + user properties
       const provider = (user.user_metadata as any)?.iss?.includes('google') ? 'google' : 'email';
@@ -552,6 +557,7 @@ export default function App() {
         setIsAuthenticated(false);
         setNeedsOnboarding(false);
         setAnalyticsUserId(null);
+        setCrashUserId(null);
         ensuredUserIdRef.current = null;
         setAuthStep('welcome');
       }
@@ -760,6 +766,7 @@ export default function App() {
     setNeedsOnboarding(false);
     DatabaseService.reloadRemoteDataForUser(currentUserId);
     setAnalyticsUserId(currentUserId);
+    setCrashUserId(currentUserId);
     Analytics.onboardingComplete();
     setAnalyticsUserProperties({
       subscription_tier: 'free',

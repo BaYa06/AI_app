@@ -27,7 +27,7 @@ TestFlight, а в деплое сервера: старые версии при�
    из App Store работает; потом TestFlight → ревью. Никогда не наоборот.
 5. Перед push в main с изменениями api/ или _db-init.js — пройтись по пунктам 1–3.
 
-## Release 3 — staging: ветка dev, тестовый сервер, тестовые сборки 🔄
+## Release 3 — staging: ветка dev, тестовый сервер, тестовые сборки ✅
 Схема: `dev` → Vercel Preview `ai-app-git-dev-baya06s-projects.vercel.app` → ветка базы Neon;
 `main` → рабочий сервер `ai-app-seven-zeta.vercel.app` → рабочая база.
 - ✅ Vercel Authentication для Preview выключена (иначе приложение получает 302 на вход Vercel).
@@ -35,9 +35,13 @@ TestFlight, а в деплое сервера: старые версии при�
 - ✅ Метка «Тестовый сервер» сверху экрана в staging-сборке (StagingBadge).
 - ✅ codemagic.yaml: `ios-testflight-staging` (APP_ENV=staging) и `ios-testflight` (production);
   номер сборки = последний в App Store Connect + 1, чтобы 10 загрузок подряд не конфликтовали.
-- ⬜ Neon (интеграция Vercel): Storage → база → Settings → ветка базы для Preview-деплоев включена.
-  Проверить ДО первого push в dev, иначе Preview работает с рабочей базой.
-- ⬜ Ветка `dev` на GitHub, первый Preview-деплой, проверка, что тестовый сервер отвечает.
+- ✅ Neon: ветка `staging` (без auto delete), compute `ep-wild-king-ah80ir3s`; в Vercel
+  `POSTGRES_URL` для Preview → ветка Git `dev`. Рабочая база — `ep-misty-scene-ahkv29p5`.
+  Проверено 13.10.2026: запросы тестового сервера будят compute `staging`.
+  Свежие данные из рабочей базы: Neon → ветка staging → Reset from parent.
+- ✅ Ветка `dev` на GitHub, Preview-деплой `ai-app-git-dev-baya06s-projects.vercel.app` работает.
+- ⬜ Первая сборка «iOS TestFlight Staging» в Codemagic (13.10 — очередь Codemagic, инцидент macOS M2).
+- Хук pre-push поднимает версию на каждом push (и в dev) — оставлено так по решению пользователя.
 
 Как работать:
 1. Пишем код в `dev`, push сколько угодно — рабочий сервер не меняется.
@@ -48,8 +52,19 @@ TestFlight, а в деплое сервера: старые версии при�
 Осторожно: тестовая база — копия рабочей, в ней push-токены реальных пользователей. Действия на
 тестовом сервере, которые шлют push (напоминания учителя и т.п.), дойдут до реальных людей.
 
-## Release 4 — Crashlytics ⬜
-Firebase уже подключён (push). Добавить Crashlytics, чтобы видеть падения раньше пользователей.
+## Release 4 — Crashlytics ✅ (код) / ⬜ (проверка на устройстве)
+- `@react-native-firebase/crashlytics` 22.4.0 (как остальной Firebase), Podfile: modular headers
+  для FirebaseCoreExtension/PromisesObjC; pod install добавил шаг «[RNFB] Crashlytics
+  Configuration» — загрузка dSYM в Firebase при сборке.
+- src/services/crashReporting(.native).ts: метка `app_env` (staging/production), UUID
+  пользователя, ошибки из ErrorBoundary. Только iOS; в режиме разработки не собирается.
+- Политика конфиденциальности: «Отчёты о сбоях», Firebase Crashlytics в таблице сервисов.
+- ⬜ App Store Connect → Конфиденциальность приложения: добавить «Диагностика → Данные о сбоях»
+  (связаны с пользователем: да — UUID; отслеживание: нет; цель: функциональность приложения).
+  Сделать ДО отправки версии с Crashlytics в ревью.
+- ⬜ Первая staging-сборка: Firebase Console → Crashlytics → приложение появилось.
+- JS-ошибки приходят с номерами строк минифицированного бандла; при необходимости — загрузка
+  source maps (отдельная задача).
 
 ## Release 5 — minVersion ⬜
 API отдаёт минимальную поддерживаемую версию; приложение ниже неё показывает «Обновите
