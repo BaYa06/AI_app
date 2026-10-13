@@ -25,6 +25,7 @@ import {
   ChevronDown,
 } from 'lucide-react-native';
 import { Text } from '@/components/common';
+import { Switch } from '@/components/ui';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha } from '@/constants';
 import { supabase } from '@/services/supabaseClient';
@@ -53,6 +54,8 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
   const [testMode, setTestMode] = useState<TestMode>('multiple');
   const [totalQuestions, setTotalQuestions] = useState(20);
   const [timePerQuestion, setTimePerQuestion] = useState(20);
+  // Контроль выхода из приложения (plan/exam_lockdown.md) — по умолчанию включён
+  const [exitControl, setExitControl] = useState(true);
   const [creating, setCreating] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
@@ -366,6 +369,23 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
               })}
             </View>
           </View>
+
+          {/* Exit control */}
+          <View style={[styles.settingCard, styles.switchCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+            <View style={styles.switchText}>
+              <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>
+                Контроль выхода из приложения
+              </Text>
+              <Text style={[styles.settingHint, { color: colors.textSecondary }]}>
+                Если ученик свернёт приложение, его тест завершится, а вы увидите это в списке
+              </Text>
+            </View>
+            <Switch
+              value={exitControl}
+              onValueChange={setExitControl}
+              accessibilityLabel="Контроль выхода из приложения"
+            />
+          </View>
         </View>
       </ScrollView>
 
@@ -409,6 +429,7 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
                   testMode,
                   questionCount: totalQuestions,
                   timePerQuestion,
+                  exitControl,
                 }),
               });
               const result = await resp.json();
@@ -603,6 +624,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     marginTop: 2,
+  },
+  switchCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.m,
+  },
+  switchText: {
+    flex: 1,
   },
 
   // Stepper

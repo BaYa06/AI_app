@@ -12,8 +12,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, Users, Check, StopCircle, ClipboardList } from 'lucide-react-native';
+import { ArrowLeft, Users, Check, StopCircle, ClipboardList, LogOut } from 'lucide-react-native';
 import { Text } from '@/components/common';
+import { Badge, Button, confirmDialog, toast } from '@/components/ui';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha, type ColorToken, iconSize } from '@/constants';
 import { supabase } from '@/services/supabaseClient';
@@ -34,7 +35,20 @@ interface StudentProgress {
   answered: number;
   total: number;
   done: boolean;
+  // Контроль выхода (plan/exam_lockdown.md); monitor отдаёт эти поля только учителю
+  leftReason?: 'manual' | 'background' | 'relaunch' | null;
+  awayCount?: number;
+  away?: boolean;
+  awayReason?: 'background' | 'split';
+  lastAwaySec?: number;
+  clientExitControl?: boolean;
 }
+
+const LEFT_LABELS: Record<string, string> = {
+  background: 'Вышел из приложения',
+  relaunch: 'Перезапустил приложение',
+  manual: 'Завершил сам',
+};
 
 export function LiveTestScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
@@ -45,6 +59,8 @@ export function LiveTestScreen({ navigation, route }: Props) {
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [ending, setEnding] = useState(false);
   const [questionCount, setQuestionCount] = useState(0);
+  const [exitControl, setExitControl] = useState(false);
+  const [reinstating, setReinstating] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hasNavigated = useRef(false);
 
@@ -76,7 +92,12 @@ export function LiveTestScreen({ navigation, route }: Props) {
       if (data.status === 'finished') { goToResults(); return; }
 
       setQuestionCount(data.questionCount || 0);
-      setStudents(data.participants || []);
+      setExitControl(data.exitControl === true);
+      // lastAwaySec приходит только в realtime (student_back) — не терять его при опросе
+      setStudents(prev => (data.participants || []).map((p: StudentProgress) => {
+        const old = prev.find(s => s.userId === p.userId);
+        return { ...p, lastAwaySec: old?.lastAwaySec, awayReason: p.away ? old?.awayReason : undefined };
+      }));
 
       // Вычислить оставшееся время
       if (data.timePerQuestion > 0 && data.startedAt && data.questionCount) {
@@ -118,12 +139,15 @@ export function LiveTestScreen({ navigation, route }: Props) {
     }
   }, [timeLeft]);
 
-  // Auto-finish: все ученики завершили
+  // Auto-finish: все ученики завершили. Если кто-то вышел досрочно (контроль выхода), тест не
+  // закрываем сами — учитель может разрешить ему продолжить; после закрытия это уже нельзя.
+  const leftCount = students.filter(s => s.leftReason).length;
+  const allDone = students.length > 0 && students.every(s => s.done);
   useEffect(() => {
-    if (students.length > 0 && students.every(s => s.done) && !hasNavigated.current) {
+    if (allDone && leftCount === 0 && !hasNavigated.current) {
       handleEndTest();
     }
-  }, [students]);
+  }, [allDone, leftCount]);
 
   // Realtime: progress_update — сопоставление по userId, а не по displayName (два "Гостя" в
   // одной сессии раньше перезаписывали друг друга, т.к. имена не уникальны). См. план, пункт 43.
@@ -135,7 +159,17 @@ export function LiveTestScreen({ navigation, route }: Props) {
         setStudents(prev =>
           prev.map(s =>
             s.userId === payload.userId
-              ? { ...s, answered: payload.answered, total: payload.total, done: payload.done }
+              ? {
+                  ...s,
+                  answered: payload.answered,
+                  total: payload.total,
+                  done: payload.done,
+                  // left: true — досрочный выход, false — учитель разрешил продолжить,
+                  // нет поля — обычный ответ (вышедший ответить не может)
+                  leftReason: payload.left === true ? payload.leftReason
+                    : payload.left === false ? null : s.leftReason,
+                  away: payload.left !== undefined ? false : s.away,
+                }
               : s,
           ),
         );
@@ -151,8 +185,23 @@ export function LiveTestScreen({ navigation, route }: Props) {
             answered: 0,
             total: questionCount,
             done: false,
+            clientExitControl: payload.clientExitControl === true,
           }];
         });
+      })
+      .on('broadcast', { event: 'student_away' }, ({ payload }) => {
+        if (!payload) return;
+        setStudents(prev => prev.map(s =>
+          s.userId === payload.userId ? { ...s, away: true, awayReason: payload.reason } : s,
+        ));
+      })
+      .on('broadcast', { event: 'student_back' }, ({ payload }) => {
+        if (!payload) return;
+        setStudents(prev => prev.map(s =>
+          s.userId === payload.userId
+            ? { ...s, away: false, awayCount: payload.awayCount, lastAwaySec: payload.awaySec }
+            : s,
+        ));
       })
       .subscribe();
 
@@ -178,6 +227,40 @@ export function LiveTestScreen({ navigation, route }: Props) {
       setEnding(false);
     }
   }, [ending, sessionId, goToResults]);
+
+  // Ложное срабатывание (звонок, блокировка телефона, сбой) — вернуть ученика к тесту
+  const handleReinstate = useCallback(async (st: StudentProgress) => {
+    const ok = await confirmDialog({
+      title: 'Разрешить продолжить?',
+      message:
+        `${st.name} продолжит с вопроса ${st.answered + 1}. ` +
+        'Используйте, если выход был случайным: звонок, блокировка телефона, сбой приложения.',
+      confirmText: 'Разрешить',
+    });
+    if (!ok) return;
+    setReinstating(st.userId);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error('Not authenticated');
+      const resp = await fetch(`${API_BASE}/test?action=reinstate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ sessionId, userId: st.userId }),
+      });
+      const result = await resp.json();
+      if (!resp.ok) throw new Error(result.error || `Error ${resp.status}`);
+      setStudents(prev => prev.map(s =>
+        s.userId === st.userId ? { ...s, leftReason: null, done: false, away: false } : s,
+      ));
+      toast.success(`${st.name} может продолжить`);
+    } catch (e) {
+      console.error('Reinstate error:', e);
+      toast.error('Не удалось разрешить. Попробуйте ещё раз.');
+    } finally {
+      setReinstating(null);
+    }
+  }, [sessionId]);
 
   const displayTime = timeLeft !== null && timeLeft >= 0 ? timeLeft : null;
   const minutes = displayTime !== null ? String(Math.floor(displayTime / 60)).padStart(2, '0') : '--';
@@ -299,14 +382,27 @@ export function LiveTestScreen({ navigation, route }: Props) {
           Ученики
         </Text>
 
+        {allDone && leftCount > 0 && (
+          <View style={[styles.leftHint, { backgroundColor: alpha(colors.warning, 10), borderColor: alpha(colors.warning, 40) }]}>
+            <Text style={[styles.leftHintText, { color: colors.textPrimary }]}>
+              Все закончили, но {leftCount === 1 ? 'один ученик вышел' : `вышли: ${leftCount}`} досрочно.
+              Разрешите продолжить или завершите тест.
+            </Text>
+          </View>
+        )}
+
         <View style={styles.studentsList}>
           {students.map((st, idx) => {
             const pct = st.total > 0 ? Math.round((st.answered / st.total) * 100) : 0;
             const accentColor = colors[AVATAR_TOKENS[idx % AVATAR_TOKENS.length]];
-            const avatarBg = st.done
-              ? (alpha(colors.success, 10))
-              : (alpha(accentColor, 10));
+            const left = !!st.leftReason;
+            const avatarBg = left
+              ? alpha(colors.error, 10)
+              : st.done
+                ? (alpha(colors.success, 10))
+                : (alpha(accentColor, 10));
             const avatarTextColor = st.done ? colors.success : accentColor;
+            const awayCount = st.awayCount || 0;
 
             return (
               <View
@@ -316,7 +412,9 @@ export function LiveTestScreen({ navigation, route }: Props) {
                 <View style={styles.studentTopRow}>
                   <View style={styles.studentLeft}>
                     <View style={[styles.studentAvatar, { backgroundColor: avatarBg }]}>
-                      {st.done ? (
+                      {left ? (
+                        <LogOut size={18} color={colors.errorText} />
+                      ) : st.done ? (
                         <Check size={18} color={colors.success} strokeWidth={3} />
                       ) : (
                         <Text style={[styles.studentInitial, { color: avatarTextColor }]}>
@@ -328,7 +426,11 @@ export function LiveTestScreen({ navigation, route }: Props) {
                       {st.name}
                     </Text>
                   </View>
-                  {st.done ? (
+                  {left ? (
+                    <Text style={[styles.doneText, { color: colors.errorText }]}>
+                      Вышел · {st.answered}/{st.total}
+                    </Text>
+                  ) : st.done ? (
                     <View style={styles.doneRow}>
                       <Text style={[styles.doneText, { color: colors.successText }]}>Готово</Text>
                     </View>
@@ -347,10 +449,47 @@ export function LiveTestScreen({ navigation, route }: Props) {
                   <View
                     style={[
                       styles.studentBarFill,
-                      { width: `${pct}%` as any, backgroundColor: st.done ? colors.success : accentColor },
+                      {
+                        width: `${pct}%` as any,
+                        backgroundColor: left ? colors.error : st.done ? colors.success : accentColor,
+                      },
                     ]}
                   />
                 </View>
+
+                {/* Контроль выхода: состояние и история выходов */}
+                {exitControl && (left || st.away || awayCount > 0 || st.clientExitControl === false) && (
+                  <View style={styles.exitRow}>
+                    {left && <Badge tone="error" label={LEFT_LABELS[st.leftReason!] || 'Вышел'} />}
+                    {!left && st.away && (
+                      <Badge
+                        tone="warning"
+                        label={st.awayReason === 'split' ? 'Рядом другое приложение' : 'Не в приложении'}
+                      />
+                    )}
+                    {awayCount > 0 && (
+                      <Badge
+                        tone="warning"
+                        label={awayCount === 1 && st.lastAwaySec !== undefined
+                          ? `Выходил на ${st.lastAwaySec} с`
+                          : `Выходил ×${awayCount}`}
+                      />
+                    )}
+                    {st.clientExitControl === false && (
+                      <Badge tone="neutral" label="Старая версия — контроль не работает" />
+                    )}
+                  </View>
+                )}
+                {left && (
+                  <Button
+                    title="Разрешить продолжить"
+                    variant="secondary"
+                    size="s"
+                    loading={reinstating === st.userId}
+                    disabled={reinstating !== null}
+                    onPress={() => handleReinstate(st)}
+                  />
+                )}
               </View>
             );
           })}
@@ -397,6 +536,23 @@ export function LiveTestScreen({ navigation, route }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+
+  // Контроль выхода
+  exitRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xxs,
+  },
+  leftHint: {
+    borderRadius: borderRadius.l,
+    borderWidth: 1,
+    padding: spacing.m,
+    marginBottom: spacing.s,
+  },
+  leftHintText: {
+    fontSize: 14,
+    lineHeight: 20,
   },
 
   // Header

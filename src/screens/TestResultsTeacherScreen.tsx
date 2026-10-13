@@ -23,7 +23,7 @@ import {
 import { Text } from '@/components/common';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha, type ColorToken } from '@/constants';
-import { toast } from '@/components/ui';
+import { Badge, toast } from '@/components/ui';
 import { supabase } from '@/services/supabaseClient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
@@ -41,6 +41,15 @@ type Participant = {
   correct: number;
   total: number;
   finished: boolean;
+  // Контроль выхода (plan/exam_lockdown.md); у старых тестов — null / 0
+  leftReason?: 'manual' | 'background' | 'relaunch' | null;
+  awayCount?: number;
+};
+
+const LEFT_LABELS: Record<string, string> = {
+  background: 'Вышел из приложения',
+  relaunch: 'Перезапустил приложение',
+  manual: 'Завершил сам',
 };
 
 type HardCard = {
@@ -107,9 +116,10 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
   const handleExportCSV = useCallback(async () => {
     if (!data) return;
 
-    const header = 'Место,Имя,Результат (%),Верно,Всего,Завершил';
+    const header = 'Место,Имя,Результат (%),Верно,Всего,Завершил,Досрочный выход,Коротких выходов';
     const rows = data.participants.map((p, idx) =>
-      `${idx + 1},"${p.name}",${p.score},${p.correct},${p.total},${p.finished ? 'Да' : 'Нет'}`
+      `${idx + 1},"${p.name}",${p.score},${p.correct},${p.total},${p.finished ? 'Да' : 'Нет'},` +
+      `${p.leftReason ? LEFT_LABELS[p.leftReason] || p.leftReason : 'Нет'},${p.awayCount || 0}`
     );
     const hardHeader = '\n\nСамые трудные слова\nСлово,Подсказка,Ошибок,Всего';
     const hardRows = data.hardestCards.map(c =>
@@ -364,9 +374,21 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
                     {student.initial}
                   </Text>
                 </View>
-                <Text style={[styles.leaderName, { color: colors.textPrimary }]} numberOfLines={1}>
-                  {student.name}
-                </Text>
+                <View style={styles.leaderNameCol}>
+                  <Text style={[styles.leaderName, { color: colors.textPrimary }]} numberOfLines={1}>
+                    {student.name}
+                  </Text>
+                  {(student.leftReason || (student.awayCount || 0) > 0) && (
+                    <View style={styles.leaderBadges}>
+                      {student.leftReason && (
+                        <Badge tone="error" label={LEFT_LABELS[student.leftReason] || 'Вышел'} />
+                      )}
+                      {(student.awayCount || 0) > 0 && (
+                        <Badge tone="warning" label={`Выходил ×${student.awayCount}`} />
+                      )}
+                    </View>
+                  )}
+                </View>
                 <Text style={[styles.leaderScore, { color: colors.primary }]}>
                   {student.score}%
                 </Text>
@@ -662,10 +684,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-  leaderName: {
+  leaderNameCol: {
     flex: 1,
+    gap: spacing.xxs,
+  },
+  leaderName: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  leaderBadges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xxs,
   },
   leaderScore: {
     fontSize: 16,

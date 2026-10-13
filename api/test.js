@@ -608,6 +608,25 @@ async function monitorTest(req, res, sql, userId) {
 
   session[0] = await autoFinishIfStale(sql, sessionId, session[0]);
 
+  // Контроль выхода: ученик ушёл в фон и не возвращается — закрыть попытку по истечении льготы,
+  // не дожидаясь его `back`, чтобы учитель сразу видел «Вышел» и мог разрешить продолжить.
+  // Без broadcast: учитель получает это этим же ответом (опрос раз в 4 с).
+  if (exitControl && session[0].status === 'active') {
+    await sql`
+      UPDATE test_participants
+      SET finished_at = NOW(),
+          left_reason = 'background',
+          away_at = NULL,
+          score = CASE
+            WHEN question_order IS NOT NULL AND jsonb_array_length(question_order) > 0
+            THEN ROUND((correct_count::numeric / jsonb_array_length(question_order)) * 100)
+            ELSE 0
+          END
+      WHERE session_id = ${sessionId}::uuid AND finished_at IS NULL
+        AND away_at IS NOT NULL AND away_at < NOW() - make_interval(secs => ${AWAY_GRACE_SEC})
+    `;
+  }
+
   const participants = await sql`
     SELECT user_id, display_name, answer_count, question_order, finished_at IS NOT NULL AS done,
            left_reason, away_count, away_at IS NOT NULL AS away, client_exit_control
