@@ -68,6 +68,23 @@ export function parseJsonArray(text) {
   }
 }
 
+/** Достаёт JSON-объект из ответа; {} если не удалось. */
+export function parseJsonObject(text) {
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+  } catch {
+    // см. parseJsonArray
+  }
+  try {
+    const match = text.match(/\{[\s\S]*\}/);
+    return match ? JSON.parse(match[0]) : {};
+  } catch {
+    console.error('Failed to parse Gemini response:', text);
+    return {};
+  }
+}
+
 /**
  * Ответ на ошибку Gemini: 429 — квота/перегрузка, 504 — тайм-аут, иначе 500.
  * Поле error старые клиенты показывают как есть или заменяют своим текстом.

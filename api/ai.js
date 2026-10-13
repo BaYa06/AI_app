@@ -3,6 +3,7 @@ import generateExamples from './_ai/generate-examples.js';
 import context from './_ai/context.js';
 import extractPdf from './_ai/extract-pdf.js';
 import extractImage from './_ai/extract-image.js';
+import importFiles from './_ai/import-files.js';
 
 /**
  * Единая Vercel-функция для AI-эндпоинтов (лимит Hobby — 12 функций).
@@ -15,6 +16,7 @@ const HANDLERS = {
   context,
   'extract-pdf': extractPdf,
   'extract-image': extractImage,
+  'import-files': importFiles,
 };
 
 export default async function handler(req, res) {

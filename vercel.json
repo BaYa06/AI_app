@@ -131,6 +131,7 @@
     { "source": "/api/context",                   "destination": "/api/ai?fn=context" },
     { "source": "/api/extract-pdf",               "destination": "/api/ai?fn=extract-pdf" },
     { "source": "/api/extract-image",             "destination": "/api/ai?fn=extract-image" },
+    { "source": "/api/import-files",              "destination": "/api/ai?fn=import-files" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/((?!.*\\.).*)", "destination": "/index.html" }
   ]
