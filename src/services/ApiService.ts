@@ -2,7 +2,7 @@
  * API Client для работы с Neon PostgreSQL через Vercel Functions
  */
 
-import { API_BASE } from '@/config/apiBase';
+import { API_BASE, API_ORIGIN } from '@/config/apiBase';
 import { hasAiConsent } from './aiConsent';
 
 // Раньше был отдельный относительный '/api' — не резолвится в fetch() на нативном React
@@ -16,7 +16,7 @@ const API_BASE_URL = API_BASE;
 // что и у API_BASE_URL), не меняя, какой бэкенд реально обслуживает эти вызовы.
 const AI_BASE_URL = __DEV__
   ? 'http://localhost:3000/api'
-  : 'https://ai-app-seven-zeta.vercel.app/ai';
+  : `${API_ORIGIN}/ai`;
 
 function requireAiConsent(): void {
   if (!hasAiConsent()) throw new Error('AI consent required');

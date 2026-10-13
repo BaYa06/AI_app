@@ -7,6 +7,8 @@ module.exports = {
         // Никаких строк подключения к БД и серверных секретов: всё, что здесь перечислено,
         // попадает в сборку приложения открытым текстом. Данные — только через /api.
         include: [
+          // 'staging' — тестовая сборка на тестовом сервере (src/config/apiBase.ts)
+          'APP_ENV',
           'SUPABASE_URL',
           'SUPABASE_ANON_KEY',
           'SUPABASE_REDIRECT_URI',

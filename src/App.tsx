@@ -10,6 +10,7 @@ import { AppNavigator } from '@/navigation';
 import { LoadingSplash } from '@/components/common';
 import { ToastHost } from '@/components/ui/Toast';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
+import { StagingBadge } from '@/components/common/StagingBadge';
 import { DatabaseService, setupAutoSave, supabase, NeonService, setAnalyticsUserId, SyncQueueService, Analytics, setAnalyticsUserProperties } from '@/services';
 import { isWidgetUrl, parseWidgetUrl } from '@/services/widgetLinks';
 import { resetWidget } from '@/services/WidgetService';
@@ -854,6 +855,7 @@ export default function App() {
         authLoading={authLoading}
         nativeLanguage={onboardingData.nativeLanguage}
       />
+      <StagingBadge />
     </SafeAreaProvider>
     </ErrorBoundary>
   );
