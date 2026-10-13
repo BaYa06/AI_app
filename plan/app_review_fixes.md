@@ -79,7 +79,8 @@
   - Приложение: `src/config/features.ts` — во вкладке «Библиотека» только учебники (без сортировки и фильтров), нет блока публикации в редакторе набора, «Мои публикации» и `LibrarySetDetail` убраны из навигации и ссылок.
   - Условия и политика: убраны библиотека, блокировка автора и срок 24 часа; жалобы — через «Написать нам» и email.
   - Остаточный риск — курсы (закрытые, по приглашению учителя). Если рецензент придерётся: кнопка «Пожаловаться» у курса.
-  - **Вернуть библиотеку позже** — с премодерацией: набор виден всем только после одобрения в админке, жалоба скрывает набор у пожаловавшегося, «Заблокировать автора», согласие с условиями перед первой публикацией. Затем включить оба флага.
+  - **13.10.2026 библиотека возвращена** — публикуют только админы, весь контент от команды (`plan/community_library.md`).
+  - ~~Вернуть библиотеку позже~~ — с премодерацией: набор виден всем только после одобрения в админке, жалоба скрывает набор у пожаловавшегося, «Заблокировать автора», согласие с условиями перед первой публикацией. Затем включить оба флага.
 - [x] **1.3 Отзыв токена Apple при удалении аккаунта.** Токены Apple не храним (схема из примеров Apple):
   - Профиль → Удалить аккаунт: для Apple-аккаунта приложение заново спрашивает вход через Apple (`requestAppleAuthorizationCode` в `src/services/appleSignInName.ts`) и шлёт свежий `authorizationCode` в `deleteAccount`.
   - Сервер (`api/_apple.js`): client secret — JWT ES256 из `.p8`, `/auth/token` → refresh-токен → `/auth/revoke`. Не вышло — данные не удаляются (502). Без переменных Apple удаление Apple-аккаунта отвечает 503.
@@ -120,6 +121,6 @@
   - Age Rating: в новой анкете отметить пользовательский контент.
   - Скриншоты и описание: без Premium, цен и функций, которых нет.
 - [ ] **5.2 Review Notes** (английский), примерно:
-  > Sign in with Apple no longer asks for a name or email: the app uses the name provided by Apple. Account deletion: Profile → Delete account (also revokes Sign in with Apple tokens). There is no public user-generated content: users cannot publish sets to other users; courses are private and invite-only, and users can report abuse via Profile → Contact us. AI features ask for consent before sending data to Google Gemini. To test teacher features, sign in with the demo account: … / course code: …
+  > Sign in with Apple no longer asks for a name or email: the app uses the name provided by Apple. Account deletion: Profile → Delete account (also revokes Sign in with Apple tokens). There is no public user-generated content: the Library tab contains only flashcard sets curated and published by our team, users cannot publish sets to other users; courses are private and invite-only, and users can report abuse via the "…" menu on a library set or Profile → Contact us. AI features ask for consent before sending data to Google Gemini. To test teacher features, sign in with the demo account: … / course code: …
 - [ ] **5.3 Демо-аккаунт учителя** с курсом и кодом для подключения — чтобы рецензент проверил курсы и тесты.
 - [ ] **5.4 Поднять версию**, сборка в TestFlight, пройти этапы 0–3 руками на устройстве, отправить.
