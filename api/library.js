@@ -9,7 +9,8 @@ import { getAuthedUserId } from './_auth.js';
  * GET  /api/library                         – list sets
  * GET  /api/library?id=xxx                  – set detail
  * GET  /api/library?action=my-publications  – user's publications
- * GET  /api/library?action=check-published  – check if set is published
+ * GET  /api/library?action=check-published  – check if set is published (+ canPublish)
+ * GET  /api/library?action=can-publish      – может ли пользователь публиковать (только админ)
  * POST /api/library?action=publish          – publish a set
  * PUT  /api/library?action=publish          – update a publication
  * DELETE /api/library?action=publish        – unpublish a set
@@ -21,6 +22,10 @@ import { getAuthedUserId } from './_auth.js';
  *
  * userId — только из Supabase JWT: мутации и «мои» запросы требуют токен, в списке/деталях
  * токен необязателен (без него флаги is_imported/is_liked = false).
+ *
+ * Публикуют только админы (users.is_admin), plan/community_library.md: весь контент библиотеки —
+ * от команды, поэтому App Review 1.2 (модерация пользовательского контента) не применяется.
+ * Чужие наборы видны, только если автор — админ; автор показывается как «Flashly».
  */
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -28,12 +33,17 @@ const isUuid = (v) => typeof v === 'string' && UUID_RE.test(v);
 
 const MUTATION_ACTIONS = new Set(['like', 'rate', 'report', 'import', 'publish']);
 
-// Библиотека сообщества выключена (plan/app_review_fixes.md, шаг 1.2): чужие наборы без модерации —
-// отказ App Review 1.2. Включить обратно — COMMUNITY_LIBRARY_ENABLED=true в переменных Vercel
-// (и COMMUNITY_LIBRARY_ENABLED в src/config/features.ts). Свои публикации автор по-прежнему видит и снимает.
-const COMMUNITY_LIBRARY_ENABLED = process.env.COMMUNITY_LIBRARY_ENABLED === 'true';
-const DISABLED_ACTIONS = new Set(['like', 'rate', 'import', 'cards']);
-const OWN_READ_ACTIONS = new Set(['my-publications', 'check-published']);
+const OWN_READ_ACTIONS = new Set(['my-publications', 'check-published', 'can-publish']);
+
+// Набор виден другим, только если его опубликовал админ.
+const ADMIN_AUTHOR = `EXISTS (SELECT 1 FROM users au WHERE au.id = ls.user_id AND au.is_admin = true)`;
+const TEAM_AUTHOR_NAME = 'Flashly';
+
+async function isAdmin(sql, userId) {
+  if (!userId) return false;
+  const rows = await sql`SELECT is_admin FROM users WHERE id = ${userId}::uuid`;
+  return rows[0]?.is_admin === true;
+}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -68,21 +78,19 @@ export default async function handler(req, res) {
   await ensureDatabaseInitialized(sql);
 
   try {
-    if (!COMMUNITY_LIBRARY_ENABLED) {
-      const isPublishWrite = action === 'publish' && (req.method === 'POST' || req.method === 'PUT');
-      if (DISABLED_ACTIONS.has(action) || isPublishWrite) {
-        return res.status(403).json({ error: 'Community library is disabled' });
-      }
-      if (!action && req.method === 'GET') {
-        return id
-          ? res.status(404).json({ error: 'Set not found' })
-          : res.status(200).json({ sets: [], has_more: false });
-      }
+    // Публиковать и обновлять публикацию может только админ; снять свою — любой автор.
+    const isPublishWrite = action === 'publish' && (req.method === 'POST' || req.method === 'PUT');
+    if (isPublishWrite && !(await isAdmin(sql, userId))) {
+      return res.status(403).json({ error: 'admins_only' });
     }
 
     // ── Action-based routing (sub-endpoints consolidated here) ──────────────
     if (action === 'my-publications') return await getMyPublications(req, res, sql);
     if (action === 'check-published') return await checkPublished(req, res, sql);
+    if (action === 'can-publish') {
+      if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+      return res.status(200).json({ canPublish: await isAdmin(sql, userId) });
+    }
     if (action === 'like')            return await toggleLike(req, res, sql);
     if (action === 'rate')            return await rateSet(req, res, sql);
     if (action === 'report')          return await reportSet(req, res, sql);
@@ -132,7 +140,7 @@ async function getLibrarySets(req, res, sql) {
   const offset = (pageNum - 1) * limitNum;
 
   // Build dynamic query with parameterized values
-  const conditions = [`ls.status = 'published'`];
+  const conditions = [`ls.status = 'published'`, ADMIN_AUTHOR];
   const params = [];
   let paramIndex = 1;
 
@@ -140,17 +148,12 @@ async function getLibrarySets(req, res, sql) {
     conditions.push(`ls.is_featured = true`);
   }
 
-  if (search) {
-    if (search.startsWith('@')) {
-      // Search by @username
-      conditions.push(`u.user_name ILIKE $${paramIndex}`);
-      params.push(`%${search}%`);
-      paramIndex++;
-    } else {
-      conditions.push(`(ls.title ILIKE $${paramIndex} OR ls.description ILIKE $${paramIndex})`);
-      params.push(`%${search}%`);
-      paramIndex++;
-    }
+  // Поиск по @нику автора убран: все наборы от команды, автор показывается как «Flashly».
+  const searchText = typeof search === 'string' ? search.replace(/^@/, '').trim() : '';
+  if (searchText) {
+    conditions.push(`(ls.title ILIKE $${paramIndex} OR ls.description ILIKE $${paramIndex})`);
+    params.push(`%${searchText}%`);
+    paramIndex++;
   }
 
   if (category) {
@@ -228,7 +231,7 @@ async function getLibrarySets(req, res, sql) {
 
   const query = `
     SELECT ls.*,
-      COALESCE(u.user_name, u.email) AS author_name,
+      '${TEAM_AUTHOR_NAME}' AS author_name,
       CASE WHEN ls.rating_count > 0 THEN ROUND(ls.rating_sum::numeric / ls.rating_count, 1) ELSE NULL END AS average_rating,
       (SELECT COUNT(*) FROM library_cards lc WHERE lc.library_set_id = ls.id)::int AS cards_count
       ${importedSelect}
@@ -266,13 +269,13 @@ async function getSetDetail(req, res, sql, id, userId) {
 
   const setRows = await sql.query(`
     SELECT ls.*,
-      COALESCE(u.user_name, u.email) AS author_name,
+      '${TEAM_AUTHOR_NAME}' AS author_name,
       CASE WHEN ls.rating_count > 0 THEN ROUND(ls.rating_sum::numeric / ls.rating_count, 1) ELSE NULL END AS average_rating,
       (SELECT COUNT(*) FROM library_cards lc WHERE lc.library_set_id = ls.id)::int AS cards_count
       ${importedSelect}
     FROM library_sets ls
     LEFT JOIN users u ON u.id = ls.user_id
-    WHERE ls.id = $1 AND ls.status = 'published'
+    WHERE ls.id = $1 AND ls.status = 'published' AND ${ADMIN_AUTHOR}
   `, params);
 
   if (setRows.length === 0) {
@@ -300,6 +303,7 @@ async function getLibraryCards(req, res, sql, id) {
     SELECT lc.front, lc.back, lc.hint
     FROM library_cards lc
     JOIN library_sets ls ON ls.id = lc.library_set_id AND ls.status = 'published'
+    JOIN users au ON au.id = ls.user_id AND au.is_admin = true
     WHERE lc.library_set_id = ${id}::uuid
     ORDER BY lc.order_index ASC
   `;
@@ -332,15 +336,18 @@ async function checkPublished(req, res, sql) {
   const { setId, userId } = req.query;
   if (!setId || !userId) return res.status(400).json({ error: 'setId and userId are required' });
 
-  const result = await sql`
-    SELECT id FROM library_sets
-    WHERE original_set_id = ${setId} AND user_id = ${userId} AND status = 'published'
-    LIMIT 1
-  `;
+  const [result, canPublish] = await Promise.all([
+    sql`
+      SELECT id FROM library_sets
+      WHERE original_set_id = ${setId} AND user_id = ${userId} AND status = 'published'
+      LIMIT 1
+    `,
+    isAdmin(sql, userId),
+  ]);
   if (result.length > 0) {
-    return res.status(200).json({ isPublished: true, librarySetId: result[0].id });
+    return res.status(200).json({ isPublished: true, librarySetId: result[0].id, canPublish });
   }
-  return res.status(200).json({ isPublished: false });
+  return res.status(200).json({ isPublished: false, canPublish });
 }
 
 // ── action=like ───────────────────────────────────────────────────────────────
@@ -426,7 +433,11 @@ async function importSet(req, res, sql) {
   const existingImport = await sql`SELECT id FROM library_imports WHERE user_id = ${userId} AND library_set_id = ${librarySetId}`;
   if (existingImport.length > 0) return res.status(400).json({ error: 'Set already imported' });
 
-  const libSet = await sql`SELECT * FROM library_sets WHERE id = ${librarySetId} AND status = 'published'`;
+  const libSet = await sql`
+    SELECT ls.* FROM library_sets ls
+    JOIN users au ON au.id = ls.user_id AND au.is_admin = true
+    WHERE ls.id = ${librarySetId} AND ls.status = 'published'
+  `;
   if (libSet.length === 0) return res.status(404).json({ error: 'Library set not found' });
   const set = libSet[0];
 
