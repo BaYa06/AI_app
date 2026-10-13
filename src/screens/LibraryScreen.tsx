@@ -11,6 +11,7 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Text } from '@/components/common';
@@ -301,20 +302,40 @@ export function LibraryScreen() {
   }, [userId]);
 
   // Каталог книг (нужна сессия Supabase — грузим, когда известен пользователь)
+  const loadBooks = useCallback(async () => {
+    try {
+      setBooks(await BookService.listBooks());
+    } finally {
+      setBooksLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!userId) return;
-    let cancelled = false;
-    BookService.listBooks()
-      .then((list) => {
-        if (!cancelled) setBooks(list);
-      })
-      .finally(() => {
-        if (!cancelled) setBooksLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [userId]);
+    loadBooks();
+  }, [userId, loadBooks]);
+
+  // Жест вниз: экран вкладки не пересоздаётся, без него новые книги видны только после перезапуска
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        loadBooks(),
+        COMMUNITY_LIBRARY_ENABLED ? fetchAllSections(userId) : Promise.resolve(),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [userId, loadBooks, fetchAllSections]);
+  const refreshControl = (
+    <RefreshControl
+      refreshing={refreshing}
+      onRefresh={onRefresh}
+      tintColor={colors.primary}
+      colors={[colors.primary]}
+    />
+  );
 
   // Debounced search
   const onSearchChange = useCallback((text: string) => {
@@ -531,14 +552,16 @@ export function LibraryScreen() {
           onRetry={() => fetchAllSections(userId)}
         />
       ) : nothingToShow ? (
-        <EmptyState
-          icon={Search}
-          title="Ничего не найдено"
-          description={COMMUNITY_LIBRARY_ENABLED ? 'Попробуй изменить фильтры или поисковый запрос' : 'Попробуй другой запрос'}
-        />
+        <ScrollView style={s.content} contentContainerStyle={s.flexGrow} refreshControl={refreshControl}>
+          <EmptyState
+            icon={Search}
+            title="Ничего не найдено"
+            description={COMMUNITY_LIBRARY_ENABLED ? 'Попробуй изменить фильтры или поисковый запрос' : 'Попробуй другой запрос'}
+          />
+        </ScrollView>
       ) : isSearchActive ? (
         /* Search Results - vertical grid with HorizontalCard design */
-        <ScrollView style={s.content} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView style={s.content} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false} refreshControl={refreshControl}>
           {matchingBooks.length > 0 && (
             <View style={s.section}>
               <View style={s.sectionHeader}>
@@ -567,7 +590,7 @@ export function LibraryScreen() {
           )}
         </ScrollView>
       ) : (
-        <ScrollView style={s.content} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView style={s.content} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false} refreshControl={refreshControl}>
           {/* Books (каталог учебников) */}
           {books.length > 0 && (
             <View style={s.section}>
@@ -647,6 +670,7 @@ export function LibraryScreen() {
 const s = StyleSheet.create({
   container: { flex: 1 },
   flex1: { flex: 1 },
+  flexGrow: { flexGrow: 1 },
   flexShrink: { flexShrink: 1 },
   semibold: { fontWeight: '600' },
   bold: { fontWeight: '700' },
