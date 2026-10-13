@@ -17,14 +17,14 @@ function modelList(envValue, fallback) {
 }
 
 // Порядок — по замерам на бесплатном ключе (13.10.2026): самые новые (3.7, 3.8, *-latest)
-// почти всегда 503, 2.5 отключены. Быстрые, но иногда перегруженные — первыми;
-// стабильная 3.1 Flash-Lite медленнее (и иногда зависает), но почти не отказывает — страховка.
+// почти всегда 503, 2.5 отключены. Первой — стабильная 3.1 Flash-Lite: медленнее (5–14 с),
+// зато почти не отказывает и даёт одинаковое качество; быстрые модели — запасные.
 export const MODELS = {
   vision: modelList(process.env.GEMINI_MODEL_VISION, [
-    'gemini-3.6-flash', 'gemini-3-flash-preview', 'gemini-3.5-flash', 'gemini-3.1-flash-lite',
+    'gemini-3.1-flash-lite', 'gemini-3.6-flash', 'gemini-3-flash-preview', 'gemini-3.5-flash',
   ]),
   text: modelList(process.env.GEMINI_MODEL_TEXT, [
-    'gemini-3.6-flash', 'gemini-3.1-flash-lite', 'gemini-3-flash-preview',
+    'gemini-3.1-flash-lite', 'gemini-3.6-flash', 'gemini-3-flash-preview',
   ]),
 };
 
