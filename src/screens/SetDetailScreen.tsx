@@ -696,7 +696,9 @@ export function SetDetailScreen({ navigation, route }: Props) {
       if (await ensureAiConsent()) {
         try {
           const result = await apiService.generateExamples(
-            importedCards.map(c => ({ front: c.front, back: c.back }))
+            importedCards.map(c => ({ front: c.front, back: c.back })),
+            set?.languageFrom,
+            set?.languageTo,
           );
           if (result.length > 0) {
             cardsWithExamples = importedCards.map((card, i) => ({
@@ -737,7 +739,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
     } finally {
       setImportLoading(false);
     }
-  }, [importedCards, addCard, setId, updateSetStats, closeImportModal]);
+  }, [importedCards, addCard, setId, updateSetStats, closeImportModal, set?.languageFrom, set?.languageTo]);
 
   const handleEditCard = useCallback(
     (cardId: string) => {

@@ -79,6 +79,9 @@ async function generateAIDistractors(
         translation: card.backText,
         wordType: card.wordType || 'other',
         count,
+        // Предложение с пропуском — чтобы ИИ не предложил слово, которое тоже подходит
+        example: card.example || undefined,
+        wordForm: card.wordForm || undefined,
       }),
     });
     if (!res.ok) return [];

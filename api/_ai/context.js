@@ -4,8 +4,10 @@ import { MODELS, generateJson, parseJsonArray, sendAiError } from './gemini.js';
  * API для режима "Слово в контексте"
  *
  * POST /api/context?action=distractors
- *   Body: { word, translation, wordType, count }
- *   Генерирует слова-дистракторы через Gemini когда карточек в наборе не хватает
+ *   Body: { word, translation, wordType, count, example?, wordForm? }
+ *   Генерирует слова-дистракторы через Gemini когда карточек в наборе не хватает.
+ *   Варианты стоят рядом с лицевой стороной карточки — поэтому в той же форме, что и word;
+ *   example (необязательно, старые клиенты не шлют) — предложение с пропуском: дистракторы не должны в него подходить.
  */
 
 export default async function handler(req, res) {
@@ -25,12 +27,12 @@ export default async function handler(req, res) {
 
 /**
  * POST ?action=distractors
- * Body: { word, translation, wordType, count }
+ * Body: { word, translation, wordType, count, example?, wordForm? }
  */
 async function generateDistractors(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { word, translation, wordType = 'other', count = 3 } = req.body;
+  const { word, translation, wordType = 'other', count = 3, example, wordForm } = req.body || {};
   if (!word || !translation) {
     return res.status(400).json({ error: 'word and translation are required' });
   }
@@ -38,16 +40,20 @@ async function generateDistractors(req, res) {
   const safeCount = Math.min(Math.max(1, Number(count)), 5);
 
   try {
-    const prompt = `You are a language learning assistant.
+    const sentence = typeof example === 'string' && example.trim()
+      ? `\nThe learner sees this sentence with a blank instead of "${typeof wordForm === 'string' && wordForm ? wordForm : word}":\n"${example.trim()}"\nEach distractor must NOT fit the blank naturally — only "${word}" should make sense there.\n`
+      : '';
 
-Given the word "${word}" (translation: "${translation}", part of speech: ${wordType}), generate ${safeCount} DISTRACTOR words in the same language as "${word}" that:
-- Are the same part of speech as "${word}"
-- Are similar in topic or difficulty
-- Are clearly DIFFERENT in meaning from "${word}"
-- Would plausibly appear in the same type of sentence
+    const prompt = `You create wrong answer options for a flashcard quiz. The correct answer is the flashcard word "${word}" (meaning: "${translation}", part of speech: ${wordType}).
+${sentence}
+Give ${safeCount} distractors that:
+- are in the same language as "${word}" and written in the SAME format: same part of speech; nouns with an article if "${word}" has one (with their own correct article); verbs in the same form (infinitive, reflexive "sich …" if "${word}" is reflexive); a phrase if "${word}" is a phrase;
+- if "${word}" has grammar notes (e.g. "der Hund, -e"), give the distractors without notes;
+- are common words of similar difficulty and length, from a similar topic;
+- clearly differ in meaning: no synonyms, no antonyms that also fit, no words with the same root, no different forms of "${word}".
 
-Return ONLY a JSON array of strings (the words themselves, no translations, no explanations).
-Example: ["schlafen", "kaufen", "schreiben"]`;
+Reply ONLY with a JSON array of ${safeCount} strings.
+Example for "der Hund" (собака): ["die Katze", "der Vogel", "das Pferd"]`;
 
     // Ответ крошечный, но лимит с запасом: размышления модели тоже расходуют токены ответа
     const text = await generateJson({ models: MODELS.text, prompt, temperature: 0.8, maxOutputTokens: 1024 });

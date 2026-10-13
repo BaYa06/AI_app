@@ -1,4 +1,5 @@
 import { MODELS, generateJson, parseJsonArray, sendAiError } from './gemini.js';
+import { languageName, vocabExtractionRules } from './prompts.js';
 
 /**
  * API для извлечения карточек из фото через Gemini (Google AI Studio)
@@ -43,28 +44,20 @@ export default async function handler(req, res) {
   }
 
   try {
-    const langFrom = languageFrom || 'the language being learned';
-    const langTo = languageTo || 'the translation language';
+    // Языки приходят кодами набора ('de', 'ru'…)
+    const langFrom = languageName(languageFrom, 'the language being learned');
+    const langTo = languageName(languageTo, "the user's native language");
 
-    const prompt = `You are a vocabulary extractor. The user uploaded a photo of a textbook page or vocabulary list for language learning.
+    const prompt = `You extract vocabulary for flashcards from a photo of a textbook page, notebook or vocabulary list.
+Card set: learning ${langFrom}, translations in ${langTo}.
 
-The card set languages:
-- Language being learned (front of card): ${langFrom}
-- Translation language (back of card): ${langTo}
+${vocabExtractionRules(langFrom, langTo)}
 
-Extract ALL words and phrases from this image that are relevant for language learning.
+Handwriting or blurry text: extract only what you can read confidently.
+If the photo has no vocabulary (continuous text, exercises, pictures), return [].
 
-Rules:
-- "front" = the word/phrase in ${langFrom}, including article if present (e.g. "der Hund", "la maison")
-- "back" = the translation in ${langTo}. If no translation is visible on the image, set "back" to an empty string ""
-- Skip any lines that are headers, page numbers, exercise instructions, or don't contain vocabulary
-- Do NOT add any words that are not in the image
-- If words are in a table format, extract each row as a pair
-- If the image contains numbered lists, ignore the numbers
-
-Return ONLY a valid JSON array of objects with "front" and "back" fields. No explanations, no markdown.
-Example: [{"front": "der Abschnitt", "back": "раздел"}, {"front": "sterben", "back": "умирать"}]
-Example with no translations: [{"front": "der Abschnitt", "back": ""}, {"front": "sterben", "back": ""}]`;
+Reply ONLY with a JSON array: [{"front": "...", "back": "..."}]
+Example: [{"front": "der Abschnitt, -e", "back": "раздел"}, {"front": "sterben", "back": "умирать"}]`;
 
     const text = await generateJson({
       models: MODELS.vision,

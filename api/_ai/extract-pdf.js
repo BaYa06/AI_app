@@ -1,4 +1,5 @@
 import { MODELS, generateJson, parseJsonArray, sendAiError } from './gemini.js';
+import { languageName, vocabExtractionRules } from './prompts.js';
 
 /**
  * API для извлечения карточек из PDF через Gemini (Google AI Studio)
@@ -37,30 +38,19 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Языки набора необязательны: старые клиенты их не присылают
-    const languages = languageFrom && languageTo
-      ? `\nThe card set languages: front = ${languageFrom}, back = ${languageTo}. Put the ${languageFrom} word in "front" and the ${languageTo} translation in "back".\n`
-      : '';
+    // Языки набора необязательны: старые клиенты их не присылают; приходят кодами ('de', 'ru'…)
+    const langFrom = languageName(languageFrom, 'the language being learned (the left side of the list)');
+    const langTo = languageName(languageTo, 'the language of the translations in the PDF');
 
-    const prompt = `You are a vocabulary list parser. The user uploaded a PDF with a vocabulary list for language learning.
+    const prompt = `You extract vocabulary for flashcards from a PDF vocabulary list.
+Card set: learning ${langFrom}, translations in ${langTo}.
 
-${languages}
-Extract ALL word pairs from this PDF. Each line typically has one of these formats:
-- "word/phrase – translation" (separated by dash – with spaces)
-- Nouns with article: "der/die/das Wort – translation"
-- Verbs: "verb – translation"
-- Phrases: "phrase – translation"
-- May have numbering (1. 2. etc.) at the start — ignore the numbers
-- May have an English translation after a second dash — ignore it, keep only the first translation
+${vocabExtractionRules(langFrom, langTo)}
 
-Rules:
-- "front" = the word/phrase in the language being learned (left side), including article if present
-- "back" = the translation (right side, first translation only)
-- Skip any lines that are headers, page numbers, or don't contain word pairs
-- Do NOT add any words that are not in the PDF
+Typical line formats: "word – translation", "der/die/das Wort, -e – translation", numbered lines (ignore the numbers), a second translation into another language after another dash (ignore it).
 
-Return ONLY a valid JSON array of objects with "front" and "back" fields. No explanations, no markdown.
-Example: [{"front": "der Abschnitt", "back": "раздел"}, {"front": "sterben", "back": "умирать"}]`;
+Reply ONLY with a JSON array: [{"front": "...", "back": "..."}]
+Example: [{"front": "der Abschnitt, -e", "back": "раздел"}, {"front": "sterben", "back": "умирать"}]`;
 
     const text = await generateJson({
       models: MODELS.vision,

@@ -1,4 +1,5 @@
 import { MODELS, generateJson, parseJsonArray, sendAiError } from './gemini.js';
+import { WORD_FORMAT_RULES, languageName } from './prompts.js';
 
 /**
  * API для перевода слов через Gemini (Google AI Studio)
@@ -30,25 +31,24 @@ export default async function handler(req, res) {
   }
 
   const batch = words.slice(0, 100);
-  const langFrom = languageFrom || 'the source language';
-  const langTo = languageTo || 'the target language';
+  // Языки приходят кодами набора ('de', 'ru'…)
+  const langFrom = languageName(languageFrom, 'the language of the words (detect it)');
+  const langTo = languageName(languageTo, "the user's native language");
 
   try {
     const wordList = batch.map((w, i) => `${i + 1}. ${w}`).join('\n');
 
-    const prompt = `You are a language learning translator. Translate the following words/phrases from ${langFrom} to ${langTo}.
+    const prompt = `You translate flashcard words for a language learning app: from ${langFrom} into ${langTo}.
 
-Words to translate:
+Words:
 ${wordList}
 
-Rules:
-- Provide the most common, natural translation for each word
-- For nouns, keep the article if present (e.g. "der Hund" → translate just "Hund", keep "der" in front)
-- If a word has multiple meanings, pick the most common one
-- Return EXACTLY ${batch.length} translations in the SAME order
+${WORD_FORMAT_RULES}
 
-Return ONLY a valid JSON array of objects with "front" (original word) and "back" (translation). No explanations, no markdown.
-Example: [{"front": "der Hund", "back": "собака"}, {"front": "laufen", "back": "бежать"}]`;
+Translate each word as a dictionary entry, not as part of a sentence. Ignore grammar notes after the word ("der Hund, -e" → translate "Hund").
+Return EXACTLY ${batch.length} items in the SAME order.
+Reply ONLY with a JSON array: [{"front": "<word exactly as given>", "back": "<translation>"}]
+Example (German → Russian): [{"front": "der Hund, -e", "back": "собака"}, {"front": "sich freuen auf", "back": "радоваться (чему-либо)"}]`;
 
     const text = await generateJson({ models: MODELS.text, prompt, temperature: 0.2, maxOutputTokens: 4096 });
     const translations = parseJsonArray(text).filter(t => t && typeof t === 'object');

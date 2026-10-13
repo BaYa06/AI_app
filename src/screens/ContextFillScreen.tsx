@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Dumbbell, PartyPopper, ThumbsUp } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import { Button, ProgressBar, ScreenHeader, toast } from '@/components/ui';
-import { useThemeColors, useCardsStore, useContextFillStore } from '@/store';
+import { useThemeColors, useCardsStore, useContextFillStore, useSetsStore } from '@/store';
 import { spacing, borderRadius, iconSize, screenPadding, alpha } from '@/constants';
 import { NeonService } from '@/services/NeonService';
 import { apiService } from '@/services/ApiService';
@@ -110,8 +110,11 @@ export function ContextFillScreen({ navigation, route }: Props) {
     if (noExample.length > 0 && (await ensureAiConsent())) {
       setPrepStatus('AI готовит задания...');
       try {
+        const set = useSetsStore.getState().getSet(setId);
         const results = await apiService.generateExamples(
           noExample.map((c) => ({ front: c.frontText, back: c.backText })),
+          set?.languageFrom,
+          set?.languageTo,
         );
 
         for (let i = 0; i < noExample.length; i++) {
