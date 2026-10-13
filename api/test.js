@@ -19,6 +19,10 @@ import { ensureDatabaseInitialized } from './_db-init.js';
  * GET  /api/test?action=results       — итоговые результаты (только учитель — владелец сессии)
  * POST /api/test?action=get-question  — ученик запрашивает вопрос с вариантами
  * GET  /api/test?action=history       — учитель получает историю тестов курса
+ * POST /api/test?action=away          — ученик ушёл в фон (контроль выхода, plan/exam_lockdown.md)
+ * POST /api/test?action=back          — ученик вернулся: продолжить или завершить попытку
+ * POST /api/test?action=leave         — ученик сам завершил тест досрочно
+ * POST /api/test?action=reinstate     — учитель разрешает вышедшему ученику продолжить
  */
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://yiwsmjbeirgomkrckoju.supabase.co';
@@ -74,8 +78,12 @@ export default async function handler(req, res) {
     if (action === 'results')      return await getResults(req, res, sql, userId);
     if (action === 'get-question') return await getQuestion(req, res, sql, userId);
     if (action === 'history')      return await getHistory(req, res, sql, userId);
+    if (action === 'away')         return await markAway(req, res, sql, userId);
+    if (action === 'back')         return await markBack(req, res, sql, userId);
+    if (action === 'leave')        return await leaveTest(req, res, sql, userId);
+    if (action === 'reinstate')    return await reinstateParticipant(req, res, sql, userId);
 
-    return res.status(400).json({ error: 'Unknown action. Use: create, join, start, answer, monitor, finish, results, get-question, history' });
+    return res.status(400).json({ error: 'Unknown action. Use: create, join, start, answer, monitor, finish, results, get-question, history, away, back, leave, reinstate' });
   } catch (error) {
     console.error('Test API error:', error);
     return res.status(500).json({ error: error.message });
@@ -215,12 +223,14 @@ function shuffle(arr) {
 
 /**
  * POST ?action=create
- * Body: { setId, courseId, testMode, questionCount, timePerQuestion }
+ * Body: { setId, courseId, testMode, questionCount, timePerQuestion, exitControl? }
+ * exitControl — контроль выхода из приложения (plan/exam_lockdown.md). Необязательный: старые
+ * версии приложения учителя его не шлют, и их тесты работают как раньше.
  */
 async function createTest(req, res, sql, userId) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { setId, courseId, testMode, questionCount, timePerQuestion } = req.body;
+  const { setId, courseId, testMode, questionCount, timePerQuestion, exitControl } = req.body;
   if (!setId || !courseId || !questionCount) {
     return res.status(400).json({ error: 'setId, courseId, questionCount are required' });
   }
@@ -237,28 +247,32 @@ async function createTest(req, res, sql, userId) {
   const code = await generateUniqueCode(sql);
 
   const result = await sql`
-    INSERT INTO test_sessions (teacher_id, set_id, course_id, code, test_mode, question_count, time_per_question)
-    VALUES (${userId}::uuid, ${setId}::uuid, ${courseId}::uuid, ${code}, ${testMode || 'multiple'}, ${questionCount}, ${timePerQuestion || 0})
+    INSERT INTO test_sessions (teacher_id, set_id, course_id, code, test_mode, question_count, time_per_question, exit_control)
+    VALUES (${userId}::uuid, ${setId}::uuid, ${courseId}::uuid, ${code}, ${testMode || 'multiple'}, ${questionCount}, ${timePerQuestion || 0}, ${exitControl === true})
     RETURNING id
   `;
 
   return res.status(201).json({
     sessionId: result[0].id,
     code,
+    exitControl: exitControl === true,
   });
 }
 
 /**
  * POST ?action=join
- * Body: { code }
+ * Body: { code, exitControl? }
+ * exitControl — клиент ученика умеет контроль выхода (plan/exam_lockdown.md). Старые версии
+ * его не шлют: их пускаем как раньше, учитель видит метку «Старая версия».
  */
 async function joinTest(req, res, sql, userId) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { code } = req.body;
+  const { code, exitControl } = req.body;
   if (!code) {
     return res.status(400).json({ error: 'code is required' });
   }
+  const clientExitControl = exitControl === true;
 
   if (!(await checkJoinRateLimit(sql, userId))) {
     return res.status(429).json({ error: 'Too many attempts, try again in a minute' });
@@ -267,6 +281,7 @@ async function joinTest(req, res, sql, userId) {
   // Найти активную сессию по коду
   const sessions = await sql`
     SELECT ts.id, ts.course_id, ts.set_id, ts.test_mode, ts.question_count, ts.time_per_question, ts.status,
+           ts.exit_control,
            cs.title AS set_title,
            COALESCE(u.display_name, u.email) AS teacher_name
     FROM test_sessions ts
@@ -292,10 +307,31 @@ async function joinTest(req, res, sql, userId) {
 
   // Проверить что ученик ещё не в сессии
   const existing = await sql`
-    SELECT id, answer_count FROM test_participants
+    SELECT id, answer_count, correct_count, question_order, score, finished_at, left_reason,
+           rejoin_allowed
+    FROM test_participants
     WHERE session_id = ${session.id}::uuid AND user_id = ${userId}::uuid
   `;
   if (existing.length > 0) {
+    let ex = existing[0];
+
+    // Контроль выхода: повторный вход в уже идущий тест с незавершённой попыткой значит, что
+    // приложение закрывали (иначе ученик остался бы на экране теста). Это выход — попытка
+    // завершается с причиной relaunch. Исключение — учитель разрешил продолжить
+    // (rejoin_allowed, флаг одноразовый). Старых клиентов не трогаем: они не умеют показать
+    // «Тест завершён» и открыли бы пустой экран вопроса.
+    if (session.exit_control && clientExitControl && session.status === 'active' && !ex.finished_at) {
+      if (ex.rejoin_allowed) {
+        await sql`
+          UPDATE test_participants SET rejoin_allowed = false, client_exit_control = true
+          WHERE id = ${ex.id}::uuid
+        `;
+      } else {
+        const finished = await finishParticipantEarly(sql, ex.id, 'relaunch');
+        if (finished) ex = { ...ex, ...finished, finished_at: new Date() };
+      }
+    }
+
     return res.status(200).json({
       sessionId: session.id,
       participantId: existing[0].id,
@@ -308,7 +344,11 @@ async function joinTest(req, res, sql, userId) {
       // Статус сессии и уже отвеченное кол-во — чтобы клиент мог восстановить прогресс вместо
       // того чтобы всегда открывать вопрос с индексом 0 (см. план, пункт 40).
       status: session.status,
-      answerCount: existing[0].answer_count,
+      answerCount: ex.answer_count,
+      exitControl: session.exit_control,
+      // Попытка уже завершена (досрочно или полностью) — клиент показывает итог, а не вопрос.
+      finished: Boolean(ex.finished_at),
+      ...(ex.left_reason ? attemptSummary(ex) : {}),
     });
   }
 
@@ -332,8 +372,8 @@ async function joinTest(req, res, sql, userId) {
 
   // Создать участника
   const participant = await sql`
-    INSERT INTO test_participants (session_id, user_id, display_name, question_order)
-    VALUES (${session.id}::uuid, ${userId}::uuid, ${displayName}, ${JSON.stringify(questionOrder)}::jsonb)
+    INSERT INTO test_participants (session_id, user_id, display_name, question_order, client_exit_control)
+    VALUES (${session.id}::uuid, ${userId}::uuid, ${displayName}, ${JSON.stringify(questionOrder)}::jsonb, ${clientExitControl})
     RETURNING id
   `;
 
@@ -346,6 +386,8 @@ async function joinTest(req, res, sql, userId) {
     userId,
     displayName,
     initials,
+    // false у старых версий приложения — учитель видит, что контроль выхода у ученика не работает
+    clientExitControl,
   });
 
   return res.status(200).json({
@@ -356,6 +398,7 @@ async function joinTest(req, res, sql, userId) {
     testMode: session.test_mode,
     questionCount: questionOrder.length,
     timePerQuestion: session.time_per_question,
+    exitControl: session.exit_control,
   });
 }
 
@@ -407,9 +450,11 @@ async function answerQuestion(req, res, sql, userId) {
   // participantId владелец — иначе кто угодно с валидным токеном мог бы слать ответы за
   // чужого участника (см. план, пункт 36 — раньше participantId вообще утекал всем в сессии).
   const participantRow = await sql`
-    SELECT session_id, user_id, display_name, question_order, answer_count
-    FROM test_participants
-    WHERE id = ${participantId}::uuid
+    SELECT p.session_id, p.user_id, p.display_name, p.question_order, p.answer_count,
+           p.correct_count, p.score, p.left_reason, p.away_at, s.exit_control
+    FROM test_participants p
+    JOIN test_sessions s ON s.id = p.session_id
+    WHERE p.id = ${participantId}::uuid
   `;
   if (participantRow.length === 0) {
     return res.status(404).json({ error: 'Participant not found' });
@@ -418,6 +463,7 @@ async function answerQuestion(req, res, sql, userId) {
   if (p0.user_id !== userId) {
     return res.status(403).json({ error: 'Not authorized for this participant' });
   }
+  if (await rejectIfLeft(sql, res, participantId, p0)) return;
 
   // cardId должен реально быть в вопросах, выданных этому участнику при join — иначе можно
   // было бы отвечать на произвольные карточки чужих наборов.
@@ -452,7 +498,8 @@ async function answerQuestion(req, res, sql, userId) {
     await sql`
       UPDATE test_participants
       SET answer_count = answer_count + 1,
-          correct_count = correct_count + ${isCorrect ? 1 : 0}
+          correct_count = correct_count + ${isCorrect ? 1 : 0},
+          rejoin_allowed = false
       WHERE id = ${participantId}::uuid
     `;
   }
@@ -520,13 +567,15 @@ async function monitorTest(req, res, sql, userId) {
   }
 
   const session = await sql`
-    SELECT status, started_at, time_per_question, question_count, teacher_id
+    SELECT status, started_at, time_per_question, question_count, teacher_id, exit_control
     FROM test_sessions
     WHERE id = ${sessionId}::uuid
   `;
   if (session.length === 0) {
     return res.status(404).json({ error: 'Session not found' });
   }
+  const isTeacher = session[0].teacher_id === userId;
+  const exitControl = session[0].exit_control;
 
   // Разрешено учителю — владельцу сессии, либо ученику, который уже подключился к ней
   // (раньше monitor был доступен вообще без проверки личности, см. план, пункт 39).
@@ -542,7 +591,8 @@ async function monitorTest(req, res, sql, userId) {
   session[0] = await autoFinishIfStale(sql, sessionId, session[0]);
 
   const participants = await sql`
-    SELECT user_id, display_name, answer_count, question_order, finished_at IS NOT NULL AS done
+    SELECT user_id, display_name, answer_count, question_order, finished_at IS NOT NULL AS done,
+           left_reason, away_count, away_at IS NOT NULL AS away, client_exit_control
     FROM test_participants
     WHERE session_id = ${sessionId}::uuid
     ORDER BY joined_at ASC
@@ -553,6 +603,7 @@ async function monitorTest(req, res, sql, userId) {
     startedAt: session[0].started_at,
     timePerQuestion: session[0].time_per_question,
     questionCount: session[0].question_count,
+    exitControl,
     participants: participants.map(p => {
       const initials = (p.display_name || 'S').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
       return {
@@ -563,6 +614,14 @@ async function monitorTest(req, res, sql, userId) {
         answered: p.answer_count,
         total: p.question_order?.length || 0,
         done: p.done,
+        // Контроль выхода (plan/exam_lockdown.md) — только учителю: monitor доступен и
+        // ученикам, а кто выходил из приложения, одноклассникам видеть незачем.
+        ...(isTeacher ? {
+          leftReason: p.left_reason || null,
+          awayCount: p.away_count || 0,
+          away: p.away,
+          clientExitControl: p.client_exit_control,
+        } : {}),
       };
     }),
   });
@@ -651,7 +710,8 @@ async function getResults(req, res, sql, userId) {
 
   // Участники отсортированы по score
   const participants = await sql`
-    SELECT display_name, score, correct_count, question_order, finished_at IS NOT NULL AS finished
+    SELECT user_id, display_name, score, correct_count, question_order, finished_at IS NOT NULL AS finished,
+           left_reason, away_count, client_exit_control
     FROM test_participants
     WHERE session_id = ${sessionId}::uuid
     ORDER BY score DESC, correct_count DESC
@@ -689,6 +749,11 @@ async function getResults(req, res, sql, userId) {
       correct: p.correct_count,
       total: p.question_order?.length || 0,
       finished: p.finished,
+      // Контроль выхода (plan/exam_lockdown.md)
+      userId: p.user_id,
+      leftReason: p.left_reason || null,
+      awayCount: p.away_count || 0,
+      clientExitControl: p.client_exit_control,
     })),
     hardestCards: hardestCards.map(c => ({
       word: c.word,
@@ -713,9 +778,11 @@ async function getQuestion(req, res, sql, userId) {
 
   // Получить участника
   const participant = await sql`
-    SELECT question_order, session_id, user_id
-    FROM test_participants
-    WHERE id = ${participantId}::uuid
+    SELECT p.question_order, p.session_id, p.user_id, p.answer_count, p.correct_count, p.score,
+           p.left_reason, p.away_at, s.exit_control
+    FROM test_participants p
+    JOIN test_sessions s ON s.id = p.session_id
+    WHERE p.id = ${participantId}::uuid
   `;
   if (participant.length === 0) {
     return res.status(404).json({ error: 'Participant not found' });
@@ -723,6 +790,7 @@ async function getQuestion(req, res, sql, userId) {
   if (participant[0].user_id !== userId) {
     return res.status(403).json({ error: 'Not authorized for this participant' });
   }
+  if (await rejectIfLeft(sql, res, participantId, participant[0])) return;
 
   const questionOrder = participant[0].question_order;
   if (questionIndex < 0 || questionIndex >= questionOrder.length) {
@@ -790,4 +858,271 @@ async function getHistory(req, res, sql, userId) {
   `;
 
   return res.status(200).json(rows);
+}
+
+// ─── Контроль выхода из приложения (plan/exam_lockdown.md) ───
+
+/** Сколько секунд в фоне прощается (случайный жест «домой»). Время считает сервер, не клиент. */
+const AWAY_GRACE_SEC = 3;
+
+/**
+ * Участник вызывающего + его сессия. Возвращает null и уже отправленный ответ при ошибке —
+ * participantId должен принадлежать вызывающему (как в answerQuestion).
+ */
+async function loadOwnParticipant(req, res, sql, userId) {
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return null;
+  }
+  const { participantId } = req.body || {};
+  if (!participantId) {
+    res.status(400).json({ error: 'participantId is required' });
+    return null;
+  }
+  const rows = await sql`
+    SELECT p.id, p.session_id, p.user_id, p.display_name, p.answer_count, p.correct_count,
+           p.question_order, p.finished_at, p.left_reason, p.away_at, p.score,
+           s.status AS session_status, s.exit_control
+    FROM test_participants p
+    JOIN test_sessions s ON s.id = p.session_id
+    WHERE p.id = ${participantId}::uuid
+  `;
+  if (rows.length === 0) {
+    res.status(404).json({ error: 'Participant not found' });
+    return null;
+  }
+  if (rows[0].user_id !== userId) {
+    res.status(403).json({ error: 'Not authorized for this participant' });
+    return null;
+  }
+  return rows[0];
+}
+
+/** Итог попытки для клиента ученика (экран «Тест завершён»). */
+function attemptSummary(p) {
+  const total = p.question_order?.length || 0;
+  return {
+    left: Boolean(p.left_reason),
+    leftReason: p.left_reason || null,
+    answered: p.answer_count,
+    correct: p.correct_count,
+    total,
+    score: p.score ?? (total > 0 ? Math.round((p.correct_count / total) * 100) : 0),
+  };
+}
+
+/**
+ * Досрочно завершить попытку участника с причиной (manual | background | relaunch).
+ * Неотвеченные вопросы засчитываются как неверные — та же формула score, что в finishTest.
+ * Возвращает обновлённую строку или null, если попытка уже была завершена.
+ */
+async function finishParticipantEarly(sql, participantId, reason) {
+  const rows = await sql`
+    UPDATE test_participants
+    SET finished_at = NOW(),
+        left_reason = ${reason},
+        away_at = NULL,
+        score = CASE
+          WHEN question_order IS NOT NULL AND jsonb_array_length(question_order) > 0
+          THEN ROUND((correct_count::numeric / jsonb_array_length(question_order)) * 100)
+          ELSE 0
+        END
+    WHERE id = ${participantId}::uuid AND finished_at IS NULL
+    RETURNING session_id, user_id, display_name, answer_count, correct_count, question_order,
+              score, left_reason
+  `;
+  if (rows.length === 0) return null;
+  const p = rows[0];
+  // Тот же progress_update, что после ответа: LiveTestScreen уже умеет done, left — новое поле.
+  await broadcast(p.session_id, 'progress_update', {
+    userId: p.user_id,
+    displayName: p.display_name,
+    answered: p.answer_count,
+    total: p.question_order?.length || 0,
+    done: true,
+    left: true,
+    leftReason: reason,
+  });
+  return p;
+}
+
+/**
+ * Не выдавать вопросы и не принимать ответы после выхода из приложения — даже от
+ * модифицированного клиента. Две ситуации:
+ * - попытка уже завершена досрочно (left_reason);
+ * - клиент сообщил `away`, но вместо `back` сразу шлёт вопрос/ответ, а льгота уже прошла —
+ *   засчитываем выход здесь же.
+ * Отправляет 409 { left: true, ... } и возвращает true, если запрос надо прервать.
+ * p — строка участника с left_reason, away_at, exit_control, answer_count, correct_count,
+ * question_order, score.
+ */
+async function rejectIfLeft(sql, res, participantId, p) {
+  let left = p.left_reason ? p : null;
+
+  if (!left && p.exit_control && p.away_at) {
+    const awaySec = (Date.now() - new Date(p.away_at).getTime()) / 1000;
+    if (awaySec > AWAY_GRACE_SEC) {
+      left = await finishParticipantEarly(sql, participantId, 'background');
+    }
+  }
+  if (!left) return false;
+
+  res.status(409).json({ error: 'Attempt finished: left the app', ...attemptSummary(left) });
+  return true;
+}
+
+/**
+ * POST ?action=away
+ * Body: { participantId }
+ * Приложение ученика ушло в фон. Отметка времени ставится один раз (повтор её не сдвигает).
+ */
+async function markAway(req, res, sql, userId) {
+  const p = await loadOwnParticipant(req, res, sql, userId);
+  if (!p) return;
+  if (!p.exit_control || p.session_status !== 'active' || p.finished_at) {
+    return res.status(200).json({ ok: true, tracked: false });
+  }
+
+  const rows = await sql`
+    UPDATE test_participants
+    SET away_at = NOW()
+    WHERE id = ${p.id}::uuid AND finished_at IS NULL AND away_at IS NULL
+    RETURNING id
+  `;
+  if (rows.length > 0) {
+    await broadcast(p.session_id, 'student_away', { userId: p.user_id, displayName: p.display_name });
+  }
+  return res.status(200).json({ ok: true, tracked: true });
+}
+
+/**
+ * POST ?action=back
+ * Body: { participantId }
+ * Приложение ученика вернулось из фона. Сервер сам считает, сколько ученик отсутствовал:
+ * ≤ AWAY_GRACE_SEC — продолжает (away_count + 1), дольше — попытка завершается. Если `away`
+ * не дошёл (нет сети, JS усыпили), а клиент сообщает о возврате из фона — это тоже выход.
+ */
+async function markBack(req, res, sql, userId) {
+  const p = await loadOwnParticipant(req, res, sql, userId);
+  if (!p) return;
+
+  if (p.finished_at) {
+    return res.status(200).json({ continue: false, ...attemptSummary(p) });
+  }
+  if (!p.exit_control || p.session_status !== 'active') {
+    return res.status(200).json({ continue: true });
+  }
+
+  // Возврат в пределах льготы: условие по времени — в самом UPDATE, без гонки с повторным away.
+  // Время отсутствия — по часам БД (old.away_at — значение до UPDATE).
+  const forgiven = await sql`
+    WITH old AS (SELECT away_at FROM test_participants WHERE id = ${p.id}::uuid)
+    UPDATE test_participants
+    SET away_count = away_count + 1, away_at = NULL
+    WHERE id = ${p.id}::uuid AND finished_at IS NULL AND away_at IS NOT NULL
+      AND away_at >= NOW() - make_interval(secs => ${AWAY_GRACE_SEC})
+    RETURNING away_count, ROUND(EXTRACT(EPOCH FROM (NOW() - (SELECT away_at FROM old))))::int AS away_sec
+  `;
+  if (forgiven.length > 0) {
+    await broadcast(p.session_id, 'student_back', {
+      userId: p.user_id,
+      awaySec: forgiven[0].away_sec,
+      awayCount: forgiven[0].away_count,
+    });
+    return res.status(200).json({ continue: true, awayCount: forgiven[0].away_count });
+  }
+
+  const finished = await finishParticipantEarly(sql, p.id, 'background');
+  if (!finished) {
+    // Параллельно завершился другим запросом (учитель, автозавершение) — вернуть итог как есть.
+    const [row] = await sql`
+      SELECT answer_count, correct_count, question_order, score, left_reason
+      FROM test_participants WHERE id = ${p.id}::uuid
+    `;
+    return res.status(200).json({ continue: false, ...attemptSummary(row) });
+  }
+  return res.status(200).json({ continue: false, ...attemptSummary(finished) });
+}
+
+/**
+ * POST ?action=leave
+ * Body: { participantId }
+ * Ученик подтвердил «Завершить тест» — результат сразу уходит учителю. Работает и без
+ * exit_control: кнопка завершения есть в любом тесте.
+ */
+async function leaveTest(req, res, sql, userId) {
+  const p = await loadOwnParticipant(req, res, sql, userId);
+  if (!p) return;
+
+  if (p.finished_at) {
+    return res.status(200).json(attemptSummary(p));
+  }
+  if (p.session_status !== 'active') {
+    return res.status(409).json({ error: 'Test not active' });
+  }
+
+  const finished = await finishParticipantEarly(sql, p.id, 'manual');
+  if (!finished) {
+    const [row] = await sql`
+      SELECT answer_count, correct_count, question_order, score, left_reason
+      FROM test_participants WHERE id = ${p.id}::uuid
+    `;
+    return res.status(200).json(attemptSummary(row));
+  }
+  return res.status(200).json(attemptSummary(finished));
+}
+
+/**
+ * POST ?action=reinstate
+ * Body: { sessionId, userId }  — userId ученика (как в monitor/progress_update)
+ * Учитель разрешает продолжить ученику, чья попытка завершилась из-за выхода (ложное
+ * срабатывание: звонок, блокировка телефона, сбой). Ученик продолжит с answer_count.
+ */
+async function reinstateParticipant(req, res, sql, userId) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const { sessionId, userId: studentId } = req.body || {};
+  if (!sessionId || !studentId) {
+    return res.status(400).json({ error: 'sessionId and userId are required' });
+  }
+
+  const session = await sql`
+    SELECT status FROM test_sessions
+    WHERE id = ${sessionId}::uuid AND teacher_id = ${userId}::uuid
+  `;
+  if (session.length === 0) {
+    return res.status(403).json({ error: 'Not authorized' });
+  }
+  if (session[0].status !== 'active') {
+    return res.status(409).json({ error: 'Test not active' });
+  }
+
+  // Только досрочно вышедших (left_reason задан) — обычное завершение (все ответы даны)
+  // этим не откатить. rejoin_allowed — если ученик закрыл приложение, ему нужно снова ввести
+  // код, и join не должен тут же завершить попытку как «перезапуск»; сбрасывается на
+  // следующем ответе.
+  const rows = await sql`
+    UPDATE test_participants
+    SET finished_at = NULL, score = 0, left_reason = NULL, away_at = NULL, rejoin_allowed = true
+    WHERE session_id = ${sessionId}::uuid AND user_id = ${studentId}::uuid
+      AND left_reason IS NOT NULL
+    RETURNING user_id, display_name, answer_count, question_order
+  `;
+  if (rows.length === 0) {
+    return res.status(404).json({ error: 'Participant has not left the test' });
+  }
+  const p = rows[0];
+  const total = p.question_order?.length || 0;
+
+  await broadcast(sessionId, 'reinstated', { userId: p.user_id, answered: p.answer_count });
+  await broadcast(sessionId, 'progress_update', {
+    userId: p.user_id,
+    displayName: p.display_name,
+    answered: p.answer_count,
+    total,
+    done: false,
+    left: false,
+  });
+
+  return res.status(200).json({ ok: true, answered: p.answer_count, total });
 }

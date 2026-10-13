@@ -4,7 +4,7 @@ import { neon } from '@neondatabase/serverless';
  * Версия схемы: при добавлении миграции в applyMigrations увеличить (и дописать файл в
  * database/migrations). Пока в app_migrations есть отметка этой версии, миграции не выполняются.
  */
-const SCHEMA_VERSION = 'schema_024';
+const SCHEMA_VERSION = 'schema_025';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -331,6 +331,19 @@ async function applyMigrations(sql) {
     await sql`ALTER TABLE books ADD COLUMN IF NOT EXISTS student_visible BOOLEAN NOT NULL DEFAULT false`;
   } catch (e) {
     console.error('Migration 024_book_student_visible failed:', e);
+  }
+
+  // Migration 025: контроль выхода из приложения во время живого теста (plan/exam_lockdown.md).
+  // Только добавляем колонки с DEFAULT — старые клиенты и старые INSERT'ы не ломаются.
+  try {
+    await sql`ALTER TABLE test_sessions ADD COLUMN IF NOT EXISTS exit_control BOOLEAN NOT NULL DEFAULT false`;
+    await sql`ALTER TABLE test_participants ADD COLUMN IF NOT EXISTS away_at TIMESTAMPTZ`;
+    await sql`ALTER TABLE test_participants ADD COLUMN IF NOT EXISTS away_count INTEGER NOT NULL DEFAULT 0`;
+    await sql`ALTER TABLE test_participants ADD COLUMN IF NOT EXISTS left_reason VARCHAR(20)`;
+    await sql`ALTER TABLE test_participants ADD COLUMN IF NOT EXISTS client_exit_control BOOLEAN NOT NULL DEFAULT false`;
+    await sql`ALTER TABLE test_participants ADD COLUMN IF NOT EXISTS rejoin_allowed BOOLEAN NOT NULL DEFAULT false`;
+  } catch (e) {
+    console.error('Migration 025_exam_exit_control failed:', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)
