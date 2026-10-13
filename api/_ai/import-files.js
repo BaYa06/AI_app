@@ -1,4 +1,6 @@
 import { MODELS, generateJson, parseJsonObject, sendAiError } from './gemini.js';
+import { consumeRecognition } from './usage.js';
+import { getAuthedUserId } from '../_auth.js';
 
 /**
  * Единый ИИ-импорт: фото, PDF, CSV/TSV и вставленный текст → карточки.
@@ -14,12 +16,16 @@ import { MODELS, generateJson, parseJsonObject, sendAiError } from './gemini.js'
  *   prompt?: string — своя инструкция пользователя, важнее goal
  *   languageFrom?, languageTo?: string — языки набора (изучаемый → перевод)
  *
+ * Нужен Bearer-токен Supabase (гости — анонимные пользователи, токен есть) → иначе 401.
+ * Лимит — 20 распознаваний в день (usage.js) → 429 { error: 'daily_limit', limit, resetAt }.
+ *
  * Response: {
  *   cards: [{ front, back, example?, confidence?: 'low' }],
  *   suggestedTitle, count,
  *   kind: 'vocab' | 'text' | 'exercise' | 'empty' — что на самом деле загрузили,
  *   lang: string | null — язык содержимого (ISO 639-1),
- *   excerpt?: string    — начало текста, когда kind = 'text'
+ *   excerpt?: string    — начало текста, когда kind = 'text',
+ *   usage: { used, limit, resetAt }
  * }
  * При goal = 'vocab' без своей инструкции сплошной текст карточками не становится:
  * возвращаем kind = 'text' и пустой cards — приложение спросит, что из него сделать.
@@ -121,6 +127,20 @@ export default async function handler(req, res) {
   if (invalid === 'too_large') return res.status(413).json({ error: 'too_large' });
   if (invalid) return res.status(400).json({ error: invalid });
 
+  const userId = await getAuthedUserId(req);
+  if (!userId) return res.status(401).json({ error: 'unauthorized' });
+
+  let quota;
+  try {
+    quota = await consumeRecognition(userId);
+  } catch (error) {
+    console.error('[import-files] usage check failed:', error?.message || error);
+    return res.status(500).json({ error: 'Failed to check usage' });
+  }
+  if (!quota.ok) {
+    return res.status(429).json({ error: 'daily_limit', limit: quota.usage.limit, resetAt: quota.usage.resetAt });
+  }
+
   const goal = GOALS.has(rawGoal) ? rawGoal : 'vocab';
   const level = LEVELS.has(rawLevel) ? rawLevel : 'B1';
   const userPrompt = typeof prompt === 'string' ? prompt.trim().slice(0, 500) : '';
@@ -162,6 +182,10 @@ export default async function handler(req, res) {
     const suggestedTitle = typeof parsed.title === 'string' ? parsed.title.trim() : '';
     const excerpt = kind === 'text' && typeof parsed.excerpt === 'string' ? parsed.excerpt.trim().slice(0, 300) : undefined;
 
+    // Ничего не нашли (текст, упражнение, пусто) — распознавание не засчитываем:
+    // следующим запросом пользователь выберет, что делать с текстом
+    if (cards.length === 0) await quota.refund();
+
     console.log(`[import-files] files=${files.length} goal=${goal} kind=${kind} lang=${lang} cards=${cards.length}`);
 
     return res.status(200).json({
@@ -171,8 +195,10 @@ export default async function handler(req, res) {
       kind,
       lang,
       ...(excerpt ? { excerpt } : {}),
+      usage: quota.usage,
     });
   } catch (error) {
+    await quota.refund();
     return sendAiError(res, error, 'Failed to generate cards');
   }
 }

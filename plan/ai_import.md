@@ -105,12 +105,17 @@ A. Старт ── «Примеры →» ──► Что понимает И
     Своя инструкция `prompt` (до 500 символов) важнее `goal`.
   - `extract-image` / `extract-pdf` не трогаем: новый экран ходит только в `import-files`, старые — для старых версий.
 
-- [ ] **AI 3. Лимит 20 распознаваний в день.** `api/_db-init.js`, `api/_ai/usage.js`, `api/ai.js`.
-  - Таблица `ai_usage (user_id, day, count)`, PK `(user_id, day)`; день — по UTC.
-  - `import-files`, `extract-image`, `extract-pdf`: если есть Bearer-токен (`getAuthedUserId`) —
-    проверить и увеличить счётчик; при превышении `429 { error: 'daily_limit', limit, resetAt }`.
-    Без токена — как раньше.
-  - Новое `fn=usage` → `{ used, limit, resetAt }`; те же поля `usage` в ответах распознавания.
+- [x] **AI 3. Лимит 20 распознаваний в день.** `api/_ai/usage.js`, `api/_ai/import-files.js`, `api/ai.js`.
+  - Без новой таблицы и миграции: счётчик в существующей `api_rate_limits` (общая с test/teacher,
+    уже чистится при удалении аккаунта), `action = 'ai-recognize'`, окно — сутки по UTC.
+    Списание атомарное (`ON CONFLICT … DO UPDATE … WHERE attempts < limit`), проверено на Postgres.
+  - `import-files` требует Bearer-токен (у гостей — анонимный пользователь Supabase) → иначе 401.
+    Старых клиентов у этого адреса нет, поэтому совместимость не страдает.
+  - Превышение → `429 { error: 'daily_limit', limit, resetAt }`. Распознавание возвращается, если ИИ
+    упал или не нашёл ни одной карточки (текст/упражнение/пусто — следующим запросом выберут цель).
+  - `fn=usage` → `{ used, limit, resetAt }`; то же `usage` в ответе `import-files`.
+  - `extract-image` / `extract-pdf` не считаются: их зовут только старые клиенты, без токена.
+  - Лимит меняется env `AI_DAILY_LIMIT` (по умолчанию 20).
 
 ### Приложение
 
