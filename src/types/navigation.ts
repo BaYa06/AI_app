@@ -213,6 +213,15 @@ export type RootStackParamList = {
     // Попытка завершена досрочно: вышел из приложения, перезапустил его или нажал «Завершить»
     leftReason?: 'manual' | 'background' | 'relaunch';
     answered?: number;
+    // Куда вернуться, если учитель разрешит продолжить (только при leftReason)
+    resume?: {
+      sessionId: string;
+      participantId: string;
+      testMode: string;
+      questionCount: number;
+      timePerQuestion: number;
+      exitControl?: boolean;
+    };
     answers?: Array<{
       word: string;
       yourAnswer: string;

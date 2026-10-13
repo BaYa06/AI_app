@@ -2,7 +2,7 @@
  * Test Done Screen
  * @description Экран результатов ученика после завершения теста
  */
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import {
@@ -15,11 +15,13 @@ import {
   LogOut,
 } from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { Button, Card, CelebrationIcon, Screen, ScreenHeader, type CelebrationKind } from '@/components/ui';
+import { Button, Card, CelebrationIcon, Screen, ScreenHeader, toast, type CelebrationKind } from '@/components/ui';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha, iconSize, typography } from '@/constants';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
+import { supabase } from '@/services/supabaseClient';
+import { API_BASE } from '@/config/apiBase';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TestDone'>;
 
@@ -27,7 +29,48 @@ type Props = NativeStackScreenProps<RootStackParamList, 'TestDone'>;
 export function TestDoneScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
 
-  const { correct, total, answers = [], leftReason, answered } = route.params;
+  const { correct, total, answers = [], leftReason, answered, resume } = route.params;
+
+  // Учитель может разрешить продолжить (ложное срабатывание: звонок, блокировка телефона).
+  // Realtime здесь не используем: канал `test:${sessionId}` общий с другими экранами теста, и
+  // supabase-js отдаёт на одно имя один объект — чужая отписка сняла бы и нашу. Опрос monitor
+  // раз в 3 с, пока тест идёт: своя строка снова не done → вернуться к вопросу answered.
+  useEffect(() => {
+    if (!leftReason || !resume) return;
+    let cancelled = false;
+
+    const check = async () => {
+      try {
+        const { data: authData } = await supabase.auth.getSession();
+        const session = authData.session;
+        if (!session || cancelled) return;
+        const resp = await fetch(`${API_BASE}/test?action=monitor&sessionId=${resume.sessionId}`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (!resp.ok || cancelled) return;
+        const data = await resp.json();
+        if (cancelled) return;
+        if (data.status !== 'active') {
+          cancelled = true;
+          clearInterval(interval);
+          return;
+        }
+        const me = (data.participants || []).find((p: any) => p.userId === session.user.id);
+        if (me && !me.done) {
+          cancelled = true;
+          clearInterval(interval);
+          toast.success('Учитель разрешил продолжить');
+          navigation.replace('TestExam', { ...resume, initialQuestionIndex: me.answered });
+        }
+      } catch {}
+    };
+
+    const interval = setInterval(check, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [leftReason, resume, navigation]);
   const wrong = total - correct;
   const percent = total > 0 ? Math.round((correct / total) * 100) : 0;
 

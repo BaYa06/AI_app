@@ -124,6 +124,14 @@ export function TestJoinScreen({ navigation, route }: Props) {
             total: result.total ?? result.questionCount,
             answered: result.answered ?? result.answerCount,
             leftReason: result.leftReason,
+            resume: {
+              sessionId: result.sessionId,
+              participantId: result.participantId,
+              testMode: result.testMode,
+              questionCount: result.questionCount,
+              timePerQuestion: result.timePerQuestion,
+              exitControl: result.exitControl === true,
+            },
           };
           if (isTab) {
             resetForm();

@@ -2,16 +2,16 @@
  * Test Waiting Screen
  * @description Экран ожидания ученика — ждёт пока учитель запустит тест
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   StyleSheet,
   Animated,
   Easing,
 } from 'react-native';
-import { BookOpen, Play } from 'lucide-react-native';
+import { BookOpen, Play, ShieldAlert } from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { Badge, Card, Screen, ScreenHeader } from '@/components/ui';
+import { Badge, Button, Card, Screen, ScreenHeader } from '@/components/ui';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha, iconSize, type ColorToken } from '@/constants';
 import { supabase } from '@/services/supabaseClient';
@@ -40,6 +40,37 @@ export function TestWaitingScreen({ navigation, route }: Props) {
   const { sessionId, participantId, setTitle, testMode, questionCount, timePerQuestion, exitControl } = route.params;
 
   const [participants, setParticipants] = useState<Participant[]>([]);
+
+  // Контроль выхода (plan/exam_lockdown.md): тест открывается только после «Понятно» под
+  // правилами. Учитель может запустить тест раньше — тогда ждём нажатия здесь.
+  const [rulesAccepted, setRulesAccepted] = useState(exitControl !== true);
+  const [testStarted, setTestStarted] = useState(false);
+  const rulesAcceptedRef = useRef(rulesAccepted);
+  const navigatedRef = useRef(false);
+
+  const openExam = useCallback(() => {
+    if (navigatedRef.current) return;
+    navigatedRef.current = true;
+    navigation.replace('TestExam', {
+      sessionId,
+      participantId,
+      testMode,
+      questionCount,
+      timePerQuestion,
+      exitControl,
+    });
+  }, [navigation, sessionId, participantId, testMode, questionCount, timePerQuestion, exitControl]);
+
+  const onTestStarted = useCallback(() => {
+    if (rulesAcceptedRef.current) openExam();
+    else setTestStarted(true);
+  }, [openExam]);
+
+  const acceptRules = () => {
+    rulesAcceptedRef.current = true;
+    setRulesAccepted(true);
+    if (testStarted) openExam();
+  };
 
   // Загрузить начальный список участников
   useEffect(() => {
@@ -95,14 +126,7 @@ export function TestWaitingScreen({ navigation, route }: Props) {
         const data = await resp.json();
         if (cancelled) return;
         if (data.status === 'active') {
-          navigation.replace('TestExam', {
-            sessionId,
-            participantId,
-            testMode,
-            questionCount,
-            timePerQuestion,
-            exitControl,
-          });
+          onTestStarted();
         } else if (data.status === 'finished') {
           navigation.navigate('Main' as any);
         }
@@ -115,23 +139,14 @@ export function TestWaitingScreen({ navigation, route }: Props) {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [sessionId, participantId, testMode, questionCount, timePerQuestion, exitControl]);
+  }, [sessionId, onTestStarted]);
 
   // Realtime: мгновенный старт (без ожидания следующего polling)
   useEffect(() => {
     const channel = supabase.channel(`test:${sessionId}`);
 
     channel
-      .on('broadcast', { event: 'test_started' }, () => {
-        navigation.replace('TestExam', {
-          sessionId,
-          participantId,
-          testMode,
-          questionCount,
-          timePerQuestion,
-          exitControl,
-        });
-      })
+      .on('broadcast', { event: 'test_started' }, onTestStarted)
       .on('broadcast', { event: 'test_finished' }, () => {
         navigation.navigate('Main' as any);
       })
@@ -147,7 +162,7 @@ export function TestWaitingScreen({ navigation, route }: Props) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [sessionId, participantId, testMode, questionCount, timePerQuestion, exitControl]);
+  }, [sessionId, onTestStarted]);
 
   useEffect(() => {
     // Pulse
@@ -224,7 +239,7 @@ export function TestWaitingScreen({ navigation, route }: Props) {
 
   return (
     <Screen
-      scroll={false}
+      scroll={exitControl === true}
       header={<ScreenHeader title="Ожидание теста" onBack={() => navigation.goBack()} />}
     >
       {/* Main Content */}
@@ -258,11 +273,34 @@ export function TestWaitingScreen({ navigation, route }: Props) {
 
         {/* Title */}
         <Text variant="h2" style={[styles.title, { color: colors.textPrimary }]}>
-          Приготовься!
+          {testStarted ? 'Тест начался!' : 'Приготовься!'}
         </Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          Тест скоро начнётся
+          {testStarted ? 'Прочитай правила и нажми «Понятно»' : 'Тест скоро начнётся'}
         </Text>
+
+        {/* Правила контроля выхода */}
+        {exitControl === true && (
+          <Card style={[styles.rulesCard, !rulesAccepted && { borderColor: colors.warning }]}>
+            <View style={styles.rulesTitleRow}>
+              <ShieldAlert size={iconSize.s} color={colors.warningText} />
+              <Text variant="label" accessibilityRole="header" style={{ color: colors.textPrimary }}>
+                Контролируемый режим
+              </Text>
+            </View>
+            <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
+              Не сворачивай приложение и не открывай другие. Если выйти из приложения во время
+              теста, он завершится, и результат сразу уйдёт учителю.
+            </Text>
+            {rulesAccepted ? (
+              <Text variant="caption" style={{ color: colors.successText }}>
+                Правила приняты
+              </Text>
+            ) : (
+              <Button title="Понятно" fullWidth onPress={acceptRules} />
+            )}
+          </Card>
+        )}
 
         {/* Set Info Card */}
         <Card padding="none" style={styles.card}>
@@ -377,6 +415,15 @@ export function TestWaitingScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
+  rulesCard: {
+    alignSelf: 'stretch',
+    gap: spacing.xs,
+  },
+  rulesTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   content: {
     flex: 1,
     alignItems: 'center',

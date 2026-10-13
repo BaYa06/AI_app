@@ -7,14 +7,16 @@ import {
   View,
   StyleSheet,
   Pressable,
+  BackHandler,
+  Platform,
 } from 'react-native';
 import { useKeepAwake } from '@sayem314/react-native-keep-awake';
-import { Maximize2 } from 'lucide-react-native';
+import { Maximize2, ShieldCheck } from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { Button, Card, ProgressBar, Screen, Skeleton, SkeletonCard } from '@/components/ui';
+import { Button, Card, ProgressBar, Screen, Skeleton, SkeletonCard, confirmDialog, toast } from '@/components/ui';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha, heights, screenPadding, iconSize } from '@/constants';
-import { useExamExitGuard, type ExamAttemptSummary } from '@/hooks/useExamExitGuard';
+import { useExamExitGuard, leaveExam, type ExamAttemptSummary } from '@/hooks/useExamExitGuard';
 import { supabase } from '@/services/supabaseClient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
@@ -42,7 +44,7 @@ type AnswerRecord = {
 export function TestExamScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
 
-  const { sessionId, participantId, questionCount, timePerQuestion, initialQuestionIndex, exitControl } = route.params;
+  const { sessionId, participantId, testMode, questionCount, timePerQuestion, initialQuestionIndex, exitControl } = route.params;
 
   // Экран не гаснет во время теста: автоблокировка при контроле выхода считалась бы выходом,
   // да и без него неприятно на вопросе без таймера.
@@ -81,14 +83,70 @@ export function TestExamScreen({ navigation, route }: Props) {
       total: summary.total || questionCount,
       answered: summary.answered,
       leftReason: summary.leftReason ?? 'background',
+      // Учитель может разрешить продолжить — TestDone вернёт сюда с того же вопроса
+      resume: { sessionId, participantId, testMode, questionCount, timePerQuestion, exitControl },
     });
-  }, [navigation, questionCount]);
+  }, [navigation, sessionId, participantId, testMode, questionCount, timePerQuestion, exitControl]);
 
   const { splitView, checking } = useExamExitGuard({
     participantId,
     enabled: exitControl === true,
     onLeft: finishLeft,
   });
+
+  // «Завершить тест?» — кнопка в шапке, «Назад» на Android и любая попытка уйти с экрана
+  // навигацией (plan/exam_lockdown.md, Exam 3). Выход из самого приложения перехватить нельзя —
+  // его ловит useExamExitGuard.
+  const questionIndexRef = useRef(questionIndex);
+  questionIndexRef.current = questionIndex;
+  const confirmingRef = useRef(false);
+
+  const confirmLeave = useCallback(async (source: 'button' | 'back') => {
+    if (finishedRef.current || confirmingRef.current) return;
+    confirmingRef.current = true;
+    try {
+      const answered = questionIndexRef.current;
+      const ok = await confirmDialog({
+        title: 'Завершить тест?',
+        message:
+          `Ты ответил на ${answered} из ${questionCount}. Неотвеченные вопросы засчитаются как неверные.\n\n` +
+          'Результат сразу отправится учителю, вернуться к тесту будет нельзя.',
+        confirmText: 'Завершить',
+        cancelText: 'Продолжить тест',
+        destructive: true,
+      });
+      if (!ok) return;
+      try {
+        const summary = await leaveExam(participantId);
+        finishLeft({ ...summary, leftReason: 'manual' });
+        // Android: «Назад» → «Завершить» закрывает приложение, как и просили; итог уже у учителя.
+        if (source === 'back' && Platform.OS === 'android') BackHandler.exitApp();
+      } catch (e) {
+        console.error('leave error:', e);
+        toast.error('Не удалось завершить тест. Проверь интернет и попробуй ещё раз.');
+      }
+    } finally {
+      confirmingRef.current = false;
+    }
+  }, [participantId, questionCount, finishLeft]);
+
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      confirmLeave('back');
+      return true;
+    });
+    // Уход с экрана навигацией (веб — кнопка «Назад» браузера). Переходы на итоги идут через
+    // replace после finishedRef = true — их не трогаем.
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (finishedRef.current) return;
+      e.preventDefault();
+      confirmLeave('button');
+    });
+    return () => {
+      sub.remove();
+      unsubscribe();
+    };
+  }, [navigation, confirmLeave]);
 
   const fetchQuestion = useCallback(async (idx: number) => {
     setLoadingQuestion(true);
@@ -252,26 +310,44 @@ export function TestExamScreen({ navigation, route }: Props) {
             <Text variant="label" style={[styles.tabular, { color: colors.textSecondary }]}>
               {questionIndex + 1} / {questionCount}
             </Text>
-            {timePerQuestion > 0 && (
-              <View
-                accessibilityLabel={`Осталось ${timeLeft} секунд`}
-                style={[
-                  styles.timerBadge,
-                  { backgroundColor: alpha(timerUrgent ? colors.error : colors.primary, 10) },
-                ]}
-              >
-                <Text
-                  variant="label"
-                  style={[styles.timerText, { color: timerUrgent ? colors.errorText : colors.primary }]}
+            <View style={styles.headerRight}>
+              {timePerQuestion > 0 && (
+                <View
+                  accessibilityLabel={`Осталось ${timeLeft} секунд`}
+                  style={[
+                    styles.timerBadge,
+                    { backgroundColor: alpha(timerUrgent ? colors.error : colors.primary, 10) },
+                  ]}
                 >
-                  {timeLeft} с
-                </Text>
-              </View>
-            )}
+                  <Text
+                    variant="label"
+                    style={[styles.timerText, { color: timerUrgent ? colors.errorText : colors.primary }]}
+                  >
+                    {timeLeft} с
+                  </Text>
+                </View>
+              )}
+              <Button
+                title="Завершить"
+                variant="quiet"
+                size="s"
+                onPress={() => confirmLeave('button')}
+              />
+            </View>
           </View>
 
           {/* Progress bar */}
           <ProgressBar progress={Math.round(progress * 100)} accessibilityLabel="Прогресс теста" />
+
+          {/* Постоянное напоминание о контроле выхода */}
+          {exitControl === true && (
+            <View style={styles.exitControlRow} accessibilityRole="text">
+              <ShieldCheck size={iconSize.xs} color={colors.textSecondary} />
+              <Text variant="caption" style={{ color: colors.textSecondary }}>
+                Контролируемый режим: не выходи из приложения
+              </Text>
+            </View>
+          )}
         </View>
       }
       contentStyle={styles.scroll}
@@ -389,6 +465,16 @@ const styles = StyleSheet.create({
   },
   tabular: {
     fontVariant: ['tabular-nums'],
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  exitControlRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxs,
   },
   timerBadge: {
     paddingHorizontal: spacing.s,

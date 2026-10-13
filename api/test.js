@@ -133,12 +133,15 @@ async function generateUniqueCode(sql) {
   throw new Error('Could not generate unique code');
 }
 
-/** Отправить broadcast-событие в Supabase Realtime */
-async function broadcast(sessionId, event, payload) {
+/**
+ * Отправить broadcast-событие в Supabase Realtime. topicSuffix — для канала экрана теста
+ * ученика (`:exam`, см. broadcastTestFinished).
+ */
+async function broadcast(sessionId, event, payload, topicSuffix = '') {
   return new Promise((resolve) => {
     try {
       const supabase = getSupabase();
-      const channel = supabase.channel(`test:${sessionId}`);
+      const channel = supabase.channel(`test:${sessionId}${topicSuffix}`);
 
       const timeout = setTimeout(() => {
         console.error(`Broadcast ${event} timed out`);
@@ -203,10 +206,25 @@ async function autoFinishIfStale(sql, sessionId, session) {
     RETURNING status, started_at, time_per_question, question_count, teacher_id
   `;
   if (updated.length > 0) {
-    await broadcast(sessionId, 'test_finished', { finishedAt: new Date().toISOString() });
+    await broadcastTestFinished(sessionId);
     return updated[0];
   }
   return session;
+}
+
+/**
+ * test_finished — и в общий канал (учитель, экран ожидания), и в `test:${id}:exam`, который
+ * слушает экран теста ученика. Экран теста не может подписаться на общий канал: supabase-js
+ * отдаёт на одно имя один объект, и отписка экрана ожидания при переходе сняла бы подписку
+ * экрана теста. Раньше событие в `:exam` не отправлялось вовсе, и ученик не узнавал, что
+ * учитель завершил тест (plan/exam_lockdown.md, Exam 3).
+ */
+async function broadcastTestFinished(sessionId) {
+  const payload = { finishedAt: new Date().toISOString() };
+  await Promise.all([
+    broadcast(sessionId, 'test_finished', payload),
+    broadcast(sessionId, 'test_finished', payload, ':exam'),
+  ]);
 }
 
 /** Перемешать массив (Fisher-Yates) */
@@ -675,7 +693,7 @@ async function finishTest(req, res, sql, userId) {
     WHERE id = ${sessionId}::uuid
   `;
 
-  await broadcast(sessionId, 'test_finished', { finishedAt: new Date().toISOString() });
+  await broadcastTestFinished(sessionId);
 
   return res.status(200).json({ ok: true });
 }
