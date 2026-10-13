@@ -1,4 +1,5 @@
 import { GoogleGenAI, ThinkingLevel } from '@google/genai';
+import { GROQ_MODELS, groqGenerate, isGroqEnabled } from './groq.js';
 
 /**
  * Общий клиент Gemini для AI-эндпоинтов (Google AI Studio, ключ GEMINI_API_KEY).
@@ -34,6 +35,9 @@ const TIMEOUT_MS = 90_000;
 const ATTEMPT_MS = 35_000;
 // Меньше этого на следующую модель не остаётся смысла пробовать
 const MIN_ATTEMPT_MS = 5_000;
+// Сколько оставить резерву Groq (текстовые задачи): он быстрый, 1–3 с на ответ
+const GROQ_RESERVE_MS = 20_000;
+const GROQ_ATTEMPT_MS = 15_000;
 
 let client = null;
 
@@ -58,9 +62,10 @@ function isRetryable(error) {
 }
 
 /**
- * Запрос к Gemini с ответом в JSON. Возвращает текст ответа.
- * models — список моделей по приоритету (MODELS.vision / MODELS.text);
+ * Запрос к ИИ с ответом в JSON. Возвращает текст ответа.
+ * models — модели Gemini по приоритету (MODELS.vision / MODELS.text);
  * prompt — строка; files — необязательные [{ mimeType, data(base64) }] перед текстом.
+ * Все модели Gemini перегружены и файлов нет → резерв Groq (если задан GROQ_API_KEY).
  */
 export async function generateJson({ models, prompt, files = [], temperature, maxOutputTokens }) {
   const parts = [
@@ -68,10 +73,13 @@ export async function generateJson({ models, prompt, files = [], temperature, ma
     { text: prompt },
   ];
   const deadline = Date.now() + TIMEOUT_MS;
+  // Фото и PDF Groq не принимает — резерв только для текста
+  const useGroq = files.length === 0 && isGroqEnabled();
+  const geminiDeadline = useGroq ? deadline - GROQ_RESERVE_MS : deadline;
 
   let lastError = null;
   for (const [index, model] of models.entries()) {
-    const remaining = deadline - Date.now();
+    const remaining = geminiDeadline - Date.now();
     if (remaining < MIN_ATTEMPT_MS) break;
     const isLast = index === models.length - 1;
     const attemptMs = isLast ? remaining : Math.min(remaining, ATTEMPT_MS);
@@ -95,6 +103,25 @@ export async function generateJson({ models, prompt, files = [], temperature, ma
       console.warn(`[gemini] ${model} → ${isTimeout(error) ? 'timeout' : errorStatus(error)}, пробуем следующую модель`);
     }
   }
+
+  if (useGroq) {
+    for (const model of GROQ_MODELS) {
+      const remaining = deadline - Date.now();
+      if (remaining < MIN_ATTEMPT_MS) break;
+      try {
+        const text = await groqGenerate({
+          model, prompt, temperature, maxOutputTokens, timeoutMs: Math.min(remaining, GROQ_ATTEMPT_MS),
+        });
+        console.warn(`[gemini] все модели заняты — ответил резерв Groq ${model}`);
+        return text;
+      } catch (error) {
+        // Последний резерв: любая ошибка (квота, 413 «больше поминутного лимита токенов»,
+        // снятая с поддержки модель) — пробуем следующую; в ответ уйдёт ошибка Gemini
+        console.warn(`[groq] ${model} → ${isTimeout(error) ? 'timeout' : errorStatus(error)}, пробуем следующую модель`);
+      }
+    }
+  }
+
   throw lastError || Object.assign(new Error('timeout'), { name: 'TimeoutError' });
 }
 

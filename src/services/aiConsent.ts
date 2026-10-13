@@ -19,8 +19,9 @@ const AI_CONSENT_KEY = 'ai_consent_granted_v2';
 const TITLE = 'Отправить данные в ИИ?';
 const MESSAGE =
   'Чтобы создать карточки, перевод или примеры, Flashly отправит выбранные фото, PDF, файлы ' +
-  'или слова в Google Gemini. Google может использовать эти данные для улучшения своих ' +
-  'моделей — не отправляй личные данные. Отозвать разрешение можно в профиле.';
+  'или слова в Google Gemini (если он перегружен — слова и текст в запасной сервис Groq). ' +
+  'Google может использовать эти данные для улучшения своих моделей — не отправляй личные ' +
+  'данные. Отозвать разрешение можно в профиле.';
 
 export function hasAiConsent(): boolean {
   return StorageService.getBoolean(AI_CONSENT_KEY) === true;
