@@ -12,13 +12,15 @@ import { Alert, Linking, Platform } from 'react-native';
 import { StorageService } from './StorageService';
 import { PRIVACY_POLICY_URL } from '@/config/legal';
 
-const AI_CONSENT_KEY = 'ai_consent_granted';
+// v2: ИИ переехал на бесплатный Gemini API, где Google может использовать данные для улучшения
+// моделей, — старое согласие давали на другое условие, поэтому спрашиваем заново
+const AI_CONSENT_KEY = 'ai_consent_granted_v2';
 
 const TITLE = 'Отправить данные в ИИ?';
 const MESSAGE =
   'Чтобы создать карточки, перевод или примеры, Flashly отправит выбранные фото, PDF, файлы ' +
-  'или слова в Google Gemini (Google Cloud). Google обрабатывает их только для ответа ' +
-  'и не использует для обучения моделей. Отозвать разрешение можно в профиле.';
+  'или слова в Google Gemini. Google может использовать эти данные для улучшения своих ' +
+  'моделей — не отправляй личные данные. Отозвать разрешение можно в профиле.';
 
 export function hasAiConsent(): boolean {
   return StorageService.getBoolean(AI_CONSENT_KEY) === true;

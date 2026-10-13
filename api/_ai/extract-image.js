@@ -1,33 +1,12 @@
-import { VertexAI } from '@google-cloud/vertexai';
+import { MODELS, generateJson, parseJsonArray, sendAiError } from './gemini.js';
 
 /**
- * API для извлечения карточек из фото через Gemini (Vertex AI)
+ * API для извлечения карточек из фото через Gemini (Google AI Studio)
  * Endpoint: /api/extract-image
  *
  * POST body: { base64: string, mimeType: string, languageFrom?: string, languageTo?: string }
  * Response:  { cards: [{ front: string, back: string }] }
  */
-
-function getVertexClient() {
-  const saKey = process.env.VERTEX_SA_KEY;
-  const project = process.env.GOOGLE_CLOUD_PROJECT_ID || 'flashly-485417';
-  const location = process.env.VERTEX_AI_LOCATION || 'us-central1';
-
-  if (!saKey) {
-    throw new Error('VERTEX_SA_KEY environment variable is not set');
-  }
-
-  const options = { project, location };
-
-  try {
-    const credentials = JSON.parse(saKey);
-    options.googleAuthOptions = { credentials };
-  } catch {
-    throw new Error('Failed to parse VERTEX_SA_KEY as JSON');
-  }
-
-  return new VertexAI(options);
-}
 
 // ~4MB base64 limit (~3MB raw file) — Vercel body limit is 4.5MB
 const MAX_BASE64_LENGTH = 5_500_000;
@@ -64,17 +43,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    const vertexAI = getVertexClient();
-    const model = process.env.VERTEX_AI_MODEL || 'gemini-2.0-flash-001';
-
-    const generativeModel = vertexAI.getGenerativeModel({
-      model,
-      generationConfig: {
-        temperature: 0.2,
-        maxOutputTokens: 8192,
-      },
-    });
-
     const langFrom = languageFrom || 'the language being learned';
     const langTo = languageTo || 'the translation language';
 
@@ -98,32 +66,14 @@ Return ONLY a valid JSON array of objects with "front" and "back" fields. No exp
 Example: [{"front": "der Abschnitt", "back": "раздел"}, {"front": "sterben", "back": "умирать"}]
 Example with no translations: [{"front": "der Abschnitt", "back": ""}, {"front": "sterben", "back": ""}]`;
 
-    const result = await generativeModel.generateContent({
-      contents: [{
-        role: 'user',
-        parts: [
-          {
-            inlineData: {
-              mimeType,
-              data: base64,
-            },
-          },
-          { text: prompt },
-        ],
-      }],
+    const text = await generateJson({
+      model: MODELS.vision,
+      prompt,
+      files: [{ mimeType, data: base64 }],
+      temperature: 0.2,
+      maxOutputTokens: 8192,
     });
-
-    const response = result.response;
-    const text = response.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
-
-    let cards;
-    try {
-      const jsonMatch = text.match(/\[[\s\S]*\]/);
-      cards = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
-    } catch {
-      console.error('Failed to parse Gemini response:', text);
-      cards = [];
-    }
+    const cards = parseJsonArray(text);
 
     // Validate and clean cards — back can be empty for image imports
     const validCards = cards
@@ -132,8 +82,6 @@ Example with no translations: [{"front": "der Abschnitt", "back": ""}, {"front":
 
     return res.status(200).json({ cards: validCards });
   } catch (error) {
-    console.error('Gemini image extraction error:', error?.message || error);
-    const message = error?.message || 'Unknown error';
-    return res.status(500).json({ error: 'Failed to extract cards from image: ' + message });
+    return sendAiError(res, error, 'Failed to extract cards from image');
   }
 }

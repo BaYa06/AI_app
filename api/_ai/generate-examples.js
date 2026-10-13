@@ -1,33 +1,12 @@
-import { VertexAI } from '@google-cloud/vertexai';
+import { MODELS, generateJson, parseJsonArray, sendAiError } from './gemini.js';
 
 /**
- * API для генерации примеров через Gemini (Vertex AI)
+ * API для генерации примеров через Gemini (Google AI Studio)
  * Endpoint: /api/generate-examples
  *
  * POST body: { words: [{ front: string, back: string }] }
  * Response:  { examples: [{ front, back, example }] }
  */
-
-function getVertexClient() {
-  // Для Vercel: credentials через env-переменную (JSON-строка)
-  const saKey = process.env.VERTEX_SA_KEY;
-  const project = process.env.GOOGLE_CLOUD_PROJECT_ID || 'flashly-485417';
-  const location = process.env.VERTEX_AI_LOCATION || 'us-central1';
-
-  const options = { project, location };
-
-  if (saKey) {
-    try {
-      const credentials = JSON.parse(saKey);
-      options.googleAuthOptions = { credentials };
-    } catch {
-      console.error('Failed to parse VERTEX_SA_KEY');
-    }
-  }
-  // Локально: подхватит GOOGLE_APPLICATION_CREDENTIALS автоматически
-
-  return new VertexAI(options);
-}
 
 export default async function handler(req, res) {
   // CORS
@@ -54,17 +33,6 @@ export default async function handler(req, res) {
   const batch = words.slice(0, 100);
 
   try {
-    const vertexAI = getVertexClient();
-    const model = process.env.VERTEX_AI_MODEL || 'gemini-2.0-flash-001';
-
-    const generativeModel = vertexAI.getGenerativeModel({
-      model,
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 4096,
-      },
-    });
-
     // Формируем список слов для промпта
     const wordList = batch
       .map((w, i) => `${i + 1}. ${w.front} — ${w.back}`)
@@ -96,19 +64,9 @@ Reply ONLY with a JSON array of objects. Each object must have:
 No extra text. Example format:
 [{"word": "gehen", "example": "Ich muss morgen früh zur Schule gehen.", "wordForm": "gehen", "wordType": "verb"}, {"word": "Hund", "example": "Mein Nachbar hat zwei kleine Hunde gekauft.", "wordForm": "Hunde", "wordType": "noun"}]`;
 
-    const result = await generativeModel.generateContent(prompt);
-    const response = result.response;
-    const text = response.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
-
-    // Извлекаем JSON из ответа (Gemini иногда оборачивает в ```json ... ```)
-    let examples;
-    try {
-      const jsonMatch = text.match(/\[[\s\S]*\]/);
-      examples = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
-    } catch {
-      console.error('Failed to parse Gemini response:', text);
-      examples = [];
-    }
+    // 100 слов × ~25 токенов на пример — 4096 впритык, берём с запасом
+    const text = await generateJson({ model: MODELS.text, prompt, temperature: 0.7, maxOutputTokens: 8192 });
+    const examples = parseJsonArray(text);
 
     const VALID_WORD_TYPES = ['noun', 'verb', 'adjective', 'adverb', 'other'];
 
@@ -148,7 +106,6 @@ No extra text. Example format:
 
     return res.status(200).json({ examples: result_words });
   } catch (error) {
-    console.error('Gemini API error:', error);
-    return res.status(500).json({ error: 'Failed to generate examples: ' + error.message });
+    return sendAiError(res, error, 'Failed to generate examples');
   }
 }
