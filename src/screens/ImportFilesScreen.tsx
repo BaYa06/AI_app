@@ -3,23 +3,31 @@
  * Единый экран ИИ-импорта: камера, галерея, файл (PDF/CSV/TSV/TXT) или вставленный текст +
  * что сделать (слова с переводом / слова из текста / термины / вопрос-ответ).
  * Простые таблицы «слово — перевод» разбираем сами, без ИИ и без расхода дневного лимита.
+ * AI 5: во время запроса — экран шагов с отменой; ошибки — полноэкранные состояния
+ * (перегружен → автоповтор, лимит, нет связи); распознанное хранится в черновике до добавления.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
+  AlertTriangle,
   Camera,
   Check,
   ClipboardPaste,
+  Clock,
   FileText,
+  History,
   Images,
   Sparkles,
   Table,
+  WifiOff,
   X,
 } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import { Button, Chip, ScreenHeader, TextField, toast, useScreenBottomInset } from '@/components/ui';
 import type { IconComponent } from '@/components/ui';
 import { ImportGuideSheet } from '@/components/import/ImportGuideSheet';
+import { ImportProcessing } from '@/components/import/ImportProcessing';
+import { ImportStatus, statusStyles } from '@/components/import/ImportStatus';
 import { useSetsStore, useThemeColors } from '@/store';
 import { alpha, borderRadius, iconSize, screenPadding, spacing } from '@/constants';
 import type { RootStackScreenProps } from '@/types/navigation';
@@ -37,10 +45,21 @@ import {
 } from '@/services/AiImportService';
 import { PickError, pickDocuments, pickFromCamera, pickFromGallery } from '@/utils/importPicker';
 import { parseWordTable } from '@/utils/parseWordTable';
+import { pluralize } from '@/utils';
+import { clearImportDraft, getImportDraft, saveImportDraft, type ImportDraft } from '@/services/importDraft';
 
 type Props = RootStackScreenProps<'ImportFiles'>;
 /** Выбор файлов: готовые к отправке файлы или null, если пользователь отменил */
 type FilePicker = typeof pickFromCamera;
+
+type Phase =
+  | { name: 'form' }
+  | { name: 'processing' }
+  | { name: 'error'; error: AiImportError };
+
+/** Сколько раз повторять автоматически, когда ИИ перегружен, — дальше только по кнопке */
+const MAX_AUTO_RETRIES = 2;
+const RETRY_DELAY_SEC = 20;
 
 const GOALS: Array<{ goal: ImportGoal; label: string }> = [
   { goal: 'vocab', label: 'Слова с переводом' },
@@ -64,19 +83,6 @@ function formatResetTime(resetAt?: string): string {
   return Number.isNaN(date.getTime())
     ? 'завтра'
     : `в ${date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
-}
-
-/** Понятный текст ошибки ИИ-импорта (подробные экраны ошибок — AI 5) */
-function errorMessage(error: unknown): string {
-  if (error instanceof AiImportError) {
-    switch (error.code) {
-      case 'ai_busy': return 'ИИ сейчас перегружен. Попробуй через минуту';
-      case 'daily_limit': return `Распознавания на сегодня закончились. Новые — ${formatResetTime(error.resetAt)}`;
-      case 'too_large': return 'Слишком много за раз — максимум ~3 МБ. Убери пару фото';
-      default: return error.message;
-    }
-  }
-  return 'Не удалось создать карточки. Попробуй ещё раз';
 }
 
 // ─── Плитка источника ─────────────────────────────────────────────────────────
@@ -135,12 +141,22 @@ export function ImportFilesScreen({ navigation, route }: Props) {
   const [promptOpen, setPromptOpen] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [guideOpen, setGuideOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [usage, setUsage] = useState<AiUsage | null>(null);
+  const [phase, setPhase] = useState<Phase>({ name: 'form' });
+  const [draft, setDraft] = useState<ImportDraft | null>(() => getImportDraft(setId));
+  const [retryIn, setRetryIn] = useState(0);
+  const abortRef = useRef<AbortController | null>(null);
+  const autoRetriesRef = useRef(0);
 
   useEffect(() => {
     getAiUsage().then(setUsage);
   }, []);
+
+  // Вернулись с проверки, не добавив карточки, — черновик остаётся, показываем его
+  useEffect(() => navigation.addListener('focus', () => setDraft(getImportDraft(setId))), [navigation, setId]);
+
+  // Ушли с экрана во время запроса — обрываем его
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   const slotsLeft = IMPORT_LIMITS.maxFiles - files.length;
   const hasInput = files.length > 0 || pasted.trim().length > 0;
@@ -180,8 +196,69 @@ export function ImportFilesScreen({ navigation, route }: Props) {
       : files;
   }, [files, pasted]);
 
+  const openReview = useCallback((d: Omit<ImportDraft, 'savedAt'>) => {
+    navigation.navigate('PreviewImport', { cards: d.cards, suggestedTitle: d.suggestedTitle, setId });
+  }, [navigation, setId]);
+
+  /** Запрос к ИИ: экран шагов, отмена, ошибки — полноэкранные состояния */
+  const runImport = useCallback(async () => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setPhase({ name: 'processing' });
+
+    try {
+      const result = await importFiles({
+        files: inputs,
+        goal,
+        level: goal === 'pick_words' ? level : undefined,
+        prompt: promptOpen ? prompt : undefined,
+        languageFrom: set?.languageFrom,
+        languageTo: set?.languageTo,
+      }, controller.signal);
+      if (controller.signal.aborted) return;
+      if (result.usage) setUsage(result.usage);
+      autoRetriesRef.current = 0;
+      setPhase({ name: 'form' });
+
+      if (result.cards.length > 0) {
+        // Запрос потрачен — сохраняем результат до добавления в набор
+        const next = { cards: result.cards, suggestedTitle: result.suggestedTitle, kind: result.kind, lang: result.lang };
+        saveImportDraft(setId, next);
+        openReview(next);
+        return;
+      }
+      // Пока нет экрана выбора (AI 6) — подсказываем цель прямо здесь
+      if (result.kind === 'text') {
+        setGoal('pick_words');
+        toast.info('Это сплошной текст, а не список слов. Выбрали «Слова из текста» — нажми ещё раз');
+      } else if (result.kind === 'exercise') {
+        toast.info('Похоже на упражнение, а не на список слов. Найди словарик к уроку или напиши инструкцию');
+      } else {
+        toast.info('Не нашли слов. Сними страницу ровно, при хорошем свете');
+      }
+    } catch (error) {
+      if (controller.signal.aborted || (error instanceof AiImportError && error.code === 'cancelled')) {
+        setPhase({ name: 'form' });
+        return;
+      }
+      const aiError = error instanceof AiImportError
+        ? error
+        : new AiImportError('server', 'Не удалось создать карточки');
+      if (aiError.code === 'daily_limit') setUsage(u => (u ? { ...u, used: u.limit } : u));
+      if (aiError.code === 'too_large') {
+        setPhase({ name: 'form' });
+        toast.info('Слишком много за раз — максимум ~3 МБ. Убери пару фото');
+        return;
+      }
+      setPhase({ name: 'error', error: aiError });
+    } finally {
+      if (abortRef.current === controller) abortRef.current = null;
+    }
+  }, [inputs, goal, level, promptOpen, prompt, set?.languageFrom, set?.languageTo, setId, openReview]);
+
   const handleSubmit = useCallback(async () => {
-    if (!hasInput || loading) return;
+    if (!hasInput || phase.name !== 'form') return;
 
     // Простые таблицы «слово — перевод» — без ИИ
     if (goal === 'vocab' && !prompt.trim() && inputs.every(f => f.kind === 'table')) {
@@ -201,45 +278,122 @@ export function ImportFilesScreen({ navigation, route }: Props) {
 
     // Файлы разбирает ИИ — сначала согласие на передачу данных
     if (!(await ensureAiConsent())) return;
+    autoRetriesRef.current = 0;
+    runImport();
+  }, [hasInput, phase.name, goal, prompt, inputs, navigation, setId, runImport]);
 
-    setLoading(true);
-    try {
-      const result = await importFiles({
-        files: inputs,
-        goal,
-        level: goal === 'pick_words' ? level : undefined,
-        prompt: promptOpen ? prompt : undefined,
-        languageFrom: set?.languageFrom,
-        languageTo: set?.languageTo,
-      });
-      if (result.usage) setUsage(result.usage);
+  const cancel = useCallback(() => {
+    abortRef.current?.abort();
+    autoRetriesRef.current = 0;
+    setPhase({ name: 'form' });
+  }, []);
 
-      if (result.cards.length > 0) {
-        navigation.navigate('PreviewImport', { cards: result.cards, suggestedTitle: result.suggestedTitle, setId });
-        return;
-      }
-      // Пока нет экрана выбора (AI 6) — подсказываем цель прямо здесь
-      if (result.kind === 'text') {
-        setGoal('pick_words');
-        toast.info('Это сплошной текст, а не список слов. Выбрали «Слова из текста» — нажми ещё раз');
-      } else if (result.kind === 'exercise') {
-        toast.info('Похоже на упражнение, а не на список слов. Найди словарик к уроку или напиши инструкцию');
-      } else {
-        toast.info('Не нашли слов. Сними страницу ровно, при хорошем свете');
-      }
-    } catch (error) {
-      if (error instanceof AiImportError && error.code === 'daily_limit') {
-        setUsage(u => (u ? { ...u, used: u.limit } : u));
-      }
-      toast.error(errorMessage(error));
-    } finally {
-      setLoading(false);
-    }
-  }, [hasInput, loading, goal, prompt, promptOpen, inputs, level, set?.languageFrom, set?.languageTo, navigation, setId]);
+  // ИИ перегружен — повторяем сами, с отсчётом (не больше MAX_AUTO_RETRIES раз)
+  const busyAutoRetry = phase.name === 'error' && phase.error.code === 'ai_busy' && autoRetriesRef.current < MAX_AUTO_RETRIES;
+  useEffect(() => {
+    if (!busyAutoRetry) return;
+    setRetryIn(RETRY_DELAY_SEC);
+    const tick = setInterval(() => setRetryIn(sec => Math.max(sec - 1, 0)), 1000);
+    const retry = setTimeout(() => {
+      autoRetriesRef.current += 1;
+      runImport();
+    }, RETRY_DELAY_SEC * 1000);
+    return () => {
+      clearInterval(tick);
+      clearTimeout(retry);
+    };
+  }, [busyAutoRetry, runImport]);
+
+  const discardDraft = useCallback(() => {
+    clearImportDraft(setId);
+    setDraft(null);
+  }, [setId]);
 
   // ── render ────────────────────────────────────────────────────────────────
 
   const usageLeft = usage ? Math.max(usage.limit - usage.used, 0) : null;
+  const photoCount = inputs.filter(f => f.kind === 'image').length;
+
+  if (phase.name === 'processing') {
+    return (
+      <View style={[styles.root, { backgroundColor: colors.background, paddingBottom: bottomInset }]}>
+        <ScreenHeader title="Создать карточки" onBack={cancel} />
+        <ImportProcessing photoCount={photoCount} fileCount={inputs.length} onCancel={cancel} />
+      </View>
+    );
+  }
+
+  if (phase.name === 'error') {
+    const { error } = phase;
+    const backToForm = () => setPhase({ name: 'form' });
+    const retryNow = () => runImport();
+    let status: React.ReactNode;
+
+    if (error.code === 'ai_busy') {
+      status = (
+        <ImportStatus
+          icon={Clock}
+          tone="warning"
+          title="ИИ сейчас перегружен"
+          text="Слишком много запросов одновременно. Файлы сохранены — загружать заново не нужно."
+          primary={{ title: busyAutoRetry ? 'Повторить сейчас' : 'Повторить', onPress: retryNow }}
+          secondary={{ title: 'Отменить', onPress: backToForm }}
+        >
+          <View style={[statusStyles.box, { backgroundColor: colors.surfaceMuted }]}>
+            <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
+              {inputs.length} {pluralize(inputs.length, 'файл', 'файла', 'файлов')} в очереди
+            </Text>
+            <Text variant="bodySmall" color="secondary">
+              {busyAutoRetry ? `Повторим сами через 0:${String(retryIn).padStart(2, '0')}` : 'Попробуй через пару минут'}
+            </Text>
+          </View>
+        </ImportStatus>
+      );
+    } else if (error.code === 'daily_limit') {
+      status = (
+        <ImportStatus
+          icon={History}
+          tone="warning"
+          title="На сегодня всё"
+          text={`Ты использовал все ${usage?.limit ?? 20} распознаваний на сегодня. Новые появятся ${formatResetTime(error.resetAt)}.`}
+          primary={{ title: 'Понятно', onPress: backToForm }}
+        >
+          <Text variant="bodySmall" color="secondary" align="center">
+            Таблицы CSV и TSV можно добавлять и сейчас — их мы разбираем без ИИ.
+          </Text>
+        </ImportStatus>
+      );
+    } else if (error.code === 'network') {
+      status = (
+        <ImportStatus
+          icon={WifiOff}
+          tone="error"
+          title="Нет связи"
+          text="Запрос не дошёл до сервера или ответ потерялся. Файлы на месте — проверь интернет и повтори."
+          primary={{ title: 'Повторить', onPress: retryNow }}
+          secondary={{ title: 'Назад', onPress: backToForm }}
+        />
+      );
+    } else {
+      status = (
+        <ImportStatus
+          icon={AlertTriangle}
+          tone="error"
+          title="Не получилось"
+          text={error.code === 'unauthorized' ? error.message : 'Что-то пошло не так на сервере. Файлы на месте — попробуй ещё раз.'}
+          primary={{ title: 'Повторить', onPress: retryNow }}
+          secondary={{ title: 'Назад', onPress: backToForm }}
+        />
+      );
+    }
+
+    return (
+      <View style={[styles.root, { backgroundColor: colors.background, paddingBottom: bottomInset }]}>
+        <ScreenHeader title="Создать карточки" onBack={backToForm} />
+        {status}
+      </View>
+    );
+  }
 
   return (
     // Верхний safe area уже учтён в App.tsx; снизу — свой (экран без панели вкладок)
@@ -257,6 +411,22 @@ export function ImportFilesScreen({ navigation, route }: Props) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        {/* ── Черновик: распознанное, но не добавленное ── */}
+        {draft && (
+          <View style={[styles.draft, { backgroundColor: alpha(colors.primary, 10) }]}>
+            <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
+              Есть распознанные карточки: {draft.cards.length}
+            </Text>
+            <Text variant="bodySmall" color="secondary" numberOfLines={1}>
+              {draft.suggestedTitle || 'Не добавлены в набор'}
+            </Text>
+            <View style={styles.draftActions}>
+              <Button size="s" title="Продолжить" onPress={() => openReview(draft)} />
+              <Button size="s" variant="quiet" title="Удалить" onPress={discardDraft} />
+            </View>
+          </View>
+        )}
+
         {/* ── Источники ── */}
         <View style={styles.grid}>
           <SourceTile
@@ -419,11 +589,10 @@ export function ImportFilesScreen({ navigation, route }: Props) {
           </Text>
         )}
         <Button
-          title={loading ? 'ИИ создаёт карточки…' : 'Создать карточки'}
+          title="Создать карточки"
           icon={Sparkles}
           onPress={handleSubmit}
-          disabled={!hasInput || loading}
-          loading={loading}
+          disabled={!hasInput}
           fullWidth
         />
       </View>
@@ -486,4 +655,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
   },
   usage: { marginBottom: spacing.xs },
+  draft: { borderRadius: borderRadius.xl, padding: spacing.m, gap: spacing.xxs },
+  draftActions: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.xs },
 });

@@ -67,6 +67,7 @@ export type AiImportErrorCode =
   | 'too_large'    // больше ~3 МБ за раз
   | 'unauthorized'
   | 'network'
+  | 'cancelled'    // пользователь нажал «Отменить»
   | 'server';
 
 export class AiImportError extends Error {
@@ -119,8 +120,11 @@ async function toAiError(response: Response): Promise<AiImportError> {
   return new AiImportError('server', error || 'Не удалось создать карточки');
 }
 
-/** Распознать файлы и создать карточки. Ответ ждём до ~2 минут: сервер перебирает модели. */
-export async function importFiles(request: ImportRequest): Promise<ImportResult> {
+/**
+ * Распознать файлы и создать карточки. Ответ ждём до ~2 минут: сервер перебирает модели.
+ * signal — отмена пользователем (AiImportError 'cancelled').
+ */
+export async function importFiles(request: ImportRequest, signal?: AbortSignal): Promise<ImportResult> {
   const headers = await authHeaders();
   const files = request.files.map(f =>
     f.kind === 'image' || f.kind === 'pdf'
@@ -141,8 +145,10 @@ export async function importFiles(request: ImportRequest): Promise<ImportResult>
         languageFrom: request.languageFrom,
         languageTo: request.languageTo,
       }),
+      signal,
     }, 120_000);
   } catch {
+    if (signal?.aborted) throw new AiImportError('cancelled', 'Отменено');
     throw new AiImportError('network', 'Нет связи с сервером. Проверь интернет');
   }
 

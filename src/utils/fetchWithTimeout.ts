@@ -11,9 +11,15 @@ export async function fetchWithTimeout(
 ): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  // Внешний сигнал (кнопка «Отменить») тоже обрывает запрос
+  const external = init.signal;
+  const onExternalAbort = () => controller.abort();
+  if (external?.aborted) controller.abort();
+  external?.addEventListener('abort', onExternalAbort);
   try {
     return await fetch(url, { ...init, signal: controller.signal });
   } finally {
     clearTimeout(timer);
+    external?.removeEventListener('abort', onExternalAbort);
   }
 }

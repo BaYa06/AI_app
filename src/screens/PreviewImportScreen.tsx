@@ -14,6 +14,7 @@ import type { RootStackParamList, RootStackScreenProps } from '@/types/navigatio
 import type { CreateCardInput } from '@/types';
 import { BookOpen } from 'lucide-react-native';
 import { describeError } from '@/utils/userErrors';
+import { clearImportDraft } from '@/services/importDraft';
 
 type Props = RootStackScreenProps<'PreviewImport'>;
 
@@ -197,6 +198,7 @@ export function PreviewImportScreen({ navigation, route }: Props) {
     try {
       addCards(cards.map(c => toCardInput(setId, c)));
       updateSetStats(setId, { cardCount: cards.length, newCount: cards.length });
+      clearImportDraft(setId);
       navigation.replace('SetDetail', { setId });
     } catch (e: any) {
       toast.error(describeError(e, 'Не удалось сохранить карточки'));
@@ -214,6 +216,7 @@ export function PreviewImportScreen({ navigation, route }: Props) {
       const newSet = await addSet({ title: trimmed, languageFrom, languageTo });
       addCards(cards.map(c => toCardInput(newSet.id, c)));
       updateSetStats(newSet.id, { cardCount: cards.length, newCount: cards.length });
+      clearImportDraft(setId);
       setModalVisible(false);
       navigation.replace('SetDetail', { setId: newSet.id });
     } catch (e: any) {
@@ -221,7 +224,7 @@ export function PreviewImportScreen({ navigation, route }: Props) {
     } finally {
       setSaving(false);
     }
-  }, [cards, addSet, addCards, updateSetStats, navigation]);
+  }, [cards, addSet, addCards, updateSetStats, navigation, setId]);
 
   // ── render ────────────────────────────────────────────────────────────────
 
