@@ -159,7 +159,7 @@ export default async function handler(req, res) {
       + (textBlocks ? `\n\nFiles content:\n${textBlocks}` : '');
 
     const text = await generateJson({
-      model: MODELS.vision,
+      models: MODELS.vision,
       prompt: fullPrompt,
       files: binaryFiles,
       temperature: 0.2,

@@ -50,7 +50,7 @@ Rules:
 Return ONLY a valid JSON array of objects with "front" (original word) and "back" (translation). No explanations, no markdown.
 Example: [{"front": "der Hund", "back": "собака"}, {"front": "laufen", "back": "бежать"}]`;
 
-    const text = await generateJson({ model: MODELS.text, prompt, temperature: 0.2, maxOutputTokens: 4096 });
+    const text = await generateJson({ models: MODELS.text, prompt, temperature: 0.2, maxOutputTokens: 4096 });
     const translations = parseJsonArray(text).filter(t => t && typeof t === 'object');
 
     // Match translations back to original words by index

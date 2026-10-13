@@ -63,7 +63,7 @@ Return ONLY a valid JSON array of objects with "front" and "back" fields. No exp
 Example: [{"front": "der Abschnitt", "back": "раздел"}, {"front": "sterben", "back": "умирать"}]`;
 
     const text = await generateJson({
-      model: MODELS.vision,
+      models: MODELS.vision,
       prompt,
       files: [{ mimeType: 'application/pdf', data: base64 }],
       temperature: 0.2,

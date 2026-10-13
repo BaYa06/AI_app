@@ -4,18 +4,36 @@ import { GoogleGenAI, ThinkingLevel } from '@google/genai';
  * Общий клиент Gemini для AI-эндпоинтов (Google AI Studio, ключ GEMINI_API_KEY).
  * Раньше был Vertex AI — у него нет бесплатного уровня; модели gemini-2.0-* Google отключил.
  *
- * Модели — алиасы, которые Google сам переводит на актуальную версию; переопределяются env:
+ * Для каждой задачи — список моделей по порядку: если модель перегружена (503) или упёрлась
+ * в квоту (429), пробуем следующую. У каждой модели своя бесплатная квота, так что запасная
+ * модель ещё и добавляет запросов в день. Переопределяются env (через запятую):
  *   GEMINI_MODEL_VISION — фото и PDF (распознавание);
- *   GEMINI_MODEL_TEXT   — перевод, примеры, дистракторы (у Flash-Lite своя бесплатная квота).
+ *   GEMINI_MODEL_TEXT   — перевод, примеры, дистракторы.
  */
 
+function modelList(envValue, fallback) {
+  const list = (envValue || '').split(',').map(m => m.trim()).filter(Boolean);
+  return list.length ? list : fallback;
+}
+
+// Порядок — по замерам на бесплатном ключе (13.10.2026): самые новые (3.7, 3.8, *-latest)
+// почти всегда 503, 2.5 отключены. Быстрые, но иногда перегруженные — первыми;
+// стабильная 3.1 Flash-Lite медленнее (и иногда зависает), но почти не отказывает — страховка.
 export const MODELS = {
-  vision: process.env.GEMINI_MODEL_VISION || 'gemini-flash-latest',
-  text: process.env.GEMINI_MODEL_TEXT || 'gemini-flash-lite-latest',
+  vision: modelList(process.env.GEMINI_MODEL_VISION, [
+    'gemini-3.6-flash', 'gemini-3-flash-preview', 'gemini-3.5-flash', 'gemini-3.1-flash-lite',
+  ]),
+  text: modelList(process.env.GEMINI_MODEL_TEXT, [
+    'gemini-3.6-flash', 'gemini-3.1-flash-lite', 'gemini-3-flash-preview',
+  ]),
 };
 
-// Запас до maxDuration функции (vercel.json), чтобы ответить ошибкой, а не быть оборванными
-const TIMEOUT_MS = 50_000;
+// Общий бюджет на все попытки — с запасом до maxDuration функции (vercel.json, 300 с)
+const TIMEOUT_MS = 90_000;
+// Модель иногда зависает — не отдаём ей весь бюджет (последней модели достаётся остаток)
+const ATTEMPT_MS = 35_000;
+// Меньше этого на следующую модель не остаётся смысла пробовать
+const MIN_ATTEMPT_MS = 5_000;
 
 let client = null;
 
@@ -25,30 +43,59 @@ function getClient() {
   return client;
 }
 
+function errorStatus(error) {
+  return error?.status ?? error?.code;
+}
+
+function isTimeout(error) {
+  return error?.name === 'TimeoutError' || error?.name === 'AbortError';
+}
+
+/** Перегрузка или квота — стоит попробовать другую модель */
+function isRetryable(error) {
+  const status = errorStatus(error);
+  return status === 429 || status === 503;
+}
+
 /**
  * Запрос к Gemini с ответом в JSON. Возвращает текст ответа.
+ * models — список моделей по приоритету (MODELS.vision / MODELS.text);
  * prompt — строка; files — необязательные [{ mimeType, data(base64) }] перед текстом.
  */
-export async function generateJson({ model, prompt, files = [], temperature, maxOutputTokens }) {
+export async function generateJson({ models, prompt, files = [], temperature, maxOutputTokens }) {
   const parts = [
     ...files.map(f => ({ inlineData: { mimeType: f.mimeType, data: f.data } })),
     { text: prompt },
   ];
+  const deadline = Date.now() + TIMEOUT_MS;
 
-  const response = await getClient().models.generateContent({
-    model,
-    contents: [{ role: 'user', parts }],
-    config: {
-      temperature,
-      maxOutputTokens,
-      responseMimeType: 'application/json',
-      // Размышления в 2–3 раза удлиняют ответ, для извлечения слов и примеров они не нужны
-      thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-      abortSignal: AbortSignal.timeout(TIMEOUT_MS),
-    },
-  });
-
-  return response.text || '';
+  let lastError = null;
+  for (const [index, model] of models.entries()) {
+    const remaining = deadline - Date.now();
+    if (remaining < MIN_ATTEMPT_MS) break;
+    const isLast = index === models.length - 1;
+    const attemptMs = isLast ? remaining : Math.min(remaining, ATTEMPT_MS);
+    try {
+      const response = await getClient().models.generateContent({
+        model,
+        contents: [{ role: 'user', parts }],
+        config: {
+          temperature,
+          maxOutputTokens,
+          responseMimeType: 'application/json',
+          // Размышления в 2–3 раза удлиняют ответ, для извлечения слов и примеров они не нужны
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+          abortSignal: AbortSignal.timeout(attemptMs),
+        },
+      });
+      return response.text || '';
+    } catch (error) {
+      lastError = error;
+      if (!isRetryable(error) && !isTimeout(error)) throw error;
+      console.warn(`[gemini] ${model} → ${isTimeout(error) ? 'timeout' : errorStatus(error)}, пробуем следующую модель`);
+    }
+  }
+  throw lastError || Object.assign(new Error('timeout'), { name: 'TimeoutError' });
 }
 
 /** Достаёт JSON-массив из ответа; [] если не удалось. */
@@ -86,15 +133,14 @@ export function parseJsonObject(text) {
 }
 
 /**
- * Ответ на ошибку Gemini: 429 — квота/перегрузка, 504 — тайм-аут, иначе 500.
+ * Ответ на ошибку Gemini: 429/503 — квота/перегрузка → 429 ai_busy, тайм-аут → 504, иначе 500.
  * Поле error старые клиенты показывают как есть или заменяют своим текстом.
  */
 export function sendAiError(res, error, fallbackMessage) {
-  const status = error?.status ?? error?.code;
-  if (status === 429) {
+  if (isRetryable(error)) {
     return res.status(429).json({ error: 'ai_busy', retryAfter: 30 });
   }
-  if (error?.name === 'TimeoutError' || error?.name === 'AbortError') {
+  if (isTimeout(error)) {
     return res.status(504).json({ error: 'ai_timeout' });
   }
   console.error(`${fallbackMessage}:`, error?.message || error);

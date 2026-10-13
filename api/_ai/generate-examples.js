@@ -65,7 +65,7 @@ No extra text. Example format:
 [{"word": "gehen", "example": "Ich muss morgen früh zur Schule gehen.", "wordForm": "gehen", "wordType": "verb"}, {"word": "Hund", "example": "Mein Nachbar hat zwei kleine Hunde gekauft.", "wordForm": "Hunde", "wordType": "noun"}]`;
 
     // 100 слов × ~25 токенов на пример — 4096 впритык, берём с запасом
-    const text = await generateJson({ model: MODELS.text, prompt, temperature: 0.7, maxOutputTokens: 8192 });
+    const text = await generateJson({ models: MODELS.text, prompt, temperature: 0.7, maxOutputTokens: 8192 });
     const examples = parseJsonArray(text);
 
     const VALID_WORD_TYPES = ['noun', 'verb', 'adjective', 'adverb', 'other'];

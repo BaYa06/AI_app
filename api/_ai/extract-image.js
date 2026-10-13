@@ -67,7 +67,7 @@ Example: [{"front": "der Abschnitt", "back": "раздел"}, {"front": "sterben
 Example with no translations: [{"front": "der Abschnitt", "back": ""}, {"front": "sterben", "back": ""}]`;
 
     const text = await generateJson({
-      model: MODELS.vision,
+      models: MODELS.vision,
       prompt,
       files: [{ mimeType, data: base64 }],
       temperature: 0.2,

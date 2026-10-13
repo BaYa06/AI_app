@@ -50,7 +50,7 @@ Return ONLY a JSON array of strings (the words themselves, no translations, no e
 Example: ["schlafen", "kaufen", "schreiben"]`;
 
     // Ответ крошечный, но лимит с запасом: размышления модели тоже расходуют токены ответа
-    const text = await generateJson({ model: MODELS.text, prompt, temperature: 0.8, maxOutputTokens: 1024 });
+    const text = await generateJson({ models: MODELS.text, prompt, temperature: 0.8, maxOutputTokens: 1024 });
     const distractors = parseJsonArray(text)
       .filter(w => typeof w === 'string' && w.trim().toLowerCase() !== word.toLowerCase())
       .slice(0, safeCount);
