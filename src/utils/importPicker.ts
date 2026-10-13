@@ -28,7 +28,8 @@ function assetToFile(asset: Asset, index: number): ImportFile | null {
     id: newId(),
     name: asset.fileName || `photo_${index + 1}.jpg`,
     kind: 'image',
-    mimeType: asset.type || 'image/jpeg',
+    // iOS отдаёт нестандартный 'image/jpg' — сервер ждёт 'image/jpeg'
+    mimeType: !asset.type || asset.type === 'image/jpg' ? 'image/jpeg' : asset.type,
     base64: asset.base64,
     previewUri: asset.uri,
   };

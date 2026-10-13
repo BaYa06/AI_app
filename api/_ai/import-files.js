@@ -38,6 +38,14 @@ const BINARY_MIME_TYPES = new Set([
 ]);
 const TEXT_MIME_TYPES = new Set(['text/csv', 'text/tab-separated-values', 'text/plain']);
 
+// Выбор фото на iOS (react-native-image-picker) отдаёт нестандартный 'image/jpg'
+const MIME_ALIASES = { 'image/jpg': 'image/jpeg', 'image/pjpeg': 'image/jpeg', 'text/tsv': 'text/tab-separated-values' };
+
+function normalizeMime(mimeType) {
+  const value = typeof mimeType === 'string' ? mimeType.trim().toLowerCase() : '';
+  return MIME_ALIASES[value] || value;
+}
+
 const MAX_FILES = 5;
 // Тело запроса Vercel — 4,5 МБ; base64 + текст + JSON-обёртка должны уложиться
 const MAX_TOTAL_CHARS = 4_200_000;
@@ -127,6 +135,7 @@ function validateFiles(files) {
 
   let total = 0;
   for (const file of files) {
+    if (file) file.mimeType = normalizeMime(file.mimeType);
     if (file?.type === 'binary') {
       if (!BINARY_MIME_TYPES.has(file.mimeType)) return `Unsupported file type: ${file.mimeType}`;
       if (typeof file.base64 !== 'string' || !file.base64) return `Missing base64 for: ${file.name || 'file'}`;
@@ -155,8 +164,12 @@ export default async function handler(req, res) {
   const { files, goal: rawGoal, level: rawLevel, prompt, languageFrom, languageTo } = req.body || {};
 
   const invalid = validateFiles(files);
-  if (invalid === 'too_large') return res.status(413).json({ error: 'too_large' });
-  if (invalid) return res.status(400).json({ error: invalid });
+  if (invalid) {
+    // Отказы проверки тоже в лог — иначе в приложении «не получилось», а на сервере тишина
+    console.warn(`[import-files] rejected: ${invalid}`);
+    if (invalid === 'too_large') return res.status(413).json({ error: 'too_large' });
+    return res.status(400).json({ error: invalid });
+  }
 
   const userId = await getAuthedUserId(req);
   if (!userId) return res.status(401).json({ error: 'unauthorized' });

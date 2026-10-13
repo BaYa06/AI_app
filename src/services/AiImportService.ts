@@ -74,12 +74,19 @@ export class AiImportError extends Error {
   code: AiImportErrorCode;
   retryAfter?: number;
   resetAt?: string;
+  /** Для экрана «Не получилось»: HTTP-статус и ответ сервера — чтобы было что прислать в поддержку */
+  detail?: string;
 
-  constructor(code: AiImportErrorCode, message: string, extra: { retryAfter?: number; resetAt?: string } = {}) {
+  constructor(
+    code: AiImportErrorCode,
+    message: string,
+    extra: { retryAfter?: number; resetAt?: string; detail?: string } = {},
+  ) {
     super(message);
     this.code = code;
     this.retryAfter = extra.retryAfter;
     this.resetAt = extra.resetAt;
+    this.detail = extra.detail;
   }
 }
 
@@ -117,7 +124,9 @@ async function toAiError(response: Response): Promise<AiImportError> {
   if (response.status === 413) return new AiImportError('too_large', 'Слишком много за раз — максимум ~3 МБ');
   if (response.status === 401) return new AiImportError('unauthorized', 'Войди в аккаунт, чтобы создавать карточки с ИИ');
   if (response.status === 504) return new AiImportError('ai_busy', 'ИИ не успел ответить', { retryAfter: 10 });
-  return new AiImportError('server', error || 'Не удалось создать карточки');
+  return new AiImportError('server', 'Не удалось создать карточки', {
+    detail: `${response.status}${error ? ` · ${error.slice(0, 160)}` : ''}`,
+  });
 }
 
 /**

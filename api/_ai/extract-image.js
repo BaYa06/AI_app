@@ -29,7 +29,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { base64, mimeType, languageFrom, languageTo } = req.body || {};
+  const { base64, languageFrom, languageTo } = req.body || {};
+  // Выбор фото на iOS отдаёт нестандартный 'image/jpg'
+  const rawMime = typeof req.body?.mimeType === 'string' ? req.body.mimeType.toLowerCase() : '';
+  const mimeType = rawMime === 'image/jpg' ? 'image/jpeg' : rawMime;
 
   if (!base64 || typeof base64 !== 'string') {
     return res.status(400).json({ error: 'base64 string is required' });

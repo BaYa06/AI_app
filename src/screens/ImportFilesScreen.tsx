@@ -289,7 +289,9 @@ export function ImportFilesScreen({ navigation, route }: Props) {
       }
       const aiError = error instanceof AiImportError
         ? error
-        : new AiImportError('server', 'Не удалось создать карточки');
+        : new AiImportError('server', 'Не удалось создать карточки', {
+          detail: error instanceof Error ? error.message.slice(0, 160) : undefined,
+        });
       if (aiError.code === 'daily_limit') setUsage(u => (u ? { ...u, used: u.limit } : u));
       if (aiError.code === 'too_large') {
         setPhase({ name: 'form' });
@@ -515,10 +517,16 @@ export function ImportFilesScreen({ navigation, route }: Props) {
           icon={AlertTriangle}
           tone="error"
           title="Не получилось"
-          text={error.code === 'unauthorized' ? error.message : 'Что-то пошло не так на сервере. Файлы на месте — попробуй ещё раз.'}
+          text={error.code === 'unauthorized' ? error.message : 'Что-то пошло не так. Файлы на месте — попробуй ещё раз.'}
           primary={{ title: 'Повторить', onPress: retryNow }}
           secondary={{ title: 'Назад', onPress: backToForm }}
-        />
+        >
+          {!!error.detail && (
+            <Text variant="caption" color="secondary" align="center" selectable>
+              {`Код ошибки: ${error.detail}`}
+            </Text>
+          )}
+        </ImportStatus>
       );
     }
 
