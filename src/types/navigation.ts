@@ -233,7 +233,8 @@ export type RootStackParamList = {
     setId: string;
     cardLimit?: number;
   };
-  ImportFiles: { setId: string };
+  /** append — пришли с проверки по «+ Фото»: новые карточки дописать к черновику */
+  ImportFiles: { setId: string; append?: boolean };
   PreviewImport: {
     /** example/wordForm/wordType — у «незнакомых слов» из текста, confidence — неуверенно распознано */
     cards: Array<{

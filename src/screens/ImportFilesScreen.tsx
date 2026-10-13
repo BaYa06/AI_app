@@ -176,6 +176,14 @@ export function ImportFilesScreen({ navigation, route }: Props) {
   // Ушли с экрана во время запроса — обрываем его
   useEffect(() => () => abortRef.current?.abort(), []);
 
+  // «+ Фото» с проверки: следующий результат дописываем к уже распознанному списку
+  const appendRef = useRef(false);
+  useEffect(() => {
+    if (!route.params.append) return;
+    appendRef.current = true;
+    navigation.setParams({ append: undefined });
+  }, [route.params.append, navigation]);
+
   const slotsLeft = IMPORT_LIMITS.maxFiles - files.length;
   const hasInput = files.length > 0 || pasted.trim().length > 0;
   const languages = set?.languageFrom && set?.languageTo
@@ -247,12 +255,23 @@ export function ImportFilesScreen({ navigation, route }: Props) {
 
       if (result.cards.length > 0) {
         // Запрос потрачен — сохраняем результат до добавления в набор
-        const next = { cards: result.cards, suggestedTitle: result.suggestedTitle, kind: result.kind, lang: result.lang };
+        const previous = appendRef.current ? getImportDraft(setId) : null;
+        appendRef.current = false;
+        const next = {
+          cards: previous ? [...previous.cards, ...result.cards] : result.cards,
+          suggestedTitle: previous?.suggestedTitle || result.suggestedTitle,
+          kind: result.kind,
+          lang: result.lang,
+        };
         saveImportDraft(setId, next);
+        // Эти файлы уже распознаны — следующие фото не должны отправить их снова
+        setFiles([]);
+        setPasted('');
+        setPasteOpen(false);
         const otherLanguage = LANGUAGE_GOALS.includes(requestGoal) && !overrides.prompt
           && !!set?.languageFrom && !!result.lang && result.lang !== set.languageFrom;
         if (otherLanguage) {
-          setPhase({ name: 'lang', result });
+          setPhase({ name: 'lang', result: { ...result, cards: next.cards, suggestedTitle: next.suggestedTitle } });
           return;
         }
         openReview(next);
