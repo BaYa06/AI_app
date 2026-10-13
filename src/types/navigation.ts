@@ -245,7 +245,13 @@ export type RootStackParamList = {
       confidence?: 'low';
     }>;
     suggestedTitle?: string;
+    /** '' — создать новый набор */
     setId: string;
+    /** Языки нового набора по умолчанию (ИИ определил, что слова на другом языке) */
+    languageFrom?: string;
+    languageTo?: string;
+    /** Чей черновик ИИ-импорта очистить после сохранения (по умолчанию — setId) */
+    draftKey?: string;
   };
 };
 

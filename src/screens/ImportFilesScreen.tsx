@@ -5,6 +5,8 @@
  * Простые таблицы «слово — перевод» разбираем сами, без ИИ и без расхода дневного лимита.
  * AI 5: во время запроса — экран шагов с отменой; ошибки — полноэкранные состояния
  * (перегружен → автоповтор, лимит, нет связи); распознанное хранится в черновике до добавления.
+ * AI 6: ветки по ответу ИИ — сплошной текст → выбор, что сделать; слова на другом языке →
+ * новый набор / перевести / как есть; ничего не нашли → причина и советы.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -17,6 +19,7 @@ import {
   FileText,
   History,
   Images,
+  SearchX,
   Sparkles,
   Table,
   WifiOff,
@@ -28,8 +31,10 @@ import type { IconComponent } from '@/components/ui';
 import { ImportGuideSheet } from '@/components/import/ImportGuideSheet';
 import { ImportProcessing } from '@/components/import/ImportProcessing';
 import { ImportStatus, statusStyles } from '@/components/import/ImportStatus';
+import { ImportTextChoice } from '@/components/import/ImportTextChoice';
+import { ImportLangChoice } from '@/components/import/ImportLangChoice';
 import { useSetsStore, useThemeColors } from '@/store';
-import { alpha, borderRadius, iconSize, screenPadding, spacing } from '@/constants';
+import { TOP_LANGUAGES, alpha, borderRadius, iconSize, screenPadding, spacing } from '@/constants';
 import type { RootStackScreenProps } from '@/types/navigation';
 import { ensureAiConsent } from '@/services/aiConsent';
 import {
@@ -42,6 +47,7 @@ import {
   type CefrLevel,
   type ImportFile,
   type ImportGoal,
+  type ImportResult,
 } from '@/services/AiImportService';
 import { PickError, pickDocuments, pickFromCamera, pickFromGallery } from '@/utils/importPicker';
 import { parseWordTable } from '@/utils/parseWordTable';
@@ -55,7 +61,19 @@ type FilePicker = typeof pickFromCamera;
 type Phase =
   | { name: 'form' }
   | { name: 'processing' }
-  | { name: 'error'; error: AiImportError };
+  | { name: 'error'; error: AiImportError }
+  | { name: 'text'; excerpt?: string }
+  | { name: 'lang'; result: ImportResult }
+  | { name: 'nothing'; kind: 'exercise' | 'empty' };
+
+/** Запрос с другой целью/инструкцией, чем выбрано в форме (ветки AI 6) */
+interface RunOverrides {
+  goal?: ImportGoal;
+  prompt?: string;
+}
+
+/** Цели про слова языка — для них сверяем язык слов с языком набора */
+const LANGUAGE_GOALS: ImportGoal[] = ['vocab', 'pick_words', 'all_words'];
 
 /** Сколько раз повторять автоматически, когда ИИ перегружен, — дальше только по кнопке */
 const MAX_AUTO_RETRIES = 2;
@@ -200,8 +218,13 @@ export function ImportFilesScreen({ navigation, route }: Props) {
     navigation.navigate('PreviewImport', { cards: d.cards, suggestedTitle: d.suggestedTitle, setId });
   }, [navigation, setId]);
 
+  // Последний запрос — повтор после ошибки повторяет его же (с той же целью)
+  const lastOverridesRef = useRef<RunOverrides>({});
+
   /** Запрос к ИИ: экран шагов, отмена, ошибки — полноэкранные состояния */
-  const runImport = useCallback(async () => {
+  const runImport = useCallback(async (overrides: RunOverrides = lastOverridesRef.current) => {
+    lastOverridesRef.current = overrides;
+    const requestGoal = overrides.goal ?? goal;
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -210,9 +233,9 @@ export function ImportFilesScreen({ navigation, route }: Props) {
     try {
       const result = await importFiles({
         files: inputs,
-        goal,
-        level: goal === 'pick_words' ? level : undefined,
-        prompt: promptOpen ? prompt : undefined,
+        goal: requestGoal,
+        level: requestGoal === 'pick_words' ? level : undefined,
+        prompt: overrides.prompt ?? (promptOpen ? prompt : undefined),
         languageFrom: set?.languageFrom,
         languageTo: set?.languageTo,
       }, controller.signal);
@@ -220,22 +243,25 @@ export function ImportFilesScreen({ navigation, route }: Props) {
       if (result.usage) setUsage(result.usage);
       autoRetriesRef.current = 0;
       setPhase({ name: 'form' });
+      setRetryIn(0);
 
       if (result.cards.length > 0) {
         // Запрос потрачен — сохраняем результат до добавления в набор
         const next = { cards: result.cards, suggestedTitle: result.suggestedTitle, kind: result.kind, lang: result.lang };
         saveImportDraft(setId, next);
+        const otherLanguage = LANGUAGE_GOALS.includes(requestGoal) && !overrides.prompt
+          && !!set?.languageFrom && !!result.lang && result.lang !== set.languageFrom;
+        if (otherLanguage) {
+          setPhase({ name: 'lang', result });
+          return;
+        }
         openReview(next);
         return;
       }
-      // Пока нет экрана выбора (AI 6) — подсказываем цель прямо здесь
       if (result.kind === 'text') {
-        setGoal('pick_words');
-        toast.info('Это сплошной текст, а не список слов. Выбрали «Слова из текста» — нажми ещё раз');
-      } else if (result.kind === 'exercise') {
-        toast.info('Похоже на упражнение, а не на список слов. Найди словарик к уроку или напиши инструкцию');
+        setPhase({ name: 'text', excerpt: result.excerpt });
       } else {
-        toast.info('Не нашли слов. Сними страницу ровно, при хорошем свете');
+        setPhase({ name: 'nothing', kind: result.kind === 'exercise' ? 'exercise' : 'empty' });
       }
     } catch (error) {
       if (controller.signal.aborted || (error instanceof AiImportError && error.code === 'cancelled')) {
@@ -279,7 +305,7 @@ export function ImportFilesScreen({ navigation, route }: Props) {
     // Файлы разбирает ИИ — сначала согласие на передачу данных
     if (!(await ensureAiConsent())) return;
     autoRetriesRef.current = 0;
-    runImport();
+    runImport({});
   }, [hasInput, phase.name, goal, prompt, inputs, navigation, setId, runImport]);
 
   const cancel = useCallback(() => {
@@ -323,9 +349,99 @@ export function ImportFilesScreen({ navigation, route }: Props) {
     );
   }
 
+  const screen = (title: string, onBack: () => void, body: React.ReactNode) => (
+    <View style={[styles.root, { backgroundColor: colors.background, paddingBottom: bottomInset }]}>
+      <ScreenHeader title={title} onBack={onBack} />
+      {body}
+    </View>
+  );
+  const backToForm = () => setPhase({ name: 'form' });
+
+  if (phase.name === 'text') {
+    return screen('Создать карточки', backToForm, (
+      <ImportTextChoice
+        excerpt={phase.excerpt}
+        level={level}
+        onLevelChange={setLevel}
+        onContinue={textGoal => {
+          setGoal(textGoal);
+          runImport({ goal: textGoal });
+        }}
+        onBack={backToForm}
+      />
+    ));
+  }
+
+  if (phase.name === 'lang' && set?.languageFrom) {
+    const { result } = phase;
+    const foundLang = result.lang!;
+    return screen('Создать карточки', backToForm, (
+      <ImportLangChoice
+        foundLang={foundLang}
+        setLanguageFrom={set.languageFrom}
+        setLanguageTo={set.languageTo}
+        setTitle={set.title}
+        sampleWords={result.cards.slice(0, 3).map(c => c.front)}
+        count={result.cards.length}
+        onNewSet={() => {
+          setPhase({ name: 'form' });
+          navigation.navigate('PreviewImport', {
+            cards: result.cards,
+            suggestedTitle: result.suggestedTitle,
+            setId: '',
+            // Язык из списка приложения — подставим; иначе пользователь выберет сам
+            languageFrom: TOP_LANGUAGES.some(l => l.code === foundLang) ? foundLang : undefined,
+            languageTo: set.languageTo,
+            draftKey: setId,
+          });
+        }}
+        onTranslateHere={() => runImport({
+          goal: 'vocab',
+          prompt: `The words are in the language with ISO code "${foundLang}". For each word make a card: `
+            + `"front" = the equivalent word in the language with ISO code "${set.languageFrom}" (dictionary form, nouns with article), `
+            + `"back" = its translation into the language with ISO code "${set.languageTo || 'ru'}".`,
+        })}
+        onAddAsIs={() => {
+          setPhase({ name: 'form' });
+          openReview(result);
+        }}
+        onCancel={backToForm}
+      />
+    ));
+  }
+
+  if (phase.name === 'nothing') {
+    const tips = phase.kind === 'exercise'
+      ? ['Найди в главе блок со словами («Wortschatz», «Vocabulary») или словарик в конце учебника',
+        'Или напиши инструкцию: «сделай карточки из подписей к картинкам»']
+      : ['Сними страницу ровно сверху, при хорошем свете, без бликов',
+        'Одна страница целиком в кадре, текст резкий'];
+    return screen('Создать карточки', backToForm, (
+      <ImportStatus
+        icon={SearchX}
+        tone="error"
+        title="Не нашли слов для карточек"
+        text={phase.kind === 'exercise'
+          ? 'Похоже, тут упражнение, а не список слов.'
+          : 'Не получилось прочитать текст: фото размыто, тёмное или на нём нет текста.'}
+        primary={{ title: 'Изменить файлы', onPress: backToForm }}
+        secondary={{ title: 'Добавить инструкцию', onPress: () => { setPromptOpen(true); backToForm(); } }}
+      >
+        <View style={[statusStyles.box, { backgroundColor: colors.surfaceMuted }]}>
+          <Text variant="label" style={{ color: colors.textPrimary }}>Что поможет</Text>
+          {tips.map(tip => (
+            <View key={tip} style={styles.tipRow}>
+              <Check size={iconSize.xs} color={colors.primary} />
+              <Text variant="bodySmall" color="secondary" style={styles.tipText}>{tip}</Text>
+            </View>
+          ))}
+        </View>
+      </ImportStatus>
+    ));
+  }
+
   if (phase.name === 'error') {
     const { error } = phase;
-    const backToForm = () => setPhase({ name: 'form' });
     const retryNow = () => runImport();
     let status: React.ReactNode;
 

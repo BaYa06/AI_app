@@ -90,7 +90,7 @@ Step 1. Classify the content as "kind":
 - "text": continuous prose — an article, story, dialogue, letter, textbook paragraph
 - "exercise": exercises, gap fills, pictures with tasks, without a usable word list
 - "empty": no readable text
-Also detect "lang": ISO 639-1 code of the main language of the content (for a vocabulary list — the language of the words being learned, not of the translations).
+Also detect "lang": the ISO 639-1 code of the language the content is ACTUALLY written in — detect it from the text itself, it may differ from the card set language (${langFrom}). For a vocabulary list: the language of the words, not of the translations (a list "to borrow — занимать" is "en", even in a German set).
 
 Step 2. ${task}
 ${stopOnText ? 'If kind is "text", "exercise" or "empty", return an empty "cards" array — the app will ask the user what to make from it. Do not invent cards.\n' : ''}

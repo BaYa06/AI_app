@@ -25,6 +25,8 @@ type CardItem = { front: string; back: string };
 function SaveModal({
   visible,
   defaultTitle,
+  defaultLanguageFrom,
+  defaultLanguageTo,
   saving,
   colors,
   onConfirm,
@@ -32,6 +34,8 @@ function SaveModal({
 }: {
   visible: boolean;
   defaultTitle: string;
+  defaultLanguageFrom?: string;
+  defaultLanguageTo?: string;
   saving: boolean;
   colors: ReturnType<typeof useThemeColors>;
   onConfirm: (title: string, languageFrom: string, languageTo: string) => void;
@@ -39,8 +43,8 @@ function SaveModal({
 }) {
   const [title, setTitle] = useState(defaultTitle);
   // Языки выбирает пользователь — без выбора набор не создаётся
-  const [languageFrom, setLanguageFrom] = useState<string | null>(null);
-  const [languageTo, setLanguageTo] = useState<string | null>(null);
+  const [languageFrom, setLanguageFrom] = useState<string | null>(defaultLanguageFrom ?? null);
+  const [languageTo, setLanguageTo] = useState<string | null>(defaultLanguageTo ?? null);
   const [showValidation, setShowValidation] = useState(false);
 
   // Sync defaultTitle when modal opens. Клавиатуру не открываем сами — только по нажатию на поле
@@ -180,7 +184,8 @@ function toCardInput(setId: string, c: RootStackParamList['PreviewImport']['card
 }
 
 export function PreviewImportScreen({ navigation, route }: Props) {
-  const { cards, suggestedTitle = '', setId } = route.params;
+  const { cards, suggestedTitle = '', setId, languageFrom: defaultLanguageFrom, languageTo: defaultLanguageTo } = route.params;
+  const draftKey = route.params.draftKey ?? setId;
   const colors = useThemeColors();
   const bottomInset = useScreenBottomInset();
 
@@ -198,14 +203,14 @@ export function PreviewImportScreen({ navigation, route }: Props) {
     try {
       addCards(cards.map(c => toCardInput(setId, c)));
       updateSetStats(setId, { cardCount: cards.length, newCount: cards.length });
-      clearImportDraft(setId);
+      clearImportDraft(draftKey);
       navigation.replace('SetDetail', { setId });
     } catch (e: any) {
       toast.error(describeError(e, 'Не удалось сохранить карточки'));
     } finally {
       setSaving(false);
     }
-  }, [cards, setId, addCards, updateSetStats, navigation]);
+  }, [cards, setId, addCards, updateSetStats, navigation, draftKey]);
 
   // ── save as new set ───────────────────────────────────────────────────────
 
@@ -216,7 +221,7 @@ export function PreviewImportScreen({ navigation, route }: Props) {
       const newSet = await addSet({ title: trimmed, languageFrom, languageTo });
       addCards(cards.map(c => toCardInput(newSet.id, c)));
       updateSetStats(newSet.id, { cardCount: cards.length, newCount: cards.length });
-      clearImportDraft(setId);
+      clearImportDraft(draftKey);
       setModalVisible(false);
       navigation.replace('SetDetail', { setId: newSet.id });
     } catch (e: any) {
@@ -224,7 +229,7 @@ export function PreviewImportScreen({ navigation, route }: Props) {
     } finally {
       setSaving(false);
     }
-  }, [cards, addSet, addCards, updateSetStats, navigation, setId]);
+  }, [cards, addSet, addCards, updateSetStats, navigation, draftKey]);
 
   // ── render ────────────────────────────────────────────────────────────────
 
@@ -287,6 +292,8 @@ export function PreviewImportScreen({ navigation, route }: Props) {
         <SaveModal
           visible={modalVisible}
           defaultTitle={suggestedTitle}
+          defaultLanguageFrom={defaultLanguageFrom}
+          defaultLanguageTo={defaultLanguageTo}
           saving={saving}
           colors={colors}
           onConfirm={handleSaveConfirm}
