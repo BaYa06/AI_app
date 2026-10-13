@@ -8,10 +8,13 @@ import {
   StyleSheet,
   Pressable,
 } from 'react-native';
+import { useKeepAwake } from '@sayem314/react-native-keep-awake';
+import { Maximize2 } from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { Button, ProgressBar, Screen, Skeleton, SkeletonCard } from '@/components/ui';
+import { Button, Card, ProgressBar, Screen, Skeleton, SkeletonCard } from '@/components/ui';
 import { useThemeColors } from '@/store';
-import { spacing, borderRadius, alpha, heights, screenPadding } from '@/constants';
+import { spacing, borderRadius, alpha, heights, screenPadding, iconSize } from '@/constants';
+import { useExamExitGuard, type ExamAttemptSummary } from '@/hooks/useExamExitGuard';
 import { supabase } from '@/services/supabaseClient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
@@ -39,7 +42,11 @@ type AnswerRecord = {
 export function TestExamScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
 
-  const { sessionId, participantId, questionCount, timePerQuestion, initialQuestionIndex } = route.params;
+  const { sessionId, participantId, questionCount, timePerQuestion, initialQuestionIndex, exitControl } = route.params;
+
+  // Экран не гаснет во время теста: автоблокировка при контроле выхода считалась бы выходом,
+  // да и без него неприятно на вопросе без таймера.
+  useKeepAwake();
 
   const [questionIndex, setQuestionIndex] = useState(initialQuestionIndex || 0);
   const [question, setQuestion] = useState<QuestionData | null>(null);
@@ -64,6 +71,25 @@ export function TestExamScreen({ navigation, route }: Props) {
     });
   }, [navigation, questionCount]);
 
+  // Попытка завершена из-за выхода из приложения (plan/exam_lockdown.md) — итог считает сервер:
+  // неотвеченные вопросы засчитаны как неверные. Разбор ответов не показываем.
+  const finishLeft = useCallback((summary: ExamAttemptSummary) => {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
+    navigation.replace('TestDone', {
+      correct: summary.correct,
+      total: summary.total || questionCount,
+      answered: summary.answered,
+      leftReason: summary.leftReason ?? 'background',
+    });
+  }, [navigation, questionCount]);
+
+  const { splitView, checking } = useExamExitGuard({
+    participantId,
+    enabled: exitControl === true,
+    onLeft: finishLeft,
+  });
+
   const fetchQuestion = useCallback(async (idx: number) => {
     setLoadingQuestion(true);
     setSelectedOption(null);
@@ -82,6 +108,11 @@ export function TestExamScreen({ navigation, route }: Props) {
         body: JSON.stringify({ participantId, questionIndex: idx }),
       });
       const json = await res.json();
+      // 409 — попытка уже завершена из-за выхода (сервер не выдаёт вопросы после выхода)
+      if (res.status === 409 && json.left) {
+        finishLeft(json);
+        return;
+      }
       if (!res.ok) throw new Error(json.error || 'Failed to load question');
       setQuestion(json);
     } catch (e: any) {
@@ -89,7 +120,7 @@ export function TestExamScreen({ navigation, route }: Props) {
     } finally {
       setLoadingQuestion(false);
     }
-  }, [participantId, timePerQuestion]);
+  }, [participantId, timePerQuestion, finishLeft]);
 
   // Загрузить первый вопрос — или, при переподключении к уже идущему тесту, тот, на котором
   // ученик остановился (см. план, пункт 40).
@@ -150,6 +181,8 @@ export function TestExamScreen({ navigation, route }: Props) {
       if (!token) throw new Error('Not authenticated');
       const authHeaders = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
 
+      const withStatus = async (r: Response) => ({ status: r.status, body: await r.json() });
+
       const answerPromise = fetch(`${API_BASE}/test?action=answer`, {
         method: 'POST',
         headers: authHeaders,
@@ -159,17 +192,26 @@ export function TestExamScreen({ navigation, route }: Props) {
           chosenAnswer: option,
           timeSpentSec,
         }),
-      }).then((r) => r.json());
+      }).then(withStatus);
 
       const nextQuestionPromise = !isLastQuestion
         ? fetch(`${API_BASE}/test?action=get-question`, {
             method: 'POST',
             headers: authHeaders,
             body: JSON.stringify({ participantId, questionIndex: nextIdx }),
-          }).then((r) => r.json())
+          }).then(withStatus)
         : Promise.resolve(null);
 
-      const [json, nextQuestion] = await Promise.all([answerPromise, nextQuestionPromise]);
+      const [answerRes, nextRes] = await Promise.all([answerPromise, nextQuestionPromise]);
+
+      // 409 — ответ не принят: попытка завершена из-за выхода из приложения
+      const leftRes = [answerRes, nextRes].find((r) => r?.status === 409 && r.body.left);
+      if (leftRes) {
+        finishLeft(leftRes.body);
+        return;
+      }
+      const json = answerRes.body;
+      const nextQuestion = nextRes?.body;
 
       answersRef.current = [
         ...answersRef.current,
@@ -196,7 +238,7 @@ export function TestExamScreen({ navigation, route }: Props) {
       console.error('answer error:', e);
       setSubmitting(false);
     }
-  }, [submitting, question, participantId, questionIndex, questionCount, timePerQuestion, finishExam]);
+  }, [submitting, question, participantId, questionIndex, questionCount, timePerQuestion, finishExam, finishLeft]);
 
   const progress = questionCount > 0 ? questionIndex / questionCount : 0;
   const timerUrgent = timeLeft <= 5 && timePerQuestion > 0;
@@ -234,7 +276,20 @@ export function TestExamScreen({ navigation, route }: Props) {
       }
       contentStyle={styles.scroll}
     >
-      {loadingQuestion ? (
+      {splitView ? (
+        // iPad Split View / мультиоконность Android: рядом открыто другое приложение. Вопрос
+        // скрыт, таймер идёт; через 3 с сервер засчитает выход (plan/exam_lockdown.md).
+        <Card style={styles.splitCard}>
+          <Maximize2 size={iconSize.l} color={colors.errorText} />
+          <Text variant="h3" accessibilityRole="header" style={[styles.centerText, { color: colors.textPrimary }]}>
+            Разверните приложение на весь экран
+          </Text>
+          <Text variant="bodySmall" style={[styles.centerText, { color: colors.textSecondary }]}>
+            Во время теста нельзя открывать другие приложения рядом. Если не развернуть
+            за 3 секунды, тест завершится, и результат уйдёт учителю.
+          </Text>
+        </Card>
+      ) : loadingQuestion ? (
         <View accessibilityLabel="Загрузка" accessibilityRole="progressbar" style={styles.skeleton}>
           <SkeletonCard height={140} />
           {OPTION_LABELS.map((label) => (
@@ -308,7 +363,7 @@ export function TestExamScreen({ navigation, route }: Props) {
             title="Подтвердить"
             fullWidth
             style={styles.confirmBtn}
-            disabled={!selectedOption}
+            disabled={!selectedOption || checking}
             loading={submitting}
             onPress={() => selectedOption && handleSubmit(selectedOption)}
           />
@@ -396,5 +451,15 @@ const styles = StyleSheet.create({
   },
   confirmBtn: {
     marginTop: spacing.s,
+  },
+
+  // Split View
+  splitCard: {
+    alignItems: 'center',
+    gap: spacing.s,
+    paddingVertical: spacing.xl,
+  },
+  centerText: {
+    textAlign: 'center',
   },
 });

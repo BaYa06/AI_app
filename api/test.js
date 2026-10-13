@@ -973,8 +973,9 @@ async function rejectIfLeft(sql, res, participantId, p) {
 
 /**
  * POST ?action=away
- * Body: { participantId }
- * Приложение ученика ушло в фон. Отметка времени ставится один раз (повтор её не сдвигает).
+ * Body: { participantId, reason? }  — reason: 'background' (по умолчанию) | 'split'
+ * Приложение ученика ушло в фон или открыто рядом с другим (iPad Split View). Отметка времени
+ * ставится один раз (повтор её не сдвигает). reason только для учителя, на правила не влияет.
  */
 async function markAway(req, res, sql, userId) {
   const p = await loadOwnParticipant(req, res, sql, userId);
@@ -990,7 +991,8 @@ async function markAway(req, res, sql, userId) {
     RETURNING id
   `;
   if (rows.length > 0) {
-    await broadcast(p.session_id, 'student_away', { userId: p.user_id, displayName: p.display_name });
+    const reason = req.body.reason === 'split' ? 'split' : 'background';
+    await broadcast(p.session_id, 'student_away', { userId: p.user_id, displayName: p.display_name, reason });
   }
   return res.status(200).json({ ok: true, tracked: true });
 }

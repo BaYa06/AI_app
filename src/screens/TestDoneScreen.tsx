@@ -12,6 +12,7 @@ import {
   Award,
   Home,
   PartyPopper,
+  LogOut,
 } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import { Button, Card, CelebrationIcon, Screen, ScreenHeader, type CelebrationKind } from '@/components/ui';
@@ -26,7 +27,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'TestDone'>;
 export function TestDoneScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
 
-  const { correct, total, answers = [] } = route.params;
+  const { correct, total, answers = [], leftReason, answered } = route.params;
   const wrong = total - correct;
   const percent = total > 0 ? Math.round((correct / total) * 100) : 0;
 
@@ -59,6 +60,13 @@ export function TestDoneScreen({ navigation, route }: Props) {
 
   const goHome = () => navigation.navigate('Main' as any);
 
+  // Попытка завершена досрочно (plan/exam_lockdown.md): без поздравлений, медали и разбора —
+  // иначе итог превращается в шпаргалку для тех, кто ещё проходит тест.
+  const leftTitle =
+    leftReason === 'manual' ? 'Ты завершил тест досрочно'
+    : leftReason === 'relaunch' ? 'Приложение закрывали во время теста'
+    : 'Ты вышел из приложения во время теста';
+
   return (
     <Screen
       enableSwipeBack={false}
@@ -72,7 +80,7 @@ export function TestDoneScreen({ navigation, route }: Props) {
               <Text variant="button" accessibilityRole="header" style={[styles.headerTitle, { color: colors.textPrimary }]}>
                 Тест завершён
               </Text>
-              <PartyPopper size={iconSize.s} color={colors.primary} />
+              {!leftReason && <PartyPopper size={iconSize.s} color={colors.primary} />}
             </View>
           }
         />
@@ -80,6 +88,22 @@ export function TestDoneScreen({ navigation, route }: Props) {
       footer={<Button title="На главную" iconRight={Home} fullWidth onPress={goHome} />}
       contentStyle={styles.scroll}
     >
+      {leftReason && (
+        <Card style={[styles.leftCard, { borderColor: alpha(colors.error, 40) }]}>
+          <View style={styles.rankTitleRow}>
+            <LogOut size={iconSize.s} color={colors.errorText} />
+            <Text variant="label" accessibilityRole="header" style={[styles.rankTitle, { color: colors.textPrimary }]}>
+              {leftTitle}
+            </Text>
+          </View>
+          <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
+            {leftReason === 'manual' ? 'Тест завершён' : 'Тест завершён автоматически'}, результат
+            отправлен учителю. Отвечено {answered ?? correct} из {total}, неотвеченные вопросы
+            засчитаны как неверные.
+          </Text>
+        </Card>
+      )}
+
       {/* Score Circle */}
       <View style={styles.scoreSection}>
         <View
@@ -118,12 +142,15 @@ export function TestDoneScreen({ navigation, route }: Props) {
             </Text>
           </View>
         </View>
-        <Text variant="button" style={[styles.greeting, { color: colors.primary }]}>
-          {getGreeting()}
-        </Text>
+        {!leftReason && (
+          <Text variant="button" style={[styles.greeting, { color: colors.primary }]}>
+            {getGreeting()}
+          </Text>
+        )}
       </View>
 
       {/* Rank Card */}
+      {!leftReason && (
       <Card style={styles.rankCard}>
         <View style={styles.rankLeft}>
           <View style={styles.rankTitleRow}>
@@ -140,6 +167,7 @@ export function TestDoneScreen({ navigation, route }: Props) {
           <Award size={iconSize.l} color={colors.primary} />
         </View>
       </Card>
+      )}
 
       {/* Stats Row */}
       <View style={styles.statsRow}>
@@ -170,7 +198,7 @@ export function TestDoneScreen({ navigation, route }: Props) {
       </View>
 
       {/* Answers Review */}
-      {answers.length > 0 && (
+      {!leftReason && answers.length > 0 && (
         <View style={styles.reviewSection}>
           <Text variant="h3" accessibilityRole="header" style={[styles.reviewTitle, { color: colors.textPrimary }]}>
             Разбор ответов
@@ -232,6 +260,10 @@ const styles = StyleSheet.create({
   },
   scroll: {
     paddingTop: spacing.m,
+  },
+  leftCard: {
+    gap: spacing.xs,
+    marginBottom: spacing.m,
   },
   // Score circle
   scoreSection: {

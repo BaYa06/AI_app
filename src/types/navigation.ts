@@ -192,6 +192,8 @@ export type RootStackParamList = {
     testMode: string;
     questionCount: number;
     timePerQuestion: number;
+    // Учитель включил контроль выхода из приложения (plan/exam_lockdown.md)
+    exitControl?: boolean;
   };
   TestExam: {
     sessionId: string;
@@ -202,10 +204,15 @@ export type RootStackParamList = {
     // С какого вопроса начинать — используется при переподключении к уже идущему тесту
     // (см. TestJoinScreen.tsx, alreadyJoined). По умолчанию 0.
     initialQuestionIndex?: number;
+    // Учитель включил контроль выхода из приложения (plan/exam_lockdown.md)
+    exitControl?: boolean;
   };
   TestDone: {
     correct: number;
     total: number;
+    // Попытка завершена досрочно: вышел из приложения, перезапустил его или нажал «Завершить»
+    leftReason?: 'manual' | 'background' | 'relaunch';
+    answered?: number;
     answers?: Array<{
       word: string;
       yourAnswer: string;

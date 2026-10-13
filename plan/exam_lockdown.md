@@ -102,23 +102,25 @@ iPad под управлением). Свой экран «Вы уверены?�
    (в `monitor` ещё `away` и `exitControl` сессии). В `monitor` поля участников — только
    учителю: ученикам незачем видеть, кто из одноклассников выходил.
 
-## Exam 2 — ученик: отслеживание выхода ⬜
-1. Хук `useExamExitGuard(participantId, enabled)` в src/hooks:
-   - `AppState`: `active → background` → `away` (best effort, JS успевает отправить запрос
-     до засыпания); `background → active` → `back` → по ответу продолжить или открыть экран
-     «Тест завершён».
-   - Флаг «был в фоне» в памяти + AsyncStorage, чтобы `back` отправился даже после
-     переподключения сети.
-   - Web (index.web.js): `document.visibilitychange` (hidden = background). `window.blur` не
-     используем: слишком много ложных срабатываний.
-2. iPad Split View / Slide Over и мультиоконность Android: приложение остаётся `active`,
-   рядом открыто другое. Признак: ширина окна (`useWindowDimensions`) меньше ширины экрана →
-   перекрывающий экран «Разверните приложение на весь экран, чтобы продолжить», вопрос
-   скрыт, таймер идёт. Учителю отправляем `away` с причиной `split`.
-3. Keep-awake на время TestExamScreen (`react-native-keep-awake` или нативный
-   `isIdleTimerDisabled` через существующий модуль), снимается при уходе с экрана.
-4. TestJoinScreen: обработать `leftReason` из `join` → экран «Тест завершён».
-5. Ответ 409 `{ left: true }` в `get-question`/`answer` → тот же экран (подстраховка).
+## Exam 2 — ученик: отслеживание выхода ✅
+1. ✅ Хук src/hooks/useExamExitGuard.ts:
+   - `AppState`: `background` → `away`; `active` → дождаться отправленного `away` (до 3 с,
+     иначе `back` мог бы прийти раньше и засчитать выход) → `back` → продолжить или итог.
+   - AsyncStorage не понадобился: если `back` не дошёл, сервер всё равно вернёт 409 на
+     следующий `get-question`/`answer` (Exam 1, п. 5).
+   - Web: react-native-web сам переводит AppState в `background` по visibilitychange.
+2. ✅ Split View / мультиоконность: окно уже 80 % экрана → `away` с `reason: 'split'`
+   (сервер передаёт причину учителю), вопрос скрыт, текст «Разверните приложение… за 3
+   секунды». Это тот же выход, что и сворачивание. Не определяется: Slide Over на iPad (окно
+   нашего приложения не меняется) и веб (окно браузера почти всегда уже экрана).
+3. ✅ Keep-awake: `@sayem314/react-native-keep-awake@1.4.0` (поддерживает старую архитектуру
+   RN), `useKeepAwake()` на всё время TestExamScreen. Podfile.lock обновит `pod install` в
+   Codemagic.
+4. ✅ TestJoinScreen: шлёт `exitControl: true`; `leftReason` из `join` → TestDone; флаг
+   `exitControl` передаётся через TestWaiting в TestExam.
+5. ✅ 409 `{ left: true }` в `get-question`/`answer` → TestDone.
+6. ✅ (заодно Exam 3, п. 5) TestDone с `leftReason`: карточка «Ты вышел из приложения…»,
+   без поздравления, медали и разбора ответов.
 
 ## Exam 3 — ученик: предупреждение и правила ⬜
 1. Компонент `ExamExitDialog` на текущих UI-компонентах (brandbook): текст из раздела
@@ -129,7 +131,7 @@ iPad под управлением). Свой экран «Вы уверены?�
 3. TestWaitingScreen: карточка правил + «Понятно» (только если `exit_control`; флаг
    приходит в ответе `join`).
 4. Плашка «Контролируемый режим» в шапке TestExamScreen.
-5. TestDone: вариант для `left_reason` («Вы вышли из приложения во время теста»), без
+5. ✅ (сделано в Exam 2) TestDone: вариант для `left_reason` («Вы вышли из приложения во время теста»), без
    разбора правильных ответов, чтобы итоги не превратились в шпаргалку для других.
 6. Realtime `reinstated` → «Учитель разрешил продолжить» → вопрос `answer_count`.
 7. **Ошибка, найденная в Exam 1:** TestExamScreen подписан на канал `test:${sessionId}:exam`, а

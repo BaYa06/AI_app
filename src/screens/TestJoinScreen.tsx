@@ -103,7 +103,9 @@ export function TestJoinScreen({ navigation, route }: Props) {
       const resp = await fetch(`${API_BASE}/test?action=join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ code }),
+        // exitControl: приложение умеет контроль выхода (plan/exam_lockdown.md) — сервер
+        // применяет к нему правило «повторный вход в идущий тест = выход».
+        body: JSON.stringify({ code, exitControl: true }),
       });
       const result = await resp.json();
 
@@ -114,6 +116,23 @@ export function TestJoinScreen({ navigation, route }: Props) {
       // Переподключение к уже идущему тесту — открыть сразу вопрос, на котором ученик
       // остановился, а не всегда с нуля (см. план, пункт 40).
       if (result.alreadyJoined && result.status === 'active') {
+        // Попытка завершена досрочно (вышел из приложения, перезапустил его, нажал «Завершить») —
+        // показать итог, а не вопрос: сервер всё равно не примет ответы.
+        if (result.leftReason) {
+          const doneParams = {
+            correct: result.correct ?? 0,
+            total: result.total ?? result.questionCount,
+            answered: result.answered ?? result.answerCount,
+            leftReason: result.leftReason,
+          };
+          if (isTab) {
+            resetForm();
+            navigation.navigate('TestDone', doneParams);
+          } else {
+            navigation.replace('TestDone', doneParams);
+          }
+          return;
+        }
         if (result.answerCount >= result.questionCount) {
           setError('Ты уже прошёл этот тест');
           setJoining(false);
@@ -126,6 +145,7 @@ export function TestJoinScreen({ navigation, route }: Props) {
           questionCount: result.questionCount,
           timePerQuestion: result.timePerQuestion,
           initialQuestionIndex: result.answerCount,
+          exitControl: result.exitControl === true,
         };
         if (isTab) {
           resetForm();
@@ -144,6 +164,7 @@ export function TestJoinScreen({ navigation, route }: Props) {
         testMode: result.testMode,
         questionCount: result.questionCount,
         timePerQuestion: result.timePerQuestion,
+        exitControl: result.exitControl === true,
       };
       if (isTab) {
         resetForm();

@@ -37,7 +37,7 @@ const MODE_LABELS: Record<string, string> = {
 export function TestWaitingScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
 
-  const { sessionId, participantId, setTitle, testMode, questionCount, timePerQuestion } = route.params;
+  const { sessionId, participantId, setTitle, testMode, questionCount, timePerQuestion, exitControl } = route.params;
 
   const [participants, setParticipants] = useState<Participant[]>([]);
 
@@ -101,6 +101,7 @@ export function TestWaitingScreen({ navigation, route }: Props) {
             testMode,
             questionCount,
             timePerQuestion,
+            exitControl,
           });
         } else if (data.status === 'finished') {
           navigation.navigate('Main' as any);
@@ -114,7 +115,7 @@ export function TestWaitingScreen({ navigation, route }: Props) {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [sessionId, participantId, testMode, questionCount, timePerQuestion]);
+  }, [sessionId, participantId, testMode, questionCount, timePerQuestion, exitControl]);
 
   // Realtime: мгновенный старт (без ожидания следующего polling)
   useEffect(() => {
@@ -128,6 +129,7 @@ export function TestWaitingScreen({ navigation, route }: Props) {
           testMode,
           questionCount,
           timePerQuestion,
+          exitControl,
         });
       })
       .on('broadcast', { event: 'test_finished' }, () => {
@@ -145,7 +147,7 @@ export function TestWaitingScreen({ navigation, route }: Props) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [sessionId, participantId, testMode, questionCount, timePerQuestion]);
+  }, [sessionId, participantId, testMode, questionCount, timePerQuestion, exitControl]);
 
   useEffect(() => {
     // Pulse
