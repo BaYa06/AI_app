@@ -2,7 +2,7 @@
  * API Client для работы с Neon PostgreSQL через Vercel Functions
  */
 
-import { API_BASE, API_ORIGIN } from '@/config/apiBase';
+import { API_BASE } from '@/config/apiBase';
 import { hasAiConsent } from './aiConsent';
 
 // Раньше был отдельный относительный '/api' — не резолвится в fetch() на нативном React
@@ -10,13 +10,10 @@ import { hasAiConsent } from './aiConsent';
 // минимум extractImageCards (единственный реально используемый метод ниже помимо AI_BASE_URL).
 const API_BASE_URL = API_BASE;
 
-// '/ai' — не опечатка: vercel.json намеренно проксирует /ai/:path* на внешний сервер
-// (http://34.9.20.41:3001), отдельно от Vercel-функций под /api. Сохраняем тот же путь и в
-// проде — просто делаем его абсолютным (та же проблема с относительным URL на нативном RN,
-// что и у API_BASE_URL), не меняя, какой бэкенд реально обслуживает эти вызовы.
-const AI_BASE_URL = __DEV__
-  ? 'http://localhost:3000/api'
-  : `${API_ORIGIN}/ai`;
+// Раньше '/ai' проксировался на GCP VM (http://34.9.20.41:3001), которая без оплаты не работает.
+// ИИ теперь — Vercel-функция api/ai (plan/ai_import.md); старые сборки по-прежнему ходят на
+// /ai/*, vercel.json перенаправляет их туда же.
+const AI_BASE_URL = API_BASE;
 
 function requireAiConsent(): void {
   if (!hasAiConsent()) throw new Error('AI consent required');
