@@ -7,7 +7,7 @@
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
-export const GROQ_MODELS = (process.env.GROQ_MODELS || 'openai/gpt-oss-120b,llama-3.3-70b-versatile,openai/gpt-oss-20b')
+export const GROQ_MODELS = (process.env.GROQ_MODELS || 'openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b')
   .split(',').map(m => m.trim()).filter(Boolean);
 
 export function isGroqEnabled() {
@@ -33,8 +33,9 @@ export async function groqGenerate({ model, prompt, temperature, maxOutputTokens
       ],
       temperature,
       max_completion_tokens: maxOutputTokens,
-      // gpt-oss — рассуждающая модель; для наших задач долгие рассуждения не нужны
+      // gpt-oss и qwen — рассуждающие модели: рассуждения короткие и не в ответе (иначе ломают JSON)
       ...(model.startsWith('openai/gpt-oss') ? { reasoning_effort: 'low' } : {}),
+      ...(model.startsWith('qwen/') ? { reasoning_format: 'hidden' } : {}),
     }),
     signal: AbortSignal.timeout(timeoutMs),
   });
