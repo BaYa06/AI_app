@@ -145,6 +145,12 @@ class LibraryServiceClass {
     return callLibraryApi<LibrarySet[]>({ action: 'my-publications' }, { requireAuth: true });
   }
 
+  /** Может ли пользователь публиковать в библиотеку — только админ */
+  async canPublish(): Promise<boolean> {
+    const json = await callLibraryApi<{ canPublish?: boolean }>({ action: 'can-publish' }, { requireAuth: true });
+    return json.canPublish === true;
+  }
+
   /** Check if a personal set is published */
   async checkPublished(setId: string, _userId: string): Promise<CheckPublishedResponse> {
     return callLibraryApi<CheckPublishedResponse>({ action: 'check-published', setId }, { requireAuth: true });

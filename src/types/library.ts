@@ -85,6 +85,8 @@ export interface ImportResponse {
 export interface CheckPublishedResponse {
   isPublished: boolean;
   librarySetId?: string;
+  /** Публиковать в библиотеку может только админ (api/library.js). */
+  canPublish?: boolean;
 }
 
 export interface ToggleLikeResponse {

@@ -12,7 +12,7 @@ import {
   Linking,
 } from 'react-native';
 import { useSettingsStore, useThemeColors, useDiamondStore } from '@/store';
-import { supabase, NeonService, Analytics, StreakService, DatabaseService } from '@/services';
+import { supabase, NeonService, Analytics, StreakService, DatabaseService, LibraryService } from '@/services';
 import type { UserStats } from '@/services';
 import { Text } from '@/components/common';
 import { spacing, borderRadius, iconSize, alpha } from '@/constants';
@@ -87,6 +87,18 @@ export function ProfileScreen({ navigation }: any) {
 
   // Имя и статистика из БД (обновляем при каждом фокусе экрана)
   const sessionUserId = session?.user?.id;
+
+  // «Мои публикации» — только тем, кто может публиковать в библиотеку (админам)
+  const [canPublish, setCanPublish] = useState(false);
+  useEffect(() => {
+    if (!COMMUNITY_LIBRARY_ENABLED || !sessionUserId) {
+      setCanPublish(false);
+      return;
+    }
+    let active = true;
+    LibraryService.canPublish().then((v) => { if (active) setCanPublish(v); }).catch(() => {});
+    return () => { active = false; };
+  }, [sessionUserId]);
   // Согласие на передачу данных ИИ (App Review 5.1.2(i)): даётся при первом использовании ИИ, здесь — отзыв
   const [aiConsent, setAiConsentState] = useState(hasAiConsent);
   const handleToggleAiConsent = useCallback(async (value: boolean) => {
@@ -277,7 +289,7 @@ export function ProfileScreen({ navigation }: any) {
       {/* ======== Account ======== */}
       <ListGroup title="Аккаунт" style={st.group}>
         <ListRow icon={User} title="Личные данные" onPress={() => navigation?.navigate('PersonalInfo')} />
-        {COMMUNITY_LIBRARY_ENABLED && (
+        {COMMUNITY_LIBRARY_ENABLED && canPublish && (
           <ListRow icon={BookOpen} title="Мои публикации" onPress={() => navigation?.navigate('MyPublications')} />
         )}
       </ListGroup>

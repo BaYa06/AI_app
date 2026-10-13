@@ -115,6 +115,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
 
   // Publish states
   const [isPublished, setIsPublished] = useState(false);
+  const [canPublish, setCanPublish] = useState(false);
   const [librarySetId, setLibrarySetId] = useState<string | null>(null);
   const [showPublishForm, setShowPublishForm] = useState(false);
   const [publishDescription, setPublishDescription] = useState('');
@@ -152,6 +153,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.user?.id) return;
         const result = await LibraryService.checkPublished(setId, session.user.id);
+        setCanPublish(result.canPublish === true);
         if (result.isPublished) {
           setIsPublished(true);
           setLibrarySetId(result.librarySetId ?? null);
@@ -580,7 +582,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
             </View>
 
             {/* Публикация в библиотеку */}
-            {COMMUNITY_LIBRARY_ENABLED && isEditing && !isReadOnly && (
+            {COMMUNITY_LIBRARY_ENABLED && canPublish && isEditing && !isReadOnly && (
               <View style={styles.field}>
                 <Text variant="label" color="primary" style={styles.fieldLabel}>
                   Библиотека

@@ -294,7 +294,7 @@ export function LibraryScreen() {
     });
   }, []);
 
-  // Initial load (наборы сообщества выключены — во вкладке только учебники)
+  // Initial load (при выключенной библиотеке во вкладке только учебники)
   useEffect(() => {
     if (!COMMUNITY_LIBRARY_ENABLED) return;
     fetchAllSections(userId);
@@ -399,7 +399,7 @@ export function LibraryScreen() {
           <TextField
             variant="search"
             icon={Search}
-            placeholder={COMMUNITY_LIBRARY_ENABLED ? 'Поиск наборов или @ник автора...' : 'Поиск учебников'}
+            placeholder={COMMUNITY_LIBRARY_ENABLED ? 'Поиск наборов...' : 'Поиск учебников'}
             accessibilityLabel={COMMUNITY_LIBRARY_ENABLED ? 'Поиск наборов' : 'Поиск учебников'}
             value={searchText}
             onChangeText={onSearchChange}
