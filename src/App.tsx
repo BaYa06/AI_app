@@ -129,12 +129,10 @@ function AppRoot({
     });
   }, [isAuthenticated, needsOnboarding]);
 
-  // В нативном приложении баннера нет: сразу системный запрос iOS. Диалог показывается
-  // только пока пользователь не ответил, дальше вызов лишь перерегистрирует токен.
-  useEffect(() => {
-    if (!isAuthenticated || needsOnboarding || !currentUserId || Platform.OS === 'web') return;
-    requestPushPermission(currentUserId).catch(() => {});
-  }, [isAuthenticated, needsOnboarding, currentUserId]);
+  // В нативном приложении системный диалог iOS сразу после онбординга больше не показываем
+  // (plan/push_notifications.md, 1.1): он бывает один раз, и тратить его на человека, который ещё
+  // не видел пользы, нельзя. Его открывает лист после первого урока (1.2). Если разрешение уже есть,
+  // токен тихо обновляет refreshPushToken при входе (handleSession) и после онбординга.
 
   // Полный safe area сверху: контент не заходит под статус-бар / Dynamic Island.
   // Нижний отступ каждый низ экрана учитывает сам (панель вкладок — в AppNavigator).
