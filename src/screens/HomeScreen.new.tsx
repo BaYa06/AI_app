@@ -57,6 +57,7 @@ import type { Card, CardSet } from '@/types';
 import { isCardWaitingReview } from '@/services/SRSService';
 import { StorageService, STORAGE_KEYS } from '@/services/StorageService';
 import { Analytics } from '@/services/analytics';
+import { currentPushOrigin, reportPushLesson } from '@/services/pushOpens';
 import { firstLessonStep } from '@/services/lessonFlow';
 import { useLessonStore } from '@/store/lessonStore';
 import { localDay } from '@/store/challengeStore';
@@ -721,7 +722,9 @@ export function HomeScreen({ navigation, route }: any) {
       reviewCount: plan.state === 'mistakes' ? plan.mistakeIds.length : plan.reviewIds.length,
       newCount: plan.newIds.length,
       minutes: plan.minutes,
+      pushId: currentPushOrigin()?.pushId,
     });
+    reportPushLesson('lesson_started');
     const rootNav = navigation?.getParent?.() ?? navigation;
     rootNav?.navigate(step.screen, step.params);
   }, [navigation, reviewStats, cardsMap]);
@@ -761,12 +764,13 @@ export function HomeScreen({ navigation, route }: any) {
   }, [lessonContent, lessonPlan, startLesson, computeLessonPlan, navigation]);
 
   // Ссылка из виджета на экране блокировки (plan/widgets.md, 0.3): flashly://lesson?from=widget.
+  // Тап по пушу (plan/push_notifications.md, 0.5) — та же ссылка с from=push.
   // Ждём, пока загрузятся карточки и станет известна роль, и запускаем урок, только если он не пройден:
   // «Ещё 10 новых» и «Найти набор» по нажатию на виджет не делаем. Параметр сбрасываем сразу,
   // чтобы следующее нажатие на виджет снова сработало, а возврат на главную урок не запускал.
   const widgetFrom = route?.params?.from;
   useEffect(() => {
-    if (widgetFrom !== 'widget' || isTeacher === null) return;
+    if ((widgetFrom !== 'widget' && widgetFrom !== 'push') || isTeacher === null) return;
     if (!isTeacher && !lessonContent && !hasLessonCards) return;
     navigation?.setParams?.({ from: undefined, state: undefined, family: undefined });
     if (isTeacher || lessonContent?.kind !== 'start') return;

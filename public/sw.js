@@ -3,7 +3,7 @@
 // ============================================================
 // ВАЖНО: bump CACHE_VERSION при каждом значимом изменении SW,
 // webpack contenthash в именах чанков позаботится об остальном.
-const CACHE_VERSION = 11;
+const CACHE_VERSION = 12;
 const CACHE_NAME = `flashly-static-v${CACHE_VERSION}`;
 const CACHE_FONTS = 'flashly-fonts-v1';
 const CACHE_IMAGES = 'flashly-images-v1';
@@ -53,7 +53,13 @@ self.addEventListener('notificationclick', (event) => {
   console.log('[SW] Notification click:', event.notification.tag);
   event.notification.close();
 
-  const targetUrl = event.notification.data?.url || '/';
+  // push_id и тип — в адресе: страница отметит открытие (pushNotifications.ts → getInitialPushData).
+  // data.link (flashly://…) — для iOS-приложения, в браузере его не открыть.
+  const data = event.notification.data || {};
+  const baseUrl = data.url && !String(data.url).startsWith('flashly://') ? data.url : '/';
+  const targetUrl = data.push_id
+    ? `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}push_id=${encodeURIComponent(data.push_id)}&push_type=${encodeURIComponent(data.type || '')}`
+    : baseUrl;
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {

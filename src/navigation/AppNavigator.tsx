@@ -3,14 +3,16 @@
  * @description Главный навигатор приложения
  */
 import React, { useEffect } from 'react';
-import { Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import { triggerHaptic } from '@/utils/haptic';
 import { NavigationContainer, useNavigationContainerRef, type LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useThemeColors, useSettingsStore } from '@/store';
 import type { RootStackParamList, MainTabParamList } from '@/types/navigation';
-import { isWidgetUrl } from '@/services/widgetLinks';
+import { isNavigationUrl } from '@/services/widgetLinks';
+import { getInitialPushData, onPushOpened } from '@/services/pushNotifications';
+import { handlePushOpen } from '@/services/pushOpens';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { typography, iconSize, spacing } from '@/constants';
 // Панель вкладок — единственное место с Ionicons (брендбук, раздел 6)
@@ -216,9 +218,27 @@ function MainTabs() {
 // сброса стека. Приглашения (/join/TOKEN) обрабатываются отдельно в App.tsx.
 // Из flashly:// пропускаем только ссылки виджета (plan/widgets.md, 0.3): lesson и set/<setId>.
 // Вход (flashly://auth-callback) и приглашения по-прежнему разбирает App.tsx.
+// Тап по пушу (plan/push_notifications.md, 0.5) идёт сюда же: data.link пуша — та же flashly:// ссылка.
 const NATIVE_LINKING: LinkingOptions<RootStackParamList> = {
   prefixes: ['flashly://'],
-  filter: isWidgetUrl,
+  filter: isNavigationUrl,
+  // Холодный старт: сначала обычная ссылка (виджет), иначе — пуш, которым открыли приложение
+  async getInitialURL() {
+    const url = await Linking.getInitialURL();
+    if (url) return url;
+    return handlePushOpen(await getInitialPushData());
+  },
+  subscribe(listener) {
+    const linkSubscription = Linking.addEventListener('url', ({ url }) => listener(url));
+    const unsubscribePush = onPushOpened((data) => {
+      const link = handlePushOpen(data);
+      if (link) listener(link);
+    });
+    return () => {
+      linkSubscription.remove();
+      unsubscribePush();
+    };
+  },
   config: {
     screens: {
       Main: {
@@ -253,6 +273,7 @@ const NATIVE_LINKING: LinkingOptions<RootStackParamList> = {
       PersonalInfo: 'personal-info',
       Security: 'security',
       SetEditor: 'set-editor',
+      CourseLeaderboard: 'rating/:courseId',
       TeacherCourseStats: 'teacher/:courseId',
       TeacherStudents: 'teacher/:courseId/students',
     },
@@ -262,6 +283,12 @@ const NATIVE_LINKING: LinkingOptions<RootStackParamList> = {
 export function AppNavigator() {
   const colors = useThemeColors();
   const navigationRef = useNavigationContainerRef<RootStackParamList>();
+
+  // Веб: тап по пушу открывает страницу с ?push_id= — отмечаем открытие (переход не нужен, это главная)
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    getInitialPushData().then(handlePushOpen).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (Platform.OS !== 'web') return;

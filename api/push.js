@@ -11,6 +11,7 @@
  * GET|POST /api/push?action=cron-reminders – cron-job.org каждые 15 мин: одно напоминание в день в notif_hour:notif_minute
  *          &dry_run=1 — ничего не шлёт: кому, что и почему (в push_log статус dry_run)
  * Переменная PUSH_PAUSED=1 — аварийная остановка: маркетинговые пуши не уходят, от учителя уходят
+ * POST /api/push?action=opened          – тап по пушу / урок после пуша (JWT): { push_id, stage? } → push_log
  * GET  /api/push?action=rewards           – diamond balance + challenges claimed today
  * POST /api/push?action=claim-reward      – claim daily challenge reward (once per day)
  */
@@ -163,18 +164,18 @@ async function pickReminder(sql, u, standingsCache) {
       const rows = standingsCache.get(course.id);
       const idx = rows.findIndex((r) => r.user_id === u.user_id);
       if (idx >= 0 && rows[idx].points > 0) {
-        return { type: 'rating_sunday', data: { place: idx + 1, gap: idx > 0 ? rows[idx - 1].points - rows[idx].points : null } };
+        return { type: 'rating_sunday', data: { place: idx + 1, gap: idx > 0 ? rows[idx - 1].points - rows[idx].points : null, courseId: course.id } };
       }
     }
   }
   // Понедельник: итоги прошлой недели (их закрывает progress?action=close-week)
   if (dow === 'mon') {
     const [result] = await sql`
-      SELECT place, reward FROM weekly_results
+      SELECT course_id, place, reward FROM weekly_results
       WHERE user_id = ${u.user_id} AND week_start >= (${u.local_today}::date - 7)
       ORDER BY week_start DESC, place ASC LIMIT 1
     `;
-    if (result) return { type: 'weekly_result', data: { place: result.place, reward: result.reward } };
+    if (result) return { type: 'weekly_result', data: { place: result.place, reward: result.reward, courseId: result.course_id } };
   }
   if (u.done_today) return null; // повторение дня уже сделано — не беспокоим
 
@@ -215,6 +216,18 @@ const TRANSACTIONAL_TYPES = new Set(['teacher_review']);
 /** Аварийный выключатель: PUSH_PAUSED=1 в переменных Vercel останавливает маркетинговые пуши без деплоя. */
 function isPushPaused() {
   return process.env.PUSH_PAUSED === '1';
+}
+
+/**
+ * Куда ведёт тап (план, принцип 4): урок дня или рейтинг курса. from=push — главная запускает урок,
+ * как по ссылке виджета. Старые сборки поля link не знают и открывают главную, как раньше.
+ */
+function pushLink(type, data) {
+  if (data?.courseId && (type === 'rating_sunday' || type === 'weekly_result')) {
+    const week = type === 'weekly_result' ? '&week=previous' : '';
+    return `flashly://rating/${encodeURIComponent(data.courseId)}?from=push${week}`;
+  }
+  return 'flashly://lesson?from=push';
 }
 
 /**
@@ -281,7 +294,7 @@ export async function sendNotification(sql, userId, type, data = {}, { dryRun = 
     result = await messaging.sendEachForMulticast({
       tokens,
       notification: message,
-      data: { type, url: '/', push_id: pushId },
+      data: { type, url: '/', push_id: pushId, link: pushLink(type, data) },
       apns: { payload: { aps: { sound: 'default' } } },
     });
   } catch (e) {
@@ -432,6 +445,38 @@ export default async function handler(req, res) {
         await sql`DELETE FROM push_log WHERE created_at < NOW() - INTERVAL '180 days'`;
       }
       return res.status(200).json(result);
+    }
+
+    // ── opened: тап по пушу и урок после него (план, шаг 0.5) ──
+    // Только своя строка журнала. Первая отметка не перезаписывается.
+    if (action === 'opened' && req.method === 'POST') {
+      const userId = await getAuthedUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const { push_id: pushId, stage = 'opened' } = req.body || {};
+      if (typeof pushId !== 'string' || !/^[0-9a-f-]{36}$/i.test(pushId)) {
+        return res.status(400).json({ error: 'Invalid push_id' });
+      }
+      let rows;
+      if (stage === 'opened') {
+        rows = await sql`
+          UPDATE push_log SET opened_at = COALESCE(opened_at, NOW())
+          WHERE id = ${pushId}::uuid AND user_id = ${userId}::uuid RETURNING id
+        `;
+      } else if (stage === 'lesson_started') {
+        rows = await sql`
+          UPDATE push_log SET lesson_started_at = COALESCE(lesson_started_at, NOW()),
+                              opened_at = COALESCE(opened_at, NOW())
+          WHERE id = ${pushId}::uuid AND user_id = ${userId}::uuid RETURNING id
+        `;
+      } else if (stage === 'lesson_completed') {
+        rows = await sql`
+          UPDATE push_log SET lesson_completed_at = COALESCE(lesson_completed_at, NOW())
+          WHERE id = ${pushId}::uuid AND user_id = ${userId}::uuid RETURNING id
+        `;
+      } else {
+        return res.status(400).json({ error: 'Invalid stage' });
+      }
+      return res.status(200).json({ ok: rows.length > 0 });
     }
 
     // ── rewards: баланс алмазов + какие челленджи уже забраны сегодня ──

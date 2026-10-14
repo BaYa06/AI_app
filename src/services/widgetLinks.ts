@@ -22,6 +22,14 @@ export function isWidgetUrl(url: string): boolean {
   return WIDGET_URL_RE.test(url);
 }
 
+/** Рейтинг курса из пуша (plan/push_notifications.md, 0.5): flashly://rating/<courseId>?from=push */
+const RATING_URL_RE = /^flashly:\/\/rating\/[^/?#]+\/?(\?.*)?$/;
+
+/** Что пропускаем в React Navigation: ссылки виджета и ссылки из пушей (урок — та же flashly://lesson) */
+export function isNavigationUrl(url: string): boolean {
+  return isWidgetUrl(url) || RATING_URL_RE.test(url);
+}
+
 export function parseWidgetUrl(url: string): WidgetLink | null {
   const match = url.match(WIDGET_URL_RE);
   if (!match) return null;

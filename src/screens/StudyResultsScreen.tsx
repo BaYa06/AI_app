@@ -7,6 +7,7 @@ import { View, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { useThemeColors } from '@/store';
 import { Text, StreakCelebrationModal } from '@/components/common';
 import { Analytics } from '@/services/analytics';
+import { currentPushOrigin, reportPushLesson } from '@/services/pushOpens';
 import { recordSessionForRatingPrompt, markRatingPromptShown } from '@/services/feedback';
 import { RatingPromptModal } from '@/components/RatingPromptModal';
 import { spacing, borderRadius, heights, iconSize, screenPadding, alpha } from '@/constants';
@@ -200,7 +201,9 @@ export function StudyResultsScreen({ navigation, route }: Props) {
             reviewCount: lesson.reviewCount ?? 0,
             newCount: lesson.newIds.length,
             durationSec: Math.round((Date.now() - lesson.startedAt) / 1000),
+            pushId: currentPushOrigin()?.pushId,
           });
+          reportPushLesson('lesson_completed');
         }
         navigation.navigate('Main', { screen: 'Home' });
         return;

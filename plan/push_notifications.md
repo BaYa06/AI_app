@@ -235,6 +235,9 @@
   - Запоминать `push_id` до конца сессии и передавать его в `lessonStarted` / `lessonCompleted` (`source: 'push'`, `push_id`) и на сервер вместе с синхронизацией прогресса → `push_log.lesson_*_at`.
   - Веб: `sw.js` → `notificationclick` открывает `data.link` и отправляет тот же `opened`.
   - **Готово, когда:** тап по тестовому пушу с `link = flashly://lesson` открывает урок, в `push_log` появляется `opened_at`, в GA4 — `push_notification_opened` с типом.
+  - ✅ Код (14.10.2026): сервер кладёт `data.link` (`flashly://lesson?from=push`, для рейтинга — `flashly://rating/<courseId>?from=push`), ручка `opened` (JWT, `stage`: `opened` / `lesson_started` / `lesson_completed`, только своя строка). Клиент: `src/services/pushOpens.ts`, `getInitialURL` / `subscribe` в `NATIVE_LINKING`, главная запускает урок по `from=push` как по виджету, `CourseLeaderboard` открывается по `rating/:courseId`. Урок засчитывается пушу в течение 6 ч после тапа.
+  - Не сделано: если человек вышел из аккаунта, ссылка из пуша не сохраняется до входа (пуши приходят только на токены вошедших — редкий случай).
+  - ⬜ Проверить на TestFlight: тап из закрытого приложения и из фона. Веб: отметка открытия зависит от того, вызывает ли Firebase SDK наш `notificationclick` (уведомления с `notification` он показывает сам) — проверить в браузере.
 
 - [ ] **0.6 Учитывать дни недели и время из настроек** — `api/push.js`
   - `sendDailyReminders`: фильтровать по `notif_days` (сейчас не учитывается). `notif_minute` оставляем: cron каждые 15 минут (решено 14.10.2026), на экране настроек — выбор минут 00/15/30/45.

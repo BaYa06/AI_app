@@ -17,6 +17,8 @@ import {
   hasPermission,
   onMessage,
   onTokenRefresh,
+  getInitialNotification,
+  onNotificationOpenedApp,
   AuthorizationStatus,
 } from '@react-native-firebase/messaging';
 import { API_BASE as APP_API_BASE } from '@/config/apiBase';
@@ -126,6 +128,26 @@ export async function subscribeForegroundMessages(handler: ForegroundMessageHand
       body: message.notification?.body,
       data: message.data as Record<string, string> | undefined,
     });
+  });
+}
+
+/** data пуша, тапом по которому приложение было запущено из закрытого состояния */
+export async function getInitialPushData(): Promise<Record<string, string> | null> {
+  if (!IS_SUPPORTED) return null;
+  try {
+    const message = await getInitialNotification(messaging());
+    return (message?.data as Record<string, string> | undefined) ?? null;
+  } catch (error) {
+    console.warn('[Push] getInitialNotification failed:', error);
+    return null;
+  }
+}
+
+/** Тап по пушу, когда приложение было в фоне. Возвращает отписку. */
+export function onPushOpened(handler: (data: Record<string, string>) => void): () => void {
+  if (!IS_SUPPORTED) return () => {};
+  return onNotificationOpenedApp(messaging(), (message) => {
+    handler((message.data as Record<string, string> | undefined) ?? {});
   });
 }
 

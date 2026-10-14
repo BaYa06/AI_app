@@ -279,6 +279,28 @@ export async function subscribeForegroundMessages(handler: ForegroundMessageHand
 /**
  * Отписка от push-уведомлений: удаляет токен с backend.
  */
+/**
+ * Тап по пушу в вебе: sw.js открывает страницу с ?push_id=…&push_type=… (план, шаг 0.5).
+ * Параметры забираем один раз и убираем из адресной строки.
+ */
+export async function getInitialPushData(): Promise<Record<string, string> | null> {
+  if (typeof window === 'undefined') return null;
+  const params = new URLSearchParams(window.location.search);
+  const pushId = params.get('push_id');
+  if (!pushId) return null;
+  const type = params.get('push_type') || 'unknown';
+  params.delete('push_id');
+  params.delete('push_type');
+  const query = params.toString();
+  window.history.replaceState(window.history.state, '', `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`);
+  return { push_id: pushId, type };
+}
+
+/** В вебе тап по пушу перезагружает вкладку (sw.js → client.navigate), его ловит getInitialPushData */
+export function onPushOpened(_handler: (data: Record<string, string>) => void): () => void {
+  return () => {};
+}
+
 export async function unsubscribePush(): Promise<boolean> {
   try {
     const token = currentToken || getStoredToken();

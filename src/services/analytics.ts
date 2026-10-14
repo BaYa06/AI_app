@@ -427,11 +427,14 @@ export const Analytics = {
     log('push_permission_denied'),
 
   /**
-   * Юзер открыл приложение через push-уведомление.
-   * Зачем: считаем CTR пушей. Ниже 5% → нужно менять текст/время.
+   * Юзер открыл приложение тапом по push-уведомлению (plan/push_notifications.md, 0.5).
+   * type — тип из реестра на сервере (review_due, teacher_review…), push_id — строка push_log.
    */
-  pushNotificationOpened: (notificationType: 'streak_reminder' | 'teacher_alert' | 'weekly_report') =>
-    log('push_notification_opened', { notification_type: notificationType }),
+  pushNotificationOpened: (params: { type: string; pushId?: string }) =>
+    log('push_notification_opened', {
+      notification_type: params.type,
+      ...(params.pushId ? { push_id: params.pushId } : null),
+    }),
 
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -523,23 +526,25 @@ export const Analytics = {
   /**
    * Урок запущен с главной. Доля lesson_started среди lesson_card_viewed — конверсия карточки.
    */
-  lessonStarted: (params: { state: string; reviewCount: number; newCount: number; minutes: number }) =>
+  lessonStarted: (params: { state: string; reviewCount: number; newCount: number; minutes: number; pushId?: string }) =>
     log('lesson_started', {
       state: params.state,
       review_count: params.reviewCount,
       new_count: params.newCount,
       minutes: params.minutes,
+      ...(params.pushId ? { source: 'push', push_id: params.pushId } : null),
     }),
 
   /**
    * Пройдена последняя часть урока. lesson_completed / lesson_started — доля доведённых до конца;
    * duration_sec сравниваем с обещанным «~N мин».
    */
-  lessonCompleted: (params: { reviewCount: number; newCount: number; durationSec: number }) =>
+  lessonCompleted: (params: { reviewCount: number; newCount: number; durationSec: number; pushId?: string }) =>
     log('lesson_completed', {
       review_count: params.reviewCount,
       new_count: params.newCount,
       duration_sec: params.durationSec,
+      ...(params.pushId ? { source: 'push', push_id: params.pushId } : null),
     }),
 
   /**
