@@ -534,7 +534,8 @@ export function PreviewImportScreen({ navigation, route }: Props) {
         {`Будет добавлено ${checked.length} из ${items.length}`}
       </Text>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
+      {/* flexGrow/flexShrink 0: иначе при длинном списке ScrollView сжимается и чипы уходят под FlatList */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersBar} contentContainerStyle={styles.filters}>
         {filters.filter(f => f.key === 'all' || f.count > 0).map(f => (
           <Chip key={f.key} label={`${f.label} ${f.count}`} selected={filter === f.key} onPress={() => setFilter(f.key)} />
         ))}
@@ -546,6 +547,7 @@ export function PreviewImportScreen({ navigation, route }: Props) {
         renderItem={({ item }) => (
           <ItemRow item={item} editing={editingKey === item.key} onToggle={toggle} onEdit={setEditingKey} onChange={change} />
         )}
+        style={styles.flex1}
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -598,6 +600,7 @@ const styles = StyleSheet.create({
   flex1: { flex: 1 },
   dimmed: { opacity: 0.6 },
   subtitle: { paddingHorizontal: screenPadding, marginTop: -spacing.xs },
+  filtersBar: { flexGrow: 0, flexShrink: 0 },
   filters: { paddingHorizontal: screenPadding, paddingVertical: spacing.s, gap: spacing.xs },
   list: { paddingHorizontal: screenPadding, paddingBottom: spacing.l },
   separator: { height: spacing.xs },
