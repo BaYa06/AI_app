@@ -6,7 +6,8 @@
  * арбитр (2.2) берёт самый важный; transactional — уходит и на паузе, и мимо дневного лимита;
  * minIntervalDays — не чаще раза в N дней; link — куда ведёт тап; variants — тексты (A/B — этап 4).
  *
- * Вариант получает ctx = { name, displayName, streak, longest, secPerAnswer, data } и возвращает { title, body }.
+ * Вариант получает ctx = { userId, name, displayName, streak, longest, secPerAnswer, data } и возвращает { title, body }.
+ * Вариантов несколько (4.1) — выбирается variantIndex(userId, type); правила тона — plan/brandbook.md, 9.1.
  * Правило реестра (принцип 3 плана): в тексте должно быть число или имя, иначе пуш не собирается.
  */
 
@@ -157,7 +158,11 @@ export const PUSH_TYPES = {
     variants: [
       ({ data, secPerAnswer }) => ({
         title: 'Слова начинают забываться',
-        body: `${data.count} ${plural(data.count, 'слово', 'слова', 'слов')} давно не повторял — спаси их за ${minutesFor(data.count, secPerAnswer)} мин`,
+        body: `${data.count} ${plural(data.count, 'слово', 'слова', 'слов')} давно без повторения — спаси их за ${minutesFor(data.count, secPerAnswer)} мин`,
+      }),
+      ({ data, secPerAnswer }) => ({
+        title: `${data.count} ${plural(data.count, 'слово начинает', 'слова начинают', 'слов начинают')} забываться`,
+        body: `Повтори их за ~${minutesFor(data.count, secPerAnswer)} мин, пока они ещё в памяти`,
       }),
     ],
   },
@@ -171,6 +176,14 @@ export const PUSH_TYPES = {
       ({ data, secPerAnswer }) => ({
         title: 'Пора повторить',
         body: `${data.count} ${plural(data.count, 'слово ждёт', 'слова ждут', 'слов ждут')} повторения · ~${minutesFor(data.count, secPerAnswer)} мин`,
+      }),
+      ({ data, secPerAnswer }) => ({
+        title: `${data.count} ${plural(data.count, 'слово', 'слова', 'слов')} на повторение`,
+        body: `Займёт ~${minutesFor(data.count, secPerAnswer)} мин — лучше сейчас, пока помнишь`,
+      }),
+      ({ data, secPerAnswer }) => ({
+        title: `~${minutesFor(data.count, secPerAnswer)} мин на повторение`,
+        body: `${data.count} ${plural(data.count, 'слово', 'слова', 'слов')} как раз пора повторить`,
       }),
     ],
   },
@@ -197,7 +210,11 @@ export const PUSH_TYPES = {
     variants: [
       ({ name, streak }) => ({
         title: 'Не теряй серию!',
-        body: `${name}, у тебя ${streak} ${plural(streak, 'день', 'дня', 'дней')} подряд. Позанимайся сегодня!`,
+        body: `${name}, у тебя ${streak} ${plural(streak, 'день', 'дня', 'дней')} подряд. Позанимайся сегодня`,
+      }),
+      ({ streak }) => ({
+        title: `Серия: ${streak} ${plural(streak, 'день', 'дня', 'дней')}`,
+        body: `Сделай сегодняшний урок — и будет ${streak + 1}`,
       }),
     ],
   },
@@ -214,6 +231,10 @@ export const PUSH_TYPES = {
         title: 'Слова ждут',
         body: `${data.count} ${plural(data.count, 'слово ждёт', 'слова ждут', 'слов ждут')} повторения · ~${minutesFor(data.count, secPerAnswer)} мин`,
       }),
+      ({ data, secPerAnswer }) => ({
+        title: `${data.count} ${plural(data.count, 'слово ждёт', 'слова ждут', 'слов ждут')} тебя`,
+        body: `~${minutesFor(data.count, secPerAnswer)} мин — и повторение сделано`,
+      }),
     ],
   },
   reactivation_4d: {
@@ -227,6 +248,10 @@ export const PUSH_TYPES = {
         title: 'Слова скоро забудутся',
         body: `Без повторения ${data.count} ${plural(data.count, 'слово скоро забудется', 'слова скоро забудутся', 'слов скоро забудутся')}`,
       }),
+      ({ data }) => ({
+        title: 'Пора освежить слова',
+        body: `${data.count} ${plural(data.count, 'слово', 'слова', 'слов')} без повторения — хватит пары минут`,
+      }),
     ],
   },
   reactivation_14d: {
@@ -237,6 +262,7 @@ export const PUSH_TYPES = {
     link: LESSON_LINK,
     variants: [
       () => ({ title: 'Лёгкий вход', body: 'Начни с 5 слов — займёт минуту' }),
+      () => ({ title: 'Вернись с 5 слов', body: 'Одна минута — и ты снова в ритме' }),
     ],
   },
   reactivation_30d: {
@@ -249,6 +275,10 @@ export const PUSH_TYPES = {
       ({ data }) => ({
         title: data.sets === 1 ? 'Твой набор на месте' : 'Твои наборы на месте',
         body: `${data.sets} ${plural(data.sets, 'набор ждёт', 'набора ждут', 'наборов ждут')}. Вернёшься — продолжим с того же места`,
+      }),
+      ({ data }) => ({
+        title: `${data.sets} ${plural(data.sets, 'набор', 'набора', 'наборов')} на месте`,
+        body: 'Продолжим с того же места в любой момент',
       }),
     ],
   },
@@ -278,6 +308,15 @@ export const PUSH_TYPES = {
         : {
             title: 'Вернись к учёбе',
             body: `Твой рекорд был ${longest} ${plural(longest, 'день', 'дня', 'дней')}. Начни новую серию!`,
+          }),
+      ({ longest, data }) => (data.learned > 0
+        ? {
+            title: `${data.learned} ${plural(data.learned, 'слово уже твоё', 'слова уже твои', 'слов уже твои')}`,
+            body: 'Неделя без повторения — самое время освежить',
+          }
+        : {
+            title: `Рекорд серии — ${longest} ${plural(longest, 'день', 'дня', 'дней')}`,
+            body: 'Начни новую серию сегодня',
           }),
     ],
   },
@@ -345,13 +384,27 @@ export function pushType(type) {
 }
 
 /**
+ * Вариант текста (4.1): детерминированно по пользователю и типу (FNV-1a), чтобы человек не прыгал
+ * между вариантами. Сравниваем варианты не по открытиям, а по «открыл → урок завершён».
+ */
+export function variantIndex(userId, type, count) {
+  if (count <= 1 || !userId) return 0;
+  let h = 0x811c9dc5;
+  for (const ch of `${userId}:${type}`) {
+    h ^= ch.charCodeAt(0);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h % count;
+}
+
+/**
  * Собрать пуш: { title, body, link, variant } или null — неизвестный тип или текст без конкретики
  * (нет ни числа, ни имени: например, данные не пришли и вышло «undefined слов»).
  */
 export function buildPush(type, ctx) {
   const def = pushType(type);
   if (!def) return null;
-  const variant = 0; // A/B-варианты — этап 4
+  const variant = variantIndex(ctx.userId, type, def.variants.length);
   const message = def.variants[variant]({ ...ctx, data: ctx.data || {} });
   const text = `${message.title} ${message.body}`;
   if (text.includes('undefined') || text.includes('NaN')) return null;

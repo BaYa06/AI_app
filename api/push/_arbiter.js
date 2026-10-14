@@ -578,6 +578,7 @@ export async function runArbiter(sql, { dryRun = false } = {}) {
     }
 
     const built = buildPush(decision.type, {
+      userId: c.user_id,
       name: c.display_name || 'Привет',
       displayName: c.display_name || null,
       streak: c.current_streak,

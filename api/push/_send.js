@@ -108,6 +108,7 @@ export async function sendNotification(sql, userId, type, data = {}, { dryRun = 
   }
 
   const built = buildPush(type, {
+    userId,
     name: user.display_name || 'Привет',
     displayName: user.display_name || null,
     streak: user.current_streak,
