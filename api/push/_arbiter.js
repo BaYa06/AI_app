@@ -319,7 +319,9 @@ async function loadCandidates(sql) {
            b.local_now::date::text AS local_today,
            trim(to_char(b.local_now, 'dy')) AS dow,
            b.last_active_date = b.local_now::date AS done_today,
-           b.local_now::date - b.last_active_date AS days_away,
+           -- Дней без занятий (3.4): по последнему засчитанному дню или ответу — что позже
+           b.local_now::date - GREATEST(b.last_active_date, la.last_answer_day) AS days_away,
+           la.learned, la.sets,
            cp.waiting, cp.fading,
            pl.ignored, pl.last_sent_day,
            wr.course_id AS weekly_course_id, wr.place AS weekly_place, wr.reward AS weekly_reward,
@@ -347,6 +349,12 @@ async function loadCandidates(sql) {
       WHERE p.user_id = b.user_id AND p.status = 'sent' AND p.category <> 'course'
         AND p.created_at > NOW() - INTERVAL '60 days'
     ) pl ON true
+    LEFT JOIN LATERAL (
+      SELECT (SELECT (MAX(an.answered_at) AT TIME ZONE COALESCE(b.timezone, ${DEFAULT_TZ}))::date
+              FROM answers an WHERE an.user_id = b.user_id) AS last_answer_day,
+             (SELECT COUNT(*)::int FROM card_progress cp WHERE cp.user_id = b.user_id AND cp.first_learned_at IS NOT NULL) AS learned,
+             (SELECT COUNT(*)::int FROM card_sets s WHERE s.user_id = b.user_id) AS sets
+    ) la ON true
     LEFT JOIN LATERAL (
       -- Текущий набор (3.2) — упрощённо, как LessonService: последний изучаемый за 4 недели, где ещё есть новые слова
       SELECT s.title, f.fresh
@@ -454,6 +462,8 @@ export async function runArbiter(sql, { dryRun = false } = {}) {
       rating: ratings.get(c.user_id) || null,
       weekly: c.weekly_place ? { place: c.weekly_place, reward: c.weekly_reward, courseId: c.weekly_course_id } : null,
       newWords: c.new_count > 0 ? { count: c.new_count, set: c.new_set } : null,
+      learned: c.learned || 0,
+      sets: c.sets || 0,
       groupsOff: groupsOff(c.notif_categories_off, c.notif_streak),
       ignored: c.ignored || 0,
       lastSentDay: c.last_sent_day,

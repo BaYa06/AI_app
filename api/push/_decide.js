@@ -49,21 +49,38 @@ export function backoffReason(ignored, lastSentDay, today, category) {
   return null;
 }
 
+/** Ступени лестницы возврата (3.4): день отсутствия → тип и данные. После 30 дней — тишина */
+export const RETURN_LADDER_DAYS = [2, 4, 7, 14, 30];
+
+export function returnLadderStep(c) {
+  switch (c.daysAway) {
+    case 2: return { type: 'reactivation_2d', data: { count: Math.min(c.waiting || 0, 30) } };
+    case 4: return { type: 'reactivation_4d', data: { count: Math.min((c.fading || c.waiting) || 0, 30) } };
+    case 7: return { type: 'reactivation_7d', data: { learned: c.learned || 0 } };
+    case 14: return { type: 'reactivation_14d', data: {} };
+    case 30: return { type: 'reactivation_30d', data: { sets: c.sets || 0 } };
+    default: return null;
+  }
+}
+
 /**
  * Подходящие типы для кандидата (без фильтров), по убыванию важности.
- * c: { dow, doneToday, daysAway, streak, notifStreak, fading, waiting, rating, weekly, newWords: { count, set } }
+ * c: { dow, doneToday, daysAway, streak, notifStreak, fading, waiting, rating, weekly, newWords: { count, set },
+ *      learned, sets }
  */
 export function eligiblePushes(c) {
   const list = [];
   if (c.dow === 'sun' && c.rating) list.push({ type: 'rating_sunday', data: c.rating });
   if (c.dow === 'mon' && c.weekly) list.push({ type: 'weekly_result', data: c.weekly });
-  if (!c.doneToday) {
+  if (!c.doneToday && c.daysAway >= 2) {
+    // Лестница возврата (3.4): ушедшему — только ступень в свой день, без ежедневных «слова ждут»
+    const step = returnLadderStep(c);
+    if (step) list.push(step);
+  } else if (!c.doneToday) {
     if (c.fading > 0) list.push({ type: 'words_fading', data: { count: c.fading } });
     if (c.waiting > 0) list.push({ type: 'review_due', data: { count: Math.min(c.waiting, 30) } });
     // Новые слова — только когда повторять нечего: урок дня начнётся с них (3.2)
     else if (c.newWords?.count > 0) list.push({ type: 'lesson_new_words', data: { count: c.newWords.count, set: c.newWords.set } });
-    if (c.daysAway === 3) list.push({ type: 'reactivation_3d', data: {} });
-    if (c.daysAway === 7) list.push({ type: 'reactivation_7d', data: {} });
     if (c.streak > 0 && c.notifStreak) list.push({ type: 'streak_reminder', data: {} });
   }
   return list.sort((a, b) => PUSH_TYPES[a.type].priority - PUSH_TYPES[b.type].priority);

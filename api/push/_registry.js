@@ -171,6 +171,57 @@ export const PUSH_TYPES = {
       }),
     ],
   },
+  // Лестница возврата (3.4): 2 / 4 / 7 / 14 / 30 дней без занятий, дальше — тишина.
+  // reactivation_3d — старая ступень, остаётся для отложенных и журнала, арбитр её больше не выбирает.
+  reactivation_2d: {
+    category: 'reactivation',
+    priority: 9,
+    transactional: false,
+    minIntervalDays: 0,
+    link: LESSON_LINK,
+    variants: [
+      ({ data, secPerAnswer }) => ({
+        title: 'Слова ждут',
+        body: `${data.count} ${plural(data.count, 'слово ждёт', 'слова ждут', 'слов ждут')} повторения · ~${minutesFor(data.count, secPerAnswer)} мин`,
+      }),
+    ],
+  },
+  reactivation_4d: {
+    category: 'reactivation',
+    priority: 9,
+    transactional: false,
+    minIntervalDays: 0,
+    link: LESSON_LINK,
+    variants: [
+      ({ data }) => ({
+        title: 'Слова скоро забудутся',
+        body: `Без повторения ${data.count} ${plural(data.count, 'слово скоро забудется', 'слова скоро забудутся', 'слов скоро забудутся')}`,
+      }),
+    ],
+  },
+  reactivation_14d: {
+    category: 'reactivation',
+    priority: 9,
+    transactional: false,
+    minIntervalDays: 0,
+    link: LESSON_LINK,
+    variants: [
+      () => ({ title: 'Лёгкий вход', body: 'Начни с 5 слов — займёт минуту' }),
+    ],
+  },
+  reactivation_30d: {
+    category: 'reactivation',
+    priority: 9,
+    transactional: false,
+    minIntervalDays: 0,
+    link: LESSON_LINK,
+    variants: [
+      ({ data }) => ({
+        title: data.sets === 1 ? 'Твой набор на месте' : 'Твои наборы на месте',
+        body: `${data.sets} ${plural(data.sets, 'набор ждёт', 'набора ждут', 'наборов ждут')}. Вернёшься — продолжим с того же места`,
+      }),
+    ],
+  },
   reactivation_3d: {
     category: 'reactivation',
     priority: 9,
@@ -181,6 +232,7 @@ export const PUSH_TYPES = {
       ({ name }) => ({ title: 'Давно не виделись', body: `${name}, прошло 3 дня. Карточки ждут тебя!` }),
     ],
   },
+  // Ступень 7 дней (3.4): прогресс. Без выученных слов — прежний текст про рекорд серии
   reactivation_7d: {
     category: 'reactivation',
     priority: 9,
@@ -188,10 +240,15 @@ export const PUSH_TYPES = {
     minIntervalDays: 0,
     link: LESSON_LINK,
     variants: [
-      ({ longest }) => ({
-        title: 'Вернись к учёбе',
-        body: `Твой рекорд был ${longest} ${plural(longest, 'день', 'дня', 'дней')}. Начни новую серию!`,
-      }),
+      ({ longest, data }) => (data.learned > 0
+        ? {
+            title: 'Не дай словам пропасть',
+            body: `Выучено ${data.learned} ${plural(data.learned, 'слово', 'слова', 'слов')}. Не дай ${data.learned === 1 ? 'ему' : 'им'} пропасть`,
+          }
+        : {
+            title: 'Вернись к учёбе',
+            body: `Твой рекорд был ${longest} ${plural(longest, 'день', 'дня', 'дней')}. Начни новую серию!`,
+          }),
     ],
   },
   // Онбординг (3.1): зарегистрировался, но урок не начат — через 3 часа (тихие часы — в 19:00)
