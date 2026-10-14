@@ -112,6 +112,8 @@ async function sendDailyReminders(sql, { dryRun = false } = {}) {
       AND us.notif_hour BETWEEN 8 AND 21
       AND EXTRACT(HOUR FROM NOW() AT TIME ZONE COALESCE(us.timezone, 'Asia/Bishkek'))::int = us.notif_hour
       AND EXTRACT(MINUTE FROM NOW() AT TIME ZONE COALESCE(us.timezone, 'Asia/Bishkek'))::int >= COALESCE(us.notif_minute, 0)
+      AND (NOT us.notif_days_custom
+           OR string_to_array(us.notif_days, ',') @> ARRAY[trim(to_char(NOW() AT TIME ZONE COALESCE(us.timezone, 'Asia/Bishkek'), 'dy'))])
       AND (us.last_reminder_date IS NULL
            OR us.last_reminder_date < (NOW() AT TIME ZONE COALESCE(us.timezone, 'Asia/Bishkek'))::date)
       AND EXISTS (SELECT 1 FROM push_tokens pt WHERE pt.user_id = us.user_id)
@@ -195,6 +197,10 @@ async function pickReminder(sql, u, standingsCache) {
   if (u.current_streak > 0 && u.notif_streak) return { type: 'streak_reminder', data: {} };
   return null;
 }
+
+const ALL_DAYS = 'mon,tue,wed,thu,fri,sat,sun';
+/** Дефолт до Push 0.6 — его ставили всем, сами его не выбирали */
+const LEGACY_DEFAULT_DAYS = 'mon,tue,wed,thu,fri';
 
 /** Категория типа пуша — для push_log и будущих переключателей в настройках (шаг 2.4). */
 const PUSH_CATEGORY = {
@@ -375,35 +381,42 @@ export default async function handler(req, res) {
       const userId = await settingsUserId(req, req.query.userId);
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
       const rows = await sql`
-        SELECT notif_enabled, notif_hour, notif_minute, notif_days, notif_streak
+        SELECT notif_enabled, notif_hour, notif_minute, notif_days, notif_days_custom, notif_streak
         FROM user_stats WHERE user_id = ${userId}
       `;
       if (!rows.length) {
-        return res.status(200).json({ notifEnabled: true, notifHour: 19, notifMinute: 0, notifDays: 'mon,tue,wed,thu,fri', notifStreak: true });
+        return res.status(200).json({ notifEnabled: true, notifHour: 19, notifMinute: 0, notifDays: ALL_DAYS, notifStreak: true });
       }
       const r = rows[0];
       return res.status(200).json({
         notifEnabled: r.notif_enabled,
         notifHour: r.notif_hour,
         notifMinute: r.notif_minute,
-        notifDays: r.notif_days,
+        // Дни, которые человек не выбирал сам, не фильтруют — показываем все
+        notifDays: r.notif_days_custom ? r.notif_days : ALL_DAYS,
         notifStreak: r.notif_streak,
       });
     }
 
     // ── settings POST ──────────────────────────────────────────
     if (action === 'settings' && req.method === 'POST') {
-      const { notifEnabled, notifHour, notifMinute, notifDays, notifStreak } = req.body || {};
+      const { notifEnabled, notifHour, notifMinute, notifDays, notifStreak, notifDaysExplicit } = req.body || {};
       const userId = await settingsUserId(req, req.body?.userId);
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      // cron-reminders запускается каждые 15 минут — минуты кратны 15
+      const minute = Math.min(45, Math.max(0, Math.floor((Number(notifMinute) || 0) / 15) * 15));
+      const days = typeof notifDays === 'string' ? notifDays : ALL_DAYS;
+      // Старые сборки не шлют notifDaysExplicit и сохраняют показанный дефолт «пн–пт» — его выбором не считаем
+      const daysCustom = days !== ALL_DAYS && (notifDaysExplicit === true || days !== LEGACY_DEFAULT_DAYS);
       await sql`
-        INSERT INTO user_stats (user_id, notif_enabled, notif_hour, notif_minute, notif_days, notif_streak)
-        VALUES (${userId}, ${notifEnabled ?? true}, ${notifHour ?? 19}, ${notifMinute ?? 0}, ${notifDays ?? 'mon,tue,wed,thu,fri'}, ${notifStreak ?? true})
+        INSERT INTO user_stats (user_id, notif_enabled, notif_hour, notif_minute, notif_days, notif_days_custom, notif_streak)
+        VALUES (${userId}, ${notifEnabled ?? true}, ${notifHour ?? 19}, ${minute}, ${days}, ${daysCustom}, ${notifStreak ?? true})
         ON CONFLICT (user_id) DO UPDATE SET
           notif_enabled = EXCLUDED.notif_enabled,
           notif_hour    = EXCLUDED.notif_hour,
           notif_minute  = EXCLUDED.notif_minute,
           notif_days    = EXCLUDED.notif_days,
+          notif_days_custom = EXCLUDED.notif_days_custom,
           notif_streak  = EXCLUDED.notif_streak,
           updated_at    = NOW()
       `;

@@ -4,7 +4,7 @@ import { neon } from '@neondatabase/serverless';
  * Версия схемы: при добавлении миграции в applyMigrations увеличить (и дописать файл в
  * database/migrations). Пока в app_migrations есть отметка этой версии, миграции не выполняются.
  */
-const SCHEMA_VERSION = 'schema_026';
+const SCHEMA_VERSION = 'schema_027';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -371,6 +371,14 @@ async function applyMigrations(sql) {
     await sql`CREATE INDEX IF NOT EXISTS push_log_created ON push_log (created_at)`;
   } catch (e) {
     console.error('Migration 026_push_log failed:', e);
+  }
+
+  // Migration 027: дни недели — фильтр только для выбранных самим (план пушей, шаг 0.6)
+  try {
+    await sql`ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS notif_days_custom BOOLEAN NOT NULL DEFAULT false`;
+    await sql`ALTER TABLE user_stats ALTER COLUMN notif_days SET DEFAULT 'mon,tue,wed,thu,fri,sat,sun'`;
+  } catch (e) {
+    console.error('Migration 027_notif_days_custom failed:', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)

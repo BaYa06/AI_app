@@ -23,10 +23,12 @@ import {
 import { supabase } from '@/services';
 import { API_BASE } from '@/config/apiBase';
 
-// Сервер шлёт напоминания раз в час и только с 8 до 21 (api/push.js, cron-reminders)
+// Сервер проверяет напоминания каждые 15 минут и шлёт их только с 8:00 до 21:45 (api/push.js, cron-reminders)
 const MIN_HOUR = 8;
 const MAX_HOUR = 21;
+const MINUTE_STEP = 15;
 const clampHour = (h: number) => Math.min(MAX_HOUR, Math.max(MIN_HOUR, h));
+const clampMinute = (m: number) => Math.min(60 - MINUTE_STEP, Math.max(0, Math.floor(m / MINUTE_STEP) * MINUTE_STEP));
 
 const DAYS = [
   { key: 'mon', label: 'Пн' },
@@ -44,8 +46,10 @@ export function NotificationSettingsScreen({ navigation }: any) {
   // ---- State ----
   const [reminderEnabled, setReminderEnabled] = useState(true);
   const [hours, setHours] = useState(19);
+  const [minutes, setMinutes] = useState(0);
+  // По умолчанию все дни; фильтр по дням сервер применяет, только если их выбрали здесь (Push 0.6)
   const [selectedDays, setSelectedDays] = useState<Record<string, boolean>>({
-    mon: true, tue: true, wed: true, thu: true, fri: true, sat: false, sun: false,
+    mon: true, tue: true, wed: true, thu: true, fri: true, sat: true, sun: true,
   });
   const [streakReminders, setStreakReminders] = useState(true);
 
@@ -67,6 +71,7 @@ export function NotificationSettingsScreen({ navigation }: any) {
           .then((d) => {
             setReminderEnabled(d.notifEnabled ?? true);
             setHours(clampHour(d.notifHour ?? 19));
+            setMinutes(clampMinute(d.notifMinute ?? 0));
             setStreakReminders(d.notifStreak ?? true);
             if (d.notifDays) {
               const active = d.notifDays.split(',');
@@ -112,6 +117,8 @@ export function NotificationSettingsScreen({ navigation }: any) {
 
   const incrementHours = () => setHours((h) => (h >= MAX_HOUR ? MIN_HOUR : h + 1));
   const decrementHours = () => setHours((h) => (h <= MIN_HOUR ? MAX_HOUR : h - 1));
+  const incrementMinutes = () => setMinutes((m) => (m + MINUTE_STEP) % 60);
+  const decrementMinutes = () => setMinutes((m) => (m - MINUTE_STEP + 60) % 60);
 
   const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -128,11 +135,11 @@ export function NotificationSettingsScreen({ navigation }: any) {
         body: JSON.stringify({
           notifEnabled: reminderEnabled,
           notifHour: hours,
-          notifMinute: 0,
-          notifDays: Object.entries(selectedDays)
-            .filter(([, v]) => v)
-            .map(([k]) => k)
+          notifMinute: minutes,
+          notifDays: DAYS.filter((day) => selectedDays[day.key])
+            .map((day) => day.key)
             .join(','),
+          notifDaysExplicit: true,
           notifStreak: streakReminders,
         }),
       });
@@ -162,7 +169,7 @@ export function NotificationSettingsScreen({ navigation }: any) {
       {/* Time Picker */}
       <Card tone="muted" style={st.card}>
         <Text variant="label" color="secondary">Время ежедневного напоминания</Text>
-        <Text variant="caption" color="secondary" style={st.cardHint}>Напоминания приходят с 8:00 до 21:00</Text>
+        <Text variant="caption" color="secondary" style={st.cardHint}>Напоминания приходят с 8:00 до 21:45</Text>
         <View style={st.timeRow}>
           <View style={st.timeCol}>
             <Button
@@ -175,7 +182,7 @@ export function NotificationSettingsScreen({ navigation }: any) {
             />
             <View
               accessible
-              accessibilityLabel={`Время напоминания: ${hours}:00`}
+              accessibilityLabel={`Час напоминания: ${hours}`}
               style={[st.timeBox, { backgroundColor: colors.surface, borderColor: alpha(colors.primary, 20) }]}
             >
               <Text variant="h1" style={{ color: colors.primary }}>{pad(hours)}</Text>
@@ -190,7 +197,33 @@ export function NotificationSettingsScreen({ navigation }: any) {
             />
           </View>
 
-          <Text variant="h1" style={{ color: colors.textTertiary }}>:00</Text>
+          <Text variant="h1" style={{ color: colors.textTertiary }}>:</Text>
+
+          <View style={st.timeCol}>
+            <Button
+              variant="icon"
+              icon={ChevronUp}
+              background="none"
+              iconColor={colors.textSecondary}
+              accessibilityLabel="Позже на 15 минут"
+              onPress={incrementMinutes}
+            />
+            <View
+              accessible
+              accessibilityLabel={`Минуты напоминания: ${pad(minutes)}`}
+              style={[st.timeBox, { backgroundColor: colors.surface, borderColor: alpha(colors.primary, 20) }]}
+            >
+              <Text variant="h1" style={{ color: colors.primary }}>{pad(minutes)}</Text>
+            </View>
+            <Button
+              variant="icon"
+              icon={ChevronDown}
+              background="none"
+              iconColor={colors.textSecondary}
+              accessibilityLabel="Раньше на 15 минут"
+              onPress={decrementMinutes}
+            />
+          </View>
         </View>
       </Card>
 
