@@ -5,7 +5,7 @@
 import React from 'react';
 import { View, StyleSheet, Pressable, ScrollView, Platform } from 'react-native';
 import { useThemeColors } from '@/store';
-import { Text, StreakCelebrationModal } from '@/components/common';
+import { Text, StreakCelebration } from '@/components/common';
 import { Analytics } from '@/services/analytics';
 import { currentPushOrigin, reportPushLesson } from '@/services/pushOpens';
 import { recordSessionForRatingPrompt, markRatingPromptShown } from '@/services/feedback';
@@ -537,7 +537,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
         </View>
       </Sheet>
 
-      <StreakCelebrationModal
+      <StreakCelebration
         visible={showStreakModal}
         streakCount={newStreakCount ?? 0}
         onClose={() => setShowStreakModal(false)}

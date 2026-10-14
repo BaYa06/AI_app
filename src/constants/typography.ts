@@ -11,6 +11,15 @@ const fontFamily = Platform.select({
 });
 
 export const typography = {
+  // Число на празднике серии — единственный текст крупнее display
+  hero: {
+    fontFamily,
+    fontSize: 72,
+    fontWeight: '700',
+    lineHeight: 80,
+    letterSpacing: -1,
+  } as TextStyle,
+
   // Крупные цифры: код игры, счёт, результат теста
   display: {
     fontFamily,
