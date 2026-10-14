@@ -653,14 +653,13 @@ export function SetDetailScreen({ navigation, route }: Props) {
             onPress={handleWarmup}
             style={[styles.warmupBanner, { backgroundColor: alpha(colors.warning, 10), borderColor: alpha(colors.warning, 40) }]}
           >
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.warmupTitle, { color: colors.textPrimary }]}>
-                Разминка: {warmup.waiting.length} слов из прошлых уроков
+            {/* Компактно, в одну строку: баннер не должен отодвигать прогресс и карточки */}
+            <Text style={[styles.warmupTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+              Разминка · {warmup.waiting.length} слов из прошлых уроков
+              <Text style={{ color: colors.textSecondary, fontWeight: '400' }}>
+                {' '}· ~{Math.max(1, Math.round(warmup.waiting.length / 4))} мин
               </Text>
-              <Text style={[styles.warmupSubtitle, { color: colors.textSecondary }]}>
-                Повтори перед новыми словами, чтобы не забыть · ~{Math.max(1, Math.round(warmup.waiting.length / 4))} мин
-              </Text>
-            </View>
+            </Text>
             <Text style={[styles.warmupAction, { color: colors.warning }]}>Начать</Text>
           </Pressable>
         )}
@@ -724,25 +723,19 @@ export function SetDetailScreen({ navigation, route }: Props) {
           <Text variant="h3" style={{ color: colors.textPrimary }}>
             Карточки ({filteredCards.length})
           </Text>
+          {/* «+ Добавить» здесь убран — он дублировал «Добавить карточку» в нижней панели */}
           {!isReadOnly && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.m }}>
-              <Pressable accessibilityRole="button"
-                accessibilityLabel="Создать карточки из фото или файла"
-                onPress={() => { triggerHaptic('selection'); navigation.navigate('ImportFiles', { setId }); }}
-                hitSlop={8}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xxs }}
-              >
-                <Camera size={iconSize.xs} color={colors.primary} />
-                <Text variant="bodySmall" style={{ color: colors.primary, fontWeight: '700' }}>
-                  Из фото
-                </Text>
-              </Pressable>
-              <Pressable accessibilityRole="button" onPress={openAddCardSheet} hitSlop={8}>
-                <Text variant="bodySmall" style={{ color: colors.primary, fontWeight: '700' }}>
-                  + Добавить
-                </Text>
-              </Pressable>
-            </View>
+            <Pressable accessibilityRole="button"
+              accessibilityLabel="Создать карточки из фото или файла"
+              onPress={() => { triggerHaptic('selection'); navigation.navigate('ImportFiles', { setId }); }}
+              hitSlop={8}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xxs }}
+            >
+              <Camera size={iconSize.xs} color={colors.primary} />
+              <Text variant="bodySmall" style={{ color: colors.primary, fontWeight: '700' }}>
+                Из фото
+              </Text>
+            </Pressable>
           )}
         </View>
       </View>
@@ -1350,25 +1343,22 @@ const styles = StyleSheet.create({
   warmupBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
     marginHorizontal: 16,
-    marginTop: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: borderRadius.m,
     borderWidth: 1,
     minHeight: 44,
   },
   warmupTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  warmupSubtitle: {
-    fontSize: 12,
-    marginTop: 2,
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
   },
   warmupAction: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
   },
   officialBadge: {
