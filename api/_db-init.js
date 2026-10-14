@@ -4,7 +4,7 @@ import { neon } from '@neondatabase/serverless';
  * Версия схемы: при добавлении миграции в applyMigrations увеличить (и дописать файл в
  * database/migrations). Пока в app_migrations есть отметка этой версии, миграции не выполняются.
  */
-const SCHEMA_VERSION = 'schema_025';
+const SCHEMA_VERSION = 'schema_026';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -344,6 +344,33 @@ async function applyMigrations(sql) {
     await sql`ALTER TABLE test_participants ADD COLUMN IF NOT EXISTS rejoin_allowed BOOLEAN NOT NULL DEFAULT false`;
   } catch (e) {
     console.error('Migration 025_exam_exit_control failed:', e);
+  }
+
+  // Migration 026: журнал push-уведомлений (plan/push_notifications.md, шаг 0.3). Только новая таблица.
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS push_log (
+        id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id             UUID NOT NULL,
+        type                TEXT NOT NULL,
+        category            TEXT NOT NULL,
+        variant             TEXT,
+        local_date          DATE NOT NULL,
+        status              TEXT NOT NULL,
+        tokens              INT DEFAULT 0,
+        delivered           INT DEFAULT 0,
+        payload             JSONB,
+        created_at          TIMESTAMPTZ DEFAULT NOW(),
+        opened_at           TIMESTAMPTZ,
+        lesson_started_at   TIMESTAMPTZ,
+        lesson_completed_at TIMESTAMPTZ
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS push_log_user_date ON push_log (user_id, local_date)`;
+    await sql`CREATE INDEX IF NOT EXISTS push_log_type_created ON push_log (type, created_at)`;
+    await sql`CREATE INDEX IF NOT EXISTS push_log_created ON push_log (created_at)`;
+  } catch (e) {
+    console.error('Migration 026_push_log failed:', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)

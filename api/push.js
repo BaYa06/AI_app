@@ -13,6 +13,7 @@
  * POST /api/push?action=claim-reward      – claim daily challenge reward (once per day)
  */
 
+import { randomUUID } from 'node:crypto';
 import { neon } from '@neondatabase/serverless';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
@@ -179,19 +180,62 @@ async function pickReminder(sql, u, standingsCache) {
   return null;
 }
 
+/** Категория типа пуша — для push_log и будущих переключателей в настройках (шаг 2.4). */
+const PUSH_CATEGORY = {
+  teacher_review: 'course',
+  review_due: 'lesson',
+  words_fading: 'lesson',
+  streak_reminder: 'streak',
+  streak_lost: 'streak',
+  streak_milestone: 'streak',
+  rating_sunday: 'rating',
+  weekly_result: 'rating',
+  reactivation_3d: 'reactivation',
+  reactivation_7d: 'reactivation',
+};
+
+/**
+ * Строка push_log на каждое решение (план, шаг 0.3). Журнал не должен ронять отправку: ошибку
+ * только логируем. local_date — по поясу пользователя, как у остальных дневных отметок.
+ */
+async function logPush(sql, { id, userId, type, status, tokens = 0, delivered = 0, data }) {
+  try {
+    await sql`
+      INSERT INTO push_log (id, user_id, type, category, local_date, status, tokens, delivered, payload)
+      VALUES (
+        ${id}, ${userId}, ${type}, ${PUSH_CATEGORY[type] || 'other'},
+        (NOW() AT TIME ZONE COALESCE((SELECT timezone FROM user_stats WHERE user_id = ${userId}), 'Asia/Bishkek'))::date,
+        ${status}, ${tokens}, ${delivered}, ${JSON.stringify(data || {})}::jsonb
+      )
+    `;
+  } catch (e) {
+    console.error('[push] push_log insert failed:', e);
+  }
+}
+
 /**
  * Отправить пуш пользователю на все его устройства. Учитывает notif_enabled; мёртвые токены удаляет.
- * → { ok, sent?, failed?, reason?, error? }
+ * Каждое решение (и отказ) пишется в push_log; id строки уходит в пуш как data.push_id.
+ * → { ok, push_id?, sent?, failed?, reason?, error? }
  */
 export async function sendNotification(sql, userId, type, data = {}) {
+  const pushId = randomUUID();
+  const log = (status, extra = {}) => logPush(sql, { id: pushId, userId, type, status, data, ...extra });
+
   const tokenRows = await sql`SELECT token FROM push_tokens WHERE user_id = ${userId}`;
-  if (tokenRows.length === 0) return { ok: false, reason: 'no token' };
+  if (tokenRows.length === 0) {
+    await log('no_token');
+    return { ok: false, push_id: pushId, reason: 'no token' };
+  }
 
   const [user] = await sql`
     SELECT u.display_name, us.current_streak, us.longest_streak, us.notif_enabled, us.notif_streak
     FROM user_stats us JOIN users u ON u.id = us.user_id WHERE us.user_id = ${userId}
   `;
-  if (!user?.notif_enabled) return { ok: false, reason: 'notifications disabled' };
+  if (!user?.notif_enabled) {
+    await log('disabled');
+    return { ok: false, push_id: pushId, reason: 'notifications disabled' };
+  }
 
   const message = buildMessage(type, user.display_name || 'Привет', user.current_streak, user.longest_streak, data);
   if (!message) return { ok: false, error: `Unknown type: ${type}` };
@@ -199,19 +243,26 @@ export async function sendNotification(sql, userId, type, data = {}) {
   const messaging = initFirebase();
   // На все устройства пользователя (телефон + веб), а не на первое попавшееся
   const tokens = tokenRows.map((r) => r.token);
-  const result = await messaging.sendEachForMulticast({
-    tokens,
-    notification: message,
-    data: { type, url: '/' },
-    apns: { payload: { aps: { sound: 'default' } } },
-  });
+  let result;
+  try {
+    result = await messaging.sendEachForMulticast({
+      tokens,
+      notification: message,
+      data: { type, url: '/', push_id: pushId },
+      apns: { payload: { aps: { sound: 'default' } } },
+    });
+  } catch (e) {
+    await log('failed', { tokens: tokens.length });
+    throw e;
+  }
   // Удалённое приложение / отозванное разрешение — токен больше не нужен
   const dead = tokens.filter((_, i) => {
     const code = result.responses[i].error?.code;
     return code === 'messaging/registration-token-not-registered' || code === 'messaging/invalid-registration-token';
   });
   if (dead.length) await sql`DELETE FROM push_tokens WHERE token = ANY(${dead})`;
-  return { ok: result.successCount > 0, sent: result.successCount, failed: result.failureCount };
+  await log(result.successCount > 0 ? 'sent' : 'failed', { tokens: tokens.length, delivered: result.successCount });
+  return { ok: result.successCount > 0, push_id: pushId, sent: result.successCount, failed: result.failureCount };
 }
 
 /**
@@ -340,7 +391,13 @@ export default async function handler(req, res) {
       if (!hasBearerSecret(req, process.env.CRON_SECRET)) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
-      return res.status(200).json(await sendDailyReminders(sql));
+      const result = await sendDailyReminders(sql);
+      // Раз в сутки (первый запуск после полуночи UTC): журнал храним 180 дней
+      const now = new Date();
+      if (now.getUTCHours() === 0 && now.getUTCMinutes() < 15) {
+        await sql`DELETE FROM push_log WHERE created_at < NOW() - INTERVAL '180 days'`;
+      }
+      return res.status(200).json(result);
     }
 
     // ── rewards: баланс алмазов + какие челленджи уже забраны сегодня ──

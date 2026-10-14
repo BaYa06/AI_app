@@ -194,7 +194,7 @@
   - Логику streak и reactivation перенести в `cron-reminders` (в этапе 2 это станет арбитром). `cron-streak` / `cron-reactivation` отвечают `{ ok: true, deprecated: true }` и ничего не шлют (удалять `action` нельзя по Release 2; удалить задачи из cron-job.org, если они там есть).
   - **Готово, когда:** в cron-job.org одна задача раз в 15 мин на рабочий сервер, `cron-streak` и `cron-reactivation` ничего не шлют, за сутки на тестовом аккаунте не больше одного пуша.
 
-- [ ] **0.3 Журнал `push_log`** — `database/migrations/026_push_log.sql`, `api/_db-init.js`
+- [x] **0.3 Журнал `push_log`** — `database/migrations/026_push_log.sql`, `api/_db-init.js`
   ```sql
   CREATE TABLE push_log (
     id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -219,6 +219,7 @@
   - Удалить `api/push/_push-store.js`: файловое хранилище токенов давно заменено таблицей.
   - Хранить 180 дней (чистка в том же cron раз в сутки): журнал нужен для анализа, а не навсегда.
   - **Готово, когда:** каждый вызов `sendNotification` оставляет строку в `push_log`, в FCM-сообщении есть `data.push_id`.
+  - Сделано: миграция 026 (`schema_026`), категории типов — `PUSH_CATEGORY` в `api/push.js`, строка пишется на `no_token` / `disabled` / `sent` / `failed`; чистка 180 дней — первый запуск `cron-reminders` после 00:00 UTC; `_push-store.js` удалён. Добавлен индекс `push_log_created` для чистки.
 
 - [ ] **0.4 Режим `dry_run` и аварийный выключатель** — `api/push.js`
   - `?dry_run=1` (только с `CRON_SECRET`): cron считает кандидатов и пишет `status = 'dry_run'`, ничего не отправляя. Так проверяем новые правила на проде, не трогая людей.
