@@ -39,6 +39,11 @@ TestFlight, а в деплое сервера: старые версии при�
   `POSTGRES_URL` для Preview → ветка Git `dev`. Рабочая база — `ep-misty-scene-ahkv29p5`.
   Проверено 13.10.2026: запросы тестового сервера будят compute `staging`.
   Свежие данные из рабочей базы: Neon → ветка staging → Reset from parent.
+  Проверено 13.10.2026 по таблице `card_sets` в Neon: набор из TestFlight-staging есть только в
+  ветке `staging`, в `main` его нет. Интеграция Neon задаёт свою `POSTGRES_URL` для всех
+  окружений, но запись для Preview → `dev` её перекрывает.
+  **Проверять разделение только по Neon или по вебу** (ai-app-seven-zeta.vercel.app): на одном
+  iPhone TestFlight-сборка заменяет версию из App Store, и «Открыть» в App Store запускает её же.
 - ✅ Ветка `dev` на GitHub, Preview-деплой `ai-app-git-dev-baya06s-projects.vercel.app` работает.
 - ⬜ Первая сборка «iOS TestFlight Staging» в Codemagic (13.10 — очередь Codemagic, инцидент macOS M2).
 - Хук pre-push поднимает версию на каждом push (и в dev) — оставлено так по решению пользователя.
