@@ -184,7 +184,7 @@
 
 - [ ] **0.2 Один cron вместо трёх, каждые 15 минут** — `api/push.js`, cron-job.org
   - ✅ Код (14.10.2026): `cron-reminders` берёт тех, у кого сейчас `notif_hour` и минута ≥ `notif_minute` (пропущенный запуск подхватит следующий), reactivation 3/7 дней — внутри него по поясу пользователя; `cron-streak` / `cron-reactivation` отвечают `deprecated` и ничего не шлют.
-  - ⬜ **Пользователь:** настроить задачу в cron-job.org (ниже) и удалить задачи на `cron-streak` / `cron-reactivation`, если есть. Сделать после выкладки сервера в `main`.
+  - ✅ cron-job.org настроен 14.10.2026 (раньше выкладки, решение пользователя): задача `Reminders`, GET `cron-reminders` каждые 15 мин; старые `cron-streak` и `Reactivation` (`notify`) удалены. `CRON_SECRET` в Vercel заменён на новый — старый в задаче давал 401 (видимо, `cron-streak` и раньше не срабатывал). До выкладки нового кода работает старый `cron-reminders` из `main`, без журнала — поэтому замер 0.7 начинать после выкладки. В cron-job.org после выкладки ничего менять не нужно.
   - Планировщик — **cron-job.org** (уже настроен пользователем, на Vercel Hobby cron чаще раза в сутки не работает). Одна задача:
     - URL: `https://ai-app-seven-zeta.vercel.app/api/push?action=cron-reminders`, метод GET;
     - расписание: каждые 15 минут (`*/15 * * * *`);
