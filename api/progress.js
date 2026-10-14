@@ -365,11 +365,18 @@ function addDays(ymd, days) {
  * Очки учеников курса за неделю: события по картам наборов курса, дневной потолок по дням
  * часового пояса курса. Сортировка: очки ↓, кто набрал раньше — выше.
  */
-export async function computeStandings(sql, courseId, tz, weekStart) {
+/**
+ * Очки и места недели курса. until — посчитать на этот момент (конец дня), а не на сейчас:
+ * так арбитр пушей сравнивает «вчера» и «позавчера» для «тебя обогнали» (план пушей, 3.5).
+ */
+export async function computeStandings(sql, courseId, tz, weekStart, until = null) {
   return sql`
     WITH bounds AS (
       SELECT (${weekStart}::date::timestamp AT TIME ZONE ${tz}) AS s,
-             ((${weekStart}::date + 7)::timestamp AT TIME ZONE ${tz}) AS e
+             LEAST(
+               ((${weekStart}::date + 7)::timestamp AT TIME ZONE ${tz}),
+               COALESCE(${until}::timestamptz, 'infinity'::timestamptz)
+             ) AS e
     ),
     members AS (
       SELECT user_id, hide_from_rating FROM course_members

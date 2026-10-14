@@ -90,6 +90,36 @@ export const PUSH_TYPES = {
       }),
     ],
   },
+  // Учитель добавил набор в курс (3.5) — транзакционный, всем ученикам курса
+  course_new_set: {
+    category: 'course',
+    priority: 1,
+    transactional: true,
+    minIntervalDays: 0,
+    link: (data) => (data?.setId ? `flashly://set/${encodeURIComponent(data.setId)}?from=push` : LESSON_LINK()),
+    variants: [
+      ({ data }) => ({
+        title: `Новый набор в курсе «${data.course}»`,
+        body: `${data.set}: ${data.count} ${plural(data.count, 'слово', 'слова', 'слов')}`,
+      }),
+    ],
+  },
+  // Тебя обогнали в рейтинге курса (3.5): вт–сб, в обычное время, не чаще раза в неделю. Только имя
+  rating_overtaken: {
+    category: 'rating',
+    priority: 4,
+    transactional: false,
+    minIntervalDays: 7,
+    link: ratingLink(null),
+    variants: [
+      ({ data }) => ({
+        title: 'Тебя обогнали в рейтинге',
+        body: data.rival
+          ? `${data.rival} теперь впереди на ${data.gap} ${plural(data.gap, 'очко', 'очка', 'очков')}. До конца недели ещё есть время`
+          : `Тебя обогнали на ${data.gap} ${plural(data.gap, 'очко', 'очка', 'очков')}. До конца недели ещё есть время`,
+      }),
+    ],
+  },
   rating_sunday: {
     category: 'rating',
     priority: 3,

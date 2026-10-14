@@ -101,4 +101,14 @@ describe('арбитр пушей', () => {
     expect(decide({ ...base, waiting: 3, newWords })).toMatchObject({ type: 'review_due' });
     expect(decide({ ...base, doneToday: true, newWords })).toEqual({ status: 'skip', reason: 'done_today' });
   });
+
+  it('«тебя обогнали»: вт–сб, не чаще раза в неделю', () => {
+    const overtaken = { rival: 'Бакыт', gap: 15, courseId: 'c1' };
+    expect(decide({ ...base, dow: 'wed', overtaken })).toMatchObject({ status: 'send', type: 'rating_overtaken' });
+    expect(decide({ ...base, dow: 'mon', streak: 0, overtaken })).toEqual({ status: 'skip', reason: 'nothing_to_send' });
+    expect(decide({ ...base, dow: 'wed', streak: 0, overtaken, lastSentByType: { rating_overtaken: '2026-10-10' } }))
+      .toMatchObject({ status: 'interval', type: 'rating_overtaken' });
+    expect(decide({ ...base, dow: 'wed', streak: 0, overtaken, lastSentByType: { rating_overtaken: '2026-10-07' } }))
+      .toMatchObject({ status: 'send', type: 'rating_overtaken' });
+  });
 });

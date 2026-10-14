@@ -4,7 +4,7 @@ import { neon } from '@neondatabase/serverless';
  * Версия схемы: при добавлении миграции в applyMigrations увеличить (и дописать файл в
  * database/migrations). Пока в app_migrations есть отметка этой версии, миграции не выполняются.
  */
-const SCHEMA_VERSION = 'schema_031';
+const SCHEMA_VERSION = 'schema_032';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -440,6 +440,20 @@ async function applyMigrations(sql) {
     await sql`ALTER TABLE courses ADD COLUMN IF NOT EXISTS schedule JSONB`;
   } catch (e) {
     console.error('Migration 031_course_schedule failed:', e);
+  }
+
+  // Migration 032: о каком наборе курса ученикам уже сообщили (план пушей, 3.5). Разово — все старые наборы.
+  try {
+    await sql`ALTER TABLE card_sets ADD COLUMN IF NOT EXISTS announced_at TIMESTAMPTZ`;
+    const claimedSets = await sql`
+      INSERT INTO app_migrations (name) VALUES ('032_set_announced_backfill')
+      ON CONFLICT (name) DO NOTHING RETURNING name
+    `;
+    if (claimedSets.length > 0) {
+      await sql`UPDATE card_sets SET announced_at = COALESCE(created_at, NOW()) WHERE announced_at IS NULL`;
+    }
+  } catch (e) {
+    console.error('Migration 032_set_announced failed:', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)

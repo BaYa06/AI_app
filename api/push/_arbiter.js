@@ -324,6 +324,8 @@ async function loadCandidates(sql) {
            la.learned, la.sets,
            cp.waiting, cp.fading,
            pl.ignored, pl.last_sent_day,
+           (SELECT MAX(p2.local_date)::text FROM push_log p2
+            WHERE p2.user_id = b.user_id AND p2.type = 'rating_overtaken' AND p2.status = 'sent') AS last_overtaken_day,
            wr.course_id AS weekly_course_id, wr.place AS weekly_place, wr.reward AS weekly_reward,
            nw.title AS new_set,
            -- LEAST игнорирует NULL: без нового набора было бы «10 слов» — поэтому через CASE
@@ -386,30 +388,121 @@ async function loadCandidates(sql) {
   `;
 }
 
-/** Воскресенье: место в рейтинге курса — одним запросом по всем кандидатам, рейтинг курса считается один раз */
-async function loadSundayRatings(sql, userIds) {
-  const result = new Map();
-  if (userIds.length === 0) return result;
+/**
+ * «Новый набор в курсе» (3.5): набор курса, о котором ещё не сообщали, создан за последние 7 дней,
+ * не скрыт от учеников, в нём ≥ 3 слов и учитель 15 минут не добавлял карточки (закончил набор).
+ * Сначала отмечаем announced_at (повторный запуск не продублирует), потом шлём всем ученикам —
+ * транзакционный: мимо контрольной группы и паузы, ночью — откладывается до 8:00.
+ */
+const NEW_SET_MIN_CARDS = 3;
+
+async function sendNewCourseSets(sql, { dryRun }) {
+  const sets = await sql`
+    SELECT s.id, s.title, s.course_id, c.title AS course,
+           (SELECT COUNT(*)::int FROM cards ca WHERE ca.set_id = s.id) AS cards,
+           (SELECT MAX(ca.created_at) FROM cards ca WHERE ca.set_id = s.id) AS last_card_at
+    FROM card_sets s JOIN courses c ON c.id = s.course_id
+    WHERE s.announced_at IS NULL AND s.course_id IS NOT NULL
+      AND COALESCE(s.is_hidden_from_students, false) = false
+      AND s.created_at > NOW() - INTERVAL '7 days'
+  `;
+  const ready = sets.filter((x) => x.cards >= NEW_SET_MIN_CARDS && x.last_card_at && Date.now() - new Date(x.last_card_at).getTime() > 15 * 60 * 1000);
+  const items = [];
+  for (const set of ready) {
+    if (!dryRun) {
+      const claimed = await sql`UPDATE card_sets SET announced_at = NOW() WHERE id = ${set.id} AND announced_at IS NULL RETURNING id`;
+      if (claimed.length === 0) continue;
+    }
+    const students = await sql`SELECT user_id FROM course_members WHERE course_id = ${set.course_id} AND role = 'student'`;
+    for (const st of students) {
+      items.push({
+        userId: st.user_id,
+        type: 'course_new_set',
+        data: { course: set.course, set: set.title, count: set.cards, setId: set.id, courseId: set.course_id },
+      });
+    }
+  }
+  const { sent, report } = await sendEach(sql, items, { dryRun, markDay: false });
+  return { newSets: ready.length, newSetPushes: items.length, newSetSent: sent, ...(dryRun ? { newSetReport: report } : null) };
+}
+
+const OVERTAKEN_DAYS = ['tue', 'wed', 'thu', 'fri', 'sat'];
+
+/** Только имя без фамилии — на экране блокировки (принцип 7) */
+function firstName(name) {
+  return String(name || '').trim().split(/\s+/)[0] || null;
+}
+
+/**
+ * Рейтинг курса для кандидатов — одним запросом участий, по курсу считаем один раз.
+ * Воскресенье: место и отрыв (rating_sunday). Вт–сб (3.5): кто обогнал за вчера — был ниже на конец
+ * позавчера, стал выше на конец вчера (строго по очкам, ничьи не считаются); младше 18 — без имени.
+ * → { sunday: Map(userId → data), overtaken: Map(userId → data) }
+ */
+async function loadRatings(sql, candidates) {
+  const sunday = new Map();
+  const overtaken = new Map();
+  const ids = candidates.filter((c) => c.dow === 'sun' || OVERTAKEN_DAYS.includes(c.dow)).map((c) => c.user_id);
+  if (ids.length === 0) return { sunday, overtaken };
+  const byUser = new Map(candidates.map((c) => [c.user_id, c]));
   const memberships = await sql`
     SELECT cm.user_id, c.id AS course_id, COALESCE(c.timezone, ts.timezone, ${DEFAULT_TZ}) AS tz
     FROM course_members cm JOIN courses c ON c.id = cm.course_id
     LEFT JOIN user_stats ts ON ts.user_id = c.user_id
-    WHERE cm.user_id = ANY(${userIds}::uuid[]) AND cm.role = 'student' AND c.rating_enabled AND NOT cm.hide_from_rating
+    WHERE cm.user_id = ANY(${ids}::uuid[]) AND cm.role = 'student' AND c.rating_enabled AND NOT cm.hide_from_rating
   `;
-  const standings = new Map();
+  const cache = new Map(); // course_id → { now, endYesterday, endBefore }
+  const standingsOf = async (m) => {
+    if (cache.has(m.course_id)) return cache.get(m.course_id);
+    const [b] = await sql`
+      SELECT (date_trunc('week', NOW() AT TIME ZONE ${m.tz}))::date::text AS week_start,
+             (((NOW() AT TIME ZONE ${m.tz})::date)::timestamp AT TIME ZONE ${m.tz}) AS end_yesterday,
+             (((NOW() AT TIME ZONE ${m.tz})::date - 1)::timestamp AT TIME ZONE ${m.tz}) AS end_before
+    `;
+    const visible = (rows) => rows.filter((r) => !r.hide_from_rating);
+    const entry = {
+      now: visible(await computeStandings(sql, m.course_id, m.tz, b.week_start)),
+      endYesterday: null,
+      endBefore: null,
+      bounds: b,
+    };
+    cache.set(m.course_id, entry);
+    return entry;
+  };
+
   for (const m of memberships) {
-    if (result.has(m.user_id)) continue;
-    if (!standings.has(m.course_id)) {
-      const [{ d: weekStart }] = await sql`SELECT (date_trunc('week', NOW() AT TIME ZONE ${m.tz}))::date::text AS d`;
-      standings.set(m.course_id, (await computeStandings(sql, m.course_id, m.tz, weekStart)).filter((r) => !r.hide_from_rating));
+    const c = byUser.get(m.user_id);
+    const st = await standingsOf(m);
+    if (c.dow === 'sun' && !sunday.has(m.user_id)) {
+      const idx = st.now.findIndex((r) => r.user_id === m.user_id);
+      if (idx >= 0 && st.now[idx].points > 0) {
+        sunday.set(m.user_id, { place: idx + 1, gap: idx > 0 ? st.now[idx - 1].points - st.now[idx].points : null, courseId: m.course_id });
+      }
     }
-    const rows = standings.get(m.course_id);
-    const idx = rows.findIndex((r) => r.user_id === m.user_id);
-    if (idx >= 0 && rows[idx].points > 0) {
-      result.set(m.user_id, { place: idx + 1, gap: idx > 0 ? rows[idx - 1].points - rows[idx].points : null, courseId: m.course_id });
+    if (OVERTAKEN_DAYS.includes(c.dow) && !overtaken.has(m.user_id)) {
+      if (!st.endYesterday) {
+        const visible = (rows) => rows.filter((r) => !r.hide_from_rating);
+        st.endYesterday = visible(await computeStandings(sql, m.course_id, m.tz, st.bounds.week_start, st.bounds.end_yesterday));
+        st.endBefore = visible(await computeStandings(sql, m.course_id, m.tz, st.bounds.week_start, st.bounds.end_before));
+      }
+      const pts = (rows) => new Map(rows.map((r) => [r.user_id, r.points]));
+      const p1 = pts(st.endYesterday);
+      const p0 = pts(st.endBefore);
+      const mine1 = p1.get(m.user_id) ?? 0;
+      const mine0 = p0.get(m.user_id) ?? 0;
+      const rivals = st.endYesterday
+        .filter((r) => r.user_id !== m.user_id && (p0.get(r.user_id) ?? 0) < mine0 && r.points > mine1)
+        .sort((a, b) => a.points - b.points);
+      if (rivals.length > 0) {
+        overtaken.set(m.user_id, {
+          rival: c.minor === true ? null : firstName(rivals[0].name),
+          gap: rivals[0].points - mine1,
+          courseId: m.course_id,
+        });
+      }
     }
   }
-  return result;
+  return { sunday, overtaken };
 }
 
 /** Строки push_log пачкой. reserve — для отправки: занять слот дня, конфликт = уже отправлено сегодня */
@@ -436,11 +529,11 @@ export async function runArbiter(sql, { dryRun = false } = {}) {
   const startedAt = Date.now();
   const deferred = dryRun ? { deferred: 0, deferredSent: 0 } : await sendDeferred(sql);
   const classPrep = await sendClassPrep(sql, { dryRun });
+  const newSets = await sendNewCourseSets(sql, { dryRun });
   // Новичков — до основной рассылки: их пуш дня важнее общего напоминания
   const onboarding = await sendOnboarding(sql, { dryRun });
   const candidates = await loadCandidates(sql);
-  const sundayIds = candidates.filter((c) => c.dow === 'sun').map((c) => c.user_id);
-  const ratings = await loadSundayRatings(sql, sundayIds);
+  const ratings = await loadRatings(sql, candidates);
   const paused = isPushPaused();
 
   const report = [];
@@ -459,7 +552,8 @@ export async function runArbiter(sql, { dryRun = false } = {}) {
       notifStreak: c.notif_streak !== false,
       fading: c.fading || 0,
       waiting: c.waiting || 0,
-      rating: ratings.get(c.user_id) || null,
+      rating: ratings.sunday.get(c.user_id) || null,
+      overtaken: ratings.overtaken.get(c.user_id) || null,
       weekly: c.weekly_place ? { place: c.weekly_place, reward: c.weekly_reward, courseId: c.weekly_course_id } : null,
       newWords: c.new_count > 0 ? { count: c.new_count, set: c.new_set } : null,
       learned: c.learned || 0,
@@ -467,7 +561,7 @@ export async function runArbiter(sql, { dryRun = false } = {}) {
       groupsOff: groupsOff(c.notif_categories_off, c.notif_streak),
       ignored: c.ignored || 0,
       lastSentDay: c.last_sent_day,
-      lastSentByType: {},
+      lastSentByType: { rating_overtaken: c.last_overtaken_day },
       habitDays: c.habit_days || null,
     });
     // Что из профиля повлияло на решение (2.9) — для dry_run
@@ -614,6 +708,7 @@ export async function runArbiter(sql, { dryRun = false } = {}) {
     skipped: logRows.length,
     ...deferred,
     ...classPrep,
+    ...newSets,
     ...onboarding,
     ...streakRisk,
     ms: Date.now() - startedAt,

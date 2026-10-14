@@ -57,6 +57,9 @@ export function SetDetailScreen({ navigation, route }: Props) {
   const isReadOnly = set?.isReadOnly === true;
 
   const [filter, setFilter] = useState<Filter>('all');
+  // Набора нет на телефоне — например, открыт по пушу «новый набор в курсе», а курс ещё не обновился
+  // (plan/push_notifications.md, 3.5): подтягиваем наборы курсов; не нашёлся за 8 с — «Набор не найден»
+  const [setMissing, setSetMissing] = useState(false);
   const [search, setSearch] = useState('');
   const [actionCardId, setActionCardId] = useState<string | null>(null);
   const [showAddCard, setShowAddCard] = useState(false);
@@ -768,7 +771,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
   );
 
   if (!set) {
-    return <Loading fullScreen message="Загрузка..." />;
+    return <MissingSet missing={setMissing} onMissing={setSetMissing} onBack={() => navigation.goBack()} />;
   }
 
   return (
@@ -1299,6 +1302,25 @@ function FilterPill({
 }
 
 // ==================== СТИЛИ ====================
+
+function MissingSet({ missing, onMissing, onBack }: { missing: boolean; onMissing: (missing: boolean) => void; onBack: () => void }) {
+  useEffect(() => {
+    DatabaseService.syncStudentCourses().catch(() => {});
+    const timer = setTimeout(() => onMissing(true), 8000);
+    return () => clearTimeout(timer);
+  }, [onMissing]);
+  if (!missing) return <Loading fullScreen message="Загрузка..." />;
+  return (
+    <Container>
+      <EmptyState
+        icon={Layers}
+        title="Набор не найден"
+        description="Возможно, его удалили или скрыли. Попробуй открыть курс ещё раз."
+        action={{ label: 'Назад', onPress: onBack }}
+      />
+    </Container>
+  );
+}
 
 const styles = StyleSheet.create({
   header: {

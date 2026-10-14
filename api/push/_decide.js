@@ -66,12 +66,14 @@ export function returnLadderStep(c) {
 /**
  * Подходящие типы для кандидата (без фильтров), по убыванию важности.
  * c: { dow, doneToday, daysAway, streak, notifStreak, fading, waiting, rating, weekly, newWords: { count, set },
- *      learned, sets }
+ *      learned, sets, overtaken: { rival, gap, courseId } }
  */
 export function eligiblePushes(c) {
   const list = [];
   if (c.dow === 'sun' && c.rating) list.push({ type: 'rating_sunday', data: c.rating });
   if (c.dow === 'mon' && c.weekly) list.push({ type: 'weekly_result', data: c.weekly });
+  // Тебя обогнали (3.5): вт–сб, если вчера кто-то поднялся выше
+  if (['tue', 'wed', 'thu', 'fri', 'sat'].includes(c.dow) && c.overtaken) list.push({ type: 'rating_overtaken', data: c.overtaken });
   if (!c.doneToday && c.daysAway >= 2) {
     // Лестница возврата (3.4): ушедшему — только ступень в свой день, без ежедневных «слова ждут»
     const step = returnLadderStep(c);
