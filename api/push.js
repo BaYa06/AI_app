@@ -24,6 +24,7 @@ import { getMessaging } from 'firebase-admin/messaging';
 import { ensureDatabaseInitialized } from './_db-init.js';
 import { getAuthedUserId, hasBearerSecret } from './_auth.js';
 import { computeStandings } from './progress.js';
+import { PUSH_TYPES, pushType, buildPush } from './push/_registry.js';
 
 function initFirebase() {
   if (!getApps().length) {
@@ -43,54 +44,6 @@ function parseRewardDay(value) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   const diff = Math.abs(Date.parse(`${value}T00:00:00Z`) - Date.parse(new Date().toISOString().slice(0, 10) + 'T00:00:00Z'));
   return diff <= 24 * 60 * 60 * 1000 ? value : null;
-}
-
-function plural(n, one, few, many) {
-  const m10 = n % 10, m100 = n % 100;
-  if (m100 >= 11 && m100 <= 19) return many;
-  if (m10 === 1) return one;
-  if (m10 >= 2 && m10 <= 4) return few;
-  return many;
-}
-
-/** Примерное время повторения: ~15 секунд на слово */
-function minutesFor(count) {
-  return Math.max(1, Math.round((count || 0) / 4));
-}
-
-function buildMessage(type, name, streak, longest, data = {}) {
-  switch (type) {
-    case 'streak_reminder':
-      return { title: 'Не теряй серию!', body: `${name}, у тебя ${streak} ${plural(streak, 'день', 'дня', 'дней')} подряд. Позанимайся сегодня!` };
-    case 'streak_lost':
-      return { title: 'Серия прервана', body: `Серия в ${data.prevStreak} ${plural(data.prevStreak, 'день', 'дня', 'дней')} потеряна. Начни сегодня заново!` };
-    case 'streak_milestone':
-      return { title: `${data.days} ${plural(data.days, 'день', 'дня', 'дней')} подряд!`, body: `${name}, это твой личный рекорд! Так держать` };
-    case 'reactivation_3d':
-      return { title: 'Давно не виделись', body: `${name}, прошло 3 дня. Карточки ждут тебя!` };
-    case 'reactivation_7d':
-      return { title: 'Вернись к учёбе', body: `Твой рекорд был ${longest} ${plural(longest, 'день', 'дня', 'дней')}. Начни новую серию!` };
-    case 'review_due':
-      return { title: 'Пора повторить', body: `${data.count} ${plural(data.count, 'слово ждёт', 'слова ждут', 'слов ждут')} повторения · ~${minutesFor(data.count)} мин` };
-    case 'words_fading':
-      return { title: 'Слова начинают забываться', body: `${data.count} ${plural(data.count, 'слово', 'слова', 'слов')} давно не повторял — спаси их за ${minutesFor(data.count)} мин` };
-    case 'rating_sunday':
-      return {
-        title: 'Последний день недели',
-        body: data.gap != null
-          ? `Ты на ${data.place}-м месте, до ${data.place - 1}-го — ${data.gap} ${plural(data.gap, 'очко', 'очка', 'очков')}. Рейтинг закроется в полночь`
-          : `Ты на ${data.place}-м месте в рейтинге курса. Удержи его до полуночи!`,
-      };
-    case 'weekly_result':
-      return {
-        title: 'Итоги недели',
-        body: `${data.place}-е место в курсе${data.reward > 0 ? `, +${data.reward} ${plural(data.reward, 'алмаз', 'алмаза', 'алмазов')}` : ''}. Новая неделя началась!`,
-      };
-    case 'teacher_review':
-      return { title: `${data.teacher || 'Учитель'} просит повторить слова`, body: `${data.count} ${plural(data.count, 'слово ждёт', 'слова ждут', 'слов ждут')} повторения · ~${minutesFor(data.count)} мин` };
-    default:
-      return null;
-  }
 }
 
 /**
@@ -203,50 +156,21 @@ const ALL_DAYS = 'mon,tue,wed,thu,fri,sat,sun';
 /** Дефолт до Push 0.6 — его ставили всем, сами его не выбирали */
 const LEGACY_DEFAULT_DAYS = 'mon,tue,wed,thu,fri';
 
-/** Категория типа пуша — для push_log и будущих переключателей в настройках (шаг 2.4). */
-const PUSH_CATEGORY = {
-  teacher_review: 'course',
-  review_due: 'lesson',
-  words_fading: 'lesson',
-  streak_reminder: 'streak',
-  streak_lost: 'streak',
-  streak_milestone: 'streak',
-  rating_sunday: 'rating',
-  weekly_result: 'rating',
-  reactivation_3d: 'reactivation',
-  reactivation_7d: 'reactivation',
-};
-
-/** Транзакционные пуши: уходят и на паузе (PUSH_PAUSED), и потом — мимо дневного лимита и контрольной группы. */
-const TRANSACTIONAL_TYPES = new Set(['teacher_review']);
-
 /** Аварийный выключатель: PUSH_PAUSED=1 в переменных Vercel останавливает маркетинговые пуши без деплоя. */
 function isPushPaused() {
   return process.env.PUSH_PAUSED === '1';
 }
 
 /**
- * Куда ведёт тап (план, принцип 4): урок дня или рейтинг курса. from=push — главная запускает урок,
- * как по ссылке виджета. Старые сборки поля link не знают и открывают главную, как раньше.
- */
-function pushLink(type, data) {
-  if (data?.courseId && (type === 'rating_sunday' || type === 'weekly_result')) {
-    const week = type === 'weekly_result' ? '&week=previous' : '';
-    return `flashly://rating/${encodeURIComponent(data.courseId)}?from=push${week}`;
-  }
-  return 'flashly://lesson?from=push';
-}
-
-/**
  * Строка push_log на каждое решение (план, шаг 0.3). Журнал не должен ронять отправку: ошибку
  * только логируем. local_date — по поясу пользователя, как у остальных дневных отметок.
  */
-async function logPush(sql, { id, userId, type, status, tokens = 0, delivered = 0, data }) {
+async function logPush(sql, { id, userId, type, status, tokens = 0, delivered = 0, data, variant = null }) {
   try {
     await sql`
-      INSERT INTO push_log (id, user_id, type, category, local_date, status, tokens, delivered, payload)
+      INSERT INTO push_log (id, user_id, type, category, variant, local_date, status, tokens, delivered, payload)
       VALUES (
-        ${id}, ${userId}, ${type}, ${PUSH_CATEGORY[type] || 'other'},
+        ${id}, ${userId}, ${type}, ${pushType(type)?.category || 'other'}, ${variant},
         (NOW() AT TIME ZONE COALESCE((SELECT timezone FROM user_stats WHERE user_id = ${userId}), 'Asia/Bishkek'))::date,
         ${status}, ${tokens}, ${delivered}, ${JSON.stringify(data || {})}::jsonb
       )
@@ -287,15 +211,28 @@ export async function sendNotification(sql, userId, type, data = {}, { dryRun = 
     return { ok: false, push_id: pushId, reason: 'notifications disabled' };
   }
 
-  const message = buildMessage(type, user.display_name || 'Привет', user.current_streak, user.longest_streak, data);
-  if (!message) return { ok: false, error: `Unknown type: ${type}` };
+  if (!pushType(type)) return { ok: false, error: `Unknown type: ${type}` };
+  const built = buildPush(type, {
+    name: user.display_name || 'Привет',
+    displayName: user.display_name || null,
+    streak: user.current_streak,
+    longest: user.longest_streak,
+    data,
+  });
+  // Текст без числа и имени (не пришли данные) не отправляем — принцип 3 плана
+  if (!built) {
+    await log('no_specifics');
+    return { ok: false, push_id: pushId, reason: 'no specifics' };
+  }
+  const message = { title: built.title, body: built.body };
+  const logBuilt = (status, extra = {}) => log(status, { variant: built.variant, ...extra });
 
-  if (isPushPaused() && !TRANSACTIONAL_TYPES.has(type)) {
-    await log('paused');
+  if (isPushPaused() && !PUSH_TYPES[type].transactional) {
+    await logBuilt('paused');
     return { ok: false, push_id: pushId, reason: 'paused', message };
   }
   if (dryRun) {
-    await log('dry_run', { tokens: tokenRows.length });
+    await logBuilt('dry_run', { tokens: tokenRows.length });
     return { ok: false, push_id: pushId, reason: 'dry_run', message };
   }
 
@@ -307,11 +244,11 @@ export async function sendNotification(sql, userId, type, data = {}, { dryRun = 
     result = await messaging.sendEachForMulticast({
       tokens,
       notification: message,
-      data: { type, url: '/', push_id: pushId, link: pushLink(type, data) },
+      data: { type, url: '/', push_id: pushId, link: built.link },
       apns: { payload: { aps: { sound: 'default' } } },
     });
   } catch (e) {
-    await log('failed', { tokens: tokens.length });
+    await logBuilt('failed', { tokens: tokens.length });
     throw e;
   }
   // Удалённое приложение / отозванное разрешение — токен больше не нужен
@@ -320,7 +257,7 @@ export async function sendNotification(sql, userId, type, data = {}, { dryRun = 
     return code === 'messaging/registration-token-not-registered' || code === 'messaging/invalid-registration-token';
   });
   if (dead.length) await sql`DELETE FROM push_tokens WHERE token = ANY(${dead})`;
-  await log(result.successCount > 0 ? 'sent' : 'failed', { tokens: tokens.length, delivered: result.successCount });
+  await logBuilt(result.successCount > 0 ? 'sent' : 'failed', { tokens: tokens.length, delivered: result.successCount });
   return { ok: result.successCount > 0, push_id: pushId, sent: result.successCount, failed: result.failureCount };
 }
 

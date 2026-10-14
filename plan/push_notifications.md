@@ -284,10 +284,11 @@
 
 ## Этап 2. Арбитр: кому, что и когда
 
-- [ ] **2.1 Реестр уведомлений** — новый `api/push/_registry.js`
+- [x] **2.1 Реестр уведомлений** — новый `api/push/_registry.js`
   - Один объект на тип: `category`, `priority`, `transactional`, `link(data)`, `variants: [(data) => ({ title, body })]`, `minIntervalDays`. Из `buildMessage` всё переносится сюда; в `push.js` остаётся вызов.
   - Правило реестра: текст без числа или имени не собирается (`return null`).
   - **Готово, когда:** все существующие типы описаны в реестре, `buildMessage` удалён, тексты не изменились.
+  - Сделано: `api/push/_registry.js` — 10 типов (`PUSH_TYPES`, `pushType`, `buildPush`); приоритеты — по «Карте уведомлений». Тексты сверены со старой `buildMessage` на 26 сочетаниях данных — совпадают. Текст без числа и имени (или с `undefined`) не собирается → `push_log.status = 'no_specifics'`. В `push_log.variant` пишется `v1`. Из `push.js` убраны `buildMessage`, `plural`, `minutesFor`, `PUSH_CATEGORY`, `TRANSACTIONAL_TYPES`, `pushLink`.
 
 - [ ] **2.2 Арбитр в почасовом cron** — новый `api/push/_arbiter.js`
   - Один SQL-запрос собирает кандидатов этого часа (пользователь, пояс, `notif_hour`, дни, серия, счётчики SRS, курсы) вместо 2–4 запросов на человека. Отправка пачками по 500 токенов (`sendEachForMulticast`).

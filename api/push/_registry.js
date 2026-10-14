@@ -1,0 +1,188 @@
+/**
+ * Реестр push-уведомлений (plan/push_notifications.md, шаг 2.1) — источник правды по типам пушей.
+ * Файл начинается с «_», поэтому Vercel не публикует его как отдельный роут.
+ *
+ * На тип: category — для журнала и переключателей в настройках (2.4); priority — меньше = важнее,
+ * арбитр (2.2) берёт самый важный; transactional — уходит и на паузе, и мимо дневного лимита;
+ * minIntervalDays — не чаще раза в N дней; link — куда ведёт тап; variants — тексты (A/B — этап 4).
+ *
+ * Вариант получает ctx = { name, displayName, streak, longest, data } и возвращает { title, body }.
+ * Правило реестра (принцип 3 плана): в тексте должно быть число или имя, иначе пуш не собирается.
+ */
+
+function plural(n, one, few, many) {
+  const m10 = n % 10, m100 = n % 100;
+  if (m100 >= 11 && m100 <= 19) return many;
+  if (m10 === 1) return one;
+  if (m10 >= 2 && m10 <= 4) return few;
+  return many;
+}
+
+/** Примерное время повторения: ~15 секунд на слово */
+function minutesFor(count) {
+  return Math.max(1, Math.round((count || 0) / 4));
+}
+
+const LESSON_LINK = () => 'flashly://lesson?from=push';
+
+/** Рейтинг курса; без courseId — урок дня (старые записи без курса) */
+function ratingLink(week) {
+  return (data) => (data?.courseId
+    ? `flashly://rating/${encodeURIComponent(data.courseId)}?from=push${week ? `&week=${week}` : ''}`
+    : LESSON_LINK());
+}
+
+export const PUSH_TYPES = {
+  teacher_review: {
+    category: 'course',
+    priority: 1,
+    transactional: true,
+    minIntervalDays: 0,
+    link: LESSON_LINK,
+    variants: [
+      ({ data }) => ({
+        title: `${data.teacher || 'Учитель'} просит повторить слова`,
+        body: `${data.count} ${plural(data.count, 'слово ждёт', 'слова ждут', 'слов ждут')} повторения · ~${minutesFor(data.count)} мин`,
+      }),
+    ],
+  },
+  rating_sunday: {
+    category: 'rating',
+    priority: 3,
+    transactional: false,
+    minIntervalDays: 0,
+    link: ratingLink(null),
+    variants: [
+      ({ data }) => ({
+        title: 'Последний день недели',
+        body: data.gap != null
+          ? `Ты на ${data.place}-м месте, до ${data.place - 1}-го — ${data.gap} ${plural(data.gap, 'очко', 'очка', 'очков')}. Рейтинг закроется в полночь`
+          : `Ты на ${data.place}-м месте в рейтинге курса. Удержи его до полуночи!`,
+      }),
+    ],
+  },
+  weekly_result: {
+    category: 'rating',
+    priority: 3,
+    transactional: false,
+    minIntervalDays: 0,
+    link: ratingLink('previous'),
+    variants: [
+      ({ data }) => ({
+        title: 'Итоги недели',
+        body: `${data.place}-е место в курсе${data.reward > 0 ? `, +${data.reward} ${plural(data.reward, 'алмаз', 'алмаза', 'алмазов')}` : ''}. Новая неделя началась!`,
+      }),
+    ],
+  },
+  words_fading: {
+    category: 'lesson',
+    priority: 5,
+    transactional: false,
+    minIntervalDays: 0,
+    link: LESSON_LINK,
+    variants: [
+      ({ data }) => ({
+        title: 'Слова начинают забываться',
+        body: `${data.count} ${plural(data.count, 'слово', 'слова', 'слов')} давно не повторял — спаси их за ${minutesFor(data.count)} мин`,
+      }),
+    ],
+  },
+  review_due: {
+    category: 'lesson',
+    priority: 6,
+    transactional: false,
+    minIntervalDays: 0,
+    link: LESSON_LINK,
+    variants: [
+      ({ data }) => ({
+        title: 'Пора повторить',
+        body: `${data.count} ${plural(data.count, 'слово ждёт', 'слова ждут', 'слов ждут')} повторения · ~${minutesFor(data.count)} мин`,
+      }),
+    ],
+  },
+  streak_reminder: {
+    category: 'streak',
+    priority: 8,
+    transactional: false,
+    minIntervalDays: 0,
+    link: LESSON_LINK,
+    variants: [
+      ({ name, streak }) => ({
+        title: 'Не теряй серию!',
+        body: `${name}, у тебя ${streak} ${plural(streak, 'день', 'дня', 'дней')} подряд. Позанимайся сегодня!`,
+      }),
+    ],
+  },
+  reactivation_3d: {
+    category: 'reactivation',
+    priority: 9,
+    transactional: false,
+    minIntervalDays: 0,
+    link: LESSON_LINK,
+    variants: [
+      ({ name }) => ({ title: 'Давно не виделись', body: `${name}, прошло 3 дня. Карточки ждут тебя!` }),
+    ],
+  },
+  reactivation_7d: {
+    category: 'reactivation',
+    priority: 9,
+    transactional: false,
+    minIntervalDays: 0,
+    link: LESSON_LINK,
+    variants: [
+      ({ longest }) => ({
+        title: 'Вернись к учёбе',
+        body: `Твой рекорд был ${longest} ${plural(longest, 'день', 'дня', 'дней')}. Начни новую серию!`,
+      }),
+    ],
+  },
+  // Шлёт data.js при сохранении прогресса. По плану это пуш утра следующего дня (этап 3)
+  streak_lost: {
+    category: 'streak',
+    priority: 9,
+    transactional: false,
+    minIntervalDays: 0,
+    link: LESSON_LINK,
+    variants: [
+      ({ data }) => ({
+        title: 'Серия прервана',
+        body: `Серия в ${data.prevStreak} ${plural(data.prevStreak, 'день', 'дня', 'дней')} потеряна. Начни сегодня заново!`,
+      }),
+    ],
+  },
+  // Шлёт data.js. По плану — награда внутри приложения, а пушем только 7 / 30 / 100 / 365 (этап 3)
+  streak_milestone: {
+    category: 'streak',
+    priority: 9,
+    transactional: false,
+    minIntervalDays: 0,
+    link: LESSON_LINK,
+    variants: [
+      ({ name, data }) => ({
+        title: `${data.days} ${plural(data.days, 'день', 'дня', 'дней')} подряд!`,
+        body: `${name}, это твой личный рекорд! Так держать`,
+      }),
+    ],
+  },
+};
+
+/** Описание типа или null для неизвестного */
+export function pushType(type) {
+  return Object.hasOwn(PUSH_TYPES, type) ? PUSH_TYPES[type] : null;
+}
+
+/**
+ * Собрать пуш: { title, body, link, variant } или null — неизвестный тип или текст без конкретики
+ * (нет ни числа, ни имени: например, данные не пришли и вышло «undefined слов»).
+ */
+export function buildPush(type, ctx) {
+  const def = pushType(type);
+  if (!def) return null;
+  const variant = 0; // A/B-варианты — этап 4
+  const message = def.variants[variant]({ ...ctx, data: ctx.data || {} });
+  const text = `${message.title} ${message.body}`;
+  if (text.includes('undefined') || text.includes('NaN')) return null;
+  const specific = /\d/.test(text) || (!!ctx.displayName && text.includes(ctx.displayName));
+  if (!specific) return null;
+  return { ...message, link: def.link(ctx.data || {}), variant: `v${variant + 1}` };
+}
