@@ -34,6 +34,17 @@ export function isPushPaused() {
   return process.env.PUSH_PAUSED === '1';
 }
 
+/**
+ * Белый список получателей для тестового сервера: PUSH_ALLOWLIST = id через запятую (только в Preview).
+ * Тестовая база — копия рабочей, в ней настоящие токены: без списка крон на тестовом сервере слал бы
+ * пуши реальным людям. Переменной нет (рабочий сервер) — шлём всем.
+ */
+export function isAllowedRecipient(userId) {
+  const list = process.env.PUSH_ALLOWLIST;
+  if (!list) return true;
+  return list.split(',').map((s) => s.trim()).filter(Boolean).includes(String(userId));
+}
+
 /** Мёртвый токен: приложение удалено или разрешение отозвано — удаляем из push_tokens */
 export function isDeadTokenError(code) {
   return code === 'messaging/registration-token-not-registered' || code === 'messaging/invalid-registration-token';
@@ -159,6 +170,10 @@ export async function sendNotification(sql, userId, type, data = {}, { dryRun = 
   if (dryRun) {
     await logBuilt('dry_run', { tokens: tokenRows.length });
     return { ok: false, push_id: pushId, reason: 'dry_run', message };
+  }
+  if (!isAllowedRecipient(userId)) {
+    await logBuilt('not_allowlisted');
+    return { ok: false, push_id: pushId, reason: 'not_allowlisted', message };
   }
 
   const messaging = initFirebase();

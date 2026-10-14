@@ -18,7 +18,7 @@ import { PUSH_TYPES, buildPush } from './_registry.js';
 import { decide } from './_decide.js';
 import {
   DEFAULT_TZ, QUIET_TO_HOUR, QUIET_FROM_HOUR, MINOR_QUIET_FROM_HOUR, groupsOff, initFirebase, isDeadTokenError, isPushPaused,
-  logChannelEvents, sendNotification,
+  isAllowedRecipient, logChannelEvents, sendNotification,
 } from './_send.js';
 
 const FCM_BATCH = 500;
@@ -591,6 +591,7 @@ export async function runArbiter(sql, { dryRun = false } = {}) {
     if (status === 'send' && !built) status = 'no_specifics';
     if (status === 'send' && paused) status = 'paused';
     if (status === 'send' && dryRun) status = 'dry_run';
+    if (status === 'send' && !isAllowedRecipient(c.user_id)) status = 'not_allowlisted';
 
     const row = {
       id: randomUUID(),
