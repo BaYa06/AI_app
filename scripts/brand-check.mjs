@@ -18,6 +18,9 @@
  *     ion      — импорт Ionicons вне AppNavigator (панель вкладок)
  *     a11y     — кнопка из одной иконки без accessibilityLabel
  *     en       — английские строки в интерфейсе
+ *   Тексты пушей (api/push/_registry.js, брендбук 9.1): каждый вариант на разных данных —
+ *     один «!», одно эмодзи, «ты», без рода и упрёков, число или имя на экране блокировки.
+ *     Нарушение пушей — всегда ошибка для --fail-on-new (снимок не нужен).
  *
  * Использование:
  *   npm run brand:check                    — таблица по всем файлам
@@ -319,6 +322,17 @@ if (!flags.has('--quiet')) {
   console.log(`\nНарушений: ${totals.total} в ${mainFiles} файлах · текст < 12 px: ${totals.small} · эмодзи: ${totals.emoji} · Ionicons вне панели вкладок: ${ionFiles} файлов · иконки-кнопки без подписи: ${totals.a11y} · английских строк: ${totals.en}`);
 }
 
+// ---------------------------------------------------------------- тексты пушей
+const { PUSH_TYPES } = await import(path.join(ROOT, 'api', 'push', '_registry.js'));
+const { checkPushTexts } = await import(path.join(ROOT, 'scripts', 'lib', 'push-tone.mjs'));
+const pushProblems = filters.length ? [] : checkPushTexts(PUSH_TYPES);
+if (!flags.has('--quiet') && !filters.length) {
+  console.log(`Тексты пушей: ${pushProblems.length ? `${pushProblems.length} нарушений` : 'нарушений нет'}`);
+  if (showDetails || pushProblems.length) {
+    for (const p of pushProblems) console.log(`    ${p.type} ${p.variant}: ${p.rule} — «${p.text}»`);
+  }
+}
+
 // ---------------------------------------------------------------- baseline
 const snapshot = {
   totals,
@@ -347,6 +361,7 @@ if (flags.has('--fail-on-new')) {
       if ((counts[k] ?? 0) > before) worse.push(`${file}: ${k} ${before} → ${counts[k]}`);
     }
   }
+  for (const p of pushProblems) worse.push(`пуш ${p.type} ${p.variant}: ${p.rule}`);
   if (worse.length) {
     console.error('\n✗ Новые нарушения брендбука (больше, чем в снимке):');
     for (const w of worse) console.error('  ' + w);

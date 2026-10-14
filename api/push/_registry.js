@@ -372,7 +372,7 @@ export const PUSH_TYPES = {
     variants: [
       ({ name, data }) => ({
         title: `${data.days} ${plural(data.days, 'день', 'дня', 'дней')} подряд!`,
-        body: `${name}, это твой личный рекорд! Так держать`,
+        body: `${name}, это твой личный рекорд. Так держать`,
       }),
     ],
   },
