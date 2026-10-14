@@ -87,6 +87,8 @@ export async function saveReminderHour(hour: number): Promise<boolean> {
         // Дни, выбранные раньше самим человеком, остаются его выбором
         notifDaysExplicit: !!days && days !== 'mon,tue,wed,thu,fri,sat,sun',
         notifStreak: current?.notifStreak ?? true,
+        // Время выбрано в листе — оно важнее привычек (plan/push_notifications.md, 2.9)
+        notifTimeExplicit: true,
       }),
     });
     return res.ok;

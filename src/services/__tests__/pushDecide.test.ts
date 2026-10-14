@@ -76,4 +76,12 @@ describe('арбитр пушей', () => {
     expect(decide({ ...base, waiting: 12, ignored: 3, lastSentDay: '2026-10-13' })).toMatchObject({ status: 'backoff', type: 'review_due', reason: 'backoff_3' });
     expect(decide({ ...base, streak: 0, daysAway: 7, waiting: 12, ignored: 14 })).toMatchObject({ status: 'send', type: 'reactivation_7d' });
   });
+
+  it('привычные дни: в «чужой» день не напоминаем об уроке, но рейтинг и возврат приходят', () => {
+    const weekdays = ['mon', 'tue', 'wed', 'thu', 'fri'];
+    expect(decide({ ...base, dow: 'sat', waiting: 12, habitDays: weekdays })).toEqual({ status: 'skip', reason: 'not_usual_day' });
+    expect(decide({ ...base, dow: 'wed', waiting: 12, habitDays: weekdays })).toMatchObject({ status: 'send', type: 'review_due' });
+    expect(decide({ ...base, dow: 'sun', waiting: 12, rating: { place: 2, gap: 5 }, habitDays: weekdays })).toMatchObject({ type: 'rating_sunday' });
+    expect(decide({ ...base, dow: 'sat', streak: 0, daysAway: 3, habitDays: weekdays })).toMatchObject({ type: 'reactivation_3d' });
+  });
 });

@@ -422,6 +422,15 @@ async function applyMigrations(sql) {
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS class_days TEXT[]`;
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS class_hour SMALLINT`;
     await sql`ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS notif_use_habits BOOLEAN NOT NULL DEFAULT true`;
+    await sql`ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS notif_time_custom BOOLEAN NOT NULL DEFAULT false`;
+    // Разово: время не по умолчанию (19:00) человек выбирал сам — привычки его не меняют (2.9)
+    const claimedTime = await sql`
+      INSERT INTO app_migrations (name) VALUES ('030_notif_time_custom_backfill')
+      ON CONFLICT (name) DO NOTHING RETURNING name
+    `;
+    if (claimedTime.length > 0) {
+      await sql`UPDATE user_stats SET notif_time_custom = true WHERE notif_hour <> 19 OR COALESCE(notif_minute, 0) <> 0`;
+    }
   } catch (e) {
     console.error('Migration 030_about_me failed:', e);
   }

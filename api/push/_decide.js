@@ -67,16 +67,23 @@ export function eligiblePushes(c) {
   return list.sort((a, b) => PUSH_TYPES[a.type].priority - PUSH_TYPES[b.type].priority);
 }
 
+/** Напоминания-привычки: их не шлём в дни, когда человек обычно не учится (2.9). Рейтинг, курс и возврат — шлём */
+const HABIT_CATEGORIES = new Set(['lesson', 'streak']);
+
 /**
  * Что делать с кандидатом в этот запуск.
  * → { status: 'send', type, data }                — отправить
  * → { status: 'holdout' | 'backoff' | 'category_off' | 'interval', type, data, reason? } — записать отказ
  * → { status: 'skip', reason }                    — ничего не писать (нечего слать)
- * c — кандидат (см. eligiblePushes) + { userId, today, groupsOff, ignored, lastSentDay, lastSentByType }
+ * c — кандидат (см. eligiblePushes) + { userId, today, groupsOff, ignored, lastSentDay, lastSentByType,
+ *     habitDays } — habitDays: привычные дни + дни занятий (null — фильтр не применяется)
  */
 export function decide(c) {
-  const all = eligiblePushes(c);
-  if (all.length === 0) return { status: 'skip', reason: c.doneToday ? 'done_today' : 'nothing_to_send' };
+  const eligible = eligiblePushes(c);
+  if (eligible.length === 0) return { status: 'skip', reason: c.doneToday ? 'done_today' : 'nothing_to_send' };
+  const usualDay = !c.habitDays || c.habitDays.includes(c.dow);
+  const all = usualDay ? eligible : eligible.filter((p) => !HABIT_CATEGORIES.has(PUSH_TYPES[p.type].category));
+  if (all.length === 0) return { status: 'skip', reason: 'not_usual_day' };
 
   const off = disabledCategories(c.groupsOff);
   const enabled = all.filter((p) => !off.has(PUSH_TYPES[p.type].category));

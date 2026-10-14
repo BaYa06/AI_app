@@ -15,9 +15,11 @@ export const DEFAULT_TZ = 'Asia/Bishkek';
 /** Тихие часы (принцип 2): с 22:00 до 8:00 по поясу пользователя ничего не шлём, даже от учителя */
 export const QUIET_FROM_HOUR = 22;
 export const QUIET_TO_HOUR = 8;
+/** Младше 18 (возраст из «о себе», 2.7) — тихие часы с 21:00 */
+export const MINOR_QUIET_FROM_HOUR = 21;
 
-export function isQuietHour(localHour) {
-  return localHour >= QUIET_FROM_HOUR || localHour < QUIET_TO_HOUR;
+export function isQuietHour(localHour, minor = false) {
+  return localHour >= (minor ? MINOR_QUIET_FROM_HOUR : QUIET_FROM_HOUR) || localHour < QUIET_TO_HOUR;
 }
 
 export function initFirebase() {
@@ -90,9 +92,11 @@ export async function sendNotification(sql, userId, type, data = {}, { dryRun = 
 
   const [user] = await sql`
     SELECT u.display_name, us.current_streak, us.longest_streak, us.notif_enabled, us.notif_streak,
-           us.notif_categories_off,
+           us.notif_categories_off, u.age_range IN ('under13', '13-17') AS minor, h.sec_per_answer,
            EXTRACT(HOUR FROM NOW() AT TIME ZONE COALESCE(us.timezone, ${DEFAULT_TZ}))::int AS local_hour
-    FROM user_stats us JOIN users u ON u.id = us.user_id WHERE us.user_id = ${userId}
+    FROM user_stats us JOIN users u ON u.id = us.user_id
+    LEFT JOIN user_habits h ON h.user_id = us.user_id
+    WHERE us.user_id = ${userId}
   `;
   if (!user?.notif_enabled) {
     await log('disabled');
@@ -108,6 +112,7 @@ export async function sendNotification(sql, userId, type, data = {}, { dryRun = 
     displayName: user.display_name || null,
     streak: user.current_streak,
     longest: user.longest_streak,
+    secPerAnswer: user.sec_per_answer,
     data,
   });
   // Текст без числа и имени (не пришли данные) не отправляем — принцип 3 плана
@@ -127,7 +132,7 @@ export async function sendNotification(sql, userId, type, data = {}, { dryRun = 
     return { ok: false, push_id: pushId, reason: 'paused', message };
   }
   // Ночью не будим: строку с данными подхватит арбитр, когда у человека наступит 8:00
-  if (!dryRun && isQuietHour(user.local_hour)) {
+  if (!dryRun && isQuietHour(user.local_hour, user.minor === true)) {
     await logBuilt('quiet_hours');
     return { ok: false, push_id: pushId, reason: 'quiet_hours', message };
   }

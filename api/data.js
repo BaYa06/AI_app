@@ -180,9 +180,13 @@ async function saveAboutMe(sql, me, p) {
   }
   if (typeof p.useHabits === 'boolean' || p.clearHabits === true) {
     const use = p.clearHabits === true ? false : p.useHabits;
+    // Включил подстройку — время из настроек больше не «выбрано самим», напоминания идут по привычкам
     await sql`
       INSERT INTO user_stats (user_id, notif_use_habits) VALUES (${me}::uuid, ${use})
-      ON CONFLICT (user_id) DO UPDATE SET notif_use_habits = ${use}, updated_at = NOW()
+      ON CONFLICT (user_id) DO UPDATE SET
+        notif_use_habits = ${use},
+        notif_time_custom = CASE WHEN ${use} THEN false ELSE user_stats.notif_time_custom END,
+        updated_at = NOW()
     `;
     if (!use) await sql`DELETE FROM user_habits WHERE user_id = ${me}::uuid`;
   }

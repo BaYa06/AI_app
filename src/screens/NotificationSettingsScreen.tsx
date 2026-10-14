@@ -61,6 +61,8 @@ export function NotificationSettingsScreen({ navigation }: any) {
   const [reminderEnabled, setReminderEnabled] = useState(true);
   const [hours, setHours] = useState(19);
   const [minutes, setMinutes] = useState(0);
+  // Время при открытии экрана: изменил — значит выбрал сам, и привычки его не переопределят (2.9)
+  const [loadedTime, setLoadedTime] = useState<string | null>(null);
   // По умолчанию все дни; фильтр по дням сервер применяет, только если их выбрали здесь (Push 0.6)
   const [selectedDays, setSelectedDays] = useState<Record<string, boolean>>({
     mon: true, tue: true, wed: true, thu: true, fri: true, sat: true, sun: true,
@@ -96,6 +98,7 @@ export function NotificationSettingsScreen({ navigation }: any) {
             setReminderEnabled(d.notifEnabled ?? true);
             setHours(clampHour(d.notifHour ?? 19));
             setMinutes(clampMinute(d.notifMinute ?? 0));
+            setLoadedTime(`${clampHour(d.notifHour ?? 19)}:${clampMinute(d.notifMinute ?? 0)}`);
             const off: PushGroup[] = Array.isArray(d.notifCategoriesOff)
               ? d.notifCategoriesOff
               : d.notifStreak === false ? ['streak'] : [];
@@ -164,6 +167,7 @@ export function NotificationSettingsScreen({ navigation }: any) {
           notifEnabled: reminderEnabled,
           notifHour: hours,
           notifMinute: minutes,
+          notifTimeExplicit: loadedTime !== `${hours}:${minutes}`,
           notifDays: DAYS.filter((day) => selectedDays[day.key])
             .map((day) => day.key)
             .join(','),

@@ -6,7 +6,7 @@
  * арбитр (2.2) берёт самый важный; transactional — уходит и на паузе, и мимо дневного лимита;
  * minIntervalDays — не чаще раза в N дней; link — куда ведёт тап; variants — тексты (A/B — этап 4).
  *
- * Вариант получает ctx = { name, displayName, streak, longest, data } и возвращает { title, body }.
+ * Вариант получает ctx = { name, displayName, streak, longest, secPerAnswer, data } и возвращает { title, body }.
  * Правило реестра (принцип 3 плана): в тексте должно быть число или имя, иначе пуш не собирается.
  */
 
@@ -18,9 +18,19 @@ function plural(n, one, few, many) {
   return many;
 }
 
-/** Примерное время повторения: ~15 секунд на слово */
-function minutesFor(count) {
-  return Math.max(1, Math.round((count || 0) / 4));
+/**
+ * Примерное время повторения: секунд на слово — из профиля привычек (2.9, медиана ответа человека),
+ * без профиля — ~15 секунд.
+ */
+const DEFAULT_SEC_PER_WORD = 15;
+/** Ответ — не весь урок: переходы и чтение тоже занимают время, поэтому не меньше 4 и не больше 30 секунд */
+const MIN_SEC_PER_WORD = 4;
+const MAX_SEC_PER_WORD = 30;
+function minutesFor(count, secPerAnswer) {
+  const sec = Number(secPerAnswer) > 0
+    ? Math.min(MAX_SEC_PER_WORD, Math.max(MIN_SEC_PER_WORD, Number(secPerAnswer)))
+    : DEFAULT_SEC_PER_WORD;
+  return Math.max(1, Math.round(((count || 0) * sec) / 60));
 }
 
 const LESSON_LINK = () => 'flashly://lesson?from=push';
@@ -40,9 +50,9 @@ export const PUSH_TYPES = {
     minIntervalDays: 0,
     link: LESSON_LINK,
     variants: [
-      ({ data }) => ({
+      ({ data, secPerAnswer }) => ({
         title: `${data.teacher || 'Учитель'} просит повторить слова`,
-        body: `${data.count} ${plural(data.count, 'слово ждёт', 'слова ждут', 'слов ждут')} повторения · ~${minutesFor(data.count)} мин`,
+        body: `${data.count} ${plural(data.count, 'слово ждёт', 'слова ждут', 'слов ждут')} повторения · ~${minutesFor(data.count, secPerAnswer)} мин`,
       }),
     ],
   },
@@ -54,9 +64,9 @@ export const PUSH_TYPES = {
     minIntervalDays: 0,
     link: LESSON_LINK,
     variants: [
-      ({ data }) => ({
+      ({ data, secPerAnswer }) => ({
         title: data.course ? `Скоро занятие: «${data.course}»` : 'Скоро занятие',
-        body: `${data.inHours === 1 ? 'Через час' : 'Через 2 часа'} — повтори ${data.count} ${plural(data.count, 'слово', 'слова', 'слов')}${data.course ? ' курса' : ''} · ~${minutesFor(data.count)} мин`,
+        body: `${data.inHours === 1 ? 'Через час' : 'Через 2 часа'} — повтори ${data.count} ${plural(data.count, 'слово', 'слова', 'слов')}${data.course ? ' курса' : ''} · ~${minutesFor(data.count, secPerAnswer)} мин`,
       }),
     ],
   },
@@ -95,9 +105,9 @@ export const PUSH_TYPES = {
     minIntervalDays: 0,
     link: LESSON_LINK,
     variants: [
-      ({ data }) => ({
+      ({ data, secPerAnswer }) => ({
         title: 'Слова начинают забываться',
-        body: `${data.count} ${plural(data.count, 'слово', 'слова', 'слов')} давно не повторял — спаси их за ${minutesFor(data.count)} мин`,
+        body: `${data.count} ${plural(data.count, 'слово', 'слова', 'слов')} давно не повторял — спаси их за ${minutesFor(data.count, secPerAnswer)} мин`,
       }),
     ],
   },
@@ -108,9 +118,9 @@ export const PUSH_TYPES = {
     minIntervalDays: 0,
     link: LESSON_LINK,
     variants: [
-      ({ data }) => ({
+      ({ data, secPerAnswer }) => ({
         title: 'Пора повторить',
-        body: `${data.count} ${plural(data.count, 'слово ждёт', 'слова ждут', 'слов ждут')} повторения · ~${minutesFor(data.count)} мин`,
+        body: `${data.count} ${plural(data.count, 'слово ждёт', 'слова ждут', 'слов ждут')} повторения · ~${minutesFor(data.count, secPerAnswer)} мин`,
       }),
     ],
   },

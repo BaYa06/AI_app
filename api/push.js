@@ -138,7 +138,7 @@ export default async function handler(req, res) {
 
     // ── settings POST ──────────────────────────────────────────
     if (action === 'settings' && req.method === 'POST') {
-      const { notifEnabled, notifHour, notifMinute, notifDays, notifStreak, notifDaysExplicit } = req.body || {};
+      const { notifEnabled, notifHour, notifMinute, notifDays, notifStreak, notifDaysExplicit, notifTimeExplicit } = req.body || {};
       const userId = await settingsUserId(req, req.body?.userId);
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
       // cron-reminders запускается каждые 15 минут — минуты кратны 15
@@ -157,9 +157,12 @@ export default async function handler(req, res) {
         if (notifStreak === false) categoriesOff.push('streak');
       }
       const streakOn = !categoriesOff.includes('streak');
+      // Время выбрано самим человеком (2.9): новый клиент шлёт notifTimeExplicit; у старых — если не 19:00
+      const hour = notifHour ?? 19;
+      const timeCustom = notifTimeExplicit === true || (notifTimeExplicit === undefined && (hour !== 19 || minute !== 0));
       await sql`
-        INSERT INTO user_stats (user_id, notif_enabled, notif_hour, notif_minute, notif_days, notif_days_custom, notif_streak, notif_categories_off)
-        VALUES (${userId}, ${notifEnabled ?? true}, ${notifHour ?? 19}, ${minute}, ${days}, ${daysCustom}, ${streakOn}, ${categoriesOff}::text[])
+        INSERT INTO user_stats (user_id, notif_enabled, notif_hour, notif_minute, notif_days, notif_days_custom, notif_streak, notif_categories_off, notif_time_custom)
+        VALUES (${userId}, ${notifEnabled ?? true}, ${hour}, ${minute}, ${days}, ${daysCustom}, ${streakOn}, ${categoriesOff}::text[], ${timeCustom})
         ON CONFLICT (user_id) DO UPDATE SET
           notif_enabled = EXCLUDED.notif_enabled,
           notif_hour    = EXCLUDED.notif_hour,
@@ -168,6 +171,8 @@ export default async function handler(req, res) {
           notif_days_custom = EXCLUDED.notif_days_custom,
           notif_streak  = EXCLUDED.notif_streak,
           notif_categories_off = EXCLUDED.notif_categories_off,
+          -- Выбранное однажды время остаётся выбором; вернуть подстройку — «Мои данные» (saveAboutMe)
+          notif_time_custom = user_stats.notif_time_custom OR EXCLUDED.notif_time_custom,
           updated_at    = NOW()
       `;
       return res.status(200).json({ ok: true });

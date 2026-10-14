@@ -17,7 +17,7 @@ import { courseSetIdsSql } from '../_course.js';
 import { PUSH_TYPES, buildPush } from './_registry.js';
 import { decide } from './_decide.js';
 import {
-  DEFAULT_TZ, QUIET_TO_HOUR, QUIET_FROM_HOUR, groupsOff, initFirebase, isDeadTokenError, isPushPaused, sendNotification,
+  DEFAULT_TZ, QUIET_TO_HOUR, QUIET_FROM_HOUR, MINOR_QUIET_FROM_HOUR, groupsOff, initFirebase, isDeadTokenError, isPushPaused, sendNotification,
 } from './_send.js';
 
 const FCM_BATCH = 500;
@@ -29,11 +29,12 @@ const DEFERRED_MAX_HOURS = 20;
 async function sendDeferred(sql) {
   const rows = await sql`
     UPDATE push_log pl SET status = 'requeued'
-    FROM user_stats us
+    FROM user_stats us JOIN users u ON u.id = us.user_id
     WHERE pl.status = 'quiet_hours' AND pl.user_id = us.user_id
       AND pl.created_at > NOW() - make_interval(hours => ${DEFERRED_MAX_HOURS})
       AND EXTRACT(HOUR FROM NOW() AT TIME ZONE COALESCE(us.timezone, ${DEFAULT_TZ}))::int >= ${QUIET_TO_HOUR}
-      AND EXTRACT(HOUR FROM NOW() AT TIME ZONE COALESCE(us.timezone, ${DEFAULT_TZ}))::int < ${QUIET_FROM_HOUR}
+      AND EXTRACT(HOUR FROM NOW() AT TIME ZONE COALESCE(us.timezone, ${DEFAULT_TZ}))::int
+          < CASE WHEN u.age_range IN ('under13', '13-17') THEN ${MINOR_QUIET_FROM_HOUR} ELSE ${QUIET_FROM_HOUR} END
     RETURNING pl.user_id, pl.type, pl.payload
   `;
   let sent = 0;
@@ -71,7 +72,9 @@ async function sendClassPrep(sql, { dryRun }) {
         AND trim(to_char(NOW() AT TIME ZONE COALESCE(us.timezone, ${DEFAULT_TZ}), 'dy')) = ANY(u.class_days)
     ),
     timed AS (
-      SELECT sl.*, (NOW() AT TIME ZONE sl.tz)::time AS local_time FROM slots sl
+      SELECT sl.*, (NOW() AT TIME ZONE sl.tz)::time AS local_time,
+             (SELECT u.age_range IN ('under13', '13-17') FROM users u WHERE u.id = sl.user_id) AS minor
+      FROM slots sl
     )
     SELECT DISTINCT ON (t.user_id) t.user_id, t.course_id, t.course,
            EXTRACT(EPOCH FROM (t.class_time - t.local_time))::int / 60 AS minutes_left
@@ -80,7 +83,7 @@ async function sendClassPrep(sql, { dryRun }) {
     WHERE t.local_time >= t.class_time - INTERVAL '2 hours'
       AND t.local_time < t.class_time - INTERVAL '1 hour'
       AND t.local_time >= make_time(${QUIET_TO_HOUR}, 0, 0)
-      AND t.local_time < make_time(${QUIET_FROM_HOUR}, 0, 0)
+      AND t.local_time < make_time(CASE WHEN t.minor THEN ${MINOR_QUIET_FROM_HOUR} ELSE ${QUIET_FROM_HOUR} END, 0, 0)
       AND EXISTS (SELECT 1 FROM push_tokens pt WHERE pt.user_id = t.user_id AND pt.permission IS DISTINCT FROM 'denied')
       AND NOT EXISTS (
         SELECT 1 FROM push_log p
@@ -122,15 +125,36 @@ async function sendClassPrep(sql, { dryRun }) {
 /** Кандидаты этого 15-минутного слота — одним запросом вместо 2–4 на человека */
 async function loadCandidates(sql) {
   return sql`
-    WITH base AS (
-      SELECT us.*, u.display_name,
-             (NOW() AT TIME ZONE COALESCE(us.timezone, ${DEFAULT_TZ})) AS local_now
+    WITH people AS (
+      SELECT us.*, u.display_name, u.class_days,
+             u.age_range IN ('under13', '13-17') AS minor,
+             h.usual_time, h.usual_days, h.sec_per_answer,
+             (NOW() AT TIME ZONE COALESCE(us.timezone, ${DEFAULT_TZ})) AS local_now,
+             -- Профиль (2.9): время из настроек, если человек выбрал его сам, иначе за 30 минут до привычного
+             (us.notif_time_custom OR NOT us.notif_use_habits OR h.usual_time IS NULL) AS time_from_settings
       FROM user_stats us JOIN users u ON u.id = us.user_id
+      LEFT JOIN user_habits h ON h.user_id = us.user_id
       WHERE us.notif_enabled = true
-        AND us.notif_hour BETWEEN ${QUIET_TO_HOUR} AND ${QUIET_FROM_HOUR - 1}
         AND EXISTS (SELECT 1 FROM push_tokens pt WHERE pt.user_id = us.user_id AND pt.permission IS DISTINCT FROM 'denied')
+    ),
+    base AS (
+      -- Не раньше 8:00 и не позже 21:45 (младше 18 — 20:45: тихие часы с 21:00)
+      SELECT p.*,
+             LEAST(
+               GREATEST(
+                 CASE WHEN p.time_from_settings THEN make_time(p.notif_hour, COALESCE(p.notif_minute, 0), 0)
+                      ELSE p.usual_time - INTERVAL '30 minutes' END,
+                 make_time(${QUIET_TO_HOUR}, 0, 0)
+               ),
+               CASE WHEN p.minor THEN make_time(${MINOR_QUIET_FROM_HOUR - 1}, 45, 0) ELSE make_time(${QUIET_FROM_HOUR - 1}, 45, 0) END
+             ) AS eff_time
+      FROM people p
     )
     SELECT b.user_id, b.display_name, b.current_streak, b.longest_streak, b.notif_streak, b.notif_categories_off,
+           b.time_from_settings, b.eff_time::text AS eff_time, b.minor, b.sec_per_answer,
+           -- Привычные дни + дни занятий (2.9): только если дни в настройках не выбраны сами и подстройка включена
+           CASE WHEN NOT b.notif_days_custom AND b.notif_use_habits AND cardinality(COALESCE(b.usual_days, '{}')) >= 2
+                THEN COALESCE(b.usual_days, '{}') || COALESCE(b.class_days, '{}') END AS habit_days,
            b.local_now::date::text AS local_today,
            trim(to_char(b.local_now, 'dy')) AS dow,
            b.last_active_date = b.local_now::date AS done_today,
@@ -164,8 +188,8 @@ async function loadCandidates(sql) {
       WHERE w.user_id = b.user_id AND w.week_start >= b.local_now::date - 7
       ORDER BY w.week_start DESC, w.place ASC LIMIT 1
     ) wr ON true
-    WHERE EXTRACT(HOUR FROM b.local_now)::int = b.notif_hour
-      AND EXTRACT(MINUTE FROM b.local_now)::int >= COALESCE(b.notif_minute, 0)
+    WHERE EXTRACT(HOUR FROM b.local_now)::int = EXTRACT(HOUR FROM b.eff_time)::int
+      AND EXTRACT(MINUTE FROM b.local_now)::int >= EXTRACT(MINUTE FROM b.eff_time)::int
       AND (NOT b.notif_days_custom OR string_to_array(b.notif_days, ',') @> ARRAY[trim(to_char(b.local_now, 'dy'))])
       AND (b.last_reminder_date IS NULL OR b.last_reminder_date < b.local_now::date)
   `;
@@ -248,9 +272,18 @@ export async function runArbiter(sql, { dryRun = false } = {}) {
       ignored: c.ignored || 0,
       lastSentDay: c.last_sent_day,
       lastSentByType: {},
+      habitDays: c.habit_days || null,
     });
+    // Что из профиля повлияло на решение (2.9) — для dry_run
+    const profile = {
+      time: c.time_from_settings ? 'settings' : 'habit',
+      at: c.eff_time ? c.eff_time.slice(0, 5) : null,
+      habitDays: c.habit_days || null,
+      minor: c.minor === true,
+      secPerAnswer: c.sec_per_answer ? Number(c.sec_per_answer) : null,
+    };
     if (decision.status === 'skip') {
-      if (dryRun) report.push({ user_id: c.user_id, type: null, status: 'skip', reason: decision.reason });
+      if (dryRun) report.push({ user_id: c.user_id, type: null, status: 'skip', reason: decision.reason, profile });
       continue;
     }
 
@@ -259,6 +292,7 @@ export async function runArbiter(sql, { dryRun = false } = {}) {
       displayName: c.display_name || null,
       streak: c.current_streak,
       longest: c.longest_streak,
+      secPerAnswer: c.sec_per_answer,
       data: decision.data,
     });
     let status = decision.status;
@@ -291,7 +325,7 @@ export async function runArbiter(sql, { dryRun = false } = {}) {
     if (dryRun) {
       report.push({
         user_id: c.user_id, type: decision.type, status, reason: decision.reason || null, data: decision.data,
-        message: built ? { title: built.title, body: built.body } : null,
+        message: built ? { title: built.title, body: built.body } : null, profile,
       });
     }
   }
