@@ -17,7 +17,8 @@ import { courseSetIdsSql } from '../_course.js';
 import { PUSH_TYPES, buildPush } from './_registry.js';
 import { decide } from './_decide.js';
 import {
-  DEFAULT_TZ, QUIET_TO_HOUR, QUIET_FROM_HOUR, MINOR_QUIET_FROM_HOUR, groupsOff, initFirebase, isDeadTokenError, isPushPaused, sendNotification,
+  DEFAULT_TZ, QUIET_TO_HOUR, QUIET_FROM_HOUR, MINOR_QUIET_FROM_HOUR, groupsOff, initFirebase, isDeadTokenError, isPushPaused,
+  logChannelEvents, sendNotification,
 } from './_send.js';
 
 const FCM_BATCH = 500;
@@ -647,6 +648,7 @@ export async function runArbiter(sql, { dryRun = false } = {}) {
       for (const token of tokensByUser.get(s.row.user_id) || []) {
         messages.push({
           pushId: s.row.id,
+          userId: s.row.user_id,
           token,
           message: {
             token,
@@ -670,7 +672,7 @@ export async function runArbiter(sql, { dryRun = false } = {}) {
             const st = stats.get(chunk[j].pushId);
             st.tokens++;
             if (r.success) st.delivered++;
-            else if (isDeadTokenError(r.error?.code)) dead.push(chunk[j].token);
+            else if (isDeadTokenError(r.error?.code)) dead.push(chunk[j]);
           });
         } catch (e) {
           console.error('[arbiter] FCM batch failed:', e);
@@ -678,7 +680,10 @@ export async function runArbiter(sql, { dryRun = false } = {}) {
         }
       }
     }
-    if (dead.length) await sql`DELETE FROM push_tokens WHERE token = ANY(${dead})`;
+    if (dead.length) {
+      await sql`DELETE FROM push_tokens WHERE token = ANY(${dead.map((m) => m.token)})`;
+      await logChannelEvents(sql, dead.map((m) => ({ userId: m.userId, event: 'token_unregistered' })));
+    }
 
     const updates = [...stats].map(([id, st]) => ({ id, status: st.delivered > 0 ? 'sent' : 'failed', tokens: st.tokens, delivered: st.delivered }));
     sent = updates.filter((u) => u.status === 'sent').length;

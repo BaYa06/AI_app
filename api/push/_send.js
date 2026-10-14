@@ -47,6 +47,25 @@ export function groupsOff(categoriesOff, notifStreak) {
 }
 
 /**
+ * Отток канала (5.1): category_disabled | disabled_all | permission_revoked | token_unregistered.
+ * events: [{ userId, event, detail? }]. Ошибку только логируем — это статистика.
+ */
+export async function logChannelEvents(sql, events) {
+  const rows = events.filter((e) => e.userId);
+  if (rows.length === 0) return;
+  try {
+    await sql`
+      INSERT INTO push_channel_events (user_id, event, detail)
+      SELECT x.user_id, x.event, x.detail
+      FROM jsonb_to_recordset(${JSON.stringify(rows.map((e) => ({ user_id: e.userId, event: e.event, detail: e.detail ?? null })))}::jsonb)
+        AS x(user_id uuid, event text, detail text)
+    `;
+  } catch (e) {
+    console.error('[push] push_channel_events insert failed:', e);
+  }
+}
+
+/**
  * Строка push_log на каждое решение (шаг 0.3). Журнал не должен ронять отправку: ошибку
  * только логируем. local_date — по поясу пользователя, как у остальных дневных отметок.
  */
@@ -158,7 +177,10 @@ export async function sendNotification(sql, userId, type, data = {}, { dryRun = 
     throw e;
   }
   const dead = tokens.filter((_, i) => isDeadTokenError(result.responses[i].error?.code));
-  if (dead.length) await sql`DELETE FROM push_tokens WHERE token = ANY(${dead})`;
+  if (dead.length) {
+    await sql`DELETE FROM push_tokens WHERE token = ANY(${dead})`;
+    await logChannelEvents(sql, dead.map(() => ({ userId, event: 'token_unregistered' })));
+  }
   await logBuilt(result.successCount > 0 ? 'sent' : 'failed', { tokens: tokens.length, delivered: result.successCount });
   return { ok: result.successCount > 0, push_id: pushId, sent: result.successCount, failed: result.failureCount };
 }

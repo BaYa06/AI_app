@@ -437,11 +437,12 @@
 
 ## Этап 5. Дашборд и ритуал
 
-- [ ] **5.1 SQL-представления** — `database/migrations/033_push_views.sql`
+- [x] **5.1 SQL-представления** — `database/migrations/033_push_views.sql`
   - `push_funnel_daily`: по дню и типу — eligible, sent, delivered, opened, lesson_started, lesson_completed, конверсии.
   - `push_churn_weekly`: отключения категорий, `revoked`, `token_unregistered` на 1 000 получателей.
   - `push_holdout_retention`: D1 / D7 / D30 у групп `push` и `holdout` по когортам регистрации.
   - **Готово, когда:** три представления отдают данные за последнюю неделю.
+  - Сделано: миграция 033. `push_funnel_daily` (день × тип × вариант: кандидаты, отправлено, доставлено, открыто, урок начат/завершён, `open_pct`, `opened_to_lesson_pct`), `push_churn_weekly` (события оттока на 1000 получателей недели), `push_holdout_retention` (неделя регистрации × группа: D1 — день 1, D7 — дни 7–13, D30 — дни 30–36; процент среди тех, у кого окно прошло). Для оттока заведён журнал `push_channel_events`: `category_disabled` (с категорией) и `disabled_all` — при сохранении настроек, `permission_revoked` — подписка с `denied` после `granted/provisional`, `token_unregistered` — FCM удалил токен. Представления проверены на рабочей базе во временной копии.
 
 - [ ] **5.2 Блок «Push» в админке** — `public/admin.html`, `api/admin.js`
   - Таблица воронки по типам за 7 / 30 дней, график отключений, сравнение с контрольной группой, кнопка `dry_run` на текущий час, состояние `PUSH_PAUSED`.

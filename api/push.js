@@ -21,7 +21,7 @@
 import { neon } from '@neondatabase/serverless';
 import { ensureDatabaseInitialized } from './_db-init.js';
 import { getAuthedUserId, hasBearerSecret } from './_auth.js';
-import { sendNotification, groupsOff } from './push/_send.js';
+import { sendNotification, groupsOff, logChannelEvents } from './push/_send.js';
 import { runArbiter } from './push/_arbiter.js';
 import { recomputeHabits } from './push/_habits.js';
 import { SETTING_GROUPS, isHoldout } from './push/_decide.js';
@@ -81,6 +81,13 @@ export default async function handler(req, res) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
       if (!userId && bodyUserId) console.warn('[push] subscribe: userId без JWT проигнорирован');
+      // Разрешение отозвали в настройках iOS (5.1, отток канала): было granted/provisional, стало denied
+      if (permission === 'denied' && userId) {
+        const [prev] = await sql`SELECT permission FROM push_tokens WHERE token = ${token}`;
+        if (prev && (prev.permission === 'granted' || prev.permission === 'provisional')) {
+          await logChannelEvents(sql, [{ userId, event: 'permission_revoked' }]);
+        }
+      }
       await sql`
         INSERT INTO push_tokens (token, user_id, platform, permission, updated_at)
         VALUES (${token}, ${userId || null}, ${platform || 'web'}, ${permission}, NOW())
@@ -157,6 +164,14 @@ export default async function handler(req, res) {
         if (notifStreak === false) categoriesOff.push('streak');
       }
       const streakOn = !categoriesOff.includes('streak');
+      // Отток канала (5.1): какие переключатели выключены сейчас и выключено ли всё
+      const [before] = await sql`SELECT notif_enabled, notif_categories_off, notif_streak FROM user_stats WHERE user_id = ${userId}`;
+      if (before) {
+        const offBefore = new Set(groupsOff(before.notif_categories_off, before.notif_streak));
+        const events = categoriesOff.filter((g) => !offBefore.has(g)).map((g) => ({ userId, event: 'category_disabled', detail: g }));
+        if (before.notif_enabled && notifEnabled === false) events.push({ userId, event: 'disabled_all' });
+        await logChannelEvents(sql, events);
+      }
       // Время выбрано самим человеком (2.9): новый клиент шлёт notifTimeExplicit; у старых — если не 19:00
       const hour = notifHour ?? 19;
       const timeCustom = notifTimeExplicit === true || (notifTimeExplicit === undefined && (hour !== 19 || minute !== 0));
