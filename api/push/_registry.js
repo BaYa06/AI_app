@@ -76,6 +76,20 @@ export const PUSH_TYPES = {
       }),
     ],
   },
+  // Вечером, если серия ≥ 3 и урок не сделан (3.3) — второй пуш дня, не чаще 2 раз в неделю
+  streak_risk: {
+    category: 'streak',
+    priority: 2,
+    transactional: false,
+    minIntervalDays: 0,
+    link: LESSON_LINK,
+    variants: [
+      ({ data }) => ({
+        title: `Серия ${data.streak} ${plural(data.streak, 'день', 'дня', 'дней')} сгорит в полночь`,
+        body: 'Хватит 2 минут, чтобы её сохранить',
+      }),
+    ],
+  },
   rating_sunday: {
     category: 'rating',
     priority: 3,

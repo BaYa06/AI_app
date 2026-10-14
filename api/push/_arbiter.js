@@ -240,6 +240,49 @@ async function sendOnboarding(sql, { dryRun }) {
   return { onboardingCandidates: items.length, onboardingSent: sent, ...(dryRun ? { onboardingReport: report } : null) };
 }
 
+/**
+ * «Серия сгорит в полночь» (3.3): 21:00–21:45 по поясу (младше 18 — 20:15–20:45), серия ≥ 3, урок
+ * сегодня не засчитан, заморозок нет (иначе серия не сгорит — честность, принцип 5), утром не было
+ * пуша про серию, за 7 дней — меньше 2 таких пушей. Это второй пуш дня: день не отмечаем.
+ */
+async function sendStreakRisk(sql, { dryRun }) {
+  const rows = await sql`
+    WITH ctx AS (
+      SELECT us.user_id, us.current_streak,
+             (NOW() AT TIME ZONE COALESCE(us.timezone, ${DEFAULT_TZ})) AS local_now,
+             u.age_range IN ('under13', '13-17') AS minor
+      FROM user_stats us JOIN users u ON u.id = us.user_id
+      WHERE us.notif_enabled = true AND us.current_streak >= 3 AND COALESCE(u.streak_freezes, 0) = 0
+        AND (us.last_active_date IS NULL
+             OR us.last_active_date < (NOW() AT TIME ZONE COALESCE(us.timezone, ${DEFAULT_TZ}))::date)
+        AND EXISTS (SELECT 1 FROM push_tokens pt WHERE pt.user_id = us.user_id AND pt.permission IS DISTINCT FROM 'denied')
+    )
+    SELECT c.user_id, c.current_streak
+    FROM ctx c
+    WHERE c.local_now::time >= CASE WHEN c.minor THEN TIME '20:15' ELSE TIME '21:00' END
+      AND c.local_now::time < CASE WHEN c.minor THEN TIME '20:45' ELSE TIME '21:45' END
+      AND NOT EXISTS (
+        SELECT 1 FROM push_log p
+        WHERE p.user_id = c.user_id AND p.local_date = c.local_now::date
+          AND p.type IN ('streak_risk', 'streak_reminder') AND p.status NOT IN ('dry_run', 'paused', 'failed')
+      )
+      -- Только что пришло обычное напоминание (например, на 21:00) — второй пуш подряд не шлём
+      AND NOT EXISTS (
+        SELECT 1 FROM push_log p
+        WHERE p.user_id = c.user_id AND p.status IN ('sent', 'sending') AND p.category <> 'course'
+          AND p.created_at > NOW() - INTERVAL '3 hours'
+      )
+      AND (
+        SELECT COUNT(*) FROM push_log p
+        WHERE p.user_id = c.user_id AND p.type = 'streak_risk' AND p.status = 'sent'
+          AND p.local_date > c.local_now::date - 7
+      ) < 2
+  `;
+  const items = rows.map((r) => ({ userId: r.user_id, type: 'streak_risk', data: { streak: r.current_streak } }));
+  const { sent, report } = await sendEach(sql, items, { dryRun, markDay: false });
+  return { streakRiskCandidates: items.length, streakRiskSent: sent, ...(dryRun ? { streakRiskReport: report } : null) };
+}
+
 /** Кандидаты этого 15-минутного слота — одним запросом вместо 2–4 на человека */
 async function loadCandidates(sql) {
   return sql`
@@ -543,6 +586,9 @@ export async function runArbiter(sql, { dryRun = false } = {}) {
     }
   }
 
+  // Вечернее «серия сгорит» — после основной рассылки, чтобы не прийти вторым пушем в ту же минуту
+  const streakRisk = await sendStreakRisk(sql, { dryRun });
+
   if (markDay.length > 0) {
     await sql`
       UPDATE user_stats us SET last_reminder_date = x.d
@@ -559,6 +605,7 @@ export async function runArbiter(sql, { dryRun = false } = {}) {
     ...deferred,
     ...classPrep,
     ...onboarding,
+    ...streakRisk,
     ms: Date.now() - startedAt,
   };
   return dryRun ? { ...summary, dry_run: true, paused, report } : summary;
