@@ -123,6 +123,72 @@ async function updateLanguagePreferences(sql, me, p) {
   return true;
 }
 
+// ─── «О себе» для напоминаний (plan/push_notifications.md, 2.7) ─────────────
+
+const AGE_RANGES = ['under13', '13-17', '18-24', '25-34', '35+'];
+const WEEK_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+/** Возраст: диапазон из списка или null (пропустил / стёр) */
+function optAgeRange(value) {
+  return AGE_RANGES.includes(value) ? value : null;
+}
+
+/** Дни занятий в центре: только дни недели, в порядке недели; пусто — null */
+function optClassDays(value) {
+  if (!Array.isArray(value)) return null;
+  const days = WEEK_DAYS.filter((d) => value.includes(d));
+  return days.length ? days : null;
+}
+
+function optClassHour(value) {
+  const h = Number(value);
+  return Number.isInteger(h) && h >= 6 && h <= 22 ? h : null;
+}
+
+/** «Профиль → Мои данные»: ответы о себе и что приложение знает о привычках (только чтение) */
+async function getAboutMe(sql, me) {
+  const [row] = await sql`
+    SELECT u.age_range, u.class_days, u.class_hour, u.learning_goal,
+           COALESCE(us.notif_use_habits, true) AS use_habits,
+           h.usual_time::text AS usual_time, h.usual_days, h.segment
+    FROM users u
+    LEFT JOIN user_stats us ON us.user_id = u.id
+    LEFT JOIN user_habits h ON h.user_id = u.id
+    WHERE u.id = ${me}::uuid
+  `;
+  if (!row) return null;
+  return {
+    ageRange: row.age_range,
+    classDays: row.class_days || [],
+    classHour: row.class_hour,
+    learningGoal: row.learning_goal,
+    useHabits: row.use_habits,
+    habits: { usualTime: row.usual_time ? row.usual_time.slice(0, 5) : null, usualDays: row.usual_days || [] },
+  };
+}
+
+/**
+ * Сохранить ответы о себе. Поле, которого нет в запросе, не трогаем; null — стереть.
+ * clearHabits — «Стереть, что знаешь о моих привычках»: профиль удаляется и больше не используется.
+ */
+async function saveAboutMe(sql, me, p) {
+  if ('ageRange' in p) await sql`UPDATE users SET age_range = ${optAgeRange(p.ageRange)} WHERE id = ${me}::uuid`;
+  if ('classDays' in p || 'classHour' in p) {
+    const days = optClassDays(p.classDays);
+    const hour = days ? optClassHour(p.classHour) : null;
+    await sql`UPDATE users SET class_days = ${days}, class_hour = ${hour} WHERE id = ${me}::uuid`;
+  }
+  if (typeof p.useHabits === 'boolean' || p.clearHabits === true) {
+    const use = p.clearHabits === true ? false : p.useHabits;
+    await sql`
+      INSERT INTO user_stats (user_id, notif_use_habits) VALUES (${me}::uuid, ${use})
+      ON CONFLICT (user_id) DO UPDATE SET notif_use_habits = ${use}, updated_at = NOW()
+    `;
+    if (!use) await sql`DELETE FROM user_habits WHERE user_id = ${me}::uuid`;
+  }
+  return true;
+}
+
 async function saveOnboardingData(sql, me, p) {
   await sql`
     UPDATE users SET
@@ -134,6 +200,9 @@ async function saveOnboardingData(sql, me, p) {
       daily_goal = COALESCE(${optString(p.dailyGoal, 100)}, daily_goal),
       teacher_subject = COALESCE(${optString(p.teacherSubject, 100)}, teacher_subject),
       teacher_group_size = COALESCE(${optString(p.teacherGroupSize, 100)}, teacher_group_size),
+      age_range = COALESCE(${optAgeRange(p.ageRange)}, age_range),
+      class_days = COALESCE(${optClassDays(p.classDays)}, class_days),
+      class_hour = COALESCE(${optClassDays(p.classDays) ? optClassHour(p.classHour) : null}, class_hour),
       onboarding_completed = true
     WHERE id = ${me}::uuid
   `;
@@ -730,6 +799,7 @@ async function deleteAccount(sql, me, p, user) {
 
 const ACTIONS = {
   ensureUserExists, getProfile, updateDisplayName, updateUserName, updateLanguagePreferences, saveOnboardingData,
+  getAboutMe, saveAboutMe,
   loadSets, loadCardsBySet, loadAllCards, updateCard, createSet, createCard, createCardsBatch,
   deleteSet, deleteCard, updateSetMeta, updateSetCourse,
   loadCourses, createCourse, loadStudentCourses,

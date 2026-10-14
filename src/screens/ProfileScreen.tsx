@@ -22,6 +22,7 @@ import {
   BookOpen,
   GraduationCap,
   Bell,
+  UserCog,
   Palette,
   Volume2,
   MessageSquare,
@@ -298,6 +299,7 @@ export function ProfileScreen({ navigation }: any) {
       <ListGroup title="Обучение" style={st.group}>
         <ListRow icon={GraduationCap} title="Настройки обучения" onPress={() => navigation?.navigate('LearningSettings')} />
         <ListRow icon={Bell} title="Уведомления" onPress={() => navigation?.navigate('NotificationSettings')} />
+        <ListRow icon={UserCog} title="Мои данные" subtitle="Возраст, занятия, привычное время" onPress={() => navigation?.navigate('MyData')} />
       </ListGroup>
 
       {/* ======== App ======== */}

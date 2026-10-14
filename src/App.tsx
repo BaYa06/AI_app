@@ -34,6 +34,7 @@ import { NativeLanguageScreen } from '@/screens/NativeLanguageScreen';
 import { TargetLanguagesScreen } from '@/screens/TargetLanguagesScreen';
 import { LearningGoalScreen } from '@/screens/LearningGoalScreen';
 import { DailyGoalScreen } from '@/screens/DailyGoalScreen';
+import { AboutMeOnboardingScreen, type AboutMeAnswers } from '@/screens/AboutMeOnboardingScreen';
 import { TeacherSubjectScreen } from '@/screens/TeacherSubjectScreen';
 import { TeacherGroupSizeScreen } from '@/screens/TeacherGroupSizeScreen';
 
@@ -56,7 +57,7 @@ const webStyles = Platform.OS === 'web' ? StyleSheet.create({
   },
 }) : undefined;
 
-type AuthStep = 'welcome' | 'name' | 'role' | 'native_language' | 'target_languages' | 'goal' | 'daily' | 'teacher_subject' | 'teacher_size';
+type AuthStep = 'welcome' | 'name' | 'role' | 'native_language' | 'target_languages' | 'goal' | 'daily' | 'about' | 'teacher_subject' | 'teacher_size';
 
 type AppRootProps = {
   isReady: boolean;
@@ -79,6 +80,8 @@ type AppRootProps = {
   onSubmitTargetLanguages: (codes: string[]) => void;
   onSubmitGoal: (goalId: string) => void;
   onSubmitDaily: (dailyId: string) => void;
+  onBackToDaily: () => void;
+  onSubmitAboutMe: (answers: AboutMeAnswers) => void;
   onSubmitTeacherSubject: (subjectId: string) => void;
   onSubmitTeacherSize: (sizeId: string) => void;
   authStep: AuthStep;
@@ -107,6 +110,8 @@ function AppRoot({
   onSubmitTargetLanguages,
   onSubmitGoal,
   onSubmitDaily,
+  onBackToDaily,
+  onSubmitAboutMe,
   onSubmitTeacherSubject,
   onSubmitTeacherSize,
   authStep,
@@ -197,6 +202,8 @@ function AppRoot({
             onBack={onBackToGoal}
             onContinue={onSubmitDaily}
           />
+        ) : authStep === 'about' ? (
+          <AboutMeOnboardingScreen onBack={onBackToDaily} onContinue={onSubmitAboutMe} />
         ) : authStep === 'teacher_subject' ? (
           <TeacherSubjectScreen
             onBack={onBackToTargetLanguages}
@@ -323,7 +330,7 @@ export default function App() {
     dailyGoal?: string;
     teacherSubject?: string;
     teacherGroupSize?: string;
-  }>({});
+  } & AboutMeAnswers>({});
   const [pendingInviteToken, setPendingInviteToken] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const ensuredUserIdRef = useRef<string | null>(null);
@@ -771,6 +778,9 @@ export default function App() {
       dailyGoal: finalData.dailyGoal,
       teacherSubject: finalData.teacherSubject,
       teacherGroupSize: finalData.teacherGroupSize,
+      ageRange: finalData.ageRange ?? undefined,
+      classDays: finalData.classDays,
+      classHour: finalData.classHour,
     });
     setNeedsOnboarding(false);
     DatabaseService.reloadRemoteDataForUser(currentUserId);
@@ -798,7 +808,17 @@ export default function App() {
       useSettingsStore.getState().updateSettings({ lessonNewPerDay: perDay });
       DatabaseService.saveSettings();
     }
-    const finalData = { ...onboardingData, dailyGoal: dailyId };
+    // Дальше — необязательные «Ещё два вопроса» для напоминаний (plan/push_notifications.md, 2.7)
+    setOnboardingData((prev) => ({ ...prev, dailyGoal: dailyId }));
+    setAuthStep('about');
+  }, []);
+
+  const handleBackToDaily = useCallback(() => {
+    setAuthStep('daily');
+  }, []);
+
+  const handleSubmitAboutMe = useCallback((answers: AboutMeAnswers) => {
+    const finalData = { ...onboardingData, ...answers };
     setOnboardingData(finalData);
     finishOnboarding(finalData);
   }, [onboardingData, finishOnboarding]);
@@ -866,6 +886,8 @@ export default function App() {
         onSubmitTargetLanguages={handleSubmitTargetLanguages}
         onSubmitGoal={handleSubmitGoal}
         onSubmitDaily={handleSubmitDaily}
+        onBackToDaily={handleBackToDaily}
+        onSubmitAboutMe={handleSubmitAboutMe}
         onSubmitTeacherSubject={handleSubmitTeacherSubject}
         onSubmitTeacherSize={handleSubmitTeacherSize}
         authStep={authStep}

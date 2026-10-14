@@ -67,6 +67,7 @@ import { StudyPlaceholderScreen } from '@/screens/StudyPlaceholderScreen';
 import { AchievementsScreen } from '@/screens/AchievementsScreen';
 import { NotificationSettingsScreen } from '@/screens/NotificationSettingsScreen';
 import { LearningSettingsScreen } from '@/screens/LearningSettingsScreen';
+import { MyDataScreen } from '@/screens/MyDataScreen';
 import { SoundSettingsScreen } from '@/screens/SoundSettingsScreen';
 import { FeedbackScreen } from '@/screens/FeedbackScreen';
 import { LibrarySetDetailScreen } from '@/screens/LibrarySetDetailScreen';
@@ -398,6 +399,15 @@ export function AppNavigator() {
         <Stack.Screen
           name="NotificationSettings"
           component={NotificationSettingsScreen}
+          options={{
+            headerShown: false,
+            animation: 'slide_from_right',
+            animationDuration: 300,
+          }}
+        />
+        <Stack.Screen
+          name="MyData"
+          component={MyDataScreen}
           options={{
             headerShown: false,
             animation: 'slide_from_right',

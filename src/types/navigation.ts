@@ -128,6 +128,8 @@ export type RootStackParamList = {
   Achievements: undefined;
   NotificationSettings: undefined;
   LearningSettings: undefined;
+  /** «Мои данные» для напоминаний (plan/push_notifications.md, 2.7) */
+  MyData: undefined;
   SoundSettings: undefined;
   Feedback: undefined;
   Settings: undefined;

@@ -305,6 +305,20 @@ function mapMembershipSetRow(row: MembershipSetRow, courseId: string): CardSet {
   } as unknown as CardSet;
 }
 
+/** Возраст диапазоном — точную дату рождения не спрашиваем (2.7) */
+export type AgeRange = 'under13' | '13-17' | '18-24' | '25-34' | '35+';
+
+/** Ответы «о себе» и профиль привычек — для напоминаний (plan/push_notifications.md, 2.7) */
+export type AboutMe = {
+  ageRange: AgeRange | null;
+  classDays: string[];
+  classHour: number | null;
+  learningGoal: string | null;
+  /** Подстраивать время напоминаний под привычки */
+  useHabits: boolean;
+  habits: { usualTime: string | null; usualDays: string[] };
+};
+
 /** Статистика пользователя (серия и итоги) — форма, которую кэширует StreakService */
 export type UserStatsData = {
   current_streak: number;
@@ -434,6 +448,16 @@ export const NeonService = {
   /**
    * Получить родной язык и изучаемые языки пользователя
    */
+  /** «Профиль → Мои данные» (plan/push_notifications.md, 2.7): ответы о себе и что известно о привычках */
+  async getAboutMe(): Promise<AboutMe | null> {
+    return callDataApi<AboutMe | null>('getAboutMe', {}, 'GET');
+  },
+
+  /** Сохранить ответы о себе. Поле не передано — не меняется; null — стереть */
+  async saveAboutMe(data: Partial<Pick<AboutMe, 'ageRange' | 'classDays' | 'classHour' | 'useHabits'>> & { clearHabits?: boolean }): Promise<boolean> {
+    return (await callDataApi<boolean>('saveAboutMe', data)) === true;
+  },
+
   async getLanguagePreferences(
     _userId: string,
   ): Promise<{ nativeLanguage: string | null; targetLanguages: string[] }> {
@@ -478,6 +502,9 @@ export const NeonService = {
       dailyGoal?: string;
       teacherSubject?: string;
       teacherGroupSize?: string;
+      ageRange?: AgeRange;
+      classDays?: string[];
+      classHour?: number;
     },
   ): Promise<void> {
     await callDataApi('saveOnboardingData', data);

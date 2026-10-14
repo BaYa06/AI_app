@@ -18,8 +18,9 @@ export interface OnboardingStepProps {
   onBack?: () => void;
   /** Заголовок шапки («Flashly»). */
   title?: string;
-  /** Номер шага 1…ONBOARDING_STEPS — по нему считаются подпись «Шаг N из 6» и процент. */
-  step: number;
+  /** Номер шага 1…ONBOARDING_STEPS — по нему считаются подпись «Шаг N из 6» и процент.
+   *  Нет — необязательный экран после основных шагов, прогресс не показываем. */
+  step?: number;
   headline: string;
   description?: string;
   /** Выравнивание заголовка и пояснения. */
@@ -51,7 +52,7 @@ export function OnboardingStep({
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const hasHeader = !!onBack || !!title;
-  const progress = Math.round((step / ONBOARDING_STEPS) * 100);
+  const progress = step ? Math.round((step / ONBOARDING_STEPS) * 100) : 100;
   const progressLabel = `Шаг ${step} из ${ONBOARDING_STEPS}`;
 
   const body = (
@@ -90,17 +91,19 @@ export function OnboardingStep({
     <View style={[styles.flex, { backgroundColor: colors.background }]}>
       {hasHeader ? <ScreenHeader title={title} onBack={onBack} /> : null}
 
-      <View style={[styles.progressBlock, !hasHeader && styles.progressBlockTop]}>
-        <View style={styles.progressHeader}>
-          <Text variant="bodySmall" style={{ color: colors.primary }}>
-            {progressLabel}
-          </Text>
-          <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
-            {progress}%
-          </Text>
+      {step ? (
+        <View style={[styles.progressBlock, !hasHeader && styles.progressBlockTop]}>
+          <View style={styles.progressHeader}>
+            <Text variant="bodySmall" style={{ color: colors.primary }}>
+              {progressLabel}
+            </Text>
+            <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
+              {progress}%
+            </Text>
+          </View>
+          <ProgressBar progress={progress} animated={false} accessibilityLabel={progressLabel} />
         </View>
-        <ProgressBar progress={progress} animated={false} accessibilityLabel={progressLabel} />
-      </View>
+      ) : null}
 
       {keyboard ? (
         <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
