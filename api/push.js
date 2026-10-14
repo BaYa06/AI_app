@@ -9,6 +9,8 @@
  * POST /api/push?action=cron-streak     – устарела (Push 0.2): ничего не шлёт, логика в cron-reminders
  * POST /api/push?action=cron-reactivation – устарела (Push 0.2): ничего не шлёт, логика в cron-reminders
  * GET|POST /api/push?action=cron-reminders – cron-job.org каждые 15 мин: одно напоминание в день в notif_hour:notif_minute
+ *          &dry_run=1 — ничего не шлёт: кому, что и почему (в push_log статус dry_run)
+ * Переменная PUSH_PAUSED=1 — аварийная остановка: маркетинговые пуши не уходят, от учителя уходят
  * GET  /api/push?action=rewards           – diamond balance + challenges claimed today
  * POST /api/push?action=claim-reward      – claim daily challenge reward (once per day)
  */
@@ -96,7 +98,7 @@ function buildMessage(type, name, streak, longest, data = {}) {
  * Приоритет: воскресенье — место в рейтинге; понедельник — итоги недели; иначе, если повторение
  * дня ещё не сделано, — угасающие слова, слова к повторению, возврат (3 и 7 дней), серия.
  */
-async function sendDailyReminders(sql) {
+async function sendDailyReminders(sql, { dryRun = false } = {}) {
   const users = await sql`
     SELECT us.user_id, us.current_streak, us.notif_streak,
            COALESCE(us.timezone, 'Asia/Bishkek') AS tz,
@@ -114,19 +116,32 @@ async function sendDailyReminders(sql) {
       AND EXISTS (SELECT 1 FROM push_tokens pt WHERE pt.user_id = us.user_id)
   `;
   let sent = 0;
+  const report = []; // для dry_run: решение по каждому кандидату
   const standingsCache = new Map();
   for (const u of users) {
     try {
       const pick = await pickReminder(sql, u, standingsCache);
-      if (!pick) continue;
-      const result = await sendNotification(sql, u.user_id, pick.type, pick.data);
-      await sql`UPDATE user_stats SET last_reminder_date = ${u.local_today} WHERE user_id = ${u.user_id}`;
+      if (!pick) {
+        if (dryRun) report.push({ user_id: u.user_id, type: null, reason: u.done_today ? 'done_today' : 'nothing_to_send' });
+        continue;
+      }
+      const result = await sendNotification(sql, u.user_id, pick.type, pick.data, { dryRun });
+      if (dryRun) {
+        report.push({ user_id: u.user_id, type: pick.type, data: pick.data, reason: result.reason || null, message: result.message || null });
+        continue;
+      }
+      // На паузе день не отмечаем: после снятия паузы напоминание ещё может уйти сегодня
+      if (result.reason !== 'paused') {
+        await sql`UPDATE user_stats SET last_reminder_date = ${u.local_today} WHERE user_id = ${u.user_id}`;
+      }
       if (result.ok) sent++;
     } catch (e) {
       console.error(`[cron-reminders] ${u.user_id} failed:`, e);
     }
   }
-  return { ok: true, candidates: users.length, sent };
+  return dryRun
+    ? { ok: true, dry_run: true, paused: isPushPaused(), candidates: users.length, report }
+    : { ok: true, candidates: users.length, sent };
 }
 
 async function pickReminder(sql, u, standingsCache) {
@@ -194,6 +209,14 @@ const PUSH_CATEGORY = {
   reactivation_7d: 'reactivation',
 };
 
+/** Транзакционные пуши: уходят и на паузе (PUSH_PAUSED), и потом — мимо дневного лимита и контрольной группы. */
+const TRANSACTIONAL_TYPES = new Set(['teacher_review']);
+
+/** Аварийный выключатель: PUSH_PAUSED=1 в переменных Vercel останавливает маркетинговые пуши без деплоя. */
+function isPushPaused() {
+  return process.env.PUSH_PAUSED === '1';
+}
+
 /**
  * Строка push_log на каждое решение (план, шаг 0.3). Журнал не должен ронять отправку: ошибку
  * только логируем. local_date — по поясу пользователя, как у остальных дневных отметок.
@@ -216,9 +239,10 @@ async function logPush(sql, { id, userId, type, status, tokens = 0, delivered = 
 /**
  * Отправить пуш пользователю на все его устройства. Учитывает notif_enabled; мёртвые токены удаляет.
  * Каждое решение (и отказ) пишется в push_log; id строки уходит в пуш как data.push_id.
- * → { ok, push_id?, sent?, failed?, reason?, error? }
+ * dryRun — пройти все проверки и собрать текст, но не отправлять (status = 'dry_run').
+ * → { ok, push_id?, sent?, failed?, reason?, message?, error? }
  */
-export async function sendNotification(sql, userId, type, data = {}) {
+export async function sendNotification(sql, userId, type, data = {}, { dryRun = false } = {}) {
   const pushId = randomUUID();
   const log = (status, extra = {}) => logPush(sql, { id: pushId, userId, type, status, data, ...extra });
 
@@ -239,6 +263,15 @@ export async function sendNotification(sql, userId, type, data = {}) {
 
   const message = buildMessage(type, user.display_name || 'Привет', user.current_streak, user.longest_streak, data);
   if (!message) return { ok: false, error: `Unknown type: ${type}` };
+
+  if (isPushPaused() && !TRANSACTIONAL_TYPES.has(type)) {
+    await log('paused');
+    return { ok: false, push_id: pushId, reason: 'paused', message };
+  }
+  if (dryRun) {
+    await log('dry_run', { tokens: tokenRows.length });
+    return { ok: false, push_id: pushId, reason: 'dry_run', message };
+  }
 
   const messaging = initFirebase();
   // На все устройства пользователя (телефон + веб), а не на первое попавшееся
@@ -391,10 +424,11 @@ export default async function handler(req, res) {
       if (!hasBearerSecret(req, process.env.CRON_SECRET)) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
-      const result = await sendDailyReminders(sql);
+      const dryRun = req.query.dry_run === '1';
+      const result = await sendDailyReminders(sql, { dryRun });
       // Раз в сутки (первый запуск после полуночи UTC): журнал храним 180 дней
       const now = new Date();
-      if (now.getUTCHours() === 0 && now.getUTCMinutes() < 15) {
+      if (!dryRun && now.getUTCHours() === 0 && now.getUTCMinutes() < 15) {
         await sql`DELETE FROM push_log WHERE created_at < NOW() - INTERVAL '180 days'`;
       }
       return res.status(200).json(result);

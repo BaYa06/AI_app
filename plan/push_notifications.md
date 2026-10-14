@@ -221,10 +221,12 @@
   - **Готово, когда:** каждый вызов `sendNotification` оставляет строку в `push_log`, в FCM-сообщении есть `data.push_id`.
   - Сделано: миграция 026 (`schema_026`), категории типов — `PUSH_CATEGORY` в `api/push.js`, строка пишется на `no_token` / `disabled` / `sent` / `failed`; чистка 180 дней — первый запуск `cron-reminders` после 00:00 UTC; `_push-store.js` удалён. Добавлен индекс `push_log_created` для чистки.
 
-- [ ] **0.4 Режим `dry_run` и аварийный выключатель** — `api/push.js`
+- [x] **0.4 Режим `dry_run` и аварийный выключатель** — `api/push.js`
   - `?dry_run=1` (только с `CRON_SECRET`): cron считает кандидатов и пишет `status = 'dry_run'`, ничего не отправляя. Так проверяем новые правила на проде, не трогая людей.
   - Переменная `PUSH_PAUSED=1` в Vercel: маркетинговые пуши не уходят (`status = 'paused'`), учительские уходят. На случай ошибки в тексте или «пуша всем подряд».
   - **Готово, когда:** `dry_run` возвращает список «кому, что и почему», а `PUSH_PAUSED` останавливает рассылку без деплоя.
+  - Сделано: `GET /api/push?action=cron-reminders&dry_run=1` + `Authorization: Bearer <CRON_SECRET>` → `report` по каждому кандидату (тип, данные, готовый текст или причина: `done_today`, `nothing_to_send`, `paused`). Кандидаты — те же, что в этот запуск получили бы пуш (их 15-минутный слот уже наступил, сегодня ещё не получали). Транзакционные типы — `TRANSACTIONAL_TYPES` (`teacher_review`). На паузе `last_reminder_date` не ставится.
+  - Включить паузу: Vercel → Settings → Environment Variables → `PUSH_PAUSED` = `1` (Production) → Deployments → последний рабочий → Redeploy (Vercel применяет переменные только к новому деплою; код не меняется, ~1 мин). Снять — удалить переменную и снова Redeploy.
 
 - [ ] **0.5 Тап по пушу: переход и замер** — `src/services/pushNotifications.native.ts`, `src/App.tsx`, `index.js`, `api/push.js`
   - Обработать `getInitialNotification` (приложение было закрыто) и `onNotificationOpenedApp` (было в фоне). Взять из `data` `push_id`, `type`, `link`.
