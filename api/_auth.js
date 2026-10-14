@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { timingSafeEqual } from 'node:crypto';
 
 /**
  * Общая проверка Supabase JWT для backend-эндпоинтов.
@@ -54,4 +55,15 @@ export async function getAuthedUser(req) {
 export async function getAuthedUserId(req) {
   const user = await getAuthedUser(req);
   return user ? user.id : null;
+}
+
+/**
+ * Серверный вызов с секретом (cron, notify): заголовок `Authorization: Bearer <secret>`.
+ * Сравнение за постоянное время; незаданный секрет не пускает никого (иначе прошёл бы «Bearer undefined»).
+ */
+export function hasBearerSecret(req, secret) {
+  if (!secret) return false;
+  const header = Buffer.from(String(req.headers.authorization || ''));
+  const expected = Buffer.from(`Bearer ${secret}`);
+  return header.length === expected.length && timingSafeEqual(header, expected);
 }

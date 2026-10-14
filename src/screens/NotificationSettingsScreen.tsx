@@ -59,9 +59,10 @@ export function NotificationSettingsScreen({ navigation }: any) {
     getPushStatus().then(setPushStatus);
     supabase.auth.getSession().then(({ data }) => {
       const uid = data.session?.user?.id;
+      const token = data.session?.access_token;
       setUserId(uid);
-      if (uid) {
-        fetch(`${API_BASE}/push?action=settings&userId=${uid}`)
+      if (uid && token) {
+        fetch(`${API_BASE}/push?action=settings`, { headers: { Authorization: `Bearer ${token}` } })
           .then((r) => r.json())
           .then((d) => {
             setReminderEnabled(d.notifEnabled ?? true);
@@ -118,11 +119,13 @@ export function NotificationSettingsScreen({ navigation }: any) {
     if (!userId || saving) return;
     setSaving(true);
     try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error('No session');
       const res = await fetch(`${API_BASE}/push?action=settings`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          userId,
           notifEnabled: reminderEnabled,
           notifHour: hours,
           notifMinute: 0,

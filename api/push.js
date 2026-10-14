@@ -3,7 +3,6 @@
  *
  * POST /api/push?action=subscribe       – store FCM token
  * POST /api/push?action=unsubscribe     – remove FCM token
- * GET  /api/push?action=get-by-user     – get tokens by userId
  * GET  /api/push?action=settings        – get notif settings
  * POST /api/push?action=settings        – save notif settings
  * POST /api/push?action=notify          – send FCM push (server-to-server)
@@ -18,7 +17,7 @@ import { neon } from '@neondatabase/serverless';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
 import { ensureDatabaseInitialized } from './_db-init.js';
-import { getAuthedUserId } from './_auth.js';
+import { getAuthedUserId, hasBearerSecret } from './_auth.js';
 import { computeStandings } from './progress.js';
 
 function initFirebase() {
@@ -208,6 +207,19 @@ export async function sendNotification(sql, userId, type, data = {}) {
   return { ok: result.successCount > 0, sent: result.successCount, failed: result.failureCount };
 }
 
+/**
+ * Чьи настройки уведомлений читать или менять. С JWT — только свои, userId из запроса игнорируется.
+ * Без JWT — переходный режим для сборок до Push 0.1 (1.5.7 и старше), которые шлют userId без входа:
+ * по правилу Release 2 их нельзя ломать. Убрать вместе с minVersion (Release 5), когда старых
+ * сборок почти не останется — до этого ручка всё ещё открыта для того, кто знает чужой UUID.
+ */
+async function settingsUserId(req, legacyUserId) {
+  if (req.headers.authorization) return getAuthedUserId(req); // невалидный JWT → null → 401
+  if (typeof legacyUserId !== 'string' || !legacyUserId) return null;
+  console.warn('[push] settings без JWT (старая сборка)');
+  return legacyUserId;
+}
+
 export default async function handler(req, res) {
   const { action } = req.query;
   const sql = neon(process.env.POSTGRES_URL);
@@ -220,13 +232,14 @@ export default async function handler(req, res) {
       if (!token || typeof token !== 'string') {
         return res.status(400).json({ error: 'Missing or invalid token' });
       }
-      // Нативное приложение шлёт JWT — тогда userId только из него. userId из тела
-      // остаётся для веб-версии, которая пока подписывается без токена входа.
-      const authedUserId = await getAuthedUserId(req);
-      if (req.headers.authorization && !authedUserId) {
+      // userId только из JWT: иначе можно привязать свой токен к чужому userId и получать его пуши.
+      // Без входа токен сохраняется ничьим (user_id = NULL) и привяжется при следующей подписке с JWT.
+      // Нативный клиент шлёт JWT с первой версии, веб — с Push 0.1 (выкатывается вместе с сервером).
+      const userId = await getAuthedUserId(req);
+      if (req.headers.authorization && !userId) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
-      const userId = authedUserId || bodyUserId;
+      if (!userId && bodyUserId) console.warn('[push] subscribe: userId без JWT проигнорирован');
       await sql`
         INSERT INTO push_tokens (token, user_id, platform, updated_at)
         VALUES (${token}, ${userId || null}, ${platform || 'web'}, NOW())
@@ -244,22 +257,19 @@ export default async function handler(req, res) {
       if (!token || typeof token !== 'string') {
         return res.status(400).json({ error: 'Missing or invalid token' });
       }
-      await sql`DELETE FROM push_tokens WHERE token = ${token}`;
+      // Удалить можно только свой токен или ничей — чужому нельзя выключить пуши, зная его токен
+      const userId = await getAuthedUserId(req);
+      await sql`
+        DELETE FROM push_tokens
+        WHERE token = ${token} AND (user_id IS NULL OR user_id = ${userId})
+      `;
       return res.status(200).json({ ok: true });
-    }
-
-    // ── get-by-user ────────────────────────────────────────────
-    if (action === 'get-by-user' && req.method === 'GET') {
-      const { userId } = req.query;
-      if (!userId) return res.status(400).json({ error: 'Missing userId' });
-      const rows = await sql`SELECT token FROM push_tokens WHERE user_id = ${userId}`;
-      return res.status(200).json({ tokens: rows.map((r) => r.token) });
     }
 
     // ── settings GET ───────────────────────────────────────────
     if (action === 'settings' && req.method === 'GET') {
-      const { userId } = req.query;
-      if (!userId) return res.status(400).json({ error: 'Missing userId' });
+      const userId = await settingsUserId(req, req.query.userId);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
       const rows = await sql`
         SELECT notif_enabled, notif_hour, notif_minute, notif_days, notif_streak
         FROM user_stats WHERE user_id = ${userId}
@@ -279,8 +289,9 @@ export default async function handler(req, res) {
 
     // ── settings POST ──────────────────────────────────────────
     if (action === 'settings' && req.method === 'POST') {
-      const { userId, notifEnabled, notifHour, notifMinute, notifDays, notifStreak } = req.body || {};
-      if (!userId) return res.status(400).json({ error: 'Missing userId' });
+      const { notifEnabled, notifHour, notifMinute, notifDays, notifStreak } = req.body || {};
+      const userId = await settingsUserId(req, req.body?.userId);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
       await sql`
         INSERT INTO user_stats (user_id, notif_enabled, notif_hour, notif_minute, notif_days, notif_streak)
         VALUES (${userId}, ${notifEnabled ?? true}, ${notifHour ?? 19}, ${notifMinute ?? 0}, ${notifDays ?? 'mon,tue,wed,thu,fri'}, ${notifStreak ?? true})
@@ -297,7 +308,7 @@ export default async function handler(req, res) {
 
     // ── notify ─────────────────────────────────────────────────
     if (action === 'notify' && req.method === 'POST') {
-      if (req.headers.authorization !== `Bearer ${process.env.NOTIFY_SECRET}`) {
+      if (!hasBearerSecret(req, process.env.NOTIFY_SECRET)) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
       const { userId, type, data = {} } = req.body || {};
@@ -309,7 +320,7 @@ export default async function handler(req, res) {
 
     // ── cron-streak ────────────────────────────────────────────
     if (action === 'cron-streak' && req.method === 'POST') {
-      if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
+      if (!hasBearerSecret(req, process.env.CRON_SECRET)) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
       const users = await sql`
@@ -339,7 +350,7 @@ export default async function handler(req, res) {
 
     // ── cron-reminders: раз в час, пуш в выбранный пользователем час (план §3.6) ──
     if (action === 'cron-reminders' && (req.method === 'POST' || req.method === 'GET')) {
-      if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
+      if (!hasBearerSecret(req, process.env.CRON_SECRET)) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
       return res.status(200).json(await sendDailyReminders(sql));
@@ -347,7 +358,7 @@ export default async function handler(req, res) {
 
     // ── cron-reactivation ──────────────────────────────────────
     if (action === 'cron-reactivation' && req.method === 'POST') {
-      if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
+      if (!hasBearerSecret(req, process.env.CRON_SECRET)) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
       const users3d = await sql`

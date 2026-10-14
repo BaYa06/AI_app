@@ -8,6 +8,7 @@
 import { Platform } from 'react-native';
 import { getMessaging, getToken, onMessage, isSupported, type Messaging } from 'firebase/messaging';
 import { app as firebaseApp } from './firebase';
+import { supabase } from './supabaseClient';
 
 // ==================== TYPES ====================
 
@@ -317,6 +318,13 @@ export async function getPushStatus(): Promise<PushStatus> {
 // вместо текущего origin (сломался бы на превью-деплоях/другом домене). См. план, пункт 55.
 const API_BASE = '/api/push';
 
+/** JWT входа: сервер привязывает токен к пользователю только по нему (userId из тела игнорирует). */
+async function authHeaders(): Promise<Record<string, string>> {
+  const { data } = await supabase.auth.getSession();
+  const accessToken = data.session?.access_token;
+  return accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+}
+
 /**
  * POST /api/push?action=subscribe — отправляет токен на backend.
  * Защита от дублей — backend делает upsert + выше проверяем token !== storedToken.
@@ -325,7 +333,7 @@ async function sendTokenToBackend(token: string, userId?: string | null): Promis
   try {
     const res = await fetch(`${API_BASE}?action=subscribe`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify({ token, platform: 'web', userId: userId || null }),
     });
     if (!res.ok) {
@@ -343,7 +351,7 @@ async function removeTokenFromBackend(token: string): Promise<void> {
   try {
     const res = await fetch(`${API_BASE}?action=unsubscribe`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify({ token }),
     });
     if (!res.ok) {

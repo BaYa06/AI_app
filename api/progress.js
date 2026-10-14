@@ -1,5 +1,5 @@
 import { neon } from '@neondatabase/serverless';
-import { getAuthedUserId } from './_auth.js';
+import { getAuthedUserId, hasBearerSecret } from './_auth.js';
 import { ensureDatabaseInitialized } from './_db-init.js';
 import { HttpError, UUID_RE, uuid, assertReadableSet } from './_access.js';
 import { courseSetIdsSql } from './_course.js';
@@ -552,7 +552,7 @@ export default async function handler(req, res) {
 
   // Vercel Cron: только с CRON_SECRET (Vercel сам добавляет заголовок, если переменная задана)
   if (action === 'close-week') {
-    if (!process.env.CRON_SECRET || req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (!hasBearerSecret(req, process.env.CRON_SECRET)) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     await ensureDatabaseInitialized(sql);
