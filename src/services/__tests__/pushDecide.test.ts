@@ -84,4 +84,11 @@ describe('арбитр пушей', () => {
     expect(decide({ ...base, dow: 'sun', waiting: 12, rating: { place: 2, gap: 5 }, habitDays: weekdays })).toMatchObject({ type: 'rating_sunday' });
     expect(decide({ ...base, dow: 'sat', streak: 0, daysAway: 3, habitDays: weekdays })).toMatchObject({ type: 'reactivation_3d' });
   });
+
+  it('новые слова — только когда повторять нечего', () => {
+    const newWords = { count: 10, set: 'Travel' };
+    expect(decide({ ...base, newWords })).toMatchObject({ status: 'send', type: 'lesson_new_words', data: { count: 10, set: 'Travel' } });
+    expect(decide({ ...base, waiting: 3, newWords })).toMatchObject({ type: 'review_due' });
+    expect(decide({ ...base, doneToday: true, newWords })).toEqual({ status: 'skip', reason: 'done_today' });
+  });
 });

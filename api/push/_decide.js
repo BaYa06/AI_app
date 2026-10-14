@@ -51,7 +51,7 @@ export function backoffReason(ignored, lastSentDay, today, category) {
 
 /**
  * Подходящие типы для кандидата (без фильтров), по убыванию важности.
- * c: { dow, doneToday, daysAway, streak, notifStreak, fading, waiting, rating, weekly }
+ * c: { dow, doneToday, daysAway, streak, notifStreak, fading, waiting, rating, weekly, newWords: { count, set } }
  */
 export function eligiblePushes(c) {
   const list = [];
@@ -60,6 +60,8 @@ export function eligiblePushes(c) {
   if (!c.doneToday) {
     if (c.fading > 0) list.push({ type: 'words_fading', data: { count: c.fading } });
     if (c.waiting > 0) list.push({ type: 'review_due', data: { count: Math.min(c.waiting, 30) } });
+    // Новые слова — только когда повторять нечего: урок дня начнётся с них (3.2)
+    else if (c.newWords?.count > 0) list.push({ type: 'lesson_new_words', data: { count: c.newWords.count, set: c.newWords.set } });
     if (c.daysAway === 3) list.push({ type: 'reactivation_3d', data: {} });
     if (c.daysAway === 7) list.push({ type: 'reactivation_7d', data: {} });
     if (c.streak > 0 && c.notifStreak) list.push({ type: 'streak_reminder', data: {} });

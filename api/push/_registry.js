@@ -130,6 +130,20 @@ export const PUSH_TYPES = {
       }),
     ],
   },
+  // Повторять нечего, но в текущем наборе есть новые слова (3.2)
+  lesson_new_words: {
+    category: 'lesson',
+    priority: 7,
+    transactional: false,
+    minIntervalDays: 0,
+    link: LESSON_LINK,
+    variants: [
+      ({ data }) => ({
+        title: 'Новые слова на сегодня',
+        body: `${data.count} ${plural(data.count, 'новое слово', 'новых слова', 'новых слов')} из «${data.set}» · ~${newWordsMinutes(data.count)} мин`,
+      }),
+    ],
+  },
   streak_reminder: {
     category: 'streak',
     priority: 8,

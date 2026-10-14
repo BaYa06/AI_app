@@ -279,7 +279,10 @@ async function loadCandidates(sql) {
            b.local_now::date - b.last_active_date AS days_away,
            cp.waiting, cp.fading,
            pl.ignored, pl.last_sent_day,
-           wr.course_id AS weekly_course_id, wr.place AS weekly_place, wr.reward AS weekly_reward
+           wr.course_id AS weekly_course_id, wr.place AS weekly_place, wr.reward AS weekly_reward,
+           nw.title AS new_set,
+           -- LEAST игнорирует NULL: без нового набора было бы «10 слов» — поэтому через CASE
+           CASE WHEN nw.fresh IS NULL THEN 0 ELSE LEAST(nw.fresh, ${DEFAULT_NEW_PER_DAY}) END AS new_count
     FROM base b
     LEFT JOIN LATERAL (
       SELECT COUNT(*) FILTER (WHERE next_review <= NOW())::int AS waiting,
@@ -301,6 +304,25 @@ async function loadCandidates(sql) {
       WHERE p.user_id = b.user_id AND p.status = 'sent' AND p.category <> 'course'
         AND p.created_at > NOW() - INTERVAL '60 days'
     ) pl ON true
+    LEFT JOIN LATERAL (
+      -- Текущий набор (3.2) — упрощённо, как LessonService: последний изучаемый за 4 недели, где ещё есть новые слова
+      SELECT s.title, f.fresh
+      FROM (
+        SELECT ca.set_id, MAX(an.answered_at) AS last_at
+        FROM answers an JOIN cards ca ON ca.id = an.card_id
+        WHERE an.user_id = b.user_id AND an.answered_at > NOW() - INTERVAL '28 days'
+        GROUP BY ca.set_id
+      ) r
+      JOIN card_sets s ON s.id = r.set_id
+      CROSS JOIN LATERAL (
+        SELECT COUNT(*)::int AS fresh FROM cards c
+        WHERE c.set_id = r.set_id
+          AND NOT EXISTS (SELECT 1 FROM card_progress cp WHERE cp.user_id = b.user_id AND cp.card_id = c.id)
+      ) f
+      WHERE f.fresh > 0
+      ORDER BY r.last_at DESC
+      LIMIT 1
+    ) nw ON true
     LEFT JOIN LATERAL (
       SELECT course_id, place, reward FROM weekly_results w
       WHERE w.user_id = b.user_id AND w.week_start >= b.local_now::date - 7
@@ -388,6 +410,7 @@ export async function runArbiter(sql, { dryRun = false } = {}) {
       waiting: c.waiting || 0,
       rating: ratings.get(c.user_id) || null,
       weekly: c.weekly_place ? { place: c.weekly_place, reward: c.weekly_reward, courseId: c.weekly_course_id } : null,
+      newWords: c.new_count > 0 ? { count: c.new_count, set: c.new_set } : null,
       groupsOff: groupsOff(c.notif_categories_off, c.notif_streak),
       ignored: c.ignored || 0,
       lastSentDay: c.last_sent_day,
