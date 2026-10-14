@@ -11,7 +11,7 @@ import { LoadingSplash } from '@/components/common';
 import { ToastHost } from '@/components/ui/Toast';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { StagingBadge } from '@/components/common/StagingBadge';
-import { DatabaseService, setupAutoSave, supabase, NeonService, setAnalyticsUserId, SyncQueueService, Analytics, setAnalyticsUserProperties } from '@/services';
+import { DatabaseService, setupAutoSave, supabase, NeonService, setAnalyticsUserId, SyncQueueService, Analytics, setAnalyticsUserProperties, setPushGroupProperty } from '@/services';
 import { isWidgetUrl, parseWidgetUrl } from '@/services/widgetLinks';
 import { resetWidget } from '@/services/WidgetService';
 import { isAppleUser, takeAppleSignInName } from '@/services/appleSignInName';
@@ -484,6 +484,7 @@ export default function App() {
         total_sets_bucket: '0',
         has_completed_onboarding: true,
       });
+      setPushGroupProperty(user.id);
 
       if (pushedTokenForUserRef.current !== user.id) {
         pushedTokenForUserRef.current = user.id;
@@ -783,6 +784,7 @@ export default function App() {
       total_sets_bucket: '0',
       has_completed_onboarding: true,
     });
+    if (currentUserId) setPushGroupProperty(currentUserId);
     if (currentUserId && pushedTokenForUserRef.current !== currentUserId) {
       pushedTokenForUserRef.current = currentUserId;
       refreshPushToken(currentUserId).catch(() => {});

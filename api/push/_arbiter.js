@@ -1,0 +1,313 @@
+/**
+ * Арбитр ежедневных пушей (plan/push_notifications.md, шаг 2.2) — вызывается из cron-reminders
+ * (cron-job.org, каждые 15 минут). Файл начинается с «_», поэтому Vercel не публикует его как роут.
+ *
+ * Один запуск:
+ *  1. Отложенные ночью пуши (тихие часы) — отправить тем, у кого наступило утро.
+ *  2. Одним SQL — кандидаты этого слота со всем, что нужно для решения (счётчики слов, серия,
+ *     итоги недели, режим игнора, выключенные категории).
+ *  3. Решение по каждому — _decide.js (приоритет, категории, контрольная группа, игнор).
+ *  4. Отправка пачками до 500 сообщений (sendEach), журнал и отметки дня — пачками.
+ * Повторный запуск в тот же день не пришлёт второй пуш: строка push_log со slot = 'daily'
+ * резервируется до отправки под уникальным индексом (user_id, category, local_date, slot).
+ */
+import { randomUUID } from 'node:crypto';
+import { computeStandings } from '../progress.js';
+import { PUSH_TYPES, buildPush } from './_registry.js';
+import { decide } from './_decide.js';
+import {
+  DEFAULT_TZ, QUIET_TO_HOUR, QUIET_FROM_HOUR, groupsOff, initFirebase, isDeadTokenError, isPushPaused, sendNotification,
+} from './_send.js';
+
+const FCM_BATCH = 500;
+const DAILY_SLOT = 'daily';
+/** Отложенные из тихих часов пуши старше этого не отправляем — неактуальны */
+const DEFERRED_MAX_HOURS = 20;
+
+/** Пуши, отложенные ночью (sendNotification → quiet_hours): у человека наступило утро — отправить */
+async function sendDeferred(sql) {
+  const rows = await sql`
+    UPDATE push_log pl SET status = 'requeued'
+    FROM user_stats us
+    WHERE pl.status = 'quiet_hours' AND pl.user_id = us.user_id
+      AND pl.created_at > NOW() - make_interval(hours => ${DEFERRED_MAX_HOURS})
+      AND EXTRACT(HOUR FROM NOW() AT TIME ZONE COALESCE(us.timezone, ${DEFAULT_TZ}))::int >= ${QUIET_TO_HOUR}
+      AND EXTRACT(HOUR FROM NOW() AT TIME ZONE COALESCE(us.timezone, ${DEFAULT_TZ}))::int < ${QUIET_FROM_HOUR}
+    RETURNING pl.user_id, pl.type, pl.payload
+  `;
+  let sent = 0;
+  for (const r of rows) {
+    try {
+      const result = await sendNotification(sql, r.user_id, r.type, r.payload || {});
+      if (result.ok) sent++;
+    } catch (e) {
+      console.error(`[arbiter] deferred ${r.type} for ${r.user_id} failed:`, e);
+    }
+  }
+  return { deferred: rows.length, deferredSent: sent };
+}
+
+/** Кандидаты этого 15-минутного слота — одним запросом вместо 2–4 на человека */
+async function loadCandidates(sql) {
+  return sql`
+    WITH base AS (
+      SELECT us.*, u.display_name,
+             (NOW() AT TIME ZONE COALESCE(us.timezone, ${DEFAULT_TZ})) AS local_now
+      FROM user_stats us JOIN users u ON u.id = us.user_id
+      WHERE us.notif_enabled = true
+        AND us.notif_hour BETWEEN ${QUIET_TO_HOUR} AND ${QUIET_FROM_HOUR - 1}
+        AND EXISTS (SELECT 1 FROM push_tokens pt WHERE pt.user_id = us.user_id AND pt.permission IS DISTINCT FROM 'denied')
+    )
+    SELECT b.user_id, b.display_name, b.current_streak, b.longest_streak, b.notif_streak, b.notif_categories_off,
+           b.local_now::date::text AS local_today,
+           trim(to_char(b.local_now, 'dy')) AS dow,
+           b.last_active_date = b.local_now::date AS done_today,
+           b.local_now::date - b.last_active_date AS days_away,
+           cp.waiting, cp.fading,
+           pl.ignored, pl.last_sent_day,
+           wr.course_id AS weekly_course_id, wr.place AS weekly_place, wr.reward AS weekly_reward
+    FROM base b
+    LEFT JOIN LATERAL (
+      SELECT COUNT(*) FILTER (WHERE next_review <= NOW())::int AS waiting,
+             COUNT(*) FILTER (WHERE NOW() - next_review > make_interval(days =>
+               CASE LEAST(learning_step, 6) WHEN 1 THEN 1 WHEN 2 THEN 3 WHEN 3 THEN 7 WHEN 4 THEN 14 WHEN 5 THEN 30 ELSE 60 END
+             ))::int AS fading
+      FROM card_progress WHERE user_id = b.user_id AND learning_step >= 1
+    ) cp ON true
+    LEFT JOIN LATERAL (
+      -- Режим игнора (2.3): отправленные маркетинговые пуши без открытия за сутки — после последнего
+      -- открытия любого пуша и после дня последнего урока
+      SELECT MAX(p.local_date)::text AS last_sent_day,
+             COUNT(*) FILTER (WHERE p.opened_at IS NULL AND p.created_at < NOW() - INTERVAL '24 hours'
+               AND p.created_at > GREATEST(
+                 COALESCE((SELECT MAX(o.opened_at) FROM push_log o WHERE o.user_id = b.user_id), 'epoch'::timestamptz),
+                 COALESCE((b.last_active_date + 1)::timestamptz, 'epoch'::timestamptz)
+               ))::int AS ignored
+      FROM push_log p
+      WHERE p.user_id = b.user_id AND p.status = 'sent' AND p.category <> 'course'
+        AND p.created_at > NOW() - INTERVAL '60 days'
+    ) pl ON true
+    LEFT JOIN LATERAL (
+      SELECT course_id, place, reward FROM weekly_results w
+      WHERE w.user_id = b.user_id AND w.week_start >= b.local_now::date - 7
+      ORDER BY w.week_start DESC, w.place ASC LIMIT 1
+    ) wr ON true
+    WHERE EXTRACT(HOUR FROM b.local_now)::int = b.notif_hour
+      AND EXTRACT(MINUTE FROM b.local_now)::int >= COALESCE(b.notif_minute, 0)
+      AND (NOT b.notif_days_custom OR string_to_array(b.notif_days, ',') @> ARRAY[trim(to_char(b.local_now, 'dy'))])
+      AND (b.last_reminder_date IS NULL OR b.last_reminder_date < b.local_now::date)
+  `;
+}
+
+/** Воскресенье: место в рейтинге курса — одним запросом по всем кандидатам, рейтинг курса считается один раз */
+async function loadSundayRatings(sql, userIds) {
+  const result = new Map();
+  if (userIds.length === 0) return result;
+  const memberships = await sql`
+    SELECT cm.user_id, c.id AS course_id, COALESCE(c.timezone, ts.timezone, ${DEFAULT_TZ}) AS tz
+    FROM course_members cm JOIN courses c ON c.id = cm.course_id
+    LEFT JOIN user_stats ts ON ts.user_id = c.user_id
+    WHERE cm.user_id = ANY(${userIds}::uuid[]) AND cm.role = 'student' AND c.rating_enabled AND NOT cm.hide_from_rating
+  `;
+  const standings = new Map();
+  for (const m of memberships) {
+    if (result.has(m.user_id)) continue;
+    if (!standings.has(m.course_id)) {
+      const [{ d: weekStart }] = await sql`SELECT (date_trunc('week', NOW() AT TIME ZONE ${m.tz}))::date::text AS d`;
+      standings.set(m.course_id, (await computeStandings(sql, m.course_id, m.tz, weekStart)).filter((r) => !r.hide_from_rating));
+    }
+    const rows = standings.get(m.course_id);
+    const idx = rows.findIndex((r) => r.user_id === m.user_id);
+    if (idx >= 0 && rows[idx].points > 0) {
+      result.set(m.user_id, { place: idx + 1, gap: idx > 0 ? rows[idx - 1].points - rows[idx].points : null, courseId: m.course_id });
+    }
+  }
+  return result;
+}
+
+/** Строки push_log пачкой. reserve — для отправки: занять слот дня, конфликт = уже отправлено сегодня */
+async function insertLogRows(sql, rows) {
+  if (rows.length === 0) return new Set();
+  const inserted = await sql`
+    INSERT INTO push_log (id, user_id, type, category, variant, local_date, status, tokens, delivered, payload, slot)
+    SELECT x.id, x.user_id, x.type, x.category, x.variant, x.local_date, x.status, x.tokens, x.delivered, x.payload, x.slot
+    FROM jsonb_to_recordset(${JSON.stringify(rows)}::jsonb) AS x(
+      id uuid, user_id uuid, type text, category text, variant text, local_date date,
+      status text, tokens int, delivered int, payload jsonb, slot text
+    )
+    ON CONFLICT DO NOTHING
+    RETURNING id
+  `;
+  return new Set(inserted.map((r) => r.id));
+}
+
+/**
+ * Запуск арбитра. dryRun — ничего не отправлять и не отмечать день: в ответе решение по каждому
+ * кандидату, в push_log — строки dry_run.
+ */
+export async function runArbiter(sql, { dryRun = false } = {}) {
+  const startedAt = Date.now();
+  const deferred = dryRun ? { deferred: 0, deferredSent: 0 } : await sendDeferred(sql);
+  const candidates = await loadCandidates(sql);
+  const sundayIds = candidates.filter((c) => c.dow === 'sun').map((c) => c.user_id);
+  const ratings = await loadSundayRatings(sql, sundayIds);
+  const paused = isPushPaused();
+
+  const report = [];
+  const toSend = []; // { row, candidate, built }
+  const logRows = [];
+  const markDay = []; // { user_id, d } — решение на сегодня принято, больше не рассматривать
+
+  for (const c of candidates) {
+    const decision = decide({
+      userId: c.user_id,
+      today: c.local_today,
+      dow: c.dow,
+      doneToday: c.done_today === true,
+      daysAway: c.days_away,
+      streak: c.current_streak || 0,
+      notifStreak: c.notif_streak !== false,
+      fading: c.fading || 0,
+      waiting: c.waiting || 0,
+      rating: ratings.get(c.user_id) || null,
+      weekly: c.weekly_place ? { place: c.weekly_place, reward: c.weekly_reward, courseId: c.weekly_course_id } : null,
+      groupsOff: groupsOff(c.notif_categories_off, c.notif_streak),
+      ignored: c.ignored || 0,
+      lastSentDay: c.last_sent_day,
+      lastSentByType: {},
+    });
+    if (decision.status === 'skip') {
+      if (dryRun) report.push({ user_id: c.user_id, type: null, status: 'skip', reason: decision.reason });
+      continue;
+    }
+
+    const built = buildPush(decision.type, {
+      name: c.display_name || 'Привет',
+      displayName: c.display_name || null,
+      streak: c.current_streak,
+      longest: c.longest_streak,
+      data: decision.data,
+    });
+    let status = decision.status;
+    if (status === 'send' && !built) status = 'no_specifics';
+    if (status === 'send' && paused) status = 'paused';
+    if (status === 'send' && dryRun) status = 'dry_run';
+
+    const row = {
+      id: randomUUID(),
+      user_id: c.user_id,
+      type: decision.type,
+      category: PUSH_TYPES[decision.type].category,
+      variant: built?.variant || null,
+      local_date: c.local_today,
+      // Пробный запуск не должен попадать в статистику отказов: всё пишется как dry_run, решение — в payload
+      status: status === 'send' ? 'sending' : dryRun ? 'dry_run' : status,
+      tokens: 0,
+      delivered: 0,
+      payload: {
+        ...decision.data,
+        ...(decision.reason ? { reason: decision.reason } : null),
+        ...(dryRun ? { decision: status } : null),
+      },
+      slot: status === 'send' ? DAILY_SLOT : null,
+    };
+    if (status === 'send') toSend.push({ row, built });
+    else logRows.push(row);
+    // На паузе день не отмечаем: после снятия паузы напоминание ещё может уйти сегодня
+    if (!dryRun && status !== 'paused') markDay.push({ user_id: c.user_id, d: c.local_today });
+    if (dryRun) {
+      report.push({
+        user_id: c.user_id, type: decision.type, status, reason: decision.reason || null, data: decision.data,
+        message: built ? { title: built.title, body: built.body } : null,
+      });
+    }
+  }
+
+  // Отказы — в журнал пачкой (кроме пропусков «нечего слать»)
+  await insertLogRows(sql, logRows);
+
+  // Отправка: сначала резерв слота дня, потом FCM пачками
+  let sent = 0;
+  if (toSend.length > 0) {
+    const reserved = await insertLogRows(sql, toSend.map((s) => s.row));
+    const ready = toSend.filter((s) => reserved.has(s.row.id));
+    const userIds = ready.map((s) => s.row.user_id);
+    const tokenRows = userIds.length
+      ? await sql`
+          SELECT user_id, token FROM push_tokens
+          WHERE user_id = ANY(${userIds}::uuid[]) AND permission IS DISTINCT FROM 'denied'
+        `
+      : [];
+    const tokensByUser = new Map();
+    for (const t of tokenRows) {
+      if (!tokensByUser.has(t.user_id)) tokensByUser.set(t.user_id, []);
+      tokensByUser.get(t.user_id).push(t.token);
+    }
+
+    const messages = []; // { pushId, token, message }
+    for (const s of ready) {
+      for (const token of tokensByUser.get(s.row.user_id) || []) {
+        messages.push({
+          pushId: s.row.id,
+          token,
+          message: {
+            token,
+            notification: { title: s.built.title, body: s.built.body },
+            data: { type: s.row.type, url: '/', push_id: s.row.id, link: s.built.link },
+            apns: { payload: { aps: { sound: 'default' } } },
+          },
+        });
+      }
+    }
+
+    const stats = new Map(ready.map((s) => [s.row.id, { tokens: 0, delivered: 0 }]));
+    const dead = [];
+    if (messages.length > 0) {
+      const messaging = initFirebase();
+      for (let i = 0; i < messages.length; i += FCM_BATCH) {
+        const chunk = messages.slice(i, i + FCM_BATCH);
+        try {
+          const result = await messaging.sendEach(chunk.map((m) => m.message));
+          result.responses.forEach((r, j) => {
+            const st = stats.get(chunk[j].pushId);
+            st.tokens++;
+            if (r.success) st.delivered++;
+            else if (isDeadTokenError(r.error?.code)) dead.push(chunk[j].token);
+          });
+        } catch (e) {
+          console.error('[arbiter] FCM batch failed:', e);
+          for (const m of chunk) stats.get(m.pushId).tokens++;
+        }
+      }
+    }
+    if (dead.length) await sql`DELETE FROM push_tokens WHERE token = ANY(${dead})`;
+
+    const updates = [...stats].map(([id, st]) => ({ id, status: st.delivered > 0 ? 'sent' : 'failed', tokens: st.tokens, delivered: st.delivered }));
+    sent = updates.filter((u) => u.status === 'sent').length;
+    if (updates.length > 0) {
+      await sql`
+        UPDATE push_log p SET status = x.status, tokens = x.tokens, delivered = x.delivered
+        FROM jsonb_to_recordset(${JSON.stringify(updates)}::jsonb) AS x(id uuid, status text, tokens int, delivered int)
+        WHERE p.id = x.id
+      `;
+    }
+  }
+
+  if (markDay.length > 0) {
+    await sql`
+      UPDATE user_stats us SET last_reminder_date = x.d
+      FROM jsonb_to_recordset(${JSON.stringify(markDay)}::jsonb) AS x(user_id uuid, d date)
+      WHERE us.user_id = x.user_id
+    `;
+  }
+
+  const summary = {
+    ok: true,
+    candidates: candidates.length,
+    sent,
+    skipped: logRows.length,
+    ...deferred,
+    ms: Date.now() - startedAt,
+  };
+  return dryRun ? { ...summary, dry_run: true, paused, report } : summary;
+}

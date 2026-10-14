@@ -18,8 +18,13 @@ CREATE TABLE IF NOT EXISTS push_log (
   created_at          TIMESTAMPTZ DEFAULT NOW(),
   opened_at           TIMESTAMPTZ,
   lesson_started_at   TIMESTAMPTZ,
-  lesson_completed_at TIMESTAMPTZ
+  lesson_completed_at TIMESTAMPTZ,
+  slot                TEXT                    -- 'daily' — ежедневная рассылка арбитра (2.2); NULL — разовые пуши
 );
 CREATE INDEX IF NOT EXISTS push_log_user_date ON push_log (user_id, local_date);
 CREATE INDEX IF NOT EXISTS push_log_type_created ON push_log (type, created_at);
 CREATE INDEX IF NOT EXISTS push_log_created ON push_log (created_at);
+-- Защита от дублей (2.2): одна ежедневная рассылка в категории в день, даже если cron запустится дважды.
+-- Строка резервируется до отправки (status = 'sending'); неудачная отправка слот освобождает.
+CREATE UNIQUE INDEX IF NOT EXISTS push_log_daily_once ON push_log (user_id, category, local_date, slot)
+  WHERE slot IS NOT NULL AND status IN ('sending', 'sent');

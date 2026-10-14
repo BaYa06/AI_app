@@ -17,21 +17,15 @@
  * POST /api/push?action=claim-reward      – claim daily challenge reward (once per day)
  */
 
-import { randomUUID } from 'node:crypto';
 import { neon } from '@neondatabase/serverless';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getMessaging } from 'firebase-admin/messaging';
 import { ensureDatabaseInitialized } from './_db-init.js';
 import { getAuthedUserId, hasBearerSecret } from './_auth.js';
-import { computeStandings } from './progress.js';
-import { PUSH_TYPES, pushType, buildPush } from './push/_registry.js';
+import { sendNotification, groupsOff } from './push/_send.js';
+import { runArbiter } from './push/_arbiter.js';
+import { SETTING_GROUPS, isHoldout } from './push/_decide.js';
 
-function initFirebase() {
-  if (!getApps().length) {
-    initializeApp({ credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)) });
-  }
-  return getMessaging();
-}
+// teacher.js и data.js импортируют отправку отсюда
+export { sendNotification };
 
 /** Награды за ежедневные челленджи — сумму определяет сервер, не клиент. */
 const CHALLENGE_REWARDS = { quick_round: 10, sniper: 10, forgotten: 10 };
@@ -46,220 +40,9 @@ function parseRewardDay(value) {
   return diff <= 24 * 60 * 60 * 1000 ? value : null;
 }
 
-/**
- * Одно напоминание в день во время, выбранное пользователем (notif_hour:notif_minute), только с 8 до 21.
- * cron-job.org вызывает каждые 15 минут. Берём тех, у кого сейчас нужный час и минута уже наступила:
- * пропущенный запуск в :00 подхватит запуск в :15. Второго пуша не будет — last_reminder_date.
- * Приоритет: воскресенье — место в рейтинге; понедельник — итоги недели; иначе, если повторение
- * дня ещё не сделано, — угасающие слова, слова к повторению, возврат (3 и 7 дней), серия.
- */
-async function sendDailyReminders(sql, { dryRun = false } = {}) {
-  const users = await sql`
-    SELECT us.user_id, us.current_streak, us.notif_streak,
-           COALESCE(us.timezone, 'Asia/Bishkek') AS tz,
-           us.last_active_date = (NOW() AT TIME ZONE COALESCE(us.timezone, 'Asia/Bishkek'))::date AS done_today,
-           to_char(NOW() AT TIME ZONE COALESCE(us.timezone, 'Asia/Bishkek'), 'dy') AS dow,
-           (NOW() AT TIME ZONE COALESCE(us.timezone, 'Asia/Bishkek'))::date::text AS local_today,
-           (NOW() AT TIME ZONE COALESCE(us.timezone, 'Asia/Bishkek'))::date - us.last_active_date AS days_away
-    FROM user_stats us
-    WHERE us.notif_enabled = true
-      AND us.notif_hour BETWEEN 8 AND 21
-      AND EXTRACT(HOUR FROM NOW() AT TIME ZONE COALESCE(us.timezone, 'Asia/Bishkek'))::int = us.notif_hour
-      AND EXTRACT(MINUTE FROM NOW() AT TIME ZONE COALESCE(us.timezone, 'Asia/Bishkek'))::int >= COALESCE(us.notif_minute, 0)
-      AND (NOT us.notif_days_custom
-           OR string_to_array(us.notif_days, ',') @> ARRAY[trim(to_char(NOW() AT TIME ZONE COALESCE(us.timezone, 'Asia/Bishkek'), 'dy'))])
-      AND (us.last_reminder_date IS NULL
-           OR us.last_reminder_date < (NOW() AT TIME ZONE COALESCE(us.timezone, 'Asia/Bishkek'))::date)
-      AND EXISTS (SELECT 1 FROM push_tokens pt WHERE pt.user_id = us.user_id)
-  `;
-  let sent = 0;
-  const report = []; // для dry_run: решение по каждому кандидату
-  const standingsCache = new Map();
-  for (const u of users) {
-    try {
-      const pick = await pickReminder(sql, u, standingsCache);
-      if (!pick) {
-        if (dryRun) report.push({ user_id: u.user_id, type: null, reason: u.done_today ? 'done_today' : 'nothing_to_send' });
-        continue;
-      }
-      const result = await sendNotification(sql, u.user_id, pick.type, pick.data, { dryRun });
-      if (dryRun) {
-        report.push({ user_id: u.user_id, type: pick.type, data: pick.data, reason: result.reason || null, message: result.message || null });
-        continue;
-      }
-      // На паузе день не отмечаем: после снятия паузы напоминание ещё может уйти сегодня
-      if (result.reason !== 'paused') {
-        await sql`UPDATE user_stats SET last_reminder_date = ${u.local_today} WHERE user_id = ${u.user_id}`;
-      }
-      if (result.ok) sent++;
-    } catch (e) {
-      console.error(`[cron-reminders] ${u.user_id} failed:`, e);
-    }
-  }
-  return dryRun
-    ? { ok: true, dry_run: true, paused: isPushPaused(), candidates: users.length, report }
-    : { ok: true, candidates: users.length, sent };
-}
-
-async function pickReminder(sql, u, standingsCache) {
-  const dow = String(u.dow).trim();
-  // Воскресенье: место в рейтинге курса (если ученик в курсе с включённым рейтингом)
-  if (dow === 'sun') {
-    const courses = await sql`
-      SELECT c.id, COALESCE(c.timezone, us.timezone, 'Asia/Bishkek') AS tz
-      FROM course_members cm JOIN courses c ON c.id = cm.course_id
-      LEFT JOIN user_stats us ON us.user_id = c.user_id
-      WHERE cm.user_id = ${u.user_id} AND cm.role = 'student' AND c.rating_enabled AND NOT cm.hide_from_rating
-    `;
-    for (const course of courses) {
-      if (!standingsCache.has(course.id)) {
-        const [{ d: weekStart }] = await sql`SELECT (date_trunc('week', NOW() AT TIME ZONE ${course.tz}))::date::text AS d`;
-        const rows = (await computeStandings(sql, course.id, course.tz, weekStart)).filter((r) => !r.hide_from_rating);
-        standingsCache.set(course.id, rows);
-      }
-      const rows = standingsCache.get(course.id);
-      const idx = rows.findIndex((r) => r.user_id === u.user_id);
-      if (idx >= 0 && rows[idx].points > 0) {
-        return { type: 'rating_sunday', data: { place: idx + 1, gap: idx > 0 ? rows[idx - 1].points - rows[idx].points : null, courseId: course.id } };
-      }
-    }
-  }
-  // Понедельник: итоги прошлой недели (их закрывает progress?action=close-week)
-  if (dow === 'mon') {
-    const [result] = await sql`
-      SELECT course_id, place, reward FROM weekly_results
-      WHERE user_id = ${u.user_id} AND week_start >= (${u.local_today}::date - 7)
-      ORDER BY week_start DESC, place ASC LIMIT 1
-    `;
-    if (result) return { type: 'weekly_result', data: { place: result.place, reward: result.reward, courseId: result.course_id } };
-  }
-  if (u.done_today) return null; // повторение дня уже сделано — не беспокоим
-
-  const [counts] = await sql`
-    SELECT
-      COUNT(*) FILTER (WHERE next_review <= NOW())::int AS waiting,
-      COUNT(*) FILTER (WHERE NOW() - next_review > make_interval(days =>
-        CASE LEAST(learning_step, 6) WHEN 1 THEN 1 WHEN 2 THEN 3 WHEN 3 THEN 7 WHEN 4 THEN 14 WHEN 5 THEN 30 ELSE 60 END
-      ))::int AS fading
-    FROM card_progress WHERE user_id = ${u.user_id} AND learning_step >= 1
-  `;
-  if (counts.fading > 0) return { type: 'words_fading', data: { count: counts.fading } };
-  if (counts.waiting > 0) return { type: 'review_due', data: { count: Math.min(counts.waiting, 30) } };
-  // Бывший cron-reactivation: теперь в привычное время и по поясу пользователя, а не по UTC
-  if (u.days_away === 3) return { type: 'reactivation_3d', data: {} };
-  if (u.days_away === 7) return { type: 'reactivation_7d', data: {} };
-  if (u.current_streak > 0 && u.notif_streak) return { type: 'streak_reminder', data: {} };
-  return null;
-}
-
 const ALL_DAYS = 'mon,tue,wed,thu,fri,sat,sun';
 /** Дефолт до Push 0.6 — его ставили всем, сами его не выбирали */
 const LEGACY_DEFAULT_DAYS = 'mon,tue,wed,thu,fri';
-
-/** Аварийный выключатель: PUSH_PAUSED=1 в переменных Vercel останавливает маркетинговые пуши без деплоя. */
-function isPushPaused() {
-  return process.env.PUSH_PAUSED === '1';
-}
-
-/**
- * Строка push_log на каждое решение (план, шаг 0.3). Журнал не должен ронять отправку: ошибку
- * только логируем. local_date — по поясу пользователя, как у остальных дневных отметок.
- */
-async function logPush(sql, { id, userId, type, status, tokens = 0, delivered = 0, data, variant = null }) {
-  try {
-    await sql`
-      INSERT INTO push_log (id, user_id, type, category, variant, local_date, status, tokens, delivered, payload)
-      VALUES (
-        ${id}, ${userId}, ${type}, ${pushType(type)?.category || 'other'}, ${variant},
-        (NOW() AT TIME ZONE COALESCE((SELECT timezone FROM user_stats WHERE user_id = ${userId}), 'Asia/Bishkek'))::date,
-        ${status}, ${tokens}, ${delivered}, ${JSON.stringify(data || {})}::jsonb
-      )
-    `;
-  } catch (e) {
-    console.error('[push] push_log insert failed:', e);
-  }
-}
-
-/**
- * Отправить пуш пользователю на все его устройства. Учитывает notif_enabled; мёртвые токены удаляет.
- * Каждое решение (и отказ) пишется в push_log; id строки уходит в пуш как data.push_id.
- * dryRun — пройти все проверки и собрать текст, но не отправлять (status = 'dry_run').
- * → { ok, push_id?, sent?, failed?, reason?, message?, error? }
- */
-export async function sendNotification(sql, userId, type, data = {}, { dryRun = false } = {}) {
-  const pushId = randomUUID();
-  const log = (status, extra = {}) => logPush(sql, { id: pushId, userId, type, status, data, ...extra });
-
-  const allTokens = await sql`SELECT token, permission FROM push_tokens WHERE user_id = ${userId}`;
-  if (allTokens.length === 0) {
-    await log('no_token');
-    return { ok: false, push_id: pushId, reason: 'no token' };
-  }
-  // Выключил уведомления в iOS (шаг 1.4) — на это устройство не шлём
-  const tokenRows = allTokens.filter((r) => r.permission !== 'denied');
-  if (tokenRows.length === 0) {
-    await log('denied');
-    return { ok: false, push_id: pushId, reason: 'permission denied' };
-  }
-
-  const [user] = await sql`
-    SELECT u.display_name, us.current_streak, us.longest_streak, us.notif_enabled, us.notif_streak
-    FROM user_stats us JOIN users u ON u.id = us.user_id WHERE us.user_id = ${userId}
-  `;
-  if (!user?.notif_enabled) {
-    await log('disabled');
-    return { ok: false, push_id: pushId, reason: 'notifications disabled' };
-  }
-
-  if (!pushType(type)) return { ok: false, error: `Unknown type: ${type}` };
-  const built = buildPush(type, {
-    name: user.display_name || 'Привет',
-    displayName: user.display_name || null,
-    streak: user.current_streak,
-    longest: user.longest_streak,
-    data,
-  });
-  // Текст без числа и имени (не пришли данные) не отправляем — принцип 3 плана
-  if (!built) {
-    await log('no_specifics');
-    return { ok: false, push_id: pushId, reason: 'no specifics' };
-  }
-  const message = { title: built.title, body: built.body };
-  const logBuilt = (status, extra = {}) => log(status, { variant: built.variant, ...extra });
-
-  if (isPushPaused() && !PUSH_TYPES[type].transactional) {
-    await logBuilt('paused');
-    return { ok: false, push_id: pushId, reason: 'paused', message };
-  }
-  if (dryRun) {
-    await logBuilt('dry_run', { tokens: tokenRows.length });
-    return { ok: false, push_id: pushId, reason: 'dry_run', message };
-  }
-
-  const messaging = initFirebase();
-  // На все устройства пользователя (телефон + веб), а не на первое попавшееся
-  const tokens = tokenRows.map((r) => r.token);
-  let result;
-  try {
-    result = await messaging.sendEachForMulticast({
-      tokens,
-      notification: message,
-      data: { type, url: '/', push_id: pushId, link: built.link },
-      apns: { payload: { aps: { sound: 'default' } } },
-    });
-  } catch (e) {
-    await logBuilt('failed', { tokens: tokens.length });
-    throw e;
-  }
-  // Удалённое приложение / отозванное разрешение — токен больше не нужен
-  const dead = tokens.filter((_, i) => {
-    const code = result.responses[i].error?.code;
-    return code === 'messaging/registration-token-not-registered' || code === 'messaging/invalid-registration-token';
-  });
-  if (dead.length) await sql`DELETE FROM push_tokens WHERE token = ANY(${dead})`;
-  await logBuilt(result.successCount > 0 ? 'sent' : 'failed', { tokens: tokens.length, delivered: result.successCount });
-  return { ok: result.successCount > 0, push_id: pushId, sent: result.successCount, failed: result.failureCount };
-}
 
 /**
  * Чьи настройки уведомлений читать или менять. С JWT — только свои, userId из запроса игнорируется.
@@ -328,11 +111,15 @@ export default async function handler(req, res) {
       const userId = await settingsUserId(req, req.query.userId);
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
       const rows = await sql`
-        SELECT notif_enabled, notif_hour, notif_minute, notif_days, notif_days_custom, notif_streak
+        SELECT notif_enabled, notif_hour, notif_minute, notif_days, notif_days_custom, notif_streak, notif_categories_off
         FROM user_stats WHERE user_id = ${userId}
       `;
+      // Контрольная группа (2.5) — для свойства GA4 push_group
+      const pushGroup = isHoldout(userId) ? 'holdout' : 'push';
       if (!rows.length) {
-        return res.status(200).json({ notifEnabled: true, notifHour: 19, notifMinute: 0, notifDays: ALL_DAYS, notifStreak: true });
+        return res.status(200).json({
+          notifEnabled: true, notifHour: 19, notifMinute: 0, notifDays: ALL_DAYS, notifStreak: true, notifCategoriesOff: [], pushGroup,
+        });
       }
       const r = rows[0];
       return res.status(200).json({
@@ -342,6 +129,8 @@ export default async function handler(req, res) {
         // Дни, которые человек не выбирал сам, не фильтруют — показываем все
         notifDays: r.notif_days_custom ? r.notif_days : ALL_DAYS,
         notifStreak: r.notif_streak,
+        notifCategoriesOff: groupsOff(r.notif_categories_off, r.notif_streak),
+        pushGroup,
       });
     }
 
@@ -355,9 +144,20 @@ export default async function handler(req, res) {
       const days = typeof notifDays === 'string' ? notifDays : ALL_DAYS;
       // Старые сборки не шлют notifDaysExplicit и сохраняют показанный дефолт «пн–пт» — его выбором не считаем
       const daysCustom = days !== ALL_DAYS && (notifDaysExplicit === true || days !== LEGACY_DEFAULT_DAYS);
+      // Переключатели «что присылать» (2.4). Старые сборки шлют только notifStreak — остальные
+      // выключенные категории сохраняем, «Серию» берём из notifStreak.
+      let categoriesOff;
+      if (Array.isArray(req.body?.notifCategoriesOff)) {
+        categoriesOff = [...new Set(req.body.notifCategoriesOff.filter((g) => Object.hasOwn(SETTING_GROUPS, g)))];
+      } else {
+        const [prev] = await sql`SELECT notif_categories_off FROM user_stats WHERE user_id = ${userId}`;
+        categoriesOff = (prev?.notif_categories_off || []).filter((g) => g !== 'streak');
+        if (notifStreak === false) categoriesOff.push('streak');
+      }
+      const streakOn = !categoriesOff.includes('streak');
       await sql`
-        INSERT INTO user_stats (user_id, notif_enabled, notif_hour, notif_minute, notif_days, notif_days_custom, notif_streak)
-        VALUES (${userId}, ${notifEnabled ?? true}, ${notifHour ?? 19}, ${minute}, ${days}, ${daysCustom}, ${notifStreak ?? true})
+        INSERT INTO user_stats (user_id, notif_enabled, notif_hour, notif_minute, notif_days, notif_days_custom, notif_streak, notif_categories_off)
+        VALUES (${userId}, ${notifEnabled ?? true}, ${notifHour ?? 19}, ${minute}, ${days}, ${daysCustom}, ${streakOn}, ${categoriesOff}::text[])
         ON CONFLICT (user_id) DO UPDATE SET
           notif_enabled = EXCLUDED.notif_enabled,
           notif_hour    = EXCLUDED.notif_hour,
@@ -365,6 +165,7 @@ export default async function handler(req, res) {
           notif_days    = EXCLUDED.notif_days,
           notif_days_custom = EXCLUDED.notif_days_custom,
           notif_streak  = EXCLUDED.notif_streak,
+          notif_categories_off = EXCLUDED.notif_categories_off,
           updated_at    = NOW()
       `;
       return res.status(200).json({ ok: true });
@@ -398,7 +199,7 @@ export default async function handler(req, res) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
       const dryRun = req.query.dry_run === '1';
-      const result = await sendDailyReminders(sql, { dryRun });
+      const result = await runArbiter(sql, { dryRun });
       // Раз в сутки (первый запуск после полуночи UTC): журнал храним 180 дней
       const now = new Date();
       if (!dryRun && now.getUTCHours() === 0 && now.getUTCMinutes() < 15) {

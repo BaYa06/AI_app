@@ -12,7 +12,7 @@ import {
   Linking,
   Platform,
 } from 'react-native';
-import { Bell, BellOff, ChevronDown, ChevronUp, Flame } from 'lucide-react-native';
+import { Bell, BellOff, BookOpen, ChevronDown, ChevronUp, Flame, Trophy, Users } from 'lucide-react-native';
 import { useThemeColors } from '@/store';
 import { Text } from '@/components/common';
 import { spacing, borderRadius, alpha, iconSize } from '@/constants';
@@ -25,6 +25,17 @@ import {
 } from '@/services/pushNotifications';
 import { supabase } from '@/services';
 import { API_BASE } from '@/config/apiBase';
+import { Analytics } from '@/services/analytics';
+
+/** «Что присылать» (plan/push_notifications.md, 2.4) — ключи как SETTING_GROUPS в api/push/_decide.js */
+type PushGroup = 'lesson' | 'streak' | 'course' | 'rating';
+const PUSH_GROUPS: { key: PushGroup; title: string; hint: string }[] = [
+  { key: 'lesson', title: 'Урок дня', hint: 'Слова ждут повторения, напоминание вернуться' },
+  { key: 'streak', title: 'Серия', hint: 'Серия под угрозой' },
+  { key: 'course', title: 'Курс и учитель', hint: 'Учитель просит повторить' },
+  { key: 'rating', title: 'Рейтинг', hint: 'Место в рейтинге курса, итоги недели' },
+];
+const PUSH_GROUP_ICONS = { lesson: BookOpen, streak: Flame, course: Users, rating: Trophy } as const;
 
 // Сервер проверяет напоминания каждые 15 минут и шлёт их только с 8:00 до 21:45 (api/push.js, cron-reminders)
 const MIN_HOUR = 8;
@@ -54,7 +65,9 @@ export function NotificationSettingsScreen({ navigation }: any) {
   const [selectedDays, setSelectedDays] = useState<Record<string, boolean>>({
     mon: true, tue: true, wed: true, thu: true, fri: true, sat: true, sun: true,
   });
-  const [streakReminders, setStreakReminders] = useState(true);
+  // Выключенные переключатели; loadedOff — как было при открытии, чтобы отметить новые выключения в аналитике
+  const [groupsOff, setGroupsOff] = useState<PushGroup[]>([]);
+  const [loadedOff, setLoadedOff] = useState<PushGroup[]>([]);
 
   // Push notifications (real)
   const [pushStatus, setPushStatus] = useState<PushStatus | null>(null);
@@ -83,7 +96,11 @@ export function NotificationSettingsScreen({ navigation }: any) {
             setReminderEnabled(d.notifEnabled ?? true);
             setHours(clampHour(d.notifHour ?? 19));
             setMinutes(clampMinute(d.notifMinute ?? 0));
-            setStreakReminders(d.notifStreak ?? true);
+            const off: PushGroup[] = Array.isArray(d.notifCategoriesOff)
+              ? d.notifCategoriesOff
+              : d.notifStreak === false ? ['streak'] : [];
+            setGroupsOff(off);
+            setLoadedOff(off);
             if (d.notifDays) {
               const active = d.notifDays.split(',');
               setSelectedDays({
@@ -151,10 +168,12 @@ export function NotificationSettingsScreen({ navigation }: any) {
             .map((day) => day.key)
             .join(','),
           notifDaysExplicit: true,
-          notifStreak: streakReminders,
+          notifStreak: !groupsOff.includes('streak'),
+          notifCategoriesOff: groupsOff,
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      for (const group of groupsOff) if (!loadedOff.includes(group)) Analytics.pushCategoryDisabled(group);
       navigation.goBack();
     } catch (e) {
       console.error('[NotificationSettings] Save error:', e);
@@ -298,14 +317,24 @@ export function NotificationSettingsScreen({ navigation }: any) {
         />
       </ListGroup>
 
-      {/* ======== Gamification ======== */}
-      <ListGroup title="Геймификация" style={st.group}>
-        <ListRow
-          icon={Flame}
-          iconColor={colors.streak}
-          title="Напоминания о серии"
-          right={<Switch value={streakReminders} onValueChange={setStreakReminders} accessibilityLabel="Напоминания о серии" />}
-        />
+      {/* ======== Что присылать (2.4) ======== */}
+      <ListGroup title="Что присылать" style={st.group}>
+        {PUSH_GROUPS.map((group) => (
+          <ListRow
+            key={group.key}
+            icon={PUSH_GROUP_ICONS[group.key]}
+            iconColor={group.key === 'streak' ? colors.streak : undefined}
+            title={group.title}
+            subtitle={group.hint}
+            right={
+              <Switch
+                value={!groupsOff.includes(group.key)}
+                onValueChange={(on) => setGroupsOff((prev) => (on ? prev.filter((g) => g !== group.key) : [...prev, group.key]))}
+                accessibilityLabel={group.title}
+              />
+            }
+          />
+        ))}
       </ListGroup>
 
       {/* ======== Save Button ======== */}

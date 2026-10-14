@@ -70,6 +70,20 @@ export function setAnalyticsUserProperties(props: {
   });
 }
 
+/**
+ * Контрольная группа пушей (plan/push_notifications.md, 2.5): 10 % без маркетинговых пушей.
+ * Та же формула, что isHoldout в api/push/_decide.js — последние 7 hex-символов UUID, % 100 < 10.
+ * Свойство push_group нужно, чтобы сравнивать удержание групп в GA4.
+ */
+export function pushGroupFor(userId: string): 'holdout' | 'push' {
+  const n = parseInt(userId.replace(/-/g, '').slice(-7), 16);
+  return Number.isFinite(n) && n % 100 < 10 ? 'holdout' : 'push';
+}
+
+export function setPushGroupProperty(userId: string) {
+  sendUserProperties({ push_group: pushGroupFor(userId) });
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // СОБЫТИЯ
 // ─────────────────────────────────────────────────────────────────────────────
@@ -442,6 +456,10 @@ export const Analytics = {
 
   pushPrepromptLater: () =>
     log('push_preprompt_later'),
+
+  /** Выключен переключатель «что присылать» (2.4) — сигнал оттока: какой тип пушей раздражает */
+  pushCategoryDisabled: (category: string) =>
+    log('push_category_disabled', { category }),
 
   /** Строка «Включи напоминания, чтобы не потерять серию» на главной (1.3): shown / tap / dismiss */
   pushStreakNudge: (action: 'shown' | 'tap' | 'dismiss') =>

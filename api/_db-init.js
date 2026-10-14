@@ -363,12 +363,18 @@ async function applyMigrations(sql) {
         created_at          TIMESTAMPTZ DEFAULT NOW(),
         opened_at           TIMESTAMPTZ,
         lesson_started_at   TIMESTAMPTZ,
-        lesson_completed_at TIMESTAMPTZ
+        lesson_completed_at TIMESTAMPTZ,
+        slot                TEXT
       )
     `;
     await sql`CREATE INDEX IF NOT EXISTS push_log_user_date ON push_log (user_id, local_date)`;
     await sql`CREATE INDEX IF NOT EXISTS push_log_type_created ON push_log (type, created_at)`;
     await sql`CREATE INDEX IF NOT EXISTS push_log_created ON push_log (created_at)`;
+    // Одна ежедневная рассылка в категории в день (шаг 2.2): резерв до отправки, повторный cron не продублирует
+    await sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS push_log_daily_once ON push_log (user_id, category, local_date, slot)
+      WHERE slot IS NOT NULL AND status IN ('sending', 'sent')
+    `;
   } catch (e) {
     console.error('Migration 026_push_log failed:', e);
   }
@@ -377,6 +383,7 @@ async function applyMigrations(sql) {
   try {
     await sql`ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS notif_days_custom BOOLEAN NOT NULL DEFAULT false`;
     await sql`ALTER TABLE user_stats ALTER COLUMN notif_days SET DEFAULT 'mon,tue,wed,thu,fri,sat,sun'`;
+    await sql`ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS notif_categories_off TEXT[] NOT NULL DEFAULT '{}'`;
   } catch (e) {
     console.error('Migration 027_notif_days_custom failed:', e);
   }
