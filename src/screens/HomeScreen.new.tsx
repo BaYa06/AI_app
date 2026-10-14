@@ -58,6 +58,9 @@ import { isCardWaitingReview } from '@/services/SRSService';
 import { StorageService, STORAGE_KEYS } from '@/services/StorageService';
 import { Analytics } from '@/services/analytics';
 import { currentPushOrigin, reportPushLesson } from '@/services/pushOpens';
+import { getPushStatus, isPushSupported } from '@/services/pushNotifications';
+import { loadStreakNudgeDay, saveStreakNudgeDay, shouldShowStreakNudge } from '@/services/pushPrompt';
+import { PushStreakNudge } from '@/components/push/PushStreakNudge';
 import { firstLessonStep } from '@/services/lessonFlow';
 import { useLessonStore } from '@/store/lessonStore';
 import { localDay } from '@/store/challengeStore';
@@ -653,6 +656,29 @@ export function HomeScreen({ navigation, route }: any) {
   // Вечером при невыполненной цели — «Сохрани серию» (считается при каждой отрисовке: главная
   // перерисовывается при заходе, так вечер наступает без перезапуска)
   const streakRiskHours = streakRiskHoursLeft(new Date(), streakValue, todayGoalReached);
+
+  // «Включи напоминания, чтобы не потерять серию» (plan/push_notifications.md, 1.3): серия от 3 дней,
+  // пушей нет, не чаще раза в 14 дней. Только приложение — в вебе свой баннер.
+  const [pushNudgePermission, setPushNudgePermission] = useState<string | null>(null);
+  useEffect(() => {
+    if (Platform.OS === 'web' || isTeacher !== false || pushNudgePermission) return;
+    let cancelled = false;
+    const today = localDay();
+    const lastShown = loadStreakNudgeDay();
+    if (!shouldShowStreakNudge(lastShown, today, { streak: streakValue, permission: 'default', supported: true })) return;
+    Promise.all([isPushSupported(), getPushStatus()])
+      .then(([supported, status]) => {
+        if (cancelled || !shouldShowStreakNudge(lastShown, today, { streak: streakValue, permission: status.permission, supported })) return;
+        saveStreakNudgeDay(today);
+        Analytics.pushStreakNudge('shown');
+        setPushNudgePermission(status.permission);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [streakValue, isTeacher, pushNudgePermission]);
+  const [pushNudgeClosed, setPushNudgeClosed] = useState(false);
   const lessonContent = useMemo(
     () => lessonCardContent(lessonPlan, { streakDays: streakValue, extraNewStep: EXTRA_NEW_STEP, streakRiskHours }),
     [lessonPlan, streakValue, streakRiskHours],
@@ -1570,6 +1596,11 @@ export function HomeScreen({ navigation, route }: any) {
                   style={styles.lessonCard}
                 />
               )}
+              {pushNudgePermission && !pushNudgeClosed && (
+                <View style={styles.pushNudge}>
+                  <PushStreakNudge permission={pushNudgePermission} onClose={() => setPushNudgeClosed(true)} />
+                </View>
+              )}
               {/* Challenges Section */}
               <View style={styles.challengesSection}>
                 <ChallengeTiles
@@ -2309,6 +2340,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   // Урок дня: 16 сверху (как баннер учителя), до мини-игр — 24 вместе с их отступом сверху
+  pushNudge: {
+    marginHorizontal: screenPadding,
+    marginBottom: spacing.xs,
+  },
   lessonCard: {
     marginHorizontal: screenPadding,
     marginTop: spacing.m,

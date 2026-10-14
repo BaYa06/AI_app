@@ -95,3 +95,32 @@ export async function saveReminderHour(hour: number): Promise<boolean> {
     return false;
   }
 }
+
+// ==================== Строка на главной (шаг 1.3) ====================
+
+const NUDGE_CACHE_NAME = 'push_streak_nudge';
+export const STREAK_NUDGE_MIN_STREAK = 3;
+export const STREAK_NUDGE_INTERVAL_DAYS = 14;
+
+/**
+ * «Включи напоминания, чтобы не потерять серию»: серия от 3 дней, пушей нет (отказал в iOS или
+ * так и не разрешил), не чаще раза в 14 дней.
+ */
+export function shouldShowStreakNudge(
+  lastShownDay: string | undefined,
+  today: string,
+  opts: { streak: number; permission: string; supported: boolean },
+): boolean {
+  if (!opts.supported || opts.permission === 'granted' || opts.permission === 'unsupported') return false;
+  if (opts.streak < STREAK_NUDGE_MIN_STREAK) return false;
+  if (!lastShownDay) return true;
+  return Date.parse(`${today}T00:00:00Z`) - Date.parse(`${lastShownDay}T00:00:00Z`) >= STREAK_NUDGE_INTERVAL_DAYS * DAY_MS;
+}
+
+export function loadStreakNudgeDay(): string | undefined {
+  return readCache<string>(NUDGE_CACHE_NAME);
+}
+
+export function saveStreakNudgeDay(day: string): void {
+  writeCache(NUDGE_CACHE_NAME, day);
+}

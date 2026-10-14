@@ -4,7 +4,7 @@ jest.mock('../localCache', () => ({ readCache: () => undefined, writeCache: () =
 jest.mock('../supabaseClient', () => ({ supabase: {} }));
 jest.mock('@/config/apiBase', () => ({ API_BASE: '' }));
 
-import { markPushPromptShown, shouldShowPushPrompt, suggestedSlot } from '../pushPrompt';
+import { markPushPromptShown, shouldShowPushPrompt, shouldShowStreakNudge, suggestedSlot } from '../pushPrompt';
 
 const ask = { permission: 'default', supported: true };
 
@@ -32,5 +32,14 @@ describe('pushPrompt', () => {
     expect(suggestedSlot(8)).toBe('morning');
     expect(suggestedSlot(14)).toBe('day');
     expect(suggestedSlot(21)).toBe('evening');
+  });
+
+  it('строка на главной: серия от 3 дней, без пушей, раз в 14 дней', () => {
+    const denied = { streak: 5, permission: 'denied', supported: true };
+    expect(shouldShowStreakNudge(undefined, '2026-10-14', denied)).toBe(true);
+    expect(shouldShowStreakNudge(undefined, '2026-10-14', { ...denied, streak: 2 })).toBe(false);
+    expect(shouldShowStreakNudge(undefined, '2026-10-14', { ...denied, permission: 'granted' })).toBe(false);
+    expect(shouldShowStreakNudge('2026-10-01', '2026-10-14', denied)).toBe(false);
+    expect(shouldShowStreakNudge('2026-10-01', '2026-10-15', denied)).toBe(true);
   });
 });

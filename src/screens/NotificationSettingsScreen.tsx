@@ -8,11 +8,14 @@ import {
   StyleSheet,
   Pressable,
   ActivityIndicator,
+  AppState,
+  Linking,
+  Platform,
 } from 'react-native';
-import { Bell, ChevronDown, ChevronUp, Flame } from 'lucide-react-native';
+import { Bell, BellOff, ChevronDown, ChevronUp, Flame } from 'lucide-react-native';
 import { useThemeColors } from '@/store';
 import { Text } from '@/components/common';
-import { spacing, borderRadius, alpha } from '@/constants';
+import { spacing, borderRadius, alpha, iconSize } from '@/constants';
 import { Button, Card, ListGroup, ListRow, Screen, ScreenHeader, Switch, toast } from '@/components/ui';
 import {
   requestPushPermission,
@@ -58,6 +61,14 @@ export function NotificationSettingsScreen({ navigation }: any) {
   const [pushLoading, setPushLoading] = useState(false);
   const [userId, setUserId] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
+
+  // Вернулся из настроек iPhone — разрешение могло поменяться (plan/push_notifications.md, 1.3)
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') getPushStatus().then(setPushStatus);
+    });
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     getPushStatus().then(setPushStatus);
@@ -251,6 +262,22 @@ export function NotificationSettingsScreen({ navigation }: any) {
         </View>
       </Card>
 
+      {/* Отказал в iOS: второй раз системный диалог не появится — включить можно только в настройках iPhone */}
+      {Platform.OS !== 'web' && pushStatus?.permission === 'denied' && (
+        <Card style={st.deniedCard}>
+          <View style={st.deniedHeader}>
+            <BellOff size={iconSize.s} color={colors.textSecondary} />
+            <View style={st.deniedText}>
+              <Text variant="body" style={[st.bold, { color: colors.textPrimary }]}>Уведомления выключены в настройках iPhone</Text>
+              <Text variant="bodySmall" color="secondary">
+                Пока они выключены, напоминания не придут. Открой настройки и включи «Разрешить уведомления».
+              </Text>
+            </View>
+          </View>
+          <Button title="Открыть настройки iPhone" variant="secondary" size="s" onPress={() => Linking.openSettings().catch(() => {})} />
+        </Card>
+      )}
+
       {/* ======== General Preferences ======== */}
       <ListGroup title="Основные настройки" style={st.group}>
         <ListRow
@@ -339,6 +366,19 @@ const st = StyleSheet.create({
     borderRadius: borderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  deniedCard: {
+    marginTop: spacing.l,
+    gap: spacing.m,
+  },
+  deniedHeader: {
+    flexDirection: 'row',
+    gap: spacing.m,
+    alignItems: 'flex-start',
+  },
+  deniedText: {
+    flex: 1,
+    gap: spacing.xxs,
   },
   group: {
     marginTop: spacing.l,

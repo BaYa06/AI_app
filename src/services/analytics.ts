@@ -439,6 +439,10 @@ export const Analytics = {
   pushPrepromptLater: () =>
     log('push_preprompt_later'),
 
+  /** Строка «Включи напоминания, чтобы не потерять серию» на главной (1.3): shown / tap / dismiss */
+  pushStreakNudge: (action: 'shown' | 'tap' | 'dismiss') =>
+    log('push_streak_nudge', { action }),
+
   /**
    * Юзер открыл приложение тапом по push-уведомлению (plan/push_notifications.md, 0.5).
    * type — тип из реестра на сервере (review_due, teacher_review…), push_id — строка push_log.
