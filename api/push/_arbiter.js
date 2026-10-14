@@ -34,7 +34,7 @@ async function sendDeferred(sql) {
       AND pl.created_at > NOW() - make_interval(hours => ${DEFERRED_MAX_HOURS})
       AND EXTRACT(HOUR FROM NOW() AT TIME ZONE COALESCE(us.timezone, ${DEFAULT_TZ}))::int >= ${QUIET_TO_HOUR}
       AND EXTRACT(HOUR FROM NOW() AT TIME ZONE COALESCE(us.timezone, ${DEFAULT_TZ}))::int
-          < CASE WHEN u.age_range IN ('under13', '13-17') THEN ${MINOR_QUIET_FROM_HOUR} ELSE ${QUIET_FROM_HOUR} END
+          < CASE WHEN u.age_range IN ('under13', '13-17') THEN ${MINOR_QUIET_FROM_HOUR}::int ELSE ${QUIET_FROM_HOUR}::int END
     RETURNING pl.user_id, pl.type, pl.payload
   `;
   let sent = 0;
@@ -83,7 +83,7 @@ async function sendClassPrep(sql, { dryRun }) {
     WHERE t.local_time >= t.class_time - INTERVAL '2 hours'
       AND t.local_time < t.class_time - INTERVAL '1 hour'
       AND t.local_time >= make_time(${QUIET_TO_HOUR}, 0, 0)
-      AND t.local_time < make_time(CASE WHEN t.minor THEN ${MINOR_QUIET_FROM_HOUR} ELSE ${QUIET_FROM_HOUR} END, 0, 0)
+      AND t.local_time < make_time(CASE WHEN t.minor THEN ${MINOR_QUIET_FROM_HOUR}::int ELSE ${QUIET_FROM_HOUR}::int END, 0, 0)
       AND EXISTS (SELECT 1 FROM push_tokens pt WHERE pt.user_id = t.user_id AND pt.permission IS DISTINCT FROM 'denied')
       AND NOT EXISTS (
         SELECT 1 FROM push_log p
@@ -120,6 +120,124 @@ async function sendClassPrep(sql, { dryRun }) {
     }
   }
   return { classCandidates: rows.length, classSent: sent, ...(dryRun ? { classReport: report } : null) };
+}
+
+/** Новые слова урока в день (DEFAULT_NEW_PER_DAY в LessonService): квота хранится на телефоне, сервер берёт обычную */
+const DEFAULT_NEW_PER_DAY = 10;
+
+/** Пуш дня уже ушёл (онбординг, вечерний и т. п.) — обычный арбитр сегодня этого человека не трогает */
+async function markRemindedToday(sql, userIds) {
+  if (userIds.length === 0) return;
+  await sql`
+    UPDATE user_stats SET last_reminder_date = (NOW() AT TIME ZONE COALESCE(timezone, ${DEFAULT_TZ}))::date
+    WHERE user_id = ANY(${userIds}::uuid[])
+  `;
+}
+
+/** Отправить по списку через sendNotification; успешным — отметка дня. → { sent, report } */
+async function sendEach(sql, items, { dryRun, markDay = true }) {
+  let sent = 0;
+  const report = [];
+  const reminded = [];
+  for (const { userId, type, data } of items) {
+    try {
+      const result = await sendNotification(sql, userId, type, data, { dryRun });
+      if (result.ok) {
+        sent++;
+        reminded.push(userId);
+      }
+      if (dryRun) report.push({ user_id: userId, type, status: result.reason || 'send', data, message: result.message || null });
+    } catch (e) {
+      console.error(`[arbiter] ${type} for ${userId} failed:`, e);
+    }
+  }
+  if (!dryRun && markDay) await markRemindedToday(sql, reminded);
+  return { sent, report };
+}
+
+/**
+ * Онбординг (3.1). Первый урок: зарегистрировался, ответов нет — через 3 часа после регистрации;
+ * если это ночь — в 19:00 (до 8:00 — того же дня, после 22:00 — следующего). Второй день: первый урок
+ * был вчера, сегодня занятий нет — в час вчерашнего урока. Каждый — один раз в жизни.
+ */
+async function sendOnboarding(sql, { dryRun }) {
+  const firstLesson = await sql`
+    WITH fresh AS (
+      SELECT u.id AS user_id, COALESCE(us.timezone, ${DEFAULT_TZ}) AS tz,
+             u.age_range IN ('under13', '13-17') AS minor,
+             (u.created_at + INTERVAL '3 hours') AS at3h,
+             ((u.created_at + INTERVAL '3 hours') AT TIME ZONE COALESCE(us.timezone, ${DEFAULT_TZ})) AS at3h_local
+      FROM users u JOIN user_stats us ON us.user_id = u.id
+      WHERE us.notif_enabled = true AND COALESCE(u.teacher, false) = false
+        AND u.created_at > NOW() - INTERVAL '3 days'
+        AND (us.last_reminder_date IS NULL OR us.last_reminder_date < (NOW() AT TIME ZONE COALESCE(us.timezone, ${DEFAULT_TZ}))::date)
+        AND NOT EXISTS (SELECT 1 FROM answers a WHERE a.user_id = u.id)
+        AND EXISTS (SELECT 1 FROM push_tokens pt WHERE pt.user_id = u.id AND pt.permission IS DISTINCT FROM 'denied')
+        AND NOT EXISTS (
+          SELECT 1 FROM push_log p WHERE p.user_id = u.id AND p.type = 'onboarding_first_lesson'
+            AND p.status NOT IN ('dry_run', 'paused', 'failed')
+        )
+    ),
+    due AS (
+      SELECT f.*,
+             CASE
+               WHEN EXTRACT(HOUR FROM f.at3h_local)::int >= ${QUIET_TO_HOUR}
+                AND EXTRACT(HOUR FROM f.at3h_local)::int < CASE WHEN f.minor THEN ${MINOR_QUIET_FROM_HOUR}::int ELSE ${QUIET_FROM_HOUR}::int END
+                 THEN f.at3h
+               WHEN EXTRACT(HOUR FROM f.at3h_local)::int < ${QUIET_TO_HOUR}
+                 THEN (f.at3h_local::date + TIME '19:00') AT TIME ZONE f.tz
+               ELSE (f.at3h_local::date + 1 + TIME '19:00') AT TIME ZONE f.tz
+             END AS due_at
+      FROM fresh f
+    )
+    SELECT d.user_id, fs.title AS set_title, LEAST(fs.cards, ${DEFAULT_NEW_PER_DAY}) AS count
+    FROM due d
+    JOIN LATERAL (
+      -- Набор для первого урока: свой (последний созданный), иначе набор курса
+      SELECT s.title, (SELECT COUNT(*) FROM cards c WHERE c.set_id = s.id)::int AS cards
+      FROM card_sets s
+      WHERE s.user_id = d.user_id
+         OR s.course_id IN (SELECT cm.course_id FROM course_members cm WHERE cm.user_id = d.user_id AND cm.role = 'student')
+      ORDER BY (s.user_id = d.user_id) DESC, s.created_at DESC
+      LIMIT 1
+    ) fs ON fs.cards > 0
+    WHERE NOW() >= d.due_at AND NOW() < d.due_at + INTERVAL '6 hours'
+  `;
+  const day2 = await sql`
+    WITH firsts AS (
+      SELECT a.user_id, MIN(a.answered_at) AS first_at FROM answers a
+      GROUP BY a.user_id HAVING MIN(a.answered_at) > NOW() - INTERVAL '3 days'
+    ),
+    ctx AS (
+      SELECT f.user_id, f.first_at, COALESCE(us.timezone, ${DEFAULT_TZ}) AS tz,
+             u.age_range IN ('under13', '13-17') AS minor,
+             (NOW() AT TIME ZONE COALESCE(us.timezone, ${DEFAULT_TZ})) AS local_now,
+             (f.first_at AT TIME ZONE COALESCE(us.timezone, ${DEFAULT_TZ})) AS first_local
+      FROM firsts f JOIN user_stats us ON us.user_id = f.user_id JOIN users u ON u.id = f.user_id
+      WHERE us.notif_enabled = true
+        AND (us.last_reminder_date IS NULL OR us.last_reminder_date < (NOW() AT TIME ZONE COALESCE(us.timezone, ${DEFAULT_TZ}))::date)
+    )
+    SELECT c.user_id,
+           (SELECT COUNT(DISTINCT a.card_id)::int FROM answers a
+            WHERE a.user_id = c.user_id AND (a.answered_at AT TIME ZONE c.tz)::date = c.first_local::date) AS count
+    FROM ctx c
+    WHERE c.first_local::date = c.local_now::date - 1
+      AND EXTRACT(HOUR FROM c.local_now)::int = EXTRACT(HOUR FROM c.first_local)::int
+      AND EXTRACT(HOUR FROM c.local_now)::int >= ${QUIET_TO_HOUR}
+      AND EXTRACT(HOUR FROM c.local_now)::int < CASE WHEN c.minor THEN ${MINOR_QUIET_FROM_HOUR}::int ELSE ${QUIET_FROM_HOUR}::int END
+      AND NOT EXISTS (SELECT 1 FROM answers a WHERE a.user_id = c.user_id AND (a.answered_at AT TIME ZONE c.tz)::date = c.local_now::date)
+      AND EXISTS (SELECT 1 FROM push_tokens pt WHERE pt.user_id = c.user_id AND pt.permission IS DISTINCT FROM 'denied')
+      AND NOT EXISTS (
+        SELECT 1 FROM push_log p WHERE p.user_id = c.user_id AND p.type = 'onboarding_day2'
+          AND p.status NOT IN ('dry_run', 'paused', 'failed')
+      )
+  `;
+  const items = [
+    ...firstLesson.map((r) => ({ userId: r.user_id, type: 'onboarding_first_lesson', data: { count: r.count, set: r.set_title } })),
+    ...day2.filter((r) => r.count > 0).map((r) => ({ userId: r.user_id, type: 'onboarding_day2', data: { count: r.count } })),
+  ];
+  const { sent, report } = await sendEach(sql, items, { dryRun });
+  return { onboardingCandidates: items.length, onboardingSent: sent, ...(dryRun ? { onboardingReport: report } : null) };
 }
 
 /** Кандидаты этого 15-минутного слота — одним запросом вместо 2–4 на человека */
@@ -245,6 +363,8 @@ export async function runArbiter(sql, { dryRun = false } = {}) {
   const startedAt = Date.now();
   const deferred = dryRun ? { deferred: 0, deferredSent: 0 } : await sendDeferred(sql);
   const classPrep = await sendClassPrep(sql, { dryRun });
+  // Новичков — до основной рассылки: их пуш дня важнее общего напоминания
+  const onboarding = await sendOnboarding(sql, { dryRun });
   const candidates = await loadCandidates(sql);
   const sundayIds = candidates.filter((c) => c.dow === 'sun').map((c) => c.user_id);
   const ratings = await loadSundayRatings(sql, sundayIds);
@@ -415,6 +535,7 @@ export async function runArbiter(sql, { dryRun = false } = {}) {
     skipped: logRows.length,
     ...deferred,
     ...classPrep,
+    ...onboarding,
     ms: Date.now() - startedAt,
   };
   return dryRun ? { ...summary, dry_run: true, paused, report } : summary;

@@ -26,6 +26,12 @@ const DEFAULT_SEC_PER_WORD = 15;
 /** Ответ — не весь урок: переходы и чтение тоже занимают время, поэтому не меньше 4 и не больше 30 секунд */
 const MIN_SEC_PER_WORD = 4;
 const MAX_SEC_PER_WORD = 30;
+/** Новое слово дольше повторения: ~22 секунды (как estimateMinutes в LessonService) */
+const SEC_PER_NEW_WORD = 22;
+function newWordsMinutes(count) {
+  return Math.max(1, Math.round(((count || 0) * SEC_PER_NEW_WORD) / 60));
+}
+
 function minutesFor(count, secPerAnswer) {
   const sec = Number(secPerAnswer) > 0
     ? Math.min(MAX_SEC_PER_WORD, Math.max(MIN_SEC_PER_WORD, Number(secPerAnswer)))
@@ -157,6 +163,34 @@ export const PUSH_TYPES = {
       ({ longest }) => ({
         title: 'Вернись к учёбе',
         body: `Твой рекорд был ${longest} ${plural(longest, 'день', 'дня', 'дней')}. Начни новую серию!`,
+      }),
+    ],
+  },
+  // Онбординг (3.1): зарегистрировался, но урок не начат — через 3 часа (тихие часы — в 19:00)
+  onboarding_first_lesson: {
+    category: 'onboarding',
+    priority: 5,
+    transactional: false,
+    minIntervalDays: 0,
+    link: LESSON_LINK,
+    variants: [
+      ({ data }) => ({
+        title: `Первый урок — ~${newWordsMinutes(data.count)} мин`,
+        body: `${data.count} ${plural(data.count, 'слово', 'слова', 'слов')} из «${data.set}» уже ${plural(data.count, 'готово', 'готовы', 'готовы')}`,
+      }),
+    ],
+  },
+  // Онбординг (3.1): первый урок был вчера, сегодня не учился — в час вчерашнего урока
+  onboarding_day2: {
+    category: 'onboarding',
+    priority: 5,
+    transactional: false,
+    minIntervalDays: 0,
+    link: LESSON_LINK,
+    variants: [
+      ({ data }) => ({
+        title: 'Повтори вчерашние слова',
+        body: `${data.count} ${plural(data.count, 'слово', 'слова', 'слов')} со вчерашнего урока пора повторить — так ${data.count === 1 ? 'оно запомнится' : 'они запомнятся'}`,
       }),
     ],
   },
