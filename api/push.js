@@ -6,9 +6,9 @@
  * GET  /api/push?action=settings        – get notif settings
  * POST /api/push?action=settings        – save notif settings
  * POST /api/push?action=notify          – send FCM push (server-to-server)
- * POST /api/push?action=cron-streak     – streak reminder cron
- * POST /api/push?action=cron-reactivation – reactivation cron
- * GET|POST /api/push?action=cron-reminders – hourly: one daily reminder per user at their notif_hour
+ * POST /api/push?action=cron-streak     – устарела (Push 0.2): ничего не шлёт, логика в cron-reminders
+ * POST /api/push?action=cron-reactivation – устарела (Push 0.2): ничего не шлёт, логика в cron-reminders
+ * GET|POST /api/push?action=cron-reminders – cron-job.org каждые 15 мин: одно напоминание в день в notif_hour:notif_minute
  * GET  /api/push?action=rewards           – diamond balance + challenges claimed today
  * POST /api/push?action=claim-reward      – claim daily challenge reward (once per day)
  */
@@ -89,9 +89,11 @@ function buildMessage(type, name, streak, longest, data = {}) {
 }
 
 /**
- * Одно напоминание в день в час, выбранный пользователем (notif_hour, notif_days), только с 8 до 21.
+ * Одно напоминание в день во время, выбранное пользователем (notif_hour:notif_minute), только с 8 до 21.
+ * cron-job.org вызывает каждые 15 минут. Берём тех, у кого сейчас нужный час и минута уже наступила:
+ * пропущенный запуск в :00 подхватит запуск в :15. Второго пуша не будет — last_reminder_date.
  * Приоритет: воскресенье — место в рейтинге; понедельник — итоги недели; иначе, если повторение
- * дня ещё не сделано, — угасающие слова, слова к повторению, серия.
+ * дня ещё не сделано, — угасающие слова, слова к повторению, возврат (3 и 7 дней), серия.
  */
 async function sendDailyReminders(sql) {
   const users = await sql`
@@ -99,11 +101,13 @@ async function sendDailyReminders(sql) {
            COALESCE(us.timezone, 'Asia/Bishkek') AS tz,
            us.last_active_date = (NOW() AT TIME ZONE COALESCE(us.timezone, 'Asia/Bishkek'))::date AS done_today,
            to_char(NOW() AT TIME ZONE COALESCE(us.timezone, 'Asia/Bishkek'), 'dy') AS dow,
-           (NOW() AT TIME ZONE COALESCE(us.timezone, 'Asia/Bishkek'))::date::text AS local_today
+           (NOW() AT TIME ZONE COALESCE(us.timezone, 'Asia/Bishkek'))::date::text AS local_today,
+           (NOW() AT TIME ZONE COALESCE(us.timezone, 'Asia/Bishkek'))::date - us.last_active_date AS days_away
     FROM user_stats us
     WHERE us.notif_enabled = true
       AND us.notif_hour BETWEEN 8 AND 21
       AND EXTRACT(HOUR FROM NOW() AT TIME ZONE COALESCE(us.timezone, 'Asia/Bishkek'))::int = us.notif_hour
+      AND EXTRACT(MINUTE FROM NOW() AT TIME ZONE COALESCE(us.timezone, 'Asia/Bishkek'))::int >= COALESCE(us.notif_minute, 0)
       AND (us.last_reminder_date IS NULL
            OR us.last_reminder_date < (NOW() AT TIME ZONE COALESCE(us.timezone, 'Asia/Bishkek'))::date)
       AND EXISTS (SELECT 1 FROM push_tokens pt WHERE pt.user_id = us.user_id)
@@ -168,6 +172,9 @@ async function pickReminder(sql, u, standingsCache) {
   `;
   if (counts.fading > 0) return { type: 'words_fading', data: { count: counts.fading } };
   if (counts.waiting > 0) return { type: 'review_due', data: { count: Math.min(counts.waiting, 30) } };
+  // Бывший cron-reactivation: теперь в привычное время и по поясу пользователя, а не по UTC
+  if (u.days_away === 3) return { type: 'reactivation_3d', data: {} };
+  if (u.days_away === 7) return { type: 'reactivation_7d', data: {} };
   if (u.current_streak > 0 && u.notif_streak) return { type: 'streak_reminder', data: {} };
   return null;
 }
@@ -318,80 +325,22 @@ export default async function handler(req, res) {
       return res.status(200).json(result);
     }
 
-    // ── cron-streak ────────────────────────────────────────────
-    if (action === 'cron-streak' && req.method === 'POST') {
+    // ── cron-streak, cron-reactivation: устарели (Push 0.2) ──
+    // Считали день по UTC и могли прислать второй пуш в тот же день. Их логика теперь в cron-reminders.
+    // Action не удаляем (Release 2): старый планировщик получит 200 и ничего не разошлёт.
+    if ((action === 'cron-streak' || action === 'cron-reactivation') && req.method === 'POST') {
       if (!hasBearerSecret(req, process.env.CRON_SECRET)) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
-      const users = await sql`
-        SELECT DISTINCT us.user_id FROM user_stats us
-        JOIN push_tokens pt ON pt.user_id = us.user_id
-        WHERE us.notif_enabled = true AND us.notif_streak = true
-          AND us.current_streak > 0 AND us.last_active_date < CURRENT_DATE
-          AND (us.last_reminder_date IS NULL OR us.last_reminder_date < CURRENT_DATE)
-      `;
-      const baseUrl = `https://${req.headers.host}`;
-      let sent = 0;
-      for (const user of users) {
-        try {
-          await fetch(`${baseUrl}/api/push?action=notify`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.NOTIFY_SECRET}` },
-            body: JSON.stringify({ userId: user.user_id, type: 'streak_reminder' }),
-          });
-          await sql`UPDATE user_stats SET last_reminder_date = CURRENT_DATE WHERE user_id = ${user.user_id}`;
-          sent++;
-        } catch (e) {
-          console.error(`[cron-streak] Failed for ${user.user_id}:`, e);
-        }
-      }
-      return res.status(200).json({ ok: true, total: users.length, sent });
+      return res.status(200).json({ ok: true, deprecated: true, sent: 0 });
     }
 
-    // ── cron-reminders: раз в час, пуш в выбранный пользователем час (план §3.6) ──
+    // ── cron-reminders: cron-job.org каждые 15 мин, пуш в выбранное пользователем время ──
     if (action === 'cron-reminders' && (req.method === 'POST' || req.method === 'GET')) {
       if (!hasBearerSecret(req, process.env.CRON_SECRET)) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
       return res.status(200).json(await sendDailyReminders(sql));
-    }
-
-    // ── cron-reactivation ──────────────────────────────────────
-    if (action === 'cron-reactivation' && req.method === 'POST') {
-      if (!hasBearerSecret(req, process.env.CRON_SECRET)) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-      const users3d = await sql`
-        SELECT DISTINCT us.user_id FROM user_stats us JOIN push_tokens pt ON pt.user_id = us.user_id
-        WHERE us.notif_enabled = true AND us.last_active_date = CURRENT_DATE - INTERVAL '3 days'
-      `;
-      const users7d = await sql`
-        SELECT DISTINCT us.user_id FROM user_stats us JOIN push_tokens pt ON pt.user_id = us.user_id
-        WHERE us.notif_enabled = true AND us.last_active_date = CURRENT_DATE - INTERVAL '7 days'
-      `;
-      const baseUrl = `https://${req.headers.host}`;
-      let sent = 0;
-      for (const user of users3d) {
-        try {
-          await fetch(`${baseUrl}/api/push?action=notify`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.NOTIFY_SECRET}` },
-            body: JSON.stringify({ userId: user.user_id, type: 'reactivation_3d' }),
-          });
-          sent++;
-        } catch (e) { console.error(`[cron-reactivation] 3d failed:`, e); }
-      }
-      for (const user of users7d) {
-        try {
-          await fetch(`${baseUrl}/api/push?action=notify`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.NOTIFY_SECRET}` },
-            body: JSON.stringify({ userId: user.user_id, type: 'reactivation_7d' }),
-          });
-          sent++;
-        } catch (e) { console.error(`[cron-reactivation] 7d failed:`, e); }
-      }
-      return res.status(200).json({ ok: true, users3d: users3d.length, users7d: users7d.length, sent });
     }
 
     // ── rewards: баланс алмазов + какие челленджи уже забраны сегодня ──
