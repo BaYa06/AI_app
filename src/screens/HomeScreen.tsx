@@ -2,7 +2,7 @@
  * Home Screen - Flashly Design
  * @description Главный экран с новым дизайном
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -11,7 +11,6 @@ import {
   Text as RNText,
   Platform,
 } from 'react-native';
-import { useIsFocused } from '@react-navigation/native';
 import {
   School,
   Search,
@@ -22,10 +21,7 @@ import {
   CheckCircle2,
   AlertCircle,
 } from '@/components/common/Icons';
-import { NotificationPrompt } from '@/components/common/NotificationPrompt';
 import { useSetsStore, useSettingsStore } from '@/store';
-import { getPushStatus } from '@/services/pushNotifications';
-import { StorageService } from '@/services/StorageService';
 import { spacing, borderRadius, getDeckAccentColor } from '@/constants';
 import type { MainTabScreenProps } from '@/types/navigation';
 import type { CardSet } from '@/types';
@@ -42,35 +38,6 @@ export function HomeScreen({ navigation }: Props) {
   const todayStats = useSettingsStore((s) => s.todayStats);
   const sets = useSetsStore((s) => s.getAllSets());
   const [activeCourse, setActiveCourse] = useState<string>('all');
-  const [showNotifPrompt, setShowNotifPrompt] = useState(false);
-  const isFocused = useIsFocused();
-  const promptChecked = useRef(false);
-
-  // Show notification prompt 2s after HomeScreen is focused (once)
-  useEffect(() => {
-    if (!isFocused || promptChecked.current) return;
-    promptChecked.current = true;
-
-    const timer = setTimeout(async () => {
-      // Already shown before?
-      if (StorageService.getString('notification_prompt_shown')) return;
-
-      // On web, if user already denied via browser — don't show
-      if (Platform.OS === 'web' && typeof Notification !== 'undefined' && Notification.permission === 'denied') return;
-
-      const status = await getPushStatus();
-      // Only show if permission hasn't been decided yet
-      if (status.permission === 'default') {
-        setShowNotifPrompt(true);
-      }
-    }, 2000);
-
-    return () => clearTimeout(timer);
-  }, [isFocused]);
-
-  const handleNotifDismiss = useCallback(() => {
-    setShowNotifPrompt(false);
-  }, []);
 
   const toTitleCase = (value: string) =>
     value
@@ -441,7 +408,6 @@ export function HomeScreen({ navigation }: Props) {
       </Pressable>
 
       {/* Notification permission prompt (one-time) */}
-      <NotificationPrompt visible={showNotifPrompt} onDismiss={handleNotifDismiss} />
     </View>
   );
 }

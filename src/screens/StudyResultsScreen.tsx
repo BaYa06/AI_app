@@ -3,13 +3,16 @@
  * @description Экран результатов тренировки после завершения изучения карточек
  */
 import React from 'react';
-import { View, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { View, StyleSheet, Pressable, ScrollView, Platform } from 'react-native';
 import { useThemeColors } from '@/store';
 import { Text, StreakCelebrationModal } from '@/components/common';
 import { Analytics } from '@/services/analytics';
 import { currentPushOrigin, reportPushLesson } from '@/services/pushOpens';
 import { recordSessionForRatingPrompt, markRatingPromptShown } from '@/services/feedback';
 import { RatingPromptModal } from '@/components/RatingPromptModal';
+import { PushPreprompt, type PushPrepromptResult } from '@/components/push/PushPreprompt';
+import { getPushStatus, isPushSupported } from '@/services/pushNotifications';
+import { loadPushPromptState, markPushPromptShown, savePushPromptState, shouldShowPushPrompt } from '@/services/pushPrompt';
 import { spacing, borderRadius, heights, iconSize, screenPadding, alpha } from '@/constants';
 import { pluralize } from '@/utils';
 import { nextLessonStep, nextLessonLabel } from '@/services/lessonFlow';
@@ -83,6 +86,33 @@ export function StudyResultsScreen({ navigation, route }: Props) {
     const cards = useCardsStore.getState().cards;
     return !nextLessonStep(lesson, (id) => cards[id]?.setId);
   }, []);
+
+  // Лист «Напомнить завтра?» (plan/push_notifications.md, 1.2): на итогах урока дня, если разрешение
+  // ещё не спрашивали. Ждём, пока закроется празднование серии, — два окна подряд не показываем.
+  const [pushPromptReady, setPushPromptReady] = React.useState(false);
+  const [pushPromptDone, setPushPromptDone] = React.useState(false);
+  React.useEffect(() => {
+    if (!isLessonEnd || Platform.OS === 'web') return;
+    let cancelled = false;
+    (async () => {
+      const today = localDay();
+      const state = loadPushPromptState();
+      const [supported, status] = await Promise.all([isPushSupported(), getPushStatus()]);
+      if (cancelled || !shouldShowPushPrompt(state, today, { supported, permission: status.permission })) return;
+      savePushPromptState(markPushPromptShown(state, today));
+      Analytics.pushPrepromptShown({ attempt: state.shownDays.length + 1, trigger: 'lesson_completed' });
+      setPushPromptReady(true);
+    })().catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isLessonEnd]);
+  const showPushPrompt = pushPromptReady && !pushPromptDone && !showStreakModal;
+  const lessonWordCount = lesson ? (lesson.reviewCount ?? 0) + lesson.newIds.length : 0;
+  const handlePushPromptClose = React.useCallback((result: PushPrepromptResult) => {
+    setPushPromptDone(true);
+    if (result === 'custom') navigation.navigate('NotificationSettings');
+  }, [navigation]);
 
   // Подсказка о виджете на экране блокировки (plan/widgets.md, 3.1): день с пройденным уроком
   // запоминаем всегда, а карточку показываем по правилам services/widgetPrompt.ts
@@ -510,10 +540,12 @@ export function StudyResultsScreen({ navigation, route }: Props) {
         streakCount={newStreakCount ?? 0}
         onClose={() => setShowStreakModal(false)}
       />
+      {/* Окно оценки и лист о напоминаниях одновременно не показываем — напоминание важнее */}
       <RatingPromptModal
-        visible={showRatingPrompt}
+        visible={showRatingPrompt && !pushPromptReady}
         onClose={() => setShowRatingPrompt(false)}
       />
+      <PushPreprompt visible={showPushPrompt} wordCount={lessonWordCount} onClose={handlePushPromptClose} />
     </View>
   );
 }

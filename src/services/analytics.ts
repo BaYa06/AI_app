@@ -427,6 +427,19 @@ export const Analytics = {
     log('push_permission_denied'),
 
   /**
+   * Лист «Напомнить завтра?» на итогах урока (plan/push_notifications.md, 1.2) — воронка разрешения:
+   * shown → accepted / later → push_permission_granted / denied.
+   */
+  pushPrepromptShown: (params: { attempt: number; trigger: string }) =>
+    log('push_preprompt_shown', { attempt: params.attempt, trigger: params.trigger }),
+
+  pushPrepromptAccepted: (hour: number | 'custom') =>
+    log('push_preprompt_accepted', { hour: String(hour) }),
+
+  pushPrepromptLater: () =>
+    log('push_preprompt_later'),
+
+  /**
    * Юзер открыл приложение тапом по push-уведомлению (plan/push_notifications.md, 0.5).
    * type — тип из реестра на сервере (review_due, teacher_review…), push_id — строка push_log.
    */
