@@ -173,6 +173,7 @@
 
 - [x] **0.1 Закрыть ручки без авторизации** — `api/push.js`
   - Сделано: `settings` с JWT — только свои настройки; `get-by-user` удалена (клиент не вызывал); `subscribe` берёт `userId` только из JWT, без входа токен ничей; `unsubscribe` удаляет только свой или ничей токен; секреты — `hasBearerSecret` в `api/_auth.js` (постоянное время, незаданный секрет не пускает), то же в `progress.js?action=close-week`.
+  - `NOTIFY_SECRET` в Vercel не задан (14.10.2026): `notify` пропускал заголовок `Bearer undefined`, то есть любой мог отправить пуш любому. Теперь ручка закрыта, а `data.js` (серия прервалась, рекорд серии) шлёт через `sendNotification` напрямую, как `teacher.js`. Секрет не нужен.
   - **Переходный режим:** сборки до 1.5.8 шлют `settings` без JWT. По правилу Release 2 их не ломаем: запрос без заголовка `Authorization` пока принимает `userId` (в логах `[push] settings без JWT`). Закрыть полностью вместе с minVersion (Release 5).
   - `settings` (GET и POST) берёт `userId` из запроса: **сейчас кто угодно может прочитать или выключить уведомления любого пользователя**, зная его id. Перевести на `getAuthedUserId(req)`, `userId` из тела и query игнорировать. Клиент `NotificationSettingsScreen.tsx:64` и `:121` сейчас шлёт `userId` без JWT: добавить заголовок `Authorization` (как `authHeaders()` в `pushNotifications.native.ts`).
   - `get-by-user` **отдаёт FCM-токены любого пользователя без проверки**. Клиент её не вызывает (проверено 06.10.2026) — удалить.

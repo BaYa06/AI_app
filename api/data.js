@@ -385,15 +385,15 @@ async function upsertDailyActivity(sql, me, p) {
   return true;
 }
 
-/** Пуш пользователю через api/push.js?action=notify (NOTIFY_SECRET есть только на сервере). */
-async function sendPush(userId, type, data = {}) {
-  const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://ai-app-seven-zeta.vercel.app';
+/**
+ * Пуш пользователю напрямую через sendNotification (как teacher.js), без HTTP и NOTIFY_SECRET.
+ * push.js подгружаем лениво: firebase-admin нужен редко и не должен замедлять холодный старт data.js.
+ * Ошибка пуша не должна ломать сохранение прогресса.
+ */
+async function sendPush(sql, userId, type, data = {}) {
   try {
-    await fetch(`${base}/api/push?action=notify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.NOTIFY_SECRET}` },
-      body: JSON.stringify({ userId, type, data }),
-    });
+    const { sendNotification } = await import('./push.js');
+    await sendNotification(sql, userId, type, data);
   } catch (e) {
     console.error(`[data] push ${type} failed:`, e);
   }
@@ -454,7 +454,7 @@ async function updateUserStatsStreak(sql, me, p) {
     currentStreak += 1;
   } else {
     currentStreak = 1;
-    if (existing.length > 0 && prevStreak > 1) await sendPush(me, 'streak_lost', { prevStreak });
+    if (existing.length > 0 && prevStreak > 1) await sendPush(sql, me, 'streak_lost', { prevStreak });
   }
   if (currentStreak > longestStreak) longestStreak = currentStreak;
 
@@ -475,7 +475,7 @@ async function updateUserStatsStreak(sql, me, p) {
   const increased = lastActive !== today;
   // Раньше этот пуш слал клиент с секретом, которого в сборке не было, — он не работал
   if (increased && STREAK_MILESTONES.includes(currentStreak)) {
-    await sendPush(me, 'streak_milestone', { days: currentStreak });
+    await sendPush(sql, me, 'streak_milestone', { days: currentStreak });
   }
   return { counted: true, increased, currentStreak, longestStreak, ...day };
 }

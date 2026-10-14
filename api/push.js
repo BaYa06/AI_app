@@ -5,7 +5,8 @@
  * POST /api/push?action=unsubscribe     – remove FCM token
  * GET  /api/push?action=settings        – get notif settings
  * POST /api/push?action=settings        – save notif settings
- * POST /api/push?action=notify          – send FCM push (server-to-server)
+ * POST /api/push?action=notify          – send FCM push (server-to-server). Нужен NOTIFY_SECRET; не задан — ручка закрыта.
+ *        Внутри сервера пуши шлются напрямую через sendNotification (teacher.js, data.js).
  * POST /api/push?action=cron-streak     – устарела (Push 0.2): ничего не шлёт, логика в cron-reminders
  * POST /api/push?action=cron-reactivation – устарела (Push 0.2): ничего не шлёт, логика в cron-reminders
  * GET|POST /api/push?action=cron-reminders – cron-job.org каждые 15 мин: одно напоминание в день в notif_hour:notif_minute
