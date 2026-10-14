@@ -21,6 +21,8 @@ export interface PushStatus {
   isSupported: boolean;
   /** Ошибка, если была */
   error?: string;
+  /** Тихие уведомления iOS (4.3) — только в нативном приложении */
+  provisional?: boolean;
 }
 
 export type ForegroundMessageHandler = (payload: {
@@ -294,6 +296,11 @@ export async function getInitialPushData(): Promise<Record<string, string> | nul
   const query = params.toString();
   window.history.replaceState(window.history.state, '', `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`);
   return { push_id: pushId, type };
+}
+
+/** Тихих уведомлений (provisional) в вебе нет — эксперимент 4.3 только для iOS */
+export async function requestProvisionalPermission(_userId?: string | null): Promise<PushStatus> {
+  return getPushStatus();
 }
 
 /** В вебе отозванное разрешение делает токен недействительным — сервер удалит его при отправке */

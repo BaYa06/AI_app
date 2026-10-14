@@ -98,7 +98,9 @@ export function StudyResultsScreen({ navigation, route }: Props) {
       const today = localDay();
       const state = loadPushPromptState();
       const [supported, status] = await Promise.all([isPushSupported(), getPushStatus()]);
-      if (cancelled || !shouldShowPushPrompt(state, today, { supported, permission: status.permission })) return;
+      // Тихие уведомления (4.3) — разрешение есть, но баннеров нет: лист предлагает полное
+      const permission = status.provisional ? 'default' : status.permission;
+      if (cancelled || !shouldShowPushPrompt(state, today, { supported, permission })) return;
       savePushPromptState(markPushPromptShown(state, today));
       Analytics.pushPrepromptShown({ attempt: state.shownDays.length + 1, trigger: 'lesson_completed' });
       setPushPromptReady(true);

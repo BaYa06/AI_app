@@ -35,6 +35,8 @@ export interface PushStatus {
   isSupported: boolean;
   /** Ошибка, если была */
   error?: string;
+  /** Тихие уведомления iOS (provisional, 4.3): разрешение есть, но баннеров и звука нет — стоит предложить полное */
+  provisional?: boolean;
 }
 
 export type ForegroundMessageHandler = (payload: {
@@ -115,6 +117,26 @@ export async function requestPushPermission(userId?: string | null): Promise<Pus
     return { permission, token, isSupported: true };
   } catch (error: any) {
     console.error('[Push] requestPushPermission failed:', error);
+    return { permission: 'default', token: null, isSupported: true, error: error?.message || 'Unknown error' };
+  }
+}
+
+/**
+ * Тихие уведомления iOS (plan/push_notifications.md, 4.3): разрешение без системного диалога —
+ * пуши приходят только в Центр уведомлений. Полное разрешение потом просит лист после урока (1.2).
+ */
+export async function requestProvisionalPermission(userId?: string | null): Promise<PushStatus> {
+  if (!IS_SUPPORTED) {
+    return { permission: 'unsupported', token: null, isSupported: false };
+  }
+  try {
+    const status = await requestPermission(messaging(), { provisional: true });
+    const permission = toPermission(status);
+    if (permission !== 'granted') return { permission, token: null, isSupported: true };
+    const token = await registerToken(userId);
+    return { permission, token, isSupported: true, provisional: status === AuthorizationStatus.PROVISIONAL };
+  } catch (error: any) {
+    console.error('[Push] requestProvisionalPermission failed:', error);
     return { permission: 'default', token: null, isSupported: true, error: error?.message || 'Unknown error' };
   }
 }
@@ -218,9 +240,10 @@ export async function getPushStatus(): Promise<PushStatus> {
     return { permission: 'unsupported', token: null, isSupported: false };
   }
   try {
-    const permission = toPermission(await hasPermission(messaging()));
+    const status = await hasPermission(messaging());
+    const permission = toPermission(status);
     const token = permission === 'granted' ? currentToken ?? (await getToken(messaging())) : null;
-    return { permission, token, isSupported: true };
+    return { permission, token, isSupported: true, provisional: status === AuthorizationStatus.PROVISIONAL };
   } catch {
     return { permission: 'default', token: null, isSupported: true };
   }

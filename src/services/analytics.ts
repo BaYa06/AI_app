@@ -85,6 +85,20 @@ export function setActivitySegmentProperty(segment: string) {
   sendUserProperties({ activity_segment: segment });
 }
 
+/**
+ * Эксперимент 4.3: как просим разрешение у новых пользователей iOS. preprompt — только лист после
+ * первого урока (вариант B); provisional — тихие уведомления сразу после онбординга + тот же лист (C).
+ * Половина на половину по первым 7 hex-символам UUID (не те, что у контрольной группы).
+ */
+export function pushPermissionFlowFor(userId: string): 'provisional' | 'preprompt' {
+  const n = parseInt(userId.replace(/-/g, '').slice(0, 7), 16);
+  return Number.isFinite(n) && n % 2 === 1 ? 'provisional' : 'preprompt';
+}
+
+export function setPushPermissionFlowProperty(userId: string) {
+  sendUserProperties({ push_permission_flow: pushPermissionFlowFor(userId) });
+}
+
 export function setPushGroupProperty(userId: string) {
   sendUserProperties({ push_group: pushGroupFor(userId) });
 }

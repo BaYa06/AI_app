@@ -23,4 +23,4 @@ export type { PushStatus, ForegroundMessageHandler } from './pushNotifications';
 export { LibraryService } from './LibraryService';
 export { BookService } from './BookService';
 export { SyncQueueService } from './SyncQueueService';
-export { Analytics, setAnalyticsUserProperties, setPushGroupProperty } from './analytics';
+export { Analytics, setAnalyticsUserProperties, setPushGroupProperty, setPushPermissionFlowProperty, pushPermissionFlowFor } from './analytics';

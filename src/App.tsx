@@ -11,7 +11,7 @@ import { LoadingSplash } from '@/components/common';
 import { ToastHost } from '@/components/ui/Toast';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { StagingBadge } from '@/components/common/StagingBadge';
-import { DatabaseService, setupAutoSave, supabase, NeonService, setAnalyticsUserId, SyncQueueService, Analytics, setAnalyticsUserProperties, setPushGroupProperty } from '@/services';
+import { DatabaseService, setupAutoSave, supabase, NeonService, setAnalyticsUserId, SyncQueueService, Analytics, setAnalyticsUserProperties, setPushGroupProperty, setPushPermissionFlowProperty, pushPermissionFlowFor } from '@/services';
 import { isWidgetUrl, parseWidgetUrl } from '@/services/widgetLinks';
 import { resetWidget } from '@/services/WidgetService';
 import { isAppleUser, takeAppleSignInName } from '@/services/appleSignInName';
@@ -19,7 +19,7 @@ import { useCourseRealtime } from '@/hooks/useCourseRealtime';
 import { StorageService } from '@/services/StorageService';
 import { CACHE_OWNER_KEY } from '@/services/DatabaseService';
 import { initCrashReporting, setCrashUserId } from '@/services/crashReporting';
-import { refreshPushToken, subscribeForegroundMessages, requestPushPermission, isPushSupported, syncPushPermission } from '@/services/pushNotifications';
+import { refreshPushToken, subscribeForegroundMessages, requestPushPermission, isPushSupported, syncPushPermission, requestProvisionalPermission } from '@/services/pushNotifications';
 import { useThemeColors } from '@/store';
 import { X } from 'lucide-react-native';
 import { Text as ThemedText } from '@/components/common/Text';
@@ -795,6 +795,15 @@ export default function App() {
       has_completed_onboarding: true,
     });
     if (currentUserId) setPushGroupProperty(currentUserId);
+    // Эксперимент 4.3: половине новых учеников на iOS — тихие уведомления сразу, без диалога
+    if (currentUserId && finalData.role !== 'teacher' && Platform.OS === 'ios') {
+      setPushPermissionFlowProperty(currentUserId);
+      if (pushPermissionFlowFor(currentUserId) === 'provisional') {
+        pushedTokenForUserRef.current = currentUserId;
+        requestProvisionalPermission(currentUserId).catch(() => {});
+        return;
+      }
+    }
     if (currentUserId && pushedTokenForUserRef.current !== currentUserId) {
       pushedTokenForUserRef.current = currentUserId;
       refreshPushToken(currentUserId).catch(() => {});
