@@ -266,10 +266,16 @@ export async function sendNotification(sql, userId, type, data = {}, { dryRun = 
   const pushId = randomUUID();
   const log = (status, extra = {}) => logPush(sql, { id: pushId, userId, type, status, data, ...extra });
 
-  const tokenRows = await sql`SELECT token FROM push_tokens WHERE user_id = ${userId}`;
-  if (tokenRows.length === 0) {
+  const allTokens = await sql`SELECT token, permission FROM push_tokens WHERE user_id = ${userId}`;
+  if (allTokens.length === 0) {
     await log('no_token');
     return { ok: false, push_id: pushId, reason: 'no token' };
+  }
+  // Выключил уведомления в iOS (шаг 1.4) — на это устройство не шлём
+  const tokenRows = allTokens.filter((r) => r.permission !== 'denied');
+  if (tokenRows.length === 0) {
+    await log('denied');
+    return { ok: false, push_id: pushId, reason: 'permission denied' };
   }
 
   const [user] = await sql`
@@ -340,6 +346,8 @@ export default async function handler(req, res) {
     // ── subscribe ──────────────────────────────────────────────
     if (action === 'subscribe' && req.method === 'POST') {
       const { token, platform, userId: bodyUserId } = req.body || {};
+      // Разрешение на устройстве (шаг 1.4). Старые сборки не шлют — оставляем прежнее значение.
+      const permission = ['granted', 'provisional', 'denied'].includes(req.body?.permission) ? req.body.permission : null;
       if (!token || typeof token !== 'string') {
         return res.status(400).json({ error: 'Missing or invalid token' });
       }
@@ -352,11 +360,12 @@ export default async function handler(req, res) {
       }
       if (!userId && bodyUserId) console.warn('[push] subscribe: userId без JWT проигнорирован');
       await sql`
-        INSERT INTO push_tokens (token, user_id, platform, updated_at)
-        VALUES (${token}, ${userId || null}, ${platform || 'web'}, NOW())
+        INSERT INTO push_tokens (token, user_id, platform, permission, updated_at)
+        VALUES (${token}, ${userId || null}, ${platform || 'web'}, ${permission}, NOW())
         ON CONFLICT (token) DO UPDATE SET
           user_id    = EXCLUDED.user_id,
           platform   = EXCLUDED.platform,
+          permission = COALESCE(EXCLUDED.permission, push_tokens.permission),
           updated_at = NOW()
       `;
       return res.status(200).json({ ok: true });

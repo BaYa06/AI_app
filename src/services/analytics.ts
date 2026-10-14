@@ -426,6 +426,10 @@ export const Analytics = {
   pushPermissionDenied: () =>
     log('push_permission_denied'),
 
+  /** Было разрешено, а при открытии приложения уже запрещено в настройках iOS (1.4) — отток канала */
+  pushPermissionRevoked: () =>
+    log('push_permission_revoked'),
+
   /**
    * Лист «Напомнить завтра?» на итогах урока (plan/push_notifications.md, 1.2) — воронка разрешения:
    * shown → accepted / later → push_permission_granted / denied.

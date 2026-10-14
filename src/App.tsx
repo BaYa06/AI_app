@@ -19,7 +19,7 @@ import { useCourseRealtime } from '@/hooks/useCourseRealtime';
 import { StorageService } from '@/services/StorageService';
 import { CACHE_OWNER_KEY } from '@/services/DatabaseService';
 import { initCrashReporting, setCrashUserId } from '@/services/crashReporting';
-import { refreshPushToken, subscribeForegroundMessages, requestPushPermission, isPushSupported } from '@/services/pushNotifications';
+import { refreshPushToken, subscribeForegroundMessages, requestPushPermission, isPushSupported, syncPushPermission } from '@/services/pushNotifications';
 import { useThemeColors } from '@/store';
 import { X } from 'lucide-react-native';
 import { Text as ThemedText } from '@/components/common/Text';
@@ -353,6 +353,16 @@ export default function App() {
       if (state !== 'active' || Date.now() - lastRefreshAt < 30_000) return;
       lastRefreshAt = Date.now();
       DatabaseService.syncStudentCourses();
+    });
+    return () => subscription.remove();
+  }, [currentUserId]);
+
+  // Разрешение на уведомления могли выключить или включить в настройках iOS, пока приложение было
+  // в фоне: сообщаем серверу при каждом возврате (plan/push_notifications.md, 1.4). Повторы отсекает сам сервис.
+  useEffect(() => {
+    if (!currentUserId || Platform.OS === 'web') return;
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') syncPushPermission();
     });
     return () => subscription.remove();
   }, [currentUserId]);

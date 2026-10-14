@@ -20,7 +20,7 @@
   - `npm run brand:check` — нарушений не больше, чем до шага (тексты пушей тоже на «ты» по брендбуку);
   - серверные изменения проверены вызовом ручки с `dry_run=1` (появляется в шаге 0.4);
   - долгие локальные сборки iOS не запускаем, проверяем через TestFlight.
-- Новые серверные модули пушей кладём в `api/push/` (там уже лежит `_push-store.js`, его удаляем в 0.3). Номера миграций: 024–025 заняты, пушам — 026 `push_log`, 027 `notif_days_custom`, 028 `user_habits`, 029 `push_views`. `api/push.js` не должен расти: в нём остаётся только маршрутизация.
+- Новые серверные модули пушей кладём в `api/push/` (там уже лежит `_push-store.js`, его удаляем в 0.3). Номера миграций: 024–025 заняты, пушам — 026 `push_log`, 027 `notif_days_custom`, 028 `push_tokens.permission`, 029 `user_habits`, 030 `push_views`. `api/push.js` не должен расти: в нём остаётся только маршрутизация.
 - Отмечать `[x]` по мере выполнения.
 
 ---
@@ -274,9 +274,11 @@
   - Сделано: на экране уведомлений при `denied` — карточка + «Открыть настройки iPhone» (`Linking.openSettings`), статус перечитывается при возврате в приложение. На главной под уроком дня — `PushStreakNudge`: серия ≥ 3, пушей нет, раз в 14 дней (`shouldShowStreakNudge`, тесты). При `denied` открывает настройки iPhone, если ещё не спрашивали — системный диалог. Событие `push_streak_nudge` (shown / tap / dismiss).
   - ⬜ Проверить на TestFlight: запретить уведомления в iOS → экран уведомлений показывает карточку → кнопка открывает настройки → после включения карточка исчезает.
 
-- [ ] **1.4 Статус разрешения на сервере** — `pushNotifications.native.ts`, `push_tokens`
+- [x] **1.4 Статус разрешения на сервере** — `pushNotifications.native.ts`, `push_tokens`
   - Колонка `push_tokens.permission` (`granted | provisional | denied`), обновляется при каждом открытии приложения. Отозвал в iOS → `denied` → cron его пропускает и пишет событие `push_permission_revoked`.
   - **Готово, когда:** выключение уведомлений в iOS отражается в `push_tokens` при следующем открытии.
+  - Сделано: миграция 028 (`permission`, NULL — неизвестно, старые сборки). `subscribe` принимает `permission`; `syncPushPermission` (нативный клиент) шлёт его при входе и при каждом возврате в приложение, повторы в пределах сессии не шлёт. `sendNotification` не шлёт на токены с `denied`; если других нет — строка `push_log` со статусом `denied`. Событие GA4 `push_permission_revoked` — когда было разрешено, а стало запрещено (сравнение с прошлым значением на устройстве).
+  - ⬜ Проверить на TestFlight: выключить уведомления в iOS → открыть приложение → в `push_tokens` у токена `denied`.
 
 ---
 
@@ -331,7 +333,7 @@
 | Возраст | вопрос | диапазон: до 13 / 13–17 / 18–24 / 25–34 / 35+, можно пропустить | до 18 — без рейтинга чужих имён и без вечерних пушей после 21:00 |
 | Занятия в центре | вопрос + учитель | «Хожу на курсы: пн, ср, пт в 18:00» или расписание курса | пуш «повтори перед занятием» за 1–2 ч до урока в центре |
 
-- [ ] **2.6 Таблица профиля** — `database/migrations/028_user_habits.sql`, `api/push/_habits.js`
+- [ ] **2.6 Таблица профиля** — `database/migrations/029_user_habits.sql`, `api/push/_habits.js`
   - `user_habits (user_id PK, usual_time TIME (кратно 15 мин), usual_days TEXT[], day_type, median_lesson_sec, favorite_mode, accuracy_14d, segment, updated_at)`.
   - Пересчёт раз в сутки в том же cron (ночью по поясу пользователя) одним SQL-запросом по `card_progress` и журналу уроков. Если журнала уроков на сервере нет, завести `lesson_log (user_id, started_at, completed_at, mode, cards, correct)`: клиент шлёт его вместе с синхронизацией прогресса.
   - Сегмент также отправляется в GA4 как свойство пользователя `activity_segment`, чтобы резать любые воронки по нему.
@@ -410,7 +412,7 @@
 
 ## Этап 5. Дашборд и ритуал
 
-- [ ] **5.1 SQL-представления** — `database/migrations/029_push_views.sql`
+- [ ] **5.1 SQL-представления** — `database/migrations/030_push_views.sql`
   - `push_funnel_daily`: по дню и типу — eligible, sent, delivered, opened, lesson_started, lesson_completed, конверсии.
   - `push_churn_weekly`: отключения категорий, `revoked`, `token_unregistered` на 1 000 получателей.
   - `push_holdout_retention`: D1 / D7 / D30 у групп `push` и `holdout` по когортам регистрации.

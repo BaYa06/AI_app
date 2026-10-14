@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS push_log (
   category            TEXT NOT NULL,          -- lesson | streak | course | rating | reactivation | onboarding
   variant             TEXT,                   -- вариант текста для A/B (этап 4)
   local_date          DATE NOT NULL,          -- день по поясу пользователя
-  status              TEXT NOT NULL,          -- sent | failed | no_token | disabled | quiet_hours | capped | backoff | holdout | dry_run | paused
+  status              TEXT NOT NULL,          -- sent | failed | no_token | denied | disabled | quiet_hours | capped | backoff | holdout | dry_run | paused
   tokens              INT DEFAULT 0,
   delivered           INT DEFAULT 0,          -- successCount от FCM
   payload             JSONB,                  -- числа из текста: count, streak, place…

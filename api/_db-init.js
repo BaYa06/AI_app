@@ -4,7 +4,7 @@ import { neon } from '@neondatabase/serverless';
  * Версия схемы: при добавлении миграции в applyMigrations увеличить (и дописать файл в
  * database/migrations). Пока в app_migrations есть отметка этой версии, миграции не выполняются.
  */
-const SCHEMA_VERSION = 'schema_027';
+const SCHEMA_VERSION = 'schema_028';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -379,6 +379,13 @@ async function applyMigrations(sql) {
     await sql`ALTER TABLE user_stats ALTER COLUMN notif_days SET DEFAULT 'mon,tue,wed,thu,fri,sat,sun'`;
   } catch (e) {
     console.error('Migration 027_notif_days_custom failed:', e);
+  }
+
+  // Migration 028: разрешение на уведомления на устройстве (план пушей, шаг 1.4). NULL — неизвестно.
+  try {
+    await sql`ALTER TABLE push_tokens ADD COLUMN IF NOT EXISTS permission TEXT`;
+  } catch (e) {
+    console.error('Migration 028_push_token_permission failed:', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)

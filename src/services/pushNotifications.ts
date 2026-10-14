@@ -296,6 +296,9 @@ export async function getInitialPushData(): Promise<Record<string, string> | nul
   return { push_id: pushId, type };
 }
 
+/** В вебе отозванное разрешение делает токен недействительным — сервер удалит его при отправке */
+export async function syncPushPermission(): Promise<void> {}
+
 /** В вебе тап по пушу перезагружает вкладку (sw.js → client.navigate), его ловит getInitialPushData */
 export function onPushOpened(_handler: (data: Record<string, string>) => void): () => void {
   return () => {};
