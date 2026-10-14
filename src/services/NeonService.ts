@@ -305,6 +305,9 @@ function mapMembershipSetRow(row: MembershipSetRow, courseId: string): CardSet {
   } as unknown as CardSet;
 }
 
+/** Занятие курса: день недели и время начала в поясе курса (2.8) */
+export type CourseScheduleItem = { day: string; time: string };
+
 /** Возраст диапазоном — точную дату рождения не спрашиваем (2.7) */
 export type AgeRange = 'under13' | '13-17' | '18-24' | '25-34' | '35+';
 
@@ -854,6 +857,18 @@ export const NeonService = {
       console.error('Progress API network error:', error);
       return null;
     }
+  },
+
+  /** Расписание занятий курса (plan/push_notifications.md, 2.8); null — не удалось загрузить */
+  async getCourseSchedule(courseId: string): Promise<CourseScheduleItem[] | null> {
+    const result = await callTeacherApi<{ schedule: CourseScheduleItem[] }>('get-schedule', { params: { courseId } });
+    return result.ok ? result.data.schedule : null;
+  },
+
+  /** Сохранить расписание; пустой список — убрать. Ученики получат «Скоро занятие» за 1–2 часа */
+  async setCourseSchedule(courseId: string, schedule: CourseScheduleItem[]): Promise<boolean> {
+    const result = await callTeacherApi('set-schedule', { method: 'POST', body: { courseId, schedule } });
+    return result.ok;
   },
 
   /**

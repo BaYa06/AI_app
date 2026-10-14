@@ -46,6 +46,20 @@ export const PUSH_TYPES = {
       }),
     ],
   },
+  // «Повтори перед занятием» (2.8): по расписанию курса от учителя или по занятиям из «о себе»
+  class_prep: {
+    category: 'course',
+    priority: 2,
+    transactional: false,
+    minIntervalDays: 0,
+    link: LESSON_LINK,
+    variants: [
+      ({ data }) => ({
+        title: data.course ? `Скоро занятие: «${data.course}»` : 'Скоро занятие',
+        body: `${data.inHours === 1 ? 'Через час' : 'Через 2 часа'} — повтори ${data.count} ${plural(data.count, 'слово', 'слова', 'слов')}${data.course ? ' курса' : ''} · ~${minutesFor(data.count)} мин`,
+      }),
+    ],
+  },
   rating_sunday: {
     category: 'rating',
     priority: 3,

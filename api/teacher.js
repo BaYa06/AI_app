@@ -56,6 +56,8 @@ export default async function handler(req, res) {
   try {
     if (action === 'delete-course')       return await deleteCourse(req, res, sql, userId);
     if (action === 'rename-course')       return await renameCourse(req, res, sql, userId);
+    if (action === 'get-schedule')        return await getSchedule(req, res, sql, userId);
+    if (action === 'set-schedule')        return await setSchedule(req, res, sql, userId);
     if (action === 'create-invite')       return await createInvite(req, res, sql, userId);
     if (action === 'regenerate-invite')   return await regenerateInvite(req, res, sql, userId);
     if (action === 'invite-info-by-code') return await inviteInfoByCode(req, res, sql, userId);
@@ -110,6 +112,50 @@ async function renameCourse(req, res, sql, userId) {
     return res.status(403).json({ error: 'Not found or not the owner' });
   }
   return res.status(200).json({ ok: true });
+}
+
+// ─── Расписание занятий (plan/push_notifications.md, 2.8) ────
+
+const SCHEDULE_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+/** [{ day, time: 'HH:MM' }] — только дни недели и время кратно 15 минутам, не больше одного занятия в день */
+function parseSchedule(value) {
+  if (!Array.isArray(value)) return null;
+  const byDay = new Map();
+  for (const item of value) {
+    const day = item?.day;
+    const m = typeof item?.time === 'string' ? item.time.match(/^(\d{1,2}):(\d{2})$/) : null;
+    if (!SCHEDULE_DAYS.includes(day) || !m) continue;
+    const h = Number(m[1]), min = Number(m[2]);
+    if (h > 23 || min > 59 || min % 15 !== 0) continue;
+    byDay.set(day, `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`);
+  }
+  const schedule = SCHEDULE_DAYS.filter((d) => byDay.has(d)).map((day) => ({ day, time: byDay.get(day) }));
+  return schedule.length ? schedule : null;
+}
+
+async function getSchedule(req, res, sql, userId) {
+  const courseId = req.query.courseId;
+  if (!courseId) return res.status(400).json({ error: 'courseId required' });
+  const rows = await sql`
+    SELECT schedule FROM courses WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid
+  `;
+  if (rows.length === 0) return res.status(403).json({ error: 'Not found or not the owner' });
+  return res.status(200).json({ schedule: rows[0].schedule || [] });
+}
+
+/** Учитель задаёт расписание один раз — ученики курса получают «Скоро занятие» без вопросов */
+async function setSchedule(req, res, sql, userId) {
+  const { courseId } = req.body || {};
+  if (!courseId) return res.status(400).json({ error: 'courseId required' });
+  const schedule = parseSchedule(req.body?.schedule);
+  const updated = await sql`
+    UPDATE courses SET schedule = ${schedule ? JSON.stringify(schedule) : null}::jsonb, updated_at = NOW()
+    WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid
+    RETURNING id
+  `;
+  if (updated.length === 0) return res.status(403).json({ error: 'Not found or not the owner' });
+  return res.status(200).json({ ok: true, schedule: schedule || [] });
 }
 
 // ─── Приглашения ────────────────────────────────────────────

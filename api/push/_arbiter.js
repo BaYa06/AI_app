@@ -13,6 +13,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { computeStandings } from '../progress.js';
+import { courseSetIdsSql } from '../_course.js';
 import { PUSH_TYPES, buildPush } from './_registry.js';
 import { decide } from './_decide.js';
 import {
@@ -45,6 +46,77 @@ async function sendDeferred(sql) {
     }
   }
   return { deferred: rows.length, deferredSent: sent };
+}
+
+/**
+ * «Скоро занятие» (2.8): за 1–2 часа до занятия по расписанию курса (учитель) или по своим занятиям
+ * из «о себе». Один раз в день; только с 8:00 до 21:45 по поясу; число слов, которые к занятию
+ * придёт время повторить (для курса — только слова курса). Нечего повторять — не шлём.
+ */
+async function sendClassPrep(sql, { dryRun }) {
+  const rows = await sql`
+    WITH slots AS (
+      SELECT cm.user_id, c.id AS course_id, c.title AS course, s.time::time AS class_time,
+             COALESCE(c.timezone, ts.timezone, ${DEFAULT_TZ}) AS tz
+      FROM courses c
+      LEFT JOIN user_stats ts ON ts.user_id = c.user_id
+      CROSS JOIN LATERAL jsonb_to_recordset(c.schedule) AS s(day text, time text)
+      JOIN course_members cm ON cm.course_id = c.id AND cm.role = 'student'
+      WHERE c.schedule IS NOT NULL
+        AND s.day = trim(to_char(NOW() AT TIME ZONE COALESCE(c.timezone, ts.timezone, ${DEFAULT_TZ}), 'dy'))
+      UNION ALL
+      SELECT u.id, NULL, NULL, make_time(u.class_hour, 0, 0), COALESCE(us.timezone, ${DEFAULT_TZ})
+      FROM users u JOIN user_stats us ON us.user_id = u.id
+      WHERE u.class_days IS NOT NULL AND u.class_hour IS NOT NULL
+        AND trim(to_char(NOW() AT TIME ZONE COALESCE(us.timezone, ${DEFAULT_TZ}), 'dy')) = ANY(u.class_days)
+    ),
+    timed AS (
+      SELECT sl.*, (NOW() AT TIME ZONE sl.tz)::time AS local_time FROM slots sl
+    )
+    SELECT DISTINCT ON (t.user_id) t.user_id, t.course_id, t.course,
+           EXTRACT(EPOCH FROM (t.class_time - t.local_time))::int / 60 AS minutes_left
+    FROM timed t
+    JOIN user_stats us ON us.user_id = t.user_id AND us.notif_enabled = true
+    WHERE t.local_time >= t.class_time - INTERVAL '2 hours'
+      AND t.local_time < t.class_time - INTERVAL '1 hour'
+      AND t.local_time >= make_time(${QUIET_TO_HOUR}, 0, 0)
+      AND t.local_time < make_time(${QUIET_FROM_HOUR}, 0, 0)
+      AND EXISTS (SELECT 1 FROM push_tokens pt WHERE pt.user_id = t.user_id AND pt.permission IS DISTINCT FROM 'denied')
+      AND NOT EXISTS (
+        SELECT 1 FROM push_log p
+        WHERE p.user_id = t.user_id AND p.type = 'class_prep'
+          AND p.local_date = (NOW() AT TIME ZONE COALESCE(us.timezone, ${DEFAULT_TZ}))::date
+          AND p.status NOT IN ('dry_run', 'paused', 'failed')
+      )
+    ORDER BY t.user_id, t.course_id NULLS LAST
+  `;
+  let sent = 0;
+  const report = [];
+  for (const r of rows) {
+    try {
+      const [{ n }] = r.course_id
+        ? await sql`
+            SELECT COUNT(*)::int AS n FROM card_progress cp JOIN cards ca ON ca.id = cp.card_id
+            WHERE cp.user_id = ${r.user_id} AND cp.learning_step >= 1 AND cp.next_review <= NOW() + INTERVAL '2 hours'
+              AND ca.set_id IN (${courseSetIdsSql(sql, r.course_id)})
+          `
+        : await sql`
+            SELECT COUNT(*)::int AS n FROM card_progress
+            WHERE user_id = ${r.user_id} AND learning_step >= 1 AND next_review <= NOW() + INTERVAL '2 hours'
+          `;
+      if (n === 0) {
+        if (dryRun) report.push({ user_id: r.user_id, type: 'class_prep', status: 'skip', reason: 'nothing_to_review' });
+        continue;
+      }
+      const data = { count: Math.min(n, 30), course: r.course || undefined, inHours: r.minutes_left >= 90 ? 2 : 1 };
+      const result = await sendNotification(sql, r.user_id, 'class_prep', data, { dryRun });
+      if (result.ok) sent++;
+      if (dryRun) report.push({ user_id: r.user_id, type: 'class_prep', status: result.reason || 'send', data, message: result.message || null });
+    } catch (e) {
+      console.error(`[arbiter] class_prep for ${r.user_id} failed:`, e);
+    }
+  }
+  return { classCandidates: rows.length, classSent: sent, ...(dryRun ? { classReport: report } : null) };
 }
 
 /** Кандидаты этого 15-минутного слота — одним запросом вместо 2–4 на человека */
@@ -148,6 +220,7 @@ async function insertLogRows(sql, rows) {
 export async function runArbiter(sql, { dryRun = false } = {}) {
   const startedAt = Date.now();
   const deferred = dryRun ? { deferred: 0, deferredSent: 0 } : await sendDeferred(sql);
+  const classPrep = await sendClassPrep(sql, { dryRun });
   const candidates = await loadCandidates(sql);
   const sundayIds = candidates.filter((c) => c.dow === 'sun').map((c) => c.user_id);
   const ratings = await loadSundayRatings(sql, sundayIds);
@@ -307,6 +380,7 @@ export async function runArbiter(sql, { dryRun = false } = {}) {
     sent,
     skipped: logRows.length,
     ...deferred,
+    ...classPrep,
     ms: Date.now() - startedAt,
   };
   return dryRun ? { ...summary, dry_run: true, paused, report } : summary;

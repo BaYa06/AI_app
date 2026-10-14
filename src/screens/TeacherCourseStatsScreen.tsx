@@ -13,7 +13,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, X, GraduationCap, FileText, Mic, Clock, AlertTriangle, BookOpen, Trophy, Flame } from 'lucide-react-native';
+import { ArrowLeft, X, GraduationCap, FileText, Mic, Clock, AlertTriangle, BookOpen, Trophy, Flame, CalendarClock } from 'lucide-react-native';
+import { CourseScheduleSheet } from '@/components/push/CourseScheduleSheet';
 import { Text } from '@/components/common';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha, iconSize } from '@/constants';
@@ -173,6 +174,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
 
   const [chartPeriod, setChartPeriod] = useState<'7d' | '30d'>('7d');
   const [lobbyModal, setLobbyModal] = useState(false);
+  const [scheduleSheet, setScheduleSheet] = useState(false);
   const [studentModal, setStudentModal] = useState<'active' | 'inactive' | null>(null);
   const [chartTooltip, setChartTooltip] = useState<{
     index: number;
@@ -405,6 +407,31 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
           </View>
           <Text style={[styles.testLobbyText, { color: colors.textPrimary }]}>
             Рейтинг недели
+          </Text>
+          <ArrowLeft
+            size={16}
+            color={colors.textSecondary}
+            style={{ transform: [{ rotate: '180deg' }] }}
+          />
+        </Pressable>
+
+        {/* Расписание занятий (plan/push_notifications.md, 2.8): ученикам — «Скоро занятие» за 1–2 часа */}
+        <Pressable accessibilityRole="button"
+          style={({ pressed }) => [
+            styles.testLobbyBtn,
+            {
+              backgroundColor: alpha(colors.primary, 10),
+              borderColor: alpha(colors.primary, 10),
+            },
+            pressed && { opacity: 0.75, transform: [{ scale: 0.985 }] },
+          ]}
+          onPress={() => setScheduleSheet(true)}
+        >
+          <View style={[styles.testLobbyIcon, { backgroundColor: colors.primaryFill }]}>
+            <CalendarClock size={18} color={colors.onPrimary} />
+          </View>
+          <Text style={[styles.testLobbyText, { color: colors.textPrimary }]}>
+            Расписание занятий
           </Text>
           <ArrowLeft
             size={16}
@@ -739,6 +766,12 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <CourseScheduleSheet
+        visible={scheduleSheet}
+        courseId={route.params.courseId}
+        onClose={() => setScheduleSheet(false)}
+      />
 
       {/* Test Lobby Bottom Sheet */}
       <Modal

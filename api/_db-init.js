@@ -4,7 +4,7 @@ import { neon } from '@neondatabase/serverless';
  * Версия схемы: при добавлении миграции в applyMigrations увеличить (и дописать файл в
  * database/migrations). Пока в app_migrations есть отметка этой версии, миграции не выполняются.
  */
-const SCHEMA_VERSION = 'schema_030';
+const SCHEMA_VERSION = 'schema_031';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -424,6 +424,13 @@ async function applyMigrations(sql) {
     await sql`ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS notif_use_habits BOOLEAN NOT NULL DEFAULT true`;
   } catch (e) {
     console.error('Migration 030_about_me failed:', e);
+  }
+
+  // Migration 031: расписание занятий курса (план пушей, шаг 2.8). Nullable.
+  try {
+    await sql`ALTER TABLE courses ADD COLUMN IF NOT EXISTS schedule JSONB`;
+  } catch (e) {
+    console.error('Migration 031_course_schedule failed:', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)
