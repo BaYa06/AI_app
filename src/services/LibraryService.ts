@@ -60,7 +60,7 @@ class LibraryServiceClass {
 
   /** Get library sets with filters */
   async getLibrarySets(filters: LibraryFilters, _userId?: string): Promise<LibraryListResponse> {
-    const { search, category, language, sort = 'popular', cardsMin, cardsMax, page = 1, curatedOnly } = filters;
+    const { search, category, language, sort = 'popular', cardsMin, cardsMax, page = 1 } = filters;
     return callLibraryApi<LibraryListResponse>({
       search,
       category,
@@ -69,7 +69,6 @@ class LibraryServiceClass {
       cardsMin,
       cardsMax,
       page,
-      curatedOnly: curatedOnly ? true : undefined,
     });
   }
 

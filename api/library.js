@@ -144,6 +144,7 @@ async function getLibrarySets(req, res, sql) {
   const params = [];
   let paramIndex = 1;
 
+  // curatedOnly шлют только старые сборки (до отказа от фильтра «подборки» на главной библиотеки).
   if (curatedOnly === 'true') {
     conditions.push(`ls.is_featured = true`);
   }

@@ -64,8 +64,6 @@ export interface LibraryFilters {
   cardsMin?: number;
   cardsMax?: number | null;
   page?: number;
-  /** Restrict results to team-curated sets (is_featured = true). Used for the default browse sections; omitted/false for search. */
-  curatedOnly?: boolean;
 }
 
 export interface LibraryListResponse {
