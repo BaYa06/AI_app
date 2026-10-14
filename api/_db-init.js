@@ -4,7 +4,7 @@ import { neon } from '@neondatabase/serverless';
  * Версия схемы: при добавлении миграции в applyMigrations увеличить (и дописать файл в
  * database/migrations). Пока в app_migrations есть отметка этой версии, миграции не выполняются.
  */
-const SCHEMA_VERSION = 'schema_028';
+const SCHEMA_VERSION = 'schema_029';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -393,6 +393,27 @@ async function applyMigrations(sql) {
     await sql`ALTER TABLE push_tokens ADD COLUMN IF NOT EXISTS permission TEXT`;
   } catch (e) {
     console.error('Migration 028_push_token_permission failed:', e);
+  }
+
+  // Migration 029: профиль привычек для пушей (план пушей, шаг 2.6). Только новая таблица.
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS user_habits (
+        user_id           UUID PRIMARY KEY,
+        usual_time        TIME,
+        usual_days        TEXT[] NOT NULL DEFAULT '{}',
+        day_type          TEXT,
+        median_lesson_sec INT,
+        sec_per_answer    NUMERIC,
+        favorite_mode     TEXT,
+        accuracy_14d      NUMERIC,
+        active_days_7     INT NOT NULL DEFAULT 0,
+        segment           TEXT,
+        updated_at        TIMESTAMPTZ DEFAULT NOW()
+      )
+    `;
+  } catch (e) {
+    console.error('Migration 029_user_habits failed:', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)

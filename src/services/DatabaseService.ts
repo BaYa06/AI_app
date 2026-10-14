@@ -6,6 +6,7 @@ import { StorageService, STORAGE_KEYS } from './StorageService';
 import { NeonService, NetworkLoadError, type BootstrapData } from './NeonService';
 import { BookService } from './BookService';
 import { supabase } from './supabaseClient';
+import { setActivitySegmentProperty } from './analytics';
 import type { Card, CardSet, Course, UserSettings } from '@/types';
 
 // Lazy imports для store чтобы избежать циклических зависимостей
@@ -444,6 +445,7 @@ export const DatabaseService = {
               lastActiveDate: userStats.last_active_date,
             });
             devLog('🔥 Streak загружен:', userStats.current_streak, 'дней');
+            if (userStats.activity_segment) setActivitySegmentProperty(userStats.activity_segment);
           }
         } catch (e) {
           console.warn('⚠️ Не удалось загрузить streak:', e);

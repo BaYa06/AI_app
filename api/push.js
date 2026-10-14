@@ -11,6 +11,7 @@
  * POST /api/push?action=cron-reactivation – устарела (Push 0.2): ничего не шлёт, логика в cron-reminders
  * GET|POST /api/push?action=cron-reminders – cron-job.org каждые 15 мин: одно напоминание в день в notif_hour:notif_minute
  *          &dry_run=1 — ничего не шлёт: кому, что и почему (в push_log статус dry_run)
+ *          &habits=1 — пересчитать профиль привычек сейчас (иначе раз в сутки, первый запуск после 00:00 UTC)
  * Переменная PUSH_PAUSED=1 — аварийная остановка: маркетинговые пуши не уходят, от учителя уходят
  * POST /api/push?action=opened          – тап по пушу / урок после пуша (JWT): { push_id, stage? } → push_log
  * GET  /api/push?action=rewards           – diamond balance + challenges claimed today
@@ -22,6 +23,7 @@ import { ensureDatabaseInitialized } from './_db-init.js';
 import { getAuthedUserId, hasBearerSecret } from './_auth.js';
 import { sendNotification, groupsOff } from './push/_send.js';
 import { runArbiter } from './push/_arbiter.js';
+import { recomputeHabits } from './push/_habits.js';
 import { SETTING_GROUPS, isHoldout } from './push/_decide.js';
 
 // teacher.js и data.js импортируют отправку отсюда
@@ -199,13 +201,16 @@ export default async function handler(req, res) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
       const dryRun = req.query.dry_run === '1';
-      const result = await runArbiter(sql, { dryRun });
-      // Раз в сутки (первый запуск после полуночи UTC): журнал храним 180 дней
+      // Раз в сутки (первый запуск после полуночи UTC): профиль привычек (2.6) — до арбитра, чтобы
+      // он сразу работал со свежим; журнал храним 180 дней
       const now = new Date();
-      if (!dryRun && now.getUTCHours() === 0 && now.getUTCMinutes() < 15) {
+      const daily = !dryRun && now.getUTCHours() === 0 && now.getUTCMinutes() < 15;
+      const habits = daily || req.query.habits === '1' ? await recomputeHabits(sql) : undefined;
+      const result = await runArbiter(sql, { dryRun });
+      if (daily) {
         await sql`DELETE FROM push_log WHERE created_at < NOW() - INTERVAL '180 days'`;
       }
-      return res.status(200).json(result);
+      return res.status(200).json(habits ? { ...result, habits } : result);
     }
 
     // ── opened: тап по пушу и урок после него (план, шаг 0.5) ──

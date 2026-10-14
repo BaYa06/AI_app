@@ -318,6 +318,8 @@ export type UserStatsData = {
   streak_freezes: number;
   /** Сегодня заморозка спасла серию (вчера был пропуск) */
   freeze_used: boolean;
+  /** Сегмент активности из профиля привычек (plan/push_notifications.md, 2.6): new / daily / regular / casual / sleeping / lost */
+  activity_segment?: string;
 };
 
 function mapUserStatsRow(row: any): UserStatsData {
@@ -337,6 +339,7 @@ function mapUserStatsRow(row: any): UserStatsData {
     total_cards_studied: row.total_cards_studied || 0,
     streak_freezes: row.streak_freezes || 0,
     freeze_used: row.freeze_used === true,
+    activity_segment: row.activity_segment || undefined,
   };
 }
 

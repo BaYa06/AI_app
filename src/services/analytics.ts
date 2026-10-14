@@ -80,6 +80,11 @@ export function pushGroupFor(userId: string): 'holdout' | 'push' {
   return Number.isFinite(n) && n % 100 < 10 ? 'holdout' : 'push';
 }
 
+/** Сегмент активности (2.6) — чтобы резать любые воронки по нему */
+export function setActivitySegmentProperty(segment: string) {
+  sendUserProperties({ activity_segment: segment });
+}
+
 export function setPushGroupProperty(userId: string) {
   sendUserProperties({ push_group: pushGroupFor(userId) });
 }

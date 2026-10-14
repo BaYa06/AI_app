@@ -519,8 +519,9 @@ async function getUserStats(sql, me) {
   const rows = await sql`
     SELECT us.current_streak, us.longest_streak, us.last_active_date::text AS last_active_date, us.timezone,
            us.total_words_learned, us.total_minutes_learned, us.total_cards_studied,
-           u.streak_freezes
+           u.streak_freezes, h.segment AS activity_segment
     FROM user_stats us JOIN users u ON u.id = us.user_id
+    LEFT JOIN user_habits h ON h.user_id = us.user_id
     WHERE us.user_id = ${me}::uuid
   `;
   const row = rows[0];
