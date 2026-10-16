@@ -94,7 +94,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
       // Урок дня: считаем по состоянию карточки до ответа
       const lessonPhase = lessonPhaseForAnswer(lesson?.part, card);
       if (lessonPhase) useLessonStore.getState().recordAnswer(lessonPhase, card.id);
-      // Замер виджета (plan/widgets.md, 4.1): точность на словах из виджета и контрольной половины
+      // Замер виджета (plan/new/widgets.md, 4.1): точность на словах из виджета и контрольной половины
       if (lessonPhase === 'review') reportWidgetReview(card.id, isCorrect);
       ProgressService.recordAnswer(card, { mode: 'test', correct: isCorrect, chosen: chosenCardId, timeSpentMs });
 
@@ -304,7 +304,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
   }, [paramTimeLimit, handleTimeUp]);
 
   const finishQuiz = React.useCallback(
-    (errorsCount: number, errorList: Array<{ id: string; front: string; back: string; rating: number }>) => {
+    async (errorsCount: number, errorList: Array<{ id: string; front: string; back: string; rating: number }>) => {
       const timeSpent = Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000));
       const learnedCards = Math.max(0, totalQuestions - errorsCount);
       
@@ -349,7 +349,8 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
         phaseTotal
       });
       
-      finishStudySession();
+      // Серия: результат нужен экрану итогов — там праздник, если день засчитан впервые
+      const streakResult = await finishStudySession();
 
       navigation.replace('StudyResults', {
         setId,
@@ -368,6 +369,8 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
         studiedInPhase: newStudiedInPhase,
         phaseOffset: newPhaseOffset,
         phaseFailedIds: newPhaseFailedIds,
+        streakIncreased: streakResult.streakIncreased,
+        newStreakCount: streakResult.newStreakCount,
         lesson,
       });
     },

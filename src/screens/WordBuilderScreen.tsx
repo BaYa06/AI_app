@@ -268,7 +268,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
   );
 
   const finishSession = useCallback(
-    (
+    async (
       errorsCount: number,
       errorList: Array<{ id?: string; front: string; back: string; rating: number }>,
     ) => {
@@ -294,7 +294,8 @@ export function WordBuilderScreen({ navigation, route }: Props) {
       });
       const newPhaseFailedIds = Array.from(prevFailed);
 
-      finishStudySession();
+      // Серия: результат нужен экрану итогов — там праздник, если день засчитан впервые
+      const streakResult = await finishStudySession();
 
       navigation.replace('StudyResults', {
         setId,
@@ -313,6 +314,8 @@ export function WordBuilderScreen({ navigation, route }: Props) {
         studiedInPhase: newStudiedInPhase,
         phaseOffset: newPhaseOffset,
         phaseFailedIds: newPhaseFailedIds,
+        streakIncreased: streakResult.streakIncreased,
+        newStreakCount: streakResult.newStreakCount,
       });
     },
     [
