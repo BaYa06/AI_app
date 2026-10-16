@@ -1,5 +1,5 @@
 /**
- * Арбитр ежедневных пушей (plan/push_notifications.md, шаг 2.2) — вызывается из cron-reminders
+ * Арбитр ежедневных пушей (plan/new/push_notifications.md, шаг 2.2) — вызывается из cron-reminders
  * (cron-job.org, каждые 15 минут). Файл начинается с «_», поэтому Vercel не публикует его как роут.
  *
  * Один запуск:

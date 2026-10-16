@@ -35,7 +35,7 @@ interface StudentProgress {
   answered: number;
   total: number;
   done: boolean;
-  // Контроль выхода (plan/exam_lockdown.md); monitor отдаёт эти поля только учителю
+  // Контроль выхода (plan/done/exam_lockdown.md); monitor отдаёт эти поля только учителю
   leftReason?: 'manual' | 'background' | 'relaunch' | null;
   awayCount?: number;
   away?: boolean;

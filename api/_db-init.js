@@ -333,7 +333,7 @@ async function applyMigrations(sql) {
     console.error('Migration 024_book_student_visible failed:', e);
   }
 
-  // Migration 025: контроль выхода из приложения во время живого теста (plan/exam_lockdown.md).
+  // Migration 025: контроль выхода из приложения во время живого теста (plan/done/exam_lockdown.md).
   // Только добавляем колонки с DEFAULT — старые клиенты и старые INSERT'ы не ломаются.
   try {
     await sql`ALTER TABLE test_sessions ADD COLUMN IF NOT EXISTS exit_control BOOLEAN NOT NULL DEFAULT false`;
@@ -346,7 +346,7 @@ async function applyMigrations(sql) {
     console.error('Migration 025_exam_exit_control failed:', e);
   }
 
-  // Migration 026: журнал push-уведомлений (plan/push_notifications.md, шаг 0.3). Только новая таблица.
+  // Migration 026: журнал push-уведомлений (plan/new/push_notifications.md, шаг 0.3). Только новая таблица.
   try {
     await sql`
       CREATE TABLE IF NOT EXISTS push_log (

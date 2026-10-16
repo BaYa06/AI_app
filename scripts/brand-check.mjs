@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Автопроверка брендбука (plan/brandbook.md, plan/brandbook_migration.md шаг 1.1).
+ * Автопроверка брендбука (plan/done/brandbook.md, plan/done/brandbook_migration.md шаг 1.1).
  *
  * Считает по каждому файлу в src/ нарушения брендбука:
  *   Основной счёт (колонка «Всего»):

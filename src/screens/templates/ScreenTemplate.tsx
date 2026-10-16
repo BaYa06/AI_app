@@ -1,5 +1,5 @@
 /**
- * ScreenTemplate — шаблон нового экрана по брендбуку (plan/brandbook.md, шаг 8.2 плана).
+ * ScreenTemplate — шаблон нового экрана по брендбуку (plan/done/brandbook.md, шаг 8.2 плана).
  *
  * Создать экран: `npm run new:screen -- Имя` → src/screens/ИмяScreen.tsx.
  * Шаблон проверяют TypeScript и `npm run brand:check` — он всегда рабочий.

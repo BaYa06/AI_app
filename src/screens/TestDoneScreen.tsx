@@ -103,7 +103,7 @@ export function TestDoneScreen({ navigation, route }: Props) {
 
   const goHome = () => navigation.navigate('Main' as any);
 
-  // Попытка завершена досрочно (plan/exam_lockdown.md): без поздравлений, медали и разбора —
+  // Попытка завершена досрочно (plan/done/exam_lockdown.md): без поздравлений, медали и разбора —
   // иначе итог превращается в шпаргалку для тех, кто ещё проходит тест.
   const leftTitle =
     leftReason === 'manual' ? 'Ты завершил тест досрочно'

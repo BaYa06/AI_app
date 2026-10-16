@@ -135,7 +135,7 @@ function AppRoot({
   }, [isAuthenticated, needsOnboarding]);
 
   // В нативном приложении системный диалог iOS сразу после онбординга больше не показываем
-  // (plan/push_notifications.md, 1.1): он бывает один раз, и тратить его на человека, который ещё
+  // (plan/new/push_notifications.md, 1.1): он бывает один раз, и тратить его на человека, который ещё
   // не видел пользы, нельзя. Его открывает лист после первого урока (1.2). Если разрешение уже есть,
   // токен тихо обновляет refreshPushToken при входе (handleSession) и после онбординга.
 
@@ -311,7 +311,7 @@ function AppRoot({
   );
 }
 
-// Метка сервера для отчётов о падениях (plan/release_safety.md, Release 4)
+// Метка сервера для отчётов о падениях (plan/new/release_safety.md, Release 4)
 initCrashReporting();
 
 export default function App() {
@@ -365,7 +365,7 @@ export default function App() {
   }, [currentUserId]);
 
   // Разрешение на уведомления могли выключить или включить в настройках iOS, пока приложение было
-  // в фоне: сообщаем серверу при каждом возврате (plan/push_notifications.md, 1.4). Повторы отсекает сам сервис.
+  // в фоне: сообщаем серверу при каждом возврате (plan/new/push_notifications.md, 1.4). Повторы отсекает сам сервис.
   useEffect(() => {
     if (!currentUserId || Platform.OS === 'web') return;
     const subscription = AppState.addEventListener('change', (state) => {
@@ -564,7 +564,7 @@ export default function App() {
         }, 0);
       } else {
         Analytics.logout();
-        // Виджет на экране блокировки не должен показывать слова прошлого аккаунта (plan/widgets.md, 1.2)
+        // Виджет на экране блокировки не должен показывать слова прошлого аккаунта (plan/new/widgets.md, 1.2)
         resetWidget();
         // Сохранённые данные больше не показываем мгновенно — следующий вошедший может быть другим
         StorageService.delete(CACHE_OWNER_KEY);
@@ -646,7 +646,7 @@ export default function App() {
 
     const handleUrl = async (url: string) => {
       try {
-        // Ссылка из виджета (plan/widgets.md, 0.3): экран открывает React Navigation, здесь только аналитика
+        // Ссылка из виджета (plan/new/widgets.md, 0.3): экран открывает React Navigation, здесь только аналитика
         const widgetLink = parseWidgetUrl(url);
         if (widgetLink) {
           Analytics.widgetOpenedApp(widgetLink);
@@ -811,13 +811,13 @@ export default function App() {
   }, [currentUserId]);
 
   const handleSubmitDaily = useCallback((dailyId: string) => {
-    // Выбор «5 / 10 / 20 слов в день» — квота новых слов урока дня (plan/home_redesign.md, 1.5)
+    // Выбор «5 / 10 / 20 слов в день» — квота новых слов урока дня (plan/done/home_redesign.md, 1.5)
     const perDay = Number(dailyId);
     if ((NEW_PER_DAY_OPTIONS as readonly number[]).includes(perDay)) {
       useSettingsStore.getState().updateSettings({ lessonNewPerDay: perDay });
       DatabaseService.saveSettings();
     }
-    // Дальше — необязательные «Ещё два вопроса» для напоминаний (plan/push_notifications.md, 2.7)
+    // Дальше — необязательные «Ещё два вопроса» для напоминаний (plan/new/push_notifications.md, 2.7)
     setOnboardingData((prev) => ({ ...prev, dailyGoal: dailyId }));
     setAuthStep('about');
   }, []);

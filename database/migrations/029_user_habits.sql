@@ -1,4 +1,4 @@
--- Migration 029: профиль привычек для пушей (plan/push_notifications.md, шаг 2.6).
+-- Migration 029: профиль привычек для пушей (plan/new/push_notifications.md, шаг 2.6).
 -- Только поведение в приложении: считается раз в сутки из журнала ответов answers (занятие —
 -- ответы с перерывами не больше 30 минут). Пересчёт — api/push/_habits.js, вызывает cron-reminders.
 CREATE TABLE IF NOT EXISTS user_habits (

@@ -1,6 +1,6 @@
 /**
  * ImportGuideSheet
- * @description Справка «Что понимает ИИ» на экране создания карточек (plan/ai_import.md, вариант A):
+ * @description Справка «Что понимает ИИ» на экране создания карточек (plan/done/ai_import.md, вариант A):
  * что сработает сразу, что — с вопросом, что не получится, и форматы файлов.
  */
 import React, { memo } from 'react';

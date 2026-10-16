@@ -1,4 +1,4 @@
--- Migration 033: дашборд пушей (plan/push_notifications.md, шаг 5.1).
+-- Migration 033: дашборд пушей (plan/new/push_notifications.md, шаг 5.1).
 -- push_channel_events — отток канала: человек выключил категорию или всё, отозвал разрешение в iOS,
 -- удалил приложение (FCM вернул «токен не зарегистрирован»).
 CREATE TABLE IF NOT EXISTS push_channel_events (

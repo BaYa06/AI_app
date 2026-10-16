@@ -7,11 +7,11 @@ import { hasAiConsent } from './aiConsent';
 
 // Раньше был отдельный относительный '/api' — не резолвится в fetch() на нативном React
 // Native (в отличие от веба), см. plan/teacher_access_fix_plan.md, пункт 55.
-// Распознавание фото/PDF и перевод — в AiImportService (plan/ai_import.md).
+// Распознавание фото/PDF и перевод — в AiImportService (plan/done/ai_import.md).
 const API_BASE_URL = API_BASE;
 
 // Раньше '/ai' проксировался на GCP VM (http://34.9.20.41:3001), которая без оплаты не работает.
-// ИИ теперь — Vercel-функция api/ai (plan/ai_import.md); старые сборки по-прежнему ходят на
+// ИИ теперь — Vercel-функция api/ai (plan/done/ai_import.md); старые сборки по-прежнему ходят на
 // /ai/*, vercel.json перенаправляет их туда же.
 const AI_BASE_URL = API_BASE;
 

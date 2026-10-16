@@ -23,7 +23,7 @@ import { getAuthedUserId } from './_auth.js';
  * userId — только из Supabase JWT: мутации и «мои» запросы требуют токен, в списке/деталях
  * токен необязателен (без него флаги is_imported/is_liked = false).
  *
- * Публикуют только админы (users.is_admin), plan/community_library.md: весь контент библиотеки —
+ * Публикуют только админы (users.is_admin), plan/done/community_library.md: весь контент библиотеки —
  * от команды, поэтому App Review 1.2 (модерация пользовательского контента) не применяется.
  * Чужие наборы видны, только если автор — админ; автор показывается как «Flashly».
  */

@@ -87,7 +87,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
     return !nextLessonStep(lesson, (id) => cards[id]?.setId);
   }, []);
 
-  // Лист «Напомнить завтра?» (plan/push_notifications.md, 1.2): на итогах урока дня, если разрешение
+  // Лист «Напомнить завтра?» (plan/new/push_notifications.md, 1.2): на итогах урока дня, если разрешение
   // ещё не спрашивали. Ждём, пока закроется празднование серии, — два окна подряд не показываем.
   const [pushPromptReady, setPushPromptReady] = React.useState(false);
   const [pushPromptDone, setPushPromptDone] = React.useState(false);
@@ -116,7 +116,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
     if (result === 'custom') navigation.navigate('NotificationSettings');
   }, [navigation]);
 
-  // Подсказка о виджете на экране блокировки (plan/widgets.md, 3.1): день с пройденным уроком
+  // Подсказка о виджете на экране блокировки (plan/new/widgets.md, 3.1): день с пройденным уроком
   // запоминаем всегда, а карточку показываем по правилам services/widgetPrompt.ts
   const [showWidgetPrompt, setShowWidgetPrompt] = React.useState(false);
   const [showWidgetHowTo, setShowWidgetHowTo] = React.useState(false);

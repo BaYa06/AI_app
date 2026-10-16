@@ -1,7 +1,7 @@
 /**
  * Метка «Тестовый сервер» поверх всего приложения — только в тестовых сборках (APP_ENV=staging).
  * Чтобы тестовую TestFlight-сборку нельзя было спутать с рабочей и случайно отправить в
- * App Store. plan/release_safety.md, Release 3.
+ * App Store. plan/new/release_safety.md, Release 3.
  */
 import React from 'react';
 import { StyleSheet, View } from 'react-native';

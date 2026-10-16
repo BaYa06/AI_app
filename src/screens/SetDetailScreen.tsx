@@ -58,7 +58,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
 
   const [filter, setFilter] = useState<Filter>('all');
   // Набора нет на телефоне — например, открыт по пушу «новый набор в курсе», а курс ещё не обновился
-  // (plan/push_notifications.md, 3.5): подтягиваем наборы курсов; не нашёлся за 8 с — «Набор не найден»
+  // (plan/new/push_notifications.md, 3.5): подтягиваем наборы курсов; не нашёлся за 8 с — «Набор не найден»
   const [setMissing, setSetMissing] = useState(false);
   const [search, setSearch] = useState('');
   const [actionCardId, setActionCardId] = useState<string | null>(null);

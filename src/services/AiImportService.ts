@@ -1,6 +1,6 @@
 /**
  * AiImportService
- * @description Единый ИИ-импорт (plan/ai_import.md): фото, PDF, CSV/TSV и вставленный текст →
+ * @description Единый ИИ-импорт (plan/done/ai_import.md): фото, PDF, CSV/TSV и вставленный текст →
  * карточки через api/ai?fn=import-files, и дневной лимит распознаваний (fn=usage).
  * Ошибки сервера превращаются в AiImportError с кодом — экран показывает понятный текст.
  */

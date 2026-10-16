@@ -1,5 +1,5 @@
 /**
- * SetsSectionMenu — меню «···» секции «Мои наборы» (plan/home_redesign.md, шаг 4.1)
+ * SetsSectionMenu — меню «···» секции «Мои наборы» (plan/done/home_redesign.md, шаг 4.1)
  * @description Третий уровень главной: редкие действия с наборами живут у самих наборов, а не в шапке.
  */
 import React from 'react';

@@ -54,7 +54,7 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
   const [testMode, setTestMode] = useState<TestMode>('multiple');
   const [totalQuestions, setTotalQuestions] = useState(20);
   const [timePerQuestion, setTimePerQuestion] = useState(20);
-  // Контроль выхода из приложения (plan/exam_lockdown.md) — по умолчанию включён
+  // Контроль выхода из приложения (plan/done/exam_lockdown.md) — по умолчанию включён
   const [exitControl, setExitControl] = useState(true);
   const [creating, setCreating] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);

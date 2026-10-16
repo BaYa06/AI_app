@@ -1,6 +1,6 @@
 #!/bin/sh
 # Брендбук: коммит не проходит, если нарушений стало больше, чем в снимке
-# scripts/brand-baseline.json (plan/brandbook_migration.md, шаг 8.1).
+# scripts/brand-baseline.json (plan/done/brandbook_migration.md, шаг 8.1).
 # Ставится командой `npm run hooks:install` (и автоматически при npm install).
 # Обойти в крайнем случае: git commit --no-verify
 

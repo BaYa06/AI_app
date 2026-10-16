@@ -1,5 +1,5 @@
 /**
- * Мост к виджету на экране блокировки (plan/widgets.md, шаг 1.2) — iOS.
+ * Мост к виджету на экране блокировки (plan/new/widgets.md, шаг 1.2) — iOS.
  *
  * Тот же API, что у widgetBridge.ts: Metro на iOS подхватывает этот файл, на Android и в вебе —
  * widgetBridge.ts, который ничего не делает. Нативная часть — ios/FlashcardsApp/FlashlyWidgetBridge.swift.

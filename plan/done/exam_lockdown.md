@@ -5,7 +5,7 @@
 пускает обратно на тот же вопрос (`join` → `alreadyJoined`, TestJoinScreen.tsx:116, план
 App Review, пункт 40).
 
-Шаг = коммит «Exam N». Порядок выкладки — по plan/release_safety.md: сначала сервер, потом
+Шаг = коммит «Exam N». Порядок выкладки — по plan/new/release_safety.md: сначала сервер, потом
 приложение.
 
 ## Что технически возможно

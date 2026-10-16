@@ -165,7 +165,7 @@ export function HomeScreen({ navigation, route }: any) {
     setSearchVisible(false);
     setSearchQuery('');
   }, []);
-  // Меню «···» секции «Мои наборы» (plan/home_redesign.md, 4.1). Следующее окно — после закрытия
+  // Меню «···» секции «Мои наборы» (plan/done/home_redesign.md, 4.1). Следующее окно — после закрытия
   // меню: одновременно не больше одного окна (брендбук, 7.6)
   const [setsMenuVisible, setSetsMenuVisible] = useState(false);
   const openSetsMenu = useCallback(() => {
@@ -657,7 +657,7 @@ export function HomeScreen({ navigation, route }: any) {
   // перерисовывается при заходе, так вечер наступает без перезапуска)
   const streakRiskHours = streakRiskHoursLeft(new Date(), streakValue, todayGoalReached);
 
-  // «Включи напоминания, чтобы не потерять серию» (plan/push_notifications.md, 1.3): серия от 3 дней,
+  // «Включи напоминания, чтобы не потерять серию» (plan/new/push_notifications.md, 1.3): серия от 3 дней,
   // пушей нет, не чаще раза в 14 дней. Только приложение — в вебе свой баннер.
   const [pushNudgePermission, setPushNudgePermission] = useState<string | null>(null);
   useEffect(() => {
@@ -697,7 +697,7 @@ export function HomeScreen({ navigation, route }: any) {
     }, [hasLessonCards]),
   );
 
-  // Аналитика (plan/home_redesign.md, 0.2): что главная предлагала в момент захода — один раз за заход,
+  // Аналитика (plan/done/home_redesign.md, 0.2): что главная предлагала в момент захода — один раз за заход,
   // когда роль уже известна (до этого главная не знает, показывать ли баннер учителя)
   const [focusTick, setFocusTick] = useState(0);
   useFocusEffect(useCallback(() => { setFocusTick((t) => t + 1); }, []));
@@ -724,7 +724,7 @@ export function HomeScreen({ navigation, route }: any) {
     }
   }, [focusTick, isTeacher, filteredSets.length, reviewStats, lessonPlan, lessonContent, streakRiskHours]);
 
-  // «Урок дня» (plan/home_redesign.md, 1.4, 2.2): повторение + новые слова из текущего набора (LessonService)
+  // «Урок дня» (plan/done/home_redesign.md, 1.4, 2.2): повторение + новые слова из текущего набора (LessonService)
   const startLesson = useCallback((plan: LessonPlan) => {
     let reviewIds = plan.reviewIds;
     // Тесту нужно хотя бы 4 вопроса — добираем уже изученными словами, которым срок ещё не пришёл
@@ -789,8 +789,8 @@ export function HomeScreen({ navigation, route }: any) {
     startLesson(lessonPlan);
   }, [lessonContent, lessonPlan, startLesson, computeLessonPlan, navigation]);
 
-  // Ссылка из виджета на экране блокировки (plan/widgets.md, 0.3): flashly://lesson?from=widget.
-  // Тап по пушу (plan/push_notifications.md, 0.5) — та же ссылка с from=push.
+  // Ссылка из виджета на экране блокировки (plan/new/widgets.md, 0.3): flashly://lesson?from=widget.
+  // Тап по пушу (plan/new/push_notifications.md, 0.5) — та же ссылка с from=push.
   // Ждём, пока загрузятся карточки и станет известна роль, и запускаем урок, только если он не пройден:
   // «Ещё 10 новых» и «Найти набор» по нажатию на виджет не делаем. Параметр сбрасываем сразу,
   // чтобы следующее нажатие на виджет снова сработало, а возврат на главную урок не запускал.
@@ -803,7 +803,7 @@ export function HomeScreen({ navigation, route }: any) {
     startLesson(lessonPlan);
   }, [widgetFrom, isTeacher, lessonContent, hasLessonCards, lessonPlan, startLesson, navigation]);
 
-  // Виджет на экране блокировки (plan/widgets.md, 1.2): расписание пересчитывается при любом изменении
+  // Виджет на экране блокировки (plan/new/widgets.md, 1.2): расписание пересчитывается при любом изменении
   // карточек, урока или серии и при каждом заходе на главную. Данные собираются в момент записи
   // (WidgetService ждёт 5 секунд), поэтому план урока считаем заново — на «сейчас», с учётом нового дня.
   const widgetInputRef = useRef<() => WidgetPlanInput | null>(() => null);
@@ -838,7 +838,7 @@ export function HomeScreen({ navigation, route }: any) {
     checkWidgetUsage();
   }, []);
 
-  // Рейтинг курса: значок-кубок в шапке, точка — есть новости (plan/home_redesign.md, 3.2)
+  // Рейтинг курса: значок-кубок в шапке, точка — есть новости (plan/done/home_redesign.md, 3.2)
   const [leaderboard, setLeaderboard] = useState<CourseLeaderboard | null>(null);
   const [lastWeekBoard, setLastWeekBoard] = useState<CourseLeaderboard | null>(null);
   useFocusEffect(
@@ -1429,7 +1429,7 @@ export function HomeScreen({ navigation, route }: any) {
     const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     return Math.max(1, Math.ceil((midnight.getTime() - now.getTime()) / 3_600_000));
   })();
-  // Мини-игры «Разминка» (plan/home_redesign.md, 3.1): плитки — ChallengeTiles
+  // Мини-игры «Разминка» (plan/done/home_redesign.md, 3.1): плитки — ChallengeTiles
   const challengeTiles: ChallengeTile[] = [
     { id: 'quick_round', title: 'Быстрый раунд', badge: '2 минуты', icon: Zap, accent: colors.gameViolet, onPlay: handleQuickRound },
     { id: 'sniper', title: 'Снайпер', badge: '5 подряд', icon: Crosshair, accent: colors.gameRose, onPlay: handleSniperChallenge },
@@ -1504,7 +1504,7 @@ export function HomeScreen({ navigation, route }: any) {
         </View>
 
         <View style={styles.headerRight}>
-          {/* Рейтинг курса (plan/home_redesign.md, 3.2): значок в шапке, точка — есть новости */}
+          {/* Рейтинг курса (plan/done/home_redesign.md, 3.2): значок в шапке, точка — есть новости */}
           {ratingTeaser && (
             <View>
               <Button
@@ -1587,7 +1587,7 @@ export function HomeScreen({ navigation, route }: any) {
               teacherBanner
             ) : (
               <>
-              {/* Урок дня — единственное главное действие главной (plan/home_redesign.md, 2.2) */}
+              {/* Урок дня — единственное главное действие главной (plan/done/home_redesign.md, 2.2) */}
               {lessonContent && (
                 <LessonCard
                   content={lessonContent}
@@ -1648,7 +1648,7 @@ export function HomeScreen({ navigation, route }: any) {
               </View>
             </View>
 
-            {/* Поиск по наборам — у самих наборов (plan/home_redesign.md, 4.1) */}
+            {/* Поиск по наборам — у самих наборов (plan/done/home_redesign.md, 4.1) */}
             {searchVisible && (
               <View style={styles.searchRow}>
                 <TextField
@@ -1695,7 +1695,7 @@ export function HomeScreen({ navigation, route }: any) {
                     isFocus ? 'сейчас учишь' : null,
                   ].filter(Boolean).join(', ')}
                 >
-                  {/* Строка набора (plan/home_redesign.md, 5.1): дата, название, «48 карточек · 62%», бейджи, прогресс */}
+                  {/* Строка набора (plan/done/home_redesign.md, 5.1): дата, название, «48 карточек · 62%», бейджи, прогресс */}
                   <View style={styles.setCardHeader}>
                     <View style={styles.setCardLeft}>
                       <View style={[styles.dateIcon, { backgroundColor: alpha(accentColor, 10) }]}>
@@ -1754,7 +1754,7 @@ export function HomeScreen({ navigation, route }: any) {
                 </StaggerCard>
               );
             })}
-            {/* Создание набора — в конце списка, у самих наборов (plan/home_redesign.md, 4.2) */}
+            {/* Создание набора — в конце списка, у самих наборов (plan/done/home_redesign.md, 4.2) */}
             <Pressable
               onPress={() => { triggerHaptic('selection'); Analytics.homeAction('create_set'); navigation?.navigate('SetEditor', {}); }}
               accessibilityRole="button"

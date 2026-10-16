@@ -217,9 +217,9 @@ function MainTabs() {
 // (не пишет в window.history, не привязывается к URL).
 // Это ключевое решение проблемы с кнопкой "назад": без linking нет URL-based
 // сброса стека. Приглашения (/join/TOKEN) обрабатываются отдельно в App.tsx.
-// Из flashly:// пропускаем только ссылки виджета (plan/widgets.md, 0.3): lesson и set/<setId>.
+// Из flashly:// пропускаем только ссылки виджета (plan/new/widgets.md, 0.3): lesson и set/<setId>.
 // Вход (flashly://auth-callback) и приглашения по-прежнему разбирает App.tsx.
-// Тап по пушу (plan/push_notifications.md, 0.5) идёт сюда же: data.link пуша — та же flashly:// ссылка.
+// Тап по пушу (plan/new/push_notifications.md, 0.5) идёт сюда же: data.link пуша — та же flashly:// ссылка.
 const NATIVE_LINKING: LinkingOptions<RootStackParamList> = {
   prefixes: ['flashly://'],
   filter: isNavigationUrl,

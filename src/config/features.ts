@@ -5,7 +5,7 @@
 /**
  * Библиотека наборов во вкладке «Библиотека» (рядом с учебниками). Публикуют только админы —
  * сервер отвечает canPublish (api/library.js), блок публикации и «Мои публикации» видны только им.
- * Весь контент от команды, поэтому App Review 1.2 не применяется (plan/community_library.md).
+ * Весь контент от команды, поэтому App Review 1.2 не применяется (plan/done/community_library.md).
  * false — во вкладке только учебники.
  */
 export const COMMUNITY_LIBRARY_ENABLED = true;

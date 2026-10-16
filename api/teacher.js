@@ -114,7 +114,7 @@ async function renameCourse(req, res, sql, userId) {
   return res.status(200).json({ ok: true });
 }
 
-// ─── Расписание занятий (plan/push_notifications.md, 2.8) ────
+// ─── Расписание занятий (plan/new/push_notifications.md, 2.8) ────
 
 const SCHEDULE_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 

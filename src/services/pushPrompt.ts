@@ -1,5 +1,5 @@
 /**
- * Лист «Напомнить завтра повторить эти слова?» (plan/push_notifications.md, шаг 1.2)
+ * Лист «Напомнить завтра повторить эти слова?» (plan/new/push_notifications.md, шаг 1.2)
  * @description Системный диалог iOS бывает один раз, поэтому спрашиваем не сразу после онбординга,
  * а на итогах урока дня, когда человек только что увидел пользу. «Не сейчас» — следующая попытка
  * не раньше чем через 3 дня, снова после пройденного урока; всего не больше 3 попыток.
@@ -87,7 +87,7 @@ export async function saveReminderHour(hour: number): Promise<boolean> {
         // Дни, выбранные раньше самим человеком, остаются его выбором
         notifDaysExplicit: !!days && days !== 'mon,tue,wed,thu,fri,sat,sun',
         notifStreak: current?.notifStreak ?? true,
-        // Время выбрано в листе — оно важнее привычек (plan/push_notifications.md, 2.9)
+        // Время выбрано в листе — оно важнее привычек (plan/new/push_notifications.md, 2.9)
         notifTimeExplicit: true,
       }),
     });

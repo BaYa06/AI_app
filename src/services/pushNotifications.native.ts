@@ -122,7 +122,7 @@ export async function requestPushPermission(userId?: string | null): Promise<Pus
 }
 
 /**
- * Тихие уведомления iOS (plan/push_notifications.md, 4.3): разрешение без системного диалога —
+ * Тихие уведомления iOS (plan/new/push_notifications.md, 4.3): разрешение без системного диалога —
  * пуши приходят только в Центр уведомлений. Полное разрешение потом просит лист после урока (1.2).
  */
 export async function requestProvisionalPermission(userId?: string | null): Promise<PushStatus> {

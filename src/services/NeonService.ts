@@ -311,7 +311,7 @@ export type CourseScheduleItem = { day: string; time: string };
 /** Возраст диапазоном — точную дату рождения не спрашиваем (2.7) */
 export type AgeRange = 'under13' | '13-17' | '18-24' | '25-34' | '35+';
 
-/** Ответы «о себе» и профиль привычек — для напоминаний (plan/push_notifications.md, 2.7) */
+/** Ответы «о себе» и профиль привычек — для напоминаний (plan/new/push_notifications.md, 2.7) */
 export type AboutMe = {
   ageRange: AgeRange | null;
   classDays: string[];
@@ -335,7 +335,7 @@ export type UserStatsData = {
   streak_freezes: number;
   /** Сегодня заморозка спасла серию (вчера был пропуск) */
   freeze_used: boolean;
-  /** Сегмент активности из профиля привычек (plan/push_notifications.md, 2.6): new / daily / regular / casual / sleeping / lost */
+  /** Сегмент активности из профиля привычек (plan/new/push_notifications.md, 2.6): new / daily / regular / casual / sleeping / lost */
   activity_segment?: string;
 };
 
@@ -451,7 +451,7 @@ export const NeonService = {
   /**
    * Получить родной язык и изучаемые языки пользователя
    */
-  /** «Профиль → Мои данные» (plan/push_notifications.md, 2.7): ответы о себе и что известно о привычках */
+  /** «Профиль → Мои данные» (plan/new/push_notifications.md, 2.7): ответы о себе и что известно о привычках */
   async getAboutMe(): Promise<AboutMe | null> {
     return callDataApi<AboutMe | null>('getAboutMe', {}, 'GET');
   },
@@ -859,7 +859,7 @@ export const NeonService = {
     }
   },
 
-  /** Расписание занятий курса (plan/push_notifications.md, 2.8); null — не удалось загрузить */
+  /** Расписание занятий курса (plan/new/push_notifications.md, 2.8); null — не удалось загрузить */
   async getCourseSchedule(courseId: string): Promise<CourseScheduleItem[] | null> {
     const result = await callTeacherApi<{ schedule: CourseScheduleItem[] }>('get-schedule', { params: { courseId } });
     return result.ok ? result.data.schedule : null;

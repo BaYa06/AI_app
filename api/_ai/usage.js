@@ -2,7 +2,7 @@ import { neon } from '@neondatabase/serverless';
 import { getAuthedUserId } from '../_auth.js';
 
 /**
- * Дневной лимит ИИ-распознаваний на пользователя (plan/ai_import.md, AI 3).
+ * Дневной лимит ИИ-распознаваний на пользователя (plan/done/ai_import.md, AI 3).
  * Бесплатная квота Gemini общая на всех — лимит не даёт одному пользователю выесть её целиком.
  *
  * Счётчик — в api_rate_limits (общая с api/test.js и api/teacher.js, чистится при удалении

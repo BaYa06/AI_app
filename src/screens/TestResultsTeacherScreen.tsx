@@ -41,7 +41,7 @@ type Participant = {
   correct: number;
   total: number;
   finished: boolean;
-  // Контроль выхода (plan/exam_lockdown.md); у старых тестов — null / 0
+  // Контроль выхода (plan/done/exam_lockdown.md); у старых тестов — null / 0
   leftReason?: 'manual' | 'background' | 'relaunch' | null;
   awayCount?: number;
 };

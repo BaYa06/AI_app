@@ -103,7 +103,7 @@ export function TestJoinScreen({ navigation, route }: Props) {
       const resp = await fetch(`${API_BASE}/test?action=join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        // exitControl: приложение умеет контроль выхода (plan/exam_lockdown.md) — сервер
+        // exitControl: приложение умеет контроль выхода (plan/done/exam_lockdown.md) — сервер
         // применяет к нему правило «повторный вход в идущий тест = выход».
         body: JSON.stringify({ code, exitControl: true }),
       });

@@ -1,5 +1,5 @@
 /**
- * UI-компоненты брендбука (plan/brandbook.md, раздел 7).
+ * UI-компоненты брендбука (plan/done/brandbook.md, раздел 7).
  * Все стили — только токены из src/constants.
  */
 export type { IconComponent } from './types';

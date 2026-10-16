@@ -41,7 +41,7 @@ export function TestWaitingScreen({ navigation, route }: Props) {
 
   const [participants, setParticipants] = useState<Participant[]>([]);
 
-  // Контроль выхода (plan/exam_lockdown.md): тест открывается только после «Понятно» под
+  // Контроль выхода (plan/done/exam_lockdown.md): тест открывается только после «Понятно» под
   // правилами. Учитель может запустить тест раньше — тогда ждём нажатия здесь.
   const [rulesAccepted, setRulesAccepted] = useState(exitControl !== true);
   const [testStarted, setTestStarted] = useState(false);

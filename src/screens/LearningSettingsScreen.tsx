@@ -1,7 +1,7 @@
 /**
  * Learning Settings Screen
  * @description Настройки обучения: новые слова в уроке дня, размер порции, обратный режим
- * и виджет на экране блокировки (только iPhone, plan/widgets.md, 2.3)
+ * и виджет на экране блокировки (только iPhone, plan/new/widgets.md, 2.3)
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';

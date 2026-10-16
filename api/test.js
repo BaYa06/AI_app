@@ -19,7 +19,7 @@ import { ensureDatabaseInitialized } from './_db-init.js';
  * GET  /api/test?action=results       — итоговые результаты (только учитель — владелец сессии)
  * POST /api/test?action=get-question  — ученик запрашивает вопрос с вариантами
  * GET  /api/test?action=history       — учитель получает историю тестов курса
- * POST /api/test?action=away          — ученик ушёл в фон (контроль выхода, plan/exam_lockdown.md)
+ * POST /api/test?action=away          — ученик ушёл в фон (контроль выхода, plan/done/exam_lockdown.md)
  * POST /api/test?action=back          — ученик вернулся: продолжить или завершить попытку
  * POST /api/test?action=leave         — ученик сам завершил тест досрочно
  * POST /api/test?action=reinstate     — учитель разрешает вышедшему ученику продолжить
@@ -217,7 +217,7 @@ async function autoFinishIfStale(sql, sessionId, session) {
  * слушает экран теста ученика. Экран теста не может подписаться на общий канал: supabase-js
  * отдаёт на одно имя один объект, и отписка экрана ожидания при переходе сняла бы подписку
  * экрана теста. Раньше событие в `:exam` не отправлялось вовсе, и ученик не узнавал, что
- * учитель завершил тест (plan/exam_lockdown.md, Exam 3).
+ * учитель завершил тест (plan/done/exam_lockdown.md, Exam 3).
  */
 async function broadcastTestFinished(sessionId) {
   const payload = { finishedAt: new Date().toISOString() };
@@ -242,7 +242,7 @@ function shuffle(arr) {
 /**
  * POST ?action=create
  * Body: { setId, courseId, testMode, questionCount, timePerQuestion, exitControl? }
- * exitControl — контроль выхода из приложения (plan/exam_lockdown.md). Необязательный: старые
+ * exitControl — контроль выхода из приложения (plan/done/exam_lockdown.md). Необязательный: старые
  * версии приложения учителя его не шлют, и их тесты работают как раньше.
  */
 async function createTest(req, res, sql, userId) {
@@ -280,7 +280,7 @@ async function createTest(req, res, sql, userId) {
 /**
  * POST ?action=join
  * Body: { code, exitControl? }
- * exitControl — клиент ученика умеет контроль выхода (plan/exam_lockdown.md). Старые версии
+ * exitControl — клиент ученика умеет контроль выхода (plan/done/exam_lockdown.md). Старые версии
  * его не шлют: их пускаем как раньше, учитель видит метку «Старая версия».
  */
 async function joinTest(req, res, sql, userId) {
@@ -651,7 +651,7 @@ async function monitorTest(req, res, sql, userId) {
         answered: p.answer_count,
         total: p.question_order?.length || 0,
         done: p.done,
-        // Контроль выхода (plan/exam_lockdown.md) — только учителю: monitor доступен и
+        // Контроль выхода (plan/done/exam_lockdown.md) — только учителю: monitor доступен и
         // ученикам, а кто выходил из приложения, одноклассникам видеть незачем.
         ...(isTeacher ? {
           leftReason: p.left_reason || null,
@@ -786,7 +786,7 @@ async function getResults(req, res, sql, userId) {
       correct: p.correct_count,
       total: p.question_order?.length || 0,
       finished: p.finished,
-      // Контроль выхода (plan/exam_lockdown.md)
+      // Контроль выхода (plan/done/exam_lockdown.md)
       userId: p.user_id,
       leftReason: p.left_reason || null,
       awayCount: p.away_count || 0,
@@ -897,7 +897,7 @@ async function getHistory(req, res, sql, userId) {
   return res.status(200).json(rows);
 }
 
-// ─── Контроль выхода из приложения (plan/exam_lockdown.md) ───
+// ─── Контроль выхода из приложения (plan/done/exam_lockdown.md) ───
 
 /** Сколько секунд в фоне прощается (случайный жест «домой»). Время считает сервер, не клиент. */
 const AWAY_GRACE_SEC = 3;

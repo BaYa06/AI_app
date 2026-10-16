@@ -1,4 +1,4 @@
--- Migration 026: журнал push-уведомлений (plan/push_notifications.md, шаг 0.3).
+-- Migration 026: журнал push-уведомлений (plan/new/push_notifications.md, шаг 0.3).
 -- Применяется автоматически в api/_db-init.js; файл — для истории и ручного применения.
 -- Строка на каждое решение sendNotification, включая отказы (no_token, disabled…).
 -- id уходит в пуш как data.push_id — по нему тап (opened_at) и урок (lesson_*_at) связываются с отправкой.

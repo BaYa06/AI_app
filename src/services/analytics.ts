@@ -22,7 +22,7 @@ type AuthMethod = 'email' | 'google' | 'apple' | 'anonymous';
 type CardRating = 'again' | 'hard' | 'good' | 'easy'; // оценки SRS
 /** Что главная предлагает главным действием в момент показа */
 type HomeState = 'daily_review' | 'study_all' | 'no_sets' | 'teacher';
-/** Что нажали на главной (plan/home_redesign.md, шаг 0.2) */
+/** Что нажали на главной (plan/done/home_redesign.md, шаг 0.2) */
 type HomeAction =
   | 'daily_review'
   | 'extra_new'
@@ -71,7 +71,7 @@ export function setAnalyticsUserProperties(props: {
 }
 
 /**
- * Контрольная группа пушей (plan/push_notifications.md, 2.5): 10 % без маркетинговых пушей.
+ * Контрольная группа пушей (plan/new/push_notifications.md, 2.5): 10 % без маркетинговых пушей.
  * Та же формула, что isHoldout в api/push/_decide.js — последние 7 hex-символов UUID, % 100 < 10.
  * Свойство push_group нужно, чтобы сравнивать удержание групп в GA4.
  */
@@ -464,7 +464,7 @@ export const Analytics = {
     log('push_permission_revoked'),
 
   /**
-   * Лист «Напомнить завтра?» на итогах урока (plan/push_notifications.md, 1.2) — воронка разрешения:
+   * Лист «Напомнить завтра?» на итогах урока (plan/new/push_notifications.md, 1.2) — воронка разрешения:
    * shown → accepted / later → push_permission_granted / denied.
    */
   pushPrepromptShown: (params: { attempt: number; trigger: string }) =>
@@ -485,7 +485,7 @@ export const Analytics = {
     log('push_streak_nudge', { action }),
 
   /**
-   * Юзер открыл приложение тапом по push-уведомлению (plan/push_notifications.md, 0.5).
+   * Юзер открыл приложение тапом по push-уведомлению (plan/new/push_notifications.md, 0.5).
    * type — тип из реестра на сервере (review_due, teacher_review…), push_id — строка push_log.
    */
   pushNotificationOpened: (params: { type: string; pushId?: string }) =>
@@ -541,7 +541,7 @@ export const Analytics = {
   // ═══════════════════════════════════════════════════════════════════════════
   // ГЛАВНЫЙ ЭКРАН
   // Зачем: понять, с чего люди начинают учёбу и что на главной отвлекает.
-  // Замер «до» и «после» редизайна главной (plan/home_redesign.md, шаги 0.2 и 6.3).
+  // Замер «до» и «после» редизайна главной (plan/done/home_redesign.md, шаги 0.2 и 6.3).
   // ═══════════════════════════════════════════════════════════════════════════
 
   /**
@@ -566,7 +566,7 @@ export const Analytics = {
   // ═══════════════════════════════════════════════════════════════════════════
   // УРОК ДНЯ
   // Зачем: главная метрика редизайна главной — сколько людей начинают и заканчивают урок дня
-  // (plan/home_redesign.md, 6.1). «Ещё 10 новых» и «Сменить набор» — также в home_action.
+  // (plan/done/home_redesign.md, 6.1). «Ещё 10 новых» и «Сменить набор» — также в home_action.
   // ═══════════════════════════════════════════════════════════════════════════
 
   /**
@@ -614,7 +614,7 @@ export const Analytics = {
 
   // ═══════════════════════════════════════════════════════════════════════════
   // ВИДЖЕТ НА ЭКРАНЕ БЛОКИРОВКИ
-  // Зачем: понять, учит ли виджет и приводит ли в урок (plan/widgets.md, «Аналитика»).
+  // Зачем: понять, учит ли виджет и приводит ли в урок (plan/new/widgets.md, «Аналитика»).
   // family — accessoryRectangular / accessoryInline / accessoryCircular.
   // ═══════════════════════════════════════════════════════════════════════════
 

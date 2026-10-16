@@ -1,5 +1,5 @@
 /**
- * Проверка тона пушей (plan/brandbook.md, 9.1; plan/push_notifications.md, 4.2).
+ * Проверка тона пушей (plan/done/brandbook.md, 9.1; plan/new/push_notifications.md, 4.2).
  * Собирает каждый вариант каждого типа из api/push/_registry.js на разных данных (1, 3, 12, 21;
  * с именем и без) и проверяет правила. Вызывается из scripts/brand-check.mjs.
  */

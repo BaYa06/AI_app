@@ -123,7 +123,7 @@ async function updateLanguagePreferences(sql, me, p) {
   return true;
 }
 
-// ─── «О себе» для напоминаний (plan/push_notifications.md, 2.7) ─────────────
+// ─── «О себе» для напоминаний (plan/new/push_notifications.md, 2.7) ─────────────
 
 const AGE_RANGES = ['under13', '13-17', '18-24', '25-34', '35+'];
 const WEEK_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];

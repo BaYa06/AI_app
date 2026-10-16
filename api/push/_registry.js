@@ -1,5 +1,5 @@
 /**
- * Реестр push-уведомлений (plan/push_notifications.md, шаг 2.1) — источник правды по типам пушей.
+ * Реестр push-уведомлений (plan/new/push_notifications.md, шаг 2.1) — источник правды по типам пушей.
  * Файл начинается с «_», поэтому Vercel не публикует его как отдельный роут.
  *
  * На тип: category — для журнала и переключателей в настройках (2.4); priority — меньше = важнее,
@@ -7,7 +7,7 @@
  * minIntervalDays — не чаще раза в N дней; link — куда ведёт тап; variants — тексты (A/B — этап 4).
  *
  * Вариант получает ctx = { userId, name, displayName, streak, longest, secPerAnswer, data } и возвращает { title, body }.
- * Вариантов несколько (4.1) — выбирается variantIndex(userId, type); правила тона — plan/brandbook.md, 9.1.
+ * Вариантов несколько (4.1) — выбирается variantIndex(userId, type); правила тона — plan/done/brandbook.md, 9.1.
  * Правило реестра (принцип 3 плана): в тексте должно быть число или имя, иначе пуш не собирается.
  */
 

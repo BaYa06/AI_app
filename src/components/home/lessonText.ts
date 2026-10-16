@@ -1,5 +1,5 @@
 /**
- * Тексты урока дня для главной (plan/home_redesign.md, шаги 1.4 и 2.3)
+ * Тексты урока дня для главной (plan/done/home_redesign.md, шаги 1.4 и 2.3)
  * @description Состав («10 повторить + 10 новых»), время и подпись-причина по плану урока.
  */
 import { pluralize } from '@/utils';
@@ -64,7 +64,7 @@ export function streakRiskHoursLeft(now: Date, streakDays: number, goalReached: 
 }
 
 /**
- * Содержимое карточки по плану урока (plan/home_redesign.md, таблица шага 2.3).
+ * Содержимое карточки по плану урока (plan/done/home_redesign.md, таблица шага 2.3).
  * null — карточку не показываем (нет ни одной карточки: главная показывает своё пустое состояние).
  */
 export function lessonCardContent(

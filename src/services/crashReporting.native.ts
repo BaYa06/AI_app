@@ -1,5 +1,5 @@
 /**
- * Отчёты о падениях в нативном приложении (Firebase Crashlytics). plan/release_safety.md, Release 4.
+ * Отчёты о падениях в нативном приложении (Firebase Crashlytics). plan/new/release_safety.md, Release 4.
  *
  * Нативные падения и необработанные JS-ошибки Crashlytics ловит сам; здесь — то, что он сам
  * не видит: ошибки, пойманные ErrorBoundary, и кто/где упал (UUID пользователя, сервер).

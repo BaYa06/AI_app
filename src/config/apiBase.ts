@@ -9,7 +9,7 @@
  * работала вообще в собранном iOS/Android-приложении, только при разработке через Metro
  * (__DEV__) или в веб-версии. См. plan/teacher_access_fix_plan.md, пункт 55.
  *
- * Тестовый сервер (plan/release_safety.md, Release 3): сборка с APP_ENV=staging (Codemagic,
+ * Тестовый сервер (plan/new/release_safety.md, Release 3): сборка с APP_ENV=staging (Codemagic,
  * workflow ios-testflight-staging) ходит на Vercel Preview ветки dev — там своя ветка базы
  * Neon, рабочие данные не трогаются. Веб берёт API со своего же домена, поэтому Preview-сайт
  * тоже работает со своим сервером.

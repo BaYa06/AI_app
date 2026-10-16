@@ -1,5 +1,5 @@
 /**
- * PushStreakNudge — «Включи напоминания, чтобы не потерять серию» (plan/push_notifications.md, 1.3)
+ * PushStreakNudge — «Включи напоминания, чтобы не потерять серию» (plan/new/push_notifications.md, 1.3)
  * @description Ненавязчивая строка на главной под уроком дня. Когда показывать — services/pushPrompt.ts.
  * Отказал в iOS — открываем настройки iPhone (второй раз системный диалог не появится);
  * ещё не отвечал — системный диалог.

@@ -1,5 +1,5 @@
 /**
- * Ссылки из виджета на экране блокировки (plan/widgets.md, шаг 0.3)
+ * Ссылки из виджета на экране блокировки (plan/new/widgets.md, шаг 0.3)
  * @description flashly://lesson?from=widget&state=…&family=… — главная запускает урок дня;
  *   flashly://set/<setId>?from=widget&… — набор слова.
  *   Остальные flashly:// (вход, приглашения) разбирает App.tsx, а не React Navigation.
@@ -22,7 +22,7 @@ export function isWidgetUrl(url: string): boolean {
   return WIDGET_URL_RE.test(url);
 }
 
-/** Рейтинг курса из пуша (plan/push_notifications.md, 0.5): flashly://rating/<courseId>?from=push */
+/** Рейтинг курса из пуша (plan/new/push_notifications.md, 0.5): flashly://rating/<courseId>?from=push */
 const RATING_URL_RE = /^flashly:\/\/rating\/[^/?#]+\/?(\?.*)?$/;
 
 /** Что пропускаем в React Navigation: ссылки виджета и ссылки из пушей (урок — та же flashly://lesson) */

@@ -444,7 +444,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
             />
           </Pressable>
 
-          {/* Расписание занятий (plan/push_notifications.md, 2.8): ученикам — «Скоро занятие» за 1–2 часа */}
+          {/* Расписание занятий (plan/new/push_notifications.md, 2.8): ученикам — «Скоро занятие» за 1–2 часа */}
           <Pressable accessibilityRole="button"
             style={({ pressed }) => [
               styles.testLobbyBtn,

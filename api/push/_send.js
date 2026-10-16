@@ -1,5 +1,5 @@
 /**
- * Отправка push-уведомлений и журнал push_log (plan/push_notifications.md, этапы 0 и 2).
+ * Отправка push-уведомлений и журнал push_log (plan/new/push_notifications.md, этапы 0 и 2).
  * Файл начинается с «_», поэтому Vercel не публикует его как отдельный роут.
  *
  * sendNotification — один пуш одному человеку (учитель, data.js, notify, отложенные из тихих часов).

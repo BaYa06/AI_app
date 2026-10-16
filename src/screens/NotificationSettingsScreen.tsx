@@ -27,7 +27,7 @@ import { supabase } from '@/services';
 import { API_BASE } from '@/config/apiBase';
 import { Analytics } from '@/services/analytics';
 
-/** «Что присылать» (plan/push_notifications.md, 2.4) — ключи как SETTING_GROUPS в api/push/_decide.js */
+/** «Что присылать» (plan/new/push_notifications.md, 2.4) — ключи как SETTING_GROUPS в api/push/_decide.js */
 type PushGroup = 'lesson' | 'streak' | 'course' | 'rating';
 const PUSH_GROUPS: { key: PushGroup; title: string; hint: string }[] = [
   { key: 'lesson', title: 'Урок дня', hint: 'Слова ждут повторения, напоминание вернуться' },
@@ -77,7 +77,7 @@ export function NotificationSettingsScreen({ navigation }: any) {
   const [userId, setUserId] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
 
-  // Вернулся из настроек iPhone — разрешение могло поменяться (plan/push_notifications.md, 1.3)
+  // Вернулся из настроек iPhone — разрешение могло поменяться (plan/new/push_notifications.md, 1.3)
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') getPushStatus().then(setPushStatus);

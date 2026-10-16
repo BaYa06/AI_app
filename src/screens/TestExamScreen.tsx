@@ -73,7 +73,7 @@ export function TestExamScreen({ navigation, route }: Props) {
     });
   }, [navigation, questionCount]);
 
-  // Попытка завершена из-за выхода из приложения (plan/exam_lockdown.md) — итог считает сервер:
+  // Попытка завершена из-за выхода из приложения (plan/done/exam_lockdown.md) — итог считает сервер:
   // неотвеченные вопросы засчитаны как неверные. Разбор ответов не показываем.
   const finishLeft = useCallback((summary: ExamAttemptSummary) => {
     if (finishedRef.current) return;
@@ -95,7 +95,7 @@ export function TestExamScreen({ navigation, route }: Props) {
   });
 
   // «Завершить тест?» — кнопка в шапке, «Назад» на Android и любая попытка уйти с экрана
-  // навигацией (plan/exam_lockdown.md, Exam 3). Выход из самого приложения перехватить нельзя —
+  // навигацией (plan/done/exam_lockdown.md, Exam 3). Выход из самого приложения перехватить нельзя —
   // его ловит useExamExitGuard.
   const questionIndexRef = useRef(questionIndex);
   questionIndexRef.current = questionIndex;
@@ -354,7 +354,7 @@ export function TestExamScreen({ navigation, route }: Props) {
     >
       {splitView ? (
         // iPad Split View / мультиоконность Android: рядом открыто другое приложение. Вопрос
-        // скрыт, таймер идёт; через 3 с сервер засчитает выход (plan/exam_lockdown.md).
+        // скрыт, таймер идёт; через 3 с сервер засчитает выход (plan/done/exam_lockdown.md).
         <Card style={styles.splitCard}>
           <Maximize2 size={iconSize.l} color={colors.errorText} />
           <Text variant="h3" accessibilityRole="header" style={[styles.centerText, { color: colors.textPrimary }]}>

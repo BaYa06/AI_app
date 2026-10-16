@@ -11,7 +11,7 @@ import type { StudyMode } from './index';
 /** Часть урока дня: повторение (тест) → новые слова (карточки) → проверка новых (тест); ошибки — отдельно */
 export type LessonPart = 'review' | 'new' | 'check' | 'mistakes';
 
-/** Экран тренировки открыт из урока дня (plan/home_redesign.md, шаг 1.3) */
+/** Экран тренировки открыт из урока дня (plan/done/home_redesign.md, шаг 1.3) */
 export interface LessonRouteParams {
   part: LessonPart;
   /** Новые слова урока — для следующих частей */
@@ -128,7 +128,7 @@ export type RootStackParamList = {
   Achievements: undefined;
   NotificationSettings: undefined;
   LearningSettings: undefined;
-  /** «Мои данные» для напоминаний (plan/push_notifications.md, 2.7) */
+  /** «Мои данные» для напоминаний (plan/new/push_notifications.md, 2.7) */
   MyData: undefined;
   SoundSettings: undefined;
   Feedback: undefined;
@@ -194,7 +194,7 @@ export type RootStackParamList = {
     testMode: string;
     questionCount: number;
     timePerQuestion: number;
-    // Учитель включил контроль выхода из приложения (plan/exam_lockdown.md)
+    // Учитель включил контроль выхода из приложения (plan/done/exam_lockdown.md)
     exitControl?: boolean;
   };
   TestExam: {
@@ -206,7 +206,7 @@ export type RootStackParamList = {
     // С какого вопроса начинать — используется при переподключении к уже идущему тесту
     // (см. TestJoinScreen.tsx, alreadyJoined). По умолчанию 0.
     initialQuestionIndex?: number;
-    // Учитель включил контроль выхода из приложения (plan/exam_lockdown.md)
+    // Учитель включил контроль выхода из приложения (plan/done/exam_lockdown.md)
     exitControl?: boolean;
   };
   TestDone: {
@@ -261,7 +261,7 @@ export type RootStackParamList = {
 // ==================== MAIN TABS ====================
 
 export type MainTabParamList = {
-  /** from: 'widget' — открыто ссылкой виджета, главная запускает урок дня (plan/widgets.md, 0.3) */
+  /** from: 'widget' — открыто ссылкой виджета, главная запускает урок дня (plan/new/widgets.md, 0.3) */
   Home: { from?: string; state?: string; family?: string } | undefined;
   Library: undefined;
   TestTab: undefined;
