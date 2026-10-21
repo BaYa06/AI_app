@@ -61,13 +61,15 @@ Apple: таб-бар, кнопки шапки, FAB, нижние панели, �
 - 0.3 ⬜ — проверить в TestFlight: плавность, высота листа, тёмная тема, настройки доходят до тренировки,
   закрытие свайпом / «Отмена», иконки SF Symbols вместо lucide.
 
-## Glass 1 — Swift: `GlassView` ⬜
-Нативный view manager на Swift (по образцу `ios/FlashcardsApp/FlashlyWidgetBridge.swift`):
-`UIVisualEffectView` + `UIGlassEffect`, свойства `tint`, `interactive`, `cornerRadius`.
-Откат на `UIBlurEffect` на iOS < 26. JS-обёртка `src/components/ui/GlassView.tsx`
-(+ `.web.tsx`): на Android / вебе — обычный `View` с текущим фоном.
-Проверить: работает ли анимация нажатия у `interactive`, если внутри RN `Pressable`
-(нажатия обрабатывает RN, а не UIKit). Если нет — `interactive` не используем, нажатие анимирует RN.
+## Glass 1 — Swift: `GlassView` ✅
+ios/FlashcardsApp/GlassView.swift: `RCTView` + `UIVisualEffectView` с `UIGlassEffect` под детьми,
+свойства `tint`, `cornerRadius`, `dark` (тема приложения). JS: src/components/ui/GlassView.ios.tsx
+(+ GlassView.tsx для Android / веба), обязательный `fallbackColor`.
+- **Откат изменён:** на iOS < 26 не blur, а прежний непрозрачный фон (`fallbackColor`) — у старых iOS
+  вид не меняется и нет лишней нагрузки. `isGlassSupported` — из констант view manager
+  (сборка с SDK iOS 26 и устройство на iOS 26).
+- **`interactive` не делаем:** подложка не принимает касания (иначе RN отдаёт ей нажатия детей),
+  а анимация нажатия у стекла работает только с касаниями UIKit. Нажатие анимирует RN, как раньше.
 
 ## Glass 2 — Swift: `GlassContainer` ⬜
 `UIGlassContainerEffect` (параметр `spacing`): соседние стеклянные элементы сливаются и

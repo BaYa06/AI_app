@@ -12,6 +12,8 @@
 		1A2F31A7D5870C95A980158F /* FlashlyWidgetBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = 52B11D15E0DD18295FE59251 /* FlashlyWidgetBridge.m */; };
 		5C3D2A1E9B7F40A1C6E8D201 /* StudyModeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3D2A1E9B7F40A1C6E8D203 /* StudyModeSheet.swift */; };
 		5C3D2A1E9B7F40A1C6E8D202 /* StudyModeSheet.m in Sources */ = {isa = PBXBuildFile; fileRef = 5C3D2A1E9B7F40A1C6E8D204 /* StudyModeSheet.m */; };
+		2639B0F79BDBFFB7C55848E9 /* GlassView.m in Sources */ = {isa = PBXBuildFile; fileRef = 9CD85F392639B0F79BDBFFB7 /* GlassView.m */; };
+		B5949B2B457FFBFC2C5DE380 /* GlassView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01453A1AB5949B2B457FFBFC /* GlassView.swift */; };
 		47EF294445E7B26BAF70668A /* FlashlyWidgetBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3D7608701811AA6E686C4B5 /* FlashlyWidgetBridge.swift */; };
 		761780ED2CA45674006654EE /* AppDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.mm */; };
 		761780EE2CA45674006654EF /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 761780EB2CA45674006654EF /* main.m */; };
@@ -61,6 +63,8 @@
 		52B11D15E0DD18295FE59251 /* FlashlyWidgetBridge.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlashcardsApp/FlashlyWidgetBridge.m; sourceTree = "<group>"; };
 		5C3D2A1E9B7F40A1C6E8D203 /* StudyModeSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/StudyModeSheet.swift; sourceTree = "<group>"; };
 		5C3D2A1E9B7F40A1C6E8D204 /* StudyModeSheet.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlashcardsApp/StudyModeSheet.m; sourceTree = "<group>"; };
+		9CD85F392639B0F79BDBFFB7 /* GlassView.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlashcardsApp/GlassView.m; sourceTree = "<group>"; };
+		01453A1AB5949B2B457FFBFC /* GlassView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/GlassView.swift; sourceTree = "<group>"; };
 		5709B34CF0A7D63546082F79 /* Pods-FlashcardsApp.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-FlashcardsApp.release.xcconfig"; path = "Target Support Files/Pods-FlashcardsApp/Pods-FlashcardsApp.release.xcconfig"; sourceTree = "<group>"; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-FlashcardsApp.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-FlashcardsApp.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		761780EA2CA45674006654EF /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AppDelegate.h; path = FlashcardsApp/AppDelegate.h; sourceTree = "<group>"; };
@@ -122,6 +126,8 @@
 				52B11D15E0DD18295FE59251 /* FlashlyWidgetBridge.m */,
 				5C3D2A1E9B7F40A1C6E8D203 /* StudyModeSheet.swift */,
 				5C3D2A1E9B7F40A1C6E8D204 /* StudyModeSheet.m */,
+				9CD85F392639B0F79BDBFFB7 /* GlassView.m */,
+				01453A1AB5949B2B457FFBFC /* GlassView.swift */,
 				A7D72821F52AE455224D6A08 /* FlashcardsApp-Bridging-Header.h */,
 			);
 			name = FlashcardsApp;
@@ -405,6 +411,8 @@
 				1A2F31A7D5870C95A980158F /* FlashlyWidgetBridge.m in Sources */,
 				5C3D2A1E9B7F40A1C6E8D201 /* StudyModeSheet.swift in Sources */,
 				5C3D2A1E9B7F40A1C6E8D202 /* StudyModeSheet.m in Sources */,
+				2639B0F79BDBFFB7C55848E9 /* GlassView.m in Sources */,
+				B5949B2B457FFBFC2C5DE380 /* GlassView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

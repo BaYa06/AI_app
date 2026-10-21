@@ -27,5 +27,7 @@ export { Chip, Badge, ProgressBar, Switch } from './Controls';
 export type { ChipProps, BadgeProps, BadgeTone, ProgressBarProps, SwitchProps } from './Controls';
 export { Icon, CategoryIcon, CelebrationIcon } from './Icon';
 export type { IconProps, IconSizeName, CategoryIconProps, CelebrationIconProps, CelebrationKind } from './Icon';
+export { GlassView, isGlassSupported } from './GlassView';
+export type { GlassViewProps } from './GlassView';
 export { GoogleLogo } from './GoogleLogo';
 export type { GoogleLogoProps } from './GoogleLogo';
