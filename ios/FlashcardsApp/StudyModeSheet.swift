@@ -22,7 +22,7 @@ class StudyModeSheetModule: RCTEventEmitter, UISheetPresentationControllerDelega
   private var hasListeners = false
   private weak var presented: UIViewController?
 
-  @objc static func requiresMainQueueSetup() -> Bool { false }
+  override static func requiresMainQueueSetup() -> Bool { false }
 
   override func supportedEvents() -> [String]! { [Self.eventName] }
   override func startObserving() { hasListeners = true }

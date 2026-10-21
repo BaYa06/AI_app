@@ -62,9 +62,9 @@ class GlassView: RCTView {
 class GlassViewManager: RCTViewManager {
   override func view() -> UIView! { GlassView() }
 
-  @objc static func requiresMainQueueSetup() -> Bool { true }
+  override static func requiresMainQueueSetup() -> Bool { true }
 
-  @objc func constantsToExport() -> [AnyHashable: Any]! { ["isSupported": GlassView.isSupported] }
+  override func constantsToExport() -> [AnyHashable: Any]! { ["isSupported": GlassView.isSupported] }
 }
 
 /// Контейнер для соседних GlassView (UIGlassContainerEffect): стекло рисуется за один проход,
@@ -124,5 +124,5 @@ class GlassContainer: RCTView {
 class GlassContainerManager: RCTViewManager {
   override func view() -> UIView! { GlassContainer() }
 
-  @objc static func requiresMainQueueSetup() -> Bool { true }
+  override static func requiresMainQueueSetup() -> Bool { true }
 }
