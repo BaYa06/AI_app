@@ -1,6 +1,6 @@
 //
 //  GlassView.m
-//  Регистрация Swift-компонентов GlassView / GlassContainer (Liquid Glass) в React Native.
+//  Регистрация Swift-компонентов GlassView / GlassContainer / GlassTabBar (Liquid Glass) в React Native.
 //
 
 #import <React/RCTViewManager.h>
@@ -16,5 +16,13 @@ RCT_EXPORT_VIEW_PROPERTY(dark, BOOL)
 @interface RCT_EXTERN_MODULE(GlassContainerManager, RCTViewManager)
 
 RCT_EXPORT_VIEW_PROPERTY(spacing, CGFloat)
+
+@end
+
+@interface RCT_EXTERN_MODULE(GlassTabBarManager, RCTViewManager)
+
+RCT_EXPORT_VIEW_PROPERTY(items, NSArray)
+RCT_EXPORT_VIEW_PROPERTY(selectedKey, NSString)
+RCT_EXPORT_VIEW_PROPERTY(onTabPress, RCTDirectEventBlock)
 
 @end

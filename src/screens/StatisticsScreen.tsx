@@ -14,7 +14,7 @@ import {
 import { Text } from '@/components/common';
 import { useThemeColors, useSettingsStore, useCardsStore, useSetsStore, useContextFillStore } from '@/store';
 import { spacing, borderRadius, iconSize, screenPadding, alpha, type ColorToken } from '@/constants';
-import { Button, Card, ProgressBar, type IconComponent } from '@/components/ui';
+import { Button, Card, ProgressBar, useTabBarOverlayInset, type IconComponent } from '@/components/ui';
 import { pluralize } from '@/utils';
 import {
   BookOpen,
@@ -68,6 +68,8 @@ const DAILY_GOAL = 10;
 
 export function StatisticsScreen({ navigation }: any) {
   const colors = useThemeColors();
+  // Контент уходит под плавающую панель вкладок iOS — последний блок должен прокручиваться выше неё
+  const tabBarInset = useTabBarOverlayInset();
   const todayStatsLocal = useSettingsStore((s) => s.todayStats);
 
   const [chartTab, setChartTab] = useState<'week' | 'month' | 'year'>('week');
@@ -257,7 +259,7 @@ export function StatisticsScreen({ navigation }: any) {
     <View style={[st.container, { backgroundColor: colors.background }]}>
       <ScrollView
         style={st.scroll}
-        contentContainerStyle={st.scrollContent}
+        contentContainerStyle={[st.scrollContent, tabBarInset > 0 && { paddingBottom: tabBarInset + spacing.m }]}
         showsVerticalScrollIndicator={false}
       >
         {/* ======== User Hero Card ======== */}

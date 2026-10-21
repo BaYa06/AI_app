@@ -30,7 +30,7 @@ import {
   Flame,
   Sparkles,
 } from 'lucide-react-native';
-import { Badge, CategoryIcon, EmptyState, ErrorState, SkeletonCard, TextField, type IconComponent } from '@/components/ui';
+import { Badge, CategoryIcon, EmptyState, ErrorState, SkeletonCard, TextField, useTabBarOverlayInset, type IconComponent } from '@/components/ui';
 import { pluralize } from '@/utils';
 import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'react-native-svg';
 import { supabase } from '@/services/supabaseClient';
@@ -262,6 +262,9 @@ const BookCard = memo(function BookCard({
 // ---- Main Screen ----
 
 export function LibraryScreen() {
+  // Контент уходит под плавающую панель вкладок iOS — последний блок должен прокручиваться выше неё
+  const tabBarInset = useTabBarOverlayInset();
+  const bottomPad = tabBarInset > 0 ? { paddingBottom: tabBarInset + spacing.m } : null;
   const navigation = useNavigation();
   const colors = useThemeColors();
 
@@ -552,7 +555,7 @@ export function LibraryScreen() {
           onRetry={() => fetchAllSections(userId)}
         />
       ) : nothingToShow ? (
-        <ScrollView style={s.content} contentContainerStyle={s.flexGrow} refreshControl={refreshControl}>
+        <ScrollView style={s.content} contentContainerStyle={[s.flexGrow, bottomPad]} refreshControl={refreshControl}>
           <EmptyState
             icon={Search}
             title="Ничего не найдено"
@@ -561,7 +564,7 @@ export function LibraryScreen() {
         </ScrollView>
       ) : isSearchActive ? (
         /* Search Results - vertical grid with HorizontalCard design */
-        <ScrollView style={s.content} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false} refreshControl={refreshControl}>
+        <ScrollView style={s.content} contentContainerStyle={[s.scrollContent, bottomPad]} showsVerticalScrollIndicator={false} refreshControl={refreshControl}>
           {matchingBooks.length > 0 && (
             <View style={s.section}>
               <View style={s.sectionHeader}>
@@ -590,7 +593,7 @@ export function LibraryScreen() {
           )}
         </ScrollView>
       ) : (
-        <ScrollView style={s.content} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false} refreshControl={refreshControl}>
+        <ScrollView style={s.content} contentContainerStyle={[s.scrollContent, bottomPad]} showsVerticalScrollIndicator={false} refreshControl={refreshControl}>
           {/* Books (каталог учебников) */}
           {books.length > 0 && (
             <View style={s.section}>

@@ -29,6 +29,7 @@ export { Icon, CategoryIcon, CelebrationIcon } from './Icon';
 export type { IconProps, IconSizeName, CategoryIconProps, CelebrationIconProps, CelebrationKind } from './Icon';
 export { GlassView, GlassContainer, isGlassSupported } from './GlassView';
 export type { GlassViewProps, GlassContainerProps } from './GlassView';
+export { GlassTabBar, isGlassTabBarSupported, useTabBarOverlayInset } from './GlassTabBar';
 export { BottomBar } from './BottomBar';
 export type { BottomBarProps } from './BottomBar';
 export { GoogleLogo } from './GoogleLogo';

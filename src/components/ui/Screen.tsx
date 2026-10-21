@@ -22,6 +22,7 @@ import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { useThemeColors } from '@/store';
 import { screenPadding, spacing } from '@/constants';
 import { useEdgeSwipeBack } from '@/hooks/useEdgeSwipeBack';
+import { useTabBarOverlayInset } from './GlassTabBar';
 
 export interface ScreenProps {
   children?: React.ReactNode;
@@ -44,11 +45,15 @@ export interface ScreenProps {
   enableSwipeBack?: boolean;
 }
 
-/** Нижний отступ экрана: safe area, если снизу нет панели вкладок. */
+/**
+ * Нижний отступ экрана: safe area, если снизу нет панели вкладок. На вкладке под плавающей
+ * панелью iOS (GlassTabBar) — её высота с отступом, иначе панель стоит в раскладке и отступ не нужен.
+ */
 export function useScreenBottomInset(): number {
   const insets = useSafeAreaInsets();
   const tabBarHeight = useContext(BottomTabBarHeightContext);
-  return tabBarHeight === undefined ? insets.bottom : 0;
+  const tabBarOverlay = useTabBarOverlayInset();
+  return tabBarHeight === undefined ? insets.bottom : tabBarOverlay;
 }
 
 export function Screen({

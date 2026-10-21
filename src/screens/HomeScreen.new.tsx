@@ -19,7 +19,7 @@ import ReanimatedAnimated, { useSharedValue, withTiming, withSequence, useAnimat
 import { spacing, borderRadius, heights, iconSize, typography, screenPadding, alpha, getDeckAccentColor, animation } from '@/constants';
 import { triggerHaptic } from '@/utils/haptic';
 import { pluralize } from '@/utils';
-import { Button, Card as SurfaceCard, Badge, Dialog, EmptyState, ListRow, ProgressBar, Sheet, TextField, confirmDialog, toast } from '@/components/ui';
+import { Button, Card as SurfaceCard, Badge, Dialog, EmptyState, ListRow, ProgressBar, Sheet, TextField, confirmDialog, toast, useTabBarOverlayInset } from '@/components/ui';
 import {
   Menu,
   Plus,
@@ -190,6 +190,8 @@ export function HomeScreen({ navigation, route }: any) {
   }, []);
   const { width: windowWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  // Контент уходит под плавающую панель вкладок iOS — последний блок должен прокручиваться выше неё
+  const tabBarInset = useTabBarOverlayInset();
   const drawerWidth = useMemo(() => Math.min(windowWidth * 0.8, 320), [windowWidth]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [streakModalVisible, setStreakModalVisible] = useState(false);
@@ -1530,7 +1532,7 @@ export function HomeScreen({ navigation, route }: any) {
       <View style={styles.body}>
         <ScrollView
           style={styles.content}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, tabBarInset > 0 && { paddingBottom: tabBarInset + spacing.m }]}
           showsVerticalScrollIndicator={false}
           bounces
           refreshControl={
