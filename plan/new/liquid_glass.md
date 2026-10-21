@@ -78,7 +78,7 @@ ios/FlashcardsApp/GlassView.swift: `RCTView` + `UIVisualEffectView` с `UIGlassE
 (с `pointerEvents="box-none"` пропускает касания). Проверить в TestFlight: сливаются ли стёкла,
 если GlassView не прямой ребёнок `contentView` (между ними RN-view).
 
-## Glass 3 — шторки, диалоги, тосты ⬜
+## Glass 3 — шторки, диалоги, тосты ✅
 - `Sheet` (src/components/ui/Sheet.tsx, ~18 мест): фон → `GlassView`; как в iOS 26 — отступ от
   краёв и скругление всех углов.
 - `Dialog` (там же): фон → `GlassView`.
@@ -87,6 +87,13 @@ ios/FlashcardsApp/GlassView.swift: `RCTView` + `UIVisualEffectView` с `UIGlassE
 Заодно убрать прыжки в общем `Sheet`: не менять путь анимации, пока лист едет (зафиксировать
 `sheetHeight` на время анимации, `translateY` не пересоздавать при перерисовке).
 `StudyModeSheet` на iOS уже нативный (Glass 0) — его не касается.
+Сделано:
+- `Sheet`: стеклянная подложка, отступ 8 от краёв, скругление 32 со всех сторон. Путь анимации
+  меняется только в покое (высота, измеренная на ходу, применяется после открытия), узел
+  `translateY` один на высоту.
+- `Toast`: стеклянный, выезжает снизу без прозрачности, текст обычного цвета.
+- **`Dialog` оставлен непрозрачным:** он появляется через прозрачность, а стекло с прозрачностью
+  меньше 1 отображается неправильно (и это нарушает правило 3).
 
 ## Glass 4 — таб-бар ⬜
 `MainTabs` в src/navigation/AppNavigator.tsx: `tabBarBackground` → `GlassView`, убрать

@@ -7,8 +7,12 @@
  *
  * По фону закрываем только необязательные окна (меню, выбор); формы с вводом —
  * `dismissOnBackdrop={false}`. Контент монтируется, пока окно видно или закрывается.
+ *
+ * На iOS 26 лист — Liquid Glass (plan/new/liquid_glass.md, Glass 3): отступ от краёв экрана,
+ * скруглены все углы. Dialog остаётся непрозрачным: он появляется через прозрачность,
+ * а стекло с прозрачностью меньше 1 отображается неправильно.
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -28,6 +32,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '@/store';
 import { Text } from '@/components/common/Text';
 import { alpha, animation, borderRadius, screenPadding, spacing } from '@/constants';
+import { GlassView, isGlassSupported } from './GlassView';
 import { ToastHost } from './Toast';
 
 const useNativeDriver = Platform.OS !== 'web';
@@ -59,18 +64,24 @@ function useOverlayAnimation(
 ) {
   const [mounted, setMounted] = useState(visible);
   const progress = useRef(new Animated.Value(0)).current;
+  /** Окно едет (открывается или закрывается) — путь анимации в это время не меняем. */
+  const moving = useRef(false);
+  /** Растёт, когда окно открылось до конца. */
+  const [openedCount, setOpenedCount] = useState(0);
 
   useEffect(() => {
     if (visible) {
       setMounted(true);
       return;
     }
+    moving.current = true;
     Animated.timing(progress, {
       toValue: 0,
       duration: durations.close,
       easing: Easing.in(Easing.cubic),
       useNativeDriver,
     }).start(({ finished }) => {
+      moving.current = false;
       if (finished) setMounted(false);
     });
   }, [visible, progress, durations.close]);
@@ -78,20 +89,27 @@ function useOverlayAnimation(
   useEffect(() => {
     if (!visible || !mounted || !ready) return;
     const frame = requestAnimationFrame(() => {
+      moving.current = true;
       Animated.timing(progress, {
         toValue: 1,
         duration: durations.open,
         easing: Easing.out(Easing.cubic),
         useNativeDriver,
-      }).start();
+      }).start(({ finished }) => {
+        moving.current = false;
+        if (finished) setOpenedCount((n) => n + 1);
+      });
     });
     return () => cancelAnimationFrame(frame);
   }, [visible, mounted, ready, progress, durations.open]);
 
-  return { mounted, progress };
+  return { mounted, progress, moving, openedCount };
 }
 
 const SHEET_DURATIONS = { open: animation.sheet, close: animation.normal };
+/** Стеклянный лист (iOS 26) висит над краями экрана, как системный, и скруглён со всех сторон. */
+const GLASS_SHEET_INSET = spacing.xs;
+const GLASS_SHEET_RADIUS = spacing.xl;
 const DIALOG_DURATIONS = { open: animation.normal, close: animation.fast };
 
 function OverlayHeader({
@@ -136,25 +154,48 @@ export function Sheet({
 }: SheetProps) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
-  const { height } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   // Лист уезжает на свою высоту, а не на высоту экрана: путь короче — движение ровнее.
   // Пока высота не измерена, лист стоит за экраном и анимация не стартует.
   const [sheetHeight, setSheetHeight] = useState(0);
-  const { mounted, progress } = useOverlayAnimation(visible, sheetHeight > 0, SHEET_DURATIONS);
+  const { mounted, progress, moving, openedCount } = useOverlayAnimation(visible, sheetHeight > 0, SHEET_DURATIONS);
+  // Высота, измеренная, пока лист ехал: применяем, когда он остановится
+  const pendingHeight = useRef(0);
 
   useEffect(() => {
     if (!mounted) setSheetHeight(0);
   }, [mounted]);
 
   const handleLayout = useCallback((e: LayoutChangeEvent) => {
-    const next = Math.ceil(e.nativeEvent.layout.height);
-    setSheetHeight((prev) => (Math.abs(prev - next) > 1 ? next : prev));
-  }, []);
+    const next = Math.ceil(e.nativeEvent.layout.height) + (isGlassSupported ? GLASS_SHEET_INSET : 0);
+    // Путь анимации меняется только в покое: иначе лист перескакивает на ходу
+    setSheetHeight((prev) => {
+      if (Math.abs(prev - next) <= 1) return prev;
+      if (prev > 0 && moving.current) {
+        pendingHeight.current = next;
+        return prev;
+      }
+      return next;
+    });
+  }, [moving]);
+
+  useEffect(() => {
+    if (!pendingHeight.current) return;
+    setSheetHeight(pendingHeight.current);
+    pendingHeight.current = 0;
+  }, [openedCount]);
+
+  // Один узел анимации на высоту: новый узел на каждой перерисовке дёргает лист на нативном драйвере
+  const translateY = useMemo(
+    () => progress.interpolate({ inputRange: [0, 1], outputRange: [sheetHeight || height, 0] }),
+    [progress, sheetHeight, height],
+  );
 
   if (!mounted) return null;
 
-  const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [sheetHeight || height, 0] });
-  const bottomPadding = Math.max(insets.bottom, spacing.m);
+  const bottomPadding = isGlassSupported
+    ? Math.max(insets.bottom - GLASS_SHEET_INSET, spacing.m)
+    : Math.max(insets.bottom, spacing.m);
 
   return (
     <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
@@ -173,10 +214,16 @@ export function Sheet({
             onLayout={handleLayout}
             style={[
               styles.sheet,
-              { backgroundColor: colors.surface, maxHeight: height * 0.9, transform: [{ translateY }] },
+              isGlassSupported
+                ? [styles.sheetGlass, { width: Math.min(width - GLASS_SHEET_INSET * 2, 640) }]
+                : { backgroundColor: colors.surface },
+              { maxHeight: height * 0.9, transform: [{ translateY }] },
               style,
             ]}
           >
+            {isGlassSupported ? (
+              <GlassView fallbackColor={colors.surface} cornerRadius={GLASS_SHEET_RADIUS} style={StyleSheet.absoluteFill} />
+            ) : null}
             <View style={[styles.handle, { backgroundColor: alpha(colors.textTertiary, 40) }]} />
             <OverlayHeader title={title} headerRight={headerRight} />
             {scroll ? (
@@ -278,6 +325,10 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 640,
     alignSelf: 'center',
+  },
+  sheetGlass: {
+    marginBottom: GLASS_SHEET_INSET,
+    borderRadius: GLASS_SHEET_RADIUS,
   },
   handle: {
     width: 36,

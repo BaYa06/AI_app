@@ -8,6 +8,9 @@
  *
  * ToastHost — в App.tsx и внутри Sheet / Dialog: системный Modal перекрывает приложение,
  * поэтому тост показывает последний смонтированный хост (окно поверх — его хост).
+ *
+ * На iOS 26 — стеклянная капсула (plan/new/liquid_glass.md, Glass 3): выезжает снизу без
+ * прозрачности (стекло с прозрачностью меньше 1 отображается неправильно), текст обычного цвета.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Platform, StyleSheet, View } from 'react-native';
@@ -16,6 +19,7 @@ import { CheckCircle2, Info, AlertCircle } from 'lucide-react-native';
 import { useThemeColors } from '@/store';
 import { Text } from '@/components/common/Text';
 import { animation, borderRadius, heights, iconSize, screenPadding, spacing } from '@/constants';
+import { GlassView, isGlassSupported } from './GlassView';
 
 export type ToastTone = 'success' | 'info' | 'error';
 
@@ -89,23 +93,31 @@ export function ToastHost({ offset }: { offset?: number } = {}) {
   if (!current) return null;
 
   const Icon = ICONS[current.tone];
-  const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [spacing.m, 0] });
+  const bottom = offset ?? insets.bottom + heights.tabBar + spacing.xs;
+  // Стекло выезжает из-за нижнего края экрана, обычный тост — на 16 с проявлением
+  const translateY = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [isGlassSupported ? bottom + heights.button : spacing.m, 0],
+  });
+  // Инверсная поверхность: тёмный тост в светлой теме, светлый — в тёмной. На стекле — обычный текст
+  const contentColor = isGlassSupported ? colors.textPrimary : colors.textInverse;
 
   return (
-    <View
-      pointerEvents="none"
-      style={[styles.host, { bottom: offset ?? insets.bottom + heights.tabBar + spacing.xs }]}
-    >
+    <View pointerEvents="none" style={[styles.host, { bottom }]}>
       <Animated.View
         accessibilityLiveRegion="polite"
         style={[
           styles.toast,
-          // Инверсная поверхность: тёмный тост в светлой теме, светлый — в тёмной
-          { backgroundColor: colors.textPrimary, opacity: progress, transform: [{ translateY }] },
+          isGlassSupported
+            ? { transform: [{ translateY }] }
+            : { backgroundColor: colors.textPrimary, opacity: progress, transform: [{ translateY }] },
         ]}
       >
-        <Icon size={iconSize.s} color={colors.textInverse} />
-        <Text variant="bodySmall" numberOfLines={2} style={[styles.text, { color: colors.textInverse }]}>
+        {isGlassSupported ? (
+          <GlassView fallbackColor={colors.textPrimary} cornerRadius={borderRadius.xl} style={StyleSheet.absoluteFill} />
+        ) : null}
+        <Icon size={iconSize.s} color={contentColor} />
+        <Text variant="bodySmall" numberOfLines={2} style={[styles.text, { color: contentColor }]}>
           {current.message}
         </Text>
       </Animated.View>
