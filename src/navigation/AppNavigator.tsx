@@ -3,7 +3,7 @@
  * @description Главный навигатор приложения
  */
 import React, { useEffect } from 'react';
-import { Linking, Platform } from 'react-native';
+import { Linking, Platform, StyleSheet } from 'react-native';
 import { triggerHaptic } from '@/utils/haptic';
 import { NavigationContainer, useNavigationContainerRef, type LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -15,6 +15,7 @@ import { getInitialPushData, onPushOpened } from '@/services/pushNotifications';
 import { handlePushOpen } from '@/services/pushOpens';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { typography, iconSize, spacing } from '@/constants';
+import { GlassView, isGlassSupported } from '@/components/ui';
 // Панель вкладок — единственное место с Ionicons (брендбук, раздел 6)
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import ReAnimated, {
@@ -111,6 +112,8 @@ function MainTabs() {
   const tabBarPaddingTop = spacing.xs;
   const tabBarPaddingBottom = insets.bottom > 0 ? insets.bottom : spacing.xs;
   const tabBarHeight = tabBarPaddingTop + iconSize.m + spacing.xxs + typography.caption.lineHeight! + tabBarPaddingBottom;
+  // Стеклянная капсула заканчивается чуть ниже кнопок, над «полоской Home»
+  const glassTabBarBottom = Math.max(tabBarPaddingBottom - spacing.xs, 0);
 
   // Синхронизируем CSS-переменную --app-bg с текущей темой (для ios-pwa-fix.css)
   useEffect(() => {
@@ -131,9 +134,20 @@ function MainTabs() {
         tabBarInactiveTintColor: colors.textTertiary,
         tabBarShowLabel: true,
         tabBarLabelPosition: 'below-icon',
+        // iOS 26: стеклянная капсула на прежнем фоне (plan/new/liquid_glass.md, Glass 4).
+        // Раскладка экранов не меняется: контент под бар не заезжает.
+        tabBarBackground: isGlassSupported
+          ? () => (
+              <GlassView
+                fallbackColor={colors.background}
+                cornerRadius={(tabBarHeight - glassTabBarBottom) / 2}
+                style={[styles.glassTabBar, { bottom: glassTabBarBottom }]}
+              />
+            )
+          : undefined,
         tabBarStyle: {
           backgroundColor: colors.background,
-          borderTopWidth: 1,
+          borderTopWidth: isGlassSupported ? 0 : 1,
           borderTopColor: colors.border,
           elevation: 0,
           shadowOpacity: 0,
@@ -581,3 +595,12 @@ export function AppNavigator() {
     </NavigationContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  glassTabBar: {
+    position: 'absolute',
+    top: 0,
+    left: spacing.xs,
+    right: spacing.xs,
+  },
+});

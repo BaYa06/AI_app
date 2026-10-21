@@ -95,10 +95,14 @@ ios/FlashcardsApp/GlassView.swift: `RCTView` + `UIVisualEffectView` с `UIGlassE
 - **`Dialog` оставлен непрозрачным:** он появляется через прозрачность, а стекло с прозрачностью
   меньше 1 отображается неправильно (и это нарушает правило 3).
 
-## Glass 4 — таб-бар ⬜
+## Glass 4 — таб-бар ✅
 `MainTabs` в src/navigation/AppNavigator.tsx: `tabBarBackground` → `GlassView`, убрать
 `borderTopWidth`, непрозрачный `backgroundColor`, контент виден под баром (проверить нижние
 отступы списков на вкладках). Плавающий таб-бар-капсула — только в Glass 8.
+Сделано (безопасный вариант): стеклянная капсула (`tabBarBackground`) с отступом 8 по бокам на прежнем
+фоне, без линии сверху. **Контент под бар не заезжает** — для этого на Home, Library, Statistics
+пришлось бы вручную менять нижние отступы ~25 списков и плавающих элементов. Если после TestFlight
+захочется — отдельный шаг: `position: 'absolute'` у бара + `useScreenBottomInset` с высотой бара.
 
 ## Glass 5 — шапка экрана ⬜
 `ScreenHeader` (src/components/ui/ScreenHeader.tsx, 28 экранов): кнопка «назад» и правые
