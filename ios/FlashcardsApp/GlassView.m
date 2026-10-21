@@ -12,3 +12,9 @@ RCT_EXPORT_VIEW_PROPERTY(cornerRadius, CGFloat)
 RCT_EXPORT_VIEW_PROPERTY(dark, BOOL)
 
 @end
+
+@interface RCT_EXTERN_MODULE(GlassContainerManager, RCTViewManager)
+
+RCT_EXPORT_VIEW_PROPERTY(spacing, CGFloat)
+
+@end

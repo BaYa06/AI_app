@@ -3,6 +3,7 @@
  *
  * Стекло есть только на iOS 26 (GlassView.ios.tsx). Здесь — обычный View с `fallbackColor`:
  * элемент выглядит как раньше. Стекло — только для навигации и управления, не для контента.
+ * GlassContainer (Glass 2) — общий контейнер для соседних GlassView; здесь — обычный View.
  */
 import React, { memo } from 'react';
 import { View, type ViewProps } from 'react-native';
@@ -20,4 +21,13 @@ export const isGlassSupported = false;
 
 export const GlassView = memo(function GlassView({ fallbackColor, tint: _tint, cornerRadius = 0, style, ...rest }: GlassViewProps) {
   return <View {...rest} style={[{ backgroundColor: fallbackColor, borderRadius: cornerRadius }, style]} />;
+});
+
+export interface GlassContainerProps extends ViewProps {
+  /** На каком расстоянии соседние стёкла начинают сливаться (0 — не сливаются). */
+  spacing?: number;
+}
+
+export const GlassContainer = memo(function GlassContainer({ spacing: _spacing, ...rest }: GlassContainerProps) {
+  return <View {...rest} />;
 });

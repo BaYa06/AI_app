@@ -71,9 +71,12 @@ ios/FlashcardsApp/GlassView.swift: `RCTView` + `UIVisualEffectView` с `UIGlassE
 - **`interactive` не делаем:** подложка не принимает касания (иначе RN отдаёт ей нажатия детей),
   а анимация нажатия у стекла работает только с касаниями UIKit. Нажатие анимирует RN, как раньше.
 
-## Glass 2 — Swift: `GlassContainer` ⬜
+## Glass 2 — Swift: `GlassContainer` ✅
 `UIGlassContainerEffect` (параметр `spacing`): соседние стеклянные элементы сливаются и
 перетекают, как в системе, и рисуются за один проход. JS-обёртка рядом с `GlassView`.
+Дети кладутся в `contentView` контейнера; пустое место контейнера ведёт себя как обычный `View`
+(с `pointerEvents="box-none"` пропускает касания). Проверить в TestFlight: сливаются ли стёкла,
+если GlassView не прямой ребёнок `contentView` (между ними RN-view).
 
 ## Glass 3 — шторки, диалоги, тосты ⬜
 - `Sheet` (src/components/ui/Sheet.tsx, ~18 мест): фон → `GlassView`; как в iOS 26 — отступ от
