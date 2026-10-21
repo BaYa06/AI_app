@@ -23,7 +23,7 @@ import {
 import { Text } from '@/components/common';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha, type ColorToken } from '@/constants';
-import { Badge, toast } from '@/components/ui';
+import { Badge, toast, BottomBar } from '@/components/ui';
 import { supabase } from '@/services/supabaseClient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
@@ -446,21 +446,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
       </ScrollView>
 
       {/* Footer CTA */}
-      <View
-        style={[
-          styles.footer,
-          {
-            paddingBottom: insets.bottom + 16,
-            borderTopColor: cardBorder,
-            ...Platform.select({
-              web: {
-                background: `linear-gradient(to top, ${colors.background} 70%, transparent)`,
-              },
-            }) as any,
-            backgroundColor: Platform.OS !== 'web' ? colors.background : undefined,
-          },
-        ]}
-      >
+      <BottomBar webFade={70} style={[styles.footer, { paddingBottom: insets.bottom + 16, borderTopColor: cardBorder }]}>
         <View style={styles.footerRow}>
           <Pressable accessibilityRole="button"
             style={({ pressed }) => [
@@ -484,7 +470,7 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
             <Text style={[styles.ctaText, { color: colors.onPrimary }]}>Выгрузить</Text>
           </Pressable>
         </View>
-      </View>
+      </BottomBar>
     </View>
   );
 }

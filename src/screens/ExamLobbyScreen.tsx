@@ -25,7 +25,7 @@ import {
   ChevronDown,
 } from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { Switch } from '@/components/ui';
+import { Switch, BottomBar } from '@/components/ui';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha } from '@/constants';
 import { supabase } from '@/services/supabaseClient';
@@ -390,20 +390,7 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
       </ScrollView>
 
       {/* Footer CTA */}
-      <View
-        style={[
-          styles.footer,
-          {
-            paddingBottom: insets.bottom + 16,
-            ...Platform.select({
-              web: {
-                background: `linear-gradient(to top, ${colors.background} 60%, transparent)`,
-              },
-            }) as any,
-            backgroundColor: Platform.OS !== 'web' ? colors.background : undefined,
-          },
-        ]}
-      >
+      <BottomBar style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
         <Pressable accessibilityRole="button"
           style={({ pressed }) => [
             styles.ctaBtn,
@@ -461,7 +448,7 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
             </>
           )}
         </Pressable>
-      </View>
+      </BottomBar>
     </View>
   );
 }

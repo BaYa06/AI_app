@@ -12,7 +12,7 @@ import { useSetsStore, useCardsStore, useThemeColors, selectSetStats, useSetting
 import { Container, Text, Loading } from '@/components/common';
 import { StudyModeSheet, type StudyMode } from '@/components/study/StudyModeSheet';
 import { spacing, borderRadius, iconSize, alpha, config } from '@/constants';
-import { EmptyState, ProgressBar, toast } from '@/components/ui';
+import { BottomBar, EmptyState, ProgressBar, toast } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card } from '@/types';
 import { DatabaseService, LibraryService, Analytics, NeonService, BookService } from '@/services';
@@ -786,15 +786,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
         updateCellsBatchingPeriod={50}
       />
 
-      <View
-        style={[
-          styles.bottomBar,
-          {
-            borderTopColor: colors.border,
-            backgroundColor: colors.surface,
-          },
-        ]}
-      >
+      <BottomBar color={colors.surface} style={[styles.bottomBar, { borderTopColor: colors.border }]}>
         <Pressable accessibilityRole="button"
           onPress={() => { triggerHaptic('selection'); openAddCardSheet(); }}
           style={[styles.secondaryAction, { borderColor: colors.border }]}
@@ -814,7 +806,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
             Будет включено: {filteredCards.length || set.cardCount}
           </Text>
         </Pressable>
-      </View>
+      </BottomBar>
 
       {actionCardId && (
         <View style={[styles.sheetWrapper, { zIndex: 25 }]} pointerEvents="box-none">

@@ -16,7 +16,7 @@ import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha } from '@/constants';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
-import { CelebrationIcon } from '@/components/ui';
+import { CelebrationIcon, BottomBar } from '@/components/ui';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OralTestResults'>;
 
@@ -127,20 +127,7 @@ export function OralTestResultsScreen({ navigation, route }: Props) {
       </ScrollView>
 
       {/* Footer buttons */}
-      <View
-        style={[
-          styles.footer,
-          {
-            paddingBottom: insets.bottom + 16,
-            ...Platform.select({
-              web: {
-                background: `linear-gradient(to top, ${colors.background} 60%, transparent)`,
-              },
-            }) as any,
-            backgroundColor: Platform.OS !== 'web' ? colors.background : undefined,
-          },
-        ]}
-      >
+      <BottomBar style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
         <Pressable accessibilityRole="button"
           onPress={() =>
             navigation.replace('OralTestLobby', { courseId, courseTitle })
@@ -166,7 +153,7 @@ export function OralTestResultsScreen({ navigation, route }: Props) {
         >
           <Text style={[styles.primaryText, { color: colors.onPrimary }]}>Готово</Text>
         </Pressable>
-      </View>
+      </BottomBar>
     </View>
   );
 }

@@ -14,7 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Users, Check, StopCircle, ClipboardList, LogOut } from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { Badge, Button, confirmDialog, toast } from '@/components/ui';
+import { Badge, Button, confirmDialog, toast, BottomBar } from '@/components/ui';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha, type ColorToken, iconSize } from '@/constants';
 import { supabase } from '@/services/supabaseClient';
@@ -497,20 +497,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
       </ScrollView>
 
       {/* Footer */}
-      <View
-        style={[
-          styles.footer,
-          {
-            paddingBottom: insets.bottom + 16,
-            ...Platform.select({
-              web: {
-                background: `linear-gradient(to top, ${colors.background} 60%, transparent)`,
-              },
-            }) as any,
-            backgroundColor: Platform.OS !== 'web' ? colors.background : undefined,
-          },
-        ]}
-      >
+      <BottomBar style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
         <Pressable accessibilityRole="button"
           style={({ pressed }) => [
             styles.endBtn,
@@ -528,7 +515,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
             </>
           )}
         </Pressable>
-      </View>
+      </BottomBar>
     </View>
   );
 }

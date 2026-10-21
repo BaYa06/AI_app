@@ -31,6 +31,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 
 import { API_BASE } from '@/config/apiBase';
 import { describeTestError } from '@/utils/testApiErrors';
+import { BottomBar } from '@/components/ui';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TestLobby'>;
 
@@ -336,20 +337,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
       </ScrollView>
 
       {/* Footer CTA */}
-      <View
-        style={[
-          styles.footer,
-          {
-            paddingBottom: insets.bottom + 16,
-            ...Platform.select({
-              web: {
-                background: `linear-gradient(to top, ${colors.background} 60%, transparent)`,
-              },
-            }) as any,
-            backgroundColor: Platform.OS !== 'web' ? colors.background : undefined,
-          },
-        ]}
-      >
+      <BottomBar style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
         <Pressable accessibilityRole="button"
           style={({ pressed }) => [
             styles.ctaBtn,
@@ -368,7 +356,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
             </>
           )}
         </Pressable>
-      </View>
+      </BottomBar>
     </View>
   );
 }

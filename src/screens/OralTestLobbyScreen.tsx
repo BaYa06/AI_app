@@ -17,7 +17,7 @@ import { useThemeColors, useSetsStore, useCardsStore } from '@/store';
 import { spacing, borderRadius, alpha } from '@/constants';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
-import { toast } from '@/components/ui';
+import { toast, BottomBar } from '@/components/ui';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OralTestLobby'>;
 
@@ -151,20 +151,7 @@ export function OralTestLobbyScreen({ navigation, route }: Props) {
       </ScrollView>
 
       {/* Footer CTA */}
-      <View
-        style={[
-          styles.footer,
-          {
-            paddingBottom: insets.bottom + 16,
-            ...Platform.select({
-              web: {
-                background: `linear-gradient(to top, ${colors.background} 60%, transparent)`,
-              },
-            }) as any,
-            backgroundColor: Platform.OS !== 'web' ? colors.background : undefined,
-          },
-        ]}
-      >
+      <BottomBar style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
         <Pressable accessibilityRole="button"
           style={({ pressed }) => [
             styles.ctaBtn,
@@ -177,7 +164,7 @@ export function OralTestLobbyScreen({ navigation, route }: Props) {
           <Mic size={20} color={colors.onPrimary} />
           <Text style={[styles.ctaText, { color: colors.onPrimary }]}>Начать тренировку</Text>
         </Pressable>
-      </View>
+      </BottomBar>
     </View>
   );
 }

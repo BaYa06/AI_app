@@ -25,8 +25,8 @@ Apple: таб-бар, кнопки шапки, FAB, нижние панели, �
 4. **Не ставить стекло на контент:** `Card`, `LessonCard`, `ChallengeTiles`, ячейки списков, игровые
    экраны (Match, WordBuilder, StudyScreen), `ProgressBar`, `Badge`, `Chip` в контенте. Превью карточки
    с blur в SetDetailScreen остаётся обычным blur.
-5. **Откат:** iOS < 26 — `UIBlurEffect` (как сейчас `@react-native-community/blur`); Android и веб —
-   текущий фон. «Понижение прозрачности» система обрабатывает сама.
+5. **Откат:** iOS < 26, Android и веб — прежний непрозрачный фон (`fallbackColor`), вид не меняется.
+   «Понижение прозрачности» система обрабатывает сама.
 6. Код под iOS 26 — за `#available(iOS 26, *)` и `#if compiler(>=6.2)`, чтобы проект собирался и
    на старом Xcode.
 
@@ -115,11 +115,18 @@ ios/FlashcardsApp/GlassView.swift: `RCTView` + `UIVisualEffectView` с `UIGlassE
 на iOS 26 — стеклянные круги, нажатие — масштабом, а не прозрачностью. Те же кнопки в контенте
 остаются обычными. Текстовые кнопки в шапке («Готово» и т. п.) не меняются. Фон шапки прежний.
 
-## Glass 6 — FAB и нижние панели ⬜
+## Glass 6 — FAB и нижние панели ✅
 - FAB на главной (`styles.fab` в src/screens/HomeScreen.tsx): `GlassView` с tint основного цвета.
 - Нижние панели с кнопками (`footer` / `bottomBar`, 14 экранов: лобби тестов, итоги, Welcome,
   вход и др.): вынести общий `BottomBar` в src/components/ui/ со стеклянным фоном; главная кнопка
   остаётся залитой брендовым цветом. Можно разбить на несколько коммитов.
+Сделано:
+- **FAB нет:** он был в старом HomeScreen.tsx, а в приложении — HomeScreen.new.tsx без FAB.
+- Общий `BottomBar` (src/components/ui/BottomBar.tsx): стекло на iOS 26, прежний фон на iOS < 26
+  и Android, градиент в вебе. Переведены плавающие панели поверх прокрутки (7 экранов): SetDetail
+  («Учить всё»), LiveTest, TestLobby, ExamLobby, OralTestLobby, OralTestResults, TestResultsTeacher.
+- Футеры внутри раскладки (Welcome, SignIn, OTPVerify, OralTestSession) не трогали: под ними нет
+  прокрутки, и это текст или одиночная кнопка.
 
 ## Glass 7 — меню и боковая панель (по желанию) ⬜
 - `SetsSectionMenu` (src/components/home/SetsSectionMenu.tsx): нативный `UIMenu` на Swift
