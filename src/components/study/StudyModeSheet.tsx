@@ -4,6 +4,7 @@
  * экранов (раньше была продублирована в обоих и успела разойтись по функциональности).
  * Оформление — общий нижний лист `Sheet` (брендбук, 7.6): анимация на нативном драйвере,
  * контент монтируется только пока лист виден или закрывается.
+ * На iOS — нативная шторка (nativeStudyModeSheet.ts, plan/new/liquid_glass.md, Glass 0).
  */
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
@@ -14,6 +15,7 @@ import { Button, Chip, Sheet, Switch, type IconComponent } from '@/components/ui
 import { heights, spacing } from '@/constants';
 import { GameRow } from './GameRow';
 import { RecommendedModeCard } from './RecommendedModeCard';
+import { isNativeStudyModeSheet, useNativeStudyModeSheet } from './nativeStudyModeSheet';
 
 export type StudyMode = 'classic' | 'match' | 'multipleChoice' | 'wordBuilder' | 'audio' | 'contextFill';
 export type WordLimit = '10' | '20' | '30' | 'all';
@@ -54,14 +56,20 @@ interface Props {
 
 const WORD_LIMIT_OPTIONS: WordLimit[] = ['10', '20', '30', 'all'];
 
-export function StudyModeSheet({
+export function StudyModeSheet({ games = DEFAULT_STUDY_MODE_GAMES, ...props }: Props) {
+  useNativeStudyModeSheet({ ...props, games });
+  if (isNativeStudyModeSheet) return null;
+  return <StudyModeSheetRN {...props} games={games} />;
+}
+
+function StudyModeSheetRN({
   visible,
   onClose,
   subtitle,
   onSelectMode,
-  games = DEFAULT_STUDY_MODE_GAMES,
+  games,
   settings,
-}: Props) {
+}: Props & { games: StudyModeGame[] }) {
   const colors = useThemeColors();
 
   return (
