@@ -4,6 +4,7 @@
  * Высота 56, фон background, без тени. Слева «назад» 44×44 (ArrowLeft 24).
  * nested (по умолчанию) — заголовок по центру 16/600; root — слева, h2 (корневые вкладки).
  * Разделитель снизу — только на экранах со скроллом (`bordered`).
+ * На iOS 26 кнопки-иконки шапки — стеклянные круги в одном GlassContainer (Glass 5).
  */
 import React, { memo } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
@@ -12,6 +13,8 @@ import { useThemeColors } from '@/store';
 import { Text } from '@/components/common/Text';
 import { heights, screenPadding, spacing, typography } from '@/constants';
 import { Button } from './Button';
+import { GlassContainer } from './GlassView';
+import { GlassControlsContext } from './glassContext';
 import type { IconComponent } from './types';
 
 export interface ScreenHeaderProps {
@@ -49,45 +52,47 @@ export const ScreenHeader = memo(function ScreenHeader({
   ) : null;
 
   return (
-    <View
-      style={[
-        styles.header,
-        { backgroundColor: colors.background },
-        bordered && { borderBottomWidth: 1, borderBottomColor: colors.border },
-        style,
-      ]}
-    >
-      {isRoot ? (
-        <>
-          {back}
-          <View style={styles.rootTitle}>
-            {center ?? (
-              <Text variant="h2" numberOfLines={1} accessibilityRole="header" style={{ color: colors.textPrimary }}>
-                {title}
-              </Text>
-            )}
-          </View>
-          {right ? <View style={styles.rightRoot}>{right}</View> : null}
-        </>
-      ) : (
-        <>
-          {/* Боковые слоты одинаковой ширины — заголовок строго по центру */}
-          <View style={styles.side}>{back}</View>
-          <View style={styles.center}>
-            {center ?? (
-              <Text
-                numberOfLines={1}
-                accessibilityRole="header"
-                style={[typography.button, styles.nestedTitle, { color: colors.textPrimary }]}
-              >
-                {title}
-              </Text>
-            )}
-          </View>
-          <View style={[styles.side, styles.sideRight]}>{right}</View>
-        </>
-      )}
-    </View>
+    <GlassControlsContext.Provider value>
+      <GlassContainer
+        style={[
+          styles.header,
+          { backgroundColor: colors.background },
+          bordered && { borderBottomWidth: 1, borderBottomColor: colors.border },
+          style,
+        ]}
+      >
+        {isRoot ? (
+          <>
+            {back}
+            <View style={styles.rootTitle}>
+              {center ?? (
+                <Text variant="h2" numberOfLines={1} accessibilityRole="header" style={{ color: colors.textPrimary }}>
+                  {title}
+                </Text>
+              )}
+            </View>
+            {right ? <View style={styles.rightRoot}>{right}</View> : null}
+          </>
+        ) : (
+          <>
+            {/* Боковые слоты одинаковой ширины — заголовок строго по центру */}
+            <View style={styles.side}>{back}</View>
+            <View style={styles.center}>
+              {center ?? (
+                <Text
+                  numberOfLines={1}
+                  accessibilityRole="header"
+                  style={[typography.button, styles.nestedTitle, { color: colors.textPrimary }]}
+                >
+                  {title}
+                </Text>
+              )}
+            </View>
+            <View style={[styles.side, styles.sideRight]}>{right}</View>
+          </>
+        )}
+      </GlassContainer>
+    </GlassControlsContext.Provider>
   );
 });
 

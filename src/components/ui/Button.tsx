@@ -6,10 +6,11 @@
  * quiet     — без фона и рамки: «Отмена», «Пропустить», ссылки.
  * danger    — текст errorText без заливки; `filled` — заливка error (только в окне подтверждения).
  * icon      — круг 44×44 с иконкой 24 на surfaceMuted: «назад», «ещё», «закрыть».
+ *             В шапке на iOS 26 — стеклянный круг (GlassControlsContext, Glass 5).
  *
  * Неактивная — прозрачность 0.5. Загрузка — спиннер вместо текста, ширина не меняется.
  */
-import React, { memo } from 'react';
+import React, { memo, useContext } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -23,6 +24,8 @@ import {
 import { useThemeColors } from '@/store';
 import { Text } from '@/components/common/Text';
 import { borderRadius, heights, iconSize, spacing, typography } from '@/constants';
+import { GlassView, isGlassSupported } from './GlassView';
+import { GlassControlsContext } from './glassContext';
 import type { IconComponent } from './types';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'quiet' | 'danger';
@@ -66,6 +69,7 @@ export type ButtonProps = TextButtonProps | IconButtonProps;
 
 export const Button = memo(function Button(props: ButtonProps) {
   const colors = useThemeColors();
+  const inGlassControls = useContext(GlassControlsContext);
 
   if (props.variant === 'icon') {
     const {
@@ -81,6 +85,7 @@ export const Button = memo(function Button(props: ButtonProps) {
       ...rest
     } = props;
     const isDisabled = disabled || loading;
+    const glass = inGlassControls && isGlassSupported && background === 'muted';
     return (
       <Pressable
         accessibilityRole="button"
@@ -91,13 +96,22 @@ export const Button = memo(function Button(props: ButtonProps) {
         hitSlop={spacing.xxs}
         style={({ pressed }) => [
           styles.iconButton,
-          background === 'muted' && { backgroundColor: colors.surfaceMuted },
-          pressed && styles.pressed,
+          background === 'muted' && !glass && { backgroundColor: colors.surfaceMuted },
+          // Стекло с прозрачностью меньше 1 отображается неправильно — нажатие масштабом
+          pressed && (glass ? styles.pressedScale : styles.pressed),
           isDisabled && styles.disabled,
           style,
         ]}
         {...rest}
       >
+        {glass ? (
+          <GlassView
+            pointerEvents="none"
+            fallbackColor={colors.surfaceMuted}
+            cornerRadius={heights.touch / 2}
+            style={StyleSheet.absoluteFill}
+          />
+        ) : null}
         {loading ? (
           <ActivityIndicator size="small" color={colors.textSecondary} />
         ) : (
