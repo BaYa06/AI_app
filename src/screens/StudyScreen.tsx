@@ -66,6 +66,8 @@ export function StudyScreen({ navigation, route }: Props) {
   const currentTotalPhaseCards = useRef(totalPhaseCards || 0);
   // Количество ошибочных карточек из прошлых порций в текущей очереди
   const pendingCardsInQueueRef = useRef(0);
+  // Длина очереди без повторов «Почти» — по ней итоги сессии; повторы идут после неё
+  const baseQueueLengthRef = useRef(0);
   // Analytics: момент показа текущей карточки
   const cardShownAtRef = useRef(Date.now());
   
@@ -246,6 +248,7 @@ export function StudyScreen({ navigation, route }: Props) {
       return;
     }
 
+    baseQueueLengthRef.current = queue.length;
     startSession(
       {
         setId,
@@ -281,15 +284,23 @@ export function StudyScreen({ navigation, route }: Props) {
 
       // Логика: 1,2 = ошибка, 3,4 = правильно
       const isCorrect = rating >= 3;
+      // Повтор слова, на которое ответили «Почти»: в статистику дня, урок и аналитику не идёт —
+      // это то же слово. Уровень по-прежнему отправляем, сервер сам решит (plan/new/card_rating.md)
+      const isRepeat = Boolean(session) && session!.currentIndex >= baseQueueLengthRef.current;
+      // «Почти» — слово ещё раз в конце сессии: один раз и только если после него есть другие слова
+      const repeatLater =
+        rating === 3 && !isRepeat && Boolean(session) && session!.currentIndex + 1 < session!.queue.length;
 
       // Analytics: card_answered
       const ratingMap: Record<number, 'again' | 'hard' | 'good' | 'easy'> = { 1: 'again', 2: 'hard', 3: 'good', 4: 'easy' };
-      Analytics.cardAnswered({
-        correct: isCorrect,
-        rating: ratingMap[rating],
-        timeSpentMs: Date.now() - cardShownAtRef.current,
-        mode: 'flashcard',
-      });
+      if (!isRepeat) {
+        Analytics.cardAnswered({
+          correct: isCorrect,
+          rating: ratingMap[rating],
+          timeSpentMs: Date.now() - cardShownAtRef.current,
+          mode: 'flashcard',
+        });
+      }
       
       // Если ошибка, добавляем в список ошибочных карточек (с id для фаз)
       if (!isCorrect) {
@@ -303,7 +314,7 @@ export function StudyScreen({ navigation, route }: Props) {
 
       // Урок дня: считаем по состоянию карточки до ответа
       const lessonPhase = lessonPhaseForAnswer(lesson?.part, currentCard);
-      if (lessonPhase) useLessonStore.getState().recordAnswer(lessonPhase, currentCard.id);
+      if (lessonPhase && !isRepeat) useLessonStore.getState().recordAnswer(lessonPhase, currentCard.id);
       // Самооценка: уровень считает сервер (очков рейтинга она не даёт — план §1.3), экран обновляется сразу
       ProgressService.recordAnswer(currentCard, {
         mode: 'flashcard',
@@ -321,15 +332,15 @@ export function StudyScreen({ navigation, route }: Props) {
         masteredCount: statsSnapshot.masteredCount,
       });
 
-      // Обновляем статистику только для правильных ответов (rating >= 3)
-      if (isCorrect) {
+      // Обновляем статистику только для правильных ответов (rating >= 3), повтор не считаем
+      if (isCorrect && !isRepeat) {
         incrementTodayCards();
       }
 
       // Переход к следующей карточке
       if (session && session.currentIndex + 1 >= session.queue.length) {
         // Переходим на экран результатов
-        const totalCards = session.queue.length;
+        const totalCards = baseQueueLengthRef.current;
         const finalErrorCards = isCorrect ? errorCards : [...errorCards, {
           id: currentCard.id,
           front: currentCard.frontText ?? (currentCard as any).front ?? '',
@@ -433,7 +444,14 @@ export function StudyScreen({ navigation, route }: Props) {
         useStudyStore.setState((s) => ({
           ...s,
           session: s.session
-            ? { ...s.session, currentIndex: s.session.currentIndex + 1 }
+            ? {
+                ...s.session,
+                currentIndex: s.session.currentIndex + 1,
+                // Повтор «Почти» — в конец очереди; знаменатель прогресса растёт, чтобы полоса не ушла за 100%
+                ...(repeatLater
+                  ? { queue: [...s.session.queue, currentCard.id], totalCards: s.session.totalCards + 1 }
+                  : {}),
+              }
             : null,
           isFlipped: false,
         }));
