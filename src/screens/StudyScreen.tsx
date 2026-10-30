@@ -85,6 +85,8 @@ export function StudyScreen({ navigation, route }: Props) {
   // Свайп: сдвиг карточки за пальцем и «карточка улетает» — пока летит, кнопки не принимаются
   const swipeX = useSharedValue(0);
   const swipeFlying = useSharedValue(false);
+  // Палец за порогом свайпа — вибрация при каждом пересечении порога
+  const swipePastThreshold = useSharedValue(false);
   
   // Store
   const updateLastStudied = useSetsStore((s) => s.updateLastStudied);
@@ -292,6 +294,7 @@ export function StudyScreen({ navigation, route }: Props) {
       answeringRef.current = false;
       swipeFlying.value = false;
       swipeX.value = 0;
+      swipePastThreshold.value = false;
       flipProgress.value = 0;
     }
   }, [session?.currentIndex]);
@@ -596,12 +599,18 @@ export function StudyScreen({ navigation, route }: Props) {
     .onUpdate((e) => {
       if (swipeFlying.value) return;
       swipeX.value = e.translationX;
+      const past = Math.abs(e.translationX) >= SWIPE_DISTANCE;
+      if (past !== swipePastThreshold.value) {
+        swipePastThreshold.value = past;
+        runOnJS(triggerHaptic)('selection');
+      }
     })
     .onEnd((e) => {
       if (swipeFlying.value) return;
       const flick = Math.abs(e.velocityX) > SWIPE_VELOCITY && Math.sign(e.velocityX) === Math.sign(e.translationX);
       if (Math.abs(e.translationX) < SWIPE_DISTANCE && !flick) {
         swipeX.value = withSpring(0, { damping: 18, stiffness: 220 });
+        swipePastThreshold.value = false;
         return;
       }
       const direction = e.translationX > 0 ? 1 : -1;
@@ -615,6 +624,15 @@ export function StudyScreen({ navigation, route }: Props) {
     'worklet';
     const rotate = interpolate(swipeX.value, [-CARD_WIDTH, 0, CARD_WIDTH], [-12, 0, 12], Extrapolation.CLAMP);
     return { transform: [{ translateX: swipeX.value }, { rotate: `${rotate}deg` }] };
+  });
+  // Подписи свайпа проступают вместе со сдвигом и на пороге видны полностью
+  const swipeLeftStyle = useAnimatedStyle(() => {
+    'worklet';
+    return { opacity: interpolate(-swipeX.value, [0, SWIPE_DISTANCE], [0, 1], Extrapolation.CLAMP) };
+  });
+  const swipeRightStyle = useAnimatedStyle(() => {
+    'worklet';
+    return { opacity: interpolate(swipeX.value, [0, SWIPE_DISTANCE], [0, 1], Extrapolation.CLAMP) };
   });
 
   // Заранее озвучиваем вопрос и ответ текущей и следующей карточки — кнопка динамика играет сразу
@@ -778,6 +796,24 @@ export function StudyScreen({ navigation, route }: Props) {
                   <View style={styles.cardBottom} />
                 </View>
               </ReAnimated.View>
+
+              {/* Подписи свайпа: влево — «Не знаю», вправо — «Уверенно» */}
+              <ReAnimated.View
+                pointerEvents="none"
+                style={[styles.swipeOverlay, { borderColor: colors.ratingAgain, backgroundColor: alpha(colors.ratingAgain, 10) }, swipeLeftStyle]}
+              >
+                <View style={[styles.swipeLabel, { borderColor: colors.ratingAgain, backgroundColor: colors.surface }]}>
+                  <Text variant="label" style={{ color: colors.errorText }}>Не знаю</Text>
+                </View>
+              </ReAnimated.View>
+              <ReAnimated.View
+                pointerEvents="none"
+                style={[styles.swipeOverlay, { borderColor: colors.ratingGood, backgroundColor: alpha(colors.ratingGood, 10) }, swipeRightStyle]}
+              >
+                <View style={[styles.swipeLabel, { borderColor: colors.ratingGood, backgroundColor: colors.surface }]}>
+                  <Text variant="label" style={{ color: colors.successText }}>Уверенно</Text>
+                </View>
+              </ReAnimated.View>
             </Pressable>
           </ReAnimated.View>
         </GestureDetector>
@@ -896,6 +932,20 @@ const styles = StyleSheet.create({
     // Без overflow:'hidden': фон и рамка сами скругляются через borderRadius,
     // а маска слоя (masksToBounds) в связке с 3D-трансформом на iOS
     // рендерится offscreen и может срезать верх глифов.
+  },
+  // Подпись свайпа поверх карточки: рамка и лёгкая заливка цветом оценки, плашка сверху
+  swipeOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: borderRadius.xl,
+    borderWidth: 2,
+    alignItems: 'center',
+    paddingTop: spacing.l,
+  },
+  swipeLabel: {
+    borderWidth: 2,
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.xxs,
   },
   cardTopRow: {
     flexDirection: 'row',
