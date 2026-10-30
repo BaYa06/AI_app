@@ -19,12 +19,13 @@ import { spacing, borderRadius, iconSize, TOP_LANGUAGES, alpha } from '@/constan
 import { Button, CategoryIcon, toast, useScreenBottomInset } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { SetCategory } from '@/types';
-import { ArrowLeftRight, Check, ChevronDown, Globe, Link2 } from 'lucide-react-native';
+import { ArrowLeftRight, Check, ChevronDown, Globe, Link2, Share2 } from 'lucide-react-native';
 import { LibraryService, ShareService, Analytics } from '@/services';
 import { supabase } from '@/services/supabaseClient';
 import { LIBRARY_CATEGORIES } from '@/constants/library';
 import { describeError } from '@/utils/userErrors';
 import { confirmAction } from '@/utils/dialogs';
+import { canShareSet, useShareSet } from '@/components/share/useShareSet';
 import { pluralize } from '@/utils';
 import { COMMUNITY_LIBRARY_ENABLED } from '@/config/features';
 
@@ -164,17 +165,19 @@ export function SetEditorScreen({ navigation, route }: Props) {
     })();
   }, [isEditing, setId]);
 
-  // Доступ по ссылке (plan/new/share_set.md, Share 3): блок виден, только пока ссылка действует
+  // «Поделиться набором» (plan/new/share_set.md, Share 3): кнопка — здесь, в редакторе своего набора;
+  // пока ссылка действует, под ней — сколько открыли/добавили и «Закрыть доступ»
+  const canShare = isEditing && canShareSet(existingSet);
   const [shareLink, setShareLink] = useState<{ views: number; imports: number } | null>(null);
   const [isDisablingShare, setIsDisablingShare] = useState(false);
+  const loadShareLink = useCallback(() => {
+    if (!setId) return;
+    ShareService.getStatus(setId).then(setShareLink).catch(() => {});
+  }, [setId]);
   useEffect(() => {
-    if (!isEditing || !setId) return;
-    let cancelled = false;
-    ShareService.getStatus(setId)
-      .then((status) => { if (!cancelled) setShareLink(status); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [isEditing, setId]);
+    if (canShare) loadShareLink();
+  }, [canShare, loadShareLink]);
+  const { share, isSharing } = useShareSet(loadShareLink);
 
   const handleDisableShare = useCallback(async () => {
     if (!setId) return;
@@ -745,33 +748,43 @@ export function SetEditorScreen({ navigation, route }: Props) {
               </View>
             )}
 
-            {isEditing && !isReadOnly && shareLink && (
+            {canShare && existingSet && (
               <View style={styles.field}>
                 <Text variant="label" color="primary" style={styles.fieldLabel}>
-                  Доступ по ссылке
+                  Поделиться набором
                 </Text>
-                <View style={[styles.shareRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <View style={[styles.shareIcon, { backgroundColor: alpha(colors.primary, 10) }]}>
-                    <Link2 size={iconSize.s} color={colors.primary} />
+                <Button
+                  variant="secondary"
+                  title="Поделиться"
+                  icon={Share2}
+                  loading={isSharing}
+                  onPress={() => share(existingSet)}
+                  fullWidth
+                />
+                {shareLink && (
+                  <View style={[styles.shareRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    <View style={[styles.shareIcon, { backgroundColor: alpha(colors.primary, 10) }]}>
+                      <Link2 size={iconSize.s} color={colors.primary} />
+                    </View>
+                    <View style={styles.flex1}>
+                      <Text variant="body" color="primary">Ссылка действует</Text>
+                      <Text variant="caption" color="secondary">
+                        {`Открыли ${shareLink.views} · добавили ${shareLink.imports} ${pluralize(shareLink.imports, 'раз', 'раза', 'раз')}`}
+                      </Text>
+                    </View>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={handleDisableShare}
+                      disabled={isDisablingShare}
+                      hitSlop={10}
+                      style={({ pressed }) => [styles.shareDisable, (pressed || isDisablingShare) && { opacity: 0.5 }]}
+                    >
+                      <Text variant="label" style={{ color: colors.errorText }}>Закрыть доступ</Text>
+                    </Pressable>
                   </View>
-                  <View style={styles.flex1}>
-                    <Text variant="body" color="primary">Ссылка действует</Text>
-                    <Text variant="caption" color="secondary">
-                      {`Открыли ${shareLink.views} · добавили ${shareLink.imports} ${pluralize(shareLink.imports, 'раз', 'раза', 'раз')}`}
-                    </Text>
-                  </View>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={handleDisableShare}
-                    disabled={isDisablingShare}
-                    hitSlop={10}
-                    style={({ pressed }) => [styles.shareDisable, (pressed || isDisablingShare) && { opacity: 0.5 }]}
-                  >
-                    <Text variant="label" style={{ color: colors.errorText }}>Закрыть доступ</Text>
-                  </Pressable>
-                </View>
+                )}
                 <Text variant="caption" color="tertiary" style={styles.helperText}>
-                  Набор видят только те, у кого есть ссылка
+                  Отправь ссылку — друг сможет добавить все карточки себе. Набор видят только те, у кого есть ссылка
                 </Text>
               </View>
             )}

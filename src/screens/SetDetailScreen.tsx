@@ -15,7 +15,7 @@ import { spacing, borderRadius, iconSize, alpha, config } from '@/constants';
 import { BottomBar, EmptyState, ProgressBar, toast } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card } from '@/types';
-import { DatabaseService, LibraryService, Analytics, NeonService, BookService, ShareService, ShareApiError, buildShareMessage } from '@/services';
+import { DatabaseService, LibraryService, Analytics, NeonService, BookService } from '@/services';
 import { confirmAction } from '@/utils/dialogs';
 import { supabase } from '@/services/supabaseClient';
 import { LIBRARY_CATEGORIES } from '@/constants/library';
@@ -32,7 +32,6 @@ import {
   X,
   BookOpen,
   Layers,
-  Share2,
 } from 'lucide-react-native';
 import { describeError } from '@/utils/userErrors';
 import { pluralize } from '@/utils';
@@ -481,43 +480,6 @@ export function SetDetailScreen({ navigation, route }: Props) {
     handleEditSet();
   }, [handleEditSet, handleForkOfficialSet, isTeacher, set?.isOfficial]);
 
-  // Поделиться набором по ссылке (plan/new/share_set.md, Share 3): только свой набор —
-  // не набор учителя у ученика и не юнит учебника.
-  const canShare = !!set && !isReadOnly && !set.isOfficial;
-  const [isSharing, setIsSharing] = useState(false);
-  const handleShare = useCallback(async () => {
-    if (!set || isSharing) return;
-    if (set.cardCount === 0) {
-      toast.info('Добавь карточки, чтобы поделиться набором');
-      return;
-    }
-    setIsSharing(true);
-    try {
-      const link = await ShareService.createLink(set.id);
-      Analytics.shareLinkCreated(set.cardCount);
-      const result = await ShareService.openShareSheet(buildShareMessage(set.title, set.cardCount, link.url));
-      if (result.kind === 'copied') {
-        toast.success('Ссылка скопирована');
-        Analytics.shareLinkSent('clipboard');
-      } else if (result.kind === 'shared') {
-        Analytics.shareLinkSent(result.app);
-      }
-    } catch (e) {
-      if (e instanceof ShareApiError) {
-        // 404 — набор ещё не дошёл до сервера (создан только что, синхронизация в очереди)
-        if (e.status === 404) toast.error('Набор ещё сохраняется — попробуй через пару секунд');
-        else if (e.code === 'empty_set') toast.info('Добавь карточки, чтобы поделиться набором');
-        else if (e.code === 'too_many_cards') toast.error('По ссылке можно отправить набор до 2000 карточек');
-        else if (e.status === 401) toast.error('Войди в аккаунт, чтобы поделиться набором');
-        else toast.error('Не удалось создать ссылку');
-      } else {
-        toast.error(describeError(e, 'Не удалось поделиться'));
-      }
-    } finally {
-      setIsSharing(false);
-    }
-  }, [set, isSharing]);
-
   const handlePublish = useCallback(async () => {
     if (!publishCategory) {
       toast.info('Выбери категорию');
@@ -650,19 +612,15 @@ export function SetDetailScreen({ navigation, route }: Props) {
     () => (
       <View style={styles.header}>
         <View style={[styles.topBar, { borderBottomColor: colors.border }]}>
-          <View style={styles.topSide}>
-            <Pressable
-              onPress={() => navigation.goBack()}
-              hitSlop={10}
-              style={styles.topIcon}
-              accessibilityRole="button"
-              accessibilityLabel="Назад"
-            >
-              <ArrowLeft size={iconSize.m} color={colors.textPrimary} />
-            </Pressable>
-            {/* Распорка под кнопку «Поделиться» справа — заголовок остаётся по центру */}
-            {canShare && <View style={styles.topIcon} />}
-          </View>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            hitSlop={10}
+            style={styles.topIcon}
+            accessibilityRole="button"
+            accessibilityLabel="Назад"
+          >
+            <ArrowLeft size={iconSize.m} color={colors.textPrimary} />
+          </Pressable>
           <Text
             variant="body"
             style={[styles.topTitle, { color: colors.textPrimary }]}
@@ -670,34 +628,15 @@ export function SetDetailScreen({ navigation, route }: Props) {
           >
             {set?.title || 'Набор'}
           </Text>
-          <View style={styles.topSide}>
-            {canShare && (
-              <Pressable
-                onPress={handleShare}
-                disabled={isSharing}
-                hitSlop={10}
-                style={styles.topIcon}
-                accessibilityRole="button"
-                accessibilityLabel="Поделиться набором"
-                accessibilityState={{ busy: isSharing }}
-              >
-                {isSharing ? (
-                  <ActivityIndicator size="small" color={colors.textPrimary} />
-                ) : (
-                  <Share2 size={iconSize.m} color={colors.textPrimary} />
-                )}
-              </Pressable>
-            )}
-            <Pressable
-              onPress={handleSetMenu}
-              hitSlop={10}
-              style={styles.topIcon}
-              accessibilityRole="button"
-              accessibilityLabel="Действия с набором"
-            >
-              <MoreHorizontal size={iconSize.m} color={colors.textPrimary} />
-            </Pressable>
-          </View>
+          <Pressable
+            onPress={handleSetMenu}
+            hitSlop={10}
+            style={styles.topIcon}
+            accessibilityRole="button"
+            accessibilityLabel="Действия с набором"
+          >
+            <MoreHorizontal size={iconSize.m} color={colors.textPrimary} />
+          </Pressable>
         </View>
 
         {set?.isOfficial && (
@@ -801,7 +740,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
         </View>
       </View>
     ),
-    [set, stats, colors, filteredCards.length, navigation, openAddCardSheet, handleSetMenu, filter, search, setId, warmup, handleWarmup, canShare, handleShare, isSharing]
+    [set, stats, colors, filteredCards.length, navigation, openAddCardSheet, handleSetMenu, filter, search, setId, warmup, handleWarmup]
   );
 
   // Пустой список
@@ -1381,10 +1320,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingBottom: spacing.s,
     borderBottomWidth: 1,
-  },
-  topSide: {
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   topIcon: {
     width: 40,
