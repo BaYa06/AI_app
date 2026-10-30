@@ -16,6 +16,38 @@ export interface ShareLink {
   url: string;
 }
 
+export interface SharePreview {
+  code: string;
+  url: string;
+  set: {
+    title: string;
+    description: string;
+    category: string;
+    languageFrom: string | null;
+    languageTo: string | null;
+    cardsCount: number;
+  };
+  author: { name: string | null };
+  cards: { front: string; back: string; example: string | null; wordForm: string | null }[];
+  /** null — без входа */
+  viewer: {
+    isOwner: boolean;
+    ownSetId: string | null;
+    courses: { id: string; title: string }[];
+    imports: { courseId: string | null; setId: string }[];
+  } | null;
+}
+
+export interface SharedCard {
+  front: string;
+  back: string;
+  example: string | null;
+  wordForm: string | null;
+  wordType: string | null;
+}
+
+export type ShareReportReason = 'offensive' | 'spam' | 'inappropriate' | 'copyright' | 'other';
+
 export interface ShareLinkStatus extends ShareLink {
   views: number;
   imports: number;
@@ -23,7 +55,7 @@ export interface ShareLinkStatus extends ShareLink {
 
 /** Ошибка api/share.js: `code` — машинный код сервера (empty_set, not_found, …). */
 export class ShareApiError extends Error {
-  constructor(public code: string, public status: number) {
+  constructor(public code: string, public status: number, public payload: Record<string, unknown> = {}) {
     super(code);
   }
 }
@@ -44,7 +76,7 @@ async function callShareApi<T>(
     body: body ? JSON.stringify(body) : undefined,
   });
   const json = await resp.json().catch(() => ({}));
-  if (!resp.ok) throw new ShareApiError(json?.error || `http_${resp.status}`, resp.status);
+  if (!resp.ok) throw new ShareApiError(json?.error || `http_${resp.status}`, resp.status, json);
   return json as T;
 }
 
@@ -91,6 +123,34 @@ class ShareServiceClass {
   /** Закрыть доступ: ссылка перестаёт работать, следующее «Поделиться» создаст новую. */
   async disable(setId: string): Promise<void> {
     await callShareApi('disable', { method: 'POST', body: { setId } });
+  }
+
+  /** Превью по коду; с сессией — ещё viewer (свои курсы, куда уже добавлял). */
+  preview(code: string): Promise<SharePreview> {
+    return callShareApi<SharePreview>('preview', { params: { code } });
+  }
+
+  /** Все карточки — гость копирует набор на устройство (на сервере у него нет записи). */
+  async getAllCards(code: string): Promise<SharedCard[]> {
+    const { cards } = await callShareApi<{ cards: SharedCard[] }>('cards', { params: { code } });
+    return cards;
+  }
+
+  /**
+   * Копия набора себе на сервере. 409 already_imported → ShareApiError с payload.setId.
+   * @returns id нового набора
+   */
+  async importSet(code: string, courseId: string | null): Promise<string> {
+    const { newSetId } = await callShareApi<{ newSetId: string }>('import', { method: 'POST', body: { code, courseId } });
+    return newSetId;
+  }
+
+  async report(code: string, reason: ShareReportReason, comment?: string): Promise<void> {
+    await callShareApi('report', { method: 'POST', body: { code, reason, comment } });
+  }
+
+  async blockAuthor(code: string): Promise<void> {
+    await callShareApi('block', { method: 'POST', body: { code } });
   }
 
   /**

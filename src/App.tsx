@@ -13,6 +13,8 @@ import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { StagingBadge } from '@/components/common/StagingBadge';
 import { DatabaseService, setupAutoSave, supabase, NeonService, setAnalyticsUserId, SyncQueueService, Analytics, setAnalyticsUserProperties, setPushGroupProperty, setPushPermissionFlowProperty, pushPermissionFlowFor } from '@/services';
 import { isWidgetUrl, parseWidgetUrl } from '@/services/widgetLinks';
+import { parseShareUrl, isShareCode } from '@/services/shareLinks';
+import { navigationRef } from '@/navigation/navigationRef';
 import { resetWidget } from '@/services/WidgetService';
 import { isAppleUser, takeAppleSignInName } from '@/services/appleSignInName';
 import { useCourseRealtime } from '@/hooks/useCourseRealtime';
@@ -25,6 +27,7 @@ import { X } from 'lucide-react-native';
 import { Text as ThemedText } from '@/components/common/Text';
 import { borderRadius, colors as palette, iconSize, screenPadding, spacing } from '@/constants';
 import { CourseInviteModal } from '@/components/CourseInviteModal';
+import { SharedSetPreviewModal } from '@/components/share/SharedSetPreviewModal';
 import { useCoursesStore, useSettingsStore } from '@/store';
 import { NEW_PER_DAY_OPTIONS } from '@/services/LessonService';
 import { WelcomeScreen } from '@/screens/WelcomeScreen';
@@ -66,6 +69,13 @@ type AppRootProps = {
   pendingInviteToken: string | null;
   onInviteAccepted: (courseId: string, courseTitle: string) => void;
   onInviteDismiss: () => void;
+  /** Набор по ссылке (plan/new/share_set.md, Share 4) */
+  pendingShareCode: string | null;
+  shareDeferred: boolean;
+  shareAutoAdd: boolean;
+  onShareRequestSignIn: () => void;
+  onShareClose: () => void;
+  onShareOpenSet: (setId: string) => void;
   currentUserId: string | null;
   onBackToWelcome: () => void;
   onBackToName: () => void;
@@ -96,6 +106,12 @@ function AppRoot({
   pendingInviteToken,
   onInviteAccepted,
   onInviteDismiss,
+  pendingShareCode,
+  shareDeferred,
+  shareAutoAdd,
+  onShareRequestSignIn,
+  onShareClose,
+  onShareOpenSet,
   currentUserId,
   onBackToWelcome,
   onBackToName,
@@ -120,6 +136,7 @@ function AppRoot({
 }: AppRootProps) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const signedIn = isReady && isAuthenticated && !needsOnboarding;
   const [showPushBanner, setShowPushBanner] = useState(false);
   const [pushBannerLoading, setPushBannerLoading] = useState(false);
 
@@ -305,6 +322,19 @@ function AppRoot({
         />
       )}
 
+      {/* Набор по ссылке: без входа — превью и «Войти и добавить»; пока человек входит и проходит
+          онбординг, окно скрыто и возвращается само после входа */}
+      {isReady && pendingShareCode && (signedIn || (!isAuthenticated && !shareDeferred)) && (
+        <SharedSetPreviewModal
+          code={pendingShareCode}
+          signedIn={signedIn}
+          autoAdd={shareAutoAdd}
+          onRequestSignIn={onShareRequestSignIn}
+          onClose={onShareClose}
+          onOpenSet={onShareOpenSet}
+        />
+      )}
+
       {/* Тосты (toast.success(...)) — поверх экранов */}
       <ToastHost />
     </View>
@@ -332,6 +362,15 @@ export default function App() {
     teacherGroupSize?: string;
   } & AboutMeAnswers>({});
   const [pendingInviteToken, setPendingInviteToken] = useState<string | null>(null);
+  // Набор по ссылке: код, «ждём входа» (человек нажал «Войти и добавить») и «добавить сразу после входа»
+  const [pendingShareCode, setPendingShareCode] = useState<string | null>(null);
+  const [shareDeferred, setShareDeferred] = useState(false);
+  const [shareAutoAdd, setShareAutoAdd] = useState(false);
+  const openShareCode = useCallback((code: string) => {
+    setPendingShareCode(code);
+    setShareDeferred(false);
+    setShareAutoAdd(false);
+  }, []);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const ensuredUserIdRef = useRef<string | null>(null);
   // Вход через Apple: шага «Как к тебе обращаться?» нет, «назад» с выбора роли — на приветствие
@@ -611,6 +650,14 @@ export default function App() {
       return;
     }
 
+    // Набор по ссылке: ?share=CODE — кнопка «Открыть в Flashly» на странице /s/CODE
+    const shareParam = new URLSearchParams(window.location.search).get('share');
+    if (isShareCode(shareParam)) {
+      openShareCode(shareParam);
+      window.history.replaceState({}, '', '/');
+      return;
+    }
+
     // Вариант 2: ?join=TOKEN (переход с landing page)
     const params = new URLSearchParams(window.location.search);
     const joinParam = params.get('join');
@@ -653,6 +700,13 @@ export default function App() {
           return;
         }
         if (isWidgetUrl(url)) return;
+
+        // Набор по ссылке: https://…/s/CODE (Universal Link, Smart App Banner) или flashly://share/CODE
+        const shareCode = parseShareUrl(url);
+        if (shareCode) {
+          openShareCode(shareCode);
+          return;
+        }
 
         // Обработка приглашения: /join/TOKEN
         const joinMatch = url.match(/\/join\/([a-f0-9]{64})/);
@@ -860,6 +914,25 @@ export default function App() {
     setPendingInviteToken(null);
   }, []);
 
+  const closeShare = useCallback(() => {
+    setPendingShareCode(null);
+    setShareDeferred(false);
+    setShareAutoAdd(false);
+  }, []);
+
+  const handleShareRequestSignIn = useCallback(() => {
+    setShareDeferred(true);
+    setShareAutoAdd(true);
+  }, []);
+
+  // Окно закрывается, затем открываем набор (навигатор под окном уже смонтирован — вход выполнен)
+  const handleShareOpenSet = useCallback((setId: string) => {
+    closeShare();
+    setTimeout(() => {
+      if (navigationRef.isReady()) navigationRef.navigate('SetDetail', { setId });
+    }, 350);
+  }, [closeShare]);
+
   const appReady = isReady && authChecked;
 
   // На вебе (PWA) урезаем safe-area, чтобы на iPhone не было лишнего отступа.
@@ -881,6 +954,12 @@ export default function App() {
         pendingInviteToken={pendingInviteToken}
         onInviteAccepted={handleInviteAccepted}
         onInviteDismiss={handleInviteDismiss}
+        pendingShareCode={pendingShareCode}
+        shareDeferred={shareDeferred}
+        shareAutoAdd={shareAutoAdd}
+        onShareRequestSignIn={handleShareRequestSignIn}
+        onShareClose={closeShare}
+        onShareOpenSet={handleShareOpenSet}
         currentUserId={currentUserId}
         onBackToWelcome={handleBackToWelcome}
         onBackToName={handleBackToName}

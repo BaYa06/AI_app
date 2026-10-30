@@ -5,7 +5,8 @@
 import React, { useEffect } from 'react';
 import { Linking, Platform } from 'react-native';
 import { triggerHaptic } from '@/utils/haptic';
-import { NavigationContainer, useNavigationContainerRef, type LinkingOptions } from '@react-navigation/native';
+import { NavigationContainer, type LinkingOptions } from '@react-navigation/native';
+import { navigationRef } from './navigationRef';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useThemeColors, useSettingsStore } from '@/store';
@@ -287,7 +288,6 @@ const NATIVE_LINKING: LinkingOptions<RootStackParamList> = {
 
 export function AppNavigator() {
   const colors = useThemeColors();
-  const navigationRef = useNavigationContainerRef<RootStackParamList>();
 
   // Веб: тап по пушу открывает страницу с ?push_id= — отмечаем открытие (переход не нужен, это главная)
   useEffect(() => {
@@ -317,7 +317,7 @@ export function AppNavigator() {
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [navigationRef]);
+  }, []);
 
   return (
     <NavigationContainer

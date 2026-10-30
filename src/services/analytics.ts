@@ -545,6 +545,30 @@ export const Analytics = {
     log('share_link_disabled'),
 
   /**
+   * Получатель открыл ссылку в приложении. Зачем: сколько ссылок доходит до приложения, а не до браузера.
+   */
+  shareLinkOpened: (signedIn: boolean) =>
+    log('share_link_opened', { signed_in: signedIn }),
+
+  /**
+   * Набор по ссылке добавлен. target — куда (свой набор / курс), guest — копия на устройстве.
+   */
+  shareSetImported: (params: { target: 'own' | 'course'; guest: boolean; cardCount: number }) =>
+    log('share_set_imported', { target: params.target, guest: params.guest, card_count: params.cardCount }),
+
+  /**
+   * Жалоба на набор по ссылке (App Review 1.2).
+   */
+  shareSetReported: (reason: string) =>
+    log('share_set_reported', { reason }),
+
+  /**
+   * Автор набора по ссылке заблокирован.
+   */
+  shareAuthorBlocked: () =>
+    log('share_author_blocked'),
+
+  /**
    * Юзер изменил тему оформления.
    */
   themeChanged: (theme: 'light' | 'dark' | 'system') =>

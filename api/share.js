@@ -12,6 +12,7 @@ import { renderSharePage, renderShareErrorPage } from './_share-page.js';
  * POST /api/share?action=disable  { setId }                 – закрыть доступ по ссылке
  * GET  /api/share?action=preview&code=…                     – превью без входа; с токеном + viewer
  * GET  /s/<code> → /api/share?action=page&code=…            – HTML-страница превью (Share 2)
+ * GET  /api/share?action=cards&code=…                       – все карточки (гость копирует набор на устройство)
  * POST /api/share?action=import   { code, courseId? }       – копия набора себе (курс — только свой)
  * POST /api/share?action=report   { code, reason, comment? } – жалоба, набор скрывается у пожаловавшегося
  * POST /api/share?action=block    { code }                  – заблокировать автора ссылки
@@ -33,7 +34,7 @@ const MAX_CARDS = 2000;
 const IMPORTS_PER_HOUR = 30;
 const REPORT_REASONS = new Set(['offensive', 'spam', 'inappropriate', 'copyright', 'other']);
 
-const PUBLIC_ACTIONS = new Set(['preview', 'page']);
+const PUBLIC_ACTIONS = new Set(['preview', 'page', 'cards']);
 
 const shareUrl = (code) => `${SHARE_ORIGIN}/s/${code}`;
 
@@ -80,6 +81,7 @@ export default async function handler(req, res) {
     const isGet = req.method === 'GET';
     if (action === 'preview' && isGet)  return await preview(req, res, sql, userId, code);
     if (action === 'page' && isGet)     return await page(res, sql, code);
+    if (action === 'cards' && isGet)    return await allCards(res, sql, code);
     if (action === 'status' && isGet)   return await status(res, sql, userId, setId);
     if (isGet) return res.status(405).json({ error: 'Method not allowed' });
 
@@ -257,6 +259,33 @@ async function page(res, sql, code) {
   return res.status(200).send(renderSharePage(content));
 }
 
+// ── action=cards ──────────────────────────────────────────────────────────────
+// У гостя (анонимный вход) нет строки в users, поэтому серверный import ему недоступен: приложение
+// копирует набор на устройство из этого списка (как гостевой импорт библиотеки).
+async function allCards(res, sql, code) {
+  if (!code) return res.status(400).json({ error: 'code required' });
+  const share = await findShare(sql, code);
+  if (!share) return res.status(404).json({ error: 'not_found' });
+  if (share.disabled_at) return res.status(410).json({ error: 'disabled' });
+
+  const cards = await sql`
+    SELECT front, back, example, word_form, word_type FROM cards
+    WHERE set_id = ${share.set_id}::uuid
+    ORDER BY sort_order NULLS LAST, created_at
+    LIMIT ${MAX_CARDS}
+  `;
+  res.setHeader('Cache-Control', 'public, s-maxage=60');
+  return res.status(200).json({
+    cards: cards.map((c) => ({
+      front: c.front,
+      back: c.back,
+      example: c.example || null,
+      wordForm: c.word_form || null,
+      wordType: c.word_type || null,
+    })),
+  });
+}
+
 // ── action=import ─────────────────────────────────────────────────────────────
 async function importShared(res, sql, userId, code, courseId) {
   if (!code) return res.status(400).json({ error: 'code required' });
@@ -266,9 +295,12 @@ async function importShared(res, sql, userId, code, courseId) {
   if (!share) return res.status(404).json({ error: 'not_found' });
   if (share.disabled_at) return res.status(410).json({ error: 'disabled' });
 
-  const blocked = await sql`
-    SELECT 1 FROM user_blocks WHERE user_id = ${userId}::uuid AND blocked_user_id = ${share.owner_id}::uuid
-  `;
+  const [account, blocked] = await Promise.all([
+    sql`SELECT 1 FROM users WHERE id = ${userId}::uuid`,
+    sql`SELECT 1 FROM user_blocks WHERE user_id = ${userId}::uuid AND blocked_user_id = ${share.owner_id}::uuid`,
+  ]);
+  // Гость (анонимный вход) не записан в users — копирует набор на устройство через action=cards
+  if (account.length === 0) return res.status(403).json({ error: 'guest_account' });
   if (blocked.length > 0) return res.status(403).json({ error: 'blocked' });
 
   // Набор можно положить только в свой курс (не в курс, где пользователь ученик).

@@ -31,6 +31,13 @@
             <category android:name="android.intent.category.BROWSABLE" />
             <data android:scheme="flashly" android:host="auth-callback" />
         </intent-filter>
+        <!-- Набор по ссылке: кнопка «Открыть набор» на странице /s/<code> (plan/new/share_set.md) -->
+        <intent-filter>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="flashly" android:host="share" />
+        </intent-filter>
       </activity>
     </application>
 </manifest>
