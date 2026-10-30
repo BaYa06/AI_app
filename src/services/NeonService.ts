@@ -386,11 +386,11 @@ export const NeonService = {
   },
 
   /**
-   * Проверить, является ли пользователь учителем
+   * Проверить, является ли пользователь учителем (null — профиль не загрузился, например нет сети)
    */
-  async getIsTeacher(_userId: string): Promise<boolean> {
+  async getIsTeacher(_userId: string): Promise<boolean | null> {
     const profile = await callDataApi<ProfileRow | null>('getProfile', {}, 'GET');
-    return profile?.teacher === true;
+    return profile ? profile.teacher === true : null;
   },
 
   /**

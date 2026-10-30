@@ -2,7 +2,7 @@
  * Store для настроек и темы
  */
 import { Appearance } from 'react-native';
-import { readCache } from '@/services/localCache';
+import { readCache, writeCache } from '@/services/localCache';
 import { StorageService, STORAGE_KEYS } from '@/services/StorageService';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
@@ -139,7 +139,8 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
     },
     // Серия с прошлого запуска — показываем сразу, сервер обновит (syncStreakFromServer)
     streakCache: initialStreakCache(),
-    isTeacher: null,
+    // Роль с прошлого запуска — блоки главной видны с первого кадра, сервер уточнит (fetchIsTeacher)
+    isTeacher: readCache<boolean>('is_teacher') ?? null,
 
     // ==================== НАСТРОЙКИ ====================
     
@@ -297,6 +298,12 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
 
     fetchIsTeacher: async (userId) => {
       const isTeacher = await NeonService.getIsTeacher(userId);
+      if (isTeacher === null) {
+        // Нет ответа: оставляем роль из кэша; без кэша — экран ученика, а не вечная заготовка
+        if (get().isTeacher === null) set((state) => { state.isTeacher = false; });
+        return;
+      }
+      writeCache('is_teacher', isTeacher);
       set((state) => {
         state.isTeacher = isTeacher;
       });

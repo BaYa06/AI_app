@@ -19,7 +19,7 @@ import ReanimatedAnimated, { useSharedValue, withTiming, withSequence, useAnimat
 import { spacing, borderRadius, heights, iconSize, typography, screenPadding, alpha, getDeckAccentColor, animation } from '@/constants';
 import { triggerHaptic } from '@/utils/haptic';
 import { pluralize } from '@/utils';
-import { Button, Card as SurfaceCard, Badge, Dialog, EmptyState, ListRow, ProgressBar, Sheet, TextField, confirmDialog, toast, useTabBarOverlayInset } from '@/components/ui';
+import { Button, Card as SurfaceCard, Badge, Dialog, EmptyState, ListRow, ProgressBar, Sheet, Skeleton, SkeletonCard, TextField, confirmDialog, toast, useTabBarOverlayInset } from '@/components/ui';
 import {
   Menu,
   Plus,
@@ -1588,7 +1588,18 @@ export function HomeScreen({ navigation, route }: any) {
           </>
         ) : (
           <>
-            {isTeacher === null ? null : isTeacher ? (
+            {isTeacher === null ? (
+              // Роль ещё не известна (первый вход) — заготовка урока и «Разминки», чтобы блоки не появлялись из ниоткуда
+              <View accessibilityLabel="Загрузка" accessibilityRole="progressbar">
+                <SkeletonCard height={156} style={styles.lessonCard} />
+                <View style={[styles.challengesSection, styles.skeletonTiles]}>
+                  <Skeleton width={80} height={12} />
+                  <View style={styles.skeletonTilesRow}>
+                    {[0, 1, 2].map((i) => <SkeletonCard key={i} height={148} style={styles.flex1} />)}
+                  </View>
+                </View>
+              </View>
+            ) : isTeacher ? (
               teacherBanner
             ) : (
               <>
@@ -2359,6 +2370,14 @@ const styles = StyleSheet.create({
   pushNudge: {
     marginHorizontal: screenPadding,
     marginBottom: spacing.xs,
+  },
+  skeletonTiles: {
+    paddingHorizontal: screenPadding,
+    gap: spacing.xs,
+  },
+  skeletonTilesRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
   },
   lessonCard: {
     marginHorizontal: screenPadding,
