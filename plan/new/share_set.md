@@ -196,7 +196,7 @@ plan/new/new_user_activation.md кладёт новичку стартовый �
   Страница-превью подсказывает этот путь. Событие `home_action: add_by_link`.
 - На потом (не в этом плане): «Добавить слова по ссылке» внутри своего набора — слить карточки, а не создавать копию.
 
-### Share 6 — жалобы и блокировки ⬜
+### Share 6 — жалобы и блокировки ✅
 **iOS — нативно на Swift**, как в последних версиях (plan/new/liquid_glass.md: Glass 0, 7), чтобы
 на iOS 26 меню и лист были системными, со стеклом и плавной пружиной:
 - **Меню «…»** — `UIMenu` на кнопке шапки (системное стеклянное меню, как в Glass 7): «Пожаловаться»
@@ -215,6 +215,21 @@ plan/new/new_user_activation.md кладёт новичку стартовый �
 - admin.html: вкладка «Жалобы на наборы» — превью набора, «Закрыть ссылку», «Отклонить жалобу».
 - Профиль → «Заблокированные авторы» (разблокировать).
 - `terms.html`, `privacy.html`: наборы по ссылке, жалобы, блокировка.
+- Сделано (30.10.2026):
+  - `ios/FlashcardsApp/ShareSetActions.swift` (+ `.m`, в Xcode-проекте): `ShareMenuButton` — кнопка «…»
+    с `UIMenu` (нативная view: системное меню нельзя открыть из JS без нативной кнопки);
+    `ShareReportSheetModule.present` → Promise — лист `UISheetPresentationController` + SwiftUI
+    (причины, «Другое» с комментарием, «Отправить»). Палитра — `StudyModePalette`.
+    Подтверждение блокировки — `Alert.alert` (на iOS это и есть `UIAlertController`).
+    Мост — `src/components/share/nativeShareActions.tsx`; Android/веб — общий `Sheet`.
+    Проверено `swiftc -typecheck` на SDK iOS 15.1 с заглушками RN; сборка — в TestFlight.
+  - Профиль → «Заблокированные авторы» (`src/screens/BlockedAuthorsScreen.tsx`), API `blocks` / `unblock`.
+  - Админка локальная (`admin-server.mjs`, `public/admin.html` в .gitignore): блок «Жалобы на наборы по
+    ссылке» — набор, 10 карточек, комментарий, «Закрыть ссылку» / «Отклонить». Запросы — в
+    `api/_admin.js` (`getShareReports`, `resolveShareReport`, `disableShareByReport`).
+  - `terms.html`: новый раздел 4 «Наборы по ссылке», жалобы — ответ за 24 часа; `privacy.html`:
+    какие данные о ссылках храним и что видит получатель.
+  - Сервер: +11 сценариев на локальном Postgres (блоки, разблокировка, жалобы в админке, закрытие ссылки).
 
 ### Share 7 — Universal Links (после выхода сборки) ⬜
 - Убедиться, что сборка с Share 4 у большинства (поэтапный выпуск завершён + ~1 неделя).

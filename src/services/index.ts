@@ -22,7 +22,7 @@ export {
 export type { PushStatus, ForegroundMessageHandler } from './pushNotifications';
 export { LibraryService } from './LibraryService';
 export { ShareService, ShareApiError, buildShareMessage } from './ShareService';
-export type { SharePreview, SharedCard, ShareReportReason } from './ShareService';
+export type { SharePreview, SharedCard, ShareReportReason, BlockedAuthor } from './ShareService';
 export { parseShareUrl, isShareCode, findShareCode, requestOpenShare, onOpenShareRequest } from './shareLinks';
 export { BookService } from './BookService';
 export { SyncQueueService } from './SyncQueueService';

@@ -17,6 +17,7 @@ import { alpha, borderRadius, getLanguageFlag, getLanguageLabel, iconSize, spaci
 import { Analytics, ShareApiError, ShareService, supabase, type SharePreview, type ShareReportReason } from '@/services';
 import { importSharedSet } from '@/services/shareImport';
 import { confirmAction } from '@/utils/dialogs';
+import { ShareMenuButton, isNativeShareMenu, isNativeReportSheet, presentNativeReportSheet } from './nativeShareActions';
 import { describeError } from '@/utils/userErrors';
 import { pluralize } from '@/utils';
 
@@ -64,6 +65,7 @@ export function SharedSetPreviewModal({ code, signedIn, autoAdd, onRequestSignIn
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const isTeacher = useSettingsStore((s) => s.isTeacher) === true;
+  const dark = useSettingsStore((s) => s.resolvedTheme === 'dark');
   const allCourses = useCoursesStore((s) => s.courses);
   const activeCourseId = useCoursesStore((s) => s.activeCourseId);
   const createCourse = useCoursesStore((s) => s.createCourse);
@@ -167,10 +169,10 @@ export function SharedSetPreviewModal({ code, signedIn, autoAdd, onRequestSignIn
     setSelectedCourseId(course.id);
   }, [newCourseTitle, createCourse]);
 
-  const handleReport = useCallback(async (reason: ShareReportReason) => {
+  const handleReport = useCallback(async (reason: ShareReportReason, comment?: string) => {
     setReportVisible(false);
     try {
-      await ShareService.report(code, reason);
+      await ShareService.report(code, reason, comment || undefined);
       Analytics.shareSetReported(reason);
       toast.success('Спасибо, мы проверим набор');
       onClose();
@@ -178,6 +180,17 @@ export function SharedSetPreviewModal({ code, signedIn, autoAdd, onRequestSignIn
       toast.error(describeError(e, 'Не удалось отправить жалобу'));
     }
   }, [code, onClose]);
+
+  // iOS — системный лист (Share 6), иначе общий Sheet
+  const openReport = useCallback(async () => {
+    setMenuVisible(false);
+    if (!isNativeReportSheet) {
+      setReportVisible(true);
+      return;
+    }
+    const result = await presentNativeReportSheet({ reasons: REPORT_REASONS, colors, dark });
+    if (result) handleReport(result.reason, result.comment);
+  }, [colors, dark, handleReport]);
 
   const handleBlock = useCallback(async () => {
     setMenuVisible(false);
@@ -390,7 +403,17 @@ export function SharedSetPreviewModal({ code, signedIn, autoAdd, onRequestSignIn
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
           <Button variant="icon" icon={X} accessibilityLabel="Закрыть" onPress={onClose} />
           <Text variant="body" color="primary" style={[styles.bold, styles.headerTitle]}>Набор по ссылке</Text>
-          {canModerate ? (
+          {canModerate && isNativeShareMenu ? (
+            <ShareMenuButton
+              title={`Набор от ${authorName}`}
+              tint={colors.textPrimary}
+              items={[
+                { id: 'report', title: 'Пожаловаться', subtitle: 'Набор скроется у тебя, команда проверит его', symbol: 'flag' },
+                { id: 'block', title: 'Заблокировать автора', subtitle: 'Ссылки этого автора больше не будут открываться', symbol: 'nosign', destructive: true },
+              ]}
+              onSelect={(id) => (id === 'report' ? openReport() : handleBlock())}
+            />
+          ) : canModerate ? (
             <Button variant="icon" icon={MoreHorizontal} accessibilityLabel="Ещё" onPress={() => setMenuVisible(true)} />
           ) : (
             <View style={styles.headerSpacer} />
@@ -410,7 +433,7 @@ export function SharedSetPreviewModal({ code, signedIn, autoAdd, onRequestSignIn
               subtitle="Набор скроется у тебя, команда проверит его"
               icon={Flag}
               chevron={false}
-              onPress={() => { setMenuVisible(false); setReportVisible(true); }}
+              onPress={openReport}
             />
             <ListRow
               title="Заблокировать автора"

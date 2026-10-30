@@ -46,6 +46,12 @@ export interface SharedCard {
   wordType: string | null;
 }
 
+export interface BlockedAuthor {
+  userId: string;
+  name: string | null;
+  blockedAt: string;
+}
+
 export type ShareReportReason = 'offensive' | 'spam' | 'inappropriate' | 'copyright' | 'other';
 
 export interface ShareLinkStatus extends ShareLink {
@@ -151,6 +157,16 @@ class ShareServiceClass {
 
   async blockAuthor(code: string): Promise<void> {
     await callShareApi('block', { method: 'POST', body: { code } });
+  }
+
+  /** Профиль → «Заблокированные авторы». */
+  async listBlocks(): Promise<BlockedAuthor[]> {
+    const { blocks } = await callShareApi<{ blocks: BlockedAuthor[] }>('blocks');
+    return blocks;
+  }
+
+  async unblock(userId: string): Promise<void> {
+    await callShareApi('unblock', { method: 'POST', body: { userId } });
   }
 
   /**

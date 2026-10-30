@@ -130,6 +130,8 @@ export type RootStackParamList = {
   LearningSettings: undefined;
   /** «Мои данные» для напоминаний (plan/new/push_notifications.md, 2.7) */
   MyData: undefined;
+  /** «Заблокированные авторы» — наборы по ссылке (plan/new/share_set.md, Share 6) */
+  BlockedAuthors: undefined;
   SoundSettings: undefined;
   Feedback: undefined;
   Settings: undefined;

@@ -31,6 +31,7 @@ import {
   Sparkles,
   ExternalLink,
   LogOut,
+  UserX,
 } from 'lucide-react-native';
 import type { Session } from '@supabase/supabase-js';
 import type { ThemeMode } from '@/types';
@@ -290,6 +291,7 @@ export function ProfileScreen({ navigation }: any) {
       {/* ======== Account ======== */}
       <ListGroup title="Аккаунт" style={st.group}>
         <ListRow icon={User} title="Личные данные" onPress={() => navigation?.navigate('PersonalInfo')} />
+        <ListRow icon={UserX} title="Заблокированные авторы" onPress={() => navigation?.navigate('BlockedAuthors')} />
         {COMMUNITY_LIBRARY_ENABLED && canPublish && (
           <ListRow icon={BookOpen} title="Мои публикации" onPress={() => navigation?.navigate('MyPublications')} />
         )}

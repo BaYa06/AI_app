@@ -16,6 +16,8 @@ import { renderSharePage, renderShareErrorPage } from './_share-page.js';
  * POST /api/share?action=import   { code, courseId? }       – копия набора себе (курс — только свой)
  * POST /api/share?action=report   { code, reason, comment? } – жалоба, набор скрывается у пожаловавшегося
  * POST /api/share?action=block    { code }                  – заблокировать автора ссылки
+ * GET  /api/share?action=blocks                            – мои заблокированные авторы (профиль, Share 6)
+ * POST /api/share?action=unblock  { userId }                – разблокировать автора
  *
  * userId — только из Supabase JWT. Превью работает без токена: по нему страница-превью (Share 2)
  * и экран приложения показывают набор до входа.
@@ -83,6 +85,7 @@ export default async function handler(req, res) {
     if (action === 'page' && isGet)     return await page(res, sql, code);
     if (action === 'cards' && isGet)    return await allCards(res, sql, code);
     if (action === 'status' && isGet)   return await status(res, sql, userId, setId);
+    if (action === 'blocks' && isGet)   return await listBlocks(res, sql, userId);
     if (isGet) return res.status(405).json({ error: 'Method not allowed' });
 
     if (action === 'create')  return await createShare(res, sql, userId, setId);
@@ -90,6 +93,7 @@ export default async function handler(req, res) {
     if (action === 'import')  return await importShared(res, sql, userId, code, body.courseId ?? null);
     if (action === 'report')  return await reportShared(res, sql, userId, code, body.reason, body.comment);
     if (action === 'block')   return await blockAuthor(res, sql, userId, code);
+    if (action === 'unblock') return await unblockAuthor(res, sql, userId, body.userId);
     return res.status(400).json({ error: 'Unknown action' });
   } catch (error) {
     console.error('Share API error:', error);
@@ -399,4 +403,26 @@ async function blockAuthor(res, sql, userId, code) {
     ON CONFLICT DO NOTHING
   `;
   return res.status(201).json({ success: true });
+}
+
+// ── action=blocks / unblock ───────────────────────────────────────────────────
+// Профиль → «Заблокированные авторы». Отдаём только имя — без email и id набора.
+async function listBlocks(res, sql, userId) {
+  const rows = await sql`
+    SELECT b.blocked_user_id, b.created_at,
+           COALESCE(NULLIF(u.display_name, ''), NULLIF(u.user_name, '')) AS name
+    FROM user_blocks b
+    LEFT JOIN users u ON u.id = b.blocked_user_id
+    WHERE b.user_id = ${userId}::uuid
+    ORDER BY b.created_at DESC
+  `;
+  return res.status(200).json({
+    blocks: rows.map((r) => ({ userId: r.blocked_user_id, name: r.name || null, blockedAt: r.created_at })),
+  });
+}
+
+async function unblockAuthor(res, sql, userId, blockedUserId) {
+  if (!isUuid(blockedUserId)) return res.status(400).json({ error: 'userId must be a uuid' });
+  await sql`DELETE FROM user_blocks WHERE user_id = ${userId}::uuid AND blocked_user_id = ${blockedUserId}::uuid`;
+  return res.status(200).json({ success: true });
 }

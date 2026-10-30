@@ -217,3 +217,57 @@ export async function markAdminFeedbackRead(sql, id) {
   await sql`UPDATE app_feedback SET status = 'read' WHERE id = ${id}::uuid`;
   return { ok: true };
 }
+
+// ─── Жалобы на наборы по ссылке (plan/new/share_set.md, Share 6; App Review 1.2) ──────────────
+
+export async function getShareReports(sql) {
+  try {
+    const items = await sql`
+      SELECT r.id, r.code, r.reason, r.comment, r.created_at, r.resolved_at,
+             s.disabled_at, s.views, s.imports,
+             cs.title AS set_title,
+             (SELECT COUNT(*) FROM cards c WHERE c.set_id = s.set_id)::int AS cards_count,
+             COALESCE(owner.display_name, owner.user_name, owner.email, 'Удалённый пользователь') AS author_label,
+             COALESCE(rep.display_name, rep.user_name, rep.email, 'Гость') AS reporter_label,
+             (SELECT COUNT(*) FROM set_share_reports r2 WHERE r2.code = r.code)::int AS reports_on_link,
+             (SELECT json_agg(json_build_object('front', c.front, 'back', c.back) ORDER BY c.sort_order NULLS LAST, c.created_at)
+                FROM (SELECT front, back, sort_order, created_at FROM cards WHERE set_id = s.set_id
+                      ORDER BY sort_order NULLS LAST, created_at LIMIT 10) c) AS sample
+      FROM set_share_reports r
+      JOIN set_shares s ON s.code = r.code
+      LEFT JOIN card_sets cs ON cs.id = s.set_id
+      LEFT JOIN users owner ON owner.id = s.owner_id
+      LEFT JOIN users rep ON rep.id = r.reporter_id
+      ORDER BY (r.resolved_at IS NULL) DESC, r.created_at DESC
+      LIMIT 300
+    `;
+    const open = items.filter((i) => !i.resolved_at).length;
+    return { items, summary: { open, total: items.length } };
+  } catch (e) {
+    // Таблицы появятся после деплоя API (миграция 034 применяется при первом запросе)
+    if (e.code === '42P01') return { items: [], summary: null, missing: true };
+    throw e;
+  }
+}
+
+/** Отклонить жалобу: набор в порядке, ссылка продолжает работать. */
+export async function resolveShareReport(sql, id) {
+  await sql`UPDATE set_share_reports SET resolved_at = NOW() WHERE id = ${id}::uuid AND resolved_at IS NULL`;
+  return { ok: true };
+}
+
+/** Закрыть ссылку по жалобе: набор больше не открывается ни у кого, все жалобы на неё решены. */
+export async function disableShareByReport(sql, id) {
+  await sql`
+    WITH target AS (SELECT code FROM set_share_reports WHERE id = ${id}::uuid),
+    closed AS (
+      UPDATE set_shares SET disabled_at = COALESCE(disabled_at, NOW())
+      WHERE code = (SELECT code FROM target)
+      RETURNING code
+    )
+    UPDATE set_share_reports SET resolved_at = COALESCE(resolved_at, NOW())
+    WHERE code = (SELECT code FROM target)
+  `;
+  return { ok: true };
+}
+
