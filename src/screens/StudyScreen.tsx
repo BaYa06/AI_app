@@ -28,6 +28,9 @@ import ReAnimated, {
   withSpring,
   interpolate,
   runOnJS,
+  withDelay,
+  withSequence,
+  useReducedMotion,
   Extrapolation,
   Easing as REasing,
 } from 'react-native-reanimated';
@@ -87,6 +90,11 @@ export function StudyScreen({ navigation, route }: Props) {
   const swipeFlying = useSharedValue(false);
   // Палец за порогом свайпа — вибрация при каждом пересечении порога
   const swipePastThreshold = useSharedValue(false);
+  // Подсказка свайпа новичку: первые сессии, пока не сделал свайп — карточка покачивается
+  // и внизу «← Не знаю · Уверенно →» (только на первой карточке)
+  const [showSwipeHint, setShowSwipeHint] = useState(false);
+  const swipeHintCheckedRef = useRef(false);
+  const reduceMotion = useReducedMotion();
   
   // Store
   const updateLastStudied = useSetsStore((s) => s.updateLastStudied);
@@ -281,6 +289,17 @@ export function StudyScreen({ navigation, route }: Props) {
 
     setCurrentCard(queue[0]);
     updateLastStudied(setId);
+
+    // На вебе свайпа нет — и подсказки тоже
+    if (!swipeHintCheckedRef.current && Platform.OS !== 'web') {
+      swipeHintCheckedRef.current = true;
+      const hintsLeft = useSettingsStore.getState().settings.swipeHintsLeft;
+      if (hintsLeft > 0) {
+        updateSettings({ swipeHintsLeft: hintsLeft - 1 });
+        DatabaseService.saveSettings();
+        setShowSwipeHint(true);
+      }
+    }
   }, [setId, errorCardsFronts, studyAll, cardLimit, onlyHard, dueCardIds, phaseId, phaseOffset, phaseFailedList]);
 
   // Получить текущую карточку из очереди
@@ -298,6 +317,19 @@ export function StudyScreen({ navigation, route }: Props) {
       flipProgress.value = 0;
     }
   }, [session?.currentIndex]);
+
+  // Покачивание карточки — после сброса позиции в эффекте выше, поэтому объявлено ниже него
+  useEffect(() => {
+    if (!showSwipeHint || reduceMotion) return;
+    swipeX.value = withDelay(
+      700,
+      withSequence(
+        withTiming(-28, { duration: 220 }),
+        withTiming(28, { duration: 320 }),
+        withTiming(0, { duration: 220 }),
+      ),
+    );
+  }, [showSwipeHint]);
 
   // Обработка оценки
   const handleRate = useCallback(
@@ -589,8 +621,13 @@ export function StudyScreen({ navigation, route }: Props) {
   // Свайп влево — «Не знаю», вправо — «Уверенно»; работает на обеих сторонах (plan/new/card_rating.md).
   // Касание ловит Pressable карточки — протягивание его отменяет. На вебе только кнопки
   const handleSwipe = useCallback((direction: number) => {
+    // Свайп освоен — подсказка больше не нужна
+    if (useSettingsStore.getState().settings.swipeHintsLeft > 0) {
+      updateSettings({ swipeHintsLeft: 0 });
+      DatabaseService.saveSettings();
+    }
     handleRate(direction > 0 ? 4 : 1, 'swipe');
-  }, [handleRate]);
+  }, [handleRate, updateSettings]);
 
   const cardSwipeGesture = Gesture.Pan()
     .enabled(Platform.OS !== 'web' && !isSettingsOpen)
@@ -761,7 +798,7 @@ export function StudyScreen({ navigation, route }: Props) {
 
                   <View style={styles.cardBottom}>
                     <Text variant="bodySmall" align="center" style={{ color: colors.textSecondary }}>
-                      Нажми, чтобы перевернуть
+                      {showSwipeHint && session?.currentIndex === 0 ? '← Не знаю · Уверенно →' : 'Нажми, чтобы перевернуть'}
                     </Text>
                   </View>
                 </View>

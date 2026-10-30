@@ -81,6 +81,7 @@ const defaultSettings: UserSettings = {
   soundEnabled: true,
   hapticEnabled: true,
   reverseCards: false,
+  swipeHintsLeft: 3,
 };
 
 import { getLocalDateKey } from '@/services/StreakService';
