@@ -4,7 +4,7 @@ import { neon } from '@neondatabase/serverless';
  * Версия схемы: при добавлении миграции в applyMigrations увеличить (и дописать файл в
  * database/migrations). Пока в app_migrations есть отметка этой версии, миграции не выполняются.
  */
-const SCHEMA_VERSION = 'schema_033';
+const SCHEMA_VERSION = 'schema_034';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -522,6 +522,51 @@ async function applyMigrations(sql) {
     `;
   } catch (e) {
     console.error('Migration 033_push_views failed:', e);
+  }
+
+  // Migration 034: наборы по ссылке (plan/new/share_set.md, Share 1). Только новые таблицы.
+  // Тексты и комментарии — в database/migrations/034_set_shares.sql.
+  try {
+    await sql`CREATE TABLE IF NOT EXISTS set_shares (
+      code        VARCHAR(16) PRIMARY KEY,
+      set_id      UUID NOT NULL REFERENCES card_sets(id) ON DELETE CASCADE,
+      owner_id    UUID NOT NULL,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      disabled_at TIMESTAMPTZ,
+      views       INTEGER NOT NULL DEFAULT 0,
+      imports     INTEGER NOT NULL DEFAULT 0
+    )`;
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_set_shares_active_set ON set_shares(set_id) WHERE disabled_at IS NULL`;
+    await sql`CREATE TABLE IF NOT EXISTS set_share_imports (
+      id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id     UUID NOT NULL,
+      code        VARCHAR(16) NOT NULL REFERENCES set_shares(code) ON DELETE CASCADE,
+      course_id   UUID,
+      new_set_id  UUID REFERENCES card_sets(id) ON DELETE CASCADE,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_set_share_imports_place
+      ON set_share_imports(user_id, code, COALESCE(course_id, '00000000-0000-0000-0000-000000000000'::uuid))`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_set_share_imports_user_time ON set_share_imports(user_id, created_at DESC)`;
+    await sql`CREATE TABLE IF NOT EXISTS set_share_reports (
+      id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      code        VARCHAR(16) NOT NULL REFERENCES set_shares(code) ON DELETE CASCADE,
+      reporter_id UUID NOT NULL,
+      reason      VARCHAR(20) NOT NULL,
+      comment     TEXT,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      resolved_at TIMESTAMPTZ,
+      UNIQUE(code, reporter_id)
+    )`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_set_share_reports_open ON set_share_reports(created_at) WHERE resolved_at IS NULL`;
+    await sql`CREATE TABLE IF NOT EXISTS user_blocks (
+      user_id         UUID NOT NULL,
+      blocked_user_id UUID NOT NULL,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (user_id, blocked_user_id)
+    )`;
+  } catch (e) {
+    console.error('Migration 034_set_shares failed:', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)
