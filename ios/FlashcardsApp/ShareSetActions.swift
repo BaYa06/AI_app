@@ -16,6 +16,9 @@ import UIKit
 
 // MARK: - Меню «…»
 
+// Имя для Objective-C обязательно: без @objc(…) класс в рантайме называется FlashcardsApp.ShareMenuButton,
+// и RCT_EXTERN_MODULE в ShareSetActions.m не находит его при линковке
+@objc(ShareMenuButton)
 class ShareMenuButton: RCTView {
   /// [{ id, title, subtitle?, symbol?, destructive? }]
   @objc var items: NSArray = [] { didSet { rebuildMenu() } }
@@ -60,6 +63,7 @@ class ShareMenuButton: RCTView {
   }
 }
 
+@objc(ShareMenuButtonManager)
 class ShareMenuButtonManager: RCTViewManager {
   override func view() -> UIView! { ShareMenuButton() }
 
