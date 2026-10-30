@@ -3,7 +3,8 @@
  * @description Экран изучения карточек с CSS-анимациями для web
  */
 import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
-import { View, StyleSheet, Pressable, Dimensions, Animated, Modal, AppState, type LayoutChangeEvent } from 'react-native';
+import { View, StyleSheet, Pressable, Dimensions, Animated, Modal, AppState, Platform, type LayoutChangeEvent } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useCardsStore, useSetsStore, useStudyStore, useThemeColors, useSettingsStore, selectSetStats } from '@/store';
 import { Text, Loading } from '@/components/common';
 import { Button, ProgressBar, ScreenHeader, Switch } from '@/components/ui';
@@ -24,7 +25,10 @@ import ReAnimated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  withSpring,
   interpolate,
+  runOnJS,
+  Extrapolation,
   Easing as REasing,
 } from 'react-native-reanimated';
 
@@ -45,6 +49,10 @@ const WORD_FIT = { sizes: [24, 22, 20, 18], lineHeightRatio: 1.5 };
 const EXAMPLE_FIT = { sizes: [18, 16, 15], lineHeightRatio: 1.45 };
 // Между словом и примером: два отступа cardContent + разделитель
 const EXAMPLE_GAP = spacing.m * 2 + 2;
+// Свайп карточки засчитывается после 30% её ширины или быстрым смахом; затем она улетает за край
+const SWIPE_DISTANCE = CARD_WIDTH * 0.3;
+const SWIPE_VELOCITY = 800;
+const SWIPE_OUT_MS = 220;
 
 type Props = RootStackScreenProps<'Study'>;
 
@@ -70,6 +78,13 @@ export function StudyScreen({ navigation, route }: Props) {
   const baseQueueLengthRef = useRef(0);
   // Analytics: момент показа текущей карточки
   const cardShownAtRef = useRef(Date.now());
+  // Один ответ на карточку: повторное нажатие или свайп до показа следующей игнорируются
+  const answeringRef = useRef(false);
+  // Анимация переворота карточки (reanimated для native + web)
+  const flipProgress = useSharedValue(0);
+  // Свайп: сдвиг карточки за пальцем и «карточка улетает» — пока летит, кнопки не принимаются
+  const swipeX = useSharedValue(0);
+  const swipeFlying = useSharedValue(false);
   
   // Store
   const updateLastStudied = useSetsStore((s) => s.updateLastStudied);
@@ -273,13 +288,20 @@ export function StudyScreen({ navigation, route }: Props) {
       const card = useCardsStore.getState().getCard(cardId);
       setCurrentCard(card || null);
       cardShownAtRef.current = Date.now();
+      // Новая карточка — на месте и лицевой стороной, без анимации переворота
+      answeringRef.current = false;
+      swipeFlying.value = false;
+      swipeX.value = 0;
+      flipProgress.value = 0;
     }
   }, [session?.currentIndex]);
 
   // Обработка оценки
   const handleRate = useCallback(
-    async (rating: Rating) => {
-      if (!currentCard) return;
+    async (rating: Rating, input: 'button' | 'swipe' = 'button') => {
+      if (!currentCard || answeringRef.current) return;
+      if (input === 'button' && swipeFlying.value) return;
+      answeringRef.current = true;
       triggerHaptic('selection');
 
       // Логика: 1,2 = ошибка, 3,4 = правильно
@@ -299,6 +321,7 @@ export function StudyScreen({ navigation, route }: Props) {
           rating: ratingMap[rating],
           timeSpentMs: Date.now() - cardShownAtRef.current,
           mode: 'flashcard',
+          input,
         });
       }
       
@@ -531,9 +554,6 @@ export function StudyScreen({ navigation, route }: Props) {
   // Прогресс
   const progress = getProgress();
 
-  // Анимация переворота карточки (reanimated для native + web)
-  const flipProgress = useSharedValue(0);
-
   useEffect(() => {
     flipProgress.value = withTiming(isFlipped ? 1 : 0, {
       duration: 400,
@@ -561,6 +581,40 @@ export function StudyScreen({ navigation, route }: Props) {
       opacity,
       backfaceVisibility: 'hidden' as const,
     };
+  });
+
+  // Свайп влево — «Не знаю», вправо — «Уверенно»; работает на обеих сторонах (plan/new/card_rating.md).
+  // Касание ловит Pressable карточки — протягивание его отменяет. На вебе только кнопки
+  const handleSwipe = useCallback((direction: number) => {
+    handleRate(direction > 0 ? 4 : 1, 'swipe');
+  }, [handleRate]);
+
+  const cardSwipeGesture = Gesture.Pan()
+    .enabled(Platform.OS !== 'web' && !isSettingsOpen)
+    .activeOffsetX([-15, 15])
+    .failOffsetY([-15, 15])
+    .onUpdate((e) => {
+      if (swipeFlying.value) return;
+      swipeX.value = e.translationX;
+    })
+    .onEnd((e) => {
+      if (swipeFlying.value) return;
+      const flick = Math.abs(e.velocityX) > SWIPE_VELOCITY && Math.sign(e.velocityX) === Math.sign(e.translationX);
+      if (Math.abs(e.translationX) < SWIPE_DISTANCE && !flick) {
+        swipeX.value = withSpring(0, { damping: 18, stiffness: 220 });
+        return;
+      }
+      const direction = e.translationX > 0 ? 1 : -1;
+      swipeFlying.value = true;
+      swipeX.value = withTiming(direction * SCREEN_WIDTH * 1.2, { duration: SWIPE_OUT_MS }, (finished) => {
+        if (finished) runOnJS(handleSwipe)(direction);
+      });
+    });
+
+  const swipeStyle = useAnimatedStyle(() => {
+    'worklet';
+    const rotate = interpolate(swipeX.value, [-CARD_WIDTH, 0, CARD_WIDTH], [-12, 0, 12], Extrapolation.CLAMP);
+    return { transform: [{ translateX: swipeX.value }, { rotate: `${rotate}deg` }] };
   });
 
   // Заранее озвучиваем вопрос и ответ текущей и следующей карточки — кнопка динамика играет сразу
@@ -661,68 +715,72 @@ export function StudyScreen({ navigation, route }: Props) {
       {/* Основной контент */}
       <View style={styles.mainContent}>
         {/* Флеш-карточка */}
-        <Pressable
-          onPress={handleToggleCard}
-          accessibilityRole="button"
-          accessibilityLabel={isFlipped ? `Ответ: ${answerText}. Нажми, чтобы перевернуть` : `${questionText}. Нажми, чтобы перевернуть`}
-          style={[
-            styles.cardWrapper,
-            { opacity: cardVisible ? 1 : 0 },
-          ]}
-        >
-          {/* Передняя сторона (вопрос) */}
-          <ReAnimated.View style={[styles.cardAnim, frontAnimStyle]} pointerEvents={isFlipped ? 'none' : 'auto'}>
-            <View style={[styles.cardInner, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              {renderCardTop(() => handleSpeak(questionText, questionLang, answerText))}
+        <GestureDetector gesture={cardSwipeGesture}>
+          <ReAnimated.View style={swipeStyle}>
+            <Pressable
+              onPress={handleToggleCard}
+              accessibilityRole="button"
+              accessibilityLabel={isFlipped ? `Ответ: ${answerText}. Нажми, чтобы перевернуть` : `${questionText}. Нажми, чтобы перевернуть`}
+              style={[
+                styles.cardWrapper,
+                { opacity: cardVisible ? 1 : 0 },
+              ]}
+            >
+              {/* Передняя сторона (вопрос) */}
+              <ReAnimated.View style={[styles.cardAnim, frontAnimStyle]} pointerEvents={isFlipped ? 'none' : 'auto'}>
+                <View style={[styles.cardInner, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  {renderCardTop(() => handleSpeak(questionText, questionLang, answerText))}
 
-              <View style={styles.cardContent} onLayout={measureTextBox('front')}>
-                <Text
-                  variant="h2"
-                  numberOfLines={questionFit.numberOfLines}
-                  style={[styles.cardWord, { color: colors.textPrimary, fontSize: questionFit.fontSize, lineHeight: questionFit.lineHeight }]}
-                >
-                  {questionText}
-                </Text>
-              </View>
+                  <View style={styles.cardContent} onLayout={measureTextBox('front')}>
+                    <Text
+                      variant="h2"
+                      numberOfLines={questionFit.numberOfLines}
+                      style={[styles.cardWord, { color: colors.textPrimary, fontSize: questionFit.fontSize, lineHeight: questionFit.lineHeight }]}
+                    >
+                      {questionText}
+                    </Text>
+                  </View>
 
-              <View style={styles.cardBottom}>
-                <Text variant="bodySmall" align="center" style={{ color: colors.textSecondary }}>
-                  Нажми, чтобы перевернуть
-                </Text>
-              </View>
-            </View>
+                  <View style={styles.cardBottom}>
+                    <Text variant="bodySmall" align="center" style={{ color: colors.textSecondary }}>
+                      Нажми, чтобы перевернуть
+                    </Text>
+                  </View>
+                </View>
+              </ReAnimated.View>
+
+              {/* Задняя сторона (ответ) */}
+              <ReAnimated.View style={[styles.cardAnim, backAnimStyle]} pointerEvents={isFlipped ? 'auto' : 'none'}>
+                <View style={[styles.cardInner, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  {renderCardTop(() => handleSpeak(answerText, answerLang, questionText))}
+
+                  <View style={styles.cardContent} onLayout={measureTextBox('back')}>
+                    <Text
+                      variant="h2"
+                      numberOfLines={answerFit.word.numberOfLines}
+                      style={[styles.cardWord, { color: colors.textPrimary, fontSize: answerFit.word.fontSize, lineHeight: answerFit.word.lineHeight }]}
+                    >
+                      {answerText}
+                    </Text>
+                    <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                    {example ? (
+                      <Text
+                        variant="bodyLarge"
+                        align="center"
+                        numberOfLines={answerFit.example.numberOfLines}
+                        style={{ color: colors.textSecondary, fontSize: answerFit.example.fontSize, lineHeight: answerFit.example.lineHeight }}
+                      >
+                        {example}
+                      </Text>
+                    ) : null}
+                  </View>
+
+                  <View style={styles.cardBottom} />
+                </View>
+              </ReAnimated.View>
+            </Pressable>
           </ReAnimated.View>
-
-          {/* Задняя сторона (ответ) */}
-          <ReAnimated.View style={[styles.cardAnim, backAnimStyle]} pointerEvents={isFlipped ? 'auto' : 'none'}>
-            <View style={[styles.cardInner, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              {renderCardTop(() => handleSpeak(answerText, answerLang, questionText))}
-
-              <View style={styles.cardContent} onLayout={measureTextBox('back')}>
-                <Text
-                  variant="h2"
-                  numberOfLines={answerFit.word.numberOfLines}
-                  style={[styles.cardWord, { color: colors.textPrimary, fontSize: answerFit.word.fontSize, lineHeight: answerFit.word.lineHeight }]}
-                >
-                  {answerText}
-                </Text>
-                <View style={[styles.divider, { backgroundColor: colors.border }]} />
-                {example ? (
-                  <Text
-                    variant="bodyLarge"
-                    align="center"
-                    numberOfLines={answerFit.example.numberOfLines}
-                    style={{ color: colors.textSecondary, fontSize: answerFit.example.fontSize, lineHeight: answerFit.example.lineHeight }}
-                  >
-                    {example}
-                  </Text>
-                ) : null}
-              </View>
-
-              <View style={styles.cardBottom} />
-            </View>
-          </ReAnimated.View>
-        </Pressable>
+        </GestureDetector>
       </View>
 
       <Modal

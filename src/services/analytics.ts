@@ -248,12 +248,14 @@ export const Analytics = {
     rating?: CardRating; // только для flashcard-режима
     timeSpentMs: number;
     mode: StudyMode;
+    input?: 'button' | 'swipe'; // только для flashcard-режима: кнопка или свайп
   }) =>
     log('card_answered', {
       correct: params.correct,
       rating: params.rating ?? '',
       time_spent_ms: params.timeSpentMs,
       mode: params.mode,
+      input: params.input ?? '',
     }),
 
   /**
