@@ -4,9 +4,23 @@
     "details": [
       {
         "appID": "QY39YM9ZQ2.com.baiirbek.flashly",
-        "appIDs": ["QY39YM9ZQ2.com.baiirbek.flashly"],
-        "paths": ["/join/*"],
-        "components": [{ "/": "/join/*", "comment": "Приглашение в курс" }]
+        "appIDs": [
+          "QY39YM9ZQ2.com.baiirbek.flashly"
+        ],
+        "paths": [
+          "/join/*",
+          "/s/*"
+        ],
+        "components": [
+          {
+            "/": "/join/*",
+            "comment": "Приглашение в курс"
+          },
+          {
+            "/": "/s/*",
+            "comment": "Набор по ссылке (plan/new/share_set.md)"
+          }
+        ]
       }
     ]
   }

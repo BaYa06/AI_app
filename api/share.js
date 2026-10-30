@@ -28,8 +28,19 @@ const isUuid = (v) => typeof v === 'string' && UUID_RE.test(v);
 const CODE_RE = /^[0-9A-Za-z]{10}$/;
 const BASE62 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 
-// Домен ссылок — один на сервере и в приложении (src/config); свой домен подключается через env.
-const SHARE_ORIGIN = (process.env.SHARE_ORIGIN || 'https://ai-app-seven-zeta.vercel.app').replace(/\/$/, '');
+// Домен ссылок: SHARE_ORIGIN (свой домен, когда появится) или домен, на который пришёл запрос, —
+// тестовый сервер (Vercel Preview ветки dev) даёт ссылки на себя: набор лежит в его базе, и
+// Universal Link тестового домена открывает тестовую сборку. Чужие Host не принимаем.
+const DEFAULT_ORIGIN = 'https://ai-app-seven-zeta.vercel.app';
+const SHARE_ORIGIN = process.env.SHARE_ORIGIN ? process.env.SHARE_ORIGIN.replace(/\/$/, '') : null;
+const OWN_HOST_RE = /^(ai-app-[a-z0-9-]+\.vercel\.app|localhost(:\d+)?|127\.0\.0\.1(:\d+)?)$/;
+
+function originFor(req) {
+  if (SHARE_ORIGIN) return SHARE_ORIGIN;
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim().toLowerCase();
+  if (!OWN_HOST_RE.test(host)) return DEFAULT_ORIGIN;
+  return `${host.startsWith('localhost') || host.startsWith('127.') ? 'http' : 'https'}://${host}`;
+}
 
 const PREVIEW_CARDS = 20;
 const MAX_CARDS = 2000;
@@ -38,7 +49,7 @@ const REPORT_REASONS = new Set(['offensive', 'spam', 'inappropriate', 'copyright
 
 const PUBLIC_ACTIONS = new Set(['preview', 'page', 'cards']);
 
-const shareUrl = (code) => `${SHARE_ORIGIN}/s/${code}`;
+const shareUrl = (origin, code) => `${origin}/s/${code}`;
 
 // 10 символов base62 ≈ 59 бит. Остаток от 256 % 62 даёт небольшой перекос — для неугадываемости не важно.
 function generateCode() {
@@ -59,6 +70,7 @@ export default async function handler(req, res) {
   }
 
   const { action } = req.query;
+  const origin = originFor(req);
   const userId = await getAuthedUserId(req);
   if (!PUBLIC_ACTIONS.has(action) && !userId) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -71,7 +83,7 @@ export default async function handler(req, res) {
   if (code !== undefined && !CODE_RE.test(code)) {
     if (action === 'page') {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      return res.status(404).send(renderShareErrorPage('not_found', SHARE_ORIGIN));
+      return res.status(404).send(renderShareErrorPage('not_found', origin));
     }
     return res.status(400).json({ error: 'invalid_code' });
   }
@@ -81,14 +93,14 @@ export default async function handler(req, res) {
 
   try {
     const isGet = req.method === 'GET';
-    if (action === 'preview' && isGet)  return await preview(req, res, sql, userId, code);
-    if (action === 'page' && isGet)     return await page(res, sql, code);
+    if (action === 'preview' && isGet)  return await preview(res, sql, userId, code, origin);
+    if (action === 'page' && isGet)     return await page(res, sql, code, origin);
     if (action === 'cards' && isGet)    return await allCards(res, sql, code);
-    if (action === 'status' && isGet)   return await status(res, sql, userId, setId);
+    if (action === 'status' && isGet)   return await status(res, sql, userId, setId, origin);
     if (action === 'blocks' && isGet)   return await listBlocks(res, sql, userId);
     if (isGet) return res.status(405).json({ error: 'Method not allowed' });
 
-    if (action === 'create')  return await createShare(res, sql, userId, setId);
+    if (action === 'create')  return await createShare(res, sql, userId, setId, origin);
     if (action === 'disable') return await disableShare(res, sql, userId, setId);
     if (action === 'import')  return await importShared(res, sql, userId, code, body.courseId ?? null);
     if (action === 'report')  return await reportShared(res, sql, userId, code, body.reason, body.comment);
@@ -108,7 +120,7 @@ async function findShare(sql, code) {
 }
 
 // ── action=create ─────────────────────────────────────────────────────────────
-async function createShare(res, sql, userId, setId) {
+async function createShare(res, sql, userId, setId, origin) {
   if (!setId) return res.status(400).json({ error: 'setId required' });
 
   const owned = await sql`
@@ -121,7 +133,7 @@ async function createShare(res, sql, userId, setId) {
   if (cards > MAX_CARDS) return res.status(400).json({ error: 'too_many_cards', max: MAX_CARDS });
 
   const existing = await sql`SELECT code FROM set_shares WHERE set_id = ${setId}::uuid AND disabled_at IS NULL`;
-  if (existing.length > 0) return res.status(200).json({ code: existing[0].code, url: shareUrl(existing[0].code) });
+  if (existing.length > 0) return res.status(200).json({ code: existing[0].code, url: shareUrl(origin, existing[0].code) });
 
   // Совпадение кода почти невозможно, но повторяем; гонку двух «Поделиться» ловит частичный
   // уникальный индекс по set_id — тогда отдаём ссылку, которую создал соседний запрос.
@@ -129,18 +141,18 @@ async function createShare(res, sql, userId, setId) {
     const newCode = generateCode();
     try {
       await sql`INSERT INTO set_shares (code, set_id, owner_id) VALUES (${newCode}, ${setId}::uuid, ${userId}::uuid)`;
-      return res.status(201).json({ code: newCode, url: shareUrl(newCode) });
+      return res.status(201).json({ code: newCode, url: shareUrl(origin, newCode) });
     } catch (e) {
       if (e.code !== '23505') throw e;
       const raced = await sql`SELECT code FROM set_shares WHERE set_id = ${setId}::uuid AND disabled_at IS NULL`;
-      if (raced.length > 0) return res.status(200).json({ code: raced[0].code, url: shareUrl(raced[0].code) });
+      if (raced.length > 0) return res.status(200).json({ code: raced[0].code, url: shareUrl(origin, raced[0].code) });
     }
   }
   return res.status(500).json({ error: 'code_generation_failed' });
 }
 
 // ── action=status ─────────────────────────────────────────────────────────────
-async function status(res, sql, userId, setId) {
+async function status(res, sql, userId, setId, origin) {
   if (!setId) return res.status(400).json({ error: 'setId required' });
   const rows = await sql`
     SELECT s.code, s.views, s.imports FROM set_shares s
@@ -148,7 +160,7 @@ async function status(res, sql, userId, setId) {
   `;
   if (rows.length === 0) return res.status(200).json({ share: null });
   const { code, views, imports } = rows[0];
-  return res.status(200).json({ share: { code, url: shareUrl(code), views, imports } });
+  return res.status(200).json({ share: { code, url: shareUrl(origin, code), views, imports } });
 }
 
 // ── action=disable ────────────────────────────────────────────────────────────
@@ -162,7 +174,7 @@ async function disableShare(res, sql, userId, setId) {
 }
 
 // ── action=preview ────────────────────────────────────────────────────────────
-async function preview(req, res, sql, userId, code) {
+async function preview(res, sql, userId, code, origin) {
   if (!code) return res.status(400).json({ error: 'code required' });
 
   const share = await findShare(sql, code);
@@ -179,7 +191,7 @@ async function preview(req, res, sql, userId, code) {
     if (hidden[0].reported) return res.status(403).json({ error: 'reported' });
   }
 
-  const content = await loadContent(sql, share);
+  const content = await loadContent(sql, share, origin);
   if (!content) return res.status(404).json({ error: 'not_found' });
 
   await sql`UPDATE set_shares SET views = views + 1 WHERE code = ${code}`;
@@ -206,7 +218,7 @@ async function preview(req, res, sql, userId, code) {
 }
 
 // Набор, автор и первые карточки — общие для JSON-превью и HTML-страницы. null — набора нет.
-async function loadContent(sql, share) {
+async function loadContent(sql, share, origin) {
   const [setRows, cards] = await Promise.all([
     sql`
       SELECT cs.title, cs.description, cs.category, cs.language_from, cs.language_to,
@@ -228,7 +240,7 @@ async function loadContent(sql, share) {
 
   return {
     code: share.code,
-    url: shareUrl(share.code),
+    url: shareUrl(origin, share.code),
     set: {
       title: set.title,
       description: set.description || '',
@@ -244,10 +256,10 @@ async function loadContent(sql, share) {
 
 // ── action=page ───────────────────────────────────────────────────────────────
 // HTML для /s/<code>: без входа, одинаковый для всех — кэш на CDN. В поиск не попадает (noindex).
-async function page(res, sql, code) {
+async function page(res, sql, code, origin) {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('X-Robots-Tag', 'noindex, nofollow');
-  const url = code ? shareUrl(code) : SHARE_ORIGIN;
+  const url = code ? shareUrl(origin, code) : origin;
 
   const share = code ? await findShare(sql, code) : null;
   if (!share || share.disabled_at) {
@@ -255,7 +267,7 @@ async function page(res, sql, code) {
     return res.status(share ? 410 : 404).send(renderShareErrorPage(share ? 'disabled' : 'not_found', url));
   }
 
-  const content = await loadContent(sql, share);
+  const content = await loadContent(sql, share, origin);
   if (!content) return res.status(404).send(renderShareErrorPage('not_found', url));
 
   await sql`UPDATE set_shares SET views = views + 1 WHERE code = ${code}`;
