@@ -516,6 +516,20 @@ async function updateUserStatsStreak(sql, me, p) {
   const prevStreak = existing[0]?.current_streak || 0;
   const lastActive = existing[0]?.last_active_date ?? null;
   if (!day.counted) {
+    // Итоги (по ним уровень) копятся и до того, как день засчитан в серию. Только для клиентов,
+    // которые шлют прибавку с прошлой отправки (incremental): старые шлют счётчик за весь день
+    // при каждом выходе с экрана — им по-прежнему только в засчитанный день (plan/new/card_rating.md, Cards 6)
+    if (p.incremental === true) {
+      await sql`
+        INSERT INTO user_stats (user_id, total_words_learned, total_minutes_learned, total_cards_studied)
+        VALUES (${me}::uuid, ${d.wordsDelta}, ${d.minutesDelta}, ${d.cardsDelta})
+        ON CONFLICT (user_id) DO UPDATE SET
+          total_words_learned = user_stats.total_words_learned + ${d.wordsDelta},
+          total_minutes_learned = user_stats.total_minutes_learned + ${d.minutesDelta},
+          total_cards_studied = user_stats.total_cards_studied + ${d.cardsDelta},
+          updated_at = NOW()
+      `;
+    }
     return { counted: false, currentStreak: prevStreak, longestStreak: existing[0]?.longest_streak || 0, ...day };
   }
 

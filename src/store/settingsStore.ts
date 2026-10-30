@@ -25,6 +25,8 @@ interface SettingsState {
   // Статистика за сегодня (для быстрого доступа)
   todayStats: {
     cardsStudied: number;
+    /** Сколько из cardsStudied уже отправлено на сервер — отправляем только разницу */
+    cardsSynced: number;
     streak: number;
     longestStreak: number;
     lastStudyDate: string; // YYYY-MM-DD
@@ -130,6 +132,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
     colors: colors[startTheme] as any,
     todayStats: {
       cardsStudied: 0,
+      cardsSynced: 0,
       streak: 0,
       longestStreak: 0,
       lastStudyDate: getTodayDate(),
@@ -184,6 +187,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
         // Сбрасываем если новый день
         if (state.todayStats.lastStudyDate !== today) {
           state.todayStats.cardsStudied = 0;
+          state.todayStats.cardsSynced = 0;
           state.todayStats.lastStudyDate = today;
         }
 
@@ -192,19 +196,33 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
     },
 
     finishStudySession: async () => {
-      const { cardsStudied } = get().todayStats;
-      if (cardsStudied <= 0) return { streakIncreased: false, newStreakCount: 0 };
+      // Отправляем только карточки с прошлой отправки: раньше каждый вызов («назад», уход в фон,
+      // конец сессии) снова прибавлял все карточки дня (plan/new/card_rating.md, Cards 6)
+      const { cardsStudied, cardsSynced } = get().todayStats;
+      const cardsDelta = cardsStudied - cardsSynced;
+      if (cardsDelta <= 0) return { streakIncreased: false, newStreakCount: 0 };
+
+      // Отмечаем до await: «назад» и уход в фон вызывают это почти одновременно
+      set((state) => {
+        state.todayStats.cardsSynced += cardsDelta;
+      });
+      // Не записалось — вернём карточки, они уйдут со следующей отправкой
+      const rollback = () =>
+        set((state) => {
+          state.todayStats.cardsSynced = Math.max(0, state.todayStats.cardsSynced - cardsDelta);
+        });
 
       const lastActiveDate = get().streakCache.lastActiveDate;
       const today = getTodayDate();
       const wasAlreadyActiveToday = lastActiveDate === today;
 
       try {
-        const success = await StreakService.recordActivity({
-          cardsDelta: cardsStudied,
-          wordsDelta: cardsStudied,
-          minutesDelta: Math.max(1, Math.round(cardsStudied / 5)),
+        const { saved, counted: success } = await StreakService.recordActivity({
+          cardsDelta,
+          wordsDelta: cardsDelta,
+          minutesDelta: Math.max(1, Math.round(cardsDelta / 5)),
         });
+        if (!saved) rollback();
 
         if (success && !wasAlreadyActiveToday) {
           // Получаем актуальный стрик из БД после обновления
@@ -251,6 +269,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
       set((state) => {
         state.todayStats = {
           cardsStudied: 0,
+          cardsSynced: 0,
           streak: 0,
           longestStreak: 0,
           lastStudyDate: getTodayDate(),

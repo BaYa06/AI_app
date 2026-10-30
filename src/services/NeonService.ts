@@ -712,7 +712,8 @@ export const NeonService = {
     yesterdayDate: string,
     deltas: { wordsDelta: number; minutesDelta: number; cardsDelta: number }
   ): Promise<boolean> {
-    const result = await callDataApi<{ counted: boolean }>('updateUserStatsStreak', { localDate, yesterdayDate, deltas });
+    // incremental: прибавка с прошлой отправки — сервер копит итоги и до засчитанного дня
+    const result = await callDataApi<{ counted: boolean }>('updateUserStatsStreak', { localDate, yesterdayDate, deltas, incremental: true });
     return result?.counted === true;
   },
 

@@ -105,10 +105,10 @@ function getYesterdayKey(timezone: string = getDeviceTimezone()): string {
 // ==================== ОСНОВНЫЕ ФУНКЦИИ ====================
 
 /**
- * Записать активность за сессию
- * Вызывать при завершении изучения карточек
+ * Записать активность за сессию — прибавку с прошлой отправки.
+ * saved — активность записана (иначе прибавку надо отправить ещё раз); counted — день засчитан в серию.
  */
-export async function recordActivity(params: RecordActivityParams): Promise<boolean> {
+export async function recordActivity(params: RecordActivityParams): Promise<{ saved: boolean; counted: boolean }> {
   const { wordsDelta = 0, minutesDelta = 0, cardsDelta = 0 } = params;
 
   try {
@@ -118,12 +118,12 @@ export async function recordActivity(params: RecordActivityParams): Promise<bool
 
     if (!userId) {
       console.log('ℹ️ Streak: пользователь не авторизован, активность сохранена локально');
-      return false;
+      return { saved: false, counted: false };
     }
 
     if (!NeonService.isEnabled()) {
       console.log('ℹ️ Streak: Neon не настроен');
-      return false;
+      return { saved: false, counted: false };
     }
 
     // Получаем таймзон из user_stats, фолбек на системный
@@ -149,7 +149,7 @@ export async function recordActivity(params: RecordActivityParams): Promise<bool
 
     if (!activityResult) {
       console.warn('⚠️ Streak: не удалось записать daily_activity');
-      return false;
+      return { saved: false, counted: false };
     }
 
     // 2. Серия: засчитывается ли день, решает сервер — по журналу ответов (повторение слов, которым
@@ -161,10 +161,11 @@ export async function recordActivity(params: RecordActivityParams): Promise<bool
     });
 
     console.log(counted ? '✅ Streak: день засчитан' : 'ℹ️ Streak: активность записана, день в серию пока не засчитан');
-    return counted;
+    // daily_activity уже записан — повторная отправка задвоила бы его, поэтому saved даже без итогов
+    return { saved: true, counted };
   } catch (error) {
     console.error('❌ Streak: ошибка при записи активности:', error);
-    return false;
+    return { saved: false, counted: false };
   }
 }
 
