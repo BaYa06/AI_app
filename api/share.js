@@ -2,6 +2,7 @@ import { neon } from '@neondatabase/serverless';
 import { randomBytes } from 'node:crypto';
 import { ensureDatabaseInitialized } from './_db-init.js';
 import { getAuthedUserId } from './_auth.js';
+import { renderSharePage, renderShareErrorPage } from './_share-page.js';
 
 /**
  * Наборы по ссылке (plan/new/share_set.md, Share 1).
@@ -10,6 +11,7 @@ import { getAuthedUserId } from './_auth.js';
  * GET  /api/share?action=status&setId=…                     – действующая ссылка своего набора или null
  * POST /api/share?action=disable  { setId }                 – закрыть доступ по ссылке
  * GET  /api/share?action=preview&code=…                     – превью без входа; с токеном + viewer
+ * GET  /s/<code> → /api/share?action=page&code=…            – HTML-страница превью (Share 2)
  * POST /api/share?action=import   { code, courseId? }       – копия набора себе (курс — только свой)
  * POST /api/share?action=report   { code, reason, comment? } – жалоба, набор скрывается у пожаловавшегося
  * POST /api/share?action=block    { code }                  – заблокировать автора ссылки
@@ -31,7 +33,7 @@ const MAX_CARDS = 2000;
 const IMPORTS_PER_HOUR = 30;
 const REPORT_REASONS = new Set(['offensive', 'spam', 'inappropriate', 'copyright', 'other']);
 
-const PUBLIC_ACTIONS = new Set(['preview']);
+const PUBLIC_ACTIONS = new Set(['preview', 'page']);
 
 const shareUrl = (code) => `${SHARE_ORIGIN}/s/${code}`;
 
@@ -63,7 +65,13 @@ export default async function handler(req, res) {
   const setId = body.setId ?? req.query.setId;
   const code = body.code ?? req.query.code;
   if (setId !== undefined && !isUuid(setId)) return res.status(400).json({ error: 'setId must be a uuid' });
-  if (code !== undefined && !CODE_RE.test(code)) return res.status(400).json({ error: 'invalid_code' });
+  if (code !== undefined && !CODE_RE.test(code)) {
+    if (action === 'page') {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      return res.status(404).send(renderShareErrorPage('not_found', SHARE_ORIGIN));
+    }
+    return res.status(400).json({ error: 'invalid_code' });
+  }
 
   const sql = neon(process.env.POSTGRES_URL);
   await ensureDatabaseInitialized(sql);
@@ -71,6 +79,7 @@ export default async function handler(req, res) {
   try {
     const isGet = req.method === 'GET';
     if (action === 'preview' && isGet)  return await preview(req, res, sql, userId, code);
+    if (action === 'page' && isGet)     return await page(res, sql, code);
     if (action === 'status' && isGet)   return await status(res, sql, userId, setId);
     if (isGet) return res.status(405).json({ error: 'Method not allowed' });
 
@@ -164,24 +173,8 @@ async function preview(req, res, sql, userId, code) {
     if (hidden[0].reported) return res.status(403).json({ error: 'reported' });
   }
 
-  const [setRows, cards] = await Promise.all([
-    sql`
-      SELECT cs.title, cs.description, cs.category, cs.language_from, cs.language_to,
-             (SELECT COUNT(*) FROM cards c WHERE c.set_id = cs.id) AS cards_count,
-             COALESCE(NULLIF(u.display_name, ''), NULLIF(u.user_name, '')) AS author_name
-      FROM card_sets cs
-      LEFT JOIN users u ON u.id = ${share.owner_id}::uuid
-      WHERE cs.id = ${share.set_id}::uuid
-    `,
-    sql`
-      SELECT front, back, example, word_form FROM cards
-      WHERE set_id = ${share.set_id}::uuid
-      ORDER BY sort_order NULLS LAST, created_at
-      LIMIT ${PREVIEW_CARDS}
-    `,
-  ]);
-  if (setRows.length === 0) return res.status(404).json({ error: 'not_found' });
-  const set = setRows[0];
+  const content = await loadContent(sql, share);
+  if (!content) return res.status(404).json({ error: 'not_found' });
 
   await sql`UPDATE set_shares SET views = views + 1 WHERE code = ${code}`;
 
@@ -203,9 +196,33 @@ async function preview(req, res, sql, userId, code) {
 
   // Без токена ответ одинаков для всех — кэшируем на CDN (views тогда считаются по промахам кэша).
   res.setHeader('Cache-Control', userId ? 'private, no-store' : 'public, s-maxage=60, stale-while-revalidate=60');
-  return res.status(200).json({
-    code,
-    url: shareUrl(code),
+  return res.status(200).json({ ...content, viewer });
+}
+
+// Набор, автор и первые карточки — общие для JSON-превью и HTML-страницы. null — набора нет.
+async function loadContent(sql, share) {
+  const [setRows, cards] = await Promise.all([
+    sql`
+      SELECT cs.title, cs.description, cs.category, cs.language_from, cs.language_to,
+             (SELECT COUNT(*) FROM cards c WHERE c.set_id = cs.id) AS cards_count,
+             COALESCE(NULLIF(u.display_name, ''), NULLIF(u.user_name, '')) AS author_name
+      FROM card_sets cs
+      LEFT JOIN users u ON u.id = ${share.owner_id}::uuid
+      WHERE cs.id = ${share.set_id}::uuid
+    `,
+    sql`
+      SELECT front, back, example, word_form FROM cards
+      WHERE set_id = ${share.set_id}::uuid
+      ORDER BY sort_order NULLS LAST, created_at
+      LIMIT ${PREVIEW_CARDS}
+    `,
+  ]);
+  if (setRows.length === 0) return null;
+  const set = setRows[0];
+
+  return {
+    code: share.code,
+    url: shareUrl(share.code),
     set: {
       title: set.title,
       description: set.description || '',
@@ -216,8 +233,28 @@ async function preview(req, res, sql, userId, code) {
     },
     author: { name: set.author_name || null },
     cards: cards.map((c) => ({ front: c.front, back: c.back, example: c.example || null, wordForm: c.word_form || null })),
-    viewer,
-  });
+  };
+}
+
+// ── action=page ───────────────────────────────────────────────────────────────
+// HTML для /s/<code>: без входа, одинаковый для всех — кэш на CDN. В поиск не попадает (noindex).
+async function page(res, sql, code) {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  const url = code ? shareUrl(code) : SHARE_ORIGIN;
+
+  const share = code ? await findShare(sql, code) : null;
+  if (!share || share.disabled_at) {
+    res.setHeader('Cache-Control', 'public, s-maxage=60');
+    return res.status(share ? 410 : 404).send(renderShareErrorPage(share ? 'disabled' : 'not_found', url));
+  }
+
+  const content = await loadContent(sql, share);
+  if (!content) return res.status(404).send(renderShareErrorPage('not_found', url));
+
+  await sql`UPDATE set_shares SET views = views + 1 WHERE code = ${code}`;
+  res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=60');
+  return res.status(200).send(renderSharePage(content));
 }
 
 // ── action=import ─────────────────────────────────────────────────────────────

@@ -69,7 +69,7 @@ function renderPage({ courseTitle, teacherName, token, error }) {
   <meta property="og:url" content="${esc(pwaUrl)}">
 
   <!-- iOS deep link -->
-  <meta name="apple-itunes-app" content="app-id=, app-argument=${esc(deepLink)}">
+  <meta name="apple-itunes-app" content="app-id=6808731151, app-argument=${esc(deepLink)}">
 
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
