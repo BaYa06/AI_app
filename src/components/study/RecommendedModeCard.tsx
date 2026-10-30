@@ -11,10 +11,9 @@ import { spacing, borderRadius, iconSize, alpha } from '@/constants';
 
 type RateTone = 'ratingAgain' | 'ratingHard' | 'ratingGood' | 'ratingEasy';
 
-// Те же оценки и цвета, что в классическом режиме (Снова / Сложно / Хорошо / Легко)
+// Те же оценки и цвета, что на экране карточек
 const RATE_LABELS: Array<{ label: string; tone: RateTone }> = [
   { label: 'Не знаю', tone: 'ratingAgain' },
-  { label: 'Сомневаюсь', tone: 'ratingHard' },
   { label: 'Почти', tone: 'ratingEasy' },
   { label: 'Уверенно', tone: 'ratingGood' },
 ];

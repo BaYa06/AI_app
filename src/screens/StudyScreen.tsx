@@ -591,14 +591,13 @@ export function StudyScreen({ navigation, route }: Props) {
   const questionLang = reverseEnabled ? backLang : frontLang;
   const answerLang = reverseEnabled ? frontLang : backLang;
 
-  // Кнопки оценки: цвета оценок SRS, текст — «текстовые» токены; «Уверенно» — главная кнопка
+  // Кнопки оценки: цвета оценок SRS, текст — «текстовые» токены; «Уверенно» — главная кнопка.
+  // Оценки 2 («Сомневаюсь») больше нет, сервер её по-прежнему принимает от старых версий (plan/new/card_rating.md)
   const ratingOptions: Array<{ rating: Rating; label: string; bg: string; text: string }> = [
     { rating: 1, label: 'Не знаю', bg: alpha(colors.ratingAgain, 10), text: colors.errorText },
-    { rating: 2, label: 'Сомнев...', bg: alpha(colors.ratingHard, 10), text: colors.warningText },
     { rating: 3, label: 'Почти', bg: alpha(colors.ratingEasy, 10), text: colors.info },
     { rating: 4, label: 'Уверенно', bg: colors.primaryFill, text: colors.onPrimary },
   ];
-  const ratingA11y: Record<Rating, string> = { 1: 'Не знаю', 2: 'Сомневаюсь', 3: 'Почти', 4: 'Уверенно' };
 
   const renderCardTop = (onSpeak: () => void) => (
     <View style={styles.cardTopRow}>
@@ -762,7 +761,7 @@ export function StudyScreen({ navigation, route }: Props) {
               key={rating}
               onPress={() => handleRate(rating)}
               accessibilityRole="button"
-              accessibilityLabel={ratingA11y[rating]}
+              accessibilityLabel={label}
               style={({ pressed }) => [styles.ratingButton, { backgroundColor: bg }, pressed && styles.pressed]}
             >
               <Text variant="label" numberOfLines={1} style={{ color: text }}>{label}</Text>

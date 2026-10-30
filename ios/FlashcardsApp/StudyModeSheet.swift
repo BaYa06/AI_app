@@ -345,7 +345,6 @@ private struct RecommendedModeCard: View {
   private var rates: [Rate] {
     [
       Rate(label: "Не знаю", fill: palette.ratingAgain, text: palette.errorText),
-      Rate(label: "Сомневаюсь", fill: palette.ratingHard, text: palette.warningText),
       Rate(label: "Почти", fill: palette.ratingEasy, text: palette.info),
       Rate(label: "Уверенно", fill: palette.ratingGood, text: palette.successText),
     ]
