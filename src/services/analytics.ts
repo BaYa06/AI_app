@@ -526,6 +526,25 @@ export const Analytics = {
     log('set_shared', { method }),
 
   /**
+   * Наборы по ссылке (plan/new/share_set.md). Ссылка получена (новая или та же) перед меню «Поделиться».
+   */
+  shareLinkCreated: (cardCount: number) =>
+    log('share_link_created', { card_count: cardCount }),
+
+  /**
+   * Ссылку отправили: app — приложение из меню iOS (WhatsApp, Telegram…), 'clipboard' — скопировали на вебе.
+   * Зачем: какие мессенджеры главные — под них доводим превью и текст.
+   */
+  shareLinkSent: (app: string | null) =>
+    log('share_link_sent', { app: app ?? 'unknown' }),
+
+  /**
+   * Автор закрыл доступ по ссылке.
+   */
+  shareLinkDisabled: () =>
+    log('share_link_disabled'),
+
+  /**
    * Юзер изменил тему оформления.
    */
   themeChanged: (theme: 'light' | 'dark' | 'system') =>

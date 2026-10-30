@@ -19,11 +19,13 @@ import { spacing, borderRadius, iconSize, TOP_LANGUAGES, alpha } from '@/constan
 import { Button, CategoryIcon, toast, useScreenBottomInset } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { SetCategory } from '@/types';
-import { ArrowLeftRight, Check, ChevronDown, Globe } from 'lucide-react-native';
-import { LibraryService } from '@/services';
+import { ArrowLeftRight, Check, ChevronDown, Globe, Link2 } from 'lucide-react-native';
+import { LibraryService, ShareService, Analytics } from '@/services';
 import { supabase } from '@/services/supabaseClient';
 import { LIBRARY_CATEGORIES } from '@/constants/library';
 import { describeError } from '@/utils/userErrors';
+import { confirmAction } from '@/utils/dialogs';
+import { pluralize } from '@/utils';
 import { COMMUNITY_LIBRARY_ENABLED } from '@/config/features';
 
 type Props = RootStackScreenProps<'SetEditor'>;
@@ -161,6 +163,40 @@ export function SetEditorScreen({ navigation, route }: Props) {
       } catch {}
     })();
   }, [isEditing, setId]);
+
+  // Доступ по ссылке (plan/new/share_set.md, Share 3): блок виден, только пока ссылка действует
+  const [shareLink, setShareLink] = useState<{ views: number; imports: number } | null>(null);
+  const [isDisablingShare, setIsDisablingShare] = useState(false);
+  useEffect(() => {
+    if (!isEditing || !setId) return;
+    let cancelled = false;
+    ShareService.getStatus(setId)
+      .then((status) => { if (!cancelled) setShareLink(status); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [isEditing, setId]);
+
+  const handleDisableShare = useCallback(async () => {
+    if (!setId) return;
+    const confirmed = await confirmAction(
+      'Закрыть доступ по ссылке?',
+      'Ссылка перестанет открываться. Те, кто уже добавил набор, сохранят свою копию.',
+      'Закрыть доступ',
+      { destructive: true },
+    );
+    if (!confirmed) return;
+    setIsDisablingShare(true);
+    try {
+      await ShareService.disable(setId);
+      Analytics.shareLinkDisabled();
+      setShareLink(null);
+      toast.success('Доступ по ссылке закрыт');
+    } catch (error) {
+      toast.error(describeError(error, 'Не удалось закрыть доступ'));
+    } finally {
+      setIsDisablingShare(false);
+    }
+  }, [setId]);
 
   // Предзаполнение формы публикации данными набора
   useEffect(() => {
@@ -709,6 +745,37 @@ export function SetEditorScreen({ navigation, route }: Props) {
               </View>
             )}
 
+            {isEditing && !isReadOnly && shareLink && (
+              <View style={styles.field}>
+                <Text variant="label" color="primary" style={styles.fieldLabel}>
+                  Доступ по ссылке
+                </Text>
+                <View style={[styles.shareRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <View style={[styles.shareIcon, { backgroundColor: alpha(colors.primary, 10) }]}>
+                    <Link2 size={iconSize.s} color={colors.primary} />
+                  </View>
+                  <View style={styles.flex1}>
+                    <Text variant="body" color="primary">Ссылка действует</Text>
+                    <Text variant="caption" color="secondary">
+                      {`Открыли ${shareLink.views} · добавили ${shareLink.imports} ${pluralize(shareLink.imports, 'раз', 'раза', 'раз')}`}
+                    </Text>
+                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={handleDisableShare}
+                    disabled={isDisablingShare}
+                    hitSlop={10}
+                    style={({ pressed }) => [styles.shareDisable, (pressed || isDisablingShare) && { opacity: 0.5 }]}
+                  >
+                    <Text variant="label" style={{ color: colors.errorText }}>Закрыть доступ</Text>
+                  </Pressable>
+                </View>
+                <Text variant="caption" color="tertiary" style={styles.helperText}>
+                  Набор видят только те, у кого есть ссылка
+                </Text>
+              </View>
+            )}
+
             {isEditing && !isReadOnly && (
               <Pressable accessibilityRole="button"
                 onPress={handleDelete}
@@ -1209,6 +1276,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.s,
     marginTop: spacing.m,
+  },
+  shareRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+    padding: spacing.m,
+    borderRadius: borderRadius.l,
+    borderWidth: 1,
+  },
+  shareIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shareDisable: {
+    minHeight: 44,
+    justifyContent: 'center',
   },
   publishActionBtn: {
     borderWidth: 1,
