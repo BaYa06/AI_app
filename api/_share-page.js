@@ -177,7 +177,7 @@ export function renderSharePage({ code, url, set, author, cards }) {
 <section class="actions">
   <a class="btn btn-primary only-ios" href="${APP_STORE_URL}">Скачать Flashly в App Store</a>
   <a class="btn btn-quiet only-ios" href="${esc(deepLink)}">Уже есть Flashly? Открыть набор</a>
-  <p class="hint only-ios">После установки нажми на ссылку ещё раз — набор откроется в приложении. <button class="link-btn" id="copy" type="button">Скопировать ссылку</button></p>
+  <p class="hint only-ios">После установки нажми на ссылку ещё раз или в приложении: «Наборы» → «Добавить набор по ссылке». <button class="link-btn" id="copy" type="button">Скопировать ссылку</button></p>
   <a class="btn btn-primary only-other" href="/?share=${esc(code)}">Открыть в Flashly</a>
   <p class="hint only-other">Работает прямо в браузере — без установки</p>
 </section>

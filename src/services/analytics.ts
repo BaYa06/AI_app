@@ -36,6 +36,7 @@ type HomeAction =
   | 'set'
   | 'create_set'
   | 'join_course'
+  | 'add_by_link'
   | 'search'
   | 'sort'
   | 'sets_menu';

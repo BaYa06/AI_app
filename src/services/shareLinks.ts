@@ -21,3 +21,31 @@ export function parseShareUrl(url: string | null | undefined): string | null {
 export function isShareCode(value: string | null | undefined): value is string {
   return !!value && CODE_RE.test(value);
 }
+
+const ANYWHERE_RE = new RegExp(`(?:https?://[^\\s/]+/s/|flashly://share/)${CODE}(?![0-9A-Za-z])`);
+
+/**
+ * Код из вставленного текста (Share 5): ссылка где угодно в тексте — люди вставляют сообщение
+ * целиком («Вот мой набор … https://…/s/CODE») — или сам код.
+ */
+export function findShareCode(text: string | null | undefined): string | null {
+  if (!text) return null;
+  const trimmed = text.trim();
+  if (CODE_RE.test(trimmed)) return trimmed;
+  const match = trimmed.match(ANYWHERE_RE);
+  return match ? match[1] : null;
+}
+
+// Окно превью живёт в App.tsx над навигатором; экраны просят открыть его через этот сигнал.
+let openShareListener: ((code: string) => void) | null = null;
+
+export function requestOpenShare(code: string): void {
+  openShareListener?.(code);
+}
+
+export function onOpenShareRequest(listener: (code: string) => void): () => void {
+  openShareListener = listener;
+  return () => {
+    if (openShareListener === listener) openShareListener = null;
+  };
+}

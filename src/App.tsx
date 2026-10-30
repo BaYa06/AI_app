@@ -13,7 +13,7 @@ import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { StagingBadge } from '@/components/common/StagingBadge';
 import { DatabaseService, setupAutoSave, supabase, NeonService, setAnalyticsUserId, SyncQueueService, Analytics, setAnalyticsUserProperties, setPushGroupProperty, setPushPermissionFlowProperty, pushPermissionFlowFor } from '@/services';
 import { isWidgetUrl, parseWidgetUrl } from '@/services/widgetLinks';
-import { parseShareUrl, isShareCode } from '@/services/shareLinks';
+import { parseShareUrl, isShareCode, onOpenShareRequest } from '@/services/shareLinks';
 import { navigationRef } from '@/navigation/navigationRef';
 import { resetWidget } from '@/services/WidgetService';
 import { isAppleUser, takeAppleSignInName } from '@/services/appleSignInName';
@@ -371,6 +371,8 @@ export default function App() {
     setShareDeferred(false);
     setShareAutoAdd(false);
   }, []);
+  // «Добавить набор по ссылке» на главной (Share 5) открывает то же окно
+  useEffect(() => onOpenShareRequest(openShareCode), [openShareCode]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const ensuredUserIdRef = useRef<string | null>(null);
   // Вход через Apple: шага «Как к тебе обращаться?» нет, «назад» с выбора роли — на приветствие

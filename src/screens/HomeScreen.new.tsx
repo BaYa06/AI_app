@@ -72,6 +72,8 @@ import type { WidgetPlanInput } from '@/services/WidgetPlanner';
 import { FocusSetSheet } from '@/components/home/FocusSetSheet';
 import { ChallengeTiles, type ChallengeTile } from '@/components/home/ChallengeTiles';
 import { SetsSectionMenu } from '@/components/home/SetsSectionMenu';
+import { AddByLinkSheet } from '@/components/share/AddByLinkSheet';
+import { requestOpenShare } from '@/services/shareLinks';
 
 const StaggerCard = React.memo(function StaggerCard({
   index,
@@ -236,6 +238,7 @@ export function HomeScreen({ navigation, route }: any) {
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteRegenerating, setInviteRegenerating] = useState(false);
   const [joinByCodeVisible, setJoinByCodeVisible] = useState(false);
+  const [addByLinkVisible, setAddByLinkVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   // Потянуть вниз — подтянуть изменения в курсах учителя (новые наборы, карточки, юниты)
@@ -2032,6 +2035,7 @@ export function HomeScreen({ navigation, route }: any) {
           Analytics.homeAction('create_set');
           navigation?.navigate('SetEditor', {});
         }}
+        onAddByLink={() => afterSetsMenu(() => { Analytics.homeAction('add_by_link'); setAddByLinkVisible(true); })}
         onJoinCourse={isTeacher === true
           ? null
           : () => afterSetsMenu(() => { Analytics.homeAction('join_course'); setJoinByCodeVisible(true); })}
@@ -2044,6 +2048,16 @@ export function HomeScreen({ navigation, route }: any) {
         currentSetId={lessonPlan.focusSetId}
         manual={lessonPlan.focusManual}
         onSelect={selectFocusSet}
+      />
+
+      <AddByLinkSheet
+        visible={addByLinkVisible}
+        onClose={() => setAddByLinkVisible(false)}
+        onCode={(code) => {
+          // Окно превью — системный лист поверх приложения: открываем после того, как этот лист уедет
+          setAddByLinkVisible(false);
+          setTimeout(() => requestOpenShare(code), animation.sheet);
+        }}
       />
 
       {/* Join by Code Modal */}

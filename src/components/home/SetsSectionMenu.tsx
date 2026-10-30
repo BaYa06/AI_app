@@ -3,7 +3,7 @@
  * @description Третий уровень главной: редкие действия с наборами живут у самих наборов, а не в шапке.
  */
 import React from 'react';
-import { ArrowUpDown, GraduationCap, Plus, Search, Users } from 'lucide-react-native';
+import { ArrowUpDown, GraduationCap, Link2, Plus, Search, Users } from 'lucide-react-native';
 import { useThemeColors } from '@/store';
 import { ListRow, Sheet } from '@/components/ui';
 
@@ -17,11 +17,13 @@ interface Props {
   /** «Учить все карточки» — null, если карточек нет */
   onStudyAll: (() => void) | null;
   onCreateSet: () => void;
+  /** «Добавить набор по ссылке» (plan/new/share_set.md, Share 5) */
+  onAddByLink: () => void;
   /** «Подключиться к курсу» — null для учителя */
   onJoinCourse: (() => void) | null;
 }
 
-export function SetsSectionMenu({ visible, onClose, sortLabel, onSort, onSearch, onStudyAll, onCreateSet, onJoinCourse }: Props) {
+export function SetsSectionMenu({ visible, onClose, sortLabel, onSort, onSearch, onStudyAll, onCreateSet, onAddByLink, onJoinCourse }: Props) {
   const colors = useThemeColors();
   const icon = colors.textPrimary;
 
@@ -39,6 +41,7 @@ export function SetsSectionMenu({ visible, onClose, sortLabel, onSort, onSearch,
         />
       ) : null}
       <ListRow icon={Plus} iconColor={icon} title="Новый набор" onPress={onCreateSet} />
+      <ListRow icon={Link2} iconColor={icon} title="Добавить набор по ссылке" subtitle="Если тебе прислали набор" onPress={onAddByLink} />
       {onJoinCourse ? (
         <ListRow icon={Users} iconColor={icon} title="Подключиться к курсу" subtitle="По коду от учителя" onPress={onJoinCourse} />
       ) : null}
