@@ -108,6 +108,23 @@ export const WHATS_NEW_FALLBACK: WhatsNewItem[] = [
     expiresAt: EXPIRES,
   },
   {
+    // plan/done/my_sets.md, MySets 6. «Открыть курсы» не ставим: вкладка «Главная» не открывает
+    // панель курсов, кнопка с главной ничего бы не сделала. Иллюстрации folders пока нет — без картинки.
+    id: 'my-sets',
+    minVersion: '1.7.0',
+    roles: ['student', 'teacher'],
+    platforms: ['ios', 'android', 'web'],
+    // Первой: без неё человек решит, что наборы курсов пропали
+    priority: 110,
+    tag: 'Курсы',
+    title: 'Наборы живут в своих курсах',
+    text: '«Все наборы» теперь «Мои наборы» — тут наборы без курса. Наборы курса — только внутри курса.',
+    art: 'folders',
+    action: null,
+    publishedAt: '2026-10-31',
+    expiresAt: '2027-02-28',
+  },
+  {
     id: 'cards-almost-repeat',
     minVersion: '1.6.8',
     roles: ['student'],

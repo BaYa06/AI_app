@@ -140,7 +140,8 @@ MMKV, чтобы в следующий раз окно открылось сра
 - `src/types/whatsNew.ts` — тип `WhatsNewItem` (формат выше).
 - `src/constants/whatsNew.ts` — запасная копия: новости 1.6.5–1.6.9 (свайп и три оценки,
   «Почти» в конце урока, поделиться набором, новые книги, честный опыт, стекло iOS 26),
-  и «Мои наборы» (`my-sets`, текст и формат — в plan/new/my_sets.md, MySets 6).
+  и «Мои наборы» (`my-sets`, plan/done/my_sets.md, MySets 6; `minVersion` 1.7.0, первой — priority 110,
+  без «Открыть курсы»: вкладка «Главная» не открывает панель курсов).
 - `src/services/whatsNew.ts` — чистые функции:
   - `selectNews(all, { seen, appVersion, role, platform, osVersion, today })` → отфильтровано и отсортировано;
   - `toPages(items)` → ≤ 4 страниц, лишнее в странице «И ещё»;
