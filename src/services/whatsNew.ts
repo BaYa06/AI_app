@@ -4,6 +4,8 @@
  * не открывает, а кто пропустил несколько версий, видит всё непросмотренное за них.
  * Состояние — на устройстве (не в localCache: тот привязан к пользователю и пуст до входа).
  */
+import { API_BASE } from '@/config/apiBase';
+import { WHATS_NEW_FALLBACK } from '@/constants/whatsNew';
 import { StorageService } from './StorageService';
 import {
   WHATS_NEW_ARTS,
@@ -203,4 +205,69 @@ export function toSheetPages(pages: WhatsNewPage[]): WhatsNewSheetPage[] {
         }
       : { tag: 'И ещё', title: 'Ещё изменения', text: '', art: null, actionLabel: null, items: p.items.map((n) => n.title) },
   );
+}
+
+// ==================== Новости с сервера (News 5) ====================
+
+const REMOTE_KEY = 'whats_new_remote';
+/** Дольше не ждём: окно покажет кэш или запасную копию */
+export const NEWS_FETCH_TIMEOUT_MS = 3000;
+
+export interface RemoteNews {
+  items: WhatsNewItem[];
+  /** id снятых с публикации — скрывают и новость из сборки */
+  hidden: string[];
+}
+
+const isStrArray = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === 'string');
+
+function isItem(v: any): v is WhatsNewItem {
+  return (
+    !!v && typeof v.id === 'string' && v.id.length > 0 && typeof v.minVersion === 'string' &&
+    isStrArray(v.roles) && isStrArray(v.platforms) && typeof v.priority === 'number' &&
+    typeof v.tag === 'string' && typeof v.title === 'string' && v.title.length > 0 &&
+    typeof v.text === 'string' && typeof v.publishedAt === 'string' &&
+    (v.action == null || (typeof v.action.label === 'string' && typeof v.action.route === 'string'))
+  );
+}
+
+/** Ответ сервера → новости. Битые записи отбрасываем, а не роняем окно */
+export function parseRemoteNews(data: unknown): RemoteNews | null {
+  const d = data as { items?: unknown; hidden?: unknown } | null;
+  if (!d || !Array.isArray(d.items)) return null;
+  return { items: d.items.filter(isItem), hidden: isStrArray(d.hidden) ? d.hidden : [] };
+}
+
+/** Сервер поверх сборки: тот же id — текст с сервера, снятые — скрыты, новые — добавлены */
+export function mergeNews(fallback: WhatsNewItem[], remote: RemoteNews | null | undefined): WhatsNewItem[] {
+  if (!remote) return fallback;
+  const hidden = new Set(remote.hidden);
+  const fromServer = new Map(remote.items.map((n) => [n.id, n]));
+  return [
+    ...fallback.filter((n) => !hidden.has(n.id) && !fromServer.has(n.id)),
+    ...remote.items.filter((n) => !hidden.has(n.id)),
+  ];
+}
+
+/** Новости прямо сейчас, без сети: последний ответ сервера поверх сборки */
+export function currentNews(): WhatsNewItem[] {
+  return mergeNews(WHATS_NEW_FALLBACK, StorageService.getObject<RemoteNews>(REMOTE_KEY));
+}
+
+/** Свежие новости с сервера (не дольше 3 с); без сети или при ошибке — currentNews() */
+export async function refreshNews(timeoutMs = NEWS_FETCH_TIMEOUT_MS): Promise<WhatsNewItem[]> {
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = setTimeout(() => controller?.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${API_BASE}/data?action=news`, { signal: controller?.signal });
+    if (!res.ok) return currentNews();
+    const remote = parseRemoteNews((await res.json())?.data);
+    if (!remote) return currentNews();
+    StorageService.setObject(REMOTE_KEY, remote);
+    return mergeNews(WHATS_NEW_FALLBACK, remote);
+  } catch {
+    return currentNews();
+  } finally {
+    clearTimeout(timer);
+  }
 }

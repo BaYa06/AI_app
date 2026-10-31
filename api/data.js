@@ -10,6 +10,7 @@ import {
   getAdminFeedbackThread, replyAdminFeedback, closeAdminFeedback,
 } from './_admin.js';
 import { isAppleUser, isAppleRevokeConfigured, revokeAppleAuthorization } from './_apple.js';
+import { getPublicNews } from './_whatsNew.js';
 
 /**
  * API данных пользователя: профиль, наборы, карточки, курсы, прогресс, серия.
@@ -21,6 +22,7 @@ import { isAppleUser, isAppleRevokeConfigured, revokeAppleAuthorization } from '
  * См. plan/course_rating_and_review_plan.md, этап 0.
  *
  * GET|POST /api/data?action=<имя>  — параметры в query (GET) или JSON-теле (POST).
+ * GET /api/data?action=news — исключение: без входа (новости «Что нового», api/_whatsNew.js).
  * Ответ: { data } или { error }. Имена действий совпадают с методами NeonService.
  *
  * Прогресс по карточкам (уровень, дата повторения) здесь не пишется — только api/progress.js,
@@ -1039,6 +1041,21 @@ async function coursesTouchedBy(sql, action, p) {
 
 export default async function handler(req, res) {
   const { action } = req.query;
+
+  // «Что нового» (plan/new/whats_new.md, News 5) — одинаково для всех, без входа и с кэшем на CDN.
+  // Отдельной функции Vercel не заводим: их уже 11 из 12.
+  if (action === 'news') {
+    if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+    try {
+      const sql = neon(process.env.POSTGRES_URL);
+      await ensureDatabaseInitialized(sql);
+      res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+      return res.status(200).json({ data: await getPublicNews(sql) });
+    } catch (error) {
+      console.error('[data] news failed:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  }
   if (!Object.hasOwn(ACTIONS, action || '')) return res.status(400).json({ error: 'Unknown action' });
   if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 

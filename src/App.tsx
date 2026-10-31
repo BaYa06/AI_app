@@ -14,8 +14,7 @@ import { StagingBadge } from '@/components/common/StagingBadge';
 import { DatabaseService, setupAutoSave, supabase, NeonService, setAnalyticsUserId, SyncQueueService, Analytics, setAnalyticsUserProperties, setPushGroupProperty, setPushPermissionFlowProperty, pushPermissionFlowFor } from '@/services';
 import { isWidgetUrl, parseWidgetUrl } from '@/services/widgetLinks';
 import { parseShareUrl, isShareCode, onOpenShareRequest } from '@/services/shareLinks';
-import { initWhatsNew } from '@/services/whatsNew';
-import { WHATS_NEW_FALLBACK } from '@/constants/whatsNew';
+import { currentNews, initWhatsNew } from '@/services/whatsNew';
 import { markLaunchInterrupted, setGateOpen } from '@/services/modalGate';
 import { navigationRef } from '@/navigation/navigationRef';
 import { resetWidget } from '@/services/WidgetService';
@@ -147,7 +146,7 @@ function AppRoot({
   // при первом запуске; приглашение и набор по ссылке важнее и откладывают окно
   useEffect(() => {
     if (!isReady) return;
-    initWhatsNew({ hasSession: isAuthenticated, signedIn, allIds: WHATS_NEW_FALLBACK.map((n) => n.id) });
+    initWhatsNew({ hasSession: isAuthenticated, signedIn, allIds: currentNews().map((n) => n.id) });
   }, [isReady, isAuthenticated, signedIn]);
   useEffect(() => setGateOpen('courseInvite', inviteOpen), [inviteOpen]);
   useEffect(() => setGateOpen('shareLink', shareOpen), [shareOpen]);

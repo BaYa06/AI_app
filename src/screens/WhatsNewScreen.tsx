@@ -8,16 +8,15 @@ import { StyleSheet } from 'react-native';
 import { Sparkles } from 'lucide-react-native';
 import { Badge, EmptyState, ListGroup, ListRow, Screen, ScreenHeader } from '@/components/ui';
 import { spacing } from '@/constants';
-import { WHATS_NEW_FALLBACK } from '@/constants/whatsNew';
 import { useSettingsStore } from '@/store';
-import { knownArt, loadWhatsNewState, markSeen, newsHistory, saveWhatsNewState } from '@/services/whatsNew';
+import { currentNews, knownArt, loadWhatsNewState, markSeen, newsHistory, saveWhatsNewState } from '@/services/whatsNew';
 import { WhatsNewSheet } from '@/components/whatsNew/WhatsNewSheet';
 import { APP_VERSION, newsContext, openNewsAction } from '@/components/whatsNew/newsContext';
 import type { WhatsNewItem, WhatsNewPage } from '@/types/whatsNew';
 
 export function WhatsNewScreen({ navigation }: any) {
   const isTeacher = useSettingsStore((s) => s.isTeacher) === true;
-  const groups = useMemo(() => newsHistory(WHATS_NEW_FALLBACK, newsContext(isTeacher)), [isTeacher]);
+  const groups = useMemo(() => newsHistory(currentNews(), newsContext(isTeacher)), [isTeacher]);
   const [seen, setSeen] = useState<string[]>(() => loadWhatsNewState()?.seen ?? []);
   // Новость остаётся в окне, пока оно уезжает после закрытия
   const [open, setOpen] = useState<WhatsNewItem | null>(null);

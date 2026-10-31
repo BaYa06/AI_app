@@ -4,7 +4,7 @@ import { neon } from '@neondatabase/serverless';
  * Версия схемы: при добавлении миграции в applyMigrations увеличить (и дописать файл в
  * database/migrations). Пока в app_migrations есть отметка этой версии, миграции не выполняются.
  */
-const SCHEMA_VERSION = 'schema_036';
+const SCHEMA_VERSION = 'schema_037';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -602,6 +602,31 @@ async function applyMigrations(sql) {
     await sql`ALTER TABLE push_tokens ADD COLUMN IF NOT EXISTS app_version VARCHAR(20)`;
   } catch (e) {
     console.error('Migration 036_push_token_version failed:', e);
+  }
+
+  // Migration 037: «Что нового» (plan/new/whats_new.md, News 5) — новости окна после обновления.
+  // Поля — как WhatsNewItem в src/types/whatsNew.ts; database/migrations/037_whats_new.sql.
+  try {
+    await sql`CREATE TABLE IF NOT EXISTS whats_new (
+      id           VARCHAR(64) PRIMARY KEY,
+      min_version  VARCHAR(20) NOT NULL,
+      roles        TEXT[] NOT NULL DEFAULT ARRAY['student', 'teacher'],
+      platforms    TEXT[] NOT NULL DEFAULT ARRAY['ios', 'android', 'web'],
+      min_os       VARCHAR(10),
+      priority     INTEGER NOT NULL DEFAULT 0,
+      tag          VARCHAR(40) NOT NULL DEFAULT '',
+      title        VARCHAR(60) NOT NULL,
+      text         VARCHAR(200) NOT NULL DEFAULT '',
+      art          VARCHAR(20),
+      action_label VARCHAR(40),
+      action_route VARCHAR(40),
+      published_at DATE NOT NULL DEFAULT CURRENT_DATE,
+      expires_at   DATE,
+      published    BOOLEAN NOT NULL DEFAULT false,
+      updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+  } catch (e) {
+    console.error('Migration 037_whats_new failed:', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)

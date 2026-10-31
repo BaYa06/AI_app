@@ -36,8 +36,7 @@ import {
 import type { Session } from '@supabase/supabase-js';
 import type { ThemeMode } from '@/types';
 import { useFocusEffect } from '@react-navigation/native';
-import { WHATS_NEW_FALLBACK } from '@/constants/whatsNew';
-import { loadWhatsNewState, newsHistory, unseenCount } from '@/services/whatsNew';
+import { currentNews, loadWhatsNewState, newsHistory, unseenCount } from '@/services/whatsNew';
 import { newsContext } from '@/components/whatsNew/newsContext';
 import { version as APP_VERSION } from '../../package.json';
 import { getLevelProgress, XP_PER_LEVEL } from '@/utils/level';
@@ -135,7 +134,7 @@ export function ProfileScreen({ navigation }: any) {
       loadRewards();
       loadSupportUnreadCount().then(setSupportUnread);
       setNewsUnseen(
-        unseenCount(newsHistory(WHATS_NEW_FALLBACK, newsContext(isTeacher === true)), loadWhatsNewState()?.seen ?? []),
+        unseenCount(newsHistory(currentNews(), newsContext(isTeacher === true)), loadWhatsNewState()?.seen ?? []),
       );
     }, [sessionUserId, loadRewards, isTeacher]),
   );

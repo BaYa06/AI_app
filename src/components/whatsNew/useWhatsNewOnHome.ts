@@ -4,17 +4,18 @@
  * 1. главная на экране и загрузилась (роль известна), на ней не открыто своё окно;
  * 2. приложение открыли обычным способом, а не по ссылке, пушу или виджету (modalGate);
  * 3. не открыто окно важнее — приглашение в курс или набор по ссылке;
- * 4. спустя секунду (человек успел увидеть свою главную) есть подходящие новости.
+ * 4. спустя секунду (человек успел увидеть свою главную) есть подходящие новости — с сервера
+ *    (ждём не дольше 3 с), иначе из кэша или сборки.
  * Хук решает, когда показать; само окно главная рисует через <WhatsNewSheet {...whatsNew} />.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
-import { WHATS_NEW_FALLBACK } from '@/constants/whatsNew';
 import { localDay } from '@/store/challengeStore';
 import {
   canShowNews,
   loadWhatsNewState,
   markShown,
+  refreshNews,
   pageItemIds,
   saveWhatsNewState,
   selectNews,
@@ -30,7 +31,7 @@ import {
   subscribeGate,
 } from '@/services/modalGate';
 import { toast } from '@/components/ui';
-import type { WhatsNewPage } from '@/types/whatsNew';
+import type { WhatsNewItem, WhatsNewPage } from '@/types/whatsNew';
 import type { WhatsNewSheetProps } from './nativeWhatsNewSheet';
 import { APP_VERSION, newsContext, openNewsAction } from './newsContext';
 
@@ -52,6 +53,7 @@ export function useWhatsNewOnHome({ navigation, isTeacher, blocked, openedFrom }
   const [pages, setPages] = useState<WhatsNewPage[]>([]);
   const [visible, setVisible] = useState(false);
   const [gateTick, setGateTick] = useState(0);
+  const newsRequest = useRef<Promise<WhatsNewItem[]> | null>(null);
 
   useEffect(() => subscribeGate(() => setGateTick((t) => t + 1)), []);
 
@@ -65,18 +67,26 @@ export function useWhatsNewOnHome({ navigation, isTeacher, blocked, openedFrom }
   useEffect(() => {
     if (visible || !isFocused || isTeacher === null || blocked) return;
     if (isLaunchInterrupted() || isBlockedFor('whatsNew')) return;
-    const timer = setTimeout(() => {
-      if (isLaunchInterrupted() || isBlockedFor('whatsNew')) return;
+    // Новости с сервера грузятся, пока идёт пауза; один запрос на заход на главную
+    newsRequest.current ??= refreshNews();
+    const news = newsRequest.current;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const all = await news;
+      if (cancelled || isLaunchInterrupted() || isBlockedFor('whatsNew')) return;
       const state = loadWhatsNewState();
       if (!state || !canShowNews(state)) return;
-      const items = selectNews(WHATS_NEW_FALLBACK, { ...newsContext(isTeacher), seen: state.seen });
+      const items = selectNews(all, { ...newsContext(isTeacher), seen: state.seen });
       if (items.length === 0) return;
       const next = toPages(items);
       saveWhatsNewState(markShown(state, pageItemIds(next), localDay()));
       setPages(next);
       setVisible(true);
     }, SHOW_DELAY_MS);
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [visible, isFocused, isTeacher, blocked, gateTick]);
 
   useEffect(() => {

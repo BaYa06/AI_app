@@ -1,4 +1,4 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { afterEach, describe, expect, it, jest } from '@jest/globals';
 
 const mockStore = new Map<string, unknown>();
 jest.mock('../StorageService', () => ({
@@ -8,6 +8,8 @@ jest.mock('../StorageService', () => ({
   },
 }));
 
+jest.mock('@/config/apiBase', () => ({ API_BASE: 'https://api.test' }));
+
 import { WHATS_NEW_FALLBACK } from '@/constants/whatsNew';
 import type { WhatsNewItem } from '@/types/whatsNew';
 import {
@@ -16,6 +18,10 @@ import {
   initWhatsNew,
   loadWhatsNewState,
   markShown,
+  mergeNews,
+  parseRemoteNews,
+  refreshNews,
+  currentNews,
   newsHistory,
   shouldShowProfileHint,
   unseenCount,
@@ -206,6 +212,57 @@ describe('whatsNew', () => {
     expect(shouldShowProfileHint({ seen: [] }, { ...close, tried: true })).toBe(false);
     expect(shouldShowProfileHint({ seen: [] }, { ...close, pageCount: 1 })).toBe(false);
     expect(shouldShowProfileHint(undefined, close)).toBe(false);
+  });
+
+  describe('новости с сервера', () => {
+    const remoteItem = (id: string, extra: Partial<WhatsNewItem> = {}) => item(id, { minVersion: '1.6.9', ...extra });
+
+    it('битые записи отбрасываем, ответ без items — null', () => {
+      expect(parseRemoteNews(null)).toBeNull();
+      expect(parseRemoteNews({ items: 'x' })).toBeNull();
+      const parsed = parseRemoteNews({ items: [remoteItem('ok'), { id: 'broken' }, null], hidden: ['a', 1] });
+      expect(parsed && ids(parsed.items)).toEqual(['ok']);
+      expect(parsed?.hidden).toEqual([]);
+    });
+
+    it('сервер поверх сборки: замена по id, скрытие, новые', () => {
+      const fallback = [item('a'), item('b'), item('c')];
+      const merged = mergeNews(fallback, {
+        items: [remoteItem('b', { title: 'с сервера' }), remoteItem('new')],
+        hidden: ['c'],
+      });
+      expect(ids(merged)).toEqual(['a', 'b', 'new']);
+      expect(merged.find((n) => n.id === 'b')?.title).toBe('с сервера');
+      expect(mergeNews(fallback, null)).toBe(fallback);
+    });
+
+    afterEach(() => {
+      (global as any).fetch = undefined;
+    });
+
+    it('загрузка: ответ сохраняется в кэш, без сети — кэш', async () => {
+      mockStore.clear();
+      (global as any).fetch = jest.fn(async () => ({
+        ok: true,
+        json: async () => ({ data: { items: [remoteItem('server-only')], hidden: ['cards-swipe'] } }),
+      }));
+      const fresh = await refreshNews();
+      expect(ids(fresh)).toContain('server-only');
+      expect(ids(fresh)).not.toContain('cards-swipe');
+      expect((global as any).fetch).toHaveBeenCalledWith('https://api.test/data?action=news', expect.anything());
+
+      (global as any).fetch = jest.fn(async () => {
+        throw new Error('offline');
+      });
+      expect(ids(await refreshNews())).toEqual(ids(currentNews()));
+      expect(ids(currentNews())).toContain('server-only');
+    });
+
+    it('сервер ответил ошибкой — сборка', async () => {
+      mockStore.clear();
+      (global as any).fetch = jest.fn(async () => ({ ok: false, json: async () => ({}) }));
+      expect(ids(await refreshNews())).toEqual(ids(WHATS_NEW_FALLBACK));
+    });
   });
 
   describe('запасная копия', () => {
