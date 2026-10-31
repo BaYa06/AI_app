@@ -39,7 +39,8 @@ type HomeAction =
   | 'add_by_link'
   | 'search'
   | 'sort'
-  | 'sets_menu';
+  | 'sets_menu'
+  | 'open_courses';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Внутренний helper

@@ -625,6 +625,9 @@ export function HomeScreen({ navigation, route }: any) {
     }
     return allSets.filter((set) => isSetInCourse(set, activeCourseId));
   }, [allSets, activeCourseId, courseIdSet]);
+  // «Мои наборы» пусты, а в курсах наборы есть — подсказываем, где они (MySets 6)
+  const mySetsEmptyButCourses = activeCourseId === null && filteredSets.length === 0
+    && allSets.some((set) => !isSetInMySets(set, courseIdSet));
 
   // Слова курса и ждущие повторения — для счётчиков «N ждут» у наборов и аналитики (урок — lessonPlan ниже)
   const cardsMap = useCardsStore((s) => s.cards);
@@ -1614,6 +1617,16 @@ export function HomeScreen({ navigation, route }: any) {
               style={styles.lessonCard}
             />
           )}
+          {mySetsEmptyButCourses ? (
+          <EmptyState
+            icon={Library}
+            title="Здесь наборы без курса"
+            description="Наборы курсов лежат внутри своих курсов. Выбери курс в списке — или создай набор здесь."
+            action={{ label: 'Открыть курсы', icon: Folder, onPress: () => { Analytics.homeAction('open_courses'); setDrawerOpen(true); } }}
+            secondaryAction={{ label: 'Создать набор', icon: Plus, onPress: () => { Analytics.homeAction('create_set'); navigation?.navigate('SetEditor', {}); } }}
+          />
+          ) : (
+          <>
           <EmptyState
             icon={Library}
             title="Пока нет наборов"
@@ -1649,6 +1662,8 @@ export function HomeScreen({ navigation, route }: any) {
               </Text>
             </View>
           </SurfaceCard>
+          </>
+          )}
           </>
         ) : (
           <>
