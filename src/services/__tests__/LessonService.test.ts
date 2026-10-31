@@ -255,6 +255,17 @@ describe('buildLessonPlan', () => {
     expect(onlyFirst.newLeftTotal).toBe(10);
   });
 
+  it('новые — только из открытого курса (newFrom), повторение — из всех наборов', () => {
+    const fx = freshLibrary(2, 10);
+    fx.cards.push(...due('s2', 5));
+    const plan = buildLessonPlan({ ...input(fx), newFrom: [fx.sets[0]] });
+    expect(plan.reviewIds).toHaveLength(5);
+    expect(plan.newIds).toHaveLength(10);
+    expect(plan.newIds.every((id) => id.startsWith('s1-'))).toBe(true);
+    expect(plan.focusSetId).toBe('s1');
+    expect(plan.newLeftTotal).toBe(10);
+  });
+
   it('нет карточек — empty', () => {
     const plan = buildLessonPlan(input({ sets: [makeSet('s1')], cards: [] }));
     expect(plan.state).toBe('empty');

@@ -647,8 +647,27 @@ export function HomeScreen({ navigation, route }: any) {
     return { waiting, all, waitingBySet };
   }, [filteredSets, cardsBySet, cardsMap]);
 
-  // Урок дня: наборы курса в порядке списка (без учёта поиска) — из них берутся новые слова
-  const lessonSets = useMemo(() => [...filteredSets].sort(SETS_COMPARATORS[setsSort]), [filteredSets, setsSort]);
+  // Урок дня: новые слова — из наборов открытого курса в порядке списка (без учёта поиска),
+  // повторение — из всех наборов: иначе слова других курсов не повторялись бы, пока курс закрыт
+  const lessonNewSets = useMemo(() => [...filteredSets].sort(SETS_COMPARATORS[setsSort]), [filteredSets, setsSort]);
+  const lessonSets = useMemo(() => {
+    const inCourse = new Set(lessonNewSets.map((set) => set.id));
+    return [...lessonNewSets, ...allSets.filter((set) => !inCourse.has(set.id))];
+  }, [lessonNewSets, allSets]);
+  // Все слова урока — для добора теста и виджета (reviewStats — только открытый курс)
+  const lessonCards = useMemo(() => {
+    const seen = new Set<string>();
+    const list: Card[] = [];
+    for (const set of lessonSets) {
+      for (const id of cardsBySet[set.id] || []) {
+        const card = cardsMap[id];
+        if (!card || seen.has(id)) continue;
+        seen.add(id);
+        list.push(card);
+      }
+    }
+    return list;
+  }, [lessonSets, cardsBySet, cardsMap]);
   const lessonDay = useLessonStore((s) => s.day);
   const lessonNewPerDay = useSettingsStore((s) => s.settings.lessonNewPerDay);
   const computeLessonPlan = useCallback((stored: LessonDay | null) => {
@@ -658,8 +677,8 @@ export function HomeScreen({ navigation, route }: any) {
     const day = stored?.date === today
       ? stored
       : ensureLessonDay(stored, today, countWaitingReview(lessonSets, cardsBySet, cardsMap, now));
-    return buildLessonPlan({ sets: lessonSets, cardsBySet, cards: cardsMap, newPerDay: lessonNewPerDay, day, now });
-  }, [lessonSets, cardsBySet, cardsMap, lessonNewPerDay]);
+    return buildLessonPlan({ sets: lessonSets, newFrom: lessonNewSets, cardsBySet, cards: cardsMap, newPerDay: lessonNewPerDay, day, now });
+  }, [lessonSets, lessonNewSets, cardsBySet, cardsMap, lessonNewPerDay]);
   const lessonPlan = useMemo(() => computeLessonPlan(lessonDay), [computeLessonPlan, lessonDay]);
   // Вечером при невыполненной цели — «Сохрани серию» (считается при каждой отрисовке: главная
   // перерисовывается при заходе, так вечер наступает без перезапуска)
@@ -696,7 +715,7 @@ export function HomeScreen({ navigation, route }: any) {
   // (иначе снимок «0 ждут» дал бы полную квоту новых в день большого повторения)
   const lessonInputsRef = useRef({ lessonSets, cardsBySet, cardsMap });
   lessonInputsRef.current = { lessonSets, cardsBySet, cardsMap };
-  const hasLessonCards = reviewStats.all.length > 0;
+  const hasLessonCards = lessonCards.length > 0;
   useFocusEffect(
     useCallback(() => {
       if (!hasLessonCards) return;
@@ -741,7 +760,7 @@ export function HomeScreen({ navigation, route }: any) {
     if (reviewIds.length > 0 && reviewIds.length < 4) {
       const taken = new Set([...reviewIds, ...plan.newIds]);
       const extra = pickCardsForGame(
-        reviewStats.all.filter((c) => !taken.has(c.id) && (c.learningStep || 0) >= 1),
+        lessonCards.filter((c) => !taken.has(c.id) && (c.learningStep || 0) >= 1),
         4 - reviewIds.length,
       );
       reviewIds = [...reviewIds, ...extra.map((c) => c.id)];
@@ -761,7 +780,7 @@ export function HomeScreen({ navigation, route }: any) {
     reportPushLesson('lesson_started');
     const rootNav = navigation?.getParent?.() ?? navigation;
     rootNav?.navigate(step.screen, step.params);
-  }, [navigation, reviewStats, cardsMap]);
+  }, [navigation, lessonCards, cardsMap]);
 
   // «Сменить набор» (2.4): откуда урок берёт новые слова
   const [focusSheetVisible, setFocusSheetVisible] = useState(false);
@@ -824,7 +843,7 @@ export function HomeScreen({ navigation, route }: any) {
       ? (cardsBySet[widgetSetId] || []).map((id) => cardsMap[id]).filter((c): c is Card => !!c)
       : [];
     return {
-      cards: reviewStats.all,
+      cards: lessonCards,
       poolCards: setCards.length > 0 ? setCards : undefined,
       direction: widgetDirection,
       hideAnswer: widgetHideAnswer,
@@ -841,7 +860,7 @@ export function HomeScreen({ navigation, route }: any) {
   );
   useEffect(() => {
     syncWidget(() => widgetInputRef.current());
-  }, [reviewStats, lessonDay, lessonPlan, lessonNewPerDay, streakValue, todayGoalReached, isTeacher, focusTick, widgetSettingsKey]);
+  }, [lessonCards, lessonDay, lessonPlan, lessonNewPerDay, streakValue, todayGoalReached, isTeacher, focusTick, widgetSettingsKey]);
   useEffect(() => {
     checkWidgetUsage();
   }, []);
@@ -1553,6 +1572,15 @@ export function HomeScreen({ navigation, route }: any) {
         {filteredSets.length === 0 ? (
           <>
           {isTeacher === true && teacherBanner}
+          {/* Курс пуст, но в других курсах есть слова — урок дня всё равно на месте (повторение из всех) */}
+          {isTeacher === false && hasLessonCards && lessonContent && (
+            <LessonCard
+              content={lessonContent}
+              onPress={handleLessonPress}
+              onSecondaryPress={openFocusSheet}
+              style={styles.lessonCard}
+            />
+          )}
           <EmptyState
             icon={Library}
             title="Пока нет наборов"

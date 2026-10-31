@@ -104,8 +104,10 @@ export interface LessonPlan {
 }
 
 export interface LessonInput {
-  /** Наборы текущего курса в порядке списка на главной */
+  /** Все наборы пользователя: повторение — из всех курсов, чтобы слова других курсов не забывались */
   sets: CardSet[];
+  /** Откуда брать новые слова — наборы открытого курса в порядке списка. Нет — из sets */
+  newFrom?: CardSet[];
   /** id карточек по наборам и сами карточки — как в cardsStore */
   cardsBySet: Record<string, string[] | undefined>;
   cards: Record<string, Card | undefined>;
@@ -190,9 +192,9 @@ export function estimateMinutes(reviewCount: number, newCount: number): number {
   return Math.max(1, Math.round((reviewCount * REVIEW_SEC + newCount * NEW_SEC) / 60));
 }
 
-export function buildLessonPlan({ sets, cardsBySet, cards, newPerDay, day, now }: LessonInput): LessonPlan {
-  const bySet = collectCards(sets, cardsBySet, cards);
-  const all = bySet.flatMap((s) => s.cards);
+export function buildLessonPlan({ sets, newFrom, cardsBySet, cards, newPerDay, day, now }: LessonInput): LessonPlan {
+  const all = collectCards(sets, cardsBySet, cards).flatMap((s) => s.cards);
+  const bySet = newFrom ? collectCards(newFrom, cardsBySet, cards) : collectCards(sets, cardsBySet, cards);
   const answeredToday = new Set([...day.reviewedIds, ...day.introducedIds]);
   const introduced = new Set(day.introducedIds);
 
@@ -239,7 +241,8 @@ export function buildLessonPlan({ sets, cardsBySet, cards, newPerDay, day, now }
   for (const c of all) {
     if (stepOf(c) >= 1 && !isCardWaitingReview(c, now) && c.nextReviewDate <= now + DAY_MS) tomorrowCount++;
   }
-  const newLeftTotal = all.filter((c) => stepOf(c) === 0).length;
+  // Новые слова берутся только из newFrom — и считаем их там же
+  const newLeftTotal = bySet.reduce((n, s) => n + s.cards.filter((c) => stepOf(c) === 0).length, 0);
   const focusCards = focus?.cards ?? [];
 
   let state: LessonState;
