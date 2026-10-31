@@ -58,7 +58,7 @@ interface SetsActions {
   mergeSets: (sets: CardSet[]) => void;
 
   // Курсы
-  moveSetsFromCourse: (courseId: string) => void; // Перемещает наборы из курса в "All"
+  moveSetsFromCourse: (courseId: string) => void; // Перемещает наборы из курса в «Мои наборы»
   getSetsByCourse: (courseId: string | null) => CardSet[]; // Получить наборы по курсу
   
   // Обновление статистики набора
@@ -81,6 +81,17 @@ interface SetsActions {
 /** Набор относится к курсу: свой набор курса или юнит книги, открытый в этом курсе. */
 export function isSetInCourse(cardSet: CardSet, courseId: string): boolean {
   return cardSet.courseId === courseId || cardSet.officialCourseIds?.includes(courseId) === true;
+}
+
+/**
+ * Набор лежит в «Моих наборах» (activeCourseId = null): без курса. Набор, чей курс пропал
+ * (удалён на другом устройстве, а синхронизация ещё не обнулила courseId), тоже здесь —
+ * иначе его не видно нигде. Для этого передаём id известных курсов.
+ */
+export function isSetInMySets(cardSet: CardSet, courseIds?: ReadonlySet<string>): boolean {
+  if (cardSet.officialCourseIds?.length) return false;
+  if (!cardSet.courseId) return true;
+  return !!courseIds && !cardSet.isReadOnly && !courseIds.has(cardSet.courseId);
 }
 
 const LOCAL_USER_ID = 'local'; // Для локального хранения
@@ -328,11 +339,11 @@ export const useSetsStore = create<SetsState & SetsActions>()(
           if (cardSet.isReadOnly) {
             // Это read-only зеркало набора учителя (см. loadCourseSetsByMembership) — не наш
             // набор, а кэш на время членства в курсе. При выходе из курса удаляем целиком,
-            // а не обнуляем courseId — иначе он "всплывёт" в разделе "Все" до следующей
+            // а не обнуляем courseId — иначе он "всплывёт" в «Моих наборах» до следующей
             // полной синхронизации с Neon.
             readOnlySetIds.push(cardSet.id);
           } else {
-            cardSet.courseId = null; // Свой набор — просто перемещаем в "All"
+            cardSet.courseId = null; // Свой набор — просто перемещаем в «Мои наборы»
             cardSet.updatedAt = Date.now();
           }
         });
@@ -350,7 +361,7 @@ export const useSetsStore = create<SetsState & SetsActions>()(
 
       // Сохраняем изменения
       DatabaseService.saveSets();
-      console.log('✅ Наборы перемещены из курса в "All":', courseId, '· удалено read-only:', readOnlySetIds.length);
+      console.log('✅ Наборы перемещены из курса в «Мои наборы»:', courseId, '· удалено read-only:', readOnlySetIds.length);
     },
 
     getSetsByCourse: (courseId) => {
@@ -359,9 +370,7 @@ export const useSetsStore = create<SetsState & SetsActions>()(
         .map((id) => state.sets[id])
         .filter((s) => {
           if (!s || s.isArchived) return false;
-          if (courseId === null) return true; // "All" показывает все
-          // Учитываем, что courseId может быть undefined для старых наборов
-          return isSetInCourse(s, courseId);
+          return courseId === null ? isSetInMySets(s) : isSetInCourse(s, courseId);
         });
     },
 

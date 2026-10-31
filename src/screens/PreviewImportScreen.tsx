@@ -8,7 +8,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Check, CheckCircle } from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { selectSetStats, useCardsStore, useSetsStore, useThemeColors } from '@/store';
+import { selectSetStats, useCardsStore, useCoursesStore, useSetsStore, useThemeColors } from '@/store';
 import { TOP_LANGUAGES, alpha, borderRadius, iconSize, screenPadding, spacing } from '@/constants';
 import {
   Badge,
@@ -418,7 +418,10 @@ export function PreviewImportScreen({ navigation, route }: Props) {
 
   const handleSaveConfirm = useCallback(async (title: string, languageFrom: string, languageTo: string) => {
     try {
-      const newSet = await addSet({ title: title.trim() || 'Импорт', languageFrom, languageTo });
+      // Новый набор — в открытый свой курс (как в SetEditorScreen), иначе в «Мои наборы»
+      const { activeCourseId, courses } = useCoursesStore.getState();
+      const courseId = courses.some((c) => c.id === activeCourseId && !c.isStudentCourse) ? activeCourseId : null;
+      const newSet = await addSet({ title: title.trim() || 'Импорт', languageFrom, languageTo, courseId });
       setModalVisible(false);
       await save({ setId: newSet.id, isNew: true, languageFrom, languageTo });
     } catch (e) {

@@ -564,7 +564,7 @@ export const CoursesDrawer = memo(function CoursesDrawer(props: CoursesDrawerPro
         </View>
       )}
 
-      {/* "All" item — всегда первым */}
+      {/* «Мои наборы» — курс по умолчанию, всегда первым */}
       <Pressable
         style={[
           styles.courseItem,
@@ -582,7 +582,7 @@ export const CoursesDrawer = memo(function CoursesDrawer(props: CoursesDrawerPro
             <Library size={iconSize.m} color={activeCourseId === null ? colors.primary : colors.textPrimary} />
             <View style={styles.flex1}>
               <Text variant="body" style={[styles.semibold, { color: activeCourseId === null ? colors.primary : colors.textPrimary }]}>
-                Все наборы
+                Мои наборы
               </Text>
               <Text variant="caption" style={{ color: colors.textSecondary }}>
                 {formatCourseStats(allStats)}

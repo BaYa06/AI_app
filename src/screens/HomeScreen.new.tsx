@@ -7,7 +7,7 @@ import { View, StyleSheet, ScrollView, Pressable, useWindowDimensions, TextInput
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { useSetsStore, useSettingsStore, useThemeColors, useCardsStore, useCoursesStore, useDiamondStore, useChallengeStore, isSetInCourse } from '@/store';
+import { useSetsStore, useSettingsStore, useThemeColors, useCardsStore, useCoursesStore, useDiamondStore, useChallengeStore, isSetInCourse, isSetInMySets } from '@/store';
 import type { ChallengeId } from '@/store';
 import { selectSetStats } from '@/store/cardsStore';
 import { Text, DiamondReward } from '@/components/common';
@@ -612,13 +612,16 @@ export function HomeScreen({ navigation, route }: any) {
     return `Хорошее начало! Осталось ${remaining} ${pluralize(remaining, 'слово', 'слова', 'слов')} до цели. Продолжай в том же духе!`;
   }, [goalProgress, dailyGoal, cardsLearned]);
   
-  // Фильтрация наборов по активному курсу
+  // Id известных курсов: набор, чей курс пропал, показываем в «Моих наборах» (isSetInMySets)
+  const courseIdSet = useMemo(() => new Set(courses.map((c) => c.id)), [courses]);
+
+  // Фильтрация наборов по активному курсу; null — «Мои наборы», только наборы без курса
   const filteredSets = useMemo(() => {
     if (activeCourseId === null) {
-      return allSets; // "All" - показываем все наборы
+      return allSets.filter((set) => isSetInMySets(set, courseIdSet));
     }
     return allSets.filter((set) => isSetInCourse(set, activeCourseId));
-  }, [allSets, activeCourseId]);
+  }, [allSets, activeCourseId, courseIdSet]);
 
   // Слова курса и ждущие повторения — для счётчиков «N ждут» у наборов и аналитики (урок — lessonPlan ниже)
   const cardsMap = useCardsStore((s) => s.cards);
@@ -1080,7 +1083,7 @@ export function HomeScreen({ navigation, route }: any) {
   // Подсчет наборов в каждом курсе
   const getCourseStats = useCallback(
     (courseId: string | null) => {
-      const sets = courseId === null ? allSets : allSets.filter((s) => isSetInCourse(s, courseId));
+      const sets = allSets.filter((s) => (courseId === null ? isSetInMySets(s, courseIdSet) : isSetInCourse(s, courseId)));
       const cards = sets.reduce((sum, s) => sum + (s.cardCount || 0), 0);
       const mastered = sets.reduce((sum, s) => sum + (s.masteredCount || 0), 0);
       const percent = cards > 0 ? Math.round((mastered / cards) * 100) : 0;
@@ -1090,7 +1093,7 @@ export function HomeScreen({ navigation, route }: any) {
         masteredPercent: percent,
       };
     },
-    [allSets]
+    [allSets, courseIdSet]
   );
 
   // Раньше считалось только по 1 / 2–4: выходило «21 наборов», «22 наборов»
@@ -2227,7 +2230,7 @@ export function HomeScreen({ navigation, route }: any) {
       <StudyModeSheet
         visible={showStudyModeModal}
         onClose={() => setShowStudyModeModal(false)}
-        subtitle={`${activeCourseTitle ? activeCourseTitle : 'Все наборы'} • ${dueCards} ${pluralize(dueCards, 'карточка', 'карточки', 'карточек')}`}
+        subtitle={`${activeCourseTitle ? activeCourseTitle : 'Мои наборы'} • ${dueCards} ${pluralize(dueCards, 'карточка', 'карточки', 'карточек')}`}
         onSelectMode={handleSelectStudyMode}
         games={homeStudyModeGames}
         settings={{

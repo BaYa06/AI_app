@@ -143,7 +143,7 @@ export const useCoursesStore = create<CoursesState & CoursesActions>()(
     deleteCourse: (id) => {
       const state = get();
       
-      // Если удаляем активный курс, переключаемся на "All"
+      // Если удаляем активный курс, переключаемся на «Мои наборы»
       if (state.activeCourseId === id) {
         set((s) => {
           s.activeCourseId = null;
@@ -157,7 +157,7 @@ export const useCoursesStore = create<CoursesState & CoursesActions>()(
         }
       });
 
-      // Перемещаем все наборы из этого курса в "All"
+      // Перемещаем все наборы из этого курса в «Мои наборы»
       const setsStore = getSetsStore().getState();
       setsStore.moveSetsFromCourse(id);
 
@@ -202,7 +202,7 @@ export const useCoursesStore = create<CoursesState & CoursesActions>()(
 
       // Сохраняем в хранилище
       get().saveCourses();
-      console.log('✅ Активный курс:', id || 'All');
+      console.log('✅ Активный курс:', id || 'Мои наборы');
     },
 
     // ==================== СЕЛЕКТОРЫ ====================
