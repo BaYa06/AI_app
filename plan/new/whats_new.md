@@ -171,11 +171,13 @@ MMKV, чтобы в следующий раз окно открылось сра
 - `toSheetPages(pages)` в whatsNew.ts — страницы для окна (одни и те же для Swift и RN).
 - Увидеть окно можно только после News 3 (показ на главной).
 
-### News 2.1 — то же окно на RN (Android, веб) ⬜
-- `src/components/whatsNew/WhatsNewSheet.tsx`: `Modal` + горизонтальный `FlatList` с `pagingEnabled`,
-  те же точки, кнопки и события; кнопка «Назад» на Android закрывает.
-- `src/components/whatsNew/WhatsNewArt.tsx`: статичные иллюстрации из токенов.
-- `src/components/whatsNew/showWhatsNew.ts` — единая точка: iOS и модуль есть → Swift, иначе RN.
+### News 2.1 — то же окно на RN (Android, веб) ✅
+- `src/components/whatsNew/WhatsNewSheet.tsx` — единая точка: на iOS с модулем — Swift, иначе
+  общий `Sheet` + горизонтальный `FlatList` с `pagingEnabled` (страницы от края до края листа),
+  те же точки, «Дальше» / «Понятно», крестик, «Попробовать →» и события. «Назад» на Android
+  закрывает (`onRequestClose`). Точки — `adjustable` для TalkBack/VoiceOver.
+- `src/components/whatsNew/WhatsNewArt.tsx` — статичные иллюстрации из токенов.
+- `useWhatsNewOnHome` возвращает пропсы окна, главная рисует `<WhatsNewSheet {...whatsNew} />`.
 
 ### News 3 — когда показывать ✅
 - `src/services/modalGate.ts`: какое окно открыто (`courseInvite` > `shareLink` > `whatsNew`) и
@@ -188,7 +190,7 @@ MMKV, чтобы в следующий раз окно открылось сра
   по ссылке, пока окно открыто, — окно закрывается. «Попробовать» ведёт только на вкладки.
 - App.tsx: `initWhatsNew` — новичок или старый пользователь по сессии при первом запуске.
 - `RatingPromptModal` не показывается в день показа «Что нового» (`wasWhatsNewShownOn`).
-- Пока только iOS: на Android и вебе окна нет (и новости не отмечаются) до News 2.1.
+- С News 2.1 — на всех платформах.
 - Тост «Что нового — всегда в Профиле» перенесён в News 4: до него пункта в Профиле нет.
 
 ### News 4 — история в Профиле ⬜

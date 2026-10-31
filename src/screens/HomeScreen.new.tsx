@@ -76,6 +76,7 @@ import { SetsSectionMenu } from '@/components/home/SetsSectionMenu';
 import { AddByLinkSheet } from '@/components/share/AddByLinkSheet';
 import { requestOpenShare } from '@/services/shareLinks';
 import { useWhatsNewOnHome } from '@/components/whatsNew/useWhatsNewOnHome';
+import { WhatsNewSheet } from '@/components/whatsNew/WhatsNewSheet';
 
 const StaggerCard = React.memo(function StaggerCard({
   index,
@@ -824,7 +825,7 @@ export function HomeScreen({ navigation, route }: any) {
   }, [lessonContent, lessonPlan, startLesson, computeLessonPlan, navigation]);
 
   // «Что нового» после обновления (plan/new/whats_new.md, News 3) — ждёт, пока на главной закрыты свои окна
-  useWhatsNewOnHome({
+  const whatsNew = useWhatsNewOnHome({
     navigation,
     isTeacher,
     openedFrom: route?.params?.from,
@@ -2342,6 +2343,8 @@ export function HomeScreen({ navigation, route }: any) {
           </View>
         )}
       </Dialog>
+
+      <WhatsNewSheet {...whatsNew} />
 
       <StudyModeSheet
         visible={showStudyModeModal}

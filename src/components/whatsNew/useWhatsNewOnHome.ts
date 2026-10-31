@@ -5,7 +5,7 @@
  * 2. приложение открыли обычным способом, а не по ссылке, пушу или виджету (modalGate);
  * 3. не открыто окно важнее — приглашение в курс или набор по ссылке;
  * 4. спустя секунду (человек успел увидеть свою главную) есть подходящие новости.
- * Пока только iOS (нативная шторка); Android и веб — после News 2.1.
+ * Хук решает, когда показать; само окно главная рисует через <WhatsNewSheet {...whatsNew} />.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
@@ -31,7 +31,7 @@ import {
   subscribeGate,
 } from '@/services/modalGate';
 import type { WhatsNewPage, WhatsNewPlatform } from '@/types/whatsNew';
-import { isNativeWhatsNewSheet, useNativeWhatsNewSheet } from './nativeWhatsNewSheet';
+import type { WhatsNewSheetProps } from './nativeWhatsNewSheet';
 
 /** Пауза после загрузки главной, чтобы окно не выскакивало вместе с ней */
 const SHOW_DELAY_MS = 1000;
@@ -49,7 +49,7 @@ interface Options {
   openedFrom?: string;
 }
 
-export function useWhatsNewOnHome({ navigation, isTeacher, blocked, openedFrom }: Options) {
+export function useWhatsNewOnHome({ navigation, isTeacher, blocked, openedFrom }: Options): WhatsNewSheetProps {
   const isFocused = useIsFocused();
   const [pages, setPages] = useState<WhatsNewPage[]>([]);
   const [visible, setVisible] = useState(false);
@@ -65,7 +65,7 @@ export function useWhatsNewOnHome({ navigation, isTeacher, blocked, openedFrom }
   useFocusEffect(useCallback(() => () => clearLaunchInterrupted(), []));
 
   useEffect(() => {
-    if (!isNativeWhatsNewSheet || visible || !isFocused || isTeacher === null || blocked) return;
+    if (visible || !isFocused || isTeacher === null || blocked) return;
     if (isLaunchInterrupted() || isBlockedFor('whatsNew')) return;
     const timer = setTimeout(() => {
       if (isLaunchInterrupted() || isBlockedFor('whatsNew')) return;
@@ -100,14 +100,14 @@ export function useWhatsNewOnHome({ navigation, isTeacher, blocked, openedFrom }
 
   useEffect(() => () => setGateOpen('whatsNew', false), []);
 
-  useNativeWhatsNewSheet({
-    visible,
-    version: APP_VERSION,
-    pages,
-    onClose: ({ tryItem }) => {
+  const onClose = useCallback<WhatsNewSheetProps['onClose']>(
+    ({ tryItem }) => {
       setVisible(false);
       const route = tryItem?.action?.route;
       if (route && TAB_ROUTES.includes(route)) navigation?.navigate(route);
     },
-  });
+    [navigation],
+  );
+
+  return { visible, version: APP_VERSION, pages, onClose };
 }

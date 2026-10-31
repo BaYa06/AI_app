@@ -41,7 +41,7 @@ export interface WhatsNewCloseResult {
   tryItem?: WhatsNewItem;
 }
 
-interface Options {
+export interface WhatsNewSheetProps {
   visible: boolean;
   /** Версия в надписи «ЧТО НОВОГО · 1.6.9» */
   version: string;
@@ -51,7 +51,7 @@ interface Options {
 }
 
 /** Показывает нативную шторку, пока `visible`. Ничего не делает, если нативного модуля нет. */
-export function useNativeWhatsNewSheet(options: Options) {
+export function useNativeWhatsNewSheet(options: WhatsNewSheetProps) {
   const colors = useThemeColors();
   const dark = useSettingsStore((s) => s.resolvedTheme === 'dark');
   const latest = useRef({ ...options, colors, dark });
