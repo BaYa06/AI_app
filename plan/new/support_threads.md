@@ -56,9 +56,8 @@
 - Порядок выкладки: сначала API (Support 1–3), потом сборка приложения (Support 4–5).
 
 ### 2. Две админки
-Список обращений отдают и `admin-server.mjs` (локальная), и `api/_admin.js` (через `api/data.js`).
-Ответ и автоматическое «Прочитано» добавляем в обе, логику — в `api/_admin.js`, локальная её импортирует
-или повторяет те же запросы.
+Список обращений отдают и `admin-server.mjs` (локальная, не в git), и `api/_admin.js` (через `api/data.js`,
+страница `public/dashboard.html`). Переписка и ответы — только в `dashboard.html`; локальная остаётся как есть.
 
 ### 3. Удалённый пользователь
 `app_feedback.user_id` — `ON DELETE CASCADE`, ответы удаляются вместе с обращением. В админке
@@ -90,12 +89,18 @@
 - Чужое обращение → 404 (неотличимо от несуществующего).
 - Миграция 035 (`schema_035`), SQL — `database/migrations/035_feedback_replies.sql`.
 
-### Support 2 — админка
-- `api/_admin.js`: `getAdminFeedbackThread(id)` (ставит `read_at` и статус `read`, если был `new`),
-  `replyAdminFeedback(id, message, { push, close })`.
-- `public/admin.html`: клик по обращению открывает ветку справа, поле ответа, шаблоны,
-  галочки «Отправить push» и «Закрыть обращение»; фильтр «Ждут ответа» (`new` с текстом или проблемой).
-- Кнопку «Прочитано» убрать. Счётчик «Непрочитано» → «Ждут ответа».
+### Support 2 — админка ✅
+- Админка по ссылке — `public/dashboard.html` (в git, через `api/data.js`). Локальная `public/admin.html`
+  + `admin-server.mjs` в `.gitignore` и не менялась: там по-прежнему старый список и кнопка «Прочитано».
+- `api/_admin.js`: `getAdminFeedbackThread` (открытие ставит `read` и `read_at`, если было `new`),
+  `replyAdminFeedback(adminId, id, message, { close })`, `closeAdminFeedback` («Закрыть без ответа»).
+  В списке — `awaiting` (ждёт ответа), число сообщений в переписке, сортировка по последнему сообщению.
+- `api/data.js`: `adminFeedbackThread`, `adminReplyFeedback`, `adminCloseFeedback` (только `is_admin`).
+- `dashboard.html`: обращение раскрывается прямо в списке (вместо ветки справа — так работает и с телефона):
+  переписка, «Прочитано · дата», прочитал ли пользователь ответ, шаблоны, поле ответа, «Закрыть обращение».
+  Фильтр по умолчанию «Ждут ответа», счётчик «непрочитанных» → «ждут ответа». Кнопка «Прочитано» убрана.
+- Автообновление раз в минуту не перерисовывает список, пока админ печатает; черновики ответов сохраняются.
+- Галочка «Отправить push» — в Support 3.
 
 ### Support 3 — push
 - `api/push/_registry.js`: тип `support_reply` (category `support`, transactional, `minIntervalDays: 0`,

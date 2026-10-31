@@ -182,6 +182,34 @@
       padding: 4px 10px; font-size: 11px; cursor: pointer;
     }
     .fb-read-btn:hover { color: var(--text); border-color: var(--accent2); }
+    .fb-item.closed { opacity: .6; }
+    .fb-summary { cursor: pointer; }
+    .fb-summary:focus-visible { outline: 2px solid var(--accent2); outline-offset: 4px; border-radius: 8px; }
+    .fb-thread { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+    .fb-msgs { display: flex; flex-direction: column; gap: 8px; }
+    .fb-bubble { font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; padding: 8px 12px; border-radius: 10px; max-width: 85%; }
+    .fb-bubble.user { background: var(--border); align-self: flex-start; }
+    .fb-bubble.admin { background: var(--accent); color: #fff; align-self: flex-end; }
+    .fb-bubble small { display: block; font-size: 11px; opacity: .65; margin-top: 3px; }
+    .fb-sys { align-self: center; font-size: 11px; color: var(--muted); }
+    .fb-quick { display: flex; flex-wrap: wrap; gap: 6px; }
+    .fb-quick button {
+      background: none; border: 1px dashed var(--border); color: var(--muted); border-radius: 6px;
+      padding: 3px 8px; font-size: 12px; cursor: pointer;
+    }
+    .fb-quick button:hover { color: var(--text); }
+    .fb-reply textarea {
+      width: 100%; min-height: 72px; resize: vertical; background: var(--bg); color: var(--text);
+      border: 1px solid var(--border); border-radius: 8px; padding: 9px 10px; font: inherit; font-size: 13px;
+    }
+    .fb-reply-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 8px; font-size: 12px; color: var(--muted); }
+    .fb-reply-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+    .fb-reply-row .sp { flex: 1; }
+    .fb-send-btn {
+      background: var(--accent2); color: #fff; border: 0; border-radius: 8px; padding: 7px 16px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    .fb-send-btn:disabled { opacity: .5; cursor: default; }
     .fb-empty { color: var(--muted); font-size: 12px; padding: 12px 0; }
 
     /* ── Вход ── */
@@ -401,7 +429,7 @@
       <div class="metric-card">
         <div class="label">Сообщений «Написать нам»</div>
         <div class="value" id="fb-messages">—</div>
-        <div class="sub"><span id="fb-unread" class="pos">—</span> непрочитанных всего</div>
+        <div class="sub"><span id="fb-awaiting" class="pos">—</span> ждут ответа</div>
       </div>
     </div>
     <div class="fb-filters" id="fb-filters"></div>
@@ -713,7 +741,7 @@
   // ── Обратная связь ──
   const FB_FILTERS = [
     { key: 'all',      label: 'Все' },
-    { key: 'new',      label: 'Новые' },
+    { key: 'awaiting', label: 'Ждут ответа' },
     { key: 'problem',  label: 'Проблемы' },
     { key: 'idea',     label: 'Идеи' },
     { key: 'question', label: 'Вопросы' },
@@ -725,8 +753,23 @@
     question: { label: 'Вопрос',   color: '#6c63d4' },
   };
   const FB_TAGS = { speech: 'Озвучка', cards: 'Карточки', tests: 'Тесты', courses: 'Курсы', sync: 'Синхронизация', other: 'Другое' };
+  const FB_STATUS = {
+    new:      { label: 'Новое',    color: '#6c63d4' },
+    read:     { label: 'Прочитано', color: '#e5a50a' },
+    answered: { label: 'Отвечено', color: '#2ec27e' },
+    closed:   { label: 'Закрыто',  color: '#7a7a9a' },
+  };
+  const FB_QUICK = [
+    { label: 'Исправим', text: 'Спасибо, что написал! Нашли причину, исправим в следующем обновлении.' },
+    { label: 'Уже исправлено', text: 'Спасибо! Это уже исправлено — обнови приложение до последней версии.' },
+    { label: 'Идея в плане', text: 'Спасибо за идею! Добавили её в план.' },
+  ];
   let fbItems = [];
-  let fbFilter = 'all';
+  let fbFilter = 'awaiting';
+  // Открытое обращение и его переписка; черновики ответов переживают автообновление раз в минуту
+  let fbOpenId = null;
+  const fbThreads = {};
+  const fbDrafts = {};
 
   // Текст пишут пользователи — вставляем только экранированным
   function esc(str) {
@@ -735,7 +778,7 @@
 
   function fbMatches(item) {
     if (fbFilter === 'all') return true;
-    if (fbFilter === 'new') return item.status === 'new';
+    if (fbFilter === 'awaiting') return item.awaiting;
     if (fbFilter === 'rating') return item.kind === 'rating';
     return item.kind === 'message' && item.category === fbFilter;
   }
@@ -771,14 +814,23 @@
       }
       const tags = (f.tags || []).map((t) => `<span class="fb-tag">${esc(FB_TAGS[t] || t)}</span>`).join('');
       const device = [f.platform, f.os_version, f.app_version && 'v' + f.app_version].filter(Boolean).map(esc).join(' · ');
+      const st = FB_STATUS[f.status] || FB_STATUS.new;
+      const open = f.id === fbOpenId;
       return `
-        <div class="fb-item ${f.status === 'new' ? 'new' : ''}">
-          <div class="fb-head">${badge}${tags}</div>
-          ${f.message ? `<div class="fb-msg">${esc(f.message)}</div>` : ''}
-          <div class="fb-meta">
-            <span>${esc(f.user_label)}${f.email ? ' (' + esc(f.email) + ')' : ''} · ${f.user_role === 'teacher' ? 'учитель' : 'ученик'} · ${device} · ${timeAgo(f.created_at)}</span>
-            ${f.status === 'new' ? `<button class="fb-read-btn" onclick="markFbRead('${esc(f.id)}')">Прочитано</button>` : ''}
+        <div class="fb-item ${f.awaiting ? 'new' : ''} ${f.status === 'closed' ? 'closed' : ''}">
+          <div class="fb-summary" role="button" tabindex="0" aria-expanded="${open}"
+               onclick="toggleFbThread('${esc(f.id)}')" onkeydown="if(event.key==='Enter')toggleFbThread('${esc(f.id)}')">
+            <div class="fb-head">${badge}${tags}
+              <span class="fb-badge" style="background:${st.color}22;color:${st.color}">${st.label}</span>
+              ${f.replies ? `<span class="fb-tag">${f.replies} в переписке</span>` : ''}
+            </div>
+            ${f.message ? `<div class="fb-msg">${esc(f.message)}</div>` : ''}
+            <div class="fb-meta">
+              <span>${esc(f.user_label)}${f.email ? ' (' + esc(f.email) + ')' : ''} · ${f.user_role === 'teacher' ? 'учитель' : 'ученик'} · ${device} · ${timeAgo(f.last_message_at || f.created_at)}</span>
+              <span>${open ? 'Свернуть' : 'Открыть'}</span>
+            </div>
           </div>
+          ${open ? renderFbThread(f) : ''}
         </div>`;
     }).join('');
   }
@@ -798,18 +850,111 @@
       setEl('fb-ratings30', fmt(s.ratings30d));
       setEl('fb-problems', fmt(s.with_problems));
       setEl('fb-messages', fmt(s.messages));
-      setEl('fb-unread', fmt(s.unread));
+      setEl('fb-awaiting', fmt(s.awaiting));
       renderFeedbackFilters();
+      // Админ печатает ответ — не перерисовываем под курсором, обновится после отправки
+      if (document.getElementById('fb-list').contains(document.activeElement)) return;
       renderFeedbackList();
+      if (fbOpenId) loadFbThread(fbOpenId);
     } catch (e) {
       document.getElementById('fb-list').innerHTML = `<div class="fb-empty">Ошибка загрузки: ${esc(e.message)}</div>`;
     }
   }
 
-  async function markFbRead(id) {
-    await adminApi('adminMarkFeedbackRead', { method: 'POST', body: { id } });
+  function fmtDate(d) {
+    return new Date(d).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function renderFbThread(f) {
+    const t = fbThreads[f.id];
+    if (!t) return '<div class="fb-thread"><div class="fb-sys">Загружаю переписку…</div></div>';
+    const id = esc(f.id);
+    const msgs = t.replies.map((r) => `
+      <div class="fb-bubble ${r.author === 'admin' ? 'admin' : 'user'}">${esc(r.message)}<small>${
+        r.author === 'admin' ? esc(r.admin_label || 'Команда') : esc(f.user_label)} · ${fmtDate(r.created_at)}</small></div>`).join('');
+    const seen = t.last_admin_reply_at
+      ? (t.user_seen_at && new Date(t.user_seen_at) >= new Date(t.last_admin_reply_at)
+        ? `<div class="fb-sys">Пользователь прочитал ответ · ${fmtDate(t.user_seen_at)}</div>`
+        : '<div class="fb-sys">Пользователь ещё не открыл ответ</div>')
+      : '';
+    return `
+      <div class="fb-thread">
+        ${t.read_at ? `<div class="fb-sys">Прочитано · ${fmtDate(t.read_at)} — пользователь видит этот статус</div>` : ''}
+        <div class="fb-msgs">${msgs}</div>
+        ${seen}
+        <div class="fb-reply">
+          <div class="fb-quick">${FB_QUICK.map((q, i) => `<button type="button" onclick="useFbQuick('${id}', ${i})">${q.label}</button>`).join('')}</div>
+          <textarea id="fb-text-${id}" aria-label="Ответ пользователю" placeholder="Ответ увидит только автор обращения"
+                    oninput="fbDrafts['${id}'] = this.value">${esc(fbDrafts[f.id] || '')}</textarea>
+          <div class="fb-reply-row">
+            <label><input type="checkbox" id="fb-close-${id}"> Закрыть обращение</label>
+            <span class="sp"></span>
+            ${f.status !== 'closed' ? `<button class="fb-read-btn" type="button" onclick="closeFb('${id}')">Закрыть без ответа</button>` : ''}
+            <button class="fb-send-btn" type="button" id="fb-send-${id}" onclick="sendFbReply('${id}')">Отправить</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  async function toggleFbThread(id) {
+    fbOpenId = fbOpenId === id ? null : id;
+    renderFeedbackList();
+    if (fbOpenId === id) await loadFbThread(id);
+  }
+
+  async function loadFbThread(id) {
+    try {
+      const t = await adminApi('adminFeedbackThread', { method: 'POST', body: { id } });
+      if (!t) return;
+      fbThreads[id] = t;
+      // Открыли — для пользователя теперь «Прочитано»
+      const item = fbItems.find((f) => f.id === id);
+      if (item && t.justRead) { item.status = 'read'; item.awaiting = false; }
+      if (item) item.read_at = t.read_at;
+      renderFeedbackList();
+    } catch (e) {
+      alert('Не удалось открыть переписку: ' + e.message);
+    }
+  }
+
+  function useFbQuick(id, i) {
+    const ta = document.getElementById('fb-text-' + id);
+    ta.value = FB_QUICK[i].text;
+    fbDrafts[id] = ta.value;
+    ta.focus();
+  }
+
+  async function sendFbReply(id) {
+    const ta = document.getElementById('fb-text-' + id);
+    const message = ta.value.trim();
+    if (!message) { ta.focus(); return; }
+    const close = document.getElementById('fb-close-' + id).checked;
+    const btn = document.getElementById('fb-send-' + id);
+    btn.disabled = true;
+    try {
+      const reply = await adminApi('adminReplyFeedback', { method: 'POST', body: { id, message, close } });
+      if (!reply) return;
+      delete fbDrafts[id];
+      const item = fbItems.find((f) => f.id === id);
+      if (item) {
+        item.status = close ? 'closed' : 'answered';
+        item.awaiting = false;
+        item.replies = (item.replies || 0) + 1;
+        item.last_message_at = reply.created_at;
+      }
+      await loadFbThread(id);
+    } catch (e) {
+      // Текст остаётся в поле — можно отправить ещё раз
+      alert('Не удалось отправить: ' + e.message);
+      btn.disabled = false;
+    }
+  }
+
+  async function closeFb(id) {
+    await adminApi('adminCloseFeedback', { method: 'POST', body: { id } });
     const item = fbItems.find((f) => f.id === id);
-    if (item) item.status = 'read';
+    if (item) { item.status = 'closed'; item.awaiting = false; }
+    fbOpenId = null;
     renderFeedbackList();
   }
 

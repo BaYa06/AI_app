@@ -5,7 +5,10 @@ import { ensureDatabaseInitialized } from './_db-init.js';
 import { HttpError, uuid, assertReadableSet } from './_access.js';
 import { courseSetsForStudent } from './_course.js';
 import { notifyCoursesChanged } from './_realtime.js';
-import { getAdminStats, getAdminFeedback, markAdminFeedbackRead } from './_admin.js';
+import {
+  getAdminStats, getAdminFeedback, markAdminFeedbackRead,
+  getAdminFeedbackThread, replyAdminFeedback, closeAdminFeedback,
+} from './_admin.js';
 import { isAppleUser, isAppleRevokeConfigured, revokeAppleAuthorization } from './_apple.js';
 
 /**
@@ -874,6 +877,27 @@ async function adminMarkFeedbackRead(sql, me, p) {
   return markAdminFeedbackRead(sql, uuid(p.id, 'id'));
 }
 
+async function adminFeedbackThread(sql, me, p) {
+  await assertAdmin(sql, me);
+  const thread = await getAdminFeedbackThread(sql, uuid(p.id, 'id'));
+  if (!thread) throw new HttpError(404, 'Not found');
+  return thread;
+}
+
+async function adminReplyFeedback(sql, me, p) {
+  await assertAdmin(sql, me);
+  const message = optString(p.message, 4000)?.trim();
+  if (!message) throw new HttpError(400, 'Message required');
+  const reply = await replyAdminFeedback(sql, me, uuid(p.id, 'id'), message, { close: p.close === true });
+  if (!reply) throw new HttpError(404, 'Not found');
+  return reply;
+}
+
+async function adminCloseFeedback(sql, me, p) {
+  await assertAdmin(sql, me);
+  return closeAdminFeedback(sql, uuid(p.id, 'id'));
+}
+
 // ==================== УДАЛЕНИЕ АККАУНТА ====================
 
 /**
@@ -950,6 +974,7 @@ const ACTIONS = {
   myFeedback, feedbackThread, replyFeedback, feedbackUnreadCount,
   adminDashboard,
   adminMarkFeedbackRead,
+  adminFeedbackThread, adminReplyFeedback, adminCloseFeedback,
 };
 
 // ─── Сигнал ученикам об изменениях в курсе ─────────────────────────────────

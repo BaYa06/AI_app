@@ -1,7 +1,7 @@
 /**
  * Админка по ссылке (/admin): статистика и обратная связь.
  * Файл начинается с "_", поэтому Vercel не публикует его как отдельный роут — вызывается из
- * api/data.js (adminDashboard / adminMarkFeedbackRead) только для users.is_admin = true.
+ * api/data.js (adminDashboard, adminFeedbackThread, adminReplyFeedback…) только для users.is_admin = true.
  * Запросы те же, что в локальной админке (admin-server.mjs).
  */
 
@@ -185,25 +185,36 @@ export async function getAdminStats(sql) {
 
 // ─── Feedback («Написать нам» и окно оценки) ─────────────────────────────────
 
+/**
+ * Ждёт ответа: новое (status = new) и есть что ответить — сообщение «Написать нам», текст или
+ * проблема в окне оценки, или пользователь дописал. Оценка в одно касание («Нравится», без проблем) не ждёт.
+ */
+const FEEDBACK_AWAITING = `(f.status = 'new' AND (f.kind = 'message' OR f.message IS NOT NULL OR f.has_problem IS TRUE
+  OR EXISTS (SELECT 1 FROM app_feedback_replies r WHERE r.feedback_id = f.id AND r.author = 'user')))`;
+
 export async function getAdminFeedback(sql) {
   try {
     const [items, summary] = await Promise.all([
-      sql`SELECT f.id, f.kind, f.category, f.rating, f.has_problem, f.tags, f.message,
+      sql.query(`SELECT f.id, f.kind, f.category, f.rating, f.has_problem, f.tags, f.message,
                  f.app_version, f.platform, f.os_version, f.user_role, f.status, f.created_at,
+                 f.read_at, f.last_message_at, f.last_admin_reply_at,
+                 ${FEEDBACK_AWAITING} AS awaiting,
+                 (SELECT count(*)::int FROM app_feedback_replies r WHERE r.feedback_id = f.id) AS replies,
                  COALESCE(u.display_name, u.user_name, u.email, 'Удалённый пользователь') AS user_label,
                  u.email
           FROM app_feedback f
           LEFT JOIN users u ON u.id = f.user_id
-          ORDER BY f.created_at DESC
-          LIMIT 300`,
-      sql`SELECT
+          ORDER BY f.last_message_at DESC
+          LIMIT 300`),
+      sql.query(`SELECT
             ROUND(AVG(rating) FILTER (WHERE kind = 'rating'), 2)                                         AS avg_rating,
             COUNT(*) FILTER (WHERE kind = 'rating')::int                                                 AS ratings,
             COUNT(*) FILTER (WHERE kind = 'rating' AND created_at > NOW() - INTERVAL '30 days')::int    AS ratings30d,
             COUNT(*) FILTER (WHERE kind = 'rating' AND has_problem)::int                                 AS with_problems,
             COUNT(*) FILTER (WHERE kind = 'message')::int                                                AS messages,
-            COUNT(*) FILTER (WHERE status = 'new')::int                                                  AS unread
-          FROM app_feedback`,
+            COUNT(*) FILTER (WHERE status = 'new')::int                                                  AS unread,
+            COUNT(*) FILTER (WHERE ${FEEDBACK_AWAITING})::int                                            AS awaiting
+          FROM app_feedback f`),
     ]);
     return { items, summary: summary[0] };
   } catch (e) {
@@ -211,6 +222,48 @@ export async function getAdminFeedback(sql) {
     if (e.code === '42P01') return { items: [], summary: null, missing: true };
     throw e;
   }
+}
+
+/** Переписка по обращению. Открытие = «Прочитано» для пользователя (кнопка больше не нужна). */
+export async function getAdminFeedbackThread(sql, id) {
+  const [rows, replies] = await Promise.all([
+    sql`UPDATE app_feedback SET status = 'read', read_at = COALESCE(read_at, NOW())
+        WHERE id = ${id}::uuid AND status = 'new'
+        RETURNING id`,
+    sql`SELECT r.id, r.author, r.message, r.created_at,
+               COALESCE(u.display_name, u.user_name, u.email) AS admin_label
+        FROM app_feedback_replies r
+        LEFT JOIN users u ON u.id = r.admin_id
+        WHERE r.feedback_id = ${id}::uuid
+        ORDER BY r.created_at`,
+  ]);
+  const f = await sql`SELECT id, status, read_at, user_seen_at, last_admin_reply_at FROM app_feedback WHERE id = ${id}::uuid`;
+  if (!f[0]) return null;
+  return { ...f[0], justRead: rows.length > 0, replies };
+}
+
+/** Ответ команды. close — сразу закрыть обращение (дописка пользователя откроет его снова). */
+export async function replyAdminFeedback(sql, adminId, id, message, { close = false } = {}) {
+  const rows = await sql`
+    INSERT INTO app_feedback_replies (feedback_id, author, admin_id, message)
+    SELECT id, 'admin', ${adminId}::uuid, ${message} FROM app_feedback WHERE id = ${id}::uuid
+    RETURNING id, created_at
+  `;
+  if (!rows[0]) return null;
+  const at = rows[0].created_at;
+  await sql`
+    UPDATE app_feedback
+    SET status = ${close ? 'closed' : 'answered'}, read_at = COALESCE(read_at, ${at}),
+        last_admin_reply_at = ${at}, last_message_at = ${at}
+    WHERE id = ${id}::uuid
+  `;
+  return { id: rows[0].id, author: 'admin', message, created_at: at };
+}
+
+/** Закрыть без ответа (спам, оценка без текста) */
+export async function closeAdminFeedback(sql, id) {
+  await sql`UPDATE app_feedback SET status = 'closed', read_at = COALESCE(read_at, NOW()) WHERE id = ${id}::uuid`;
+  return { ok: true };
 }
 
 export async function markAdminFeedbackRead(sql, id) {
