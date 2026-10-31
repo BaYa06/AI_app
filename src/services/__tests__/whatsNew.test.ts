@@ -1,12 +1,22 @@
 import { describe, expect, it, jest } from '@jest/globals';
 
-jest.mock('../StorageService', () => ({ StorageService: { getObject: () => undefined, setObject: () => {} } }));
+const mockStore = new Map<string, unknown>();
+jest.mock('../StorageService', () => ({
+  StorageService: {
+    getObject: (key: string) => mockStore.get(key),
+    setObject: (key: string, value: unknown) => mockStore.set(key, value),
+  },
+}));
 
 import { WHATS_NEW_FALLBACK } from '@/constants/whatsNew';
 import type { WhatsNewItem } from '@/types/whatsNew';
 import {
   canShowNews,
   compareVersions,
+  initWhatsNew,
+  loadWhatsNewState,
+  markShown,
+  wasWhatsNewShownOn,
   markSeen,
   pageItemIds,
   resolveState,
@@ -137,6 +147,34 @@ describe('whatsNew', () => {
     const sheet = toSheetPages(pages);
     expect(sheet[0]).toEqual({ tag: 'Тег', title: 'a', text: 'Текст', art: 'swipe', actionLabel: 'Попробовать', items: [] });
     expect(sheet[3]).toMatchObject({ tag: 'И ещё', art: null, actionLabel: null, items: ['d', 'e'] });
+  });
+
+  it('запуск: сессия есть при первом запуске — старый пользователь', () => {
+    mockStore.clear();
+    initWhatsNew({ hasSession: true, signedIn: false, allIds: ['a'] });
+    expect(loadWhatsNewState()).toEqual({ seen: [] });
+  });
+
+  it('запуск: без сессии — новичок, после входа и онбординга всё просмотрено', () => {
+    mockStore.clear();
+    initWhatsNew({ hasSession: false, signedIn: false, allIds: ['a', 'b'] });
+    expect(loadWhatsNewState()).toEqual({ seen: [], markOnSignIn: true });
+    // вошёл, но онбординг ещё идёт
+    initWhatsNew({ hasSession: true, signedIn: false, allIds: ['a', 'b'] });
+    expect(loadWhatsNewState()?.markOnSignIn).toBe(true);
+    initWhatsNew({ hasSession: true, signedIn: true, allIds: ['a', 'b'] });
+    expect(loadWhatsNewState()).toEqual({ seen: ['a', 'b'] });
+  });
+
+  it('показ отмечает новости и день', () => {
+    mockStore.clear();
+    const state = markShown({ seen: ['a'] }, ['b', 'c'], '2026-10-31');
+    expect(state).toEqual({ seen: ['a', 'b', 'c'], shownDay: '2026-10-31' });
+    initWhatsNew({ hasSession: true, signedIn: true, allIds: [] });
+    expect(wasWhatsNewShownOn('2026-10-31')).toBe(false);
+    mockStore.set('whats_new', state);
+    expect(wasWhatsNewShownOn('2026-10-31')).toBe(true);
+    expect(wasWhatsNewShownOn('2026-11-01')).toBe(false);
   });
 
   describe('запасная копия', () => {

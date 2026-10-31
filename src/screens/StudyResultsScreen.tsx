@@ -10,6 +10,7 @@ import { Analytics } from '@/services/analytics';
 import { currentPushOrigin, reportPushLesson } from '@/services/pushOpens';
 import { recordSessionForRatingPrompt, markRatingPromptShown } from '@/services/feedback';
 import { RatingPromptModal } from '@/components/RatingPromptModal';
+import { wasWhatsNewShownOn } from '@/services/whatsNew';
 import { PushPreprompt, type PushPrepromptResult } from '@/components/push/PushPreprompt';
 import { getPushStatus, isPushSupported } from '@/services/pushNotifications';
 import { loadPushPromptState, markPushPromptShown, savePushPromptState, shouldShowPushPrompt } from '@/services/pushPrompt';
@@ -66,7 +67,8 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   // празднование серии, второе окно подряд не открываем — спросим в другой раз.
   React.useEffect(() => {
     const goodMoment = recordSessionForRatingPrompt({ totalCards, errors });
-    if (!goodMoment || streakIncreased) return;
+    // В день, когда показали «Что нового», второе окно с просьбой не открываем
+    if (!goodMoment || streakIncreased || wasWhatsNewShownOn(localDay())) return;
     const timer = setTimeout(() => {
       markRatingPromptShown();
       setShowRatingPrompt(true);

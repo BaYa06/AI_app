@@ -14,6 +14,9 @@ import { StagingBadge } from '@/components/common/StagingBadge';
 import { DatabaseService, setupAutoSave, supabase, NeonService, setAnalyticsUserId, SyncQueueService, Analytics, setAnalyticsUserProperties, setPushGroupProperty, setPushPermissionFlowProperty, pushPermissionFlowFor } from '@/services';
 import { isWidgetUrl, parseWidgetUrl } from '@/services/widgetLinks';
 import { parseShareUrl, isShareCode, onOpenShareRequest } from '@/services/shareLinks';
+import { initWhatsNew } from '@/services/whatsNew';
+import { WHATS_NEW_FALLBACK } from '@/constants/whatsNew';
+import { markLaunchInterrupted, setGateOpen } from '@/services/modalGate';
 import { navigationRef } from '@/navigation/navigationRef';
 import { resetWidget } from '@/services/WidgetService';
 import { isAppleUser, takeAppleSignInName } from '@/services/appleSignInName';
@@ -137,6 +140,21 @@ function AppRoot({
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const signedIn = isReady && isAuthenticated && !needsOnboarding;
+  const inviteOpen = isAuthenticated && !!pendingInviteToken;
+  const shareOpen = isReady && !!pendingShareCode && (signedIn || (!isAuthenticated && !shareDeferred));
+
+  // «Что нового» (plan/new/whats_new.md, News 3): новичок или старый пользователь — по сессии
+  // при первом запуске; приглашение и набор по ссылке важнее и откладывают окно
+  useEffect(() => {
+    if (!isReady) return;
+    initWhatsNew({ hasSession: isAuthenticated, signedIn, allIds: WHATS_NEW_FALLBACK.map((n) => n.id) });
+  }, [isReady, isAuthenticated, signedIn]);
+  useEffect(() => setGateOpen('courseInvite', inviteOpen), [inviteOpen]);
+  useEffect(() => setGateOpen('shareLink', shareOpen), [shareOpen]);
+  useEffect(() => {
+    if (pendingInviteToken || pendingShareCode) markLaunchInterrupted();
+  }, [pendingInviteToken, pendingShareCode]);
+
   const [showPushBanner, setShowPushBanner] = useState(false);
   const [pushBannerLoading, setPushBannerLoading] = useState(false);
 
@@ -313,7 +331,7 @@ function AppRoot({
       )}
 
       {/* Модалка принятия приглашения в курс */}
-      {isAuthenticated && pendingInviteToken && (
+      {inviteOpen && (
         <CourseInviteModal
           token={pendingInviteToken}
           userId={currentUserId}
@@ -324,7 +342,7 @@ function AppRoot({
 
       {/* Набор по ссылке: без входа — превью и «Войти и добавить»; пока человек входит и проходит
           онбординг, окно скрыто и возвращается само после входа */}
-      {isReady && pendingShareCode && (signedIn || (!isAuthenticated && !shareDeferred)) && (
+      {shareOpen && pendingShareCode && (
         <SharedSetPreviewModal
           code={pendingShareCode}
           signedIn={signedIn}
@@ -698,6 +716,7 @@ export default function App() {
         // Ссылка из виджета (plan/new/widgets.md, 0.3): экран открывает React Navigation, здесь только аналитика
         const widgetLink = parseWidgetUrl(url);
         if (widgetLink) {
+          markLaunchInterrupted();
           Analytics.widgetOpenedApp(widgetLink);
           return;
         }

@@ -75,6 +75,7 @@ import { ChallengeTiles, type ChallengeTile } from '@/components/home/ChallengeT
 import { SetsSectionMenu } from '@/components/home/SetsSectionMenu';
 import { AddByLinkSheet } from '@/components/share/AddByLinkSheet';
 import { requestOpenShare } from '@/services/shareLinks';
+import { useWhatsNewOnHome } from '@/components/whatsNew/useWhatsNewOnHome';
 
 const StaggerCard = React.memo(function StaggerCard({
   index,
@@ -821,6 +822,18 @@ export function HomeScreen({ navigation, route }: any) {
     Analytics.homeAction('daily_review');
     startLesson(lessonPlan);
   }, [lessonContent, lessonPlan, startLesson, computeLessonPlan, navigation]);
+
+  // «Что нового» после обновления (plan/new/whats_new.md, News 3) — ждёт, пока на главной закрыты свои окна
+  useWhatsNewOnHome({
+    navigation,
+    isTeacher,
+    openedFrom: route?.params?.from,
+    blocked:
+      searchVisible || setsMenuVisible || sortSheetVisible || drawerOpen || streakModalVisible ||
+      courseMenuOpen !== null || isEditModalVisible || joinByCodeVisible || addByLinkVisible ||
+      setMenuTarget !== null || focusSheetVisible || showStudyModeModal ||
+      deleteModalCourseId !== null || leaveModalCourseId !== null || inviteModalCourseId !== null,
+  });
 
   // Ссылка из виджета на экране блокировки (plan/new/widgets.md, 0.3): flashly://lesson?from=widget.
   // Тап по пушу (plan/new/push_notifications.md, 0.5) — та же ссылка с from=push.

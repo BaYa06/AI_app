@@ -6,6 +6,7 @@
  */
 import { API_BASE } from '@/config/apiBase';
 import { Analytics } from './analytics';
+import { markLaunchInterrupted } from './modalGate';
 import { supabase } from './supabaseClient';
 
 /** Урок засчитывается пушу, если начат в течение 6 часов после тапа (главная метрика плана) */
@@ -52,6 +53,8 @@ export function handlePushOpen(data: Record<string, string> | undefined | null):
     reportToServer(pushId, 'opened');
   }
   Analytics.pushNotificationOpened({ type, pushId });
+  // Пришёл по пушу за конкретным делом — «Что нового» в этот раз не показываем
+  markLaunchInterrupted();
   return typeof data.link === 'string' && data.link ? data.link : null;
 }
 

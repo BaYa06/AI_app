@@ -25,6 +25,8 @@ export interface WhatsNewState {
    * просмотренными, а до этого ничего не показываем
    */
   markOnSignIn?: boolean;
+  /** День последнего показа окна (YYYY-MM-DD): в этот день не просим оценить приложение */
+  shownDay?: string;
 }
 
 export interface WhatsNewContext {
@@ -97,6 +99,25 @@ export function resolveState(
 /** Можно ли сейчас показывать окно: новичок до входа и сразу после него ничего не видит */
 export function canShowNews(state: WhatsNewState): boolean {
   return !state.markOnSignIn;
+}
+
+/**
+ * Запуск приложения: состояние на устройстве по входу. Новичок или старый — решаем по сессии при
+ * первом запуске (онбординг ещё может идти), а «после входа» — когда человек дошёл до приложения.
+ */
+export function initWhatsNew(opts: { hasSession: boolean; signedIn: boolean; allIds: string[] }): void {
+  const saved = loadWhatsNewState();
+  const next = resolveState(saved, { isSignedIn: saved ? opts.signedIn : opts.hasSession, allIds: opts.allIds });
+  if (next !== saved) saveWhatsNewState(next);
+}
+
+/** Окно показано: новости в нём просмотрены сразу — даже если приложение закроют, пока оно открыто */
+export function markShown(state: WhatsNewState, ids: string[], day: string): WhatsNewState {
+  return { ...state, seen: markSeen(state.seen, ids), shownDay: day };
+}
+
+export function wasWhatsNewShownOn(day: string): boolean {
+  return loadWhatsNewState()?.shownDay === day;
 }
 
 export function markSeen(seen: string[], ids: string[]): string[] {
