@@ -1,8 +1,8 @@
 /**
  * GlassTabBar — стеклянная панель вкладок (plan/new/liquid_glass.md, Glass 4.1). iOS.
  *
- * Плавающая капсула в тёмной теме: контент вкладки виден и размыт под ней, активная вкладка —
- * светлый стеклянный «пузырь», который перетекает к новой вкладке. Рисует Swift
+ * Плавающая капсула: контент вкладки виден и размыт под ней, активная вкладка — стеклянный «пузырь»,
+ * который перетекает к новой вкладке. Цвета панели следуют теме приложения (dark, Glass 4.2). Рисует Swift
  * (ios/FlashcardsApp/GlassTabBar.swift): iOS 26 — системное стекло, iOS < 26 — размытие.
  * Вкладки с `tabBarItemStyle: { display: 'none' }` в панели не показываются.
  */
@@ -18,6 +18,7 @@ import { CommonActions } from '@react-navigation/native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { screenPadding, spacing } from '@/constants';
+import { useSettingsStore } from '@/store';
 
 interface TabItem {
   key: string;
@@ -28,6 +29,7 @@ interface TabItem {
 interface NativeProps extends ViewProps {
   items: TabItem[];
   selectedKey?: string;
+  dark: boolean;
   onTabPress: (event: NativeSyntheticEvent<{ key: string }>) => void;
 }
 
@@ -60,6 +62,7 @@ export function useTabBarOverlayInset(): number {
 
 export function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const dark = useSettingsStore((s) => s.resolvedTheme === 'dark');
   if (!NativeGlassTabBar) return null;
 
   const items: TabItem[] = state.routes
@@ -85,6 +88,7 @@ export function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProp
     <NativeGlassTabBar
       items={items}
       selectedKey={state.routes[state.index].key}
+      dark={dark}
       onTabPress={handleTabPress}
       style={[styles.bar, { bottom: barBottom(insets.bottom) }]}
     />

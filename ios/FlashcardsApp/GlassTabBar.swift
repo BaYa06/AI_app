@@ -2,13 +2,14 @@
 //  GlassTabBar.swift
 //  Нижняя панель вкладок на iOS (plan/new/liquid_glass.md, шаг Glass 4.1).
 //
-//  Плавающая стеклянная капсула в тёмной теме: под ней виден и размыт контент, активная вкладка —
-//  второй, более светлый стеклянный «пузырь», который при переключении перетекает к новой вкладке
-//  (сначала растягивается на обе вкладки, потом пружиной собирается на новой). Иконки и подписи белые.
+//  Плавающая стеклянная капсула: под ней виден и размыт контент, активная вкладка — второй стеклянный
+//  «пузырь», который при переключении перетекает к новой вкладке (сначала растягивается на обе вкладки,
+//  потом пружиной собирается на новой). Тема — из JS (dark, Glass 4.2): в тёмной иконки и подписи белые,
+//  пузырь светлее капсулы; в светлой иконки тёмные, пузырь, обводка и блики — тёмные полупрозрачные.
 //  iOS 26 — системное стекло (UIGlassEffect в общем UIGlassContainerEffect, блики рисует система).
 //  iOS < 26 — размытие UIBlurEffect, тонкая светлая обводка и блики — свои слои.
 //
-//  JS (src/components/ui/GlassTabBar.ios.tsx) задаёт items [{ key, title, symbol }], selectedKey
+//  JS (src/components/ui/GlassTabBar.ios.tsx) задаёт items [{ key, title, symbol }], selectedKey, dark
 //  и получает onTabPress { key }. Положение и размер капсулы задаёт JS.
 //
 
@@ -27,6 +28,13 @@ class GlassTabBar: UIView {
     didSet {
       guard selectedKey != oldValue else { return }
       select(index: keys.firstIndex(of: selectedKey as String? ?? ""), animated: window != nil)
+    }
+  }
+
+  @objc var dark: Bool = true {
+    didSet {
+      guard dark != oldValue else { return }
+      applyTheme()
     }
   }
 
@@ -60,14 +68,13 @@ class GlassTabBar: UIView {
     #endif
     glass = useGlass
 
-    let background = UIVisualEffectView(effect: useGlass ? nil : UIBlurEffect(style: .systemUltraThinMaterialDark))
+    let background = UIVisualEffectView(effect: nil)
     backgroundView = background
     capsule = useGlass ? UIVisualEffectView(effect: nil) : UIView()
     bubble = useGlass ? UIVisualEffectView(effect: nil) : UIView()
     hostView = useGlass ? background.contentView : UIView()
 
     super.init(frame: frame)
-    overrideUserInterfaceStyle = .dark
     accessibilityTraits = .tabBar
 
     addSubview(backgroundView)
@@ -78,8 +85,6 @@ class GlassTabBar: UIView {
     } else {
       backgroundView.clipsToBounds = true
       backgroundView.layer.cornerCurve = .continuous
-      // Лёгкий тёмный тон поверх размытия — белые подписи читаются на любом фоне
-      capsule.backgroundColor = UIColor.black.withAlphaComponent(0.18)
       capsule.isUserInteractionEnabled = false
       backgroundView.contentView.addSubview(capsule)
       setUpFallbackHighlights()
@@ -89,12 +94,19 @@ class GlassTabBar: UIView {
     bubble.layer.cornerCurve = .continuous
     host.addSubview(bubble)
     host.addSubview(buttonsView)
-    applyGlassEffects()
+    applyTheme()
   }
 
   required init?(coder: NSCoder) { fatalError("init(coder:) не используется") }
 
-  private func applyGlassEffects() {
+  /// Цвет иконок и подписей
+  private var contentColor: UIColor { dark ? .white : UIColor(white: 0.1, alpha: 1) }
+
+  /// Перекрашивает панель под тему: стекло/размытие, обводку, блики, пузырь и вкладки
+  private func applyTheme() {
+    overrideUserInterfaceStyle = dark ? .dark : .light
+    buttons.forEach { $0.setContentColor(contentColor) }
+
     #if compiler(>=6.2)
     if #available(iOS 26.0, *), glass {
       let container = UIGlassContainerEffect()
@@ -102,20 +114,30 @@ class GlassTabBar: UIView {
       backgroundView.effect = container
       (capsule as? UIVisualEffectView)?.effect = UIGlassEffect()
       let bubbleEffect = UIGlassEffect()
-      // Пузырь светлее капсулы
-      bubbleEffect.tintColor = UIColor.white.withAlphaComponent(0.18)
+      // Пузырь заметнее капсулы: в тёмной теме светлее, в светлой темнее
+      bubbleEffect.tintColor = dark ? UIColor.white.withAlphaComponent(0.18) : UIColor.black.withAlphaComponent(0.08)
       (bubble as? UIVisualEffectView)?.effect = bubbleEffect
+      return
     }
     #endif
+
+    let tone: UIColor = dark ? .white : .black
+    backgroundView.effect = UIBlurEffect(style: dark ? .systemUltraThinMaterialDark : .systemThinMaterialLight)
+    // Лёгкий тон поверх размытия: подписи читаются на любом фоне
+    capsule.backgroundColor = dark ? UIColor.black.withAlphaComponent(0.18) : UIColor.white.withAlphaComponent(0.4)
+    rimGradient.colors = (dark ? [0.45, 0.08, 0.22] : [0.10, 0.04, 0.12]).map { tone.withAlphaComponent($0).cgColor }
+    sheen.colors = [UIColor.white.withAlphaComponent(dark ? 0.10 : 0.5).cgColor, UIColor.white.withAlphaComponent(0).cgColor]
+    bubble.backgroundColor = tone.withAlphaComponent(dark ? 0.16 : 0.07)
+    bubble.layer.borderColor = tone.withAlphaComponent(dark ? 0.3 : 0.08).cgColor
+    // В светлой теме капсулу на белом фоне отделяет мягкая тень
+    layer.shadowColor = UIColor.black.cgColor
+    layer.shadowOpacity = dark ? 0 : 0.12
+    layer.shadowRadius = 12
+    layer.shadowOffset = CGSize(width: 0, height: 4)
   }
 
-  /// iOS < 26: светлая обводка с бликами сверху и снизу, мягкий блеск верхней половины, светлый пузырь
+  /// iOS < 26: обводка с бликами сверху и снизу, мягкий блеск верхней половины. Цвета — в applyTheme
   private func setUpFallbackHighlights() {
-    rimGradient.colors = [
-      UIColor.white.withAlphaComponent(0.45).cgColor,
-      UIColor.white.withAlphaComponent(0.08).cgColor,
-      UIColor.white.withAlphaComponent(0.22).cgColor,
-    ]
     rimGradient.locations = [0, 0.5, 1]
     rimMask.fillColor = UIColor.clear.cgColor
     rimMask.strokeColor = UIColor.white.cgColor
@@ -123,14 +145,11 @@ class GlassTabBar: UIView {
     rimGradient.mask = rimMask
     layer.addSublayer(rimGradient)
 
-    sheen.colors = [UIColor.white.withAlphaComponent(0.10).cgColor, UIColor.white.withAlphaComponent(0).cgColor]
     sheen.locations = [0, 0.55]
     capsule.layer.addSublayer(sheen)
 
     // Обводка пузыря — border слоя: едет и растягивается вместе с пузырём
-    bubble.backgroundColor = UIColor.white.withAlphaComponent(0.16)
     bubble.layer.borderWidth = 1
-    bubble.layer.borderColor = UIColor.white.withAlphaComponent(0.3).cgColor
   }
 
   // MARK: - Кнопки
@@ -142,6 +161,7 @@ class GlassTabBar: UIView {
     for case let item as NSDictionary in items {
       let key = item["key"] as? String ?? ""
       let button = GlassTabButton(title: item["title"] as? String ?? "", symbol: item["symbol"] as? String ?? "circle.fill")
+      button.setContentColor(contentColor)
       button.addTarget(self, action: #selector(handleTap(_:)), for: .touchUpInside)
       keys.append(key)
       buttons.append(button)
@@ -191,6 +211,7 @@ class GlassTabBar: UIView {
       CATransaction.setDisableActions(true)
       rimGradient.frame = bounds
       rimMask.path = UIBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), cornerRadius: radius).cgPath
+      layer.shadowPath = UIBezierPath(roundedRect: bounds, cornerRadius: radius).cgPath
       sheen.frame = capsule.bounds
       CATransaction.commit()
     }
@@ -242,7 +263,7 @@ class GlassTabBar: UIView {
   }
 }
 
-/// Вкладка: белая иконка SF Symbols и подпись, без подложки. Неактивная — приглушённая.
+/// Вкладка: иконка SF Symbols и подпись цвета темы, без подложки. Неактивная — приглушённая.
 final class GlassTabButton: UIControl {
   private let iconView = UIImageView()
   private let titleLabel = UILabel()
@@ -254,10 +275,8 @@ final class GlassTabButton: UIControl {
 
     let config = UIImage.SymbolConfiguration(pointSize: 20, weight: .semibold)
     iconView.image = UIImage(systemName: symbol, withConfiguration: config) ?? UIImage(systemName: "circle.fill", withConfiguration: config)
-    iconView.tintColor = .white
     iconView.contentMode = .center
     titleLabel.text = title
-    titleLabel.textColor = .white
     titleLabel.font = .systemFont(ofSize: 10, weight: .semibold)
     titleLabel.adjustsFontSizeToFitWidth = true
     titleLabel.minimumScaleFactor = 0.8
@@ -280,6 +299,11 @@ final class GlassTabButton: UIControl {
     let size = stack.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize)
     let width = min(size.width, bounds.width - 4)
     stack.frame = CGRect(x: (bounds.width - width) / 2, y: (bounds.height - size.height) / 2, width: width, height: size.height)
+  }
+
+  func setContentColor(_ color: UIColor) {
+    iconView.tintColor = color
+    titleLabel.textColor = color
   }
 
   func setSelected(_ selected: Bool, bounce: Bool) {
