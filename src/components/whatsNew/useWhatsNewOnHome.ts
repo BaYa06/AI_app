@@ -8,9 +8,7 @@
  * Хук решает, когда показать; само окно главная рисует через <WhatsNewSheet {...whatsNew} />.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { Platform } from 'react-native';
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
-import { version as APP_VERSION } from '../../../package.json';
 import { WHATS_NEW_FALLBACK } from '@/constants/whatsNew';
 import { localDay } from '@/store/challengeStore';
 import {
@@ -20,6 +18,7 @@ import {
   pageItemIds,
   saveWhatsNewState,
   selectNews,
+  shouldShowProfileHint,
   toPages,
 } from '@/services/whatsNew';
 import {
@@ -30,14 +29,13 @@ import {
   setGateOpen,
   subscribeGate,
 } from '@/services/modalGate';
-import type { WhatsNewPage, WhatsNewPlatform } from '@/types/whatsNew';
+import { toast } from '@/components/ui';
+import type { WhatsNewPage } from '@/types/whatsNew';
 import type { WhatsNewSheetProps } from './nativeWhatsNewSheet';
+import { APP_VERSION, newsContext, openNewsAction } from './newsContext';
 
 /** Пауза после загрузки главной, чтобы окно не выскакивало вместе с ней */
 const SHOW_DELAY_MS = 1000;
-
-/** Куда ведёт «Попробовать»: только вкладки, чтобы новость с сервера не открыла неизвестный экран */
-const TAB_ROUTES = ['Home', 'Library', 'TestTab', 'Statistics', 'Study', 'Profile'];
 
 interface Options {
   navigation: any;
@@ -71,15 +69,7 @@ export function useWhatsNewOnHome({ navigation, isTeacher, blocked, openedFrom }
       if (isLaunchInterrupted() || isBlockedFor('whatsNew')) return;
       const state = loadWhatsNewState();
       if (!state || !canShowNews(state)) return;
-      const items = selectNews(WHATS_NEW_FALLBACK, {
-        seen: state.seen,
-        appVersion: APP_VERSION,
-        role: isTeacher ? 'teacher' : 'student',
-        platform: Platform.OS as WhatsNewPlatform,
-        // На Android Platform.Version — уровень API, а не версия ОС; minOs пока только у iOS-новостей
-        osVersion: Platform.OS === 'ios' ? String(Platform.Version) : null,
-        today: localDay(),
-      });
+      const items = selectNews(WHATS_NEW_FALLBACK, { ...newsContext(isTeacher), seen: state.seen });
       if (items.length === 0) return;
       const next = toPages(items);
       saveWhatsNewState(markShown(state, pageItemIds(next), localDay()));
@@ -101,12 +91,20 @@ export function useWhatsNewOnHome({ navigation, isTeacher, blocked, openedFrom }
   useEffect(() => () => setGateOpen('whatsNew', false), []);
 
   const onClose = useCallback<WhatsNewSheetProps['onClose']>(
-    ({ tryItem }) => {
+    ({ index, tryItem }) => {
       setVisible(false);
-      const route = tryItem?.action?.route;
-      if (route && TAB_ROUTES.includes(route)) navigation?.navigate(route);
+      if (tryItem) {
+        openNewsAction(navigation, tryItem);
+        return;
+      }
+      // Закрыл, не дочитав, — один раз подсказываем, где найти новости потом
+      const state = loadWhatsNewState();
+      if (state && shouldShowProfileHint(state, { index, pageCount: pages.length, tried: false })) {
+        saveWhatsNewState({ ...state, profileHintShown: true });
+        toast.info('Что нового — всегда в Профиле');
+      }
     },
-    [navigation],
+    [navigation, pages.length],
   );
 
   return { visible, version: APP_VERSION, pages, onClose };

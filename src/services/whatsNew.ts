@@ -27,6 +27,8 @@ export interface WhatsNewState {
   markOnSignIn?: boolean;
   /** День последнего показа окна (YYYY-MM-DD): в этот день не просим оценить приложение */
   shownDay?: string;
+  /** Подсказку «Что нового — всегда в Профиле» уже показали */
+  profileHintShown?: boolean;
 }
 
 export interface WhatsNewContext {
@@ -51,18 +53,60 @@ export function compareVersions(a: string | number, b: string | number): number 
   return 0;
 }
 
+/** Новость про этого человека: роль, платформа, версия приложения и ОС, уже опубликована */
+function fitsUser(n: WhatsNewItem, ctx: Omit<WhatsNewContext, 'seen'>): boolean {
+  return (
+    compareVersions(n.minVersion, ctx.appVersion) <= 0 &&
+    n.roles.includes(ctx.role) &&
+    n.platforms.includes(ctx.platform) &&
+    (!n.minOs || (ctx.osVersion != null && compareVersions(n.minOs, ctx.osVersion) <= 0)) &&
+    n.publishedAt <= ctx.today
+  );
+}
+
 /** Непросмотренные новости, подходящие этому человеку, по убыванию priority */
 export function selectNews(all: WhatsNewItem[], ctx: WhatsNewContext): WhatsNewItem[] {
   const seen = new Set(ctx.seen);
   return all
-    .filter((n) => !seen.has(n.id))
-    .filter((n) => compareVersions(n.minVersion, ctx.appVersion) <= 0)
-    .filter((n) => n.roles.includes(ctx.role))
-    .filter((n) => n.platforms.includes(ctx.platform))
-    .filter((n) => !n.minOs || (ctx.osVersion != null && compareVersions(n.minOs, ctx.osVersion) <= 0))
-    .filter((n) => n.publishedAt <= ctx.today)
+    .filter((n) => !seen.has(n.id) && fitsUser(n, ctx))
     .filter((n) => !n.expiresAt || ctx.today <= n.expiresAt)
     .sort((a, b) => b.priority - a.priority);
+}
+
+export interface WhatsNewVersionGroup {
+  version: string;
+  items: WhatsNewItem[];
+}
+
+/**
+ * История для Профиля: все новости про этого человека, в том числе просмотренные и с истёкшим
+ * сроком (срок — только для окна). Новые версии сверху, внутри версии — по priority.
+ */
+export function newsHistory(all: WhatsNewItem[], ctx: Omit<WhatsNewContext, 'seen'>): WhatsNewVersionGroup[] {
+  const groups = new Map<string, WhatsNewItem[]>();
+  for (const n of all.filter((item) => fitsUser(item, ctx))) {
+    groups.set(n.minVersion, [...(groups.get(n.minVersion) ?? []), n]);
+  }
+  return [...groups.entries()]
+    .sort(([a], [b]) => compareVersions(b, a))
+    .map(([version, items]) => ({ version, items: items.sort((a, b) => b.priority - a.priority) }));
+}
+
+/** Сколько новостей из истории человек ещё не видел */
+export function unseenCount(groups: WhatsNewVersionGroup[], seen: string[]): number {
+  const set = new Set(seen);
+  return groups.reduce((sum, g) => sum + g.items.filter((n) => !set.has(n.id)).length, 0);
+}
+
+/**
+ * Подсказка «Что нового — всегда в Профиле»: окно закрыли на первой странице, не дочитав
+ * и не нажав «Попробовать». Один раз.
+ */
+export function shouldShowProfileHint(
+  state: WhatsNewState | undefined,
+  close: { index: number; pageCount: number; tried: boolean },
+): boolean {
+  return !!state && !state.profileHintShown && !close.tried && close.index === 0 && close.pageCount > 1;
 }
 
 export function knownArt(art: string | null | undefined): WhatsNewArt | null {

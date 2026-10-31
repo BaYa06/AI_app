@@ -16,6 +16,9 @@ import {
   initWhatsNew,
   loadWhatsNewState,
   markShown,
+  newsHistory,
+  shouldShowProfileHint,
+  unseenCount,
   wasWhatsNewShownOn,
   markSeen,
   pageItemIds,
@@ -175,6 +178,34 @@ describe('whatsNew', () => {
     mockStore.set('whats_new', state);
     expect(wasWhatsNewShownOn('2026-10-31')).toBe(true);
     expect(wasWhatsNewShownOn('2026-11-01')).toBe(false);
+  });
+
+  it('история: по версиям, новые сверху, с просмотренными и истёкшими', () => {
+    const all = [
+      item('old', { minVersion: '1.6.5', expiresAt: '2026-10-01' }),
+      item('new-low', { minVersion: '1.6.10', priority: 1 }),
+      item('new-high', { minVersion: '1.6.10', priority: 9 }),
+      item('future', { minVersion: '1.7.0' }),
+      item('teacher', { roles: ['teacher'] }),
+      item('mid', { minVersion: '1.6.9' }),
+    ];
+    const groups = newsHistory(all, { ...ctx, appVersion: '1.6.10' });
+    expect(groups.map((g) => [g.version, ids(g.items)])).toEqual([
+      ['1.6.10', ['new-high', 'new-low']],
+      ['1.6.9', ['mid']],
+      ['1.6.5', ['old']],
+    ]);
+    expect(unseenCount(groups, ['old', 'mid'])).toBe(2);
+  });
+
+  it('подсказка про Профиль — один раз и только если закрыли на первой странице', () => {
+    const close = { index: 0, pageCount: 3, tried: false };
+    expect(shouldShowProfileHint({ seen: [] }, close)).toBe(true);
+    expect(shouldShowProfileHint({ seen: [], profileHintShown: true }, close)).toBe(false);
+    expect(shouldShowProfileHint({ seen: [] }, { ...close, index: 1 })).toBe(false);
+    expect(shouldShowProfileHint({ seen: [] }, { ...close, tried: true })).toBe(false);
+    expect(shouldShowProfileHint({ seen: [] }, { ...close, pageCount: 1 })).toBe(false);
+    expect(shouldShowProfileHint(undefined, close)).toBe(false);
   });
 
   describe('запасная копия', () => {

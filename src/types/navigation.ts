@@ -132,6 +132,8 @@ export type RootStackParamList = {
   MyData: undefined;
   /** «Заблокированные авторы» — наборы по ссылке (plan/new/share_set.md, Share 6) */
   BlockedAuthors: undefined;
+  /** История новостей «Что нового» (plan/new/whats_new.md, News 4) */
+  WhatsNew: undefined;
   SoundSettings: undefined;
   Feedback: undefined;
   /** «Мои обращения» и переписка (plan/new/support_threads.md, Support 4) */

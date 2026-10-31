@@ -36,6 +36,9 @@ import {
 import type { Session } from '@supabase/supabase-js';
 import type { ThemeMode } from '@/types';
 import { useFocusEffect } from '@react-navigation/native';
+import { WHATS_NEW_FALLBACK } from '@/constants/whatsNew';
+import { loadWhatsNewState, newsHistory, unseenCount } from '@/services/whatsNew';
+import { newsContext } from '@/components/whatsNew/newsContext';
 import { version as APP_VERSION } from '../../package.json';
 import { getLevelProgress, XP_PER_LEVEL } from '@/utils/level';
 import { PRIVACY_POLICY_URL, TERMS_URL } from '@/config/legal';
@@ -68,6 +71,7 @@ export function ProfileScreen({ navigation }: any) {
   const [deleting, setDeleting] = useState(false);
   // Непрочитанные ответы команды — бейдж у «Мои обращения»
   const [supportUnread, setSupportUnread] = useState(0);
+  const [newsUnseen, setNewsUnseen] = useState(0);
 
 
   // Подтягиваем актуальную сессию Supabase
@@ -130,7 +134,10 @@ export function ProfileScreen({ navigation }: any) {
       });
       loadRewards();
       loadSupportUnreadCount().then(setSupportUnread);
-    }, [sessionUserId, loadRewards]),
+      setNewsUnseen(
+        unseenCount(newsHistory(WHATS_NEW_FALLBACK, newsContext(isTeacher === true)), loadWhatsNewState()?.seen ?? []),
+      );
+    }, [sessionUserId, loadRewards, isTeacher]),
   );
 
   const userEmail = session?.user?.email;
@@ -335,6 +342,13 @@ export function ProfileScreen({ navigation }: any) {
           }
         />
         <ListRow icon={Volume2} title="Звук и вибрация" onPress={() => navigation?.navigate('SoundSettings')} />
+        <ListRow
+          icon={Sparkles}
+          title="Что нового"
+          subtitle={newsUnseen > 0 ? 'Есть новое в приложении' : 'Что изменилось в обновлениях'}
+          right={newsUnseen > 0 ? <Badge label={String(newsUnseen)} /> : undefined}
+          onPress={() => navigation?.navigate('WhatsNew')}
+        />
       </ListGroup>
 
       {/* ======== Support ======== */}

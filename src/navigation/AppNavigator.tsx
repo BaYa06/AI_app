@@ -71,6 +71,7 @@ import { NotificationSettingsScreen } from '@/screens/NotificationSettingsScreen
 import { LearningSettingsScreen } from '@/screens/LearningSettingsScreen';
 import { MyDataScreen } from '@/screens/MyDataScreen';
 import { BlockedAuthorsScreen } from '@/screens/BlockedAuthorsScreen';
+import { WhatsNewScreen } from '@/screens/WhatsNewScreen';
 import { SoundSettingsScreen } from '@/screens/SoundSettingsScreen';
 import { FeedbackScreen } from '@/screens/FeedbackScreen';
 import { SupportListScreen } from '@/screens/SupportListScreen';
@@ -426,6 +427,15 @@ export function AppNavigator() {
         <Stack.Screen
           name="BlockedAuthors"
           component={BlockedAuthorsScreen}
+          options={{
+            headerShown: false,
+            animation: 'slide_from_right',
+            animationDuration: 300,
+          }}
+        />
+        <Stack.Screen
+          name="WhatsNew"
+          component={WhatsNewScreen}
           options={{
             headerShown: false,
             animation: 'slide_from_right',
