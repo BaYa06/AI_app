@@ -353,7 +353,7 @@ export interface UserSettings {
 
   // Режимы
   reverseCards: boolean;
-  /** Сколько ещё сессий карточек показывать подсказку свайпа; 0 после первого свайпа (plan/new/card_rating.md) */
+  /** Сколько ещё сессий карточек показывать подсказку свайпа; 0 после первого свайпа (plan/done/card_rating.md) */
   swipeHintsLeft: number;
 }
 

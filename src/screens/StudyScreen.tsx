@@ -342,7 +342,7 @@ export function StudyScreen({ navigation, route }: Props) {
       // Логика: 1,2 = ошибка, 3,4 = правильно
       const isCorrect = rating >= 3;
       // Повтор слова, на которое ответили «Почти»: в статистику дня, урок и аналитику не идёт —
-      // это то же слово. Уровень по-прежнему отправляем, сервер сам решит (plan/new/card_rating.md)
+      // это то же слово. Уровень по-прежнему отправляем, сервер сам решит (plan/done/card_rating.md)
       const isRepeat = Boolean(session) && session!.currentIndex >= baseQueueLengthRef.current;
       // «Почти» — слово ещё раз в конце сессии: один раз и только если после него есть другие слова
       const repeatLater =
@@ -618,7 +618,7 @@ export function StudyScreen({ navigation, route }: Props) {
     };
   });
 
-  // Свайп влево — «Не знаю», вправо — «Уверенно»; работает на обеих сторонах (plan/new/card_rating.md).
+  // Свайп влево — «Не знаю», вправо — «Уверенно»; работает на обеих сторонах (plan/done/card_rating.md).
   // Касание ловит Pressable карточки — протягивание его отменяет. На вебе только кнопки
   const handleSwipe = useCallback((direction: number) => {
     // Свайп освоен — подсказка больше не нужна
@@ -719,7 +719,7 @@ export function StudyScreen({ navigation, route }: Props) {
   const answerLang = reverseEnabled ? frontLang : backLang;
 
   // Кнопки оценки: цвета оценок SRS, текст — «текстовые» токены; «Уверенно» — главная кнопка.
-  // Оценки 2 («Сомневаюсь») больше нет, сервер её по-прежнему принимает от старых версий (plan/new/card_rating.md)
+  // Оценки 2 («Сомневаюсь») больше нет, сервер её по-прежнему принимает от старых версий (plan/done/card_rating.md)
   const ratingOptions: Array<{ rating: Rating; label: string; bg: string; text: string }> = [
     { rating: 1, label: 'Не знаю', bg: alpha(colors.ratingAgain, 10), text: colors.errorText },
     { rating: 3, label: 'Почти', bg: alpha(colors.ratingEasy, 10), text: colors.info },

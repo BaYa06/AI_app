@@ -523,7 +523,7 @@ async function updateUserStatsStreak(sql, me, p) {
   if (!day.counted) {
     // Итоги (по ним уровень) копятся и до того, как день засчитан в серию. Только для клиентов,
     // которые шлют прибавку с прошлой отправки (incremental): старые шлют счётчик за весь день
-    // при каждом выходе с экрана — им по-прежнему только в засчитанный день (plan/new/card_rating.md, Cards 6)
+    // при каждом выходе с экрана — им по-прежнему только в засчитанный день (plan/done/card_rating.md, Cards 6)
     if (p.incremental === true) {
       await sql`
         INSERT INTO user_stats (user_id, total_words_learned, total_minutes_learned, total_cards_studied)

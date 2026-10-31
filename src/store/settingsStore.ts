@@ -198,7 +198,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
 
     finishStudySession: async () => {
       // Отправляем только карточки с прошлой отправки: раньше каждый вызов («назад», уход в фон,
-      // конец сессии) снова прибавлял все карточки дня (plan/new/card_rating.md, Cards 6)
+      // конец сессии) снова прибавлял все карточки дня (plan/done/card_rating.md, Cards 6)
       const { cardsStudied, cardsSynced } = get().todayStats;
       const cardsDelta = cardsStudied - cardsSynced;
       if (cardsDelta <= 0) return { streakIncreased: false, newStreakCount: 0 };
