@@ -33,7 +33,7 @@ import {
 import { toast } from '@/components/ui';
 import type { WhatsNewItem, WhatsNewPage } from '@/types/whatsNew';
 import type { WhatsNewSheetProps } from './nativeWhatsNewSheet';
-import { APP_VERSION, newsContext, openNewsAction } from './newsContext';
+import { APP_VERSION, newsContext, openNewsAction, trackWhatsNew } from './newsContext';
 
 /** Пауза после загрузки главной, чтобы окно не выскакивало вместе с ней */
 const SHOW_DELAY_MS = 1000;
@@ -54,6 +54,7 @@ export function useWhatsNewOnHome({ navigation, isTeacher, blocked, openedFrom }
   const [visible, setVisible] = useState(false);
   const [gateTick, setGateTick] = useState(0);
   const newsRequest = useRef<Promise<WhatsNewItem[]> | null>(null);
+  const tracker = useRef<ReturnType<typeof trackWhatsNew> | null>(null);
 
   useEffect(() => subscribeGate(() => setGateTick((t) => t + 1)), []);
 
@@ -80,6 +81,7 @@ export function useWhatsNewOnHome({ navigation, isTeacher, blocked, openedFrom }
       if (items.length === 0) return;
       const next = toPages(items);
       saveWhatsNewState(markShown(state, pageItemIds(next), localDay()));
+      tracker.current = trackWhatsNew('home', next);
       setPages(next);
       setVisible(true);
     }, SHOW_DELAY_MS);
@@ -103,6 +105,8 @@ export function useWhatsNewOnHome({ navigation, isTeacher, blocked, openedFrom }
   const onClose = useCallback<WhatsNewSheetProps['onClose']>(
     ({ index, tryItem }) => {
       setVisible(false);
+      tracker.current?.close(index, tryItem);
+      tracker.current = null;
       if (tryItem) {
         openNewsAction(navigation, tryItem);
         return;
@@ -117,5 +121,7 @@ export function useWhatsNewOnHome({ navigation, isTeacher, blocked, openedFrom }
     [navigation, pages.length],
   );
 
-  return { visible, version: APP_VERSION, pages, onClose };
+  const onPage = useCallback((index: number) => tracker.current?.page(index), []);
+
+  return { visible, version: APP_VERSION, pages, onPage, onClose };
 }

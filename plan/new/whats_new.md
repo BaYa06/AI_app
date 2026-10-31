@@ -213,11 +213,14 @@ MMKV, чтобы в следующий раз окно открылось сра
   (удалить — вернуть текст из сборки). Проверка формы — `validateNews` (тесты в whatsNewServer.test.ts).
 - Порядок выпуска: сначала деплой API (создаёт таблицу), потом сборка. Старая сборка запрос не делает.
 
-### News 6 — аналитика ⬜
-- В `Analytics` (src/services/analytics.ts): `whats_new_shown { count, version }`,
-  `whats_new_page { id, index }`, `whats_new_try { id }`, `whats_new_closed { index, count }`.
-- Цель: больше половины открывших доходят до последней страницы. Если закрывают на первой —
-  первая новость неинтересна, меняем `priority`.
+### News 6 — аналитика ✅
+- `Analytics` (src/services/analytics.ts), у всех событий `place`: `home` (само после обновления) /
+  `history` (Профиль → Что нового):
+  `whats_new_shown { count, news, version }`, `whats_new_page { id, index }` (id новости или `more`),
+  `whats_new_try { id, index }`, `whats_new_closed { index, count, reached_last, tried }`.
+- Подключено через `trackWhatsNew(place, pages)` (newsContext.ts) — один трекер на показ окна.
+- Цель: больше половины открывших (`place = home`) доходят до последней страницы (`reached_last`).
+  Если закрывают на первой — первая новость неинтересна, меняем `priority` в админке.
 
 ---
 

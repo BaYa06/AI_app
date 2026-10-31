@@ -706,6 +706,44 @@ export const Analytics = {
 
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // «ЧТО НОВОГО»
+  // Зачем: дочитывают ли новости и какие интересны (plan/new/whats_new.md, News 6).
+  // place — home (само после обновления) / history (Профиль → Что нового). id — новость или more («И ещё»).
+  // Цель: больше половины открывших доходят до последней страницы (reached_last в whats_new_closed).
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Окно открылось. count — страниц, news — новостей в нём (на «И ещё» их несколько).
+   */
+  whatsNewShown: (params: { place: string; count: number; news: number; version: string }) =>
+    log('whats_new_shown', { place: params.place, count: params.count, news: params.news, version: params.version }),
+
+  /**
+   * Открыта страница (и первая — при показе). Много закрытий после index 0 — первая новость неинтересна.
+   */
+  whatsNewPage: (params: { place: string; id: string; index: number }) =>
+    log('whats_new_page', { place: params.place, id: params.id, index: params.index }),
+
+  /**
+   * «Попробовать» — новость вызвала интерес.
+   */
+  whatsNewTry: (params: { place: string; id: string; index: number }) =>
+    log('whats_new_try', { place: params.place, id: params.id, index: params.index }),
+
+  /**
+   * Окно закрыто (крестик, «Понятно», жест или «Попробовать»). index — на какой странице.
+   */
+  whatsNewClosed: (params: { place: string; index: number; count: number; tried: boolean }) =>
+    log('whats_new_closed', {
+      place: params.place,
+      index: params.index,
+      count: params.count,
+      reached_last: params.index >= params.count - 1,
+      tried: params.tried,
+    }),
+
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // ОШИБКИ И ТЕХНИЧЕСКИЕ СОБЫТИЯ
   // Зачем: видим user-facing ошибки до того как они попадут в отзывы.
   // ═══════════════════════════════════════════════════════════════════════════

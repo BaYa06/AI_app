@@ -1,12 +1,13 @@
 /**
  * Общее для главной и экрана «Что нового» (plan/new/whats_new.md): кто смотрит новости
- * и куда ведёт «Попробовать».
+ * куда ведёт «Попробовать» и события аналитики.
  */
 import { Platform } from 'react-native';
 import { version as APP_VERSION } from '../../../package.json';
 import { localDay } from '@/store/challengeStore';
-import type { WhatsNewContext } from '@/services/whatsNew';
-import type { WhatsNewItem, WhatsNewPlatform } from '@/types/whatsNew';
+import { Analytics } from '@/services/analytics';
+import { pageItemIds, type WhatsNewContext } from '@/services/whatsNew';
+import type { WhatsNewItem, WhatsNewPage, WhatsNewPlatform } from '@/types/whatsNew';
 
 export { APP_VERSION };
 
@@ -28,4 +29,25 @@ const TAB_ROUTES = ['Home', 'Library', 'TestTab', 'Statistics', 'Study', 'Profil
 export function openNewsAction(navigation: any, item: WhatsNewItem | undefined): void {
   const route = item?.action?.route;
   if (route && TAB_ROUTES.includes(route)) navigation?.navigate('Main', { screen: route });
+}
+
+// ==================== Аналитика (News 6) ====================
+
+type Place = 'home' | 'history';
+
+const pageId = (pages: WhatsNewPage[], index: number): string => {
+  const page = pages[index];
+  return page?.kind === 'item' ? page.item.id : 'more';
+};
+
+/** События окна для одного показа: shown сразу, остальные — из onPage / onClose */
+export function trackWhatsNew(place: Place, pages: WhatsNewPage[]) {
+  Analytics.whatsNewShown({ place, count: pages.length, news: pageItemIds(pages).length, version: APP_VERSION });
+  return {
+    page: (index: number) => Analytics.whatsNewPage({ place, id: pageId(pages, index), index }),
+    close: (index: number, tryItem?: WhatsNewItem) => {
+      if (tryItem) Analytics.whatsNewTry({ place, id: tryItem.id, index });
+      Analytics.whatsNewClosed({ place, index, count: pages.length, tried: !!tryItem });
+    },
+  };
 }
