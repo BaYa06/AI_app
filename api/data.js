@@ -890,7 +890,19 @@ async function adminReplyFeedback(sql, me, p) {
   if (!message) throw new HttpError(400, 'Message required');
   const reply = await replyAdminFeedback(sql, me, uuid(p.id, 'id'), message, { close: p.close === true });
   if (!reply) throw new HttpError(404, 'Not found');
-  return reply;
+  // Пуш — по галочке в админке; результат показываем рядом с ответом (ночью уйдёт утром, старой версии — нет)
+  let push = null;
+  if (p.push !== false && reply.user_id) {
+    try {
+      const { sendNotification } = await import('./push.js');
+      const r = await sendNotification(sql, reply.user_id, 'support_reply', { feedbackId: p.id, text: message });
+      push = { ok: r.ok === true, reason: r.reason || r.error || null };
+    } catch (e) {
+      console.error('[data] support_reply push failed:', e);
+      push = { ok: false, reason: 'error' };
+    }
+  }
+  return { ...reply, push };
 }
 
 async function adminCloseFeedback(sql, me, p) {

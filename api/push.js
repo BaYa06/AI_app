@@ -70,6 +70,9 @@ export default async function handler(req, res) {
       const { token, platform, userId: bodyUserId } = req.body || {};
       // Разрешение на устройстве (шаг 1.4). Старые сборки не шлют — оставляем прежнее значение.
       const permission = ['granted', 'provisional', 'denied'].includes(req.body?.permission) ? req.body.permission : null;
+      // С версии с «Моими обращениями» (Support 4); старые не присылают — пуши с новыми экранами им не уходят
+      const appVersion = typeof req.body?.appVersion === 'string' && /^\d+(\.\d+){0,3}$/.test(req.body.appVersion)
+        ? req.body.appVersion : null;
       if (!token || typeof token !== 'string') {
         return res.status(400).json({ error: 'Missing or invalid token' });
       }
@@ -89,13 +92,14 @@ export default async function handler(req, res) {
         }
       }
       await sql`
-        INSERT INTO push_tokens (token, user_id, platform, permission, updated_at)
-        VALUES (${token}, ${userId || null}, ${platform || 'web'}, ${permission}, NOW())
+        INSERT INTO push_tokens (token, user_id, platform, permission, app_version, updated_at)
+        VALUES (${token}, ${userId || null}, ${platform || 'web'}, ${permission}, ${appVersion}, NOW())
         ON CONFLICT (token) DO UPDATE SET
-          user_id    = EXCLUDED.user_id,
-          platform   = EXCLUDED.platform,
-          permission = COALESCE(EXCLUDED.permission, push_tokens.permission),
-          updated_at = NOW()
+          user_id     = EXCLUDED.user_id,
+          platform    = EXCLUDED.platform,
+          permission  = COALESCE(EXCLUDED.permission, push_tokens.permission),
+          app_version = COALESCE(EXCLUDED.app_version, push_tokens.app_version),
+          updated_at  = NOW()
       `;
       return res.status(200).json({ ok: true });
     }

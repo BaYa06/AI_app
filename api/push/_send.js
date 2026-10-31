@@ -8,7 +8,7 @@
 import { randomUUID } from 'node:crypto';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
-import { PUSH_TYPES, pushType, buildPush } from './_registry.js';
+import { PUSH_TYPES, pushType, buildPush, versionAtLeast } from './_registry.js';
 import { disabledCategories, isHoldout } from './_decide.js';
 
 export const DEFAULT_TZ = 'Asia/Bishkek';
@@ -108,10 +108,18 @@ export async function sendNotification(sql, userId, type, data = {}, { dryRun = 
   const pushId = randomUUID();
   const log = (status, extra = {}) => logPush(sql, { id: pushId, userId, type, status, data, ...extra });
 
-  const allTokens = await sql`SELECT token, permission FROM push_tokens WHERE user_id = ${userId}`;
+  let allTokens = await sql`SELECT token, permission, app_version FROM push_tokens WHERE user_id = ${userId}`;
   if (allTokens.length === 0) {
     await log('no_token');
     return { ok: false, push_id: pushId, reason: 'no token' };
+  }
+  // Тап ведёт на экран, которого нет в старой версии, — туда не шлём (старые версии app_version не присылают)
+  if (def.minAppVersion) {
+    allTokens = allTokens.filter((r) => versionAtLeast(r.app_version, def.minAppVersion));
+    if (allTokens.length === 0) {
+      await log('old_app');
+      return { ok: false, push_id: pushId, reason: 'old app' };
+    }
   }
   // Выключил уведомления в iOS (шаг 1.4) — на это устройство не шлём
   const tokenRows = allTokens.filter((r) => r.permission !== 'denied');

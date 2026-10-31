@@ -251,13 +251,14 @@ export async function replyAdminFeedback(sql, adminId, id, message, { close = fa
   `;
   if (!rows[0]) return null;
   const at = rows[0].created_at;
-  await sql`
+  const [f] = await sql`
     UPDATE app_feedback
     SET status = ${close ? 'closed' : 'answered'}, read_at = COALESCE(read_at, ${at}),
         last_admin_reply_at = ${at}, last_message_at = ${at}
     WHERE id = ${id}::uuid
+    RETURNING user_id
   `;
-  return { id: rows[0].id, author: 'admin', message, created_at: at };
+  return { id: rows[0].id, author: 'admin', message, created_at: at, user_id: f.user_id };
 }
 
 /** Закрыть без ответа (спам, оценка без текста) */

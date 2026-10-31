@@ -9,6 +9,8 @@
  * Вариант получает ctx = { userId, name, displayName, streak, longest, secPerAnswer, data } и возвращает { title, body }.
  * Вариантов несколько (4.1) — выбирается variantIndex(userId, type); правила тона — plan/done/brandbook.md, 9.1.
  * Правило реестра (принцип 3 плана): в тексте должно быть число или имя, иначе пуш не собирается.
+ * Исключение — anyText: текст пишет человек (ответ команды), конкретика в нём уже есть.
+ * minAppVersion — тап ведёт на экран, которого нет в старых версиях: шлём только на устройства не старше.
  */
 
 function plural(n, one, few, many) {
@@ -41,6 +43,27 @@ function minutesFor(count, secPerAnswer) {
 }
 
 const LESSON_LINK = () => 'flashly://lesson?from=push';
+
+/** Первая версия приложения с экраном «Мои обращения» (Support 4) — она же присылает app_version токена */
+export const SUPPORT_MIN_APP_VERSION = '1.6.10';
+const SUPPORT_BODY_MAX = 120;
+
+function excerpt(text, max) {
+  const t = String(text ?? '').replace(/\s+/g, ' ').trim();
+  return t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t;
+}
+
+/** '1.6.10' >= '1.6.9' — по числам, а не по строке */
+export function versionAtLeast(version, min) {
+  const a = String(version || '').split('.').map(Number);
+  const b = String(min).split('.').map(Number);
+  if (a.some(Number.isNaN) || !version) return false;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const d = (a[i] || 0) - (b[i] || 0);
+    if (d !== 0) return d > 0;
+  }
+  return true;
+}
 
 /** Рейтинг курса; без courseId — урок дня (старые записи без курса) */
 function ratingLink(week) {
@@ -376,6 +399,22 @@ export const PUSH_TYPES = {
       }),
     ],
   },
+  // Ответ команды на обращение (plan/new/support_threads.md, Support 3). Отправляет админка, не арбитр
+  support_reply: {
+    category: 'support',
+    priority: 0,
+    transactional: true,
+    minIntervalDays: 0,
+    anyText: true,
+    minAppVersion: SUPPORT_MIN_APP_VERSION,
+    link: (data) => `flashly://support/${encodeURIComponent(data.feedbackId)}?from=push`,
+    variants: [
+      ({ data }) => ({
+        title: 'Команда Flashly ответила',
+        body: excerpt(data.text, SUPPORT_BODY_MAX),
+      }),
+    ],
+  },
 };
 
 /** Описание типа или null для неизвестного */
@@ -407,8 +446,12 @@ export function buildPush(type, ctx) {
   const variant = variantIndex(ctx.userId, type, def.variants.length);
   const message = def.variants[variant]({ ...ctx, data: ctx.data || {} });
   const text = `${message.title} ${message.body}`;
-  if (text.includes('undefined') || text.includes('NaN')) return null;
-  const specific = /\d/.test(text) || (!!ctx.displayName && text.includes(ctx.displayName));
-  if (!specific) return null;
+  if (def.anyText) {
+    if (!message.body) return null;
+  } else {
+    if (text.includes('undefined') || text.includes('NaN')) return null;
+    const specific = /\d/.test(text) || (!!ctx.displayName && text.includes(ctx.displayName));
+    if (!specific) return null;
+  }
   return { ...message, link: def.link(ctx.data || {}), variant: `v${variant + 1}` };
 }

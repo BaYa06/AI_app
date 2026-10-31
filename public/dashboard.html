@@ -770,6 +770,16 @@
   let fbOpenId = null;
   const fbThreads = {};
   const fbDrafts = {};
+  // Что стало с push после последнего ответа (sendNotification → reason)
+  const fbPushNote = {};
+  const FB_PUSH_REASON = {
+    'old app': 'push не ушёл: у пользователя старая версия приложения — ответ увидит после обновления',
+    'no token': 'push не ушёл: уведомления на устройстве не подключены',
+    'permission denied': 'push не ушёл: уведомления запрещены в настройках телефона',
+    'notifications disabled': 'push не ушёл: пользователь выключил уведомления в приложении',
+    'quiet_hours': 'push отложен: у пользователя ночь — уйдёт утром',
+    'not_allowlisted': 'push не ушёл: включён тестовый список получателей',
+  };
 
   // Текст пишут пользователи — вставляем только экранированным
   function esc(str) {
@@ -882,11 +892,13 @@
         ${t.read_at ? `<div class="fb-sys">Прочитано · ${fmtDate(t.read_at)} — пользователь видит этот статус</div>` : ''}
         <div class="fb-msgs">${msgs}</div>
         ${seen}
+        ${fbPushNote[f.id] ? `<div class="fb-sys">${esc(fbPushNote[f.id])}</div>` : ''}
         <div class="fb-reply">
           <div class="fb-quick">${FB_QUICK.map((q, i) => `<button type="button" onclick="useFbQuick('${id}', ${i})">${q.label}</button>`).join('')}</div>
           <textarea id="fb-text-${id}" aria-label="Ответ пользователю" placeholder="Ответ увидит только автор обращения"
                     oninput="fbDrafts['${id}'] = this.value">${esc(fbDrafts[f.id] || '')}</textarea>
           <div class="fb-reply-row">
+            <label><input type="checkbox" id="fb-push-${id}" checked> Отправить push</label>
             <label><input type="checkbox" id="fb-close-${id}"> Закрыть обращение</label>
             <span class="sp"></span>
             ${f.status !== 'closed' ? `<button class="fb-read-btn" type="button" onclick="closeFb('${id}')">Закрыть без ответа</button>` : ''}
@@ -929,12 +941,15 @@
     const message = ta.value.trim();
     if (!message) { ta.focus(); return; }
     const close = document.getElementById('fb-close-' + id).checked;
+    const push = document.getElementById('fb-push-' + id).checked;
     const btn = document.getElementById('fb-send-' + id);
     btn.disabled = true;
     try {
-      const reply = await adminApi('adminReplyFeedback', { method: 'POST', body: { id, message, close } });
+      const reply = await adminApi('adminReplyFeedback', { method: 'POST', body: { id, message, close, push } });
       if (!reply) return;
       delete fbDrafts[id];
+      fbPushNote[id] = !reply.push ? '' : reply.push.ok ? 'push отправлен'
+        : FB_PUSH_REASON[reply.push.reason] || 'push не ушёл: ' + reply.push.reason;
       const item = fbItems.find((f) => f.id === id);
       if (item) {
         item.status = close ? 'closed' : 'answered';

@@ -4,7 +4,7 @@ import { neon } from '@neondatabase/serverless';
  * Версия схемы: при добавлении миграции в applyMigrations увеличить (и дописать файл в
  * database/migrations). Пока в app_migrations есть отметка этой версии, миграции не выполняются.
  */
-const SCHEMA_VERSION = 'schema_035';
+const SCHEMA_VERSION = 'schema_036';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -594,6 +594,14 @@ async function applyMigrations(sql) {
     await sql`CREATE INDEX IF NOT EXISTS idx_app_feedback_user_last ON app_feedback(user_id, last_message_at DESC)`;
   } catch (e) {
     console.error('Migration 035_feedback_replies failed:', e);
+  }
+
+  // Migration 036: версия приложения у push-токена — пуш с новым экраном не шлём старым версиям
+  // (plan/new/support_threads.md, Support 3). Старые версии её не присылают — остаётся NULL.
+  try {
+    await sql`ALTER TABLE push_tokens ADD COLUMN IF NOT EXISTS app_version VARCHAR(20)`;
+  } catch (e) {
+    console.error('Migration 036_push_token_version failed:', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)
