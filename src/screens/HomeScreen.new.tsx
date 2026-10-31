@@ -44,6 +44,7 @@ import {
   Clock,
   GraduationCap,
   Trophy,
+  FolderInput,
 } from 'lucide-react-native';
 import { StreakService, getLocalDateKey } from '@/services/StreakService';
 import { supabase } from '@/services/supabaseClient';
@@ -252,6 +253,8 @@ export function HomeScreen({ navigation, route }: any) {
   }, []);
   const inviteBaseUrl = 'https://ai-app-seven-zeta.vercel.app';
   const [setMenuTarget, setSetMenuTarget] = useState<CardSet | null>(null);
+  // Меню набора: действия или список курсов для «Переместить в курс…» (та же шторка)
+  const [setMenuMoving, setSetMenuMoving] = useState(false);
   const editInputRef = useRef<RNTextInput>(null);
   const newCourseInputRef = useRef<RNTextInput>(null);
   const editModalInputRef = useRef<RNTextInput>(null);
@@ -1035,6 +1038,21 @@ export function HomeScreen({ navigation, route }: any) {
   const deleteSet = useSetsStore((s) => s.deleteSet);
   const addSet = useSetsStore((s) => s.addSet);
   const deleteCardsBySet = useCardsStore((s) => s.deleteCardsBySet);
+
+  // Свои курсы — куда можно переложить свой набор (в курс учителя нельзя)
+  const moveTargetCourses = useMemo(() => courses.filter((c) => !c.isStudentCourse), [courses]);
+  const closeSetMenu = useCallback(() => {
+    setSetMenuTarget(null);
+    setSetMenuMoving(false);
+  }, []);
+  const handleMoveSet = useCallback((set: CardSet, courseId: string | null) => {
+    closeSetMenu();
+    if ((set.courseId ?? null) === courseId) return;
+    triggerHaptic('selection');
+    updateSet(set.id, { courseId });
+    const title = courseId ? courses.find((c) => c.id === courseId)?.title : 'Мои наборы';
+    toast.success(`Набор перенесён в «${title ?? 'курс'}»`);
+  }, [closeSetMenu, updateSet, courses]);
 
   const handleToggleSetHidden = useCallback(async (set: CardSet) => {
     const newHidden = !set.isHiddenFromStudents;
@@ -2313,29 +2331,61 @@ export function HomeScreen({ navigation, route }: any) {
         }}
       />
       {/* Set Action Sheet */}
-      <Sheet visible={!!setMenuTarget} onClose={() => setSetMenuTarget(null)}>
-        <ListRow
-          icon={Edit2}
-          iconColor={colors.textPrimary}
-          title="Редактировать"
-          chevron={false}
-          onPress={() => {
-            if (setMenuTarget) {
-              navigation?.navigate('SetEditor', { setId: setMenuTarget.id, autoFocusTitle: true });
-              setSetMenuTarget(null);
-            }
-          }}
-          style={styles.sheetRow}
-        />
-        {setMenuTarget?.courseId && isTeacher && (
-          <ListRow
-            icon={setMenuTarget.isHiddenFromStudents ? Eye : EyeOff}
-            iconColor={setMenuTarget.isHiddenFromStudents ? colors.primary : colors.textSecondary}
-            title={setMenuTarget.isHiddenFromStudents ? 'Показать ученикам' : 'Скрыть от учеников'}
-            chevron={false}
-            onPress={() => setMenuTarget && handleToggleSetHidden(setMenuTarget)}
-            style={styles.sheetRow}
-          />
+      <Sheet visible={!!setMenuTarget} onClose={closeSetMenu}>
+        {setMenuMoving && setMenuTarget ? (
+          <>
+            {[{ id: null as string | null, title: 'Мои наборы' }, ...moveTargetCourses].map((c) => {
+              const current = (setMenuTarget.courseId ?? null) === c.id;
+              return (
+                <ListRow
+                  key={c.id ?? 'my-sets'}
+                  icon={c.id ? Folder : Library}
+                  iconColor={current ? colors.primary : colors.textPrimary}
+                  title={c.title}
+                  right={current ? <Check size={iconSize.s} color={colors.primary} /> : undefined}
+                  chevron={false}
+                  onPress={() => handleMoveSet(setMenuTarget, c.id)}
+                  style={styles.sheetRow}
+                />
+              );
+            })}
+          </>
+        ) : (
+          <>
+            <ListRow
+              icon={Edit2}
+              iconColor={colors.textPrimary}
+              title="Редактировать"
+              chevron={false}
+              onPress={() => {
+                if (setMenuTarget) {
+                  navigation?.navigate('SetEditor', { setId: setMenuTarget.id, autoFocusTitle: true });
+                  setSetMenuTarget(null);
+                }
+              }}
+              style={styles.sheetRow}
+            />
+            {setMenuTarget?.courseId && isTeacher && (
+              <ListRow
+                icon={setMenuTarget.isHiddenFromStudents ? Eye : EyeOff}
+                iconColor={setMenuTarget.isHiddenFromStudents ? colors.primary : colors.textSecondary}
+                title={setMenuTarget.isHiddenFromStudents ? 'Показать ученикам' : 'Скрыть от учеников'}
+                chevron={false}
+                onPress={() => setMenuTarget && handleToggleSetHidden(setMenuTarget)}
+                style={styles.sheetRow}
+              />
+            )}
+            {setMenuTarget && !setMenuTarget.isReadOnly && !setMenuTarget.isOfficial && (
+              <ListRow
+                icon={FolderInput}
+                iconColor={colors.textPrimary}
+                title="Переместить в курс…"
+                chevron={false}
+                onPress={() => setSetMenuMoving(true)}
+                style={styles.sheetRow}
+              />
+            )}
+          </>
         )}
       </Sheet>
       <DiamondReward
