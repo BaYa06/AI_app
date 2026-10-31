@@ -1185,20 +1185,36 @@ export function HomeScreen({ navigation, route }: any) {
     [courses, deleteModalCourseId]
   );
 
-  const deleteModalStats = useMemo(
-    () => (deleteModalCourseId ? getCourseStats(deleteModalCourseId) : null),
-    [deleteModalCourseId, getCourseStats]
-  );
+  // Что удалится вместе с курсом: только свои наборы (юниты книг остаются в каталоге)
+  const deleteModalStats = useMemo(() => {
+    if (!deleteModalCourseId) return null;
+    const own = allSets.filter((s) => s.courseId === deleteModalCourseId && !s.isOfficial && !s.isReadOnly);
+    return { setCount: own.length, cardCount: own.reduce((sum, s) => sum + (s.cardCount || 0), 0) };
+  }, [deleteModalCourseId, allSets]);
 
   const deleteModalHasSets = deleteModalStats ? deleteModalStats.setCount > 0 : false;
+  // Галочка «Я понимаю» — без неё курс с наборами не удалить; сбрасывается при каждом открытии
+  const [deleteConfirmed, setDeleteConfirmed] = useState(false);
+  // Ученики курса — у них тоже пропадут наборы; null — ещё не знаем (или нет сети)
+  const [deleteModalStudents, setDeleteModalStudents] = useState<number | null>(null);
+  useEffect(() => {
+    setDeleteConfirmed(false);
+    setDeleteModalStudents(null);
+    if (!deleteModalCourseId || !NeonService.isEnabled()) return;
+    let cancelled = false;
+    NeonService.loadCourseMembers(deleteModalCourseId)
+      .then((members) => { if (!cancelled) setDeleteModalStudents(members.length); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [deleteModalCourseId]);
 
   const deleteModalMessage = useMemo(() => {
     if (!deleteModalCourse || !deleteModalStats) return '';
     if (deleteModalHasSets) {
-      const setWord = formatSetWord(deleteModalStats.setCount);
-      return `В курсе "${deleteModalCourse.title}" ${deleteModalStats.setCount} ${setWord}. Перемести наборы в другие курсы или удали их.`;
+      const { setCount, cardCount } = deleteModalStats;
+      return `Вместе с курсом «${deleteModalCourse.title}» удалятся ${setCount} ${formatSetWord(setCount)} и ${cardCount} ${pluralize(cardCount, 'карточка', 'карточки', 'карточек')}, а также весь прогресс по ним. Вернуть их будет нельзя.`;
     }
-    return `Удалить курс "${deleteModalCourse.title}"?`;
+    return `Удалить курс «${deleteModalCourse.title}»?`;
   }, [deleteModalCourse, deleteModalHasSets, deleteModalStats, formatSetWord]);
 
   const openInviteModal = useCallback(async (courseId: string) => {
@@ -1267,12 +1283,11 @@ export function HomeScreen({ navigation, route }: any) {
 
   const confirmDeleteCourse = useCallback(() => {
     if (!deleteModalCourseId) return;
-    const stats = getCourseStats(deleteModalCourseId);
-    if (stats.setCount > 0) return;
+    if (deleteModalHasSets && !deleteConfirmed) return;
 
     deleteCourse(deleteModalCourseId);
     setDeleteModalCourseId(null);
-  }, [deleteModalCourseId, deleteCourse, getCourseStats]);
+  }, [deleteModalCourseId, deleteModalHasSets, deleteConfirmed, deleteCourse]);
 
   const removeLocalCourse = useCoursesStore((s) => s.removeLocalCourse);
 
@@ -1895,7 +1910,7 @@ export function HomeScreen({ navigation, route }: any) {
               filled
               title="Удалить"
               onPress={confirmDeleteCourse}
-              disabled={deleteModalHasSets}
+              disabled={deleteModalHasSets && !deleteConfirmed}
               style={styles.flex1}
             />
           </View>
@@ -1905,9 +1920,36 @@ export function HomeScreen({ navigation, route }: any) {
           {deleteModalMessage}
         </Text>
         {deleteModalHasSets && (
-          <Text variant="bodySmall" style={[styles.semibold, styles.dialogNote, { color: colors.warningText }]}>
-            Удаление недоступно: сначала перемести наборы.
-          </Text>
+          <>
+            {!!deleteModalStudents && (
+              <Text variant="body" style={[styles.semibold, styles.dialogNote, { color: colors.warningText }]}>
+                {`У ${deleteModalStudents} ${pluralize(deleteModalStudents, 'ученика', 'учеников', 'учеников')} пропадут наборы этого курса.`}
+              </Text>
+            )}
+            <Pressable
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: deleteConfirmed }}
+              onPress={() => { triggerHaptic('selection'); setDeleteConfirmed((v) => !v); }}
+              style={styles.deleteConfirmRow}
+            >
+              <View
+                style={[
+                  styles.deleteConfirmBox,
+                  deleteConfirmed
+                    ? { backgroundColor: colors.error, borderColor: colors.error }
+                    : { borderColor: colors.border, backgroundColor: colors.surface },
+                ]}
+              >
+                {deleteConfirmed && <Check size={iconSize.xs} color={colors.onPrimary} />}
+              </View>
+              <Text variant="body" style={[styles.flex1, { color: colors.textPrimary }]}>
+                Я понимаю, что наборы и прогресс удалятся навсегда
+              </Text>
+            </Pressable>
+            <Text variant="bodySmall" style={[styles.dialogNote, { color: colors.textSecondary }]}>
+              Хочешь сохранить набор? Сначала перенеси его в «Мои наборы».
+            </Text>
+          </>
         )}
       </Dialog>
 
@@ -2574,6 +2616,21 @@ const styles = StyleSheet.create({
   },
   dialogNote: {
     marginTop: spacing.s,
+  },
+  deleteConfirmRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+    marginTop: spacing.m,
+    minHeight: 44,
+  },
+  deleteConfirmBox: {
+    width: 24,
+    height: 24,
+    borderRadius: borderRadius.s,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   inviteDescription: {
     marginBottom: spacing.m,

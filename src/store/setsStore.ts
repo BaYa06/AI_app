@@ -59,6 +59,7 @@ interface SetsActions {
 
   // Курсы
   moveSetsFromCourse: (courseId: string) => void; // Перемещает наборы из курса в «Мои наборы»
+  deleteSetsOfCourse: (courseId: string) => void; // Удаление курса: его наборы и карточки — локально (MySets 4)
   getSetsByCourse: (courseId: string | null) => CardSet[]; // Получить наборы по курсу
   
   // Обновление статистики набора
@@ -362,6 +363,39 @@ export const useSetsStore = create<SetsState & SetsActions>()(
       // Сохраняем изменения
       DatabaseService.saveSets();
       console.log('✅ Наборы перемещены из курса в «Мои наборы»:', courseId, '· удалено read-only:', readOnlySetIds.length);
+    },
+
+    deleteSetsOfCourse: (courseId) => {
+      const removedIds: string[] = [];
+
+      set((state) => {
+        Object.values(state.sets).forEach((cardSet) => {
+          const official = cardSet.officialCourseIds?.includes(courseId) === true;
+          if (cardSet.courseId !== courseId && !official) return;
+
+          if (cardSet.isOfficial || cardSet.isReadOnly) {
+            // Юнит книги — не наш набор: убираем только этот курс, без курсов он больше не виден
+            const rest = (cardSet.officialCourseIds ?? []).filter((id) => id !== courseId);
+            if (rest.length > 0) {
+              cardSet.officialCourseIds = rest;
+              cardSet.courseId = rest[0];
+              return;
+            }
+          }
+          removedIds.push(cardSet.id);
+        });
+
+        removedIds.forEach((id) => {
+          delete state.sets[id];
+          const index = state.setsOrder.indexOf(id);
+          if (index > -1) state.setsOrder.splice(index, 1);
+        });
+      });
+
+      // На сервере наборы удаляет сам delete-course (withSets) — отдельные deleteSet не нужны
+      removedIds.forEach((id) => useCardsStore.getState().deleteCardsBySet(id));
+      DatabaseService.saveSets();
+      console.log('✅ Наборы курса удалены локально:', courseId, removedIds.length);
     },
 
     getSetsByCourse: (courseId) => {

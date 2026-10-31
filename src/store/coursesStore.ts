@@ -9,15 +9,21 @@ import { Alert } from 'react-native';
 import type { Course } from '@/types';
 import { StorageService, STORAGE_KEYS } from '@/services/StorageService';
 import { NeonService } from '@/services/NeonService';
+import { SyncQueueService } from '@/services/SyncQueueService';
 import { supabase } from '@/services/supabaseClient';
 
 // Lazy import для useSetsStore чтобы избежать циклических зависимостей
 const getSetsStore = () => require('./setsStore').useSetsStore;
 
+// Удаление курса вместе с наборами — через очередь с повтором: если запрос не дошёл, при
+// следующей загрузке наборы вернулись бы в «Мои наборы»
+SyncQueueService.registerExecutor('deleteCourseWithSets', (p) =>
+  NeonService.deleteCourse(p as string, { withSets: true }));
+
 interface CoursesState {
   // Данные
   courses: Course[];
-  activeCourseId: string | null; // null = "All courses"
+  activeCourseId: string | null; // null = «Мои наборы»
   
   // Загрузка
   isLoading: boolean;
@@ -157,25 +163,17 @@ export const useCoursesStore = create<CoursesState & CoursesActions>()(
         }
       });
 
-      // Перемещаем все наборы из этого курса в «Мои наборы»
+      // Наборы курса удаляются вместе с ним (пользователь подтвердил галочкой)
       const setsStore = getSetsStore().getState();
-      setsStore.moveSetsFromCourse(id);
+      setsStore.deleteSetsOfCourse(id);
 
       // Сохраняем в хранилище
       get().saveCourses();
       console.log('✅ Курс удален:', id);
 
-      // Синхронизируем с Neon (async)
+      // Сервер удаляет курс, его наборы и карточки (withSets) — через очередь с повтором
       if (NeonService.isEnabled()) {
-        console.log('🔄 Удаление курса из Neon PostgreSQL...');
-        (async () => {
-          const ok = await NeonService.deleteCourse(id);
-          if (ok) {
-            console.log('✅ Курс удален из Neon PostgreSQL');
-          } else {
-            console.warn('⚠️  Не удалось удалить курс из Neon');
-          }
-        })();
+        SyncQueueService.enqueue('deleteCourseWithSets', id);
       }
     },
 
