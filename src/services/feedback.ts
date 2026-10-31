@@ -1,6 +1,6 @@
 /**
- * Обратная связь: «Написать нам» и окно оценки приложения.
- * Всё уходит в app_feedback (api/data.js → submitFeedback) и смотрится в админке.
+ * Обратная связь: «Написать нам», окно оценки и «Мои обращения» (plan/new/support_threads.md).
+ * Всё уходит в app_feedback (api/data.js → submitFeedback), смотрится и отвечается в админке.
  */
 import { Platform } from 'react-native';
 import { version as APP_VERSION } from '../../package.json';
@@ -28,8 +28,12 @@ function deviceMeta() {
   };
 }
 
-export function sendFeedbackMessage(category: FeedbackCategory, message: string): Promise<boolean> {
-  return NeonService.submitFeedback({ kind: 'message', category, message: message.trim(), ...deviceMeta() });
+/**
+ * «Написать нам». id — открыть созданную переписку; true — отправлено, но сервер ещё без «Моих обращений»;
+ * null — не отправилось.
+ */
+export function sendFeedbackMessage(category: FeedbackCategory, message: string): Promise<string | true | null> {
+  return NeonService.submitFeedbackForThread({ kind: 'message', category, message: message.trim(), ...deviceMeta() });
 }
 
 export function sendRating(params: {
@@ -46,6 +50,81 @@ export function sendRating(params: {
     message: params.message?.trim() || undefined,
     ...deviceMeta(),
   });
+}
+
+// ==================== Мои обращения ====================
+
+/** sent — мы ещё не открыли; read — прочитали; answered — есть ответ, который ты ещё не открыл */
+export type SupportStatus = 'sent' | 'read' | 'answered';
+
+export interface SupportTicket {
+  id: string;
+  kind: 'message' | 'rating';
+  category: FeedbackCategory | null;
+  rating: number | null;
+  hasProblem: boolean | null;
+  tags: FeedbackTag[] | null;
+  /** Последнее сообщение ветки (или само обращение); у оценки в одно касание — null */
+  preview: string | null;
+  previewAuthor: 'user' | 'admin';
+  status: SupportStatus;
+  closed: boolean;
+  createdAt: string;
+  lastMessageAt: string;
+}
+
+export interface SupportMessage {
+  author: 'user' | 'admin';
+  message: string;
+  createdAt: string;
+}
+
+export interface SupportThread {
+  id: string;
+  kind: 'message' | 'rating';
+  category: FeedbackCategory | null;
+  rating: number | null;
+  hasProblem: boolean | null;
+  tags: FeedbackTag[] | null;
+  closed: boolean;
+  /** Когда команда впервые открыла обращение */
+  readAt: string | null;
+  createdAt: string;
+  messages: SupportMessage[];
+}
+
+export function loadSupportTickets(): Promise<SupportTicket[]> {
+  return NeonService.myFeedback();
+}
+
+export function loadSupportThread(id: string): Promise<SupportThread> {
+  return NeonService.feedbackThread(id);
+}
+
+export function sendSupportReply(id: string, message: string): Promise<SupportMessage> {
+  return NeonService.replyFeedback(id, message.trim());
+}
+
+export function loadSupportUnreadCount(): Promise<number> {
+  return NeonService.feedbackUnreadCount();
+}
+
+export const FEEDBACK_CATEGORY_LABELS: Record<FeedbackCategory, string> = {
+  problem: 'Проблема',
+  idea: 'Идея',
+  question: 'Вопрос',
+};
+
+/** Ответ из окна оценки: сейчас 5 / 3 / 1, у старых оценок со звёздами бывают и 2 / 4 */
+export function satisfactionLabel(rating: number | null): string {
+  if (!rating) return 'Отзыв';
+  if (rating >= 4) return 'Нравится';
+  if (rating === 3) return 'Нормально';
+  return 'Не нравится';
+}
+
+export function feedbackTagLabel(tag: FeedbackTag): string {
+  return FEEDBACK_TAGS.find((t) => t.value === tag)?.label ?? tag;
 }
 
 // ==================== Когда показывать окно оценки ====================

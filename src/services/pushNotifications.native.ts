@@ -22,6 +22,7 @@ import {
   AuthorizationStatus,
 } from '@react-native-firebase/messaging';
 import { API_BASE as APP_API_BASE } from '@/config/apiBase';
+import { version as APP_VERSION } from '../../package.json';
 import { supabase } from './supabaseClient';
 import { StorageService } from './StorageService';
 import { Analytics } from './analytics';
@@ -263,7 +264,10 @@ async function sendTokenToBackend(token: string, permission?: ServerPermission |
     const res = await fetch(`${API_BASE}?action=subscribe`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-      body: JSON.stringify({ token, platform: Platform.OS, userId: currentUserId, permission: permission ?? undefined }),
+      // appVersion — сервер шлёт пуши с новыми экранами только версиям, которые их знают (support_reply)
+      body: JSON.stringify({
+        token, platform: Platform.OS, userId: currentUserId, permission: permission ?? undefined, appVersion: APP_VERSION,
+      }),
     });
     if (!res.ok) console.warn('[Push] Backend subscribe failed:', res.status);
   } catch (error) {

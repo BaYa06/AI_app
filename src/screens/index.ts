@@ -20,6 +20,8 @@ export { NotificationSettingsScreen } from './NotificationSettingsScreen';
 export { LearningSettingsScreen } from './LearningSettingsScreen';
 export { SoundSettingsScreen } from './SoundSettingsScreen';
 export { FeedbackScreen } from './FeedbackScreen';
+export { SupportListScreen } from './SupportListScreen';
+export { SupportThreadScreen } from './SupportThreadScreen';
 export { SharedSetDetailScreen } from './SharedSetDetailScreen';
 export { PersonalInfoScreen } from './PersonalInfoScreen';
 export { SecurityScreen } from './SecurityScreen';

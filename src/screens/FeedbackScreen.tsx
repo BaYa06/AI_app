@@ -1,6 +1,7 @@
 /**
  * Feedback Screen
- * @description «Написать нам»: проблема, идея или вопрос. Смотрится в админке (app_feedback).
+ * @description «Написать нам»: проблема, идея или вопрос. Смотрится и отвечается в админке (app_feedback);
+ * после отправки открывается переписка в «Моих обращениях» (plan/new/support_threads.md).
  */
 import React, { useState } from 'react';
 import { View, StyleSheet, Pressable, Platform } from 'react-native';
@@ -35,9 +36,15 @@ export function FeedbackScreen({ navigation }: any) {
   const handleSend = async () => {
     if (!canSend) return;
     setSending(true);
-    const ok = await sendFeedbackMessage(category, message).catch(() => false);
+    const result = await sendFeedbackMessage(category, message).catch(() => null);
     setSending(false);
-    if (ok) {
+    if (typeof result === 'string') {
+      triggerHaptic('notificationSuccess');
+      navigation.replace('SupportThread', { id: result });
+      return;
+    }
+    // Сервер ещё без «Моих обращений» — сообщение сохранено, показываем «Спасибо!»
+    if (result === true) {
       triggerHaptic('notificationSuccess');
       setSent(true);
       return;
@@ -64,7 +71,7 @@ export function FeedbackScreen({ navigation }: any) {
   return (
     <Screen header={header} keyboard contentStyle={st.content}>
       <Text variant="bodySmall" color="secondary">
-        Нашёл ошибку или есть идея? Напиши — мы читаем каждое сообщение.
+        Нашёл ошибку или есть идея? Напиши — мы читаем каждое сообщение и ответим в «Моих обращениях».
       </Text>
 
       {/* ======== Category ======== */}

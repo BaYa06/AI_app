@@ -184,6 +184,19 @@ async function callProgressApi<T = any>(
 /** Загрузка на старте: сетевую ошибку не выдавать за «пусто», иначе сохранённые данные затрутся */
 type LoadOptions = { throwOnError?: boolean };
 
+/** «Написать нам» или окно оценки (api/data.js → submitFeedback) */
+export interface FeedbackPayload {
+  kind: 'message' | 'rating';
+  category?: string;
+  rating?: number;
+  hasProblem?: boolean | null;
+  tags?: string[];
+  message?: string;
+  appVersion?: string;
+  platform?: string;
+  osVersion?: string;
+}
+
 /** Сервер не ответил (нет сети/таймаут/ошибка) — в отличие от пустого ответа */
 export class NetworkLoadError extends Error {
   /** HTTP-код ответа; 0 — сеть/таймаут */
@@ -415,18 +428,45 @@ export const NeonService = {
   /**
    * Обратная связь: «Написать нам» (message) или окно оценки (rating). Смотрится в админке.
    */
-  async submitFeedback(payload: {
-    kind: 'message' | 'rating';
-    category?: string;
-    rating?: number;
-    hasProblem?: boolean | null;
-    tags?: string[];
-    message?: string;
-    appVersion?: string;
-    platform?: string;
-    osVersion?: string;
-  }): Promise<boolean> {
+  async submitFeedback(payload: FeedbackPayload): Promise<boolean> {
     return (await callDataApi<boolean>('submitFeedback', payload)) === true;
+  },
+
+  /**
+   * То же, но возвращает id обращения — чтобы сразу открыть переписку (plan/new/support_threads.md).
+   * true — сервер ещё без «Моих обращений»: сообщение сохранено, id нет. null — не отправилось.
+   */
+  async submitFeedbackForThread(payload: FeedbackPayload): Promise<string | true | null> {
+    const data = await callDataApi<{ id: string } | boolean>('submitFeedback', { ...payload, returnId: true });
+    if (data === true) return true;
+    return data && typeof data === 'object' && data.id ? data.id : null;
+  },
+
+  /** «Мои обращения»: список (strict — нужна разница между «пусто» и «не загрузилось») */
+  async myFeedback(): Promise<any[]> {
+    const data = await callDataApi<any[]>('myFeedback', {}, 'POST', true);
+    if (!Array.isArray(data)) throw new NetworkLoadError('myFeedback');
+    return data;
+  },
+
+  /** Одна переписка; открытие гасит бейдж непрочитанного ответа */
+  async feedbackThread(id: string): Promise<any> {
+    const data = await callDataApi<any>('feedbackThread', { id }, 'POST', true);
+    if (!data) throw new NetworkLoadError('feedbackThread');
+    return data;
+  },
+
+  /** Дописать в своё обращение. Ошибка — NetworkLoadError со статусом (429 — дневной лимит) */
+  async replyFeedback(id: string, message: string): Promise<any> {
+    const data = await callDataApi<any>('replyFeedback', { id, message }, 'POST', true);
+    if (!data) throw new NetworkLoadError('replyFeedback');
+    return data;
+  },
+
+  /** Сколько обращений с непрочитанным ответом команды — бейдж в профиле. 0 — и при ошибке */
+  async feedbackUnreadCount(): Promise<number> {
+    const n = await callDataApi<number>('feedbackUnreadCount');
+    return typeof n === 'number' ? n : 0;
   },
 
   /**

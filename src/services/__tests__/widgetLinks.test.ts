@@ -16,6 +16,8 @@ describe('widgetLinks', () => {
     expect(isNavigationUrl('flashly://lesson?from=push')).toBe(true);
     expect(isNavigationUrl('flashly://rating/3f2a-11?from=push&week=previous')).toBe(true);
     expect(isNavigationUrl('flashly://rating/')).toBe(false);
+    expect(isNavigationUrl('flashly://support/3f2a-11?from=push')).toBe(true);
+    expect(isNavigationUrl('flashly://support/')).toBe(false);
     expect(isNavigationUrl('flashly://auth-callback?code=abc')).toBe(false);
   });
 

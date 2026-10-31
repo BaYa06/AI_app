@@ -73,6 +73,8 @@ import { MyDataScreen } from '@/screens/MyDataScreen';
 import { BlockedAuthorsScreen } from '@/screens/BlockedAuthorsScreen';
 import { SoundSettingsScreen } from '@/screens/SoundSettingsScreen';
 import { FeedbackScreen } from '@/screens/FeedbackScreen';
+import { SupportListScreen } from '@/screens/SupportListScreen';
+import { SupportThreadScreen } from '@/screens/SupportThreadScreen';
 import { LibrarySetDetailScreen } from '@/screens/LibrarySetDetailScreen';
 import { BookDetailScreen } from '@/screens/BookDetailScreen';
 import { CourseBooksScreen } from '@/screens/CourseBooksScreen';
@@ -273,6 +275,8 @@ const NATIVE_LINKING: LinkingOptions<RootStackParamList> = {
       LearningSettings: 'learning-settings',
       SoundSettings: 'sound-settings',
       Feedback: 'feedback',
+      // Push «Команда Flashly ответила» (plan/new/support_threads.md): flashly://support/<id>?from=push
+      SupportThread: 'support/:id',
       ...(COMMUNITY_LIBRARY_ENABLED ? { LibrarySetDetail: 'library-set/:setId' } : null),
       BookDetail: 'book/:bookId',
       CourseBooks: 'course-books/:courseId',
@@ -449,6 +453,24 @@ export function AppNavigator() {
         <Stack.Screen
           name="Feedback"
           component={FeedbackScreen}
+          options={{
+            headerShown: false,
+            animation: 'slide_from_right',
+            animationDuration: 300,
+          }}
+        />
+        <Stack.Screen
+          name="Support"
+          component={SupportListScreen}
+          options={{
+            headerShown: false,
+            animation: 'slide_from_right',
+            animationDuration: 300,
+          }}
+        />
+        <Stack.Screen
+          name="SupportThread"
+          component={SupportThreadScreen}
           options={{
             headerShown: false,
             animation: 'slide_from_right',

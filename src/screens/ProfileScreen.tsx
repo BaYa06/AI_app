@@ -16,7 +16,7 @@ import { supabase, NeonService, Analytics, StreakService, DatabaseService, Libra
 import type { UserStats } from '@/services';
 import { Text } from '@/components/common';
 import { spacing, borderRadius, iconSize, alpha } from '@/constants';
-import { Button, Card, ListGroup, ListRow, ProgressBar, Screen, Switch, toast } from '@/components/ui';
+import { Badge, Button, Card, ListGroup, ListRow, ProgressBar, Screen, Switch, toast } from '@/components/ui';
 import {
   User,
   BookOpen,
@@ -42,6 +42,7 @@ import { PRIVACY_POLICY_URL, TERMS_URL } from '@/config/legal';
 import { COMMUNITY_LIBRARY_ENABLED } from '@/config/features';
 import { isAppleUser, requestAppleAuthorizationCode } from '@/services/appleSignInName';
 import { ensureAiConsent, hasAiConsent, setAiConsent } from '@/services/aiConsent';
+import { loadSupportUnreadCount } from '@/services/feedback';
 
 const THEME_OPTIONS: Array<{ value: ThemeMode; label: string }> = [
   { value: 'light', label: 'Светлая' },
@@ -65,6 +66,8 @@ export function ProfileScreen({ navigation }: any) {
   const loadRewards = useDiamondStore((s) => s.loadRewards);
   const isTeacher = useSettingsStore((s) => s.isTeacher);
   const [deleting, setDeleting] = useState(false);
+  // Непрочитанные ответы команды — бейдж у «Мои обращения»
+  const [supportUnread, setSupportUnread] = useState(0);
 
 
   // Подтягиваем актуальную сессию Supabase
@@ -126,6 +129,7 @@ export function ProfileScreen({ navigation }: any) {
         if (stats) setUserStats(stats);
       });
       loadRewards();
+      loadSupportUnreadCount().then(setSupportUnread);
     }, [sessionUserId, loadRewards]),
   );
 
@@ -335,7 +339,13 @@ export function ProfileScreen({ navigation }: any) {
 
       {/* ======== Support ======== */}
       <ListGroup title="Поддержка" style={st.group}>
-        <ListRow icon={MessageSquare} title="Написать нам" onPress={() => navigation?.navigate('Feedback')} />
+        <ListRow
+          icon={MessageSquare}
+          title="Мои обращения"
+          subtitle={supportUnread > 0 ? 'Есть ответ от команды' : 'Написать нам и наши ответы'}
+          right={supportUnread > 0 ? <Badge label={String(supportUnread)} /> : undefined}
+          onPress={() => navigation?.navigate('Support')}
+        />
       </ListGroup>
 
       {/* ======== Legal ======== */}

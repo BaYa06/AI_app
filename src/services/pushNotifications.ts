@@ -9,6 +9,7 @@ import { Platform } from 'react-native';
 import { getMessaging, getToken, onMessage, isSupported, type Messaging } from 'firebase/messaging';
 import { app as firebaseApp } from './firebase';
 import { supabase } from './supabaseClient';
+import { version as APP_VERSION } from '../../package.json';
 
 // ==================== TYPES ====================
 
@@ -53,6 +54,18 @@ if (Platform.OS === 'web') {
 // ==================== HELPERS ====================
 
 /** localStorage-обёртка для хранения последнего отправленного токена */
+/** Версия, с которой токен последний раз ушёл на сервер: обновилось приложение — отправляем заново */
+const TOKEN_VERSION_STORAGE_KEY = 'fcm_token_app_version';
+
+function tokenNeedsSync(token: string, storedToken: string | null): boolean {
+  if (token !== storedToken) return true;
+  try {
+    return localStorage.getItem(TOKEN_VERSION_STORAGE_KEY) !== APP_VERSION;
+  } catch {
+    return false;
+  }
+}
+
 function getStoredToken(): string | null {
   try {
     return localStorage.getItem(TOKEN_STORAGE_KEY);
@@ -193,7 +206,7 @@ export async function requestPushPermission(userId?: string | null): Promise<Pus
     // 5. Сохраняем локально + отправляем на backend (не блокируя)
     const storedToken = getStoredToken();
     storeToken(token);
-    if (token !== storedToken) {
+    if (tokenNeedsSync(token, storedToken)) {
       sendTokenToBackend(token, userId); // fire-and-forget
     }
 
@@ -239,7 +252,7 @@ export async function refreshPushToken(userId?: string | null): Promise<string |
     // Отправляем на backend только если токен изменился
     const storedToken = getStoredToken();
     storeToken(token);
-    if (token !== storedToken) {
+    if (tokenNeedsSync(token, storedToken)) {
       sendTokenToBackend(token, userId); // fire-and-forget
     }
 
@@ -359,17 +372,23 @@ async function authHeaders(): Promise<Record<string, string>> {
 
 /**
  * POST /api/push?action=subscribe — отправляет токен на backend.
- * Защита от дублей — backend делает upsert + выше проверяем token !== storedToken.
+ * Защита от дублей — backend делает upsert + выше проверяем tokenNeedsSync (новый токен или новая версия).
  */
 async function sendTokenToBackend(token: string, userId?: string | null): Promise<void> {
   try {
     const res = await fetch(`${API_BASE}?action=subscribe`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-      body: JSON.stringify({ token, platform: 'web', userId: userId || null }),
+      body: JSON.stringify({ token, platform: 'web', userId: userId || null, appVersion: APP_VERSION }),
     });
     if (!res.ok) {
       console.warn('[Push] Backend subscribe failed:', res.status);
+    } else {
+      try {
+        localStorage.setItem(TOKEN_VERSION_STORAGE_KEY, APP_VERSION);
+      } catch {
+        // не страшно — отправим ещё раз при следующем запуске
+      }
     }
   } catch (error) {
     console.error('[Push] Failed to send token to backend:', error);

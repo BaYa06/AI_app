@@ -134,6 +134,9 @@ export type RootStackParamList = {
   BlockedAuthors: undefined;
   SoundSettings: undefined;
   Feedback: undefined;
+  /** «Мои обращения» и переписка (plan/new/support_threads.md, Support 4) */
+  Support: undefined;
+  SupportThread: { id: string; from?: string };
   Settings: undefined;
   Search: undefined;
   TeacherCourseStats: { courseId: string; courseTitle: string };
