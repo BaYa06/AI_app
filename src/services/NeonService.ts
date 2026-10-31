@@ -925,10 +925,14 @@ export const NeonService = {
   },
 
   /**
-   * Удалить курс
+   * Удалить курс. withSets — вместе с его наборами и карточками (MySets 3),
+   * иначе наборы остаются без курса, в «Моих наборах».
    */
-  async deleteCourse(courseId: string): Promise<boolean> {
-    const result = await callTeacherApi('delete-course', { method: 'POST', body: { courseId } });
+  async deleteCourse(courseId: string, options?: { withSets?: boolean }): Promise<boolean> {
+    const result = await callTeacherApi('delete-course', {
+      method: 'POST',
+      body: { courseId, withSets: options?.withSets === true },
+    });
     if (!result.ok) {
       console.error('Failed to delete course:', result.error);
       return false;

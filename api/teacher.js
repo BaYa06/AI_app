@@ -13,7 +13,8 @@ import crypto from 'crypto';
  * подлинность вызывающего по Supabase JWT (Authorization: Bearer <access_token>) и сам
  * определяет userId из токена — тело/query запроса на userId/teacherId не полагается.
  *
- * POST /api/teacher?action=delete-course        { courseId }
+ * POST /api/teacher?action=delete-course        { courseId, withSets? } — withSets: удалить и наборы
+ *                                               курса (MySets 3); без флага они уходят в «Мои наборы»
  * POST /api/teacher?action=rename-course         { courseId, title }
  * POST /api/teacher?action=create-invite         { courseId }
  * POST /api/teacher?action=regenerate-invite      { courseId }  — старые token/join_code перестают работать
@@ -86,17 +87,36 @@ export default async function handler(req, res) {
 // ─── Курс: удалить / переименовать ─────────────────────────
 
 async function deleteCourse(req, res, sql, userId) {
-  const { courseId } = req.body || {};
+  const { courseId, withSets } = req.body || {};
   if (!courseId) return res.status(400).json({ error: 'courseId required' });
 
-  const deleted = await sql`
-    DELETE FROM courses WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid
-    RETURNING id
-  `;
-  if (deleted.length === 0) {
+  if (withSets !== true) {
+    // Старые версии: наборы остаются, card_sets.course_id обнуляется (ON DELETE SET NULL)
+    const deleted = await sql`
+      DELETE FROM courses WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid
+      RETURNING id
+    `;
+    if (deleted.length === 0) {
+      return res.status(403).json({ error: 'Not found or not the owner' });
+    }
+    return res.status(200).json({ ok: true, deletedSets: 0 });
+  }
+
+  const owned = await sql`SELECT 1 FROM courses WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid`;
+  if (owned.length === 0) {
     return res.status(403).json({ error: 'Not found or not the owner' });
   }
-  return res.status(200).json({ ok: true });
+  // Как deleteSet в data.js: сначала карточки, потом наборы — и курс, всё одной транзакцией
+  const [, sets] = await sql.transaction([
+    sql`
+      DELETE FROM cards WHERE set_id IN (
+        SELECT id FROM card_sets WHERE course_id = ${courseId}::uuid AND user_id = ${userId}::uuid
+      )
+    `,
+    sql`DELETE FROM card_sets WHERE course_id = ${courseId}::uuid AND user_id = ${userId}::uuid RETURNING id`,
+    sql`DELETE FROM courses WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid`,
+  ]);
+  return res.status(200).json({ ok: true, deletedSets: sets.length });
 }
 
 async function renameCourse(req, res, sql, userId) {
