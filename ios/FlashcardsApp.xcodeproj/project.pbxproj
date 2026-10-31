@@ -12,6 +12,8 @@
 		1A2F31A7D5870C95A980158F /* FlashlyWidgetBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = 52B11D15E0DD18295FE59251 /* FlashlyWidgetBridge.m */; };
 		5C3D2A1E9B7F40A1C6E8D201 /* StudyModeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3D2A1E9B7F40A1C6E8D203 /* StudyModeSheet.swift */; };
 		5C3D2A1E9B7F40A1C6E8D202 /* StudyModeSheet.m in Sources */ = {isa = PBXBuildFile; fileRef = 5C3D2A1E9B7F40A1C6E8D204 /* StudyModeSheet.m */; };
+		8B4E6D2F1A3C50B2D7F9E401 /* WhatsNewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B4E6D2F1A3C50B2D7F9E403 /* WhatsNewSheet.swift */; };
+		8B4E6D2F1A3C50B2D7F9E402 /* WhatsNewSheet.m in Sources */ = {isa = PBXBuildFile; fileRef = 8B4E6D2F1A3C50B2D7F9E404 /* WhatsNewSheet.m */; };
 		7A1E5C3D9B2F40A1C6E8D301 /* ShareSetActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A1E5C3D9B2F40A1C6E8D303 /* ShareSetActions.swift */; };
 		7A1E5C3D9B2F40A1C6E8D302 /* ShareSetActions.m in Sources */ = {isa = PBXBuildFile; fileRef = 7A1E5C3D9B2F40A1C6E8D304 /* ShareSetActions.m */; };
 		434213A3719B8722F951511C /* GlassTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69F91CDF434213A3719B8722 /* GlassTabBar.swift */; };
@@ -66,6 +68,8 @@
 		52B11D15E0DD18295FE59251 /* FlashlyWidgetBridge.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlashcardsApp/FlashlyWidgetBridge.m; sourceTree = "<group>"; };
 		5C3D2A1E9B7F40A1C6E8D203 /* StudyModeSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/StudyModeSheet.swift; sourceTree = "<group>"; };
 		5C3D2A1E9B7F40A1C6E8D204 /* StudyModeSheet.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlashcardsApp/StudyModeSheet.m; sourceTree = "<group>"; };
+		8B4E6D2F1A3C50B2D7F9E403 /* WhatsNewSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/WhatsNewSheet.swift; sourceTree = "<group>"; };
+		8B4E6D2F1A3C50B2D7F9E404 /* WhatsNewSheet.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlashcardsApp/WhatsNewSheet.m; sourceTree = "<group>"; };
 		7A1E5C3D9B2F40A1C6E8D303 /* ShareSetActions.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/ShareSetActions.swift; sourceTree = "<group>"; };
 		7A1E5C3D9B2F40A1C6E8D304 /* ShareSetActions.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlashcardsApp/ShareSetActions.m; sourceTree = "<group>"; };
 		69F91CDF434213A3719B8722 /* GlassTabBar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/GlassTabBar.swift; sourceTree = "<group>"; };
@@ -132,6 +136,8 @@
 				52B11D15E0DD18295FE59251 /* FlashlyWidgetBridge.m */,
 				5C3D2A1E9B7F40A1C6E8D203 /* StudyModeSheet.swift */,
 				5C3D2A1E9B7F40A1C6E8D204 /* StudyModeSheet.m */,
+				8B4E6D2F1A3C50B2D7F9E403 /* WhatsNewSheet.swift */,
+				8B4E6D2F1A3C50B2D7F9E404 /* WhatsNewSheet.m */,
 				7A1E5C3D9B2F40A1C6E8D303 /* ShareSetActions.swift */,
 				7A1E5C3D9B2F40A1C6E8D304 /* ShareSetActions.m */,
 				69F91CDF434213A3719B8722 /* GlassTabBar.swift */,
@@ -420,6 +426,8 @@
 				1A2F31A7D5870C95A980158F /* FlashlyWidgetBridge.m in Sources */,
 				5C3D2A1E9B7F40A1C6E8D201 /* StudyModeSheet.swift in Sources */,
 				5C3D2A1E9B7F40A1C6E8D202 /* StudyModeSheet.m in Sources */,
+				8B4E6D2F1A3C50B2D7F9E401 /* WhatsNewSheet.swift in Sources */,
+				8B4E6D2F1A3C50B2D7F9E402 /* WhatsNewSheet.m in Sources */,
 				7A1E5C3D9B2F40A1C6E8D301 /* ShareSetActions.swift in Sources */,
 				7A1E5C3D9B2F40A1C6E8D302 /* ShareSetActions.m in Sources */,
 				434213A3719B8722F951511C /* GlassTabBar.swift in Sources */,

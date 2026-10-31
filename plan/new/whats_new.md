@@ -148,7 +148,7 @@ MMKV, чтобы в следующий раз окно открылось сра
 - `src/services/__tests__/whatsNew.test.ts`: фильтры, сортировка, сжатие до 4, сравнение версий
   (`1.6.10 > 1.6.9`), незнакомый `art`, новичок / старый пользователь.
 
-### News 2 — шторка на Swift (iOS) ⬜
+### News 2 — шторка на Swift (iOS) ✅
 - `ios/FlashcardsApp/WhatsNewSheet.swift` — модуль `WhatsNewSheetModule: RCTEventEmitter`,
   по образцу `StudyModeSheet.swift`:
   - `present(options)`: `{ version, pages: [{ id, tag, title, text, art, actionLabel }], colors, dark }`;
@@ -165,8 +165,11 @@ MMKV, чтобы в следующий раз окно открылось сра
   (сначала закрытие листа, потом событие — переход не дёргается), `{ type: 'close', index }`
   (крестик, «Понятно» или жест).
 - `ios/FlashcardsApp/WhatsNewSheet.m` — `RCT_EXTERN_MODULE`, оба файла в `project.pbxproj`.
-- `src/components/whatsNew/nativeWhatsNewSheet.ts` — обёртка как `nativeStudyModeSheet.ts`:
-  есть модуль → Swift, нет → `null`.
+- `src/components/whatsNew/nativeWhatsNewSheet.ts` — хук `useNativeWhatsNewSheet({ visible, version,
+  pages, onPage, onClose })` как `nativeStudyModeSheet.ts`; `onClose({ index, tryItem? })` — закрыли
+  (с «Попробовать» — `tryItem`). `isNativeWhatsNewSheet` — модуль есть в сборке.
+- `toSheetPages(pages)` в whatsNew.ts — страницы для окна (одни и те же для Swift и RN).
+- Увидеть окно можно только после News 3 (показ на главной).
 
 ### News 2.1 — то же окно на RN (Android, веб) ⬜
 - `src/components/whatsNew/WhatsNewSheet.tsx`: `Modal` + горизонтальный `FlatList` с `pagingEnabled`,

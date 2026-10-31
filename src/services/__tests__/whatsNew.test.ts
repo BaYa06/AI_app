@@ -12,6 +12,7 @@ import {
   resolveState,
   selectNews,
   toPages,
+  toSheetPages,
   type WhatsNewContext,
 } from '../whatsNew';
 
@@ -129,6 +130,13 @@ describe('whatsNew', () => {
     expect(markSeen(['a'], ['a', 'b'])).toEqual(['a', 'b']);
     const same = ['a'];
     expect(markSeen(same, ['a'])).toBe(same);
+  });
+
+  it('страницы для окна: новость и «И ещё»', () => {
+    const pages = toPages(['a', 'b', 'c', 'd', 'e'].map((id) => item(id, { action: { label: 'Попробовать', route: 'Study' } })));
+    const sheet = toSheetPages(pages);
+    expect(sheet[0]).toEqual({ tag: 'Тег', title: 'a', text: 'Текст', art: 'swipe', actionLabel: 'Попробовать', items: [] });
+    expect(sheet[3]).toMatchObject({ tag: 'И ещё', art: null, actionLabel: null, items: ['d', 'e'] });
   });
 
   describe('запасная копия', () => {

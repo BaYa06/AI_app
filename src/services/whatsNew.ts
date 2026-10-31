@@ -113,3 +113,29 @@ export function loadWhatsNewState(): WhatsNewState | undefined {
 export function saveWhatsNewState(state: WhatsNewState): void {
   StorageService.setObject(STORAGE_KEY, state);
 }
+
+/** Страница в том виде, в каком её получает окно (Swift и RN) */
+export interface WhatsNewSheetPage {
+  tag: string;
+  title: string;
+  text: string;
+  art: WhatsNewArt | null;
+  actionLabel: string | null;
+  /** Страница «И ещё» — заголовки остальных новостей */
+  items: string[];
+}
+
+export function toSheetPages(pages: WhatsNewPage[]): WhatsNewSheetPage[] {
+  return pages.map((p) =>
+    p.kind === 'item'
+      ? {
+          tag: p.item.tag,
+          title: p.item.title,
+          text: p.item.text,
+          art: p.art,
+          actionLabel: p.item.action?.label ?? null,
+          items: [],
+        }
+      : { tag: 'И ещё', title: 'Ещё изменения', text: '', art: null, actionLabel: null, items: p.items.map((n) => n.title) },
+  );
+}
