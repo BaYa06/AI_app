@@ -5,6 +5,8 @@
  *   «Да» — что случилось (подсказки + текст) → отправить;
  *   «Нет» и «Нормально» / «Не нравится» — необязательное «Что нам улучшить?»;
  *   «Нет» и «Нравится» — «Спасибо за отзыв!» и окно закрывается само.
+ * Были проблемы или написал текст — «Ответ придёт в “Мои обращения”» и кнопка «Готово»: окно само
+ * не закрывается, чтобы подсказку успели прочитать (plan/new/support_threads.md, Support 5).
  * Внизу всегда «Пропустить». По фону не закрывается — чтобы не закрыли случайно.
  * Оформление — общий нижний лист Sheet (брендбук, 7.6).
  * Без звёзд: своё окно со звёздами похоже на оценку App Store, а такие окна Apple запрещает
@@ -46,6 +48,8 @@ export function RatingPromptModal({ visible, onClose }: { visible: boolean; onCl
   const [tags, setTags] = useState<FeedbackTag[]>([]);
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
+  // Отзыв, на который команда может ответить: ответ придёт в «Мои обращения»
+  const [expectsReply, setExpectsReply] = useState(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -56,15 +60,17 @@ export function RatingPromptModal({ visible, onClose }: { visible: boolean; onCl
       setTags([]);
       setMessage('');
       setSending(false);
+      setExpectsReply(false);
     }
     return () => {
       if (closeTimer.current) clearTimeout(closeTimer.current);
     };
   }, [visible]);
 
-  const showThanks = useCallback(() => {
+  const showThanks = useCallback((withReplyHint: boolean) => {
+    setExpectsReply(withReplyHint);
     setStep('thanks');
-    closeTimer.current = setTimeout(onClose, THANKS_CLOSE_MS);
+    if (!withReplyHint) closeTimer.current = setTimeout(onClose, THANKS_CLOSE_MS);
   }, [onClose]);
 
   const submit = useCallback(
@@ -72,9 +78,9 @@ export function RatingPromptModal({ visible, onClose }: { visible: boolean; onCl
       setSending(true);
       markRatingSubmitted();
       // Ошибку сети не показываем: это необязательный опрос, пользователя не наказываем
-      await sendRating({ rating, ...payload }).catch(() => false);
+      const ok = await sendRating({ rating, ...payload }).catch(() => false);
       setSending(false);
-      showThanks();
+      showThanks(ok && (payload.hasProblem === true || !!payload.message?.trim()));
     },
     [rating, showThanks],
   );
@@ -204,6 +210,14 @@ export function RatingPromptModal({ visible, onClose }: { visible: boolean; onCl
           <View style={styles.thanks} accessibilityLiveRegion="polite">
             <Heart size={iconSize.xl} color={colors.primary} fill={colors.primary} />
             <Text variant="h3" align="center" style={{ color: colors.textPrimary }}>Спасибо за отзыв!</Text>
+            {expectsReply && (
+              <>
+                <Text variant="bodySmall" align="center" style={{ color: colors.textSecondary }}>
+                  Мы прочитаем и ответим. Ответ придёт в «Профиль → Мои обращения» — пришлём уведомление.
+                </Text>
+                <Button title="Готово" onPress={onClose} fullWidth style={styles.done} />
+              </>
+            )}
           </View>
         )}
 
@@ -246,5 +260,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.s,
     paddingVertical: spacing.l,
+  },
+  done: {
+    marginTop: spacing.s,
   },
 });
