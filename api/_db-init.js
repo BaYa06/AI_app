@@ -629,6 +629,84 @@ async function applyMigrations(sql) {
     console.error('Migration 037_whats_new failed:', e);
   }
 
+  // Migration 038: защита наборов книг (database/migrations/038_official_sets_guard.sql).
+  // Триггер 018 ставился вручную и на проде его не было — 01.11.2026 SQL «удалить мои наборы без
+  // курса» у админа удалил все наборы книг с карточками и прогрессом учеников. Теперь триггер
+  // ставится здесь (только если его нет — без блокировки таблиц на каждом холодном старте), а у
+  // наборов книг нет владельца.
+  try {
+    const guard = await sql`SELECT 1 FROM pg_trigger WHERE tgname = 'trg_guard_official_sets'`;
+    if (guard.length === 0) {
+      await sql.transaction([
+        sql`
+          CREATE OR REPLACE FUNCTION flashly_official_write_allowed() RETURNS boolean
+          LANGUAGE sql STABLE AS $fn$
+            SELECT coalesce(current_setting('flashly.official_write', true), '') = 'on'
+          $fn$
+        `,
+        sql`
+          CREATE OR REPLACE FUNCTION flashly_guard_official_sets() RETURNS trigger
+          LANGUAGE plpgsql AS $fn$
+          BEGIN
+            IF flashly_official_write_allowed() THEN
+              RETURN coalesce(NEW, OLD);
+            END IF;
+            IF (TG_OP IN ('UPDATE', 'DELETE') AND OLD.is_official)
+               OR (TG_OP IN ('INSERT', 'UPDATE') AND NEW.is_official) THEN
+              RAISE EXCEPTION 'Official set % is read-only', coalesce(NEW.id, OLD.id)
+                USING ERRCODE = 'insufficient_privilege';
+            END IF;
+            RETURN coalesce(NEW, OLD);
+          END
+          $fn$
+        `,
+        sql`DROP TRIGGER IF EXISTS trg_guard_official_sets ON card_sets`,
+        sql`
+          CREATE TRIGGER trg_guard_official_sets
+            BEFORE INSERT OR UPDATE OR DELETE ON card_sets
+            FOR EACH ROW EXECUTE FUNCTION flashly_guard_official_sets()
+        `,
+        sql`
+          CREATE OR REPLACE FUNCTION flashly_guard_official_cards() RETURNS trigger
+          LANGUAGE plpgsql AS $fn$
+          BEGIN
+            IF flashly_official_write_allowed() THEN
+              RETURN coalesce(NEW, OLD);
+            END IF;
+            IF EXISTS (
+              SELECT 1 FROM card_sets cs
+               WHERE cs.is_official
+                 AND cs.id IN (
+                   CASE WHEN TG_OP IN ('UPDATE', 'DELETE') THEN OLD.set_id END,
+                   CASE WHEN TG_OP IN ('INSERT', 'UPDATE') THEN NEW.set_id END
+                 )
+            ) THEN
+              RAISE EXCEPTION 'Cards of an official set are read-only'
+                USING ERRCODE = 'insufficient_privilege';
+            END IF;
+            RETURN coalesce(NEW, OLD);
+          END
+          $fn$
+        `,
+        sql`DROP TRIGGER IF EXISTS trg_guard_official_cards ON cards`,
+        sql`
+          CREATE TRIGGER trg_guard_official_cards
+            BEFORE INSERT OR UPDATE OR DELETE ON cards
+            FOR EACH ROW EXECUTE FUNCTION flashly_guard_official_cards()
+        `,
+      ]);
+    }
+    const owned = await sql`SELECT 1 FROM card_sets WHERE is_official AND user_id IS NOT NULL LIMIT 1`;
+    if (owned.length > 0) {
+      await sql.transaction([
+        sql`SET LOCAL flashly.official_write = 'on'`,
+        sql`UPDATE card_sets SET user_id = NULL WHERE is_official AND user_id IS NOT NULL`,
+      ]);
+    }
+  } catch (e) {
+    console.error('Migration 038_official_sets_guard failed:', e);
+  }
+
   // Migration 019: daily challenge rewards (один claim на челлендж в день)
   try {
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS diamond INTEGER DEFAULT 0`;

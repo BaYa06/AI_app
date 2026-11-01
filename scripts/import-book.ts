@@ -129,9 +129,13 @@ async function upsertUnit(db: Db, bookId: string, unit: ParsedUnit, sortOrder: n
   return row.id;
 }
 
-/** Официальный набор юнита. На старте 1 юнит = 1 набор: берём самый ранний, если их несколько. */
+/**
+ * Официальный набор юнита. На старте 1 юнит = 1 набор: берём самый ранний, если их несколько.
+ * Владельца нет (user_id = NULL, миграция 038): с админом-владельцем наборы книг попадали в его
+ * «свои» — и удалились вместе с его наборами 01.11.2026.
+ */
 async function upsertOfficialSet(
-  db: Db, unitId: string, unit: ParsedUnit, book: ParsedBook, adminUserId: string,
+  db: Db, unitId: string, unit: ParsedUnit, book: ParsedBook,
 ): Promise<string> {
   const title = `Unit ${unit.number} — ${unit.title}`;
   const existing = await db.query<{ id: string; title: string; language_from: string | null; language_to: string | null }>(
@@ -143,8 +147,8 @@ async function upsertOfficialSet(
     const inserted = await db.query<{ id: string }>(
       `INSERT INTO card_sets (user_id, title, description, category, language_from, language_to,
                               is_public, unit_id, is_official, total_cards)
-       VALUES ($1, $2, '', 'general', $3, $4, false, $5, true, 0) RETURNING id`,
-      [adminUserId, title, book.languageFrom, book.languageTo, unitId],
+       VALUES (NULL, $1, '', 'general', $2, $3, false, $4, true, 0) RETURNING id`,
+      [title, book.languageFrom, book.languageTo, unitId],
     );
     return inserted.rows[0].id;
   }
@@ -341,7 +345,7 @@ async function main(): Promise<void> {
     const touchedSets: string[] = [];
     for (const [index, unit] of parsed.units.entries()) {
       const unitId = await upsertUnit(db, bookId, unit, index + 1, stats);
-      const setId = await upsertOfficialSet(db, unitId, unit, book, adminUserId);
+      const setId = await upsertOfficialSet(db, unitId, unit, book);
       await syncCards(db, setId, unit, stats);
       touchedSets.push(setId);
     }
