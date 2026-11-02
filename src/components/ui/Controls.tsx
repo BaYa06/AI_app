@@ -148,6 +148,54 @@ export const ProgressBar = memo(function ProgressBar({
   );
 });
 
+// ==================== SegmentedProgressBar ====================
+
+export interface ProgressSegment {
+  value: number;
+  color: string;
+}
+
+export interface SegmentedProgressBarProps {
+  /** Сегменты слева направо; остаток до total — пустой трек */
+  segments: ProgressSegment[];
+  total: number;
+  accessibilityLabel?: string;
+  style?: StyleProp<ViewStyle>;
+}
+
+/**
+ * Одна полоска из нескольких цветов — статусы слов набора (plan/new/word_status_colors.md).
+ * Трек как у ProgressBar; непустой сегмент не уже 3 pt, чтобы одно слово было видно.
+ */
+export const SegmentedProgressBar = memo(function SegmentedProgressBar({
+  segments,
+  total,
+  accessibilityLabel,
+  style,
+}: SegmentedProgressBarProps) {
+  const colors = useThemeColors();
+  const visible = total > 0 ? segments.filter((s) => s.value > 0) : [];
+
+  return (
+    <View
+      accessible
+      accessibilityLabel={accessibilityLabel}
+      style={[styles.track, styles.segmentTrack, { backgroundColor: colors.surfaceMuted }, style]}
+    >
+      {visible.map((s, i) => (
+        <View
+          key={i}
+          style={[
+            styles.segment,
+            { width: `${Math.min(100, (s.value / total) * 100)}%`, backgroundColor: s.color },
+            i > 0 && styles.segmentGap,
+          ]}
+        />
+      ))}
+    </View>
+  );
+});
+
 // ==================== Switch ====================
 
 export interface SwitchProps {
@@ -232,6 +280,16 @@ const styles = StyleSheet.create({
   fill: {
     height: '100%',
     borderRadius: borderRadius.full,
+  },
+  segmentTrack: {
+    flexDirection: 'row',
+  },
+  segment: {
+    height: '100%',
+    minWidth: 3,
+  },
+  segmentGap: {
+    marginLeft: 2,
   },
   switchTrack: {
     width: TRACK_WIDTH,

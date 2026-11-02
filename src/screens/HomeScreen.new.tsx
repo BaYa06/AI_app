@@ -20,7 +20,7 @@ import { spacing, borderRadius, heights, iconSize, typography, screenPadding, al
 import { triggerHaptic } from '@/utils/haptic';
 import { pluralize } from '@/utils';
 import { isModeAllowedForSets } from '@/utils/setKind';
-import { Button, Card as SurfaceCard, Badge, Dialog, EmptyState, ListRow, ProgressBar, Sheet, Skeleton, SkeletonCard, TextField, confirmDialog, toast, useTabBarOverlayInset } from '@/components/ui';
+import { Button, Card as SurfaceCard, Badge, Dialog, EmptyState, ListRow, ProgressBar, SegmentedProgressBar, Sheet, Skeleton, SkeletonCard, TextField, confirmDialog, toast, useTabBarOverlayInset } from '@/components/ui';
 import {
   Menu,
   Plus,
@@ -1790,7 +1790,12 @@ export function HomeScreen({ navigation, route }: any) {
               </Text>
             )}
             {visibleSets.map((set, index) => {
-              const progress = set.cardCount > 0 ? Math.round(((set.masteredCount || 0) / set.cardCount) * 100) : 0;
+              // Статусы слов (plan/new/word_status_colors.md); у набора с сервера нет разбивки — выученные считаем «знаю»
+              const learning = set.learningCount || 0;
+              const young = set.youngCount ?? (set.masteredCount || 0);
+              const mature = set.matureCount ?? 0;
+              const fresh = Math.max(0, set.cardCount - learning - young - mature);
+              const statusLabel = `учится ${learning}, знаю ${young}, выучено надолго ${mature}, новых ${fresh}`;
               // Цвет набора — лёгким оттенком плитки даты: помогает узнать набор, но не спорит с «N ждут»
               const accentColor = getDeckAccentColor(set.id || index);
               const created = new Date(set.createdAt);
@@ -1808,7 +1813,7 @@ export function HomeScreen({ navigation, route }: any) {
                   accessibilityLabel={[
                     set.title,
                     cardsLabel,
-                    `выучено ${progress}%`,
+                    statusLabel,
                     waitingCount > 0 ? `${waitingCount} ждут повторения` : null,
                     isFocus ? 'сейчас учишь' : null,
                   ].filter(Boolean).join(', ')}
@@ -1828,7 +1833,7 @@ export function HomeScreen({ navigation, route }: any) {
                           {set.title}
                         </Text>
                         <Text variant="caption" style={{ color: colors.textSecondary }}>
-                          {cardsLabel} · {progress}%
+                          {cardsLabel}
                         </Text>
                         {hasBadges && (
                           <View style={styles.setBadges}>
@@ -1867,7 +1872,28 @@ export function HomeScreen({ navigation, route }: any) {
                     />
                   </View>
 
-                  <ProgressBar progress={progress} color={colors.primary} animated={false} style={styles.setProgress} />
+                  <SegmentedProgressBar
+                    total={set.cardCount}
+                    segments={[
+                      { value: mature, color: colors.statusMature },
+                      { value: young, color: colors.statusYoung },
+                      { value: learning, color: colors.statusLearning },
+                    ]}
+                    style={styles.setProgress}
+                  />
+                  <View style={styles.setStatusCounts} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+                    {[
+                      { n: mature, color: colors.statusMature },
+                      { n: young, color: colors.statusYoung },
+                      { n: learning, color: colors.statusLearning },
+                      { n: fresh, color: colors.surfaceMuted },
+                    ].map(({ n, color }, i) => (
+                      <View key={i} style={styles.setStatusCount}>
+                        <View style={[styles.setStatusDot, { backgroundColor: color }, i === 3 && { borderWidth: 1, borderColor: colors.border }]} />
+                        <Text variant="caption" style={[styles.tabular, { color: colors.textSecondary }]}>{n}</Text>
+                      </View>
+                    ))}
+                  </View>
                 </SurfaceCard>
                 </StaggerCard>
               );
@@ -2689,6 +2715,25 @@ const styles = StyleSheet.create({
   },
   setProgress: {
     marginTop: spacing.s,
+  },
+  setStatusCounts: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.s,
+    marginTop: spacing.xs,
+  },
+  setStatusCount: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxs,
+  },
+  setStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: borderRadius.full,
+  },
+  tabular: {
+    fontVariant: ['tabular-nums'],
   },
 
   // Sheets
