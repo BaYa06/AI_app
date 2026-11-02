@@ -60,6 +60,7 @@ export async function courseSetsForStudent(sql, courseId) {
       icon: row.icon || null,
       languageFrom: row.language_from || 'de',
       languageTo: row.language_to || 'ru',
+      kind: row.kind || null,
       totalCards: parseInt(row.total_cards, 10) || 0,
       createdAt: row.created_at,
       updatedAt: row.updated_at || null,

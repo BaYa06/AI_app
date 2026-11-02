@@ -56,7 +56,7 @@
 
 ## Шаги
 
-- [ ] **Kind 1. База и сервер.**
+- [x] **Kind 1. База и сервер.** ✅ (выкладка сервера в main — в Kind 9)
   - `database/migrations/039_set_kind.sql` и `api/_db-init.js`: `card_sets.kind` и `library_sets.kind`,
     `TEXT NULL CHECK (kind IN ('language', 'subject'))`.
   - `api/data.js`: отдавать `kind`, принимать при создании и обновлении (неизвестное значение → 400,

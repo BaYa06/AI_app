@@ -37,6 +37,13 @@ function optString(value, max = 1000) {
   return value.slice(0, max);
 }
 
+/** Тип набора (plan/new/set_kind.md): нет поля → null (не менять), неизвестное значение → 400. */
+function optSetKind(value) {
+  if (value === undefined || value === null) return null;
+  if (value !== 'language' && value !== 'subject') throw new HttpError(400, 'Invalid kind');
+  return value;
+}
+
 function isoOrNull(ms) {
   return ms ? new Date(Number(ms)).toISOString() : null;
 }
@@ -222,7 +229,7 @@ async function saveOnboardingData(sql, me, p) {
 
 async function loadSets(sql, me) {
   return sql`
-    SELECT id, user_id, course_id, title, description, category, language_from, language_to,
+    SELECT id, user_id, course_id, title, description, category, language_from, language_to, kind,
            is_public, created_at, updated_at, total_cards, mastered_cards, studying_cards,
            is_hidden_from_students
     FROM card_sets
@@ -293,12 +300,12 @@ async function createSet(sql, me, p) {
   const now = new Date().toISOString();
   await sql`
     INSERT INTO card_sets (
-      id, user_id, course_id, title, description, category, language_from, language_to,
+      id, user_id, course_id, title, description, category, language_from, language_to, kind,
       is_public, created_at, updated_at, total_cards, mastered_cards, studying_cards
     ) VALUES (
       ${id}::uuid, ${me}::uuid, ${courseId}, ${optString(p.title, 255) || 'Без названия'},
       ${optString(p.description, 2000)}, ${optString(p.category, 100) || 'custom'},
-      ${optString(p.languageFrom, 10)}, ${optString(p.languageTo, 10)}, ${p.isPublic === true},
+      ${optString(p.languageFrom, 10)}, ${optString(p.languageTo, 10)}, ${optSetKind(p.kind)}, ${p.isPublic === true},
       ${isoOrNull(p.createdAt) || now}, ${isoOrNull(p.updatedAt) || now}, 0, 0, 0
     )
     ON CONFLICT (id) DO NOTHING
@@ -390,6 +397,7 @@ async function updateSetMeta(sql, me, p) {
         category = COALESCE(${optString(f.category, 100)}, category),
         language_from = COALESCE(${optString(f.languageFrom, 10)}, language_from),
         language_to = COALESCE(${optString(f.languageTo, 10)}, language_to),
+        kind = COALESCE(${optSetKind(f.kind)}, kind),
         updated_at = NOW()
     WHERE id = ${setId}::uuid AND user_id = ${me}::uuid
     RETURNING id

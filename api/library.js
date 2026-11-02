@@ -447,9 +447,9 @@ async function importSet(req, res, sql) {
   // library_imports, и весь запрос откатится — дубля набора не будет.
   const created = await sql`
     WITH new_set AS (
-      INSERT INTO card_sets (user_id, course_id, title, description, category, language_from, language_to, total_cards)
+      INSERT INTO card_sets (user_id, course_id, title, description, category, language_from, language_to, kind, total_cards)
       VALUES (${userId}::uuid, ${courseId}::uuid, ${set.title + ' (из библиотеки)'}, ${set.description || ''},
-              ${set.category || 'general'}, ${set.language_from || 'en'}, ${set.language_to || 'ru'},
+              ${set.category || 'general'}, ${set.language_from || 'en'}, ${set.language_to || 'ru'}, ${set.kind || null},
               (SELECT COUNT(*) FROM library_cards WHERE library_set_id = ${librarySetId}::uuid))
       RETURNING id
     ), copied AS (
@@ -486,10 +486,10 @@ async function publishSet(req, res, sql) {
 
   const libSet = await sql`
     INSERT INTO library_sets (user_id, original_set_id, title, description, category, tags,
-      language_from, language_to, cards_count, cover_emoji, status)
+      language_from, language_to, kind, cards_count, cover_emoji, status)
     VALUES (${userId}, ${setId}, ${cardSet.title}, ${description || cardSet.description || null},
             ${category || cardSet.category || null}, ${tags || []},
-            ${cardSet.language_from || null}, ${cardSet.language_to || null},
+            ${cardSet.language_from || null}, ${cardSet.language_to || null}, ${cardSet.kind || null},
             ${parseInt(cardCount[0].cnt, 10)}, ${coverEmoji || null}, 'published')
     RETURNING id
   `;
@@ -540,6 +540,7 @@ async function updatePublication(req, res, sql) {
         category = ${category || cardSet.category || null},
         language_from = ${cardSet.language_from || null},
         language_to = ${cardSet.language_to || null},
+        kind = ${cardSet.kind || null},
         cards_count = ${cards.length},
         cover_emoji = ${coverEmoji || null},
         updated_at = NOW()

@@ -707,6 +707,14 @@ async function applyMigrations(sql) {
     console.error('Migration 038_official_sets_guard failed:', e);
   }
 
+  // Migration 039: тип набора (plan/new/set_kind.md, Kind 1) — 'language' | 'subject' | NULL (= язык).
+  try {
+    await sql`ALTER TABLE card_sets ADD COLUMN IF NOT EXISTS kind TEXT CHECK (kind IN ('language', 'subject'))`;
+    await sql`ALTER TABLE library_sets ADD COLUMN IF NOT EXISTS kind TEXT CHECK (kind IN ('language', 'subject'))`;
+  } catch (e) {
+    console.error('Migration 039_set_kind failed:', e);
+  }
+
   // Migration 019: daily challenge rewards (один claim на челлендж в день)
   try {
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS diamond INTEGER DEFAULT 0`;

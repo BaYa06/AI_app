@@ -221,7 +221,7 @@ async function preview(res, sql, userId, code, origin) {
 async function loadContent(sql, share, origin) {
   const [setRows, cards] = await Promise.all([
     sql`
-      SELECT cs.title, cs.description, cs.category, cs.language_from, cs.language_to,
+      SELECT cs.title, cs.description, cs.category, cs.language_from, cs.language_to, cs.kind,
              (SELECT COUNT(*) FROM cards c WHERE c.set_id = cs.id) AS cards_count,
              COALESCE(NULLIF(u.display_name, ''), NULLIF(u.user_name, '')) AS author_name
       FROM card_sets cs
@@ -247,6 +247,7 @@ async function loadContent(sql, share, origin) {
       category: set.category || 'general',
       languageFrom: set.language_from,
       languageTo: set.language_to,
+      kind: set.kind || null,
       cardsCount: Number(set.cards_count) || 0,
     },
     author: { name: set.author_name || null },
@@ -339,7 +340,7 @@ async function importShared(res, sql, userId, code, courseId) {
   if (Number(recent[0].n) >= IMPORTS_PER_HOUR) return res.status(429).json({ error: 'rate_limited' });
 
   const source = await sql`
-    SELECT cs.title, cs.description, cs.category, cs.language_from, cs.language_to,
+    SELECT cs.title, cs.description, cs.category, cs.language_from, cs.language_to, cs.kind,
            (SELECT COUNT(*) FROM cards c WHERE c.set_id = cs.id) AS cards_count
     FROM card_sets cs WHERE cs.id = ${share.set_id}::uuid
   `;
@@ -354,9 +355,9 @@ async function importShared(res, sql, userId, code, courseId) {
     const created = await sql`
       WITH new_set AS (
         INSERT INTO card_sets (user_id, course_id, title, description, category, language_from, language_to,
-                               is_public, total_cards)
+                               kind, is_public, total_cards)
         VALUES (${userId}::uuid, ${courseId}::uuid, ${s.title}, ${s.description || ''}, ${s.category || 'general'},
-                ${s.language_from}, ${s.language_to}, false, ${Number(s.cards_count) || 0})
+                ${s.language_from}, ${s.language_to}, ${s.kind}, false, ${Number(s.cards_count) || 0})
         RETURNING id
       ), copied AS (
         INSERT INTO cards (set_id, front, back, example, word_form, word_type, sort_order)
