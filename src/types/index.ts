@@ -132,6 +132,9 @@ export interface Course {
   ownerId?: string;
 }
 
+/** Тип набора: язык (слова с переводом) или предмет (вопрос → ответ). Пусто = язык. */
+export type SetKind = 'language' | 'subject';
+
 /**
  * Набор карточек
  */
@@ -149,6 +152,7 @@ export interface CardSet {
   color?: string; // Цвет набора
   languageFrom?: string; // Язык лицевой стороны
   languageTo?: string;   // Язык оборотной стороны
+  kind?: SetKind;        // Тип набора; нет — язык (isSubjectSet в src/utils/setKind.ts)
   
   // Метаданные
   createdAt: number;
@@ -193,6 +197,7 @@ export interface CreateSetInput {
   color?: string;
   languageFrom?: string;
   languageTo?: string;
+  kind?: SetKind;
   isPublic?: boolean;
   courseId?: string | null; // ID курса, к которому принадлежит набор
 }
@@ -212,6 +217,7 @@ export interface UpdateSetInput {
   isArchived?: boolean;
   languageFrom?: string;
   languageTo?: string;
+  kind?: SetKind;
   courseId?: string | null;
   isHiddenFromStudents?: boolean;
 }

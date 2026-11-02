@@ -8,7 +8,8 @@ import { supabase } from './supabaseClient';
 import { API_BASE } from '@/config/apiBase';
 import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
 import { readCache, writeCache } from './localCache';
-import type { Card, CardSet, CardStatus, UpdateCardInput, Course } from '@/types';
+import type { Card, CardSet, CardStatus, UpdateCardInput, Course, SetKind } from '@/types';
+import { parseSetKind } from '@/utils/setKind';
 
 // Учительские мутации (курсы/инвайты/ростер/видимость наборов) идут через настоящий backend
 // (api/teacher.js), а не напрямую в Neon — он проверяет Supabase JWT вызывающего вместо того,
@@ -251,6 +252,7 @@ function mapSetRow(set: any): CardSet {
     tags: [],
     languageFrom: set.language_from || 'de',
     languageTo: set.language_to || 'ru',
+    kind: parseSetKind(set.kind),
     createdAt: new Date(set.created_at).getTime(),
     updatedAt: new Date(set.updated_at).getTime(),
     cardCount: set.total_cards || 0,
@@ -288,7 +290,7 @@ function mapStudentCourseRow(row: any): Course {
 /** Набор курса для ученика (форма ответа courseSetsForStudent в api/_course.js) */
 type MembershipSetRow = {
   id: string; userId: string; title: string; description: string; category: string;
-  icon: string | null; languageFrom: string; languageTo: string; totalCards: number;
+  icon: string | null; languageFrom: string; languageTo: string; kind?: string | null; totalCards: number;
   createdAt: string; updatedAt: string | null; courseId: string;
   isOfficial?: boolean; unitId?: string | null; bookId?: string | null;
   bookTitle?: string | null; unitNumber?: number | null;
@@ -304,6 +306,7 @@ function mapMembershipSetRow(row: MembershipSetRow, courseId: string): CardSet {
     icon: row.icon || null,
     languageFrom: row.languageFrom || 'de',
     languageTo: row.languageTo || 'ru',
+    kind: parseSetKind(row.kind),
     totalCards: row.totalCards || 0,
     createdAt: new Date(row.createdAt).getTime(),
     updatedAt: row.updatedAt ? new Date(row.updatedAt).getTime() : undefined,
@@ -627,6 +630,7 @@ export const NeonService = {
     category?: string;
     languageFrom?: string;
     languageTo?: string;
+    kind?: SetKind;
     isPublic?: boolean;
     createdAt?: number;
     updatedAt?: number;
@@ -700,7 +704,7 @@ export const NeonService = {
   },
 
   /**
-   * Обновить мета-данные набора (title, description, category, languageFrom, languageTo)
+   * Обновить мета-данные набора (title, description, category, languageFrom, languageTo, kind)
    */
   async updateSetMeta(setId: string, fields: {
     title?: string;
@@ -708,6 +712,7 @@ export const NeonService = {
     category?: string;
     languageFrom?: string;
     languageTo?: string;
+    kind?: SetKind;
   }): Promise<boolean> {
     return (await callDataApi<boolean>('updateSetMeta', { setId, fields })) === true;
   },
@@ -1076,7 +1081,7 @@ export const NeonService = {
     const result = await callTeacherApi<{
       sets: Array<{
         id: string; userId: string; title: string; description: string; category: string;
-        icon: string | null; languageFrom: string; languageTo: string; totalCards: number;
+        icon: string | null; languageFrom: string; languageTo: string; kind?: string | null; totalCards: number;
         createdAt: string; updatedAt: string | null; courseId: string;
         isOfficial?: boolean; unitId?: string | null; bookId?: string | null;
         bookTitle?: string | null; unitNumber?: number | null;

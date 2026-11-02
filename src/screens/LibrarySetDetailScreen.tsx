@@ -36,6 +36,7 @@ import { DatabaseService } from '@/services/DatabaseService';
 import type { RootStackScreenProps } from '@/types/navigation';
 import { describeError } from '@/utils/userErrors';
 import { pluralize } from '@/utils';
+import { parseSetKind } from '@/utils/setKind';
 
 type Props = RootStackScreenProps<'LibrarySetDetail'>;
 
@@ -106,6 +107,7 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
         color: undefined,
         languageFrom: (currentSet as any).language_from || 'en',
         languageTo: (currentSet as any).language_to || 'ru',
+        kind: parseSetKind(currentSet.kind),
         isPublic: false,
         createdAt: now,
         updatedAt: now,

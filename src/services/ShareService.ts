@@ -25,6 +25,8 @@ export interface SharePreview {
     category: string;
     languageFrom: string | null;
     languageTo: string | null;
+    /** Тип набора; null — язык (сервер до Kind 1 поле не присылает) */
+    kind?: string | null;
     cardsCount: number;
   };
   author: { name: string | null };

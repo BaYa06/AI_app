@@ -5,7 +5,7 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { v4 as uuid } from 'uuid';
-import type { CardSet, CreateSetInput, UpdateSetInput } from '@/types';
+import type { CardSet, CreateSetInput, SetKind, UpdateSetInput } from '@/types';
 import { NeonService } from '@/services/NeonService';
 import { DatabaseService } from '@/services/DatabaseService';
 import { SyncQueueService } from '@/services/SyncQueueService';
@@ -28,7 +28,7 @@ SyncQueueService.registerExecutor('updateSetCourse', (p) => {
 });
 
 SyncQueueService.registerExecutor('updateSetMeta', (p) => {
-  const { setId, ...fields } = p as { setId: string; title?: string; description?: string; category?: string; languageFrom?: string; languageTo?: string };
+  const { setId, ...fields } = p as { setId: string; title?: string; description?: string; category?: string; languageFrom?: string; languageTo?: string; kind?: SetKind };
   return NeonService.updateSetMeta(setId, fields);
 });
 
@@ -126,6 +126,7 @@ export const useSetsStore = create<SetsState & SetsActions>()(
         color: input.color,
         languageFrom: input.languageFrom || 'de',
         languageTo: input.languageTo || 'ru',
+        kind: input.kind,
         isPublic: input.isPublic ?? false,
         createdAt: now,
         updatedAt: now,
@@ -162,6 +163,7 @@ export const useSetsStore = create<SetsState & SetsActions>()(
           updatedAt: newSet.updatedAt,
           languageFrom: newSet.languageFrom,
           languageTo: newSet.languageTo,
+          kind: newSet.kind,
         });
       }
 
@@ -186,7 +188,7 @@ export const useSetsStore = create<SetsState & SetsActions>()(
       }
 
       // Синхронизируем мета-поля набора в Neon
-      const metaKeys = ['title', 'description', 'category', 'languageFrom', 'languageTo'] as const;
+      const metaKeys = ['title', 'description', 'category', 'languageFrom', 'languageTo', 'kind'] as const;
       const hasMeta = metaKeys.some((k) => k in input);
       if (NeonService.isEnabled() && hasMeta) {
         const fields: Record<string, string | undefined> = {};

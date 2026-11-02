@@ -64,7 +64,7 @@
   - `api/share.js` (превью и копия), `api/_course.js` (наборы курса у ученика), `api/library.js`
     (список, детали, публикация копирует из `card_sets`, импорт копирует в `card_sets`).
   - Выложить сервер до сборки (Release 2, п. 4).
-- [ ] **Kind 2. Данные в приложении.**
+- [x] **Kind 2. Данные в приложении.** ✅
   - `src/types/index.ts`: `CardSet.kind?: 'language' | 'subject'`. Функция `isSubjectSet` в `src/utils`.
   - `NeonService` / `ApiService` / `setsStore`: чтение, создание, обновление, синхронизация и локальное хранение.
   - `ShareService` / `shareImport`, импорт из библиотеки: тип приходит с сервера.

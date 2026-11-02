@@ -8,6 +8,7 @@
 import { v4 as uuid } from 'uuid';
 import { useSetsStore, useCardsStore } from '@/store';
 import type { Card, CardSet } from '@/types';
+import { parseSetKind } from '@/utils/setKind';
 import { DatabaseService } from './DatabaseService';
 import { ShareService, ShareApiError, type SharePreview } from './ShareService';
 
@@ -38,6 +39,7 @@ async function importAsGuest(
     color: undefined,
     languageFrom: preview.set.languageFrom || 'en',
     languageTo: preview.set.languageTo || 'ru',
+    kind: parseSetKind(preview.set.kind),
     isPublic: false,
     createdAt: now,
     updatedAt: now,

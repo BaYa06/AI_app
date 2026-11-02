@@ -12,6 +12,8 @@ export interface LibrarySet {
   tags: string[];
   language_from: string | null;
   language_to: string | null;
+  /** Тип набора (plan/new/set_kind.md); null — язык */
+  kind?: 'language' | 'subject' | null;
   cards_count: number;
   imports_count: number;
   likes_count: number;
