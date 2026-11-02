@@ -89,7 +89,7 @@
     «learning X, translations in Y» заменяем на «content language: X», цели vocab / pick_words / all_words
     не принимаем (→ qa). Без параметра всё как сейчас (старые версии).
   - `PreviewImportScreen` (старый поток со словами): для предмета без автоперевода и генерации примеров.
-- [ ] **Kind 8. Библиотека.**
+- [x] **Kind 8. Библиотека.** ✅
   - Импорт из Excel (`plan/new/library_import.md`): обязательная колонка `kind` (`language` / `subject`)
     на листе «Наборы», запись в `library_sets.kind`, обновить шаблон и README.
   - Чип «Предметы» в фильтрах библиотеки — на потом, отдельным решением.

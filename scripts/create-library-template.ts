@@ -21,15 +21,15 @@ async function main(): Promise<void> {
 
   const sets = workbook.addWorksheet(SETS_SHEET);
   const setWidths: Record<(typeof SET_COLUMNS)[number], number> = {
-    title: 36, category: 14, language_from: 14, language_to: 14, description: 44, tags: 24, cover_emoji: 12,
+    title: 36, kind: 12, category: 14, language_from: 14, language_to: 14, description: 44, tags: 24, cover_emoji: 12,
   };
   sets.columns = SET_COLUMNS.map((key) => ({ header: key, key, width: setWidths[key] }));
   sets.addRow({
-    title: 'Travel: at the airport', category: 'travel', language_from: 'en', language_to: 'ru',
+    title: 'Travel: at the airport', kind: 'language', category: 'travel', language_from: 'en', language_to: 'ru',
     description: 'Слова, которые пригодятся в аэропорту', tags: 'путешествия, A2', cover_emoji: '✈️',
   });
   sets.addRow({
-    title: 'Столицы Центральной Азии', category: 'geography', language_from: 'ru', language_to: 'ru',
+    title: 'Столицы Центральной Азии', kind: 'subject', category: 'geography', language_from: 'ru', language_to: 'ru',
     description: 'Страна → столица', tags: 'ОРТ', cover_emoji: '🗺️',
   });
   styleHeader(sets);
@@ -79,6 +79,8 @@ async function main(): Promise<void> {
     '',
     'Лист «Наборы» — одна строка на набор:',
     '  title — название (до 100 символов), уникальное в файле. По нему и языкам набор находится при повторном импорте.',
+    '  kind — тип набора: language (язык: слова с переводом) или subject (предмет: история, география, ОРТ — вопрос → ответ).',
+    '    У предмета в приложении нет языковых режимов и озвучки.',
     `  category — из списка (лист «${CATEGORIES_SHEET}»).`,
     '  language_from, language_to — коды языков: en, ru, ky… Для предметов без перевода (история, ОРТ) — одинаковые: ru и ru.',
     '  description, tags (через запятую), cover_emoji (один эмодзи) — по желанию.',

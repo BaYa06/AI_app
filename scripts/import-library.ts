@@ -38,6 +38,7 @@ interface SetReport {
 interface LibrarySetRow {
   id: string;
   title: string;
+  kind: string | null;
   description: string | null;
   category: string | null;
   tags: string[] | null;
@@ -70,7 +71,7 @@ function parseArgs(argv: string[]): Args {
  */
 async function findSet(db: Db, authorId: string, set: ParsedLibrarySet): Promise<LibrarySetRow | null> {
   const rows = await db.query<LibrarySetRow>(
-    `SELECT id, title, description, category, tags, cover_emoji, status FROM library_sets
+    `SELECT id, title, kind, description, category, tags, cover_emoji, status FROM library_sets
       WHERE user_id = $1 AND language_from = $2 AND language_to = $3
       ORDER BY published_at, id FOR UPDATE`,
     [authorId, set.languageFrom, set.languageTo],
@@ -112,17 +113,17 @@ async function upsertSet(db: Db, authorId: string, set: ParsedLibrarySet, publis
     const status: SetStatus = publish ? 'published' : 'draft';
     const inserted = await db.query<{ id: string }>(
       `INSERT INTO library_sets (user_id, original_set_id, title, description, category, tags,
-                                 language_from, language_to, cards_count, cover_emoji, status)
-       VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+                                 language_from, language_to, cards_count, cover_emoji, status, kind)
+       VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
       [authorId, set.title, set.description, set.category, set.tags, set.languageFrom, set.languageTo,
-        set.cards.length, set.coverEmoji, status],
+        set.cards.length, set.coverEmoji, status, set.kind],
     );
     await replaceCards(db, inserted.rows[0].id, set);
     return report('новый', status);
   }
 
   const metaChanged =
-    existing.title !== set.title || existing.description !== set.description || existing.category !== set.category ||
+    existing.title !== set.title || existing.kind !== set.kind || existing.description !== set.description || existing.category !== set.category ||
     existing.cover_emoji !== set.coverEmoji || JSON.stringify(existing.tags ?? []) !== JSON.stringify(set.tags);
   const cardsDiffer = await cardsChanged(db, existing.id, set);
   const goLive = publish && existing.status === 'draft';
@@ -135,9 +136,10 @@ async function upsertSet(db: Db, authorId: string, set: ParsedLibrarySet, publis
   await db.query(
     `UPDATE library_sets SET title = $2, description = $3, category = $4, tags = $5, cover_emoji = $6,
             cards_count = $7, status = $8, updated_at = NOW(),
-            published_at = CASE WHEN $9 THEN NOW() ELSE published_at END
+            published_at = CASE WHEN $9 THEN NOW() ELSE published_at END, kind = $10
       WHERE id = $1`,
-    [existing.id, set.title, set.description, set.category, set.tags, set.coverEmoji, set.cards.length, status, goLive],
+    [existing.id, set.title, set.description, set.category, set.tags, set.coverEmoji, set.cards.length, status, goLive,
+      set.kind],
   );
   return report('обновлён', status);
 }

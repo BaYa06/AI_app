@@ -11,13 +11,13 @@ import { cellText, findSheet, isLanguageCode, normalizeTerm, readHeaders, rowIsE
 export const SETS_SHEET = 'Наборы';
 export const CARDS_SHEET = 'Карточки';
 
-export const SET_COLUMNS = ['title', 'category', 'language_from', 'language_to', 'description', 'tags', 'cover_emoji'] as const;
+export const SET_COLUMNS = ['title', 'kind', 'category', 'language_from', 'language_to', 'description', 'tags', 'cover_emoji'] as const;
 export const CARD_COLUMNS = ['set', 'term', 'translation', 'example'] as const;
 
 type SetColumn = (typeof SET_COLUMNS)[number];
 type CardColumn = (typeof CARD_COLUMNS)[number];
 
-const REQUIRED_SET_COLUMNS: SetColumn[] = ['title', 'category', 'language_from', 'language_to'];
+const REQUIRED_SET_COLUMNS: SetColumn[] = ['title', 'kind', 'category', 'language_from', 'language_to'];
 const REQUIRED_CARD_COLUMNS: CardColumn[] = ['set', 'term', 'translation'];
 
 /** Ограничения library_sets (миграция 005) и правило публикации (api/library.js). */
@@ -27,6 +27,10 @@ export const MIN_CARDS = 5;
 
 export const CATEGORY_KEYS = LIBRARY_CATEGORIES.map((c) => c.key);
 
+/** Тип набора (plan/new/set_kind.md): язык — слова с переводом, предмет — вопрос → ответ. */
+export const SET_KINDS = ['language', 'subject'] as const;
+export type LibrarySetKind = (typeof SET_KINDS)[number];
+
 export interface ParsedLibraryCard {
   term: string;
   translation: string;
@@ -35,6 +39,7 @@ export interface ParsedLibraryCard {
 
 export interface ParsedLibrarySet {
   title: string;
+  kind: LibrarySetKind;
   category: string;
   languageFrom: string;
   languageTo: string;
@@ -91,6 +96,7 @@ export async function parseLibraryWorkbook(filePath: string): Promise<LibraryPar
       const where = `Лист «${SETS_SHEET}», строка ${r}`;
 
       const title = get('title').replace(/\s+/g, ' ');
+      const kind = get('kind').toLowerCase();
       const category = get('category').toLowerCase();
       const languageFrom = get('language_from').toLowerCase();
       const languageTo = get('language_to').toLowerCase();
@@ -99,6 +105,10 @@ export async function parseLibraryWorkbook(filePath: string): Promise<LibraryPar
       let rowOk = true;
       if (!title) { errors.push(`${where}: пустой title`); rowOk = false; }
       if (title.length > MAX_TITLE) { errors.push(`${where}: title длиннее ${MAX_TITLE} символов`); rowOk = false; }
+      if (!(SET_KINDS as readonly string[]).includes(kind)) {
+        errors.push(`${where}: kind «${kind}» — нужно language (язык) или subject (предмет)`);
+        rowOk = false;
+      }
       if (!CATEGORY_KEYS.includes(category)) {
         errors.push(`${where}: category «${category}» — нет такой категории. Можно: ${CATEGORY_KEYS.join(', ')}`);
         rowOk = false;
@@ -122,7 +132,7 @@ export async function parseLibraryWorkbook(filePath: string): Promise<LibraryPar
         continue;
       }
       const set: ParsedLibrarySet = {
-        title, category, languageFrom, languageTo,
+        title, kind: kind as LibrarySetKind, category, languageFrom, languageTo,
         description: get('description') || null,
         tags: parseTags(get('tags')),
         coverEmoji,

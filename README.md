@@ -209,7 +209,7 @@ npx tsx scripts/import-library.ts sets.xlsx                # импорт, но�
 npx tsx scripts/import-library.ts sets.xlsx --publish      # черновики из файла → в библиотеку
 ```
 
-- Один файл — сколько угодно наборов. Лист «Наборы»: `title, category, language_from, language_to` обязательны, `description, tags, cover_emoji` по желанию. Лист «Карточки»: `set` (title набора), `term`, `translation` обязательны, `example` по желанию. В наборе не меньше 5 карточек.
+- Один файл — сколько угодно наборов. Лист «Наборы»: `title, kind, category, language_from, language_to` обязательны (`kind` — `language` или `subject`, см. plan/new/set_kind.md; колонка `library_sets.kind` появляется миграцией 039 — сервер должен быть выложен), `description, tags, cover_emoji` по желанию. Лист «Карточки»: `set` (title набора), `term`, `translation` обязательны, `example` по желанию. В наборе не меньше 5 карточек.
 - `category` — только из списка на листе «Категории» шаблона, это категории библиотеки в приложении.
 - При повторном импорте набор находится по `title` и языкам, карточки заменяются целиком. Лайки, оценки и число импортов сохраняются. У пользователей, которые уже взяли набор, остаётся их копия.
 - Снятые с публикации (`archived`) наборы `--publish` не возвращает.
