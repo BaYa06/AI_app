@@ -46,6 +46,12 @@ export const colors = {
     cardReview: '#EF4444',   // Красный - на повторение
     cardMastered: '#10B981', // Зеленый - выучены
     
+    // Статус слова: кружок у карточки и полоска набора (plan/new/word_status_colors.md)
+    statusLearning: '#F59E0B',    // шаги 1–2: фон, рамка, сегмент полоски
+    statusLearningInk: '#D97706', // галочка learning — #F59E0B на белом почти не виден
+    statusYoung: '#10B981',       // шаги 3–4
+    statusMature: '#6467F2',      // шаг 5+ — фирменный
+    
     // Оценки
     ratingAgain: '#EF4444',
     ratingHard: '#F59E0B',
@@ -113,6 +119,12 @@ export const colors = {
     cardLearning: '#FBBF24',
     cardReview: '#F87171',
     cardMastered: '#34D399',
+    
+    // Статус слова
+    statusLearning: '#FBBF24',
+    statusLearningInk: '#FBBF24',
+    statusYoung: '#34D399',
+    statusMature: '#818CF8',
     
     // Оценки
     ratingAgain: '#F87171',

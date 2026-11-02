@@ -39,6 +39,11 @@ export function getStatusForStep(step: number): CardStatus {
   return 'mature';
 }
 
+/** Статус слова по его шагу; поле card.status может отставать — цвет и счётчики берём отсюда */
+export function getCardStatus(card: Pick<Card, 'learningStep'>): CardStatus {
+  return getStatusForStep(card.learningStep || 0);
+}
+
 /** Выученная карточка — «знаю» и выше (шаг ≥ 3). Одно определение для наборов, статистики и рейтинга. */
 export const LEARNED_STEP = 3;
 
