@@ -10,7 +10,8 @@ import { triggerHaptic } from '@/utils/haptic';
 import { BlurView } from '@/utils/BlurView';
 import { useSetsStore, useCardsStore, useThemeColors, selectSetStats, useSettingsStore, useCoursesStore, isSetInCourse } from '@/store';
 import { Container, Text, Loading } from '@/components/common';
-import { StudyModeSheet, type StudyMode } from '@/components/study/StudyModeSheet';
+import { StudyModeSheet, DEFAULT_STUDY_MODE_GAMES, type StudyMode } from '@/components/study/StudyModeSheet';
+import { isModeAllowedForSets } from '@/utils/setKind';
 import { spacing, borderRadius, iconSize, alpha, config } from '@/constants';
 import { BottomBar, EmptyState, ProgressBar, toast } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
@@ -304,8 +305,16 @@ export function SetDetailScreen({ navigation, route }: Props) {
     });
   }, [navigation, setId, wordLimit, getShuffledDueCardIds]);
 
+  // Предметный набор (plan/new/set_kind.md): только Карточки, Пары и Тест — языковые режимы
+  // не показываем в шторке и не запускаем, даже если их вызвали.
+  const studyModeGames = useMemo(
+    () => DEFAULT_STUDY_MODE_GAMES.filter((game) => isModeAllowedForSets(game.mode, [set])),
+    [set]
+  );
+
   const handleSelectStudyMode = useCallback(
     (mode: StudyMode) => {
+      if (!isModeAllowedForSets(mode, [set])) return;
       switch (mode) {
         case 'classic': handleStartStudy(); break;
         case 'match': handleStartMatch(); break;
@@ -315,7 +324,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
         case 'contextFill': handleStartContextFill(); break;
       }
     },
-    [handleStartStudy, handleStartMatch, handleStartMultipleChoice, handleStartWordBuilder, handleStartAudio, handleStartContextFill]
+    [set, handleStartStudy, handleStartMatch, handleStartMultipleChoice, handleStartWordBuilder, handleStartAudio, handleStartContextFill]
   );
 
   const handleSelectWordLimit = useCallback(
@@ -995,6 +1004,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
         onClose={() => setShowStudySheet(false)}
         subtitle={`Набор: ${set?.title || 'Набор'} • ${set?.cardCount || 0} ${pluralize(set?.cardCount || 0, 'слово', 'слова', 'слов')}`}
         onSelectMode={handleSelectStudyMode}
+        games={studyModeGames}
         settings={{
           onlyHard,
           onToggleOnlyHard: () => setOnlyHard((v) => !v),

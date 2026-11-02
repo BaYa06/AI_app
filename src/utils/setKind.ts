@@ -12,3 +12,14 @@ export function isSubjectSet(set: Pick<CardSet, 'kind'> | null | undefined): boo
 export function parseSetKind(value: unknown): SetKind | undefined {
   return value === 'language' || value === 'subject' ? value : undefined;
 }
+
+/** Языковые режимы — для предмета их нет (Собери слово, Аудио, Слово в контексте). */
+const LANGUAGE_ONLY_MODES: readonly string[] = ['wordBuilder', 'audio', 'contextFill'];
+
+/**
+ * Можно ли запускать режим по этим наборам. Главная собирает карточки из разных наборов курса —
+ * языковой режим доступен, только если среди них нет ни одного предметного.
+ */
+export function isModeAllowedForSets(mode: string, sets: ReadonlyArray<Pick<CardSet, 'kind'> | null | undefined>): boolean {
+  return !LANGUAGE_ONLY_MODES.includes(mode) || !sets.some(isSubjectSet);
+}

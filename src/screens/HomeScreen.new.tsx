@@ -19,6 +19,7 @@ import ReanimatedAnimated, { useSharedValue, withTiming, withSequence, useAnimat
 import { spacing, borderRadius, heights, iconSize, typography, screenPadding, alpha, getDeckAccentColor, animation } from '@/constants';
 import { triggerHaptic } from '@/utils/haptic';
 import { pluralize } from '@/utils';
+import { isModeAllowedForSets } from '@/utils/setKind';
 import { Button, Card as SurfaceCard, Badge, Dialog, EmptyState, ListRow, ProgressBar, Sheet, Skeleton, SkeletonCard, TextField, confirmDialog, toast, useTabBarOverlayInset } from '@/components/ui';
 import {
   Menu,
@@ -1415,17 +1416,22 @@ export function HomeScreen({ navigation, route }: any) {
 
   // Fill in the Blank требует одного конкретного набора (setId), а Home агрегирует карточки
   // сразу по всем наборам курса — поэтому этот режим здесь не предлагается (см. games ниже).
+  // Предметные наборы (plan/new/set_kind.md): если в выборке есть хоть один, языковые режимы
+  // (Собери слово, Аудио) не предлагаем и не запускаем.
   const handleSelectStudyMode = useCallback(
     (mode: StudyMode) => {
       if (mode === 'contextFill') return;
+      if (!isModeAllowedForSets(mode, filteredSets)) return;
       handleStartStudyMode(mode);
     },
-    [handleStartStudyMode]
+    [handleStartStudyMode, filteredSets]
   );
 
   const homeStudyModeGames = useMemo(
-    () => DEFAULT_STUDY_MODE_GAMES.filter((game) => game.mode !== 'contextFill'),
-    []
+    () => DEFAULT_STUDY_MODE_GAMES.filter(
+      (game) => game.mode !== 'contextFill' && isModeAllowedForSets(game.mode, filteredSets),
+    ),
+    [filteredSets]
   );
 
   const saveCourseTitle = useCallback(
