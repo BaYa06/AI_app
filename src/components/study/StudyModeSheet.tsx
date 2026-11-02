@@ -39,8 +39,6 @@ export const DEFAULT_STUDY_MODE_GAMES: StudyModeGame[] = [
 export interface StudyModeSettings {
   onlyHard: boolean;
   onToggleOnlyHard: () => void;
-  showMnemonic: boolean;
-  onToggleShowMnemonic: () => void;
   wordLimit: WordLimit;
   onSelectWordLimit: (value: WordLimit) => void;
 }
@@ -116,16 +114,6 @@ function StudyModeSheetRN({
               value={settings.onlyHard}
               onValueChange={settings.onToggleOnlyHard}
               accessibilityLabel="Только «Не запомнил»"
-            />
-          </View>
-          <View style={styles.settingRow}>
-            <Text variant="body" style={[styles.settingLabel, { color: colors.textPrimary }]}>
-              Показывать мнемонику после ошибки
-            </Text>
-            <Switch
-              value={settings.showMnemonic}
-              onValueChange={settings.onToggleShowMnemonic}
-              accessibilityLabel="Показывать мнемонику после ошибки"
             />
           </View>
           <View style={styles.settingRow}>

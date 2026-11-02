@@ -232,7 +232,6 @@ export function HomeScreen({ navigation, route }: any) {
     [updateSettings],
   );
   const [onlyHard, setOnlyHard] = useState(false);
-  const [showMnemonic, setShowMnemonic] = useState(true);
   const isTeacher = useSettingsStore((s) => s.isTeacher);
   const fetchIsTeacher = useSettingsStore((s) => s.fetchIsTeacher);
   const [inviteModalCourseId, setInviteModalCourseId] = useState<string | null>(null);
@@ -2361,8 +2360,6 @@ export function HomeScreen({ navigation, route }: any) {
         settings={{
           onlyHard,
           onToggleOnlyHard: () => setOnlyHard((v) => !v),
-          showMnemonic,
-          onToggleShowMnemonic: () => setShowMnemonic((v) => !v),
           wordLimit,
           onSelectWordLimit: setWordLimit,
         }}

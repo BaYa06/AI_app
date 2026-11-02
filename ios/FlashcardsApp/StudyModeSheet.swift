@@ -8,7 +8,7 @@
 //  Фон листа непрозрачный (surface), без Liquid Glass.
 //
 //  JS → present(options) / dismiss(). Обратно — событие StudyModeSheetEvent:
-//  { type: 'onlyHard' | 'showMnemonic', value: Bool }, { type: 'wordLimit', value: String },
+//  { type: 'onlyHard', value: Bool }, { type: 'wordLimit', value: String },
 //  { type: 'select', mode }, { type: 'dismiss' } (закрыли жестом).
 //
 
@@ -56,7 +56,6 @@ class StudyModeSheetModule: RCTEventEmitter, UISheetPresentationControllerDelega
       subtitle: options["subtitle"] as? String ?? "",
       games: games,
       onlyHard: settings["onlyHard"] as? Bool ?? false,
-      showMnemonic: settings["showMnemonic"] as? Bool ?? false,
       wordLimit: settings["wordLimit"] as? String ?? "all",
       palette: palette
     )
@@ -188,18 +187,16 @@ final class StudyModeSheetModel: ObservableObject {
   let games: [StudyModeGame]
   let palette: StudyModePalette
   @Published var onlyHard: Bool
-  @Published var showMnemonic: Bool
   @Published var wordLimit: String
 
   var onChange: (String, Any) -> Void = { _, _ in }
   var onSelect: (String) -> Void = { _ in }
   var onCancel: () -> Void = {}
 
-  init(subtitle: String, games: [StudyModeGame], onlyHard: Bool, showMnemonic: Bool, wordLimit: String, palette: StudyModePalette) {
+  init(subtitle: String, games: [StudyModeGame], onlyHard: Bool, wordLimit: String, palette: StudyModePalette) {
     self.subtitle = subtitle
     self.games = games
     self.onlyHard = onlyHard
-    self.showMnemonic = showMnemonic
     self.wordLimit = wordLimit
     self.palette = palette
   }
@@ -267,7 +264,6 @@ struct StudyModeSheetContent: View {
         VStack(alignment: .leading, spacing: Metrics.s) {
           Overline(text: "Настройки", palette: p)
           SettingToggle(title: "Только «Не запомнил»", palette: p, isOn: binding(\.onlyHard, event: "onlyHard"))
-          SettingToggle(title: "Показывать мнемонику после ошибки", palette: p, isOn: binding(\.showMnemonic, event: "showMnemonic"))
           HStack(spacing: Metrics.s) {
             Text("Количество слов")
               .font(.system(size: 16))

@@ -67,11 +67,9 @@ export function SetDetailScreen({ navigation, route }: Props) {
   const [newFront, setNewFront] = useState('');
   const [newBack, setNewBack] = useState('');
   const [newExample, setNewExample] = useState('');
-  const [newMnemonic, setNewMnemonic] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [showStudySheet, setShowStudySheet] = useState(false);
   const [onlyHard, setOnlyHard] = useState(false);
-  const [showMnemonic, setShowMnemonic] = useState(true);
   const [previewCard, setPreviewCard] = useState<Card | null>(null);
   const [wordLimit, setWordLimit] = useState<'10' | '20' | '30' | 'all'>(() => {
     const limit = userSettings.studyCardLimit;
@@ -370,7 +368,6 @@ export function SetDetailScreen({ navigation, route }: Props) {
     const front = newFront.trim();
     const back = newBack.trim();
     const example = newExample.trim();
-    const mnemonic = newMnemonic.trim();
     if (!front || !back) return;
     setIsAdding(true);
     try {
@@ -379,7 +376,6 @@ export function SetDetailScreen({ navigation, route }: Props) {
         frontText: front, 
         backText: back, 
         example: example || undefined,
-        mnemonic: mnemonic || undefined,
       });
       const statsSnapshot = selectSetStats(setId);
       updateSetStats(setId, {
@@ -393,11 +389,10 @@ export function SetDetailScreen({ navigation, route }: Props) {
       setNewFront('');
       setNewBack('');
       setNewExample('');
-      setNewMnemonic('');
     } finally {
       setIsAdding(false);
     }
-  }, [addCard, newFront, newBack, newExample, newMnemonic, setId, updateSetStats]);
+  }, [addCard, newFront, newBack, newExample, setId, updateSetStats]);
 
   const handleEditSet = useCallback(() => {
     navigation.navigate('SetEditor', { setId });
@@ -945,28 +940,6 @@ export function SetDetailScreen({ navigation, route }: Props) {
                   multiline
                 />
               </View>
-
-              <View style={styles.addField}>
-                <Text variant="label" color="primary" style={styles.fieldLabel}>
-                  Мнемоника
-                </Text>
-                <TextInput
-                  value={newMnemonic}
-                  onChangeText={setNewMnemonic}
-                  placeholder="Своя ассоциация для запоминания"
-                  placeholderTextColor={modalPlaceholder}
-                  style={[
-                    styles.addInput,
-                    {
-                      color: modalTextPrimary,
-                      borderColor: modalBorder,
-                      backgroundColor: modalInputBg,
-                      ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
-                    }
-                  ]}
-                  multiline
-                />
-              </View>
             </ScrollView>
 
             <View style={styles.addActions}>
@@ -1008,8 +981,6 @@ export function SetDetailScreen({ navigation, route }: Props) {
         settings={{
           onlyHard,
           onToggleOnlyHard: () => setOnlyHard((v) => !v),
-          showMnemonic,
-          onToggleShowMnemonic: () => setShowMnemonic((v) => !v),
           wordLimit,
           onSelectWordLimit: handleSelectWordLimit,
         }}

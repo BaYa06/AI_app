@@ -79,7 +79,7 @@
   - Защита в обработчиках запуска: скрытый режим у предмета не запускается, даже если его вызвали.
 - [x] **Kind 5. Озвучка.** ✅ `StudyScreen`, `MultipleChoiceScreen` (и `src/utils/speech.ts`): для карточки
   предметного набора нет кнопки озвучки, автопроизношения и `prefetchSpeech`. Набор берём по карточке.
-- [ ] **Kind 6. Убрать мнемонику.** Поле и показ в `SetDetailScreen`, переключатель «Мнемоника»
+- [x] **Kind 6. Убрать мнемонику.** ✅ Поле и показ в `SetDetailScreen`, переключатель «Мнемоника»
   в `StudyModeSheet.tsx`, `nativeStudyModeSheet.ts`, `StudyModeSheet.swift`; состояние `showMnemonic`
   на главной и в наборе. Тип `mnemonic?` в `src/types/index.ts` остаётся (см. слабые места, п. 3).
 - [ ] **Kind 7. ИИ-импорт для предмета.**

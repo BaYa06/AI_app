@@ -18,7 +18,7 @@ interface StudyModeSheetModule {
 }
 
 type SheetEvent =
-  | { type: 'onlyHard' | 'showMnemonic'; value: boolean }
+  | { type: 'onlyHard'; value: boolean }
   | { type: 'wordLimit'; value: WordLimit }
   | { type: 'select'; mode: StudyMode }
   | { type: 'dismiss' };
@@ -63,9 +63,6 @@ export function useNativeStudyModeSheet(options: Options) {
         case 'onlyHard':
           if (event.value !== settings.onlyHard) settings.onToggleOnlyHard();
           break;
-        case 'showMnemonic':
-          if (event.value !== settings.showMnemonic) settings.onToggleShowMnemonic();
-          break;
         case 'wordLimit':
           settings.onSelectWordLimit(event.value);
           break;
@@ -94,7 +91,7 @@ export function useNativeStudyModeSheet(options: Options) {
       native.present({
         subtitle,
         games: games.map(({ mode, title, tag, description }) => ({ mode, title, tag, description })),
-        settings: { onlyHard: settings.onlyHard, showMnemonic: settings.showMnemonic, wordLimit: settings.wordLimit },
+        settings: { onlyHard: settings.onlyHard, wordLimit: settings.wordLimit },
         colors: Object.fromEntries(COLOR_KEYS.map((key) => [key, processColor(theme[key])])),
         dark: isDark,
       });
