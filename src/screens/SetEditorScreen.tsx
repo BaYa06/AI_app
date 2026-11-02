@@ -18,7 +18,8 @@ import { Text } from '@/components/common';
 import { spacing, borderRadius, iconSize, TOP_LANGUAGES, alpha } from '@/constants';
 import { Button, CategoryIcon, toast, useScreenBottomInset } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
-import type { SetCategory } from '@/types';
+import type { SetCategory, SetKind } from '@/types';
+import { SetKindPicker } from '@/components/cards/SetKindPicker';
 import { ArrowLeftRight, Check, ChevronDown, Globe, Link2, Share2 } from 'lucide-react-native';
 import { LibraryService, ShareService, Analytics } from '@/services';
 import { supabase } from '@/services/supabaseClient';
@@ -106,6 +107,9 @@ export function SetEditorScreen({ navigation, route }: Props) {
   const [courseId, setCourseId] = useState<string | null>(defaultCourseId ?? null);
   // Языки не выбираются за пользователя: без явного выбора набор не создать
   // (раньше по умолчанию стояло «Английский → Английский», и озвучка/тесты шли не на том языке)
+  // Тип набора тоже не выбирается за пользователя (plan/new/set_kind.md): у старого набора без типа
+  // поле пустое, и сохранить его можно только после выбора
+  const [kind, setKind] = useState<SetKind | undefined>(undefined);
   const [sourceLanguage, setSourceLanguage] = useState('');
   const [targetLanguage, setTargetLanguage] = useState('');
   const [sourcePickerOpen, setSourcePickerOpen] = useState(false);
@@ -136,6 +140,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
         setDescription(set.description || '');
         setCategory(set.category);
         setCourseId(set.courseId ?? null);
+        setKind(set.kind);
         if (set.languageFrom) {
           const label = LANG_CODE_TO_LABEL[set.languageFrom];
           if (label) setSourceLanguage(label);
@@ -236,6 +241,8 @@ export function SetEditorScreen({ navigation, route }: Props) {
   const isLanguagesSelected = !!sourceLanguage && !!targetLanguage;
   const titleError = showValidation && !title.trim();
   const languageError = showValidation && !isLanguagesSelected;
+  const kindError = showValidation && !kind;
+  const isSubject = kind === 'subject';
   // Кнопка не блокируется, пока форма не заполнена: нажатие подсвечивает, чего не хватает
   const isSaveDisabled = isSaving;
 
@@ -356,7 +363,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
 
     const langFrom = LANG_LABEL_TO_CODE[sourceLanguage];
     const langTo = LANG_LABEL_TO_CODE[targetLanguage];
-    if (!title.trim() || !langFrom || !langTo) return;
+    if (!title.trim() || !kind || !langFrom || !langTo) return;
 
     setIsSaving(true);
 
@@ -372,6 +379,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
           courseId,
           languageFrom: langFrom,
           languageTo: langTo,
+          kind,
         });
       } else {
         // Создаем набор с courseId из активного курса
@@ -383,6 +391,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
           courseId,
           languageFrom: langFrom,
           languageTo: langTo,
+          kind,
         });
         
         // Переход к новому набору
@@ -396,7 +405,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
     } finally {
       setIsSaving(false);
     }
-  }, [title, description, category, sourceLanguage, targetLanguage, isEditing, setId, updateSet, addSet, navigation, closeSheet, courseId]);
+  }, [title, description, category, kind, sourceLanguage, targetLanguage, isEditing, setId, updateSet, addSet, navigation, closeSheet, courseId]);
 
   // Удаление
   const handleDelete = useCallback(() => {
@@ -530,6 +539,19 @@ export function SetEditorScreen({ navigation, route }: Props) {
               </View>
             </View>
 
+            {/* Тип набора */}
+            <View style={styles.field}>
+              <Text variant="label" color="primary" style={styles.fieldLabel}>
+                Тип <Text style={{ color: colors.error }}>*</Text>
+              </Text>
+              <SetKindPicker value={kind} onChange={setKind} hasError={kindError} disabled={isReadOnly} />
+              {kindError ? (
+                <Text variant="caption" color="error" style={styles.helperText}>
+                  Выбери тип набора
+                </Text>
+              ) : null}
+            </View>
+
             {/* Языки */}
             <View style={styles.field}>
               <Text variant="label" color="primary" style={styles.fieldLabel}>
@@ -539,7 +561,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
                 <View style={styles.languageSelectWrapper}>
                   <SelectPill
                     label={sourceLanguage}
-                    placeholder="Язык слов"
+                    placeholder={isSubject ? 'Язык вопросов' : 'Язык слов'}
                     onPress={toggleSourcePicker}
                     isOpen={sourcePickerOpen}
                     hasError={languageError && !sourceLanguage}
@@ -567,7 +589,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
                 <View style={styles.languageSelectWrapper}>
                   <SelectPill
                     label={targetLanguage}
-                    placeholder="Язык перевода"
+                    placeholder={isSubject ? 'Язык ответов' : 'Язык перевода'}
                     onPress={toggleTargetPicker}
                     isOpen={targetPickerOpen}
                     hasError={languageError && !targetLanguage}
@@ -584,7 +606,11 @@ export function SetEditorScreen({ navigation, route }: Props) {
                 </View>
               </View>
               <Text variant="caption" color={languageError ? 'error' : 'tertiary'} style={styles.helperText}>
-                {languageError ? 'Выбери оба языка' : 'Выбери язык слов и язык перевода'}
+                {languageError
+                  ? 'Выбери оба языка'
+                  : isSubject
+                  ? 'На каком языке вопросы и ответы'
+                  : 'Выбери язык слов и язык перевода'}
               </Text>
             </View>
 

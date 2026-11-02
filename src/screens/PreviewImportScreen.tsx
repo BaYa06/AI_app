@@ -23,7 +23,8 @@ import {
   useScreenBottomInset,
 } from '@/components/ui';
 import type { RootStackParamList, RootStackScreenProps } from '@/types/navigation';
-import type { CreateCardInput } from '@/types';
+import type { CreateCardInput, SetKind } from '@/types';
+import { SetKindPicker } from '@/components/cards/SetKindPicker';
 import { describeError } from '@/utils/userErrors';
 import { pluralize } from '@/utils';
 import { apiService } from '@/services/ApiService';
@@ -51,13 +52,15 @@ function SaveModal({
   defaultLanguageTo?: string;
   saving: boolean;
   colors: ReturnType<typeof useThemeColors>;
-  onConfirm: (title: string, languageFrom: string, languageTo: string) => void;
+  onConfirm: (title: string, languageFrom: string, languageTo: string, kind: SetKind) => void;
   onCancel: () => void;
 }) {
   const [title, setTitle] = useState(defaultTitle);
   // Языки выбирает пользователь — без выбора набор не создаётся
   const [languageFrom, setLanguageFrom] = useState<string | null>(defaultLanguageFrom ?? null);
   const [languageTo, setLanguageTo] = useState<string | null>(defaultLanguageTo ?? null);
+  // Тип набора — тоже без выбора по умолчанию (plan/new/set_kind.md)
+  const [kind, setKind] = useState<SetKind | undefined>(undefined);
   const [showValidation, setShowValidation] = useState(false);
 
   // Sync defaultTitle when modal opens. Клавиатуру не открываем сами — только по нажатию на поле
@@ -69,10 +72,12 @@ function SaveModal({
   }, [visible, defaultTitle]);
 
   const languagesSelected = !!languageFrom && !!languageTo;
+  const formComplete = languagesSelected && !!kind;
+  const isSubject = kind === 'subject';
   const handleConfirm = () => {
     setShowValidation(true);
-    if (!languageFrom || !languageTo) return;
-    onConfirm(title, languageFrom, languageTo);
+    if (!languageFrom || !languageTo || !kind) return;
+    onConfirm(title, languageFrom, languageTo, kind);
   };
 
   const renderLanguageRow = (
@@ -119,7 +124,7 @@ function SaveModal({
       onClose={onCancel}
       // Форма с вводом — по фону не закрываем (брендбук, 7.6)
       dismissOnBackdrop={false}
-      title="Название набора"
+      title="Новый набор"
       footer={
         <View style={styles.modalActions}>
           <Button variant="quiet" tone="secondary" title="Отмена" onPress={onCancel} style={styles.flex1} />
@@ -127,7 +132,7 @@ function SaveModal({
             title="Сохранить"
             onPress={handleConfirm}
             loading={saving}
-            style={[styles.flex1, !languagesSelected && styles.dimmed]}
+            style={[styles.flex1, !formComplete && styles.dimmed]}
           />
         </View>
       }
@@ -141,11 +146,23 @@ function SaveModal({
         style={styles.titleField}
       />
 
-      {renderLanguageRow('Язык слов *', languageFrom, setLanguageFrom)}
-      {renderLanguageRow('Язык перевода *', languageTo, setLanguageTo)}
+      <View style={styles.langBlock}>
+        <Text variant="label" style={{ color: showValidation && !kind ? colors.errorText : colors.textSecondary }}>
+          Тип *
+        </Text>
+        <SetKindPicker value={kind} onChange={setKind} hasError={showValidation && !kind} />
+      </View>
+
+      {renderLanguageRow(isSubject ? 'Язык вопросов *' : 'Язык слов *', languageFrom, setLanguageFrom)}
+      {renderLanguageRow(isSubject ? 'Язык ответов *' : 'Язык перевода *', languageTo, setLanguageTo)}
       {showValidation && !languagesSelected && (
         <Text variant="caption" style={{ color: colors.errorText, marginTop: spacing.xs }}>
           Выбери оба языка
+        </Text>
+      )}
+      {showValidation && !kind && (
+        <Text variant="caption" style={{ color: colors.errorText, marginTop: spacing.xs }}>
+          Выбери тип набора
         </Text>
       )}
     </Dialog>
@@ -416,12 +433,12 @@ export function PreviewImportScreen({ navigation, route }: Props) {
     }
   }, [checked.length, save, setId, set?.languageFrom, set?.languageTo]);
 
-  const handleSaveConfirm = useCallback(async (title: string, languageFrom: string, languageTo: string) => {
+  const handleSaveConfirm = useCallback(async (title: string, languageFrom: string, languageTo: string, kind: SetKind) => {
     try {
       // Новый набор — в открытый свой курс (как в SetEditorScreen), иначе в «Мои наборы»
       const { activeCourseId, courses } = useCoursesStore.getState();
       const courseId = courses.some((c) => c.id === activeCourseId && !c.isStudentCourse) ? activeCourseId : null;
-      const newSet = await addSet({ title: title.trim() || 'Импорт', languageFrom, languageTo, courseId });
+      const newSet = await addSet({ title: title.trim() || 'Импорт', languageFrom, languageTo, kind, courseId });
       setModalVisible(false);
       await save({ setId: newSet.id, isNew: true, languageFrom, languageTo });
     } catch (e) {
