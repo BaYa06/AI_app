@@ -84,3 +84,12 @@ export function getAdminUserId(): string {
   }
   return id;
 }
+
+/** Служебный автор наборов библиотеки (scripts/create-library-author.ts). */
+export function getLibraryAuthorId(): string {
+  const id = (process.env.LIBRARY_AUTHOR_ID || '').trim();
+  if (!/^[0-9a-f-]{36}$/i.test(id)) {
+    throw new Error('Нет LIBRARY_AUTHOR_ID в .env.local — создайте автора: npx tsx scripts/create-library-author.ts');
+  }
+  return id;
+}
