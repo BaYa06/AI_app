@@ -260,6 +260,8 @@ export function WordBuilderScreen({ navigation, route }: Props) {
         cardCount: statsSnapshot.total,
         newCount: statsSnapshot.newCount,
         learningCount: statsSnapshot.learningCount,
+        youngCount: statsSnapshot.youngCount,
+        matureCount: statsSnapshot.matureCount,
         reviewCount: statsSnapshot.reviewCount,
         masteredCount: statsSnapshot.masteredCount,
       });

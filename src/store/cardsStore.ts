@@ -5,7 +5,7 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { v4 as uuid } from 'uuid';
-import { getStatusForStep, isCardLearned } from '@/services/SRSService';
+import { getCardStatus, getStatusForStep } from '@/services/SRSService';
 import type { Card, CreateCardInput, UpdateCardInput } from '@/types';
 import { NeonService } from '@/services/NeonService';
 import { DatabaseService } from '@/services/DatabaseService';
@@ -335,32 +335,35 @@ export const useCardsStore = create<CardsState & CardsActions>()(
 
 /**
  * Селектор для получения количества карточек по статусам для набора.
- * Выученная — уровень «знаю» и выше (шаг ≥ 3); к повторению — время повторения пришло.
+ * Статус — по шагу слова (getCardStatus): new 0, learning 1–2, young 3–4, mature 5+
+ * (plan/new/word_status_colors.md). Выученная — young + mature; к повторению — время повторения пришло.
  */
 export const selectSetStats = (setId: string) => {
   const state = useCardsStore.getState();
   const cardIds = state.cardsBySet[setId] || [];
 
-  let learnedCount = 0;   // Выученные (шаг ≥ 3)
+  const byStatus = { new: 0, learning: 0, young: 0, mature: 0 };
   let dueCount = 0;       // К повторению (nextReview <= сейчас)
   const now = Date.now();
 
   for (const id of cardIds) {
     const card = state.cards[id];
     if (!card) continue;
-    if (isCardLearned(card)) learnedCount++;
+    const status = getCardStatus(card);
+    byStatus[status === 'relearning' ? 'learning' : status]++;
     if (card.nextReviewDate <= now) dueCount++;
   }
 
   const total = cardIds.length;
+  const learnedCount = byStatus.young + byStatus.mature;
 
   return {
     total,
-    newCount: dueCount,         // Для совместимости - все что нужно повторить
-    learningCount: 0,           // Deprecated
-    youngCount: 0,              // Deprecated
-    matureCount: 0,             // Deprecated
-    masteredCount: learnedCount,// Выученные
+    newCount: byStatus.new,
+    learningCount: byStatus.learning,
+    youngCount: byStatus.young,
+    matureCount: byStatus.mature,
+    masteredCount: learnedCount,// Выученные (шаг ≥ 3)
     dueCount,                   // К повторению
     learnedCount,               // Выученные
     reviewCount: dueCount,      // Для совместимости

@@ -63,7 +63,7 @@ interface SetsActions {
   getSetsByCourse: (courseId: string | null) => CardSet[]; // Получить наборы по курсу
   
   // Обновление статистики набора
-  updateSetStats: (setId: string, stats: Partial<Pick<CardSet, 'cardCount' | 'newCount' | 'learningCount' | 'reviewCount' | 'masteredCount'>>) => void;
+  updateSetStats: (setId: string, stats: Partial<Pick<CardSet, 'cardCount' | 'newCount' | 'learningCount' | 'youngCount' | 'matureCount' | 'reviewCount' | 'masteredCount'>>) => void;
   incrementCardCount: (setId: string) => void;
   decrementCardCount: (setId: string) => void;
   

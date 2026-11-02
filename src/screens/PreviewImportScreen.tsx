@@ -411,6 +411,8 @@ export function PreviewImportScreen({ navigation, route }: Props) {
       cardCount: stats.total,
       newCount: stats.newCount,
       learningCount: stats.learningCount,
+      youngCount: stats.youngCount,
+      matureCount: stats.matureCount,
       reviewCount: stats.reviewCount,
       masteredCount: stats.masteredCount,
     });

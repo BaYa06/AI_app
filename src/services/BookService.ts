@@ -8,6 +8,7 @@ import { supabase } from './supabaseClient';
 import { API_BASE } from '@/config/apiBase';
 import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
 import type { Card, CardSet, CardStatus } from '@/types';
+import { getCardStatus, isCardLearned } from './SRSService';
 import type { BookDetail, BookFilters, BookListItem, CoursePlan } from '@/types/books';
 
 const BOOKS_API_BASE = `${API_BASE}/books`;
@@ -150,10 +151,13 @@ export const BookService = {
         createdAt: new Date(row.createdAt).getTime(),
         updatedAt: row.updatedAt ? new Date(row.updatedAt).getTime() : new Date(row.createdAt).getTime(),
         cardCount: cards.length,
-        newCount: cards.filter((c) => c.status === 'new').length,
-        learningCount: cards.filter((c) => c.status === 'learning').length,
+        // Статус по шагу, как везде (plan/new/word_status_colors.md); выученные — young + mature
+        newCount: cards.filter((c) => getCardStatus(c) === 'new').length,
+        learningCount: cards.filter((c) => getCardStatus(c) === 'learning').length,
+        youngCount: cards.filter((c) => getCardStatus(c) === 'young').length,
+        matureCount: cards.filter((c) => getCardStatus(c) === 'mature').length,
         reviewCount: 0,
-        masteredCount: cards.filter((c) => c.status === 'mature').length,
+        masteredCount: cards.filter((c) => isCardLearned(c)).length,
         isPublic: false,
         isFavorite: false,
         isArchived: false,

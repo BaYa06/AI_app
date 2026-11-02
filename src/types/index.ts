@@ -162,7 +162,9 @@ export interface CardSet {
   // Статистика (кешированные значения для быстрого отображения)
   cardCount: number;
   newCount: number;      // Новые карточки
-  learningCount: number; // В процессе изучения
+  learningCount: number; // В процессе изучения (шаги 1–2)
+  youngCount?: number;   // Знаю (шаги 3–4); нет — набор пришёл с сервера без разбивки
+  matureCount?: number;  // Выучено надолго (шаг 5+)
   reviewCount: number;   // На повторении сегодня
   masteredCount: number; // Выученные
   

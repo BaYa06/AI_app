@@ -1088,10 +1088,14 @@ export function HomeScreen({ navigation, route }: any) {
     React.useCallback(() => {
       allSets.forEach((set) => {
         const stats = selectSetStats(set.id);
+        // Карточки набора ещё не загружены — не затираем серверные счётчики нулями
+        if (stats.total === 0 && set.cardCount > 0) return;
         updateSetStats(set.id, {
           cardCount: stats.total,
           newCount: stats.newCount,
           learningCount: stats.learningCount,
+          youngCount: stats.youngCount,
+          matureCount: stats.matureCount,
           reviewCount: stats.reviewCount,
           masteredCount: stats.masteredCount,
         });
