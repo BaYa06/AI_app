@@ -32,6 +32,10 @@ export const LIBRARY_CATEGORIES: LibraryCategoryDef[] = [
   { key: 'medicine', label: 'Медицина', icon: 'medkit-outline' },
   { key: 'programming', label: 'IT', icon: 'code-outline' },
   { key: 'study', label: 'Экзамены', icon: 'school-outline' },
+  { key: 'kg_tests', label: 'ОРТ и НЦТ', icon: 'clipboard-outline' },
+  { key: 'ielts', label: 'IELTS', icon: 'ribbon-outline' },
+  { key: 'history', label: 'История', icon: 'time-outline' },
+  { key: 'geography', label: 'География', icon: 'globe-outline' },
 ];
 
 export const LIBRARY_LANGUAGES: LibraryLanguageDef[] = [

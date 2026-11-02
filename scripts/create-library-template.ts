@@ -29,7 +29,7 @@ async function main(): Promise<void> {
     description: 'Слова, которые пригодятся в аэропорту', tags: 'путешествия, A2', cover_emoji: '✈️',
   });
   sets.addRow({
-    title: 'Столицы Центральной Азии', category: 'study', language_from: 'ru', language_to: 'ru',
+    title: 'Столицы Центральной Азии', category: 'geography', language_from: 'ru', language_to: 'ru',
     description: 'Страна → столица', tags: 'ОРТ', cover_emoji: '🗺️',
   });
   styleHeader(sets);
