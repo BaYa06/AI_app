@@ -8,7 +8,8 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useCardsStore, useSetsStore, useStudyStore, useThemeColors, useSettingsStore, selectSetStats } from '@/store';
 import { Text, Loading } from '@/components/common';
 import { Button, ProgressBar, ScreenHeader, Switch } from '@/components/ui';
-import { buildStudyQueue, isCardLearned } from '@/services/SRSService';
+import { buildStudyQueue, getCardStatus } from '@/services/SRSService';
+import { StatusBadge } from '@/components/cards';
 import { ProgressService } from '@/services/ProgressService';
 import { lessonPhaseForAnswer } from '@/services/lessonFlow';
 import { useLessonStore } from '@/store/lessonStore';
@@ -16,7 +17,7 @@ import { spacing, borderRadius, heights, iconSize, screenPadding, alpha } from '
 import { DatabaseService, Analytics } from '@/services';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Rating, Card } from '@/types';
-import { Settings, Volume2, Check } from 'lucide-react-native';
+import { Settings, Volume2 } from 'lucide-react-native';
 import { speak, resolveSpeechLang, prefetchSpeech, cardSpeechLangs, isCardSpeakable } from '@/utils/speech';
 import { triggerHaptic } from '@/utils/haptic';
 import { fitText, fitWordWithExample } from '@/utils/fitText';
@@ -120,7 +121,7 @@ export function StudyScreen({ navigation, route }: Props) {
   const updateSettings = useSettingsStore((s) => s.updateSettings);
   const sheetTranslate = useRef(new Animated.Value(-220)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
-  const isCurrentMastered = currentCard ? isCardLearned(currentCard) : false;
+  const currentStatus = currentCard ? getCardStatus(currentCard) : 'new';
   const handleSpeak = useCallback(
     (text: string, langHint?: string, counterpart?: string) => {
       const normalized = (text || '').trim();
@@ -730,15 +731,8 @@ export function StudyScreen({ navigation, route }: Props) {
   const renderCardTop = (onSpeak: () => void) => (
     <View style={styles.cardTopRow}>
       <View style={styles.statusPlaceholder}>
-        {isCurrentMastered ? (
-          <View
-            accessible
-            accessibilityLabel="Выучено"
-            style={[styles.masteredBadge, { backgroundColor: alpha(colors.success, 10), borderColor: alpha(colors.success, 40) }]}
-          >
-            <Check size={iconSize.xs} color={colors.successText} />
-          </View>
-        ) : null}
+        {/* Статус слова — тот же кружок, что в наборе; у нового слова пусто */}
+        {currentStatus !== 'new' ? <StatusBadge status={currentStatus} /> : null}
       </View>
       {canSpeak ? (
         <Pressable
@@ -998,12 +992,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'flex-start',
   },
-  masteredBadge: {
-    borderWidth: 1,
-    borderRadius: borderRadius.full,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: spacing.xxs,
-  },
+
   audioButton: {
     width: 40,
     height: 40,

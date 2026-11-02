@@ -2,7 +2,8 @@
  * Set Detail Screen
  * @description Экран детали набора карточек
  */
-import { isCardLearned, isCardWaitingReview } from '@/services/SRSService';
+import { getCardStatus, isCardLearned, isCardWaitingReview } from '@/services/SRSService';
+import { StatusBadge, STATUS_LABEL } from '@/components/cards';
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { shallow } from 'zustand/shallow';
 import { View, FlatList, StyleSheet, Pressable, TextInput, ScrollView, ActivityIndicator, Platform, KeyboardAvoidingView, Modal, Dimensions } from 'react-native';
@@ -26,8 +27,6 @@ import {
   Search,
   SlidersHorizontal,
   Edit3,
-  Check,
-  Circle,
   Camera,
   Globe,
   X,
@@ -521,7 +520,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
         accessibilityRole="button"
         // Вложенные кнопки (изменить, меню) VoiceOver внутри доступного родителя не видит —
         // отдаём их действиями карточки (жест вверх/вниз)
-        accessibilityLabel={`${item.frontText ?? (item as any).front}. ${item.backText ?? (item as any).back}${isCardLearned(item) ? '. Выучена' : ''}`}
+        accessibilityLabel={`${item.frontText ?? (item as any).front}. ${item.backText ?? (item as any).back}. ${STATUS_LABEL[getCardStatus(item)]}`}
         accessibilityActions={[
           { name: 'longpress', label: 'Посмотреть' },
           ...(isReadOnly ? [] : [{ name: 'edit', label: 'Изменить' }, { name: 'menu', label: 'Действия' }]),
@@ -546,27 +545,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
         ]}
       >
         <View style={styles.cardTopRow}>
-          <View
-            style={[
-              styles.statusBadge,
-              {
-                backgroundColor:
-                  isCardLearned(item)
-                    ? alpha(colors.success, 10)
-                    : colors.surfaceMuted,
-                borderColor:
-                  isCardLearned(item)
-                    ? alpha(colors.success, 40)
-                    : colors.border,
-              },
-            ]}
-          >
-            {isCardLearned(item) ? (
-              <Check size={iconSize.xs} color={colors.successText} strokeWidth={2.5} />
-            ) : (
-              <Circle size={14} color={colors.textTertiary} strokeWidth={2} />
-            )}
-          </View>
+          <StatusBadge status={getCardStatus(item)} />
 
           {!isReadOnly && (
             <Pressable
@@ -1422,14 +1401,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing.s,
-  },
-  statusBadge: {
-    paddingHorizontal: spacing.s,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   iconButton: {
     padding: spacing.xs,
