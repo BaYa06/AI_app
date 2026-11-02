@@ -182,7 +182,7 @@
   - Сравнение секретов (`CRON_SECRET`, `NOTIFY_SECRET`) — через `crypto.timingSafeEqual`.
   - **Готово, когда:** запрос без JWT к `settings` возвращает 401; с JWT пользователя A нельзя прочитать или изменить настройки B; `get-by-user` удалена или закрыта.
 
-- [ ] **0.2 Один cron вместо трёх, каждые 15 минут** — `api/push.js`, cron-job.org
+- [x] **0.2 Один cron вместо трёх, каждые 15 минут** — `api/push.js`, cron-job.org
   - ✅ Код (14.10.2026): `cron-reminders` берёт тех, у кого сейчас `notif_hour` и минута ≥ `notif_minute` (пропущенный запуск подхватит следующий), reactivation 3/7 дней — внутри него по поясу пользователя; `cron-streak` / `cron-reactivation` отвечают `deprecated` и ничего не шлют.
   - ✅ cron-job.org настроен 14.10.2026 (раньше выкладки, решение пользователя): задача `Reminders`, GET `cron-reminders` каждые 15 мин; старые `cron-streak` и `Reactivation` (`notify`) удалены. `CRON_SECRET` в Vercel заменён на новый — старый в задаче давал 401 (видимо, `cron-streak` и раньше не срабатывал). До выкладки нового кода работает старый `cron-reminders` из `main`, без журнала — поэтому замер 0.7 начинать после выкладки. В cron-job.org после выкладки ничего менять не нужно.
   - Планировщик — **cron-job.org** (уже настроен пользователем, на Vercel Hobby cron чаще раза в сутки не работает). Одна задача:
@@ -229,7 +229,7 @@
   - Сделано: `GET /api/push?action=cron-reminders&dry_run=1` + `Authorization: Bearer <CRON_SECRET>` → `report` по каждому кандидату (тип, данные, готовый текст или причина: `done_today`, `nothing_to_send`, `paused`). Кандидаты — те же, что в этот запуск получили бы пуш (их 15-минутный слот уже наступил, сегодня ещё не получали). Транзакционные типы — `TRANSACTIONAL_TYPES` (`teacher_review`). На паузе `last_reminder_date` не ставится.
   - Включить паузу: Vercel → Settings → Environment Variables → `PUSH_PAUSED` = `1` (Production) → Deployments → последний рабочий → Redeploy (Vercel применяет переменные только к новому деплою; код не меняется, ~1 мин). Снять — удалить переменную и снова Redeploy.
 
-- [ ] **0.5 Тап по пушу: переход и замер** — `src/services/pushNotifications.native.ts`, `src/App.tsx`, `index.js`, `api/push.js`
+- [x] **0.5 Тап по пушу: переход и замер** — `src/services/pushNotifications.native.ts`, `src/App.tsx`, `index.js`, `api/push.js`
   - Обработать `getInitialNotification` (приложение было закрыто) и `onNotificationOpenedApp` (было в фоне). Взять из `data` `push_id`, `type`, `link`.
   - Переход по `link` через существующий `NATIVE_LINKING` (`AppNavigator.tsx:211`): `flashly://lesson`, `flashly://rating/:courseId`, `flashly://set/:id`. Если пользователь не вошёл, сохранить ссылку и открыть её после входа.
   - `Analytics.pushNotificationOpened({ type, push_id })` (тип параметра расширить до всех типов из реестра) и `POST /api/push?action=opened` с JWT → `push_log.opened_at` (проверка: строка принадлежит этому пользователю).
@@ -426,7 +426,7 @@
   - **Готово, когда:** все тексты реестра соответствуют правилам, а `brand:check` проверяет `_registry.js`.
   - Сделано: раздел 9.1 в `plan/done/brandbook.md`; `scripts/lib/push-tone.mjs` собирает каждый вариант каждого типа на числах 1/3/12/21 с именем и без и проверяет: пустые данные, «!» > 1, эмодзи > 1, «вы», род и упрёки (список слов), число или имя в заголовке или первых 40 символах. `brand:check` печатает «Тексты пушей», `--fail-on-new` падает при любом нарушении. Найдено и исправлено: два «!» в `streak_milestone`. Проверка на заведомо плохих текстах ловит все шесть правил.
 
-- [ ] **4.3 Проверить provisional-разрешение (вариант C)** — `pushNotifications.native.ts`
+- [x] **4.3 Проверить provisional-разрешение (вариант C)** — `pushNotifications.native.ts`
   - Для 50 % новых: `requestPermission({ provisional: true })` сразу после онбординга (без диалога, тихие уведомления), а после первого урока — обычный лист из 1.2.
   - Сравнить D7 у двух групп. Если C не лучше, оставить B.
   - **Готово, когда:** записан результат в «Замеры → 4.3».
