@@ -59,6 +59,8 @@ export interface ImportRequest {
   prompt?: string;
   languageFrom?: string;
   languageTo?: string;
+  /** Тип набора: для 'subject' сервер делает только «Вопрос-ответ» / «Термины», без перевода */
+  setKind?: 'language' | 'subject';
 }
 
 export type AiImportErrorCode =
@@ -153,6 +155,7 @@ export async function importFiles(request: ImportRequest, signal?: AbortSignal):
         prompt: request.prompt?.trim() || undefined,
         languageFrom: request.languageFrom,
         languageTo: request.languageTo,
+        setKind: request.setKind,
       }),
       signal,
     }, 120_000);

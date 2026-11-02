@@ -52,6 +52,7 @@ import {
 import { PickError, pickDocuments, pickFromCamera, pickFromGallery } from '@/utils/importPicker';
 import { parseWordTable } from '@/utils/parseWordTable';
 import { pluralize } from '@/utils';
+import { isSubjectSet } from '@/utils/setKind';
 import { clearImportDraft, getImportDraft, saveImportDraft, type ImportDraft } from '@/services/importDraft';
 
 type Props = RootStackScreenProps<'ImportFiles'>;
@@ -84,6 +85,12 @@ const GOALS: Array<{ goal: ImportGoal; label: string }> = [
   { goal: 'pick_words', label: 'Выбрать слова из текста' },
   { goal: 'terms', label: 'Термины' },
   { goal: 'qa', label: 'Вопрос-ответ' },
+];
+
+/** Предметный набор (plan/new/set_kind.md): только вопросы и термины, без перевода и уровня */
+const SUBJECT_GOALS: Array<{ goal: ImportGoal; label: string }> = [
+  { goal: 'qa', label: 'Вопрос-ответ' },
+  { goal: 'terms', label: 'Термины' },
 ];
 
 const LEVELS: CefrLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1'];
@@ -150,11 +157,13 @@ export function ImportFilesScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
   const bottomInset = useScreenBottomInset();
   const set = useSetsStore(s => s.getSet(setId));
+  const isSubject = isSubjectSet(set);
+  const goals = isSubject ? SUBJECT_GOALS : GOALS;
 
   const [files, setFiles] = useState<ImportFile[]>([]);
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasted, setPasted] = useState('');
-  const [goal, setGoal] = useState<ImportGoal>('vocab');
+  const [goal, setGoal] = useState<ImportGoal>(() => (isSubjectSet(useSetsStore.getState().getSet(setId)) ? 'qa' : 'vocab'));
   const [level, setLevel] = useState<CefrLevel>('B1');
   const [promptOpen, setPromptOpen] = useState(false);
   const [prompt, setPrompt] = useState('');
@@ -246,6 +255,7 @@ export function ImportFilesScreen({ navigation, route }: Props) {
         prompt: overrides.prompt ?? (promptOpen ? prompt : undefined),
         languageFrom: set?.languageFrom,
         languageTo: set?.languageTo,
+        setKind: set?.kind,
       }, controller.signal);
       if (controller.signal.aborted) return;
       if (result.usage) setUsage(result.usage);
@@ -277,7 +287,8 @@ export function ImportFilesScreen({ navigation, route }: Props) {
         openReview(next);
         return;
       }
-      if (result.kind === 'text') {
+      // Выбор «слова из текста» — только для языка; у предмета сервер и так делает вопросы по тексту
+      if (result.kind === 'text' && !isSubject) {
         setPhase({ name: 'text', excerpt: result.excerpt });
       } else {
         setPhase({ name: 'nothing', kind: result.kind === 'exercise' ? 'exercise' : 'empty' });
@@ -302,13 +313,13 @@ export function ImportFilesScreen({ navigation, route }: Props) {
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
     }
-  }, [inputs, goal, level, promptOpen, prompt, set?.languageFrom, set?.languageTo, setId, openReview]);
+  }, [inputs, goal, level, promptOpen, prompt, set?.languageFrom, set?.languageTo, set?.kind, isSubject, setId, openReview]);
 
   const handleSubmit = useCallback(async () => {
     if (!hasInput || phase.name !== 'form') return;
 
-    // Простые таблицы «слово — перевод» — без ИИ
-    if (goal === 'vocab' && !prompt.trim() && inputs.every(f => f.kind === 'table')) {
+    // Простые таблицы «слово — перевод» (у предмета — «вопрос — ответ») — без ИИ
+    if ((goal === 'vocab' || (isSubject && goal === 'qa')) && !prompt.trim() && inputs.every(f => f.kind === 'table')) {
       const pairs = inputs.map(f => parseWordTable(f.content || ''));
       if (pairs.every(p => p !== null)) {
         const cards = pairs.flat() as Array<{ front: string; back: string }>;
@@ -327,7 +338,7 @@ export function ImportFilesScreen({ navigation, route }: Props) {
     if (!(await ensureAiConsent())) return;
     autoRetriesRef.current = 0;
     runImport({});
-  }, [hasInput, phase.name, goal, prompt, inputs, navigation, setId, runImport]);
+  }, [hasInput, phase.name, goal, isSubject, prompt, inputs, navigation, setId, runImport]);
 
   const cancel = useCallback(() => {
     abortRef.current?.abort();
@@ -663,7 +674,7 @@ export function ImportFilesScreen({ navigation, route }: Props) {
         <View style={styles.section}>
           <Text variant="overline" color="secondary">Что сделать</Text>
           <View style={styles.chips}>
-            {GOALS.map(item => (
+            {goals.map(item => (
               <Chip key={item.goal} label={item.label} selected={goal === item.goal} onPress={() => setGoal(item.goal)} />
             ))}
           </View>

@@ -25,6 +25,7 @@ import {
 import type { RootStackParamList, RootStackScreenProps } from '@/types/navigation';
 import type { CreateCardInput, SetKind } from '@/types';
 import { SetKindPicker } from '@/components/cards/SetKindPicker';
+import { isSubjectSet } from '@/utils/setKind';
 import { describeError } from '@/utils/userErrors';
 import { pluralize } from '@/utils';
 import { apiService } from '@/services/ApiService';
@@ -329,6 +330,7 @@ export function PreviewImportScreen({ navigation, route }: Props) {
   const bottomInset = useScreenBottomInset();
 
   const set = useSetsStore(s => (setId ? s.getSet(setId) : undefined));
+  const isSubject = isSubjectSet(set);
   const addSet = useSetsStore(s => s.addSet);
   const updateSetStats = useSetsStore(s => s.updateSetStats);
   const addCards = useCardsStore(s => s.addCards);
@@ -390,9 +392,10 @@ export function PreviewImportScreen({ navigation, route }: Props) {
 
   // ── сохранение ────────────────────────────────────────────────────────────
 
-  const save = useCallback(async (target: { setId: string; isNew: boolean; languageFrom?: string; languageTo?: string }) => {
+  const save = useCallback(async (target: { setId: string; isNew: boolean; languageFrom?: string; languageTo?: string; subject?: boolean }) => {
     let toAdd: ImportCard[] = checked.map(({ key: _key, checked: _checked, duplicate: _duplicate, ...card }) => card);
-    const needExamples = examplesOn && toAdd.some(c => !c.example);
+    // Примеры предложений — для «Слова в контексте», которого у предмета нет (plan/new/set_kind.md)
+    const needExamples = examplesOn && !target.subject && toAdd.some(c => !c.example);
     // Примеры пишет ИИ — без согласия добавляем без них
     const examplesWanted = needExamples && (await ensureAiConsent());
 
@@ -426,12 +429,12 @@ export function PreviewImportScreen({ navigation, route }: Props) {
   const handleSaveToExisting = useCallback(async () => {
     if (checked.length === 0) return;
     try {
-      await save({ setId, isNew: false, languageFrom: set?.languageFrom, languageTo: set?.languageTo });
+      await save({ setId, isNew: false, languageFrom: set?.languageFrom, languageTo: set?.languageTo, subject: isSubject });
     } catch (e) {
       setProgress(null);
       toast.error(describeError(e, 'Не удалось сохранить карточки'));
     }
-  }, [checked.length, save, setId, set?.languageFrom, set?.languageTo]);
+  }, [checked.length, save, setId, set?.languageFrom, set?.languageTo, isSubject]);
 
   const handleSaveConfirm = useCallback(async (title: string, languageFrom: string, languageTo: string, kind: SetKind) => {
     try {
@@ -440,7 +443,7 @@ export function PreviewImportScreen({ navigation, route }: Props) {
       const courseId = courses.some((c) => c.id === activeCourseId && !c.isStudentCourse) ? activeCourseId : null;
       const newSet = await addSet({ title: title.trim() || 'Импорт', languageFrom, languageTo, kind, courseId });
       setModalVisible(false);
-      await save({ setId: newSet.id, isNew: true, languageFrom, languageTo });
+      await save({ setId: newSet.id, isNew: true, languageFrom, languageTo, subject: kind === 'subject' });
     } catch (e) {
       setProgress(null);
       toast.error(describeError(e, 'Не удалось сохранить набор'));
@@ -538,7 +541,7 @@ export function PreviewImportScreen({ navigation, route }: Props) {
   const filters: Array<{ key: Filter; label: string; count: number }> = [
     { key: 'all', label: 'Все', count: items.length },
     { key: 'duplicate', label: 'Уже есть', count: counts.duplicate },
-    { key: 'noTranslation', label: 'Без перевода', count: counts.noTranslation },
+    { key: 'noTranslation', label: isSubject ? 'Без ответа' : 'Без перевода', count: counts.noTranslation },
     { key: 'check', label: 'Проверить', count: counts.check },
   ];
 
@@ -546,7 +549,7 @@ export function PreviewImportScreen({ navigation, route }: Props) {
     // Верхний safe area уже учтён в App.tsx; снизу — свой (экран без панели вкладок)
     <View style={[styles.root, { backgroundColor: colors.background, paddingBottom: bottomInset }]}>
       <ScreenHeader
-        title="Проверь слова"
+        title={isSubject ? 'Проверь карточки' : 'Проверь слова'}
         onBack={() => navigation.goBack()}
         right={<Button variant="quiet" size="s" title={allChecked ? 'Снять все' : 'Отметить все'} onPress={toggleAll} />}
       />
@@ -575,13 +578,15 @@ export function PreviewImportScreen({ navigation, route }: Props) {
       />
 
       <View style={[styles.bottom, { borderTopColor: colors.border, backgroundColor: colors.background }]}>
-        <View style={styles.switchRow}>
-          <View style={styles.switchText}>
-            <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '600' }}>Примеры предложений</Text>
-            <Text variant="caption" color="secondary">ИИ допишет к каждой карточке — для «Слова в контексте»</Text>
+        {!isSubject && (
+          <View style={styles.switchRow}>
+            <View style={styles.switchText}>
+              <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '600' }}>Примеры предложений</Text>
+              <Text variant="caption" color="secondary">ИИ допишет к каждой карточке — для «Слова в контексте»</Text>
+            </View>
+            <Switch value={examplesOn} onValueChange={setExamplesOn} accessibilityLabel="Примеры предложений" />
           </View>
-          <Switch value={examplesOn} onValueChange={setExamplesOn} accessibilityLabel="Примеры предложений" />
-        </View>
+        )}
         <View style={styles.bottomButtons}>
           {setId ? <Button variant="secondary" title="+ Фото" onPress={addMorePhotos} /> : null}
           <Button
