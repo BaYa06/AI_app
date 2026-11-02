@@ -14,7 +14,7 @@ import { ProgressService } from '@/services/ProgressService';
 import { lessonPhaseForAnswer } from '@/services/lessonFlow';
 import { useLessonStore } from '@/store/lessonStore';
 import { reportWidgetReview } from '@/services/WidgetService';
-import { speak, resolveSpeechLang, prefetchSpeech, cardSpeechLangs } from '@/utils/speech';
+import { speak, resolveSpeechLang, prefetchSpeech, cardSpeechLangs, isCardSpeakable } from '@/utils/speech';
 import { playCorrectSound, preloadSound } from '@/utils/sound';
 import { buildDistractorPool, pickSimilarDistractors } from '@/utils/choiceDistractors';
 import { Analytics } from '@/services/analytics';
@@ -215,7 +215,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
 
   // Заранее озвучиваем слово текущей и следующей карточки — кнопка динамика играет сразу
   useEffect(() => {
-    const upcoming = [questions[currentIndex], questions[currentIndex + 1]].filter(Boolean) as Card[];
+    const upcoming = [questions[currentIndex], questions[currentIndex + 1]].filter((c): c is Card => !!c && isCardSpeakable(c));
     prefetchSpeech(upcoming.map((c) => ({ text: getFront(c), counterpart: getBack(c), lang: cardSpeechLangs(c).front })));
   }, [questions, currentIndex]);
   const progressPercent = totalQuestions ? Math.round(((currentIndex + 1) / totalQuestions) * 100) : 0;
@@ -707,20 +707,22 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
           <Text variant="h1" style={[styles.word, { color: colors.textPrimary }]}>
             {getFront(currentCard)}
           </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Прослушать слово"
-            style={({ pressed }) => [
-              styles.audioButton,
-              {
-                backgroundColor: pressed ? alpha(colors.primary, 20) : colors.surfaceMuted,
-                borderColor: colors.border,
-              },
-            ]}
-            onPress={() => handleSpeak(getFront(currentCard), getBack(currentCard), cardSpeechLangs(currentCard).front)}
-          >
-            <Volume2 size={iconSize.m} color={colors.primary} />
-          </Pressable>
+          {isCardSpeakable(currentCard) ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Прослушать слово"
+              style={({ pressed }) => [
+                styles.audioButton,
+                {
+                  backgroundColor: pressed ? alpha(colors.primary, 20) : colors.surfaceMuted,
+                  borderColor: colors.border,
+                },
+              ]}
+              onPress={() => handleSpeak(getFront(currentCard), getBack(currentCard), cardSpeechLangs(currentCard).front)}
+            >
+              <Volume2 size={iconSize.m} color={colors.primary} />
+            </Pressable>
+          ) : null}
         </View>
 
         <View style={styles.optionsBlock}>

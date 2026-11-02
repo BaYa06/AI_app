@@ -17,7 +17,7 @@ import { DatabaseService, Analytics } from '@/services';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Rating, Card } from '@/types';
 import { Settings, Volume2, Check } from 'lucide-react-native';
-import { speak, resolveSpeechLang, prefetchSpeech, cardSpeechLangs } from '@/utils/speech';
+import { speak, resolveSpeechLang, prefetchSpeech, cardSpeechLangs, isCardSpeakable } from '@/utils/speech';
 import { triggerHaptic } from '@/utils/haptic';
 import { fitText, fitWordWithExample } from '@/utils/fitText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -679,7 +679,7 @@ export function StudyScreen({ navigation, route }: Props) {
     const items: Array<{ text: string; lang: string }> = [];
     for (const id of ids) {
       const card = useCardsStore.getState().cards[id];
-      if (!card) continue;
+      if (!card || !isCardSpeakable(card)) continue;
       const langs = cardSpeechLangs(card);
       const front = (card.frontText ?? (card as any).front ?? '').trim();
       const back = (card.backText ?? (card as any).back ?? '').trim();
@@ -717,6 +717,7 @@ export function StudyScreen({ navigation, route }: Props) {
   const { front: frontLang, back: backLang } = cardSpeechLangs(currentCard);
   const questionLang = reverseEnabled ? backLang : frontLang;
   const answerLang = reverseEnabled ? frontLang : backLang;
+  const canSpeak = isCardSpeakable(currentCard);
 
   // Кнопки оценки: цвета оценок SRS, текст — «текстовые» токены; «Уверенно» — главная кнопка.
   // Оценки 2 («Сомневаюсь») больше нет, сервер её по-прежнему принимает от старых версий (plan/done/card_rating.md)
@@ -739,15 +740,17 @@ export function StudyScreen({ navigation, route }: Props) {
           </View>
         ) : null}
       </View>
-      <Pressable
-        style={({ pressed }) => [styles.audioButton, { backgroundColor: pressed ? alpha(colors.primary, 20) : colors.surfaceMuted }]}
-        hitSlop={spacing.xxs}
-        accessibilityRole="button"
-        accessibilityLabel="Прослушать"
-        onPress={(e) => { e.stopPropagation(); triggerHaptic('selection'); onSpeak(); }}
-      >
-        <Volume2 size={iconSize.s} color={colors.primary} />
-      </Pressable>
+      {canSpeak ? (
+        <Pressable
+          style={({ pressed }) => [styles.audioButton, { backgroundColor: pressed ? alpha(colors.primary, 20) : colors.surfaceMuted }]}
+          hitSlop={spacing.xxs}
+          accessibilityRole="button"
+          accessibilityLabel="Прослушать"
+          onPress={(e) => { e.stopPropagation(); triggerHaptic('selection'); onSpeak(); }}
+        >
+          <Volume2 size={iconSize.s} color={colors.primary} />
+        </Pressable>
+      ) : null}
     </View>
   );
 

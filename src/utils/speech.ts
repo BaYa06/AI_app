@@ -238,6 +238,16 @@ export function cardSpeechLangs(card?: { setId?: string } | null): { front?: str
   return { front: toSpeechLang(set?.languageFrom), back: toSpeechLang(set?.languageTo) };
 }
 
+/**
+ * Озвучивать ли карточку: у предметного набора озвучки нет (plan/new/set_kind.md) — ни кнопки,
+ * ни предзагрузки. Набор берём по карточке: на главной карточки из разных наборов курса.
+ */
+export function isCardSpeakable(card?: { setId?: string } | null): boolean {
+  if (!card?.setId) return true;
+  const { useSetsStore } = require('@/store/setsStore');
+  return useSetsStore.getState().getSet(card.setId)?.kind !== 'subject';
+}
+
 // ----------------- Google auth helpers -----------------
 
 const base64UrlEncode = (data: ArrayBuffer | string) => {
