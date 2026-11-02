@@ -75,7 +75,7 @@
   - `.env.local`: `LIBRARY_AUTHOR_ID` (на каждой базе свой).
   - По желанию: перенести уже опубликованные админом наборы на этого автора
     (`UPDATE library_sets SET user_id = …`), чтобы и они не зависели от личного аккаунта.
-- [ ] **LibImport 2. Общий разбор Excel и формат.**
+- [x] **LibImport 2. Общий разбор Excel и формат.**
   - Вынести общие помощники из `scripts/lib/bookExcel.ts` (`cellText`, `findSheet`, `readHeaders`,
     `rowIsEmpty`, `normalizeTerm`) в `scripts/lib/excel.ts`. Импорт книг работает как раньше
     (проверить `--dry-run` на файле из `books/`).

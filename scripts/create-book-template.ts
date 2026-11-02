@@ -8,15 +8,9 @@ import fs from 'fs';
 import path from 'path';
 import ExcelJS from 'exceljs';
 import { BOOK_COLUMNS, BOOK_SHEET, CARD_COLUMNS, CARDS_SHEET } from './lib/bookExcel';
+import { styleHeader } from './lib/excel';
 
 const OUT = path.resolve(process.cwd(), 'templates', 'book_template.xlsx');
-
-function styleHeader(sheet: ExcelJS.Worksheet): void {
-  const header = sheet.getRow(1);
-  header.font = { bold: true };
-  header.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8EEF9' } };
-  sheet.views = [{ state: 'frozen', ySplit: 1 }];
-}
 
 async function main(): Promise<void> {
   const workbook = new ExcelJS.Workbook();

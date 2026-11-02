@@ -18,7 +18,8 @@ import fs from 'fs';
 import path from 'path';
 import readline from 'readline/promises';
 import { connect, describeError, getAdminUserId, type Db } from './lib/db';
-import { normalizeTerm, parseBookWorkbook, type ParsedBook, type ParsedUnit } from './lib/bookExcel';
+import { parseBookWorkbook, type ParsedBook, type ParsedUnit } from './lib/bookExcel';
+import { normalizeTerm } from './lib/excel';
 
 interface Args {
   file: string;
