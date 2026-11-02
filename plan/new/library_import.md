@@ -82,7 +82,7 @@
   - `scripts/lib/libraryExcel.ts`: разбор и проверки по формату выше.
   - `scripts/create-library-template.ts` → `templates/library_template.xlsx`
     (выпадающий список категорий, пример набора).
-- [ ] **LibImport 3. Скрипт импорта.** `scripts/import-library.ts`.
+- [x] **LibImport 3. Скрипт импорта.** `scripts/import-library.ts`. Инструкция — в README.
   - Одна транзакция, `pg_advisory_xact_lock`, `--dry-run` откатывает. Проверка, что `LIBRARY_AUTHOR_ID` существует и `is_admin`.
   - Отчёт: наборы новые / обновлённые / без изменений, карточек всего, статус каждого, наборы в базе, которых нет в файле.
 - [ ] **LibImport 4. Новые категории.**

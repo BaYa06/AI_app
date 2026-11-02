@@ -188,6 +188,32 @@ npx tsx scripts/publish-book.ts "Solutions Pre-Intermediate" "3rd" --unpublish  
 
 Опубликовать можно и сразу при импорте, флагом `--publish`.
 
+## 🗂 Библиотека: импорт наборов из Excel
+
+Наборы библиотеки загружаются пачками локальным скриптом прямо в `library_sets` / `library_cards`. План: `plan/new/library_import.md`.
+
+### Настройка (один раз на каждую базу)
+
+```bash
+npx tsx scripts/create-library-author.ts   # служебный автор «Flashly», печатает id
+```
+
+Полученный id впишите в `.env.local` как `LIBRARY_AUTHOR_ID`. В этот аккаунт нельзя войти, поэтому его нельзя удалить из приложения вместе с библиотекой.
+
+### Шаблон и импорт
+
+```bash
+npx tsx scripts/create-library-template.ts                 # → templates/library_template.xlsx
+npx tsx scripts/import-library.ts sets.xlsx --dry-run      # проверка + отчёт, база не меняется
+npx tsx scripts/import-library.ts sets.xlsx                # импорт, новые наборы — черновики
+npx tsx scripts/import-library.ts sets.xlsx --publish      # черновики из файла → в библиотеку
+```
+
+- Один файл — сколько угодно наборов. Лист «Наборы»: `title, category, language_from, language_to` обязательны, `description, tags, cover_emoji` по желанию. Лист «Карточки»: `set` (title набора), `term`, `translation` обязательны, `example` по желанию. В наборе не меньше 5 карточек.
+- `category` — только из списка на листе «Категории» шаблона, это категории библиотеки в приложении.
+- При повторном импорте набор находится по `title` и языкам, карточки заменяются целиком. Лайки, оценки и число импортов сохраняются. У пользователей, которые уже взяли набор, остаётся их копия.
+- Снятые с публикации (`archived`) наборы `--publish` не возвращает.
+
 ## 🤖 Сборка APK в Codemagic
 
 1. Добавьте в Codemagic group `keystore_credentials` переменные: `CM_KEYSTORE_BASE64` (base64 от release keystore), `CM_KEYSTORE_PASSWORD`, `CM_KEY_ALIAS`, `CM_KEY_PASSWORD`.
