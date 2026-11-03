@@ -208,3 +208,17 @@ export function sessionPhaseForAnswer(card: Card, now: number = Date.now()): Les
   if ((card.learningStep || 0) === 0 && !(card.lastReviewDate > 0)) return 'new';
   return null;
 }
+
+/**
+ * Слово к концу сессии слабое: уровень упал (шаг 0 после ответа) или ему снова пора повторить.
+ * То же правило, по которому следующая сессия начнётся с «Повторить» (buildSetSessionPlan).
+ * Ошибка только в Парах / На слух / Слове в контексте уровень не меняет — слово не слабое.
+ */
+export function isSessionWordWeak(card: Card, now: number = Date.now()): boolean {
+  return ((card.learningStep || 0) === 0 && card.lastReviewDate > 0) || isCardWaitingReview(card, now);
+}
+
+/** Все слова сессии без повторов, в порядке первого появления */
+export function sessionCardIds(session: SessionRouteParams): string[] {
+  return [...new Set(session.stages.flatMap((s) => s.cardIds))];
+}

@@ -21,6 +21,7 @@ import { useCardsStore } from '@/store/cardsStore';
 import { Badge, Button, Card, ScreenHeader, Sheet, useScreenBottomInset } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
 import { WidgetPromptCard } from '@/components/widget/WidgetPromptCard';
+import { SessionSummary } from '@/components/study/SessionSummary';
 import { WidgetHowToSheet } from '@/components/widget/WidgetHowToSheet';
 import {
   addLessonDay,
@@ -201,10 +202,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   });
 
   // Логика кнопки: если фаза завершена - "Закончить", иначе - "Следующие карточки (N осталось)"
-  // Итоги сессии — только после последнего этапа (новый экран итогов — Session 10)
-  const primaryButtonLabel = session
-    ? 'Закончить'
-    : isPhaseComplete
+  const primaryButtonLabel = isPhaseComplete
     ? (lesson ? nextLessonLabel(lesson, (n) => pluralize(n, 'новое слово', 'новых слова', 'новых слов')) : 'Закончить')
     : remainingInPhase > 0 
       ? `Следующие карточки (${remainingInPhase} ${remainingInPhase === 1 ? 'осталась' : remainingInPhase < 5 ? 'осталось' : 'осталось'})`
@@ -218,8 +216,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   };
 
   const handleBack = () => {
-    if (session) navigation.navigate('SetDetail', { setId: session.setId });
-    else navigation.navigate('Main', { screen: 'Home' });
+    navigation.navigate('Main', { screen: 'Home' });
   };
 
   const handleSettings = () => {
@@ -244,10 +241,6 @@ export function StudyResultsScreen({ navigation, route }: Props) {
     });
     
     // Если фаза завершена — возвращаем к набору или на главную (если запущено из HomeScreen)
-    if (session) {
-      navigation.navigate('SetDetail', { setId: session.setId });
-      return;
-    }
     if (isPhaseComplete) {
       // Урок дня: следующая часть (повторение → новые слова → проверка), в конце — главная
       if (lesson) {
@@ -379,6 +372,17 @@ export function StudyResultsScreen({ navigation, route }: Props) {
 
   // Пока экран заменяется следующим этапом — пустой фон, без мигания итогов
   if (sessionStep) return <View style={[styles.container, { backgroundColor: colors.background }]} />;
+
+  // Последний этап сессии — свои итоги (решение 14 плана)
+  if (session) {
+    return (
+      <>
+        <SessionSummary session={session} />
+        <StreakCelebration visible={showStreakModal} streakCount={streakCount ?? 0} onClose={() => setShowStreakModal(false)} />
+        <RatingPromptModal visible={showRatingPrompt} onClose={() => setShowRatingPrompt(false)} />
+      </>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

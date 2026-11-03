@@ -5,9 +5,11 @@ import {
   firstLessonStep,
   firstSessionStep,
   fitsSessionStage,
+  isSessionWordWeak,
   lessonPhaseForAnswer,
   nextLessonLabel,
   nextLessonStep,
+  sessionCardIds,
   sessionPhaseForAnswer,
   sessionStepAfterPortion,
 } from '../lessonFlow';
@@ -209,5 +211,13 @@ describe('сессия набора', () => {
     expect(sessionPhaseForAnswer({ ...card(0, NOW - DAY), lastReviewDate: NOW - DAY }, NOW)).toBeNull();
     expect(sessionPhaseForAnswer(card(2, NOW - DAY), NOW)).toBe('review');
     expect(sessionPhaseForAnswer(card(2, NOW + 3 * DAY), NOW)).toBeNull();
+  });
+
+  it('итоги: слабое — уровень упал или снова пора повторить', () => {
+    expect(isSessionWordWeak({ ...card(0, NOW), lastReviewDate: NOW - 1000 }, NOW)).toBe(true);
+    expect(isSessionWordWeak(card(1, NOW - 1000), NOW)).toBe(true);
+    expect(isSessionWordWeak(card(1, NOW + DAY), NOW)).toBe(false);
+    expect(isSessionWordWeak(card(0, 0), NOW)).toBe(false);
+    expect(sessionCardIds(session(0))).toEqual(['a-1', 'a-2', 'a-3', 'a-4', 'a-5']);
   });
 });
