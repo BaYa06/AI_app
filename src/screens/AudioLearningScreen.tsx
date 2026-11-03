@@ -16,7 +16,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Settings, Mic, Check, X, AudioLines } from 'lucide-react-native';
 import { useThemeColors, useSettingsStore, useCardsStore, useSetsStore } from '@/store';
 import { Text } from '@/components/common';
-import { Button, ProgressBar, ScreenHeader, Switch, toast, useScreenBottomInset } from '@/components/ui';
+import { Button, Switch, toast } from '@/components/ui';
+import { StageLayout } from '@/components/study/StageLayout';
 import { spacing, borderRadius, heights, iconSize, screenPadding, alpha } from '@/constants';
 import { DatabaseService } from '@/services';
 import { playCorrectSound, preloadSound } from '@/utils/sound';
@@ -65,7 +66,6 @@ export function AudioLearningScreen({ navigation, route }: Props) {
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   // Верхний safe area уже учтён в App.tsx; снизу — свой (экран без панели вкладок)
   const insets = useSafeAreaInsets();
-  const bottomInset = useScreenBottomInset();
 
   // Phase refs
   const currentPhaseId = useRef(phaseId || `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
@@ -136,7 +136,6 @@ export function AudioLearningScreen({ navigation, route }: Props) {
 
   const currentCard = cards[currentIndex] || null;
   const totalCards = cards.length;
-  const progress = totalCards > 0 ? Math.round(((currentIndex + 1) / totalCards) * 100) : 0;
 
   // Preload sounds + update last studied
   useEffect(() => {
@@ -484,27 +483,70 @@ export function AudioLearningScreen({ navigation, route }: Props) {
 
   const cardBorderWidth = sessionState === 'idle' ? 1 : 3;
 
-  return (
-    <View style={[styles.container, { backgroundColor: colors.background, paddingBottom: bottomInset }]}>
-      <ScreenHeader
-        title="Аудио"
-        onBack={handleBack}
-        bordered
-        right={<Button variant="icon" icon={Settings} accessibilityLabel="Настройки" onPress={openSettings} />}
-      />
+  const bottomActions = (
+    <View style={styles.bottomActions}>
+      {!isRunning ? (
+        /* Кнопка "Начать" — запускает сессию */
+        <Button title="Начать" icon={Mic} onPress={handleStart} fullWidth />
+      ) : (
+        /* Сессия активна: показываем состояние + кнопки */
+        <View style={styles.runningArea}>
+          {sessionState === 'listening' ? (
+            <>
+              <Animated.View
+                accessible
+                accessibilityLabel="Слушаю"
+                style={[styles.listeningRow, { opacity: pulseAnim }]}
+              >
+                <AudioLines size={iconSize.l} color={colors.warning} />
+              </Animated.View>
 
-      {/* Progress Section */}
-      <View style={styles.progressSection}>
-        <View style={styles.progressHeader}>
-          <Text variant="label" style={{ color: colors.primary }}>
-            ({currentIndex + 1}/{totalCards})
-          </Text>
-          <Text variant="overline" color="secondary">
-            Аудиотренировка
-          </Text>
+              <Button variant="secondary" title="Не знаю" onPress={handleSkip} fullWidth />
+            </>
+          ) : sessionState === 'correct' ? (
+            <View
+              accessible
+              accessibilityLabel="Верно"
+              style={[styles.resultIndicator, { backgroundColor: alpha(colors.success, 10) }]}
+            >
+              <Check size={iconSize.l} color={colors.successText} />
+            </View>
+          ) : sessionState === 'incorrect' ? (
+            <View
+              accessible
+              accessibilityLabel="Неверно"
+              style={[styles.resultIndicator, { backgroundColor: alpha(colors.error, 10) }]}
+            >
+              <X size={iconSize.l} color={colors.errorText} />
+            </View>
+          ) : null}
+
+          <Button variant="quiet" tone="secondary" title="Стоп" onPress={handleStop} />
         </View>
-        <ProgressBar progress={progress} accessibilityLabel="Прогресс" />
-      </View>
+      )}
+    </View>
+  );
+
+  // Общий скелет: шапка и подпись задания. Низ — свой: режим идёт без рук (микрофон включён
+  // всю тренировку, ответ проверяется и следующее слово начинается сами), кнопка «Дальше» его сломала бы
+  return (
+    <StageLayout
+      progress={{ done: currentIndex, total: totalCards }}
+      task="Произнеси перевод вслух"
+      taskAction={
+        <Button
+          variant="icon"
+          icon={Settings}
+          iconSize={iconSize.s}
+          iconColor={colors.textSecondary}
+          accessibilityLabel="Настройки"
+          onPress={openSettings}
+        />
+      }
+      onExit={handleBack}
+      scroll={false}
+      footer={bottomActions}
+    >
 
       {/* Main Content Area */}
       <View style={styles.contentArea}>
@@ -580,55 +622,6 @@ export function AudioLearningScreen({ navigation, route }: Props) {
           </View>
         </View>
 
-        {/* Description */}
-        <View style={styles.modeDescription}>
-          <Text variant="bodySmall" color="secondary" align="center">
-            Произнеси перевод слова
-          </Text>
-        </View>
-      </View>
-
-      {/* Bottom Actions */}
-      <View style={styles.bottomActions}>
-        {!isRunning ? (
-          /* Кнопка "Начать" — запускает сессию */
-          <Button title="Начать" icon={Mic} onPress={handleStart} fullWidth />
-        ) : (
-          /* Сессия активна: показываем состояние + кнопки */
-          <View style={styles.runningArea}>
-            {sessionState === 'listening' ? (
-              <>
-                <Animated.View
-                  accessible
-                  accessibilityLabel="Слушаю"
-                  style={[styles.listeningRow, { opacity: pulseAnim }]}
-                >
-                  <AudioLines size={iconSize.l} color={colors.warning} />
-                </Animated.View>
-
-                <Button variant="secondary" title="Не знаю" onPress={handleSkip} fullWidth />
-              </>
-            ) : sessionState === 'correct' ? (
-              <View
-                accessible
-                accessibilityLabel="Верно"
-                style={[styles.resultIndicator, { backgroundColor: alpha(colors.success, 10) }]}
-              >
-                <Check size={iconSize.l} color={colors.successText} />
-              </View>
-            ) : sessionState === 'incorrect' ? (
-              <View
-                accessible
-                accessibilityLabel="Неверно"
-                style={[styles.resultIndicator, { backgroundColor: alpha(colors.error, 10) }]}
-              >
-                <X size={iconSize.l} color={colors.errorText} />
-              </View>
-            ) : null}
-
-            <Button variant="quiet" tone="secondary" title="Стоп" onPress={handleStop} />
-          </View>
-        )}
       </View>
 
       {/* Settings Modal */}
@@ -666,36 +659,21 @@ export function AudioLearningScreen({ navigation, route }: Props) {
           </Animated.View>
         </View>
       </Modal>
-    </View>
+    </StageLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
   semibold: {
     fontWeight: '600',
   },
 
-  // Progress
-  progressSection: {
-    paddingHorizontal: spacing.l,
-    paddingVertical: spacing.m,
-    gap: spacing.xs,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-  },
-
   // Content
+  // Боковой отступ даёт StageLayout
   contentArea: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: spacing.l,
   },
 
   // Card Stack
@@ -739,17 +717,9 @@ const styles = StyleSheet.create({
     gap: spacing.xxs,
   },
 
-  // Mode Description
-  modeDescription: {
-    maxWidth: 240,
-    marginTop: spacing.xxl + spacing.m,
-  },
-
   // Bottom
   bottomActions: {
-    paddingHorizontal: spacing.l,
-    paddingTop: spacing.m,
-    paddingBottom: spacing.l,
+    paddingTop: spacing.xs,
   },
   listeningRow: {
     height: 48,
