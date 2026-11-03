@@ -5,7 +5,7 @@
  * список в шторке, одна кнопка. «Продолжить» — следующая сессия по тому же плану, что и шторка
  * (слабые слова в ней идут первыми сами). Учить нечего — «Готово».
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { ChevronRight, Clock, Target, X, Zap } from 'lucide-react-native';
 import { useCardsStore, useSettingsStore, useThemeColors } from '@/store';
-import { Text } from '@/components/common';
+import { StreakCelebration, Text } from '@/components/common';
 import { Badge, Button, Sheet, useScreenBottomInset } from '@/components/ui';
 import type { IconComponent } from '@/components/ui';
 import { alpha, borderRadius, heights, iconSize, screenPadding, spacing } from '@/constants';
@@ -32,7 +32,7 @@ const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padSta
 // Ниже этой высоты экрана (iPhone SE — 667) картинка и промежутки меньше, чтобы всё влезло без прокрутки
 const COMPACT_HEIGHT = 700;
 
-export function SessionSummary({ session }: { session: SessionRouteParams }) {
+export function SessionSummary({ session, streakCount }: { session: SessionRouteParams; streakCount?: number }) {
   const colors = useThemeColors();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
@@ -42,6 +42,9 @@ export function SessionSummary({ session }: { session: SessionRouteParams }) {
   const cardsMap = useCardsStore((s) => s.cards);
   const todayStats = useSettingsStore((s) => s.todayStats);
   const [wordsOpen, setWordsOpen] = useState(false);
+  const [streakVisible, setStreakVisible] = useState(false);
+  // Переход, который ждёт закрытия празднования серии
+  const afterStreakRef = useRef<(() => void) | null>(null);
 
   // Считаем один раз — на момент окончания сессии
   const { list, weakIds, info, xp, seconds } = useMemo(() => {
@@ -81,13 +84,25 @@ export function SessionSummary({ session }: { session: SessionRouteParams }) {
 
   const plan = info?.plan;
   const canContinue = !!plan && (plan.mode === 'review' || plan.mode === 'learn' || plan.mode === 'more');
-  const toSet = () => {
+  const goToSet = () => navigation.navigate('SetDetail', { setId: session.setId });
+  // Серия выросла — празднуем после итогов, по нажатию кнопки, и уже потом уходим с экрана (решение 14)
+  const leave = (go: () => void) => {
     motion.stop();
-    navigation.navigate('SetDetail', { setId: session.setId });
+    if (streakCount && !afterStreakRef.current) {
+      afterStreakRef.current = go;
+      setStreakVisible(true);
+      return;
+    }
+    go();
   };
-  const handleContinue = () => {
-    motion.stop();
-    if (!plan || !startSetSession(navigation, session.setId, plan, 'replace')) toSet();
+  const toSet = () => leave(goToSet);
+  const handleContinue = () =>
+    leave(() => {
+      if (!plan || !startSetSession(navigation, session.setId, plan, 'replace')) goToSet();
+    });
+  const handleStreakClose = () => {
+    setStreakVisible(false);
+    afterStreakRef.current?.();
   };
 
   const title = !canContinue ? 'На сегодня всё!' : weak === 0 ? 'Без ошибок!' : 'Хорошая работа!';
@@ -193,6 +208,8 @@ export function SessionSummary({ session }: { session: SessionRouteParams }) {
           </View>
         ))}
       </Sheet>
+
+      <StreakCelebration visible={streakVisible} streakCount={streakCount ?? 0} onClose={handleStreakClose} />
     </View>
   );
 }

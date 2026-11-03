@@ -22,6 +22,7 @@ import { Badge, Button, Card, ScreenHeader, Sheet, useScreenBottomInset } from '
 import type { RootStackScreenProps } from '@/types/navigation';
 import { WidgetPromptCard } from '@/components/widget/WidgetPromptCard';
 import { SessionSummary } from '@/components/study/SessionSummary';
+import { SUMMARY_ANIMATION_MS } from '@/components/study/useSummaryChoreography';
 import { WidgetHowToSheet } from '@/components/widget/WidgetHowToSheet';
 import {
   addLessonDay,
@@ -93,7 +94,8 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   const streakGrew = streakIncreased === true || (!sessionStep && !!session?.streakCount);
   const bottomInset = useScreenBottomInset();
   const [showErrorsModal, setShowErrorsModal] = React.useState(false);
-  const [showStreakModal, setShowStreakModal] = React.useState(!sessionStep && streakGrew);
+  // Итоги сессии празднуют серию сами — по нажатию кнопки, после анимации (plan/new/session_results.md, решение 14)
+  const [showStreakModal, setShowStreakModal] = React.useState(!sessionStep && !session && streakGrew);
   const [showRatingPrompt, setShowRatingPrompt] = React.useState(false);
 
   // Окно оценки — только в хороший момент (правила в services/feedback.ts). Когда показываем
@@ -103,10 +105,11 @@ export function StudyResultsScreen({ navigation, route }: Props) {
     const goodMoment = recordSessionForRatingPrompt({ totalCards, errors });
     // В день, когда показали «Что нового», второе окно с просьбой не открываем
     if (!goodMoment || streakGrew || wasWhatsNewShownOn(localDay())) return;
+    // На итогах сессии — не раньше конца анимации счёта
     const timer = setTimeout(() => {
       markRatingPromptShown();
       setShowRatingPrompt(true);
-    }, 1200);
+    }, session ? SUMMARY_ANIMATION_MS + 500 : 1200);
     return () => clearTimeout(timer);
   }, []);
 
@@ -390,8 +393,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   if (session) {
     return (
       <>
-        <SessionSummary session={session} />
-        <StreakCelebration visible={showStreakModal} streakCount={streakCount ?? 0} onClose={() => setShowStreakModal(false)} />
+        <SessionSummary session={session} streakCount={streakGrew ? streakCount : undefined} />
         <RatingPromptModal visible={showRatingPrompt} onClose={() => setShowRatingPrompt(false)} />
       </>
     );

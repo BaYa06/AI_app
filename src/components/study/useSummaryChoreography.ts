@@ -37,6 +37,9 @@ const tileDone = (i: number) => tileStart(i) + T.countMs;
 const FINISH_AT = tileDone(TILES - 1) + T.finishAfterMs;
 const END_AT = FINISH_AT + (SESSION_SFX_HIT_MS.finish ?? 0) + T.hapticLagMs + 50;
 
+/** Длительность всей анимации итогов — раньше другие окна поверх не открываем */
+export const SUMMARY_ANIMATION_MS = END_AT;
+
 const easeOut = (p: number) => 1 - Math.pow(1 - p, 3);
 
 export interface TileMotion {
