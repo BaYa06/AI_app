@@ -46,6 +46,8 @@ interface Props {
   onIntroDone?: () => void;
   /** Нижняя панель: ответ (AnswerPanel) или действие режима */
   footer?: React.ReactNode;
+  /** false — без прокрутки: свайп карточки не спорит с прокруткой, содержимое растягивается на экран */
+  scroll?: boolean;
   children: React.ReactNode;
 }
 
@@ -58,6 +60,7 @@ export const StageLayout = memo(function StageLayout({
   showIntro = false,
   onIntroDone,
   footer,
+  scroll = true,
   children,
 }: Props) {
   const colors = useThemeColors();
@@ -95,6 +98,16 @@ export const StageLayout = memo(function StageLayout({
     const timer = setTimeout(() => setIntroVisible(false), INTRO_MS);
     return () => clearTimeout(timer);
   }, [introVisible]);
+
+  const taskRow =
+    task || taskAction ? (
+      <View style={styles.taskRow}>
+        <Text variant="overline" style={[styles.flex1, { color: colors.textSecondary }]}>
+          {task}
+        </Text>
+        {taskAction}
+      </View>
+    ) : null;
 
   const fraction = progress.total > 0 ? Math.min(1, progress.done / progress.total) : 0;
   const stagesLeft = session ? session.stages.length - session.index : 0;
@@ -145,17 +158,17 @@ export const StageLayout = memo(function StageLayout({
         )}
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {task || taskAction ? (
-          <View style={styles.taskRow}>
-            <Text variant="overline" style={[styles.flex1, { color: colors.textSecondary }]}>
-              {task}
-            </Text>
-            {taskAction}
-          </View>
-        ) : null}
-        {children}
-      </ScrollView>
+      {scroll ? (
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          {taskRow}
+          {children}
+        </ScrollView>
+      ) : (
+        <View style={[styles.content, styles.flex1]}>
+          {taskRow}
+          {children}
+        </View>
+      )}
 
       {footer ? (
         <View style={[styles.footer, { paddingBottom: Math.max(bottomInset, spacing.m) }]}>{footer}</View>

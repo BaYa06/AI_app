@@ -7,7 +7,8 @@ import { View, StyleSheet, Pressable, Dimensions, Animated, Modal, AppState, Pla
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useCardsStore, useSetsStore, useStudyStore, useThemeColors, useSettingsStore, selectSetStats } from '@/store';
 import { Text, Loading } from '@/components/common';
-import { Button, ProgressBar, ScreenHeader, Switch } from '@/components/ui';
+import { Button, Switch } from '@/components/ui';
+import { StageLayout } from '@/components/study/StageLayout';
 import { buildStudyQueue, getCardStatus } from '@/services/SRSService';
 import { StatusBadge } from '@/components/cards';
 import { ProgressService } from '@/services/ProgressService';
@@ -578,8 +579,9 @@ export function StudyScreen({ navigation, route }: Props) {
     }
     finishStudySession();
     endSession();
-    navigation.goBack();
-  }, [finishStudySession, endSession, navigation, session, setId]);
+    if (sessionRoute) navigation.navigate('SetDetail', { setId: sessionRoute.setId });
+    else navigation.goBack();
+  }, [finishStudySession, endSession, navigation, session, setId, sessionRoute]);
 
   // Сохраняем активность при уходе в background
   useEffect(() => {
@@ -753,21 +755,44 @@ export function StudyScreen({ navigation, route }: Props) {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScreenHeader
-        title="Карточки"
-        onBack={handleFinish}
-        right={<Button variant="icon" icon={Settings} accessibilityLabel="Настройки" onPress={openSettings} />}
-      />
-
-      {/* Прогресс бар */}
-      <View style={styles.progressSection}>
-        <Text variant="bodySmall" style={[styles.semibold, { color: colors.textSecondary }]}>
-          {progress.current}/{progress.total}
-        </Text>
-        <ProgressBar progress={progress.percentage} accessibilityLabel="Прогресс" />
-      </View>
-
+    <StageLayout
+      session={sessionRoute}
+      progress={{ done: Math.max(0, progress.current - 1), total: progress.total }}
+      task="Вспомни перевод"
+      taskAction={
+        <Button
+          variant="icon"
+          icon={Settings}
+          iconSize={iconSize.s}
+          iconColor={colors.textSecondary}
+          accessibilityLabel="Настройки"
+          onPress={openSettings}
+        />
+      }
+      onExit={handleFinish}
+      showIntro={phaseOffset === 0 && !phaseFailedIds?.length}
+      scroll={false}
+      footer={
+        <View>
+          <Text variant="bodySmall" align="center" style={[styles.rateHint, { color: colors.textSecondary }]}>
+            Оцени, насколько уверенно знаешь
+          </Text>
+          <View style={styles.ratingGrid}>
+            {ratingOptions.map(({ rating, label, bg, text }) => (
+              <Pressable
+                key={rating}
+                onPress={() => handleRate(rating)}
+                accessibilityRole="button"
+                accessibilityLabel={label}
+                style={({ pressed }) => [styles.ratingButton, { backgroundColor: bg }, pressed && styles.pressed]}
+              >
+                <Text variant="label" numberOfLines={1} style={{ color: text }}>{label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      }
+    >
       {/* Основной контент */}
       <View style={styles.mainContent}>
         {/* Флеш-карточка */}
@@ -900,26 +925,7 @@ export function StudyScreen({ navigation, route }: Props) {
         </View>
       </Modal>
 
-      {/* Нижняя панель SRS - всегда доступна */}
-      <View style={[styles.bottomPanel, { backgroundColor: colors.background }]}>
-        <Text variant="bodySmall" align="center" style={[styles.rateHint, { color: colors.textSecondary }]}>
-          Оцени, насколько уверенно знаешь
-        </Text>
-        <View style={styles.ratingGrid}>
-          {ratingOptions.map(({ rating, label, bg, text }) => (
-            <Pressable
-              key={rating}
-              onPress={() => handleRate(rating)}
-              accessibilityRole="button"
-              accessibilityLabel={label}
-              style={({ pressed }) => [styles.ratingButton, { backgroundColor: bg }, pressed && styles.pressed]}
-            >
-              <Text variant="label" numberOfLines={1} style={{ color: text }}>{label}</Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-    </View>
+    </StageLayout>
   );
 }
 
@@ -936,19 +942,12 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
 
-  // Progress
-  progressSection: {
-    paddingHorizontal: spacing.l,
-    paddingVertical: spacing.xs,
-    gap: spacing.xs,
-  },
-
   // Main content
+  // Боковой отступ даёт StageLayout
   mainContent: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: screenPadding,
   },
 
   // Card
@@ -1027,11 +1026,6 @@ const styles = StyleSheet.create({
   },
 
   // Bottom panel
-  bottomPanel: {
-    paddingHorizontal: screenPadding,
-    paddingBottom: spacing.l,
-    paddingTop: spacing.xs,
-  },
   rateHint: {
     marginBottom: spacing.s,
   },
