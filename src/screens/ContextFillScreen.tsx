@@ -5,20 +5,19 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
-  ScrollView,
   StyleSheet,
   Pressable,
   ActivityIndicator,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Dumbbell, PartyPopper, ThumbsUp } from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { Button, ProgressBar, ScreenHeader, toast } from '@/components/ui';
+import { Button, ScreenHeader, toast } from '@/components/ui';
 import { useThemeColors, useCardsStore, useContextFillStore, useSetsStore } from '@/store';
-import { spacing, borderRadius, iconSize, screenPadding, alpha } from '@/constants';
+import { spacing, borderRadius, iconSize, alpha } from '@/constants';
 import { NeonService } from '@/services/NeonService';
 import { apiService } from '@/services/ApiService';
 import { getDistractors } from '@/utils/distractors';
+import { StageLayout, AnswerPanel } from '@/components/study/StageLayout';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card } from '@/types';
 import { ensureAiConsent } from '@/services/aiConsent';
@@ -66,7 +65,6 @@ function blankWord(example: string, word: string, wordForm?: string): string {
 export function ContextFillScreen({ navigation, route }: Props) {
   const { setId, cardLimit, dueCardIds, session } = route.params;
   const colors = useThemeColors();
-  const insets = useSafeAreaInsets();
 
   const getCardsBySet = useCardsStore((s) => s.getCardsBySet);
   const updateCard = useCardsStore((s) => s.updateCard);
@@ -232,25 +230,28 @@ export function ContextFillScreen({ navigation, route }: Props) {
         correctIdsRef.current = [...correctIdsRef.current, currentCard.id];
       }
 
-      advanceTimerRef.current = setTimeout(() => {
-        const next = currentIndex + 1;
-        if (next >= questions.length) {
-          recordSession(
-            correctIdsRef.current.length,
-            questions.length,
-            correctIdsRef.current,
-          );
-          if (session) finishSessionStage(questions.length, correctIdsRef.current.length);
-          else setFinished(true);
-        } else {
-          setCurrentIndex(next);
-          setSelectedOption(null);
-          setOptionState('neutral');
-        }
-      }, 1500);
     },
-    [selectedOption, optionsLoading, questions, currentIndex, session, finishSessionStage],
+    [selectedOption, optionsLoading, questions, currentIndex],
   );
+
+  // Дальше — по кнопке в нижней панели (общий скелет режима)
+  const handleNext = useCallback(() => {
+    const next = currentIndex + 1;
+    if (next >= questions.length) {
+      recordSession(correctIdsRef.current.length, questions.length, correctIdsRef.current);
+      if (session) finishSessionStage(questions.length, correctIdsRef.current.length);
+      else setFinished(true);
+      return;
+    }
+    setCurrentIndex(next);
+    setSelectedOption(null);
+    setOptionState('neutral');
+  }, [currentIndex, questions.length, recordSession, session, finishSessionStage]);
+
+  const handleExit = useCallback(() => {
+    if (session) navigation.navigate('SetDetail', { setId: session.setId });
+    else navigation.goBack();
+  }, [session, navigation]);
 
   useEffect(() => {
     return () => {
@@ -261,21 +262,20 @@ export function ContextFillScreen({ navigation, route }: Props) {
   // ── Вспомогательные значения ─────────────────────────────────────────────
 
   const currentCard = questions[currentIndex];
-  const progress = questions.length > 0 ? currentIndex / questions.length : 0;
 
   // ── Экран: подготовка ────────────────────────────────────────────────────
 
+  // Подготовка — в том же скелете, чтобы экран этапа сессии не прерывался
   if (prepLoading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ScreenHeader title="Слово в контексте" onBack={() => navigation.goBack()} />
+      <StageLayout session={session} progress={{ done: 0, total: 0 }} onExit={handleExit} showIntro={!!session} scroll={false}>
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text variant="body" align="center" style={[styles.prepText, { color: colors.textSecondary }]}>
             {prepStatus}
           </Text>
         </View>
-      </View>
+      </StageLayout>
     );
   }
 
@@ -318,30 +318,26 @@ export function ContextFillScreen({ navigation, route }: Props) {
     : '';
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScreenHeader
-        title="Слово в контексте"
-        onBack={() => navigation.goBack()}
-        right={
-          <Text variant="label" style={{ color: colors.textSecondary }}>
-            {currentIndex + 1} / {questions.length}
-          </Text>
-        }
-      />
-
-      {/* Progress bar */}
-      <View style={styles.progressWrap}>
-        <ProgressBar progress={Math.round(progress * 100)} accessibilityLabel="Прогресс" />
-      </View>
-
-      <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + spacing.xl }]}
-        showsVerticalScrollIndicator={false}
-      >
+    <StageLayout
+      session={session}
+      progress={{ done: currentIndex + (selectedOption !== null ? 1 : 0), total: questions.length }}
+      task="Заполни пропуск"
+      onExit={handleExit}
+      showIntro={!!session}
+      footer={
+        selectedOption !== null && currentCard ? (
+          <AnswerPanel
+            correct={optionState === 'correct'}
+            answer={currentCard.frontText}
+            hint={{ front: currentCard.frontText, back: currentCard.backText, example: currentCard.example || undefined }}
+            onNext={handleNext}
+          />
+        ) : null
+      }
+    >
         {/* Question card */}
-        <View style={[styles.questionCard, { backgroundColor: colors.primaryFill }]}>
-          <Text variant="overline" style={[styles.onFillMuted, { color: colors.onPrimary }]}>Заполни пропуск</Text>
-          <Text variant="h2" style={{ color: colors.onPrimary }}>{sentenceWithBlank}</Text>
+        <View style={[styles.questionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text variant="h2" style={{ color: colors.textPrimary }}>{sentenceWithBlank}</Text>
         </View>
 
         {/* Options */}
@@ -422,8 +418,7 @@ export function ContextFillScreen({ navigation, route }: Props) {
             })}
           </View>
         )}
-      </ScrollView>
-    </View>
+    </StageLayout>
   );
 }
 
@@ -433,10 +428,6 @@ const styles = StyleSheet.create({
   bold: { fontWeight: '700' },
   // Второстепенный текст на цветной заливке
   onFillMuted: { opacity: 0.85 },
-
-  progressWrap: {
-    paddingHorizontal: screenPadding,
-  },
 
   centered: {
     flex: 1,
@@ -449,14 +440,10 @@ const styles = StyleSheet.create({
     marginTop: spacing.s,
   },
 
-  scroll: {
-    paddingHorizontal: screenPadding,
-    paddingTop: spacing.l,
-    gap: spacing.l,
-  },
-
+  // Рамка без тени (брендбук, 7.3)
   questionCard: {
     borderRadius: borderRadius.l,
+    borderWidth: 1,
     padding: spacing.l,
     gap: spacing.m,
   },
