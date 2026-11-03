@@ -36,10 +36,14 @@ interface Props {
   progress: { done: number; total: number };
   /** Подпись задания над содержимым: «Как переводится?» */
   task?: string;
+  /** Действие справа от подписи задания: «Не могу слушать» */
+  taskAction?: React.ReactNode;
   /** Выйти из режима. В сессии вызывается только после подтверждения в окне */
   onExit: () => void;
   /** Начало этапа сессии — показать «Этап N из M» */
   showIntro?: boolean;
+  /** Экран «Этап N из M» ушёл (или его не было): можно, например, начать озвучку */
+  onIntroDone?: () => void;
   /** Нижняя панель: ответ (AnswerPanel) или действие режима */
   footer?: React.ReactNode;
   children: React.ReactNode;
@@ -49,8 +53,10 @@ export const StageLayout = memo(function StageLayout({
   session,
   progress,
   task,
+  taskAction,
   onExit,
   showIntro = false,
+  onIntroDone,
   footer,
   children,
 }: Props) {
@@ -82,7 +88,10 @@ export const StageLayout = memo(function StageLayout({
   }, [requestExit]);
 
   useEffect(() => {
-    if (!introVisible) return;
+    if (!introVisible) {
+      onIntroDone?.();
+      return;
+    }
     const timer = setTimeout(() => setIntroVisible(false), INTRO_MS);
     return () => clearTimeout(timer);
   }, [introVisible]);
@@ -137,10 +146,13 @@ export const StageLayout = memo(function StageLayout({
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {task ? (
-          <Text variant="overline" style={{ color: colors.textSecondary }}>
-            {task}
-          </Text>
+        {task || taskAction ? (
+          <View style={styles.taskRow}>
+            <Text variant="overline" style={[styles.flex1, { color: colors.textSecondary }]}>
+              {task}
+            </Text>
+            {taskAction}
+          </View>
         ) : null}
         {children}
       </ScrollView>
@@ -318,6 +330,11 @@ const styles = StyleSheet.create({
   },
   counter: {
     fontVariant: ['tabular-nums'],
+  },
+  taskRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
   },
   content: {
     flexGrow: 1,

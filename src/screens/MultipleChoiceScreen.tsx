@@ -39,7 +39,7 @@ type OptionState = 'neutral' | 'correct' | 'wrong';
 type Option = { id: string; label: string; text: string; isCorrect: boolean };
 
 export function MultipleChoiceScreen({ navigation, route }: Props) {
-  const { setId, cardLimit, dueCardIds, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0, phaseFailedIds, challengeMode, timeLimit: paramTimeLimit, sniperMode, forgottenMode, lesson, session } = route.params;
+  const { setId, cardLimit, dueCardIds, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0, phaseFailedIds, challengeMode, timeLimit: paramTimeLimit, sniperMode, forgottenMode, lesson, session, listen } = route.params;
   const colors = useThemeColors();
   const set = useSetsStore((s) => s.getSet(setId));
   const updateSetStats = useSetsStore((s) => s.updateSetStats);
@@ -85,6 +85,10 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
 
   // Обычный тест (не мини-игра главной): общий скелет режима, после ответа — панель с кнопкой
   const isPlainTest = !challengeMode && !sniperMode && !forgottenMode;
+  // «На слух» (этап сессии): вместо слова звучит озвучка, варианты — сами слова
+  const isListen = isPlainTest && !!listen;
+  // Озвучка — только когда экран «Этап N из M» ушёл, иначе она звучит под ним
+  const [introDone, setIntroDone] = useState(false);
   const [feedback, setFeedback] = useState<{
     correct: boolean;
     nextErrors: number;
@@ -210,12 +214,12 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
 
   // Обработчик озвучивания
   const handleSpeak = React.useCallback(
-    (text: string, counterpartText?: string, langHint?: string) => {
+    (text: string, counterpartText?: string, langHint?: string, rate?: number) => {
       if (!text) return;
       const normalized = text.trim().split(/\r?\n/)[0].trim();
       if (!normalized) return;
       const lang = resolveSpeechLang(normalized, langHint, counterpartText);
-      speak(normalized, lang).catch((error) => {
+      speak(normalized, lang, rate ? { rate } : undefined).catch((error) => {
         console.warn('[MultipleChoice] Speech error:', error);
       });
     },
@@ -230,6 +234,20 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
     const upcoming = [questions[currentIndex], questions[currentIndex + 1]].filter((c): c is Card => !!c && isCardSpeakable(c));
     prefetchSpeech(upcoming.map((c) => ({ text: getFront(c), counterpart: getBack(c), lang: cardSpeechLangs(c).front })));
   }, [questions, currentIndex]);
+  const playWord = React.useCallback(
+    (slow = false) => {
+      if (!currentCard) return;
+      handleSpeak(getFront(currentCard), getBack(currentCard), cardSpeechLangs(currentCard).front, slow ? 0.6 : undefined);
+    },
+    [currentCard, handleSpeak],
+  );
+  // «На слух»: слово звучит само при каждом новом вопросе
+  useEffect(() => {
+    if (!isListen || !introDone || !currentCard) return;
+    const timer = setTimeout(() => playWord(), 250);
+    return () => clearTimeout(timer);
+  }, [isListen, introDone, currentCard?.id]);
+
   const progressPercent = totalQuestions ? Math.round(((currentIndex + 1) / totalQuestions) * 100) : 0;
 
   const options = useMemo(() => {
@@ -244,10 +262,10 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
     return baseOptions.map((card, idx) => ({
       id: card.id,
       label: labels[idx] || '?',
-      text: getBack(card),
+      text: isListen ? getFront(card) : getBack(card),
       isCorrect: card.id === currentCard.id,
     }));
-  }, [currentCard, questions]);
+  }, [currentCard, questions, isListen]);
 
   const optionState = (option: Option): OptionState => {
     if (!showResult) return 'neutral';
@@ -700,10 +718,29 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
             </Text>
           </View>
         )}
-        <Text variant="h1" style={[styles.word, { color: colors.textPrimary }]}>
-          {getFront(currentCard)}
-        </Text>
-        {isCardSpeakable(currentCard) ? (
+        {isListen ? (
+          <View style={styles.listenRow}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Прослушать ещё раз"
+              onPress={() => playWord()}
+              style={({ pressed }) => [
+                styles.listenButton,
+                { backgroundColor: pressed ? alpha(colors.primary, 20) : alpha(colors.primary, 10) },
+              ]}
+            >
+              <Volume2 size={iconSize.l} color={colors.primary} />
+            </Pressable>
+            <Button variant="secondary" size="s" title="Медленнее" onPress={() => playWord(true)} />
+          </View>
+        ) : null}
+        {/* «На слух»: слово видно только после ответа */}
+        {!isListen || showResult ? (
+          <Text variant="h1" style={[styles.word, { color: colors.textPrimary }]}>
+            {getFront(currentCard)}
+          </Text>
+        ) : null}
+        {!isListen && isCardSpeakable(currentCard) ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Прослушать слово"
@@ -782,18 +819,38 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
       if (session) navigation.navigate('SetDetail', { setId: session.setId });
       else navigation.goBack();
     };
+    // «Не могу слушать»: этап пропускается целиком, итоги сессии решают, что дальше
+    const skipListen = () => {
+      if (!session) return;
+      navigation.replace('StudyResults', {
+        setId,
+        totalCards: 0,
+        learnedCards: 0,
+        timeSpent: Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000)),
+        errors: 0,
+        errorCards: [],
+        modeTitle: 'На слух',
+        session,
+      });
+    };
     return (
       <StageLayout
         session={session}
         progress={{ done: currentIndex + (showResult ? 1 : 0), total: totalQuestions }}
-        task={isSubjectSet(set) ? 'Выберите ответ' : 'Как переводится?'}
+        task={isListen ? 'Что вы слышите?' : isSubjectSet(set) ? 'Выберите ответ' : 'Как переводится?'}
+        taskAction={
+          isListen && session && !showResult ? (
+            <Button variant="quiet" size="s" title="Не могу слушать" onPress={skipListen} />
+          ) : null
+        }
         onExit={exitTest}
         showIntro={phaseOffset === 0 && !phaseFailedList.length}
+        onIntroDone={() => setIntroDone(true)}
         footer={
           feedback ? (
             <AnswerPanel
               correct={feedback.correct}
-              answer={getBack(currentCard)}
+              answer={isListen ? getFront(currentCard) : getBack(currentCard)}
               hint={{ front: getFront(currentCard), back: getBack(currentCard), example: currentCard.example || undefined }}
               onNext={handleNextQuestion}
             />
@@ -884,6 +941,17 @@ const styles = StyleSheet.create({
   },
   word: {
     textAlign: 'center',
+  },
+  listenRow: {
+    alignItems: 'center',
+    gap: spacing.s,
+  },
+  listenButton: {
+    width: 88,
+    height: 88,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   audioButton: {
     marginTop: spacing.m,

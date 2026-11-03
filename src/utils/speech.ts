@@ -614,7 +614,8 @@ const speakWithNativeTTS = async (
   try {
     if (typeof Tts.stop === 'function') await Tts.stop();
     if (typeof Tts.setDefaultLanguage === 'function') await Tts.setDefaultLanguage(lang);
-    if (typeof Tts.setDefaultRate === 'function') await Tts.setDefaultRate(options?.rate ?? 0.5);
+    // rate везде: 1 — обычная скорость; у голоса устройства обычная — 0.5
+    if (typeof Tts.setDefaultRate === 'function') await Tts.setDefaultRate(0.5 * (options?.rate ?? 1));
     if (typeof Tts.setDefaultPitch === 'function') await Tts.setDefaultPitch(options?.pitch ?? 1);
     if (typeof Tts.speak === 'function') {
       Tts.speak(text);
