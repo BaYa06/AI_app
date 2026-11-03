@@ -20,11 +20,12 @@ if (Platform.OS !== 'web') {
 const isNative = Platform.OS !== 'web';
 const canUseNativeSound = Boolean(Sound && typeof Sound.setCategory === 'function');
 
-// Enable playback in silence mode (iOS). mixWithOthers — музыка из других приложений не останавливается
-// (plan/new/session_results.md, решение 19)
+// Enable playback in silence mode (iOS). Без mixWithOthers: react-native-sound добавляет к нему
+// AllowBluetooth, а с Playback iOS такую опцию не принимает — категория молча не ставится, и беззвучный
+// режим глушит все звуки (plan/new/session_results.md, решение 19)
 if (isNative && canUseNativeSound) {
   try {
-    Sound.setCategory('Playback', true);
+    Sound.setCategory('Playback');
   } catch (error) {
     console.warn('[sound] Failed to set audio category:', error);
   }
