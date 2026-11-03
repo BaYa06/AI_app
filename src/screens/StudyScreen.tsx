@@ -58,6 +58,9 @@ const EXAMPLE_GAP = spacing.m * 2 + 2;
 const SWIPE_DISTANCE = CARD_WIDTH * 0.3;
 const SWIPE_VELOCITY = 800;
 const SWIPE_OUT_MS = 220;
+// Следующая карточка проявляется на месте отвеченной
+const CARD_IN_MS = 160;
+const CARD_IN_DELAY_MS = 32;
 
 type Props = RootStackScreenProps<'Study'>;
 
@@ -92,6 +95,10 @@ export function StudyScreen({ navigation, route }: Props) {
   const swipeFlying = useSharedValue(false);
   // Палец за порогом свайпа — вибрация при каждом пересечении порога
   const swipePastThreshold = useSharedValue(false);
+  // Видимость карточки — на UI-потоке вместе со сдвигом: отвеченная прячется в том же кадре,
+  // в котором возвращается в центр, и следующая проявляется уже со своим текстом (одна анимация)
+  const cardOpacity = useSharedValue(1);
+  const cardScale = useSharedValue(1);
   // Подсказка свайпа новичку: первые сессии, пока не сделал свайп — карточка покачивается
   // и внизу «← Не знаю · Уверенно →» (только на первой карточке)
   const [showSwipeHint, setShowSwipeHint] = useState(false);
@@ -117,7 +124,8 @@ export function StudyScreen({ navigation, route }: Props) {
   const [textBox, setTextBox] = useState(DEFAULT_TEXT_BOX);
   const [errorCards, setErrorCards] = useState<Array<{ id: string; front: string; back: string; rating: number }>>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [cardVisible, setCardVisible] = useState(true);
+  // Индекс карточки, которая уже показана, — по нему проявляем следующую (повтор «Почти» — та же карточка)
+  const [shownIndex, setShownIndex] = useState(-1);
   const reverseEnabled = useSettingsStore((s) => s.settings.reverseCards);
   const updateSettings = useSettingsStore((s) => s.updateSettings);
   const sheetTranslate = useRef(new Animated.Value(-220)).current;
@@ -310,6 +318,7 @@ export function StudyScreen({ navigation, route }: Props) {
       const cardId = session.queue[session.currentIndex];
       const card = useCardsStore.getState().getCard(cardId);
       setCurrentCard(card || null);
+      setShownIndex(session.currentIndex);
       cardShownAtRef.current = Date.now();
       // Новая карточка — на месте и лицевой стороной, без анимации переворота
       answeringRef.current = false;
@@ -319,6 +328,14 @@ export function StudyScreen({ navigation, route }: Props) {
       flipProgress.value = 0;
     }
   }, [session?.currentIndex]);
+
+  // Новая карточка уже отрисована — проявляем её (после ответа она спрятана). Пауза в пару кадров:
+  // на старой архитектуре текст до экрана доходит позже, чем анимация стартует на UI-потоке
+  useEffect(() => {
+    const duration = reduceMotion ? 0 : CARD_IN_MS;
+    cardScale.value = withDelay(CARD_IN_DELAY_MS, withTiming(1, { duration }));
+    cardOpacity.value = withDelay(CARD_IN_DELAY_MS, withTiming(1, { duration }));
+  }, [shownIndex]);
 
   // Покачивание карточки — после сброса позиции в эффекте выше, поэтому объявлено ниже него
   useEffect(() => {
@@ -336,7 +353,15 @@ export function StudyScreen({ navigation, route }: Props) {
   // Обработка оценки
   const handleRate = useCallback(
     async (rating: Rating, input: 'button' | 'swipe' = 'button') => {
-      if (!currentCard || answeringRef.current) return;
+      if (!currentCard || answeringRef.current) {
+        // Свайп не засчитан — карточку, спрятанную после вылета, возвращаем
+        if (input === 'swipe') {
+          swipeFlying.value = false;
+          cardScale.value = 1;
+          cardOpacity.value = withTiming(1, { duration: CARD_IN_MS });
+        }
+        return;
+      }
       if (input === 'button' && swipeFlying.value) return;
       answeringRef.current = true;
       triggerHaptic('selection');
@@ -505,6 +530,9 @@ export function StudyScreen({ navigation, route }: Props) {
           session: sessionRoute,
         });
       } else {
+        // Отвеченную карточку прячем до смены текста — следующую проявит эффект на shownIndex
+        cardOpacity.value = 0;
+        cardScale.value = 0.96;
         useStudyStore.setState((s) => ({
           ...s,
           session: s.session
@@ -519,10 +547,6 @@ export function StudyScreen({ navigation, route }: Props) {
             : null,
           isFlipped: false,
         }));
-        setCardVisible(false);
-        requestAnimationFrame(() => {
-          setTimeout(() => setCardVisible(true), 60);
-        });
       }
     },
     [currentCard, incrementTodayCards, session, setId, updateSetStats, navigation, errorCards, studiedInPhase, phaseOffset, isErrorReview, lesson, sessionRoute]
@@ -660,14 +684,23 @@ export function StudyScreen({ navigation, route }: Props) {
       const direction = e.translationX > 0 ? 1 : -1;
       swipeFlying.value = true;
       swipeX.value = withTiming(direction * SCREEN_WIDTH * 1.2, { duration: SWIPE_OUT_MS }, (finished) => {
-        if (finished) runOnJS(handleSwipe)(direction);
+        if (!finished) return;
+        // Улетела — прячем и возвращаем в центр лицом в одном кадре, пока на экране ещё её текст
+        cardOpacity.value = 0;
+        cardScale.value = 0.96;
+        swipeX.value = 0;
+        flipProgress.value = 0;
+        runOnJS(handleSwipe)(direction);
       });
     });
 
   const swipeStyle = useAnimatedStyle(() => {
     'worklet';
     const rotate = interpolate(swipeX.value, [-CARD_WIDTH, 0, CARD_WIDTH], [-12, 0, 12], Extrapolation.CLAMP);
-    return { transform: [{ translateX: swipeX.value }, { rotate: `${rotate}deg` }] };
+    return {
+      opacity: cardOpacity.value,
+      transform: [{ translateX: swipeX.value }, { rotate: `${rotate}deg` }, { scale: cardScale.value }],
+    };
   });
   // Подписи свайпа проступают вместе со сдвигом и на пороге видны полностью
   const swipeLeftStyle = useAnimatedStyle(() => {
@@ -802,10 +835,7 @@ export function StudyScreen({ navigation, route }: Props) {
               onPress={handleToggleCard}
               accessibilityRole="button"
               accessibilityLabel={isFlipped ? `Ответ: ${answerText}. Нажми, чтобы перевернуть` : `${questionText}. Нажми, чтобы перевернуть`}
-              style={[
-                styles.cardWrapper,
-                { opacity: cardVisible ? 1 : 0 },
-              ]}
+              style={styles.cardWrapper}
             >
               {/* Передняя сторона (вопрос) */}
               <ReAnimated.View style={[styles.cardAnim, frontAnimStyle]} pointerEvents={isFlipped ? 'none' : 'auto'}>
