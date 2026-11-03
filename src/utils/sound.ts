@@ -20,10 +20,11 @@ if (Platform.OS !== 'web') {
 const isNative = Platform.OS !== 'web';
 const canUseNativeSound = Boolean(Sound && typeof Sound.setCategory === 'function');
 
-// Enable playback in silence mode (iOS)
+// Enable playback in silence mode (iOS). mixWithOthers — музыка из других приложений не останавливается
+// (plan/new/session_results.md, решение 19)
 if (isNative && canUseNativeSound) {
   try {
-    Sound.setCategory('Playback');
+    Sound.setCategory('Playback', true);
   } catch (error) {
     console.warn('[sound] Failed to set audio category:', error);
   }
@@ -207,4 +208,37 @@ export function playCorrectSound(): void {
 
 export function playCorrectSound2(): void {
   playSound('/correct2.wav', 0.7).catch(() => {});
+}
+
+// ----------------- Звуки сессии «Изучить» (plan/new/session_results.md) -----------------
+// Только на этапах сессии и её итогах; свободная практика — на playCorrectSound / playCorrectSound2.
+
+export type SessionSfx = 'correct' | 'error' | 'pop' | 'reveal' | 'count' | 'ding' | 'finish';
+
+const sessionSfxUrl = (name: SessionSfx) => `/session_${name}.wav`;
+
+/** Главный удар звука, мс от начала файла — вибрацию даём в этот момент (замеры Results 1) */
+export const SESSION_SFX_HIT_MS: Partial<Record<SessionSfx, number>> = {
+  reveal: 10,
+  finish: 300,
+};
+
+export function preloadSessionSfx(names: SessionSfx[]): void {
+  names.forEach((name) => preloadSound(sessionSfxUrl(name)));
+}
+
+export function playSessionSfx(name: SessionSfx, volume = 0.7): void {
+  playSound(sessionSfxUrl(name), volume).catch(() => {});
+}
+
+/** Оборвать звуки сессии — например, «Продолжить» нажали посреди анимации итогов */
+export function stopSessionSfx(names: SessionSfx[]): void {
+  for (const name of names) {
+    const url = sessionSfxUrl(name);
+    if (isNative) {
+      nativeSoundCache.get(urlToAssetName(url))?.stop();
+    } else {
+      audioCache.get(url)?.pause();
+    }
+  }
 }

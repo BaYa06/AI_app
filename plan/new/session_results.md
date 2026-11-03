@@ -153,7 +153,12 @@
   замерить смещение «хлопка» в `session_reveal` и главного удара в `session_finish` (решение 11). Удалить `sounds/`.
   В `codemagic.yaml` после `build-ipa` — проверка, что все 7 `session_*.wav` (и старые `correct*.wav`) есть
   в `.ipa` (`unzip -l … | grep`), иначе сборка падает.
-- [ ] **Results 2. `utils/sound.ts`.** Именованные звуки сессии: `playSessionSfx('correct' | 'error' | 'pop' |
+- [x] **Results 2. `utils/sound.ts`.** ✅ `SessionSfx`, `playSessionSfx(name, volume = 0.7)`,
+  `preloadSessionSfx([...])`, `stopSessionSfx([...])` (обрывает уже играющие из кэша), `SESSION_SFX_HIT_MS`
+  (reveal 10, finish 300) для вибрации. Звуки идут через тот же `playSound` — переключатель «Звуки ответов»
+  выключает и их. `Sound.setCategory('Playback', true)`: музыка других приложений не прерывается — касается
+  и озвучки слов (общая аудиосессия). `playCorrectSound/2` без изменений. Проверка: tsc по src — 88 старых
+  ошибок, новых нет. Было в плане: Именованные звуки сессии: `playSessionSfx('correct' | 'error' | 'pop' |
   'reveal' | 'count' | 'ding' | 'finish')` и `preloadSessionSfx([...])`; старые `playCorrectSound/2` не трогаем
   (свободная практика). `setCategory('Playback', true)` (решение 19); остановка звука (`stopSfx`) для решения 10.
 - [ ] **Results 3. Звуки ответов в этапах сессии** (только при `route.params.session`; в свободной практике
