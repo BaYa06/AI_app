@@ -7,9 +7,13 @@
 //  система, поэтому оно плавное. Содержимое на SwiftUI повторяет StudyModeSheet.tsx.
 //  Фон листа непрозрачный (surface), без Liquid Glass.
 //
+//  Шторка набора (plan/new/study_session.md, Session 12): одна яркая кнопка сессии «Изучить»,
+//  тихая «Свободная практика» со всеми режимами, настройки практики под шестерёнкой. На главной
+//  (home) — только свободная практика. Тексты кнопки сессии считает JS (sessionSheetText.ts).
+//
 //  JS → present(options) / dismiss(). Обратно — событие StudyModeSheetEvent:
 //  { type: 'onlyHard', value: Bool }, { type: 'wordLimit', value: String },
-//  { type: 'select', mode }, { type: 'dismiss' } (закрыли жестом).
+//  { type: 'select', mode }, { type: 'start' }, { type: 'addWords' }, { type: 'dismiss' }.
 //
 
 import SwiftUI
@@ -46,6 +50,13 @@ class StudyModeSheetModule: RCTEventEmitter, UISheetPresentationControllerDelega
     }
   }
 
+  /// Закрыть лист и сообщить JS — после закрытия, чтобы переход на тренировку не дёргал анимацию
+  private func close(_ host: UIViewController?, emitting body: [String: Any]) {
+    guard let host, presented === host else { return }
+    presented = nil
+    host.dismiss(animated: true) { self.emit(body) }
+  }
+
   private func presentSheet(_ options: NSDictionary) {
     guard presented == nil, let top = RCTPresentedViewController() else { return }
 
@@ -53,7 +64,11 @@ class StudyModeSheetModule: RCTEventEmitter, UISheetPresentationControllerDelega
     let settings = options["settings"] as? NSDictionary ?? [:]
     let games = (options["games"] as? [NSDictionary] ?? []).map(StudyModeGame.init)
     let model = StudyModeSheetModel(
+      title: options["title"] as? String ?? "Свободная практика",
       subtitle: options["subtitle"] as? String ?? "",
+      home: options["home"] as? Bool ?? true,
+      noWords: options["noWords"] as? Bool ?? false,
+      session: StudySessionButton(options["session"] as? NSDictionary),
       games: games,
       onlyHard: settings["onlyHard"] as? Bool ?? false,
       wordLimit: settings["wordLimit"] as? String ?? "all",
@@ -65,27 +80,31 @@ class StudyModeSheetModule: RCTEventEmitter, UISheetPresentationControllerDelega
     host.overrideUserInterfaceStyle = (options["dark"] as? Bool ?? false) ? .dark : .light
 
     model.onChange = { [weak self] type, value in self?.emit(["type": type, "value": value]) }
-    model.onCancel = { [weak self, weak host] in
-      guard let self, let host, self.presented === host else { return }
-      self.presented = nil
-      host.dismiss(animated: true) { self.emit(["type": "dismiss"]) }
-    }
-    model.onSelect = { [weak self, weak host] mode in
-      guard let self, let host, self.presented === host else { return }
-      self.presented = nil
-      // Переход на тренировку — после закрытия листа, чтобы закрытие не дёргалось
-      host.dismiss(animated: true) { self.emit(["type": "select", "mode": mode]) }
-    }
+    model.onCancel = { [weak self, weak host] in self?.close(host, emitting: ["type": "dismiss"]) }
+    model.onSelect = { [weak self, weak host] mode in self?.close(host, emitting: ["type": "select", "mode": mode]) }
+    model.onStart = { [weak self, weak host] in self?.close(host, emitting: ["type": "start"]) }
+    model.onAddWords = { [weak self, weak host] in self?.close(host, emitting: ["type": "addWords"]) }
 
     host.modalPresentationStyle = .pageSheet
     if let sheet = host.sheetPresentationController {
       if #available(iOS 16.0, *) {
-        // Высота по содержимому; если не помещается — весь экран, внутри прокрутка
+        // Высота по содержимому; если не помещается — весь экран, внутри прокрутка.
+        // Раскрыли «Свободную практику» или настройки — высота пересчитывается.
         let width = top.view.bounds.width
-        let measured = UIHostingController(rootView: StudyModeSheetContent(model: model))
-          .sizeThatFits(in: CGSize(width: width, height: .greatestFiniteMagnitude))
-        let height = ceil(measured.height)
-        sheet.detents = [.custom(identifier: .init("content")) { context in min(height, context.maximumDetentValue) }]
+        let measure: () -> CGFloat = { [weak model] in
+          guard let model else { return 0 }
+          let size = UIHostingController(rootView: StudyModeSheetContent(model: model))
+            .sizeThatFits(in: CGSize(width: width, height: .greatestFiniteMagnitude))
+          return ceil(size.height)
+        }
+        var contentHeight = measure()
+        sheet.detents = [.custom(identifier: .init("content")) { context in min(contentHeight, context.maximumDetentValue) }]
+        model.onLayoutChange = { [weak sheet] in
+          DispatchQueue.main.async {
+            contentHeight = measure()
+            sheet?.animateChanges { sheet?.invalidateDetents() }
+          }
+        }
       } else {
         sheet.detents = [.large()]
       }
@@ -125,6 +144,7 @@ struct StudyModeGame: Identifiable {
   /// SF Symbol вместо иконки lucide из StudyModeSheet.tsx
   var symbol: String {
     switch mode {
+    case "classic": return "rectangle.on.rectangle"
     case "match": return "puzzlepiece"
     case "multipleChoice":
       if #available(iOS 16.0, *) { return "list.bullet.clipboard" }
@@ -134,6 +154,27 @@ struct StudyModeGame: Identifiable {
     case "contextFill": return "text.book.closed"
     default: return "square.grid.2x2"
     }
+  }
+}
+
+/// Кнопка сессии набора — тексты из JS (sessionSheetText.ts). kind: "button" или "empty"
+/// (пустой набор / меньше 4 слов: подсказка и «Добавить слова»)
+struct StudySessionButton {
+  let kind: String
+  let title: String
+  let caption: String
+  let route: String
+  let stageCount: Int
+  let text: String
+
+  init?(_ dict: NSDictionary?) {
+    guard let dict else { return nil }
+    kind = dict["kind"] as? String ?? "button"
+    title = dict["title"] as? String ?? ""
+    caption = dict["caption"] as? String ?? ""
+    route = dict["route"] as? String ?? ""
+    stageCount = (dict["stageCount"] as? NSNumber)?.intValue ?? 0
+    text = dict["text"] as? String ?? ""
   }
 }
 
@@ -183,22 +224,59 @@ struct StudyModePalette {
 }
 
 final class StudyModeSheetModel: ObservableObject {
+  let title: String
   let subtitle: String
+  /// Шторка на главной: только свободная практика, без кнопки сессии
+  let home: Bool
+  /// В наборе нет слов — свободная практика недоступна, шестерёнки нет
+  let noWords: Bool
+  let session: StudySessionButton?
   let games: [StudyModeGame]
   let palette: StudyModePalette
   @Published var onlyHard: Bool
   @Published var wordLimit: String
+  @Published var freeOpen: Bool
+  @Published var showSettings = false
 
   var onChange: (String, Any) -> Void = { _, _ in }
   var onSelect: (String) -> Void = { _ in }
+  var onStart: () -> Void = {}
+  var onAddWords: () -> Void = {}
   var onCancel: () -> Void = {}
+  /// Содержимое сменило высоту — лист подстраивается
+  var onLayoutChange: () -> Void = {}
 
-  init(subtitle: String, games: [StudyModeGame], onlyHard: Bool, wordLimit: String, palette: StudyModePalette) {
+  init(
+    title: String,
+    subtitle: String,
+    home: Bool,
+    noWords: Bool,
+    session: StudySessionButton?,
+    games: [StudyModeGame],
+    onlyHard: Bool,
+    wordLimit: String,
+    palette: StudyModePalette
+  ) {
+    self.title = title
     self.subtitle = subtitle
+    self.home = home
+    self.noWords = noWords
+    self.session = session
     self.games = games
     self.onlyHard = onlyHard
     self.wordLimit = wordLimit
     self.palette = palette
+    freeOpen = home
+  }
+
+  func toggleFree() {
+    freeOpen.toggle()
+    onLayoutChange()
+  }
+
+  func setSettings(_ on: Bool) {
+    showSettings = on
+    onLayoutChange()
   }
 }
 
@@ -213,7 +291,9 @@ private enum Metrics {
   static let l: CGFloat = 24
   static let radiusM: CGFloat = 12
   static let radiusL: CGFloat = 16
+  static let radiusXL: CGFloat = 24
   static let touch: CGFloat = 44
+  static let button: CGFloat = 52
 }
 
 struct StudyModeSheetView: View {
@@ -233,59 +313,137 @@ struct StudyModeSheetContent: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      HStack(spacing: Metrics.s) {
-        Text("Выбор режима")
-          .font(.system(size: 20, weight: .semibold))
-          .foregroundColor(Color(p.textPrimary))
-          .accessibilityAddTraits(.isHeader)
-        Spacer(minLength: 0)
-        Button("Отмена") { model.onCancel() }
-          .font(.system(size: 16, weight: .semibold))
-          .foregroundColor(Color(p.textSecondary))
-          .frame(minHeight: Metrics.touch)
-      }
-      .padding(.bottom, Metrics.xxs)
-
-      Text(model.subtitle)
-        .font(.system(size: 14))
-        .foregroundColor(Color(p.textSecondary))
-        .padding(.bottom, Metrics.m)
-
-      VStack(alignment: .leading, spacing: Metrics.l) {
-        RecommendedModeCard(palette: p) { model.onSelect("classic") }
-
-        VStack(alignment: .leading, spacing: Metrics.s) {
-          Overline(text: "Игры для закрепления", palette: p)
-          ForEach(model.games) { game in
-            GameRow(game: game, palette: p) { model.onSelect(game.mode) }
-          }
-        }
-
-        VStack(alignment: .leading, spacing: Metrics.s) {
-          Overline(text: "Настройки", palette: p)
-          SettingToggle(title: "Только «Не запомнил»", palette: p, isOn: binding(\.onlyHard, event: "onlyHard"))
-          HStack(spacing: Metrics.s) {
-            Text("Количество слов")
-              .font(.system(size: 16))
-              .foregroundColor(Color(p.textPrimary))
-            Spacer(minLength: 0)
-            HStack(spacing: Metrics.xs) {
-              ForEach(["10", "20", "30", "all"], id: \.self) { value in
-                Chip(label: value == "all" ? "Все" : value, selected: model.wordLimit == value, palette: p) {
-                  guard model.wordLimit != value else { return }
-                  model.wordLimit = value
-                  model.onChange("wordLimit", value)
-                }
-              }
-            }
-          }
-          .frame(minHeight: Metrics.touch)
-        }
+      header
+      if model.showSettings {
+        settings
+      } else {
+        main
       }
     }
     .padding(.horizontal, Metrics.m)
     .padding(.top, Metrics.l)
     .padding(.bottom, Metrics.m)
+  }
+
+  private var header: some View {
+    HStack(spacing: Metrics.xs) {
+      Text(model.showSettings ? "Настройки практики" : model.title)
+        .font(.system(size: 20, weight: .semibold))
+        .foregroundColor(Color(p.textPrimary))
+        .lineLimit(1)
+        .accessibilityAddTraits(.isHeader)
+      Spacer(minLength: 0)
+      if model.showSettings {
+        Button("Готово") { model.setSettings(false) }
+          .font(.system(size: 16, weight: .semibold))
+          .foregroundColor(Color(p.primary))
+          .frame(minHeight: Metrics.touch)
+      } else {
+        if !model.noWords {
+          IconButton(symbol: "gearshape", label: "Настройки практики", palette: p) { model.setSettings(true) }
+        }
+        IconButton(symbol: "xmark", label: "Закрыть", palette: p) { model.onCancel() }
+      }
+    }
+    .padding(.bottom, Metrics.xxs)
+  }
+
+  private var main: some View {
+    VStack(alignment: .leading, spacing: Metrics.m) {
+      Text(model.subtitle)
+        .font(.system(size: 14))
+        .foregroundColor(Color(p.textSecondary))
+
+      if let session = model.session {
+        if session.kind == "empty" {
+          EmptySessionBlock(session: session, palette: p) { model.onAddWords() }
+        } else {
+          SessionButtonView(session: session, palette: p) { model.onStart() }
+        }
+      }
+
+      if !model.home {
+        freeToggle
+      }
+
+      if model.freeOpen && !model.noWords {
+        VStack(spacing: Metrics.s) {
+          ForEach(model.games) { game in
+            GameRow(game: game, palette: p) { model.onSelect(game.mode) }
+          }
+        }
+      }
+    }
+  }
+
+  private var freeToggle: some View {
+    VStack(spacing: 0) {
+      Rectangle()
+        .fill(Color(p.border))
+        .frame(height: 1)
+      Button { model.toggleFree() } label: {
+        HStack(spacing: Metrics.s) {
+          VStack(alignment: .leading, spacing: 2) {
+            Text("Свободная практика")
+              .font(.system(size: 16, weight: .semibold))
+              .foregroundColor(Color(p.textPrimary))
+            Text(model.noWords ? "Появится, когда добавите слова" : "Любой режим отдельно")
+              .font(.system(size: 12))
+              .foregroundColor(Color(p.textSecondary))
+          }
+          Spacer(minLength: 0)
+          HStack(spacing: -6) {
+            ForEach(Array(model.games.prefix(5))) { game in
+              Image(systemName: game.symbol)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(Color(p.textSecondary))
+                .frame(width: 26, height: 26)
+                .background(Circle().fill(Color(p.surfaceMuted)))
+                .overlay(Circle().strokeBorder(Color(p.surface), lineWidth: 2))
+            }
+          }
+          .accessibilityHidden(true)
+          Image(systemName: "chevron.right")
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundColor(Color(p.textTertiary))
+            .rotationEffect(.degrees(model.freeOpen ? 90 : 0))
+        }
+        .frame(minHeight: Metrics.touch)
+        .padding(.top, Metrics.xs)
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(PressableStyle())
+      .disabled(model.noWords)
+      .opacity(model.noWords ? 0.6 : 1)
+      .accessibilityLabel("Свободная практика")
+      .accessibilityValue(model.freeOpen ? "Раскрыто" : "Свёрнуто")
+    }
+  }
+
+  private var settings: some View {
+    VStack(alignment: .leading, spacing: Metrics.s) {
+      SettingToggle(title: "Только «Не запомнил»", palette: p, isOn: binding(\.onlyHard, event: "onlyHard"))
+      HStack(spacing: Metrics.s) {
+        Text("Количество слов")
+          .font(.system(size: 16))
+          .foregroundColor(Color(p.textPrimary))
+        Spacer(minLength: 0)
+        HStack(spacing: Metrics.xs) {
+          ForEach(["10", "20", "30", "all"], id: \.self) { value in
+            Chip(label: value == "all" ? "Все" : value, selected: model.wordLimit == value, palette: p) {
+              guard model.wordLimit != value else { return }
+              model.wordLimit = value
+              model.onChange("wordLimit", value)
+            }
+          }
+        }
+      }
+      .frame(minHeight: Metrics.touch)
+      Text("Действуют только на свободную практику. Сколько слов взять в сессию, приложение решает само.")
+        .font(.system(size: 12))
+        .foregroundColor(Color(p.textSecondary))
+    }
+    .padding(.top, Metrics.s)
   }
 
   private func binding(_ keyPath: ReferenceWritableKeyPath<StudyModeSheetModel, Bool>, event: String) -> Binding<Bool> {
@@ -307,18 +465,6 @@ private struct PressableStyle: ButtonStyle {
   }
 }
 
-private struct Overline: View {
-  let text: String
-  let palette: StudyModePalette
-
-  var body: some View {
-    Text(text.uppercased())
-      .font(.system(size: 12, weight: .semibold))
-      .kerning(0.8)
-      .foregroundColor(Color(palette.textSecondary))
-  }
-}
-
 private struct IconBox: View {
   let symbol: String
   let tint: UIColor
@@ -333,154 +479,117 @@ private struct IconBox: View {
   }
 }
 
-private struct RecommendedModeCard: View {
+/// Главная кнопка шторки набора — единственный яркий элемент
+private struct SessionButtonView: View {
+  let session: StudySessionButton
   let palette: StudyModePalette
   let action: () -> Void
-
-  // Те же оценки и цвета, что в RecommendedModeCard.tsx
-  private var rates: [Rate] {
-    [
-      Rate(label: "Не знаю", fill: palette.ratingAgain, text: palette.errorText),
-      Rate(label: "Почти", fill: palette.ratingEasy, text: palette.info),
-      Rate(label: "Уверенно", fill: palette.ratingGood, text: palette.successText),
-    ]
-  }
 
   var body: some View {
     Button(action: action) {
       VStack(alignment: .leading, spacing: Metrics.s) {
-        HStack(spacing: Metrics.s) {
-          IconBox(symbol: "sparkles", tint: palette.primary, fill: palette.primary.withAlphaComponent(0.1))
-          VStack(alignment: .leading, spacing: 0) {
-            Text("Карточки")
-              .font(.system(size: 16, weight: .bold))
-              .foregroundColor(Color(palette.textPrimary))
-            Text("Переворот 180° • Классический режим")
-              .font(.system(size: 12))
-              .foregroundColor(Color(palette.textSecondary))
+        HStack(alignment: .top, spacing: Metrics.s) {
+          Image(systemName: "play.fill")
+            .font(.system(size: 18))
+            .foregroundColor(Color(palette.primaryFill))
+            .frame(width: Metrics.touch, height: Metrics.touch)
+            .background(Circle().fill(Color(palette.onPrimary)))
+          VStack(alignment: .leading, spacing: 2) {
+            Text(session.title)
+              .font(.system(size: 20, weight: .bold))
+              .foregroundColor(Color(palette.onPrimary))
+            Text(session.caption)
+              .font(.system(size: 14))
+              .foregroundColor(Color(palette.onPrimary).opacity(0.85))
+              .fixedSize(horizontal: false, vertical: true)
           }
           Spacer(minLength: 0)
+          Text("Рекомендуем")
+            .font(.system(size: 12, weight: .bold))
+            .foregroundColor(Color(palette.onPrimary))
+            .padding(.horizontal, Metrics.xs)
+            .padding(.vertical, 2)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color(palette.onPrimary).opacity(0.2)))
         }
-
-        VStack(spacing: 0) {
-          Text("scharf")
-            .font(.system(size: 16, weight: .bold))
-            .foregroundColor(Color(palette.textPrimary))
-          Text("Нажми, чтобы перевернуть")
+        HStack(spacing: Metrics.s) {
+          HStack(spacing: 3) {
+            ForEach(0..<session.stageCount, id: \.self) { index in
+              Capsule()
+                .fill(Color(palette.onPrimary).opacity(index == 0 ? 1 : 0.4))
+                .frame(width: 14, height: 4)
+            }
+          }
+          Text(session.route)
             .font(.system(size: 12))
-            .foregroundColor(Color(palette.textSecondary))
+            .foregroundColor(Color(palette.onPrimary).opacity(0.85))
+            .lineLimit(1)
         }
-        .frame(maxWidth: .infinity)
-        .padding(Metrics.m)
-        .background(RoundedRectangle(cornerRadius: Metrics.radiusM).fill(Color(palette.surfaceMuted)))
-        .overlay(RoundedRectangle(cornerRadius: Metrics.radiusM).stroke(Color(palette.border), lineWidth: 1))
-
-        RatePills(rates: rates)
       }
       .padding(Metrics.m)
       .frame(maxWidth: .infinity, alignment: .leading)
-      .background(Color(palette.surface))
-      .overlay(alignment: .topTrailing) {
-        Text("Рекомендуем")
-          .font(.system(size: 12, weight: .bold))
-          .foregroundColor(Color(palette.onPrimary))
-          .padding(.horizontal, Metrics.s)
-          .padding(.vertical, Metrics.xxs)
-          .background(BottomLeftRounded(radius: Metrics.radiusM).fill(Color(palette.primaryFill)))
-      }
-      .clipShape(RoundedRectangle(cornerRadius: Metrics.radiusL))
-      .overlay(RoundedRectangle(cornerRadius: Metrics.radiusL).strokeBorder(Color(palette.primary), lineWidth: 2))
-      .contentShape(RoundedRectangle(cornerRadius: Metrics.radiusL))
+      .background(RoundedRectangle(cornerRadius: Metrics.radiusXL).fill(Color(palette.primaryFill)))
+      .contentShape(RoundedRectangle(cornerRadius: Metrics.radiusXL))
     }
     .buttonStyle(PressableStyle())
-    .accessibilityLabel("Карточки. Рекомендуем. Классический режим")
+    .accessibilityLabel("\(session.title). \(session.caption). Рекомендуем")
   }
 }
 
-/// Плашки оценок: в строку, а если не помещаются — переносом (iOS 16+) или 2 × 2 (iOS 15)
-private struct Rate {
-  let label: String
-  let fill: UIColor
-  let text: UIColor
-}
-
-private struct RatePills: View {
-  let rates: [Rate]
+/// Пустой набор или меньше 4 слов: подсказка и «Добавить слова»
+private struct EmptySessionBlock: View {
+  let session: StudySessionButton
+  let palette: StudyModePalette
+  let action: () -> Void
 
   var body: some View {
-    if #available(iOS 16.0, *) {
-      FlowLayout(spacing: Metrics.xs) { pills }
-    } else {
-      VStack(alignment: .leading, spacing: Metrics.xs) {
-        HStack(spacing: Metrics.xs) { ForEach(0..<2, id: \.self) { pill(rates[$0]) } }
-        HStack(spacing: Metrics.xs) { ForEach(2..<rates.count, id: \.self) { pill(rates[$0]) } }
+    VStack(spacing: Metrics.xs) {
+      Text(session.title)
+        .font(.system(size: 20, weight: .semibold))
+        .foregroundColor(Color(palette.textPrimary))
+        .multilineTextAlignment(.center)
+      Text(session.text)
+        .font(.system(size: 14))
+        .foregroundColor(Color(palette.textSecondary))
+        .multilineTextAlignment(.center)
+        .fixedSize(horizontal: false, vertical: true)
+      Button(action: action) {
+        Text("Добавить слова")
+          .font(.system(size: 16, weight: .semibold))
+          .foregroundColor(Color(palette.onPrimary))
+          .frame(maxWidth: .infinity, minHeight: Metrics.button)
+          .background(RoundedRectangle(cornerRadius: Metrics.radiusM).fill(Color(palette.primaryFill)))
       }
+      .buttonStyle(PressableStyle())
+      .padding(.top, Metrics.s)
     }
-  }
-
-  private var pills: some View {
-    ForEach(rates, id: \.label) { pill($0) }
-  }
-
-  private func pill(_ rate: Rate) -> some View {
-    Text(rate.label)
-      .font(.system(size: 12, weight: .semibold))
-      .foregroundColor(Color(rate.text))
-      .padding(.horizontal, Metrics.s)
-      .padding(.vertical, Metrics.xxs)
-      .background(Capsule().fill(Color(rate.fill.withAlphaComponent(0.1))))
-      .overlay(Capsule().stroke(Color(rate.fill.withAlphaComponent(0.2)), lineWidth: 1))
+    .padding(Metrics.l)
+    .frame(maxWidth: .infinity)
+    .overlay(
+      RoundedRectangle(cornerRadius: Metrics.radiusXL)
+        .strokeBorder(Color(palette.border), style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+    )
   }
 }
 
-@available(iOS 16.0, *)
-private struct FlowLayout: Layout {
-  let spacing: CGFloat
+/// Круглая кнопка-иконка в шапке (шестерёнка, закрыть)
+private struct IconButton: View {
+  let symbol: String
+  let label: String
+  let palette: StudyModePalette
+  let action: () -> Void
 
-  func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-    let rows = arrange(width: proposal.width ?? .infinity, subviews: subviews)
-    let height = rows.reduce(0) { $0 + $1.height } + spacing * CGFloat(max(rows.count - 1, 0))
-    return CGSize(width: proposal.width ?? rows.reduce(0) { max($0, $1.width) }, height: height)
-  }
-
-  func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-    var y = bounds.minY
-    for row in arrange(width: bounds.width, subviews: subviews) {
-      var x = bounds.minX
-      for index in row.indices {
-        let size = subviews[index].sizeThatFits(.unspecified)
-        subviews[index].place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
-        x += size.width + spacing
-      }
-      y += row.height + spacing
+  var body: some View {
+    Button(action: action) {
+      Image(systemName: symbol)
+        .font(.system(size: 16, weight: .semibold))
+        .foregroundColor(Color(palette.textSecondary))
+        .frame(width: 36, height: 36)
+        .background(Circle().fill(Color(palette.surfaceMuted)))
+        .frame(width: Metrics.touch, height: Metrics.touch)
+        .contentShape(Rectangle())
     }
-  }
-
-  private struct Row {
-    var indices: [Int]
-    var width: CGFloat
-    var height: CGFloat
-  }
-
-  private func arrange(width: CGFloat, subviews: Subviews) -> [Row] {
-    var rows: [Row] = []
-    for (index, subview) in subviews.enumerated() {
-      let size = subview.sizeThatFits(.unspecified)
-      if let last = rows.last, last.width + spacing + size.width <= width {
-        rows[rows.count - 1] = Row(indices: last.indices + [index], width: last.width + spacing + size.width, height: max(last.height, size.height))
-      } else {
-        rows.append(Row(indices: [index], width: size.width, height: size.height))
-      }
-    }
-    return rows
-  }
-}
-
-private struct BottomLeftRounded: Shape {
-  let radius: CGFloat
-
-  func path(in rect: CGRect) -> Path {
-    Path(UIBezierPath(roundedRect: rect, byRoundingCorners: .bottomLeft, cornerRadii: CGSize(width: radius, height: radius)).cgPath)
+    .buttonStyle(PressableStyle())
+    .accessibilityLabel(label)
   }
 }
 

@@ -9,8 +9,9 @@
  */
 import { useEffect, useRef } from 'react';
 import { NativeEventEmitter, NativeModules, Platform, processColor } from 'react-native';
-import { useSettingsStore, useThemeColors } from '@/store';
-import type { StudyMode, StudyModeGame, StudyModeSettings, WordLimit } from './StudyModeSheet';
+import { useCardsStore, useSettingsStore, useThemeColors } from '@/store';
+import type { SetSheetSession, StudyMode, StudyModeGame, StudyModeSettings, WordLimit } from './StudyModeSheet';
+import { sessionSheetMeta, sessionSheetStages, sessionSheetText } from './sessionSheetText';
 
 interface StudyModeSheetModule {
   present(options: object): void;
@@ -21,6 +22,9 @@ type SheetEvent =
   | { type: 'onlyHard'; value: boolean }
   | { type: 'wordLimit'; value: WordLimit }
   | { type: 'select'; mode: StudyMode }
+  // Шторка набора (plan/new/study_session.md, Session 12): кнопка сессии и «Добавить слова»
+  | { type: 'start' }
+  | { type: 'addWords' }
   | { type: 'dismiss' };
 
 const native: StudyModeSheetModule | undefined =
@@ -29,7 +33,7 @@ const emitter = native ? new NativeEventEmitter(NativeModules.StudyModeSheetModu
 
 export const isNativeStudyModeSheet = !!native;
 
-// Токены, которые использует нативная шторка (StudyModeSheet.swift: игры, карточка режима, Chip)
+// Токены, которые использует нативная шторка (StudyModeSheet.swift: кнопка сессии, режимы, Chip)
 const COLOR_KEYS = [
   'surface', 'surfaceMuted', 'border', 'textPrimary', 'textSecondary', 'textTertiary',
   'primary', 'primaryFill', 'onPrimary', 'ratingAgain', 'ratingHard', 'ratingEasy', 'ratingGood',
@@ -41,8 +45,11 @@ interface Options {
   onClose: () => void;
   subtitle: string;
   onSelectMode: (mode: StudyMode) => void;
+  /** Вся свободная практика: Карточки и режимы */
   games: StudyModeGame[];
   settings: StudyModeSettings;
+  /** Есть — шторка набора с кнопкой сессии; нет — главная, только свободная практика */
+  setSession?: SetSheetSession;
 }
 
 /** Показывает нативную шторку, пока `visible`. Ничего не делает, если нативного модуля нет. */
@@ -58,7 +65,7 @@ export function useNativeStudyModeSheet(options: Options) {
     if (!emitter) return;
     const subscription = emitter.addListener('StudyModeSheetEvent', (event: SheetEvent) => {
       if (!shown.current) return;
-      const { settings, onClose, onSelectMode } = latest.current;
+      const { settings, onClose, onSelectMode, setSession } = latest.current;
       switch (event.type) {
         case 'onlyHard':
           if (event.value !== settings.onlyHard) settings.onToggleOnlyHard();
@@ -70,6 +77,16 @@ export function useNativeStudyModeSheet(options: Options) {
           shown.current = false;
           onSelectMode(event.mode);
           onClose();
+          break;
+        case 'start':
+          shown.current = false;
+          if (setSession) setSession.onStart();
+          else onClose();
+          break;
+        case 'addWords':
+          shown.current = false;
+          if (setSession) setSession.onAddWords();
+          else onClose();
           break;
         case 'dismiss':
           shown.current = false;
@@ -87,9 +104,16 @@ export function useNativeStudyModeSheet(options: Options) {
     if (!native) return;
     if (options.visible && !shown.current) {
       shown.current = true;
-      const { subtitle, games, settings, colors: theme, dark: isDark } = latest.current;
+      const { subtitle, games, settings, setSession, colors: theme, dark: isDark } = latest.current;
+      // Тексты кнопки сессии считает JS (sessionSheetText) — Swift только показывает
+      const plan = setSession?.info.plan;
+      const cardsMap = useCardsStore.getState().cards;
       native.present({
-        subtitle,
+        title: setSession ? setSession.title : 'Свободная практика',
+        subtitle: plan ? sessionSheetMeta(plan) : subtitle,
+        home: !setSession,
+        noWords: plan?.mode === 'empty',
+        session: plan ? sessionSheetText(plan, sessionSheetStages(plan, cardsMap)) : null,
         games: games.map(({ mode, title, tag, description }) => ({ mode, title, tag, description })),
         settings: { onlyHard: settings.onlyHard, wordLimit: settings.wordLimit },
         colors: Object.fromEntries(COLOR_KEYS.map((key) => [key, processColor(theme[key])])),

@@ -28,13 +28,10 @@ import { useCardsStore, useThemeColors } from '@/store';
 import { Text } from '@/components/common';
 import { Button, Chip, Sheet, Switch, type IconComponent } from '@/components/ui';
 import { alpha, borderRadius, heights, iconSize, spacing } from '@/constants';
-import { pluralize } from '@/utils';
-import { buildSessionStages } from '@/services/lessonFlow';
 import type { SetSessionPlan } from '@/services/LessonService';
-import type { Card } from '@/types';
 import { GameRow } from './GameRow';
-import { SESSION_STAGE_INFO } from './StageLayout';
 import type { SetSessionInfo } from './setSession';
+import { sessionSheetMeta, sessionSheetStages, sessionSheetText } from './sessionSheetText';
 import { isNativeStudyModeSheet, useNativeStudyModeSheet } from './nativeStudyModeSheet';
 
 export type StudyMode = 'classic' | 'match' | 'multipleChoice' | 'wordBuilder' | 'audio' | 'contextFill';
@@ -58,7 +55,7 @@ export const DEFAULT_STUDY_MODE_GAMES: StudyModeGame[] = [
 ];
 
 /** Карточки в свободной практике — раньше были отдельной карточкой «Рекомендуем» */
-const CARDS_GAME: StudyModeGame = {
+export const CARDS_GAME: StudyModeGame = {
   mode: 'classic',
   icon: Layers,
   title: 'Карточки',
@@ -95,7 +92,8 @@ interface Props {
 const WORD_LIMIT_OPTIONS: WordLimit[] = ['10', '20', '30', 'all'];
 
 export function StudyModeSheet({ games = DEFAULT_STUDY_MODE_GAMES, ...props }: Props) {
-  useNativeStudyModeSheet({ ...props, games });
+  // Нативной шторке — вся свободная практика сразу, с Карточками
+  useNativeStudyModeSheet({ ...props, games: [CARDS_GAME, ...games] });
   if (isNativeStudyModeSheet) return null;
   return <StudyModeSheetRN {...props} games={games} />;
 }
@@ -124,11 +122,7 @@ function StudyModeSheetRN({
   const isEmpty = plan?.mode === 'empty';
 
   const title = view === 'settings' ? 'Настройки практики' : setSession ? setSession.title : 'Свободная практика';
-  const meta = !setSession
-    ? subtitle
-    : plan && plan.totalCount > 0
-      ? `${plan.totalCount} ${pluralize(plan.totalCount, 'слово', 'слова', 'слов')} · ${plan.studiedCount > 0 ? `изучали ${plan.studiedCount}` : 'ещё не начинали'}`
-      : 'Пока нет слов';
+  const meta = setSession && plan ? sessionSheetMeta(plan) : subtitle;
 
   const headerRight =
     view === 'settings' ? (
@@ -258,61 +252,27 @@ function StudyModeSheetRN({
   );
 }
 
-const words = (n: number) => `${n} ${pluralize(n, 'слово', 'слова', 'слов')}`;
-const minutes = (n: number) => `${n} ${pluralize(n, 'минута', 'минуты', 'минут')}`;
-
-/** Подпись и подзаголовок главной кнопки по плану (решение 4 плана) */
-function buttonText(plan: SetSessionPlan): { title: string; caption: string } {
-  const n = plan.cardIds.length;
-  const time = `около ${minutes(plan.minutes)}`;
-  switch (plan.mode) {
-    case 'review':
-      return { title: `Повторить ${words(n)}`, caption: `Пора повторить · ${time}` };
-    case 'more':
-      return { title: `Изучить ещё ${n}`, caption: 'План на сегодня выполнен · по желанию' };
-    case 'again':
-      return { title: 'Повторить набор', caption: 'Тренировка · уровень слов не растёт' };
-    default: {
-      const what =
-        plan.newCount < n
-          ? `${plan.newCount} ${pluralize(plan.newCount, 'новое', 'новых', 'новых')} + ${n - plan.newCount} на закрепление`
-          : words(n);
-      return { title: 'Изучить', caption: `${what} · ${time}` };
-    }
-  }
-}
-
 /** Главная кнопка шторки набора — единственный яркий элемент; пустой или маленький набор — подсказка */
 function SessionButton({ plan, session }: { plan: SetSessionPlan; session: SetSheetSession }) {
   const colors = useThemeColors();
   const cardsMap = useCardsStore((s) => s.cards);
-  // Этапы после отбора слов: слово без примера не попадёт в «Слово в контексте» и т.п.
-  const stages = useMemo(() => {
-    const cards = plan.cardIds.map((id) => cardsMap[id]).filter((c): c is Card => !!c);
-    return buildSessionStages(plan.stages, cards).map((s) => s.stage);
-  }, [plan, cardsMap]);
+  const text = useMemo(() => sessionSheetText(plan, sessionSheetStages(plan, cardsMap)), [plan, cardsMap]);
 
-  if (plan.mode === 'empty' || plan.mode === 'tooFew') {
+  if (text.kind === 'empty') {
     return (
       <View style={[styles.empty, { borderColor: colors.border }]}>
         <Text variant="h3" align="center" style={{ color: colors.textPrimary }}>
-          {plan.mode === 'empty' ? 'В наборе пока нет слов' : `Добавьте ещё ${words(plan.missingCards)}`}
+          {text.title}
         </Text>
         <Text variant="bodySmall" align="center" color="secondary">
-          {plan.mode === 'empty'
-            ? 'Добавьте хотя бы 4 слова, и приложение соберёт первую сессию.'
-            : 'Для теста нужно хотя бы 4 слова: иначе не из чего выбирать ответ.'}
+          {text.text}
         </Text>
         <Button title="Добавить слова" fullWidth onPress={session.onAddWords} style={styles.emptyButton} />
       </View>
     );
   }
 
-  const { title, caption } = buttonText(plan);
-  const route =
-    stages.length > 3
-      ? `${stages.length} ${pluralize(stages.length, 'этап', 'этапа', 'этапов')} · начнём с ${stages[0] === 'cards' ? 'Карточек' : SESSION_STAGE_INFO[stages[0]].title}`
-      : stages.map((s) => SESSION_STAGE_INFO[s].title).join(' → ');
+  const { title, caption, route, stageCount } = text;
 
   return (
     <Pressable
@@ -341,9 +301,9 @@ function SessionButton({ plan, session }: { plan: SetSessionPlan; session: SetSh
       </View>
       <View style={styles.routeRow}>
         <View style={styles.miniSegments}>
-          {stages.map((s, i) => (
+          {Array.from({ length: stageCount }, (_, i) => (
             <View
-              key={`${s}-${i}`}
+              key={i}
               style={[styles.miniSegment, { backgroundColor: i === 0 ? colors.onPrimary : alpha(colors.onPrimary, 40) }]}
             />
           ))}
