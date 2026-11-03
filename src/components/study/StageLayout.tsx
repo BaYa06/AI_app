@@ -15,6 +15,7 @@ import { Text } from '@/components/common';
 import { Button, Dialog, ProgressBar, useScreenBottomInset } from '@/components/ui';
 import { alpha, borderRadius, heights, iconSize, screenPadding, spacing } from '@/constants';
 import { pluralize } from '@/utils';
+import { Analytics } from '@/services/analytics';
 import type { SessionRouteParams, SessionStage } from '@/types/navigation';
 
 export const SESSION_STAGE_INFO: Record<SessionStage, { title: string; subtitle: string }> = {
@@ -190,6 +191,15 @@ export const StageLayout = memo(function StageLayout({
               style={styles.flex1}
               onPress={() => {
                 setConfirmExit(false);
+                const current = session?.stages[session.index];
+                if (session && current) {
+                  Analytics.setSessionExited({
+                    stage: current.stage,
+                    index: session.index + 1,
+                    total: session.stages.length,
+                    durationSec: Math.round((Date.now() - session.startedAt) / 1000),
+                  });
+                }
                 onExit();
               }}
             />

@@ -15,6 +15,7 @@ import {
 } from '@/services/LessonService';
 import { firstSessionStep } from '@/services/lessonFlow';
 import { isCardWaitingReview } from '@/services/SRSService';
+import { Analytics } from '@/services/analytics';
 import type { RootStackParamList } from '@/types/navigation';
 import type { Card } from '@/types';
 
@@ -71,6 +72,16 @@ export function startSetSession(
   const xpBase = useSettingsStore.getState().todayStats.cardsStudied;
   const step = firstSessionStep(setId, plan.stages, words, Date.now(), xpBase);
   if (!step) return false;
+  const stages = step.params.session?.stages ?? [];
+  Analytics.setSessionStarted({
+    mode: plan.mode,
+    words: words.length,
+    newCount: plan.newCount,
+    stages: stages.map((s) => s.stage),
+    dropped: plan.stages.length - stages.length,
+    minutes: plan.minutes,
+    from: how === 'replace' ? 'results' : 'sheet',
+  });
   if (how === 'replace') navigation.replace(step.screen, step.params);
   else navigation.push(step.screen, step.params);
   return true;

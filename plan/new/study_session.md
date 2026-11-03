@@ -206,7 +206,12 @@
   Было в плане: `nativeStudyModeSheet.ts` и `StudyModeSheet.swift` —
   та же раскладка, новые данные и событие запуска сессии (слабые места, п. 8). Без этого шага на iPhone
   останется старая шторка, поэтому Session 11 и 12 выкладываются вместе.
-- [ ] **Session 13. Аналитика.** События: старт сессии (вид, число слов), этап пройден, этап пропущен
+- [x] **Session 13. Аналитика.** ✅ `set_session_started` (mode, words, new_count, stages, dropped, minutes,
+  from: sheet / results), `set_session_stage` (stage, index, total, result: done / skipped),
+  `set_session_exited` (stage, index, total, duration_sec), `set_session_completed` (words, weak, stages,
+  duration_sec, xp). Что смотреть: completed / started — доля доведённых; exited по index — где бросают;
+  duration_sec против minutes — честна ли подпись «около N минут».
+  Было в плане: События: старт сессии (вид, число слов), этап пройден, этап пропущен
   (причина), выход (на каком этапе), сессия завершена (время, % с первой попытки). По ним — поправить
   минуты в подписи и решить, не сократить ли сессию до 4–5 этапов.
 - [ ] **Session 14. Выкладка.** Только клиент, сервер не меняется. TestFlight.

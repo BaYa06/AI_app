@@ -658,6 +658,64 @@ export const Analytics = {
   lessonFocusChanged: (auto: boolean) =>
     log('lesson_focus_changed', { auto }),
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // СЕССИЯ НАБОРА «ИЗУЧИТЬ» (plan/new/study_session.md, Session 13)
+  // Зачем: доводят ли сессию до конца, на каком этапе бросают, какие этапы пропускают
+  // и сходится ли время с обещанным «около N минут» — по этому решаем, не сократить ли этапы.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Сессия запущена: из шторки набора (sheet) или с итогов прошлой («Продолжить», results).
+   * stages — этапы после отбора слов, dropped — сколько этапов убрано до старта (нет подходящих слов).
+   */
+  setSessionStarted: (params: {
+    mode: string;
+    words: number;
+    newCount: number;
+    stages: string[];
+    dropped: number;
+    minutes: number;
+    from: 'sheet' | 'results';
+  }) =>
+    log('set_session_started', {
+      mode: params.mode,
+      words: params.words,
+      new_count: params.newCount,
+      stages: params.stages.join(','),
+      stage_count: params.stages.length,
+      dropped: params.dropped,
+      minutes: params.minutes,
+      from: params.from,
+    }),
+
+  /** Этап пройден (done) или пропущен кнопкой «Не могу слушать» (skipped). index — с 1 */
+  setSessionStage: (params: { stage: string; index: number; total: number; result: 'done' | 'skipped' }) =>
+    log('set_session_stage', {
+      stage: params.stage,
+      index: params.index,
+      total: params.total,
+      result: params.result,
+    }),
+
+  /** Вышли посреди сессии через окно «Выйти из сессии?». index — этап, на котором вышли, с 1 */
+  setSessionExited: (params: { stage: string; index: number; total: number; durationSec: number }) =>
+    log('set_session_exited', {
+      stage: params.stage,
+      index: params.index,
+      total: params.total,
+      duration_sec: params.durationSec,
+    }),
+
+  /** Сессия пройдена до итогов. duration_sec сравниваем с minutes из set_session_started */
+  setSessionCompleted: (params: { words: number; weak: number; stages: number; durationSec: number; xp: number }) =>
+    log('set_session_completed', {
+      words: params.words,
+      weak: params.weak,
+      stages: params.stages,
+      duration_sec: params.durationSec,
+      xp: params.xp,
+    }),
+
 
   // ═══════════════════════════════════════════════════════════════════════════
   // ВИДЖЕТ НА ЭКРАНЕ БЛОКИРОВКИ

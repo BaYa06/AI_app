@@ -4,7 +4,7 @@
  * опыт и уровень, одна главная кнопка «Продолжить» — следующая сессия по тому же плану, что и шторка
  * (слабые слова в ней идут первыми сами). Учить нечего — «Готово».
  */
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -15,6 +15,7 @@ import { borderRadius, heights, screenPadding, spacing } from '@/constants';
 import { pluralize } from '@/utils';
 import { getLevelProgress } from '@/utils/level';
 import { cachedUserStats } from '@/services/StreakService';
+import { Analytics } from '@/services/analytics';
 import { isSessionWordWeak, sessionCardIds } from '@/services/lessonFlow';
 import type { SetSessionPlan } from '@/services/LessonService';
 import type { RootStackParamList, SessionRouteParams } from '@/types/navigation';
@@ -54,6 +55,16 @@ export function SessionSummary({ session }: { session: SessionRouteParams }) {
       seconds: Math.max(1, Math.round((now - session.startedAt) / 1000)),
       level: getLevelProgress(total),
     };
+  }, []);
+
+  useEffect(() => {
+    Analytics.setSessionCompleted({
+      words: list.length,
+      weak: weakIds.size,
+      stages: session.stages.length,
+      durationSec: seconds,
+      xp,
+    });
   }, []);
 
   const isReview = session.stages[0]?.stage !== 'cards';

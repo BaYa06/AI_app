@@ -90,6 +90,8 @@ export type RootStackParamList = {
     newStreakCount?: number;
     lesson?: LessonRouteParams;
     session?: SessionRouteParams;
+    /** Этап сессии пропущен («Не могу слушать») — для аналитики */
+    sessionStageSkipped?: boolean;
   };
   CardEditor: { setId: string; cardId?: string };
   SetEditor: { setId?: string; autoFocusTitle?: boolean };

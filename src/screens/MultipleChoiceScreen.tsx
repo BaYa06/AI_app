@@ -831,6 +831,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
         errorCards: [],
         modeTitle: 'На слух',
         session,
+        sessionStageSkipped: true,
       });
     };
     return (

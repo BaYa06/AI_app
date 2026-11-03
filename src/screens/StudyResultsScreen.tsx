@@ -63,16 +63,29 @@ export function StudyResultsScreen({ navigation, route }: Props) {
 
   // Сессия набора (plan/new/study_session.md, Session 2): между этапами итогов нет — сразу следующая
   // порция этапа (ошибки) или следующий этап. Считаем один раз: экран сразу заменяется.
-  const sessionStep = React.useMemo(() => {
+  const sessionRoute = React.useMemo(() => {
     if (!session) return null;
     const viewed = (phaseOffset ?? 0) >= totalPhaseCards;
     const failed = (phaseFailedIds?.length ?? 0) > 0;
     // Экран без порций (Слово в контексте) — этап пройден целиком
     const complete = !phaseId || totalPhaseCards <= 0 || (viewed && !failed);
     const streak = streakIncreased ? newStreakCount : undefined;
-    return sessionStepAfterPortion(session, { complete, phaseId, totalPhaseCards, studiedInPhase, phaseOffset, phaseFailedIds }, streak);
+    return {
+      complete,
+      step: sessionStepAfterPortion(session, { complete, phaseId, totalPhaseCards, studiedInPhase, phaseOffset, phaseFailedIds }, streak),
+    };
   }, []);
+  const sessionStep = sessionRoute?.step ?? null;
   React.useEffect(() => {
+    const current = session?.stages[session.index];
+    if (session && current && sessionRoute?.complete) {
+      Analytics.setSessionStage({
+        stage: current.stage,
+        index: session.index + 1,
+        total: session.stages.length,
+        result: route.params.sessionStageSkipped ? 'skipped' : 'done',
+      });
+    }
     if (sessionStep) navigation.replace(sessionStep.screen, sessionStep.params);
   }, []);
   // Итоги сессии: серия могла вырасти на любом этапе
