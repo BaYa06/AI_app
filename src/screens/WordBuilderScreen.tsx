@@ -19,7 +19,7 @@ import type { Card, Rating } from '@/types';
 import { spacing, borderRadius, iconSize, alpha } from '@/constants';
 import { ProgressService } from '@/services/ProgressService';
 import { speak, resolveSpeechLang, prefetchSpeech, cardSpeechLangs } from '@/utils/speech';
-import { playCorrectSound2 as playCorrectSound, preloadSound } from '@/utils/sound';
+import { playCorrectSound2 as playCorrectSound, playSessionSfx, preloadSessionSfx, preloadSound } from '@/utils/sound';
 
 type Props = RootStackScreenProps<'WordBuilder'>;
 
@@ -165,8 +165,10 @@ export function WordBuilderScreen({ navigation, route }: Props) {
   }, [initKey, totalPhaseCards]);
 
   // Предзагружаем звук правильного ответа, чтобы убрать задержку первого проигрывания
+  // В сессии — свои звуки (plan/new/session_results.md), в свободной практике — прежний
   useEffect(() => {
-    preloadSound('/correct2.wav');
+    if (session) preloadSessionSfx(['pop', 'correct', 'error']);
+    else preloadSound('/correct2.wav');
   }, []);
 
   const currentCard = cardsQueue[currentIndex];
@@ -341,6 +343,8 @@ export function WordBuilderScreen({ navigation, route }: Props) {
 
       const tile = tiles.find((t) => t.id === tileId);
       if (!tile || tile.used) return;
+      // Последняя буква сразу проверяет слово — вместо «pop» прозвучит «верно» или «ошибка»
+      if (session && slots.filter((s) => !s.char).length > 1) playSessionSfx('pop');
 
       let placed = false;
       setSlots((prevSlots) => {
@@ -365,7 +369,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
         prevTiles.map((t) => (t.id === tileId ? { ...t, used: true } : t)),
       );
     },
-    [tiles, isLocked],
+    [tiles, slots, isLocked, session],
   );
 
   const handleSlotPress = useCallback(
@@ -373,6 +377,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
       if (isLocked) return;
       const slot = slots.find((s) => s.id === slotId);
       if (!slot || !slot.char || !slot.tileId) return;
+      if (session) playSessionSfx('pop');
 
       setSlots((prevSlots) =>
         prevSlots.map((s) =>
@@ -384,7 +389,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
         prevTiles.map((t) => (t.id === slot.tileId ? { ...t, used: false } : t)),
       );
     },
-    [slots, isLocked],
+    [slots, isLocked, session],
   );
 
   // Обработчик озвучивания
@@ -457,7 +462,8 @@ export function WordBuilderScreen({ navigation, route }: Props) {
       clearTimeout(advanceTimeoutRef.current);
     }
     // Дальше — по кнопке в нижней панели (общий скелет режима), и после верного ответа тоже
-    if (isCorrect) playCorrectSound();
+    if (session) playSessionSfx(isCorrect ? 'correct' : 'error');
+    else if (isCorrect) playCorrectSound();
     pendingAdvanceRef.current = { errors: nextErrors, errorCards: updatedErrorCards };
     advanceTimeoutRef.current = null;
   }, [
@@ -473,6 +479,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
     totalWords,
     advanceToNextCard,
     applySrsUpdate,
+    session,
   ]);
 
   useEffect(() => {

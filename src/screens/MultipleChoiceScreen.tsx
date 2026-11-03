@@ -15,7 +15,7 @@ import { lessonPhaseForAnswer, sessionPhaseForAnswer } from '@/services/lessonFl
 import { useLessonStore } from '@/store/lessonStore';
 import { reportWidgetReview } from '@/services/WidgetService';
 import { speak, resolveSpeechLang, prefetchSpeech, cardSpeechLangs, isCardSpeakable } from '@/utils/speech';
-import { playCorrectSound, preloadSound } from '@/utils/sound';
+import { playCorrectSound, playSessionSfx, preloadSessionSfx, preloadSound } from '@/utils/sound';
 import { buildDistractorPool, pickSimilarDistractors } from '@/utils/choiceDistractors';
 import { Analytics } from '@/services/analytics';
 import { useChallengeStore } from '@/store';
@@ -275,8 +275,10 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
   };
 
   // Предзагружаем звук при монтировании компонента
+  // В сессии — свои звуки ответа (plan/new/session_results.md), в свободной практике — прежний
   useEffect(() => {
-    preloadSound('/correct.wav');
+    if (session) preloadSessionSfx(['correct', 'error']);
+    else preloadSound('/correct.wav');
   }, []);
 
   // Analytics: сбрасываем таймер при переходе к следующей карточке
@@ -437,9 +439,11 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
     applySrsUpdate(currentCard, isCorrect, option.id, Date.now() - cardShownAtRef.current);
     if (isCorrect) {
       triggerHaptic('notificationSuccess');
-      playCorrectSound();
+      if (session) playSessionSfx('correct');
+      else playCorrectSound();
     } else {
       triggerHaptic('notificationError');
+      if (session) playSessionSfx('error');
     }
 
     setSelectedOption(option.id);

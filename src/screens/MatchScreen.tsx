@@ -14,7 +14,7 @@ import { useCardsStore, useSetsStore, useThemeColors, useSettingsStore } from '@
 import { spacing, borderRadius, heights, iconSize, screenPadding, alpha } from '@/constants';
 import { DatabaseService } from '@/services';
 import { Analytics } from '@/services/analytics';
-import { playCorrectSound2 as playCorrectSound, preloadSound } from '@/utils/sound';
+import { playCorrectSound2 as playCorrectSound, playSessionSfx, preloadSessionSfx, preloadSound } from '@/utils/sound';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card } from '@/types';
 
@@ -152,17 +152,20 @@ export function MatchScreen({ navigation, route }: Props) {
   const handleSelectLeft = useCallback(
     (cardId: string) => {
       if (isComplete || matchedIds.has(cardId)) return;
+      // Выбор карточки в сессии — «pop»; вторая карточка пары сразу даёт «верно» или «ошибку»
+      if (session && !selectedRight) playSessionSfx('pop');
       setSelectedLeft((prev) => (prev === cardId ? null : cardId));
     },
-    [isComplete, matchedIds]
+    [isComplete, matchedIds, session, selectedRight]
   );
 
   const handleSelectRight = useCallback(
     (cardId: string) => {
       if (isComplete || matchedIds.has(cardId)) return;
+      if (session && !selectedLeft) playSessionSfx('pop');
       setSelectedRight((prev) => (prev === cardId ? null : cardId));
     },
-    [isComplete, matchedIds]
+    [isComplete, matchedIds, session, selectedLeft]
   );
 
   // Проверка совпадений
@@ -190,7 +193,8 @@ export function MatchScreen({ navigation, route }: Props) {
       });
 
       triggerSuccessHaptic();
-      playCorrectSound();
+      if (session) playSessionSfx('correct');
+      else playCorrectSound();
       setMatchedIds((prev) => {
         const next = new Set(prev);
         next.add(selectedLeft);
@@ -198,6 +202,7 @@ export function MatchScreen({ navigation, route }: Props) {
       });
     } else {
       triggerHaptic('notificationError');
+      if (session) playSessionSfx('error');
       setMistakes((m) => m + 1);
       if (mismatchRef.current) clearTimeout(mismatchRef.current);
       mismatchRef.current = setTimeout(() => resetSelection(), 450);
@@ -253,7 +258,8 @@ export function MatchScreen({ navigation, route }: Props) {
 
   // Предзагрузка звука correct2.wav для мгновенного отклика
   useEffect(() => {
-    preloadSound('/correct2.wav');
+    if (session) preloadSessionSfx(['pop', 'correct', 'error']);
+    else preloadSound('/correct2.wav');
   }, []);
 
   if (!set) {

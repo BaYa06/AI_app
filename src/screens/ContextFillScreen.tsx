@@ -21,6 +21,7 @@ import { StageLayout, AnswerPanel } from '@/components/study/StageLayout';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card } from '@/types';
 import { ensureAiConsent } from '@/services/aiConsent';
+import { playSessionSfx, preloadSessionSfx } from '@/utils/sound';
 
 type Props = RootStackScreenProps<'ContextFill'>;
 
@@ -189,6 +190,7 @@ export function ContextFillScreen({ navigation, route }: Props) {
 
   useEffect(() => {
     prep();
+    if (session) preloadSessionSfx(['correct', 'error']);
   }, []);
 
   // ── Подбор вариантов ─────────────────────────────────────────────────────
@@ -225,13 +227,15 @@ export function ContextFillScreen({ navigation, route }: Props) {
 
       setSelectedOption(option);
       setOptionState(isCorrect ? 'correct' : 'wrong');
+      // Звуки ответа — только в сессии (plan/new/session_results.md); в свободной практике режим без звука
+      if (session) playSessionSfx(isCorrect ? 'correct' : 'error');
       if (isCorrect) {
         setCorrectCount((n) => n + 1);
         correctIdsRef.current = [...correctIdsRef.current, currentCard.id];
       }
 
     },
-    [selectedOption, optionsLoading, questions, currentIndex],
+    [selectedOption, optionsLoading, questions, currentIndex, session],
   );
 
   // Дальше — по кнопке в нижней панели (общий скелет режима)
