@@ -7,10 +7,11 @@ import { View, StyleSheet, ScrollView, Pressable, Animated, Modal } from 'react-
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { triggerHaptic } from '@/utils/haptic';
 import { Layers, Settings } from 'lucide-react-native';
-import { Container, Text, Loading } from '@/components/common';
-import { Button, EmptyState, ProgressBar, ScreenHeader, Switch } from '@/components/ui';
+import { Text, Loading } from '@/components/common';
+import { Button, EmptyState, Switch } from '@/components/ui';
+import { StageLayout } from '@/components/study/StageLayout';
 import { useCardsStore, useSetsStore, useThemeColors, useSettingsStore } from '@/store';
-import { spacing, borderRadius, heights, screenPadding, alpha } from '@/constants';
+import { spacing, borderRadius, heights, iconSize, screenPadding, alpha } from '@/constants';
 import { DatabaseService } from '@/services';
 import { Analytics } from '@/services/analytics';
 import { playCorrectSound2 as playCorrectSound, preloadSound } from '@/utils/sound';
@@ -101,7 +102,6 @@ export function MatchScreen({ navigation, route }: Props) {
   }, [cards, cardLimit, phaseOffset]);
 
   const matchedPairs = matchedIds.size;
-  const progress = totalPairs ? Math.round((matchedPairs / totalPairs) * 100) : 0;
 
   const formatTime = useCallback((seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -261,42 +261,46 @@ export function MatchScreen({ navigation, route }: Props) {
   }
 
   const emptyState = totalPairs === 0;
+  const handleExit = () => {
+    if (session) navigation.navigate('SetDetail', { setId: session.setId });
+    else navigation.goBack();
+  };
 
   return (
-    <Container padded={false}>
-      <ScreenHeader
-        title="Пары"
-        onBack={() => navigation.goBack()}
-        bordered
-        right={<Button variant="icon" icon={Settings} accessibilityLabel="Настройки" onPress={openSettings} />}
-      />
-
-      <View style={styles.statusBlock}>
-        <View style={styles.statusRow}>
-          <Text variant="bodySmall" style={[styles.semibold, { color: colors.textPrimary }]}>
-            Пары: {matchedPairs}/{totalPairs || 0}
-          </Text>
-          <Text
-            variant="bodySmall"
-            style={{ color: colors.textSecondary, fontVariant: ['tabular-nums'] }}
-          >
+    <StageLayout
+      session={session}
+      progress={{ done: matchedPairs, total: totalPairs }}
+      task="Найдите пары"
+      taskAction={
+        <View style={styles.taskActions}>
+          <Text variant="bodySmall" style={[styles.timer, { color: colors.textSecondary }]} accessibilityLabel={`Время ${formatTime(elapsed)}`}>
             {formatTime(elapsed)}
           </Text>
+          <Button
+            variant="icon"
+            icon={Settings}
+            iconSize={iconSize.s}
+            iconColor={colors.textSecondary}
+            accessibilityLabel="Настройки"
+            onPress={openSettings}
+          />
         </View>
-        <ProgressBar progress={progress} accessibilityLabel="Найдено пар" />
-        {/* <Text
-          variant="caption"
-          color="secondary"
-          style={{ textAlign: 'center', marginTop: spacing.xs }}
-        >
-          Соедини слово с переводом
-        </Text> */}
-      </View>
-
+      }
+      onExit={handleExit}
+      showIntro={phaseOffset === 0}
+      scroll={false}
+      footer={
+        emptyState ? null : (
+          <Text variant="bodySmall" align="center" style={[styles.hint, { color: colors.textSecondary }]}>
+            Нажмите слово, затем его перевод
+          </Text>
+        )
+      }
+    >
       {emptyState ? (
         <EmptyState icon={Layers} title="В этом наборе пока нет карточек" />
       ) : (
-        <View style={[styles.contentWrapper, { paddingHorizontal: screenPadding }]}>
+        <View style={styles.contentWrapper}>
           <View style={styles.grid}>
             <ScrollView
               style={styles.column}
@@ -452,12 +456,7 @@ export function MatchScreen({ navigation, route }: Props) {
           </Animated.View>
         </View>
       </Modal>
-
-      <View
-        style={[styles.bottomFade, { backgroundColor: colors.background }]}
-        pointerEvents="none"
-      />
-    </Container>
+    </StageLayout>
   );
 }
 
@@ -465,15 +464,16 @@ const styles = StyleSheet.create({
   semibold: {
     fontWeight: '600',
   },
-  statusBlock: {
-    paddingHorizontal: screenPadding,
-    paddingVertical: spacing.m,
-    gap: spacing.xs,
-  },
-  statusRow: {
+  taskActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: spacing.xs,
+  },
+  timer: {
+    fontVariant: ['tabular-nums'],
+  },
+  hint: {
+    paddingBottom: spacing.xs,
   },
   contentWrapper: {
     flex: 1,
@@ -488,7 +488,7 @@ const styles = StyleSheet.create({
   },
   columnContent: {
     gap: spacing.s,
-    paddingBottom: spacing.xxl,
+    paddingBottom: spacing.m,
   },
   card: {
     borderRadius: borderRadius.l,
@@ -499,15 +499,6 @@ const styles = StyleSheet.create({
   },
   cardText: {
     fontWeight: '600',
-  },
-  // Мягкое затухание списка у нижнего края
-  bottomFade: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 40,
-    opacity: 0.8,
   },
   modalRoot: {
     flex: 1,
