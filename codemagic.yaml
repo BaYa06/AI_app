@@ -74,6 +74,16 @@ definitions:
           --workspace ios/FlashcardsApp.xcworkspace \
           --scheme FlashcardsApp \
           --config Release
+    - name: Звуки в сборке (plan/new/session_results.md, Results 1)
+      # Звук без записи в project.pbxproj не попадает в .app и на iPhone молча не играет — ловим это здесь
+      script: |
+        IPA=$(ls build/ios/ipa/*.ipa | head -1)
+        LIST=$(unzip -l "$IPA")
+        MISSING=0
+        for f in correct correct2 session_correct session_error session_pop session_reveal session_count session_ding session_finish; do
+          echo "$LIST" | grep -qE "\.app/$f\.wav$" || { echo "Нет в .ipa: $f.wav"; MISSING=1; }
+        done
+        exit $MISSING
 
 workflows:
   ios-testflight-staging:

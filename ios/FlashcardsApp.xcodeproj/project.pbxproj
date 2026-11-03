@@ -25,6 +25,13 @@
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		AA000001AAAA000000000001 /* correct.wav in Resources */ = {isa = PBXBuildFile; fileRef = AA000001AAAA000000000002 /* correct.wav */; };
 		AA000001AAAA000000000003 /* correct2.wav in Resources */ = {isa = PBXBuildFile; fileRef = AA000001AAAA000000000004 /* correct2.wav */; };
+		AA000001AAAA000000000005 /* session_correct.wav in Resources */ = {isa = PBXBuildFile; fileRef = AA000001AAAA000000000006 /* session_correct.wav */; };
+		AA000001AAAA000000000007 /* session_error.wav in Resources */ = {isa = PBXBuildFile; fileRef = AA000001AAAA000000000008 /* session_error.wav */; };
+		AA000001AAAA000000000009 /* session_pop.wav in Resources */ = {isa = PBXBuildFile; fileRef = AA000001AAAA00000000000A /* session_pop.wav */; };
+		AA000001AAAA00000000000B /* session_reveal.wav in Resources */ = {isa = PBXBuildFile; fileRef = AA000001AAAA00000000000C /* session_reveal.wav */; };
+		AA000001AAAA00000000000D /* session_count.wav in Resources */ = {isa = PBXBuildFile; fileRef = AA000001AAAA00000000000E /* session_count.wav */; };
+		AA000001AAAA00000000000F /* session_ding.wav in Resources */ = {isa = PBXBuildFile; fileRef = AA000001AAAA000000000010 /* session_ding.wav */; };
+		AA000001AAAA000000000011 /* session_finish.wav in Resources */ = {isa = PBXBuildFile; fileRef = AA000001AAAA000000000012 /* session_finish.wav */; };
 		EDF3C2BA2A6E9C8B54328699 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = F21748F2D7B422E320F4F52B /* GoogleService-Info.plist */; };
 		FA25C05C307605970001D4E5 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FA25C05B307605960001D4E5 /* WidgetKit.framework */; };
 		FA25C05E307605970001D4E5 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FA25C05D307605970001D4E5 /* SwiftUI.framework */; };
@@ -84,6 +91,13 @@
 		A7D72821F52AE455224D6A08 /* FlashcardsApp-Bridging-Header.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = "FlashcardsApp/FlashcardsApp-Bridging-Header.h"; sourceTree = "<group>"; };
 		AA000001AAAA000000000002 /* correct.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = correct.wav; path = FlashcardsApp/correct.wav; sourceTree = "<group>"; };
 		AA000001AAAA000000000004 /* correct2.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = correct2.wav; path = FlashcardsApp/correct2.wav; sourceTree = "<group>"; };
+		AA000001AAAA000000000006 /* session_correct.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = session_correct.wav; path = FlashcardsApp/session_correct.wav; sourceTree = "<group>"; };
+		AA000001AAAA000000000008 /* session_error.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = session_error.wav; path = FlashcardsApp/session_error.wav; sourceTree = "<group>"; };
+		AA000001AAAA00000000000A /* session_pop.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = session_pop.wav; path = FlashcardsApp/session_pop.wav; sourceTree = "<group>"; };
+		AA000001AAAA00000000000C /* session_reveal.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = session_reveal.wav; path = FlashcardsApp/session_reveal.wav; sourceTree = "<group>"; };
+		AA000001AAAA00000000000E /* session_count.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = session_count.wav; path = FlashcardsApp/session_count.wav; sourceTree = "<group>"; };
+		AA000001AAAA000000000010 /* session_ding.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = session_ding.wav; path = FlashcardsApp/session_ding.wav; sourceTree = "<group>"; };
+		AA000001AAAA000000000012 /* session_finish.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = session_finish.wav; path = FlashcardsApp/session_finish.wav; sourceTree = "<group>"; };
 		B67EA28DB52588A4B1214301 /* FlashlyWidget.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = FlashlyWidget.entitlements; sourceTree = "<group>"; };
 		D3D7608701811AA6E686C4B5 /* FlashlyWidgetBridge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/FlashlyWidgetBridge.swift; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
@@ -131,6 +145,13 @@
 				100B5DA60BD87A0B62C81809 /* FlashcardsApp.entitlements */,
 				AA000001AAAA000000000002 /* correct.wav */,
 				AA000001AAAA000000000004 /* correct2.wav */,
+				AA000001AAAA000000000006 /* session_correct.wav */,
+				AA000001AAAA000000000008 /* session_error.wav */,
+				AA000001AAAA00000000000A /* session_pop.wav */,
+				AA000001AAAA00000000000C /* session_reveal.wav */,
+				AA000001AAAA00000000000E /* session_count.wav */,
+				AA000001AAAA000000000010 /* session_ding.wav */,
+				AA000001AAAA000000000012 /* session_finish.wav */,
 				F21748F2D7B422E320F4F52B /* GoogleService-Info.plist */,
 				D3D7608701811AA6E686C4B5 /* FlashlyWidgetBridge.swift */,
 				52B11D15E0DD18295FE59251 /* FlashlyWidgetBridge.m */,
@@ -299,6 +320,13 @@
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				AA000001AAAA000000000001 /* correct.wav in Resources */,
 				AA000001AAAA000000000003 /* correct2.wav in Resources */,
+				AA000001AAAA000000000005 /* session_correct.wav in Resources */,
+				AA000001AAAA000000000007 /* session_error.wav in Resources */,
+				AA000001AAAA000000000009 /* session_pop.wav in Resources */,
+				AA000001AAAA00000000000B /* session_reveal.wav in Resources */,
+				AA000001AAAA00000000000D /* session_count.wav in Resources */,
+				AA000001AAAA00000000000F /* session_ding.wav in Resources */,
+				AA000001AAAA000000000011 /* session_finish.wav in Resources */,
 				EDF3C2BA2A6E9C8B54328699 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
