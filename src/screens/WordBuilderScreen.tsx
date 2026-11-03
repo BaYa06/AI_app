@@ -3,8 +3,8 @@
  * @description Экран сборки слова (интерактивный)
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, StyleSheet, Pressable, ScrollView, AppState } from 'react-native';
-import { Settings, Volume2 } from 'lucide-react-native';
+import { View, StyleSheet, Pressable, AppState } from 'react-native';
+import { Volume2 } from 'lucide-react-native';
 import {
   useThemeColors,
   useCardsStore,
@@ -13,10 +13,10 @@ import {
   selectSetStats,
 } from '@/store';
 import { Text, Loading } from '@/components/common';
-import { Button, ProgressBar, ScreenHeader } from '@/components/ui';
+import { StageLayout, AnswerPanel } from '@/components/study/StageLayout';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card, Rating } from '@/types';
-import { spacing, borderRadius, iconSize, screenPadding, alpha } from '@/constants';
+import { spacing, borderRadius, iconSize, alpha } from '@/constants';
 import { ProgressService } from '@/services/ProgressService';
 import { speak, resolveSpeechLang, prefetchSpeech, cardSpeechLangs } from '@/utils/speech';
 import { playCorrectSound2 as playCorrectSound, preloadSound } from '@/utils/sound';
@@ -25,8 +25,6 @@ type Props = RootStackScreenProps<'WordBuilder'>;
 
 type LetterSlot = { id: string; char: string | null; tileId: string | null; isFilled: boolean };
 type LetterTile = { id: string; char: string; used: boolean };
-
-const FEEDBACK_DELAY_MS = 500;
 
 const shuffleArray = <T,>(items: T[]): T[] => {
   const arr = [...items];
@@ -458,16 +456,10 @@ export function WordBuilderScreen({ navigation, route }: Props) {
     if (advanceTimeoutRef.current) {
       clearTimeout(advanceTimeoutRef.current);
     }
-    if (isCorrect) {
-      playCorrectSound();
-      pendingAdvanceRef.current = null;
-      advanceTimeoutRef.current = setTimeout(() => {
-        advanceToNextCard(nextErrors, updatedErrorCards);
-      }, FEEDBACK_DELAY_MS);
-    } else {
-      pendingAdvanceRef.current = { errors: nextErrors, errorCards: updatedErrorCards };
-      advanceTimeoutRef.current = null;
-    }
+    // Дальше — по кнопке в нижней панели (общий скелет режима), и после верного ответа тоже
+    if (isCorrect) playCorrectSound();
+    pendingAdvanceRef.current = { errors: nextErrors, errorCards: updatedErrorCards };
+    advanceTimeoutRef.current = null;
   }, [
     currentCard,
     targetWord,
@@ -509,35 +501,34 @@ export function WordBuilderScreen({ navigation, route }: Props) {
     return () => sub.remove();
   }, [finishStudySession]);
 
-  const progressPercent = totalWords ? Math.round(((currentIndex + 1) / totalWords) * 100) : 0;
-
   if (!currentCard) {
     return <Loading fullScreen message="Загрузка..." />;
   }
 
+  const handleExit = () => {
+    finishStudySession();
+    if (session) navigation.navigate('SetDetail', { setId: session.setId });
+    else navigation.goBack();
+  };
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <ScreenHeader
-        title="Собери слово"
-        onBack={() => { finishStudySession(); navigation.goBack(); }}
-        right={<Button variant="icon" icon={Settings} accessibilityLabel="Настройки" />}
-      />
-
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Progress */}
-        <View style={styles.progressSection}>
-          <View style={styles.progressInfo}>
-            <Text variant="bodySmall" style={[styles.semibold, { color: colors.textSecondary }]}>
-              Слово: {currentIndex + 1}/{totalWords || 1}
-            </Text>
-          </View>
-          <ProgressBar progress={progressPercent} accessibilityLabel="Прогресс" />
-        </View>
-
+    <StageLayout
+      session={session}
+      progress={{ done: currentIndex + (wordResult ? 1 : 0), total: totalWords }}
+      task="Собери слово из букв"
+      onExit={handleExit}
+      showIntro={phaseOffset === 0 && !phaseFailedList.length}
+      footer={
+        wordResult ? (
+          <AnswerPanel
+            correct={wordResult === 'correct'}
+            answer={targetWord}
+            hint={{ front: targetWord, back: promptText, example: currentCard.example || undefined }}
+            onNext={handleConfirmNext}
+          />
+        ) : null
+      }
+    >
         {/* Card */}
         <View
           style={[
@@ -548,24 +539,9 @@ export function WordBuilderScreen({ navigation, route }: Props) {
             },
           ]}
         >
-          <View
-            style={[
-              styles.cardTopLine,
-              { backgroundColor: colors.primary },
-            ]}
-          />
-          <View style={[styles.cardChip, { backgroundColor: alpha(colors.primary, 10) }]}>
-            <Text variant="overline" style={{ color: colors.primary }}>
-              Собери слово
-            </Text>
-          </View>
-
           <View style={styles.wordBlock}>
             <Text variant="h1" style={[styles.word, { color: colors.textPrimary }]}>
               {promptText}
-            </Text>
-            <Text variant="body" color="secondary" align="center">
-              Составь оригинальное слово из букв
             </Text>
           </View>
 
@@ -632,9 +608,6 @@ export function WordBuilderScreen({ navigation, route }: Props) {
               );
             })}
           </View>
-          {wordResult === 'wrong' && (
-            <Button variant="secondary" title="Хорошо" onPress={handleConfirmNext} />
-          )}
         </View>
 
         {/* Letters grid */}
@@ -674,8 +647,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
             ))}
           </View>
         )}
-      </ScrollView>
-    </View>
+    </StageLayout>
   );
 }
 
@@ -689,40 +661,13 @@ const styles = StyleSheet.create({
   bold: {
     fontWeight: '700',
   },
-  content: {
-    paddingHorizontal: screenPadding,
-    paddingBottom: spacing.xxl,
-    gap: spacing.m,
-  },
-  progressSection: {
-    gap: spacing.xs,
-  },
-  progressInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
   // Рамка без тени (брендбук, 7.3)
   card: {
     borderRadius: borderRadius.l,
     borderWidth: 1,
     padding: spacing.l,
-    paddingTop: spacing.l + spacing.xxs,
     overflow: 'hidden',
     gap: spacing.s,
-  },
-  cardTopLine: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: spacing.xxs,
-  },
-  cardChip: {
-    alignSelf: 'center',
-    paddingHorizontal: spacing.s,
-    paddingVertical: spacing.xxs,
-    borderRadius: borderRadius.full,
   },
   wordBlock: {
     alignItems: 'center',
