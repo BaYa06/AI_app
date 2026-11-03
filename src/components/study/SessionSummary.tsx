@@ -10,6 +10,7 @@ import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { ChevronRight, Clock, Target, X, Zap } from 'lucide-react-native';
 import { useCardsStore, useSettingsStore, useThemeColors } from '@/store';
 import { Text } from '@/components/common';
@@ -23,8 +24,10 @@ import type { RootStackParamList, SessionRouteParams } from '@/types/navigation'
 import type { Card } from '@/types';
 import { currentSetSessionPlan, startSetSession } from './setSession';
 import { SessionSummaryArt } from './SessionSummaryArt';
+import { useSummaryChoreography, type TileMotion } from './useSummaryChoreography';
 
 const words = (n: number) => `${n} ${pluralize(n, 'слово', 'слова', 'слов')}`;
+const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
 
 // Ниже этой высоты экрана (iPhone SE — 667) картинка и промежутки меньше, чтобы всё влезло без прокрутки
 const COMPACT_HEIGHT = 700;
@@ -68,12 +71,22 @@ export function SessionSummary({ session }: { session: SessionRouteParams }) {
   const weak = weakIds.size;
   // Точность — доля уверенных слов сессии (решение 3): счётчика «с первой попытки» этапы не передают
   const accuracy = list.length > 0 ? Math.round(((list.length - weak) / list.length) * 100) : 100;
-  const time = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  // Плитки считают от нуля по очереди со звуком и вибрацией; кнопки работают сразу и обрывают анимацию
+  const motion = useSummaryChoreography([xp, accuracy, seconds]);
+  const heroStyle = useAnimatedStyle(() => ({
+    opacity: motion.heroOpacity.value,
+    transform: [{ scale: motion.heroScale.value }],
+  }));
+  const tailStyle = useAnimatedStyle(() => ({ opacity: motion.tailOpacity.value }));
 
   const plan = info?.plan;
   const canContinue = !!plan && (plan.mode === 'review' || plan.mode === 'learn' || plan.mode === 'more');
-  const toSet = () => navigation.navigate('SetDetail', { setId: session.setId });
+  const toSet = () => {
+    motion.stop();
+    navigation.navigate('SetDetail', { setId: session.setId });
+  };
   const handleContinue = () => {
+    motion.stop();
     if (!plan || !startSetSession(navigation, session.setId, plan, 'replace')) toSet();
   };
 
@@ -84,10 +97,11 @@ export function SessionSummary({ session }: { session: SessionRouteParams }) {
       ? `Все ${words(list.length)} — уверенно`
       : 'Ещё одна сессия — и эти слова твои';
 
-  const stats: Array<{ key: string; icon: IconComponent; value: string; label: string; fg: string; tint: string }> = [
-    { key: 'xp', icon: Zap, value: `+${xp}`, label: 'опыта', fg: colors.warningText, tint: colors.warning },
-    { key: 'accuracy', icon: Target, value: `${accuracy}%`, label: 'точность', fg: colors.successText, tint: colors.success },
-    { key: 'time', icon: Clock, value: time, label: 'время', fg: colors.primary, tint: colors.primary },
+  const [xpShown, accuracyShown, secondsShown] = motion.values;
+  const stats: StatTileProps[] = [
+    { icon: Zap, value: `+${xpShown}`, final: `+${xp}`, label: 'опыта', fg: colors.warningText, tint: colors.warning, motion: motion.tiles[0] },
+    { icon: Target, value: `${accuracyShown}%`, final: `${accuracy}%`, label: 'точность', fg: colors.successText, tint: colors.success, motion: motion.tiles[1] },
+    { icon: Clock, value: mmss(secondsShown), final: mmss(seconds), label: 'время', fg: colors.primary, tint: colors.primary, motion: motion.tiles[2] },
   ];
 
   return (
@@ -99,7 +113,9 @@ export function SessionSummary({ session }: { session: SessionRouteParams }) {
       </View>
 
       <View style={[styles.center, { gap: compact ? spacing.l : spacing.xl }]}>
-        <SessionSummaryArt kind={canContinue ? 'check' : 'star'} width={compact ? 150 : 200} />
+        <Animated.View style={heroStyle}>
+          <SessionSummaryArt kind={canContinue ? 'check' : 'star'} width={compact ? 150 : 200} />
+        </Animated.View>
 
         <View style={styles.titles}>
           <Text variant="h1" align="center" accessibilityRole="header" style={{ color: colors.textPrimary }}>
@@ -111,41 +127,25 @@ export function SessionSummary({ session }: { session: SessionRouteParams }) {
         </View>
 
         <View style={styles.stats}>
-          {stats.map((s) => {
-            const Icon = s.icon;
-            return (
-              <View
-                key={s.key}
-                accessible
-                accessibilityLabel={`${s.label}: ${s.value}`}
-                style={[styles.stat, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              >
-                <View style={[styles.statIcon, { backgroundColor: alpha(s.tint, 20) }]}>
-                  <Icon size={iconSize.s} color={s.fg} strokeWidth={2.2} />
-                </View>
-                <Text variant="h2" style={[styles.tabular, { color: s.fg }]}>
-                  {s.value}
-                </Text>
-                <Text variant="caption" style={{ color: colors.textSecondary }}>
-                  {s.label}
-                </Text>
-              </View>
-            );
-          })}
+          {stats.map((s) => (
+            <StatTile key={s.label} {...s} />
+          ))}
         </View>
 
-        <Pressable
-          onPress={() => setWordsOpen(true)}
-          accessibilityRole="button"
-          accessibilityLabel={weak > 0 ? `${words(weak)} на повторение. Показать слова сессии` : 'Показать слова сессии'}
-          style={({ pressed }) => [styles.wordsLink, { backgroundColor: colors.surfaceMuted }, pressed && styles.pressed]}
-        >
-          <View style={[styles.dot, { backgroundColor: weak > 0 ? colors.warning : colors.success }]} />
-          <Text variant="label" style={{ color: colors.textPrimary }}>
-            {weak > 0 ? `${words(weak)} на повторение` : 'Слова сессии'}
-          </Text>
-          <ChevronRight size={iconSize.xs} color={colors.textSecondary} strokeWidth={2.4} />
-        </Pressable>
+        <Animated.View style={tailStyle}>
+          <Pressable
+            onPress={() => setWordsOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={weak > 0 ? `${words(weak)} на повторение. Показать слова сессии` : 'Показать слова сессии'}
+            style={({ pressed }) => [styles.wordsLink, { backgroundColor: colors.surfaceMuted }, pressed && styles.pressed]}
+          >
+            <View style={[styles.dot, { backgroundColor: weak > 0 ? colors.warning : colors.success }]} />
+            <Text variant="label" style={{ color: colors.textPrimary }}>
+              {weak > 0 ? `${words(weak)} на повторение` : 'Слова сессии'}
+            </Text>
+            <ChevronRight size={iconSize.xs} color={colors.textSecondary} strokeWidth={2.4} />
+          </Pressable>
+        </Animated.View>
       </View>
 
       <View style={[styles.footer, { paddingBottom: Math.max(bottomInset, spacing.m) }]}>
@@ -194,6 +194,43 @@ export function SessionSummary({ session }: { session: SessionRouteParams }) {
         ))}
       </Sheet>
     </View>
+  );
+}
+
+interface StatTileProps {
+  icon: IconComponent;
+  /** Число, которое сейчас на экране (идёт счёт) */
+  value: string;
+  /** Итоговое число — для VoiceOver */
+  final: string;
+  label: string;
+  fg: string;
+  tint: string;
+  motion: TileMotion;
+}
+
+function StatTile({ icon: Icon, value, final, label, fg, tint, motion }: StatTileProps) {
+  const colors = useThemeColors();
+  const style = useAnimatedStyle(() => ({
+    opacity: motion.opacity.value,
+    transform: [{ scale: motion.scale.value }],
+  }));
+  return (
+    <Animated.View
+      accessible
+      accessibilityLabel={`${label}: ${final}`}
+      style={[styles.stat, { backgroundColor: colors.surface, borderColor: colors.border }, style]}
+    >
+      <View style={[styles.statIcon, { backgroundColor: alpha(tint, 20) }]}>
+        <Icon size={iconSize.s} color={fg} strokeWidth={2.2} />
+      </View>
+      <Text variant="h2" style={[styles.tabular, { color: fg }]}>
+        {value}
+      </Text>
+      <Text variant="caption" style={{ color: colors.textSecondary }}>
+        {label}
+      </Text>
+    </Animated.View>
   );
 }
 
