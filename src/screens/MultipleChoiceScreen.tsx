@@ -19,6 +19,8 @@ import { playCorrectSound, preloadSound } from '@/utils/sound';
 import { buildDistractorPool, pickSimilarDistractors } from '@/utils/choiceDistractors';
 import { Analytics } from '@/services/analytics';
 import { useChallengeStore } from '@/store';
+import { StageLayout, AnswerPanel } from '@/components/study/StageLayout';
+import { isSubjectSet } from '@/utils/setKind';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card, Rating } from '@/types';
 import { pluralize } from '@/utils';
@@ -80,6 +82,14 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
   const [timeLeft, setTimeLeft] = useState(paramTimeLimit ?? 120);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const [challengeResult, setChallengeResult] = useState<ChallengeResult>(null);
+
+  // Обычный тест (не мини-игра главной): общий скелет режима, после ответа — панель с кнопкой
+  const isPlainTest = !challengeMode && !sniperMode && !forgottenMode;
+  const [feedback, setFeedback] = useState<{
+    correct: boolean;
+    nextErrors: number;
+    updatedErrorCards: Array<{ id: string; front: string; back: string; rating: number }>;
+  } | null>(null);
 
   // Sniper mode state
   const [sniperStreak, setSniperStreak] = useState(0);
@@ -503,6 +513,12 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
       return;
     }
 
+    // Обычный тест: дальше — по кнопке в нижней панели (handleNextQuestion)
+    if (isPlainTest) {
+      setFeedback({ correct: isCorrect, nextErrors, updatedErrorCards });
+      return;
+    }
+
     const isLast = currentIndex >= totalQuestions - 1;
     timeoutRef.current = setTimeout(() => {
       if (isLast) {
@@ -526,6 +542,18 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
       setSelectedOption(null);
       setShowResult(false);
     }, 650);
+  };
+
+  const handleNextQuestion = () => {
+    if (!feedback) return;
+    if (currentIndex >= totalQuestions - 1) {
+      finishQuiz(feedback.nextErrors, feedback.updatedErrorCards);
+      return;
+    }
+    setFeedback(null);
+    setCurrentIndex((idx) => idx + 1);
+    setSelectedOption(null);
+    setShowResult(false);
   };
 
   // Сохраняем активность при уходе в background
@@ -662,6 +690,121 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
     });
   }
 
+  const questionView = (
+    <>
+      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        {isPlainTest ? null : (
+          <View style={styles.cardChip}>
+            <Text variant="overline" style={{ color: colors.primary }}>
+              Выбери правильный ответ
+            </Text>
+          </View>
+        )}
+        <Text variant="h1" style={[styles.word, { color: colors.textPrimary }]}>
+          {getFront(currentCard)}
+        </Text>
+        {isCardSpeakable(currentCard) ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Прослушать слово"
+            style={({ pressed }) => [
+              styles.audioButton,
+              {
+                backgroundColor: pressed ? alpha(colors.primary, 20) : colors.surfaceMuted,
+                borderColor: colors.border,
+              },
+            ]}
+            onPress={() => handleSpeak(getFront(currentCard), getBack(currentCard), cardSpeechLangs(currentCard).front)}
+          >
+            <Volume2 size={iconSize.m} color={colors.primary} />
+          </Pressable>
+        ) : null}
+      </View>
+
+      <View style={styles.optionsBlock}>
+        {options.map((option) => {
+          const state = optionState(option);
+          const isCorrect = state === 'correct';
+          const isWrong = state === 'wrong';
+
+          const baseBorder = isCorrect ? colors.success : isWrong ? colors.error : colors.border;
+          const baseBg = isCorrect
+            ? alpha(colors.success, 10)
+            : isWrong
+              ? alpha(colors.error, 10)
+              : colors.surface;
+          // Текст ответа — «текстовые» токены: заливки как текст нечитаемы
+          const textColor = isCorrect
+            ? colors.successText
+            : isWrong
+              ? colors.errorText
+              : colors.textPrimary;
+
+          return (
+            <Pressable
+              key={option.id}
+              onPress={() => handleSelectOption(option)}
+              disabled={showResult}
+              accessibilityRole="button"
+              accessibilityLabel={`${option.label}. ${option.text}${isCorrect ? ', верно' : isWrong ? ', неверно' : ''}`}
+              style={({ pressed }) => [
+                styles.option,
+                {
+                  borderColor: baseBorder,
+                  backgroundColor: pressed && !isCorrect && !isWrong ? alpha(colors.primary, 10) : baseBg,
+                },
+              ]}
+            >
+              <View style={[styles.optionBadge, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
+                <Text variant="label" style={{ color: colors.textSecondary }}>
+                  {option.label}
+                </Text>
+              </View>
+              <Text variant="bodyLarge" style={[styles.optionText, { color: textColor }]}>{option.text}</Text>
+              {/* Верно/неверно — цвет и иконка, не только цвет (брендбук, 11) */}
+              {isCorrect ? (
+                <Check size={iconSize.s} color={colors.successText} strokeWidth={3} />
+              ) : isWrong ? (
+                <X size={iconSize.s} color={colors.errorText} strokeWidth={3} />
+              ) : (
+                <View style={styles.optionMarkPlaceholder} />
+              )}
+            </Pressable>
+          );
+        })}
+      </View>
+    </>
+  );
+
+  if (isPlainTest) {
+    const exitTest = () => {
+      finishStudySession();
+      if (session) navigation.navigate('SetDetail', { setId: session.setId });
+      else navigation.goBack();
+    };
+    return (
+      <StageLayout
+        session={session}
+        progress={{ done: currentIndex + (showResult ? 1 : 0), total: totalQuestions }}
+        task={isSubjectSet(set) ? 'Выберите ответ' : 'Как переводится?'}
+        onExit={exitTest}
+        showIntro={phaseOffset === 0 && !phaseFailedList.length}
+        footer={
+          feedback ? (
+            <AnswerPanel
+              correct={feedback.correct}
+              answer={getBack(currentCard)}
+              hint={{ front: getFront(currentCard), back: getBack(currentCard), example: currentCard.example || undefined }}
+              onNext={handleNextQuestion}
+            />
+          ) : null
+        }
+      >
+        {questionView}
+      </StageLayout>
+    );
+  }
+
   return (
     <Container padded={false}>
       <ScreenHeader
@@ -701,85 +844,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={styles.cardChip}>
-            <Text variant="overline" style={{ color: colors.primary }}>
-              Выбери правильный ответ
-            </Text>
-          </View>
-          <Text variant="h1" style={[styles.word, { color: colors.textPrimary }]}>
-            {getFront(currentCard)}
-          </Text>
-          {isCardSpeakable(currentCard) ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Прослушать слово"
-              style={({ pressed }) => [
-                styles.audioButton,
-                {
-                  backgroundColor: pressed ? alpha(colors.primary, 20) : colors.surfaceMuted,
-                  borderColor: colors.border,
-                },
-              ]}
-              onPress={() => handleSpeak(getFront(currentCard), getBack(currentCard), cardSpeechLangs(currentCard).front)}
-            >
-              <Volume2 size={iconSize.m} color={colors.primary} />
-            </Pressable>
-          ) : null}
-        </View>
-
-        <View style={styles.optionsBlock}>
-          {options.map((option) => {
-            const state = optionState(option);
-            const isCorrect = state === 'correct';
-            const isWrong = state === 'wrong';
-
-            const baseBorder = isCorrect ? colors.success : isWrong ? colors.error : colors.border;
-            const baseBg = isCorrect
-              ? alpha(colors.success, 10)
-              : isWrong
-                ? alpha(colors.error, 10)
-                : colors.surface;
-            // Текст ответа — «текстовые» токены: заливки как текст нечитаемы
-            const textColor = isCorrect
-              ? colors.successText
-              : isWrong
-                ? colors.errorText
-                : colors.textPrimary;
-
-            return (
-              <Pressable
-                key={option.id}
-                onPress={() => handleSelectOption(option)}
-                disabled={showResult}
-                accessibilityRole="button"
-                accessibilityLabel={`${option.label}. ${option.text}${isCorrect ? ', верно' : isWrong ? ', неверно' : ''}`}
-                style={({ pressed }) => [
-                  styles.option,
-                  {
-                    borderColor: baseBorder,
-                    backgroundColor: pressed && !isCorrect && !isWrong ? alpha(colors.primary, 10) : baseBg,
-                  },
-                ]}
-              >
-                <View style={[styles.optionBadge, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
-                  <Text variant="label" style={{ color: colors.textSecondary }}>
-                    {option.label}
-                  </Text>
-                </View>
-                <Text variant="bodyLarge" style={[styles.optionText, { color: textColor }]}>{option.text}</Text>
-                {/* Верно/неверно — цвет и иконка, не только цвет (брендбук, 11) */}
-                {isCorrect ? (
-                  <Check size={iconSize.s} color={colors.successText} strokeWidth={3} />
-                ) : isWrong ? (
-                  <X size={iconSize.s} color={colors.errorText} strokeWidth={3} />
-                ) : (
-                  <View style={styles.optionMarkPlaceholder} />
-                )}
-              </Pressable>
-            );
-          })}
-        </View>
+        {questionView}
 
       </ScrollView>
     </Container>

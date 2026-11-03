@@ -177,8 +177,9 @@ export function firstSessionStep(
   stages: SessionStage[],
   cards: Card[],
   now: number = Date.now(),
+  xpBase?: number,
 ): SessionStep | null {
-  return sessionStepAt({ setId, stages: buildSessionStages(stages, cards), index: 0, startedAt: now }, null, now);
+  return sessionStepAt({ setId, stages: buildSessionStages(stages, cards), index: 0, startedAt: now, xpBase }, null, now);
 }
 
 /**

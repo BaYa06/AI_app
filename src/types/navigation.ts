@@ -39,6 +39,8 @@ export interface SessionRouteParams {
   /** Текущий этап */
   index: number;
   startedAt: number;
+  /** Счётчик ответов дня на старте сессии: «+N опыта» = счётчик сейчас − xpBase (1 ответ = 1 очко) */
+  xpBase?: number;
   /** Серия выросла на одном из этапов — празднуем на итогах сессии, а не посреди неё */
   streakCount?: number;
 }
