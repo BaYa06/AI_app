@@ -29,7 +29,7 @@ const emitter = native ? new NativeEventEmitter(NativeModules.StudyModeSheetModu
 
 export const isNativeStudyModeSheet = !!native;
 
-// Токены, которые использует шторка (StudyModeSheet, GameRow, RecommendedModeCard, Chip)
+// Токены, которые использует нативная шторка (StudyModeSheet.swift: игры, карточка режима, Chip)
 const COLOR_KEYS = [
   'surface', 'surfaceMuted', 'border', 'textPrimary', 'textSecondary', 'textTertiary',
   'primary', 'primaryFill', 'onPrimary', 'ratingAgain', 'ratingHard', 'ratingEasy', 'ratingGood',

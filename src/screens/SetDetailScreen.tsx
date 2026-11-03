@@ -12,6 +12,7 @@ import { BlurView } from '@/utils/BlurView';
 import { useSetsStore, useCardsStore, useThemeColors, selectSetStats, useSettingsStore, useCoursesStore, isSetInCourse } from '@/store';
 import { Container, Text, Loading } from '@/components/common';
 import { StudyModeSheet, DEFAULT_STUDY_MODE_GAMES, type StudyMode } from '@/components/study/StudyModeSheet';
+import { currentSetSessionPlan, startSetSession } from '@/components/study/setSession';
 import { isModeAllowedForSets } from '@/utils/setKind';
 import { spacing, borderRadius, iconSize, alpha, config } from '@/constants';
 import { BottomBar, EmptyState, ProgressBar, toast } from '@/components/ui';
@@ -332,6 +333,12 @@ export function SetDetailScreen({ navigation, route }: Props) {
       DatabaseService.saveSettings();
     },
     [updateSettings]
+  );
+
+  // План сессии «Изучить» — на момент открытия шторки (plan/new/study_session.md)
+  const sessionInfo = useMemo(
+    () => (showStudySheet ? currentSetSessionPlan(setId) : null),
+    [showStudySheet, setId],
   );
 
   const openAddCardSheet = useCallback(() => {
@@ -961,6 +968,22 @@ export function SetDetailScreen({ navigation, route }: Props) {
         subtitle={`Набор: ${set?.title || 'Набор'} • ${set?.cardCount || 0} ${pluralize(set?.cardCount || 0, 'слово', 'слова', 'слов')}`}
         onSelectMode={handleSelectStudyMode}
         games={studyModeGames}
+        setSession={
+          sessionInfo
+            ? {
+                title: set?.title || 'Набор',
+                info: sessionInfo,
+                onStart: () => {
+                  setShowStudySheet(false);
+                  startSetSession(navigation, setId, sessionInfo.plan);
+                },
+                onAddWords: () => {
+                  setShowStudySheet(false);
+                  openAddCardSheet();
+                },
+              }
+            : undefined
+        }
         settings={{
           onlyHard,
           onToggleOnlyHard: () => setOnlyHard((v) => !v),

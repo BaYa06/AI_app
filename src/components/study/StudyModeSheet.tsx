@@ -5,16 +5,36 @@
  * Оформление — общий нижний лист `Sheet` (брендбук, 7.6): анимация на нативном драйвере,
  * контент монтируется только пока лист виден или закрывается.
  * На iOS — нативная шторка (nativeStudyModeSheet.ts, plan/new/liquid_glass.md, Glass 0).
+ *
+ * Шторка набора (plan/new/study_session.md, решения 15–18): одна яркая кнопка сессии «Изучить»,
+ * под ней тихая «Свободная практика» со всеми режимами, настройки практики — под шестерёнкой.
+ * На главной кнопки сессии нет: главный путь там «Урок дня», шторка — только свободная практика.
  */
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Puzzle, ClipboardList, Type, Headphones, BookOpenCheck } from 'lucide-react-native';
-import { useThemeColors } from '@/store';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
+import {
+  BookOpenCheck,
+  ChevronRight,
+  ClipboardList,
+  Headphones,
+  Layers,
+  Play,
+  Puzzle,
+  Settings,
+  Type,
+  X,
+} from 'lucide-react-native';
+import { useCardsStore, useThemeColors } from '@/store';
 import { Text } from '@/components/common';
 import { Button, Chip, Sheet, Switch, type IconComponent } from '@/components/ui';
-import { heights, spacing } from '@/constants';
+import { alpha, borderRadius, heights, iconSize, spacing } from '@/constants';
+import { pluralize } from '@/utils';
+import { buildSessionStages } from '@/services/lessonFlow';
+import type { SetSessionPlan } from '@/services/LessonService';
+import type { Card } from '@/types';
 import { GameRow } from './GameRow';
-import { RecommendedModeCard } from './RecommendedModeCard';
+import { SESSION_STAGE_INFO } from './StageLayout';
+import type { SetSessionInfo } from './setSession';
 import { isNativeStudyModeSheet, useNativeStudyModeSheet } from './nativeStudyModeSheet';
 
 export type StudyMode = 'classic' | 'match' | 'multipleChoice' | 'wordBuilder' | 'audio' | 'contextFill';
@@ -32,15 +52,33 @@ export const DEFAULT_STUDY_MODE_GAMES: StudyModeGame[] = [
   { mode: 'match', icon: Puzzle, title: 'Пары', tag: 'Быстро', description: 'Сопоставление слов и переводов' },
   { mode: 'multipleChoice', icon: ClipboardList, title: 'Тест', tag: 'Легко', description: 'Выбери правильный из 4 вариантов' },
   { mode: 'wordBuilder', icon: Type, title: 'Собери слово', tag: 'Правописание', description: 'Собери слово из букв' },
-  { mode: 'audio', icon: Headphones, title: 'Аудио', tag: 'Аудирование', description: 'Прослушай и выбери верное' },
+  // Режим просит сказать перевод вслух (AudioLearningScreen), а не слушать — решение 20 плана
+  { mode: 'audio', icon: Headphones, title: 'Аудио', tag: 'Речь', description: 'Скажи перевод вслух за 5 секунд' },
   { mode: 'contextFill', icon: BookOpenCheck, title: 'Слово в контексте', tag: 'Контекст', description: 'Угадай слово по примеру' },
 ];
+
+/** Карточки в свободной практике — раньше были отдельной карточкой «Рекомендуем» */
+const CARDS_GAME: StudyModeGame = {
+  mode: 'classic',
+  icon: Layers,
+  title: 'Карточки',
+  tag: 'Классика',
+  description: 'Переверни и оцени себя',
+};
 
 export interface StudyModeSettings {
   onlyHard: boolean;
   onToggleOnlyHard: () => void;
   wordLimit: WordLimit;
   onSelectWordLimit: (value: WordLimit) => void;
+}
+
+/** Шторка набора: кнопка сессии «Изучить» */
+export interface SetSheetSession {
+  title: string;
+  info: SetSessionInfo;
+  onStart: () => void;
+  onAddWords: () => void;
 }
 
 interface Props {
@@ -50,6 +88,8 @@ interface Props {
   onSelectMode: (mode: StudyMode) => void;
   games?: StudyModeGame[];
   settings: StudyModeSettings;
+  /** Есть — шторка набора с кнопкой сессии; нет — главная, только свободная практика */
+  setSession?: SetSheetSession;
 }
 
 const WORD_LIMIT_OPTIONS: WordLimit[] = ['10', '20', '30', 'all'];
@@ -67,47 +107,61 @@ function StudyModeSheetRN({
   onSelectMode,
   games,
   settings,
+  setSession,
 }: Props & { games: StudyModeGame[] }) {
   const colors = useThemeColors();
+  const [view, setView] = useState<'main' | 'settings'>('main');
+  // На главной свободная практика — всё содержимое шторки, поэтому сразу раскрыта
+  const [freeOpen, setFreeOpen] = useState(!setSession);
+  useEffect(() => {
+    if (!visible) return;
+    setView('main');
+    setFreeOpen(!setSession);
+  }, [visible]);
+
+  const plan = setSession?.info.plan;
+  const practice = useMemo(() => [CARDS_GAME, ...games], [games]);
+  const isEmpty = plan?.mode === 'empty';
+
+  const title = view === 'settings' ? 'Настройки практики' : setSession ? setSession.title : 'Свободная практика';
+  const meta = !setSession
+    ? subtitle
+    : plan && plan.totalCount > 0
+      ? `${plan.totalCount} ${pluralize(plan.totalCount, 'слово', 'слова', 'слов')} · ${plan.studiedCount > 0 ? `изучали ${plan.studiedCount}` : 'ещё не начинали'}`
+      : 'Пока нет слов';
+
+  const headerRight =
+    view === 'settings' ? (
+      <Button variant="quiet" title="Готово" onPress={() => setView('main')} />
+    ) : (
+      <View style={styles.headerButtons}>
+        {isEmpty ? null : (
+          <Button
+            variant="icon"
+            icon={Settings}
+            iconSize={iconSize.s}
+            iconColor={colors.textSecondary}
+            accessibilityLabel="Настройки практики"
+            onPress={() => setView('settings')}
+          />
+        )}
+        <Button
+          variant="icon"
+          icon={X}
+          iconSize={iconSize.s}
+          iconColor={colors.textSecondary}
+          accessibilityLabel="Закрыть"
+          onPress={onClose}
+        />
+      </View>
+    );
 
   return (
-    <Sheet
-      visible={visible}
-      onClose={onClose}
-      title="Выбор режима"
-      headerRight={<Button variant="quiet" tone="secondary" title="Отмена" onPress={onClose} />}
-    >
-      <Text variant="bodySmall" color="secondary" style={styles.subtitle}>
-        {subtitle}
-      </Text>
-      <View style={styles.content}>
-
-        <RecommendedModeCard onPress={() => onSelectMode('classic')} />
-
-        <View style={styles.section}>
-          <Text variant="overline" color="secondary">
-            Игры для закрепления
-          </Text>
-          <View style={styles.gameList}>
-            {games.map((game) => (
-              <GameRow
-                key={game.mode}
-                icon={game.icon}
-                title={game.title}
-                tag={game.tag}
-                description={game.description}
-                onPress={() => onSelectMode(game.mode)}
-              />
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text variant="overline" color="secondary">
-            Настройки
-          </Text>
+    <Sheet visible={visible} onClose={onClose} title={title} headerRight={headerRight}>
+      {view === 'settings' ? (
+        <View style={styles.content}>
           <View style={styles.settingRow}>
-            <Text variant="body" style={[styles.settingLabel, { color: colors.textPrimary }]}>
+            <Text variant="body" style={[styles.flexShrink, { color: colors.textPrimary }]}>
               Только «Не запомнил»
             </Text>
             <Switch
@@ -117,7 +171,7 @@ function StudyModeSheetRN({
             />
           </View>
           <View style={styles.settingRow}>
-            <Text variant="body" style={[styles.settingLabel, { color: colors.textPrimary }]}>
+            <Text variant="body" style={[styles.flexShrink, { color: colors.textPrimary }]}>
               Количество слов
             </Text>
             <View style={styles.wordChips}>
@@ -131,22 +185,285 @@ function StudyModeSheetRN({
               ))}
             </View>
           </View>
+          <Text variant="caption" color="secondary">
+            Действуют только на свободную практику. Сколько слов взять в сессию, приложение решает само.
+          </Text>
         </View>
-      </View>
+      ) : (
+        <View style={styles.content}>
+          <Text variant="bodySmall" color="secondary" style={styles.meta}>
+            {meta}
+          </Text>
+
+          {setSession && plan ? <SessionButton plan={plan} session={setSession} /> : null}
+
+          {setSession ? (
+            <View style={[styles.free, { borderTopColor: colors.border }]}>
+              <Pressable
+                onPress={() => setFreeOpen((v) => !v)}
+                disabled={isEmpty}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: freeOpen, disabled: isEmpty }}
+                accessibilityLabel="Свободная практика"
+                style={({ pressed }) => [styles.freeToggle, (pressed || isEmpty) && styles.dimmed]}
+              >
+                <View style={styles.flex1}>
+                  <Text variant="body" style={[styles.semibold, { color: colors.textPrimary }]}>
+                    Свободная практика
+                  </Text>
+                  <Text variant="caption" color="secondary">
+                    {isEmpty ? 'Появится, когда добавите слова' : 'Любой режим отдельно'}
+                  </Text>
+                </View>
+                <View style={styles.iconStack}>
+                  {practice.slice(0, 5).map(({ mode, icon: Icon }, i) => (
+                    <View
+                      key={mode}
+                      style={[
+                        styles.stackIcon,
+                        { backgroundColor: colors.surfaceMuted, borderColor: colors.surface },
+                        i > 0 && styles.stackOverlap,
+                      ]}
+                    >
+                      <Icon size={iconSize.xs - 2} color={colors.textSecondary} />
+                    </View>
+                  ))}
+                </View>
+                <ChevronRight
+                  size={iconSize.xs}
+                  color={colors.textTertiary}
+                  style={freeOpen ? styles.chevronOpen : undefined}
+                />
+              </Pressable>
+            </View>
+          ) : null}
+
+          {freeOpen && !isEmpty ? (
+            <View style={styles.gameList}>
+              {practice.map((game) => (
+                <GameRow
+                  key={game.mode}
+                  icon={game.icon}
+                  title={game.title}
+                  tag={game.tag}
+                  description={game.description}
+                  onPress={() => onSelectMode(game.mode)}
+                />
+              ))}
+            </View>
+          ) : null}
+        </View>
+      )}
     </Sheet>
   );
 }
 
+const words = (n: number) => `${n} ${pluralize(n, 'слово', 'слова', 'слов')}`;
+const minutes = (n: number) => `${n} ${pluralize(n, 'минута', 'минуты', 'минут')}`;
+
+/** Подпись и подзаголовок главной кнопки по плану (решение 4 плана) */
+function buttonText(plan: SetSessionPlan): { title: string; caption: string } {
+  const n = plan.cardIds.length;
+  const time = `около ${minutes(plan.minutes)}`;
+  switch (plan.mode) {
+    case 'review':
+      return { title: `Повторить ${words(n)}`, caption: `Пора повторить · ${time}` };
+    case 'more':
+      return { title: `Изучить ещё ${n}`, caption: 'План на сегодня выполнен · по желанию' };
+    case 'again':
+      return { title: 'Повторить набор', caption: 'Тренировка · уровень слов не растёт' };
+    default: {
+      const what =
+        plan.newCount < n
+          ? `${plan.newCount} ${pluralize(plan.newCount, 'новое', 'новых', 'новых')} + ${n - plan.newCount} на закрепление`
+          : words(n);
+      return { title: 'Изучить', caption: `${what} · ${time}` };
+    }
+  }
+}
+
+/** Главная кнопка шторки набора — единственный яркий элемент; пустой или маленький набор — подсказка */
+function SessionButton({ plan, session }: { plan: SetSessionPlan; session: SetSheetSession }) {
+  const colors = useThemeColors();
+  const cardsMap = useCardsStore((s) => s.cards);
+  // Этапы после отбора слов: слово без примера не попадёт в «Слово в контексте» и т.п.
+  const stages = useMemo(() => {
+    const cards = plan.cardIds.map((id) => cardsMap[id]).filter((c): c is Card => !!c);
+    return buildSessionStages(plan.stages, cards).map((s) => s.stage);
+  }, [plan, cardsMap]);
+
+  if (plan.mode === 'empty' || plan.mode === 'tooFew') {
+    return (
+      <View style={[styles.empty, { borderColor: colors.border }]}>
+        <Text variant="h3" align="center" style={{ color: colors.textPrimary }}>
+          {plan.mode === 'empty' ? 'В наборе пока нет слов' : `Добавьте ещё ${words(plan.missingCards)}`}
+        </Text>
+        <Text variant="bodySmall" align="center" color="secondary">
+          {plan.mode === 'empty'
+            ? 'Добавьте хотя бы 4 слова, и приложение соберёт первую сессию.'
+            : 'Для теста нужно хотя бы 4 слова: иначе не из чего выбирать ответ.'}
+        </Text>
+        <Button title="Добавить слова" fullWidth onPress={session.onAddWords} style={styles.emptyButton} />
+      </View>
+    );
+  }
+
+  const { title, caption } = buttonText(plan);
+  const route =
+    stages.length > 3
+      ? `${stages.length} ${pluralize(stages.length, 'этап', 'этапа', 'этапов')} · начнём с ${stages[0] === 'cards' ? 'Карточек' : SESSION_STAGE_INFO[stages[0]].title}`
+      : stages.map((s) => SESSION_STAGE_INFO[s].title).join(' → ');
+
+  return (
+    <Pressable
+      onPress={session.onStart}
+      accessibilityRole="button"
+      accessibilityLabel={`${title}. ${caption}. Рекомендуем`}
+      style={({ pressed }) => [styles.sessionButton, { backgroundColor: colors.primaryFill }, pressed && styles.pressed]}
+    >
+      <View style={styles.sessionRow}>
+        <View style={[styles.play, { backgroundColor: colors.onPrimary }]}>
+          <Play size={iconSize.s} color={colors.primaryFill} fill={colors.primaryFill} />
+        </View>
+        <View style={styles.flex1}>
+          <Text variant="h3" style={[styles.bold, { color: colors.onPrimary }]}>
+            {title}
+          </Text>
+          <Text variant="bodySmall" style={[styles.onFillMuted, { color: colors.onPrimary }]}>
+            {caption}
+          </Text>
+        </View>
+        <View style={[styles.badge, { backgroundColor: alpha(colors.onPrimary, 20) }]}>
+          <Text variant="caption" style={[styles.bold, { color: colors.onPrimary }]}>
+            Рекомендуем
+          </Text>
+        </View>
+      </View>
+      <View style={styles.routeRow}>
+        <View style={styles.miniSegments}>
+          {stages.map((s, i) => (
+            <View
+              key={`${s}-${i}`}
+              style={[styles.miniSegment, { backgroundColor: i === 0 ? colors.onPrimary : alpha(colors.onPrimary, 40) }]}
+            />
+          ))}
+        </View>
+        <Text variant="caption" numberOfLines={1} style={[styles.flex1, styles.onFillMuted, { color: colors.onPrimary }]}>
+          {route}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
+  flex1: {
+    flex: 1,
+  },
+  flexShrink: {
+    flexShrink: 1,
+  },
+  semibold: {
+    fontWeight: '600',
+  },
+  bold: {
+    fontWeight: '700',
+  },
+  pressed: {
+    opacity: 0.85,
+  },
+  dimmed: {
+    opacity: 0.6,
+  },
+  // Второстепенный текст на цветной заливке
+  onFillMuted: {
+    opacity: 0.85,
+  },
   content: {
-    gap: spacing.l,
+    gap: spacing.m,
     paddingBottom: spacing.m,
   },
-  subtitle: {
-    marginBottom: spacing.m,
+  meta: {
+    marginTop: -spacing.xs,
   },
-  section: {
+  headerButtons: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  sessionButton: {
+    borderRadius: borderRadius.xl,
+    padding: spacing.m,
     gap: spacing.s,
+  },
+  sessionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+  },
+  play: {
+    width: heights.touch,
+    height: heights.touch,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: borderRadius.s,
+  },
+  routeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+  },
+  miniSegments: {
+    flexDirection: 'row',
+    gap: 3,
+  },
+  miniSegment: {
+    width: 14,
+    height: 4,
+    borderRadius: borderRadius.full,
+  },
+  empty: {
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderRadius: borderRadius.xl,
+    padding: spacing.l,
+    gap: spacing.xs,
+    alignItems: 'center',
+  },
+  emptyButton: {
+    marginTop: spacing.s,
+  },
+  free: {
+    borderTopWidth: 1,
+    paddingTop: spacing.xs,
+  },
+  freeToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+    minHeight: heights.touch,
+  },
+  iconStack: {
+    flexDirection: 'row',
+  },
+  stackIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: borderRadius.full,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stackOverlap: {
+    marginLeft: -6,
+  },
+  chevronOpen: {
+    transform: [{ rotate: '90deg' }],
   },
   gameList: {
     gap: spacing.s,
@@ -157,9 +474,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.s,
     minHeight: heights.touch,
-  },
-  settingLabel: {
-    flexShrink: 1,
   },
   wordChips: {
     flexDirection: 'row',
