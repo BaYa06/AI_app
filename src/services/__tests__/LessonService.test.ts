@@ -3,13 +3,16 @@ import type { Card, CardSet } from '@/types';
 import {
   addExtraNew,
   buildLessonPlan,
+  buildSetSessionPlan,
   countWaitingReview,
   ensureLessonDay,
   estimateMinutes,
   recordLessonAnswer,
+  newQuotaOf,
   setFocusSet,
   type LessonDay,
   type LessonInput,
+  type SetSessionInput,
 } from '../LessonService';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -320,5 +323,121 @@ describe('estimateMinutes', () => {
     expect(estimateMinutes(30, 0)).toBe(8);
     expect(estimateMinutes(1, 0)).toBe(1);
     expect(estimateMinutes(0, 0)).toBe(0);
+  });
+});
+
+describe('buildSetSessionPlan', () => {
+  const LATER = 2 * DAY;
+  const set = makeSet('s1');
+
+  function session(cards: Card[], day: Partial<LessonDay> = {}, extra: Partial<SetSessionInput> = {}) {
+    return buildSetSessionPlan({
+      set,
+      cards,
+      newPerDay: 10,
+      day: { ...ensureLessonDay(null, '2026-10-01', 0), ...day },
+      now: NOW,
+      ...extra,
+    });
+  }
+  const fresh = (n: number) => Array.from({ length: n }, () => newCard('s1'));
+  /** Изучали, повторять рано */
+  const seen = (n: number, step = 1) => Array.from({ length: n }, () => studiedCard('s1', LATER, step));
+  /** Ошиблись после «Уверенно»: шаг упал до 0, но ответ был */
+  const failed = () => ({ ...newCard('s1'), lastReviewDate: NOW - DAY, nextReviewDate: NOW - DAY });
+
+  it('пустой набор и меньше 4 слов', () => {
+    expect(session([])).toMatchObject({ mode: 'empty', cardIds: [], stages: [], minutes: 0 });
+    expect(session(fresh(3))).toMatchObject({ mode: 'tooFew', cardIds: [], missingCards: 1, totalCount: 3 });
+  });
+
+  it('новый набор: первые 5 слов по порядку добавления, 6 этапов, около 7 минут', () => {
+    const cards = fresh(15);
+    const plan = session(cards);
+    expect(plan.mode).toBe('learn');
+    expect(plan.cardIds).toEqual(cards.slice(0, 5).map((c) => c.id));
+    expect(plan.newCount).toBe(5);
+    expect(plan.stages).toEqual(['cards', 'pairs', 'test', 'listen', 'context', 'build']);
+    expect(plan.minutes).toBe(7);
+    expect(plan).toMatchObject({ totalCount: 15, studiedCount: 0 });
+  });
+
+  it('после сессии: изученные не возвращаются в «Изучить», берутся слова 6–10', () => {
+    const first = seen(5);
+    const rest = fresh(10);
+    const plan = session([...first, ...rest]);
+    expect(plan.mode).toBe('learn');
+    expect(plan.cardIds).toEqual(rest.slice(0, 5).map((c) => c.id));
+    expect(plan.studiedCount).toBe(5);
+  });
+
+  it('ошибка после «Уверенно»: слово слабое — «Повторить», а не новое', () => {
+    const weak = failed();
+    const plan = session([...seen(4), weak, ...fresh(5)]);
+    expect(plan.mode).toBe('review');
+    expect(plan.cardIds).toEqual([weak.id]);
+    expect(plan.stages).toEqual(['test', 'listen', 'build']);
+    expect(plan.studiedCount).toBe(5);
+  });
+
+  it('показано сегодня в уроке, ответ ещё не дошёл до сервера — тоже не новое', () => {
+    const local = newCard('s1');
+    const plan = session([local, ...seen(4)], { introducedIds: [local.id] });
+    expect(plan.mode).toBe('review');
+    expect(plan.cardIds).toEqual([local.id]);
+  });
+
+  it('повторение снизу вверх: сначала нижний уровень, внутри — самый просроченный', () => {
+    const young = studiedCard('s1', -3 * DAY, 3);
+    const learningLate = studiedCard('s1', -2 * DAY, 1);
+    const learningSoon = studiedCard('s1', -60 * 1000, 1);
+    const learning2 = studiedCard('s1', -5 * DAY, 2);
+    const plan = session([young, learningSoon, learning2, learningLate, ...fresh(3)]);
+    expect(plan.mode).toBe('review');
+    expect(plan.cardIds).toEqual([learningLate.id, learningSoon.id, learning2.id, young.id]);
+  });
+
+  it('повторение — не больше 10 слов', () => {
+    const cards = Array.from({ length: 14 }, (_, i) => studiedCard('s1', -(i + 1) * 60 * 60 * 1000));
+    const plan = session(cards);
+    expect(plan.cardIds).toHaveLength(10);
+    expect(plan.minutes).toBe(4);
+  });
+
+  it('новых меньше 5 — добираем learning с самым низким шагом, young не берём', () => {
+    const newOnes = fresh(3);
+    const step2 = studiedCard('s1', LATER, 2);
+    const step1 = studiedCard('s1', LATER + DAY, 1);
+    const young = studiedCard('s1', LATER, 3);
+    const plan = session([young, step2, ...newOnes, step1]);
+    expect(plan.mode).toBe('learn');
+    expect(plan.cardIds).toEqual([...newOnes.map((c) => c.id), step1.id, step2.id]);
+    expect(plan.newCount).toBe(3);
+  });
+
+  it('квота дня общая с уроком: выбрана — «Изучить ещё 5», «ещё» по кнопке её добавляет', () => {
+    const cards = [...seen(5), ...fresh(10)];
+    const today = Array.from({ length: 10 }, (_, i) => `other-${i}`);
+    expect(session(cards, { introducedIds: today }).mode).toBe('more');
+    expect(session(cards, { introducedIds: today.slice(0, 9) }).mode).toBe('learn');
+    expect(session(cards, { introducedIds: today, extraNew: 10 }).mode).toBe('learn');
+    // Квота та же, что у урока дня
+    expect(newQuotaOf({ ...ensureLessonDay(null, '2026-10-01', 25) }, 10)).toBe(5);
+  });
+
+  it('новых нет, повторять рано — «Повторить набор» из 5 самых слабых', () => {
+    const step3 = seen(3, 3);
+    const step1 = seen(2, 1);
+    const step2 = seen(2, 2);
+    const plan = session([...step3, ...step2, ...step1]);
+    expect(plan.mode).toBe('again');
+    expect(plan.cardIds).toEqual([...step1, ...step2, step3[0]].map((c) => c.id));
+    expect(plan.stages).toEqual(['test', 'listen', 'build']);
+  });
+
+  it('предмет: Карточки → Пары → Тест, повторение только Тест', () => {
+    const subject = makeSet('s1', { kind: 'subject' });
+    expect(session(fresh(6), {}, { set: subject }).stages).toEqual(['cards', 'pairs', 'test']);
+    expect(session([failed(), ...seen(4)], {}, { set: subject }).stages).toEqual(['test']);
   });
 });

@@ -122,7 +122,10 @@ async function runStudentCoursesSync(): Promise<void> {
     if (!incoming.has(setId)) continue;
     const merged = (serverBySet[setId] || []).map((card) => {
       const prev = local[card.id];
-      return prev && prev.lastReviewDate > card.lastReviewDate
+      // Раньше пустой last_reviewed с сервера превращался в «сейчас», и в кэше у новых слов осталась
+      // ложная дата. Слово на шаге 0, на которое сервер ответов не знает, — берём серверное.
+      const stalePrev = !!prev && card.lastReviewDate === 0 && (prev.learningStep || 0) === 0;
+      return prev && !stalePrev && prev.lastReviewDate > card.lastReviewDate
         ? { ...card, learningStep: prev.learningStep, nextReviewDate: prev.nextReviewDate, lastReviewDate: prev.lastReviewDate, status: prev.status }
         : card;
     });

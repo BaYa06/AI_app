@@ -236,7 +236,8 @@ function mapCardRow(card: any): Card {
     // SRS данные
     learningStep: card.learning_step || 0,
     nextReviewDate: card.next_review ? new Date(card.next_review).getTime() : Date.now(),
-    lastReviewDate: card.last_reviewed ? new Date(card.last_reviewed).getTime() : Date.now(),
+    // Ни разу не отвечали — 0, а не «сейчас»: по нему сессия набора отличает новое слово от слабого
+    lastReviewDate: card.last_reviewed ? new Date(card.last_reviewed).getTime() : 0,
     status: getStatusFromStep(card.learning_step || 0),
   } as Card;
 }

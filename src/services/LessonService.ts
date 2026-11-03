@@ -15,6 +15,7 @@
  * Правила SRS (шаги, интервалы) здесь не меняются — только выбор слов.
  */
 import type { Card, CardSet } from '@/types';
+import { isSubjectSet } from '@/utils/setKind';
 import { isCardWaitingReview, isCardFading } from './SRSService';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -187,6 +188,14 @@ export function setFocusSet(day: LessonDay, setId: string | null): LessonDay {
   return day.focusSetId === setId ? day : { ...day, focusSetId: setId };
 }
 
+/**
+ * Квота новых слов на сегодня (с учётом «ещё»). Одна для урока дня и сессии набора:
+ * утром ждали повторения много — новых меньше, чтобы урок не превысил LESSON_MAX_CARDS.
+ */
+export function newQuotaOf(day: LessonDay, newPerDay: number): number {
+  return Math.min(newPerDay, Math.max(0, LESSON_MAX_CARDS - day.startWaiting)) + day.extraNew;
+}
+
 export function estimateMinutes(reviewCount: number, newCount: number): number {
   if (reviewCount + newCount === 0) return 0;
   return Math.max(1, Math.round((reviewCount * REVIEW_SEC + newCount * NEW_SEC) / 60));
@@ -209,7 +218,7 @@ export function buildLessonPlan({ sets, newFrom, cardsBySet, cards, newPerDay, d
   const review = freshWaiting.slice(0, reviewBudget);
 
   // --- Новые ---
-  const newQuota = Math.min(newPerDay, Math.max(0, LESSON_MAX_CARDS - day.startWaiting)) + day.extraNew;
+  const newQuota = newQuotaOf(day, newPerDay);
   const newRemaining = Math.max(0, newQuota - day.introducedIds.length);
   const newRoom = Math.max(0, LESSON_MAX_CARDS - review.length);
 
@@ -294,4 +303,113 @@ export function buildLessonPlan({ sets, newFrom, cardsBySet, cards, newPerDay, d
     focusManual: !!chosen,
     newDaysLeft: newPerDay > 0 ? Math.ceil(Math.max(0, newLeftTotal - newCards.length) / newPerDay) : 0,
   };
+}
+
+// ─── Сессия набора «Изучить» (plan/new/study_session.md, Session 1) ───
+//
+// Главная кнопка шторки набора. Правила выбора слов те же, что у урока дня, и квота новых общая
+// (newQuotaOf, LessonDay.introducedIds), только слова берутся из одного набора.
+// - новое слово — ни разу не отвечали: шаг 0 и нет lastReviewDate (и не показано сегодня в уроке);
+//   слово, упавшее после ошибки на шаг 0, — не новое, а слабое: оно идёт в «Повторить»;
+// - слова берутся снизу вверх по уровню (new → learning → young → mature),
+//   внутри уровня — раньше всех тот, чей срок раньше, затем по порядку добавления.
+
+/** Этап сессии. «На слух» — вариант Теста: звучит слово, ответ из 4 вариантов */
+export type SessionStage = 'cards' | 'pairs' | 'test' | 'listen' | 'context' | 'build';
+
+export type SetSessionMode =
+  | 'empty' //  в наборе нет слов → «Добавить слова»
+  | 'tooFew' // слов меньше SESSION_MIN_CARDS — тесту не хватит вариантов → «Добавьте ещё N слов»
+  | 'review' // слабые слова или пора повторить → «Повторить N слов»
+  | 'learn' //  новые слова, квота дня не выбрана → «Изучить»
+  | 'more' //   квота дня выбрана, новые ещё есть → «Изучить ещё 5»
+  | 'again'; // новых нет, повторять рано → «Повторить набор» (уровень слов не растёт)
+
+/** Новых слов в одной сессии */
+export const SESSION_NEW_WORDS = 5;
+/** Слов в одной сессии повторения */
+export const SESSION_REVIEW_MAX = 10;
+/** Меньше — в тесте не собрать 4 варианта ответа */
+export const SESSION_MIN_CARDS = 4;
+
+const LANGUAGE_STAGES: Record<'learn' | 'review', SessionStage[]> = {
+  learn: ['cards', 'pairs', 'test', 'listen', 'context', 'build'],
+  // Без карточек: самооценка знание не проверяет
+  review: ['test', 'listen', 'build'],
+};
+// Предмет (plan/new/set_kind.md): нет озвучки, «Собери слово» и «Слова в контексте»
+const SUBJECT_STAGES: Record<'learn' | 'review', SessionStage[]> = {
+  learn: ['cards', 'pairs', 'test'],
+  review: ['test'],
+};
+
+/** Примерное время на одно задание этапа, секунды: у новых слов дольше (показ, перевод) */
+const SESSION_LEARN_SEC = 14;
+const SESSION_REVIEW_SEC = 8;
+
+export interface SetSessionInput {
+  set: Pick<CardSet, 'kind'>;
+  /** Карточки набора */
+  cards: Card[];
+  /** Настройка «Новых слов в день» */
+  newPerDay: number;
+  day: LessonDay;
+  now: number;
+}
+
+export interface SetSessionPlan {
+  mode: SetSessionMode;
+  /** Слова сессии в порядке показа (пусто для empty / tooFew) */
+  cardIds: string[];
+  /** Сколько из cardIds новых; остальные — добор из learning («3 новых + 2 на закрепление») */
+  newCount: number;
+  /** Этапы по порядку; неподходящие слова и пустые этапы убирает цепочка этапов (Session 2) */
+  stages: SessionStage[];
+  /** Примерное время, минуты (≥ 1, если сессия не пустая) */
+  minutes: number;
+  /** «40 слов · изучали 15» */
+  totalCount: number;
+  studiedCount: number;
+  /** tooFew: сколько слов добавить до минимума */
+  missingCards: number;
+}
+
+/** Отвечали ли на слово хоть раз (иначе оно новое) */
+function wasAnswered(card: Card, introduced: Set<string>): boolean {
+  return stepOf(card) >= 1 || card.lastReviewDate > 0 || introduced.has(card.id);
+}
+
+/** Снизу вверх по уровню, внутри уровня — срок раньше, затем порядок добавления */
+const byLevel = (a: Card, b: Card) => stepOf(a) - stepOf(b) || a.nextReviewDate - b.nextReviewDate || byCreated(a, b);
+
+export function buildSetSessionPlan({ set, cards, newPerDay, day, now }: SetSessionInput): SetSessionPlan {
+  const introduced = new Set(day.introducedIds);
+  const answered = cards.filter((c) => wasAnswered(c, introduced));
+  const stages = isSubjectSet(set) ? SUBJECT_STAGES : LANGUAGE_STAGES;
+  const base = { totalCount: cards.length, studiedCount: answered.length, missingCards: 0 };
+  const plan = (mode: SetSessionMode, list: Card[], newCount: number, kind: 'learn' | 'review'): SetSessionPlan => {
+    const sec = kind === 'learn' ? SESSION_LEARN_SEC : SESSION_REVIEW_SEC;
+    const minutes = list.length > 0 ? Math.max(1, Math.round((list.length * stages[kind].length * sec) / 60)) : 0;
+    return { ...base, mode, cardIds: list.map((c) => c.id), newCount, stages: stages[kind], minutes };
+  };
+
+  if (cards.length === 0) return { ...plan('empty', [], 0, 'learn'), stages: [] };
+  if (cards.length < SESSION_MIN_CARDS) {
+    return { ...plan('tooFew', [], 0, 'learn'), stages: [], missingCards: SESSION_MIN_CARDS - cards.length };
+  }
+
+  // Слабые (ошибка вернула на шаг 0) и те, кому пришло время повторения
+  const review = answered.filter((c) => stepOf(c) === 0 || isCardWaitingReview(c, now)).sort(byLevel);
+  if (review.length > 0) return plan('review', review.slice(0, SESSION_REVIEW_MAX), 0, 'review');
+
+  const fresh = cards.filter((c) => !wasAnswered(c, introduced)).sort(byCreated).slice(0, SESSION_NEW_WORDS);
+  if (fresh.length > 0) {
+    // Новых меньше 5 — добираем learning (шаг 1–2) с самым низким уровнем
+    const fill = answered.filter((c) => stepOf(c) <= 2).sort(byLevel).slice(0, SESSION_NEW_WORDS - fresh.length);
+    // Квота общая с уроком дня; последняя сессия дня может её чуть превысить — сессия не дробится
+    const quotaLeft = newQuotaOf(day, newPerDay) - day.introducedIds.length;
+    return plan(quotaLeft > 0 ? 'learn' : 'more', [...fresh, ...fill], fresh.length, 'learn');
+  }
+
+  return plan('again', [...answered].sort(byLevel).slice(0, SESSION_NEW_WORDS), 0, 'review');
 }
