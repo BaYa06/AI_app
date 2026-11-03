@@ -15,6 +15,7 @@
  * Правила SRS (шаги, интервалы) здесь не меняются — только выбор слов.
  */
 import type { Card, CardSet } from '@/types';
+import type { SessionStage } from '@/types/navigation';
 import { isSubjectSet } from '@/utils/setKind';
 import { isCardWaitingReview, isCardFading } from './SRSService';
 
@@ -314,8 +315,7 @@ export function buildLessonPlan({ sets, newFrom, cardsBySet, cards, newPerDay, d
 // - слова берутся снизу вверх по уровню (new → learning → young → mature),
 //   внутри уровня — раньше всех тот, чей срок раньше, затем по порядку добавления.
 
-/** Этап сессии. «На слух» — вариант Теста: звучит слово, ответ из 4 вариантов */
-export type SessionStage = 'cards' | 'pairs' | 'test' | 'listen' | 'context' | 'build';
+export type { SessionStage };
 
 export type SetSessionMode =
   | 'empty' //  в наборе нет слов → «Добавить слова»

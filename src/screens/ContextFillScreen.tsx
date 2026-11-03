@@ -64,7 +64,7 @@ function blankWord(example: string, word: string, wordForm?: string): string {
 }
 
 export function ContextFillScreen({ navigation, route }: Props) {
-  const { setId, cardLimit } = route.params;
+  const { setId, cardLimit, dueCardIds, session } = route.params;
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
 
@@ -89,13 +89,36 @@ export function ContextFillScreen({ navigation, route }: Props) {
 
   const advanceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const correctIdsRef = useRef<string[]>([]);
+  const startedAtRef = useRef(Date.now());
+
+  // Сессия набора: этап закончен (или слов с примерами нет) — итоги решают, что дальше
+  const finishSessionStage = useCallback(
+    (total: number, correct: number) => {
+      if (!session) return;
+      navigation.replace('StudyResults', {
+        setId,
+        totalCards: total,
+        learnedCards: correct,
+        timeSpent: Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000)),
+        errors: total - correct,
+        errorCards: [],
+        modeTitle: 'Слово в контексте',
+        session,
+      });
+    },
+    [session, navigation, setId],
+  );
 
   // ── Подготовка ──────────────────────────────────────────────────────────
 
   const prep = useCallback(async () => {
-    const setCards = getCardsBySet(setId);
+    // Сессия передаёт уже отобранные слова (с примерами); варианты ответа всё равно из всех карточек
+    const store = useCardsStore.getState().cards;
+    const setCards = dueCardIds?.length
+      ? dueCardIds.map((id) => store[id]).filter((c): c is Card => !!c)
+      : getCardsBySet(setId);
 
-    if (setCards.length < MIN_CARDS) {
+    if (!dueCardIds?.length && setCards.length < MIN_CARDS) {
       toast.info(`Мало карточек: для этого режима нужно минимум ${MIN_CARDS} карточки в наборе`);
       navigation.goBack();
       return;
@@ -107,7 +130,8 @@ export function ContextFillScreen({ navigation, route }: Props) {
     // Карточки без примеров — генерируем на лету
     const noExample = selected.filter((c) => !c.example);
     // Примеры пишет ИИ — без согласия режим работает только с карточками, где пример уже есть
-    if (noExample.length > 0 && (await ensureAiConsent())) {
+    // В сессии примеры не дописываем: нужны согласие, сеть и время (слова без примера сессия не даёт)
+    if (!session && noExample.length > 0 && (await ensureAiConsent())) {
       setPrepStatus('AI готовит задания...');
       try {
         const set = useSetsStore.getState().getSet(setId);
@@ -151,6 +175,10 @@ export function ContextFillScreen({ navigation, route }: Props) {
     // Оставляем только карточки с примерами
     const ready = selected.filter((c) => c.example);
 
+    if (ready.length === 0 && session) {
+      finishSessionStage(0, 0);
+      return;
+    }
     if (ready.length === 0) {
       toast.error('Не удалось загрузить примеры для карточек. Попробуй позже');
       navigation.goBack();
@@ -159,7 +187,7 @@ export function ContextFillScreen({ navigation, route }: Props) {
 
     setQuestions(ready);
     setPrepLoading(false);
-  }, [setId, cardLimit, getCardsBySet, updateCard, navigation]);
+  }, [setId, cardLimit, dueCardIds, session, finishSessionStage, getCardsBySet, updateCard, navigation]);
 
   useEffect(() => {
     prep();
@@ -212,7 +240,8 @@ export function ContextFillScreen({ navigation, route }: Props) {
             questions.length,
             correctIdsRef.current,
           );
-          setFinished(true);
+          if (session) finishSessionStage(questions.length, correctIdsRef.current.length);
+          else setFinished(true);
         } else {
           setCurrentIndex(next);
           setSelectedOption(null);
@@ -220,7 +249,7 @@ export function ContextFillScreen({ navigation, route }: Props) {
         }
       }, 1500);
     },
-    [selectedOption, optionsLoading, questions, currentIndex],
+    [selectedOption, optionsLoading, questions, currentIndex, session, finishSessionStage],
   );
 
   useEffect(() => {

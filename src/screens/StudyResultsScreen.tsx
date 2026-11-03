@@ -16,7 +16,7 @@ import { getPushStatus, isPushSupported } from '@/services/pushNotifications';
 import { loadPushPromptState, markPushPromptShown, savePushPromptState, shouldShowPushPrompt } from '@/services/pushPrompt';
 import { spacing, borderRadius, heights, iconSize, screenPadding, alpha } from '@/constants';
 import { pluralize } from '@/utils';
-import { nextLessonStep, nextLessonLabel } from '@/services/lessonFlow';
+import { nextLessonStep, nextLessonLabel, sessionStepAfterPortion } from '@/services/lessonFlow';
 import { useCardsStore } from '@/store/cardsStore';
 import { Badge, Button, Card, ScreenHeader, Sheet, useScreenBottomInset } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
@@ -56,19 +56,39 @@ export function StudyResultsScreen({ navigation, route }: Props) {
     streakIncreased,
     newStreakCount,
     lesson,
+    session,
   } = route.params;
   const colors = useThemeColors();
+
+  // Сессия набора (plan/new/study_session.md, Session 2): между этапами итогов нет — сразу следующая
+  // порция этапа (ошибки) или следующий этап. Считаем один раз: экран сразу заменяется.
+  const sessionStep = React.useMemo(() => {
+    if (!session) return null;
+    const viewed = (phaseOffset ?? 0) >= totalPhaseCards;
+    const failed = (phaseFailedIds?.length ?? 0) > 0;
+    // Экран без порций (Слово в контексте) — этап пройден целиком
+    const complete = !phaseId || totalPhaseCards <= 0 || (viewed && !failed);
+    const streak = streakIncreased ? newStreakCount : undefined;
+    return sessionStepAfterPortion(session, { complete, phaseId, totalPhaseCards, studiedInPhase, phaseOffset, phaseFailedIds }, streak);
+  }, []);
+  React.useEffect(() => {
+    if (sessionStep) navigation.replace(sessionStep.screen, sessionStep.params);
+  }, []);
+  // Итоги сессии: серия могла вырасти на любом этапе
+  const streakCount = newStreakCount ?? session?.streakCount;
+  const streakGrew = streakIncreased === true || (!sessionStep && !!session?.streakCount);
   const bottomInset = useScreenBottomInset();
   const [showErrorsModal, setShowErrorsModal] = React.useState(false);
-  const [showStreakModal, setShowStreakModal] = React.useState(streakIncreased === true);
+  const [showStreakModal, setShowStreakModal] = React.useState(!sessionStep && streakGrew);
   const [showRatingPrompt, setShowRatingPrompt] = React.useState(false);
 
   // Окно оценки — только в хороший момент (правила в services/feedback.ts). Когда показываем
   // празднование серии, второе окно подряд не открываем — спросим в другой раз.
   React.useEffect(() => {
+    if (sessionStep) return;
     const goodMoment = recordSessionForRatingPrompt({ totalCards, errors });
     // В день, когда показали «Что нового», второе окно с просьбой не открываем
-    if (!goodMoment || streakIncreased || wasWhatsNewShownOn(localDay())) return;
+    if (!goodMoment || streakGrew || wasWhatsNewShownOn(localDay())) return;
     const timer = setTimeout(() => {
       markRatingPromptShown();
       setShowRatingPrompt(true);
@@ -181,7 +201,10 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   });
 
   // Логика кнопки: если фаза завершена - "Закончить", иначе - "Следующие карточки (N осталось)"
-  const primaryButtonLabel = isPhaseComplete 
+  // Итоги сессии — только после последнего этапа (новый экран итогов — Session 10)
+  const primaryButtonLabel = session
+    ? 'Закончить'
+    : isPhaseComplete
     ? (lesson ? nextLessonLabel(lesson, (n) => pluralize(n, 'новое слово', 'новых слова', 'новых слов')) : 'Закончить')
     : remainingInPhase > 0 
       ? `Следующие карточки (${remainingInPhase} ${remainingInPhase === 1 ? 'осталась' : remainingInPhase < 5 ? 'осталось' : 'осталось'})`
@@ -195,7 +218,8 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   };
 
   const handleBack = () => {
-    navigation.navigate('Main', { screen: 'Home' });
+    if (session) navigation.navigate('SetDetail', { setId: session.setId });
+    else navigation.navigate('Main', { screen: 'Home' });
   };
 
   const handleSettings = () => {
@@ -220,6 +244,10 @@ export function StudyResultsScreen({ navigation, route }: Props) {
     });
     
     // Если фаза завершена — возвращаем к набору или на главную (если запущено из HomeScreen)
+    if (session) {
+      navigation.navigate('SetDetail', { setId: session.setId });
+      return;
+    }
     if (isPhaseComplete) {
       // Урок дня: следующая часть (повторение → новые слова → проверка), в конце — главная
       if (lesson) {
@@ -348,6 +376,9 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   const handleReviewWords = () => {
     navigation.push('Study', { setId, mode: 'classic', studyAll: true });
   };
+
+  // Пока экран заменяется следующим этапом — пустой фон, без мигания итогов
+  if (sessionStep) return <View style={[styles.container, { backgroundColor: colors.background }]} />;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -541,7 +572,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
 
       <StreakCelebration
         visible={showStreakModal}
-        streakCount={newStreakCount ?? 0}
+        streakCount={streakCount ?? 0}
         onClose={() => setShowStreakModal(false)}
       />
       {/* Окно оценки и лист о напоминаниях одновременно не показываем — напоминание важнее */}

@@ -47,6 +47,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
     studiedInPhase = 0,
     phaseOffset = 0,
     phaseFailedIds,
+    session,
   } = route.params;
   const colors = useThemeColors();
   const updateSetStats = useSetsStore((s) => s.updateSetStats);
@@ -318,9 +319,11 @@ export function WordBuilderScreen({ navigation, route }: Props) {
         phaseFailedIds: newPhaseFailedIds,
         streakIncreased: streakResult.streakIncreased,
         newStreakCount: streakResult.newStreakCount,
+        session,
       });
     },
     [
+      session,
       finishStudySession,
       navigation,
       setId,

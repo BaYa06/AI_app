@@ -20,7 +20,7 @@ import type { Card } from '@/types';
 type Props = RootStackScreenProps<'Match'>;
 
 export function MatchScreen({ navigation, route }: Props) {
-  const { setId, cardLimit, dueCardIds, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0 } = route.params;
+  const { setId, cardLimit, dueCardIds, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0, session } = route.params;
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
 
@@ -234,8 +234,9 @@ export function MatchScreen({ navigation, route }: Props) {
       totalPhaseCards: phaseTotal,
       studiedInPhase: newStudiedInPhase,
       phaseOffset: newPhaseOffset,
+      session,
     });
-  }, [isComplete, navigation, setId, totalPairs, mistakes, studiedInPhase, cardLimit, dueCardIds, phaseOffset]);
+  }, [isComplete, navigation, setId, totalPairs, mistakes, studiedInPhase, cardLimit, dueCardIds, phaseOffset, session]);
 
   useEffect(() => {
     if (!isComplete && totalPairs > 0 && matchedPairs === totalPairs) {

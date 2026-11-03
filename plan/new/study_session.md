@@ -137,7 +137,11 @@
   Тесты в `src/services/__tests__/`: новые / повторение / «ещё 5» / «повторить набор» / пустой набор /
   предмет / меньше 5 новых (добор learning) / слово с ошибкой не попадает в «Изучить» /
   порядок снизу вверх (new → learning → young → mature, внутри уровня — самые просроченные первыми).
-- [ ] **Session 2. Цепочка этапов.** `lessonFlow`: этапы по типу набора и виду сессии, отбор слов под этап
+- [x] **Session 2. Цепочка этапов.** ✅ `lessonFlow`: `firstSessionStep`, `sessionStepAfterPortion`,
+  `buildSessionStages` / `fitsSessionStage`, `sessionPhaseForAnswer`; параметр маршрута `session`.
+  `StudyResults` для сессии сразу открывает следующую порцию или этап, итоги — только в конце;
+  рост серии несётся до итогов (`session.streakCount`). «На слух» пока открывается обычным Тестом (Session 4).
+  Было в плане: `lessonFlow`: этапы по типу набора и виду сессии, отбор слов под этап
   и удаление пустых этапов до старта (решение 10), переход между экранами без `StudyResults`.
   `ContextFillScreen` принимает `dueCardIds`. Запись ответов в `lessonStore`.
 - [ ] **Session 3. Скелет режима.** Новый `src/components/study/StageLayout.tsx`: шапка сессии

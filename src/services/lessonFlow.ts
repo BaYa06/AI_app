@@ -8,7 +8,14 @@
  * Чистые функции: возвращают экран и параметры, навигацию делает вызывающий код.
  */
 import type { Card } from '@/types';
-import type { LessonPart, LessonRouteParams, RootStackParamList } from '@/types/navigation';
+import type {
+  LessonPart,
+  LessonRouteParams,
+  RootStackParamList,
+  SessionRouteParams,
+  SessionStage,
+  SessionStageRoute,
+} from '@/types/navigation';
 import { isCardWaitingReview } from './SRSService';
 import type { LessonPhase } from './LessonService';
 
@@ -90,5 +97,113 @@ export function nextLessonLabel(lesson: LessonRouteParams, pluralizeWords: (n: n
 export function lessonPhaseForAnswer(part: LessonPart | undefined, card: Card, now: number = Date.now()): LessonPhase | null {
   if (part === 'review') return isCardWaitingReview(card, now) ? 'review' : null;
   if (part === 'new') return (card.learningStep || 0) === 0 ? 'new' : null;
+  return null;
+}
+
+// ─── Сессия набора «Изучить» (plan/new/study_session.md, Session 2) ───
+//
+// Этапы идут подряд: экран этапа по окончании порции открывает StudyResults, а тот для сессии не
+// показывает итоги, а сразу продолжает этап (ошибки — следующей порцией, как сейчас) или открывает
+// следующий этап. Итоги — только после последнего этапа.
+
+export type SessionStep =
+  | LessonStep
+  | { screen: 'Match'; params: RootStackParamList['Match'] }
+  | { screen: 'WordBuilder'; params: RootStackParamList['WordBuilder'] }
+  | { screen: 'ContextFill'; params: RootStackParamList['ContextFill'] };
+
+/** Длиннее слово плитками на экране не помещается */
+export const BUILD_MAX_LETTERS = 10;
+
+/** Подходит ли слово этапу: неподходящее молча пропускаем (решение 10 плана) */
+export function fitsSessionStage(stage: SessionStage, card: Card): boolean {
+  if (stage === 'context') return !!card.example?.trim();
+  if (stage === 'build') {
+    const word = (card.frontText || '').trim();
+    return word.length > 0 && !/\s/.test(word) && Array.from(word).length <= BUILD_MAX_LETTERS;
+  }
+  return true;
+}
+
+/** Слова под каждый этап; этап без подходящих слов убирается до старта */
+export function buildSessionStages(stages: SessionStage[], cards: Card[]): SessionStageRoute[] {
+  return stages
+    .map((stage) => ({ stage, cardIds: cards.filter((c) => fitsSessionStage(stage, c)).map((c) => c.id) }))
+    .filter((s) => s.cardIds.length > 0);
+}
+
+/** Состояние порции внутри этапа — как его передают экраны тренировок */
+export interface SessionPortion {
+  phaseId?: string;
+  totalPhaseCards?: number;
+  studiedInPhase?: number;
+  phaseOffset?: number;
+  phaseFailedIds?: string[];
+}
+
+function sessionStepAt(session: SessionRouteParams, portion: SessionPortion | null, now: number): SessionStep | null {
+  const current = session.stages[session.index];
+  if (!current) return null;
+  const ids = current.cardIds;
+  const phase = portion ?? {
+    phaseId: `session_${current.stage}_${now}`,
+    totalPhaseCards: ids.length,
+    studiedInPhase: 0,
+    phaseOffset: 0,
+  };
+  const base = { setId: session.setId, cardLimit: ids.length, dueCardIds: ids, ...phase, session };
+  switch (current.stage) {
+    case 'cards':
+      return { screen: 'Study', params: { ...base, mode: 'classic', studyAll: true } };
+    case 'pairs':
+      return { screen: 'Match', params: base };
+    case 'test':
+    case 'listen':
+      return {
+        screen: 'MultipleChoice',
+        params: { ...base, questionIndex: 1, totalQuestions: ids.length, ...(current.stage === 'listen' ? { listen: true } : {}) },
+      };
+    case 'context':
+      // Порций и повтора ошибок у режима нет — все слова этапа сразу
+      return { screen: 'ContextFill', params: { setId: session.setId, dueCardIds: ids, session } };
+    case 'build':
+      return { screen: 'WordBuilder', params: base };
+  }
+}
+
+/** Первый этап сессии; null — ни одному этапу слова не подошли */
+export function firstSessionStep(
+  setId: string,
+  stages: SessionStage[],
+  cards: Card[],
+  now: number = Date.now(),
+): SessionStep | null {
+  return sessionStepAt({ setId, stages: buildSessionStages(stages, cards), index: 0, startedAt: now }, null, now);
+}
+
+/**
+ * Что дальше после порции этапа: остались слова или ошибки — та же стадия следующей порцией,
+ * иначе следующий этап. null — сессия закончена, показать итоги.
+ * streakCount — серия выросла в этой порции: несём до итогов.
+ */
+export function sessionStepAfterPortion(
+  session: SessionRouteParams,
+  portion: SessionPortion & { complete: boolean },
+  streakCount?: number,
+  now: number = Date.now(),
+): SessionStep | null {
+  const carried: SessionRouteParams = { ...session, streakCount: streakCount ?? session.streakCount };
+  const { complete, ...phase } = portion;
+  if (!complete) return sessionStepAt(carried, phase, now);
+  return sessionStepAt({ ...carried, index: session.index + 1 }, null, now);
+}
+
+/**
+ * В какую часть дня записать ответ в сессии (по состоянию карточки ДО ответа) — квота новых общая
+ * с уроком дня: пора повторить — повторение; ни разу не отвечали — новое; иначе не записываем.
+ */
+export function sessionPhaseForAnswer(card: Card, now: number = Date.now()): LessonPhase | null {
+  if (isCardWaitingReview(card, now)) return 'review';
+  if ((card.learningStep || 0) === 0 && !(card.lastReviewDate > 0)) return 'new';
   return null;
 }

@@ -11,7 +11,7 @@ import { Button, CelebrationIcon, EmptyState, ProgressBar, ScreenHeader, type Ce
 import { useCardsStore, useSetsStore, useThemeColors, useSettingsStore, selectSetStats } from '@/store';
 import { spacing, borderRadius, heights, iconSize, screenPadding, alpha } from '@/constants';
 import { ProgressService } from '@/services/ProgressService';
-import { lessonPhaseForAnswer } from '@/services/lessonFlow';
+import { lessonPhaseForAnswer, sessionPhaseForAnswer } from '@/services/lessonFlow';
 import { useLessonStore } from '@/store/lessonStore';
 import { reportWidgetReview } from '@/services/WidgetService';
 import { speak, resolveSpeechLang, prefetchSpeech, cardSpeechLangs, isCardSpeakable } from '@/utils/speech';
@@ -37,7 +37,7 @@ type OptionState = 'neutral' | 'correct' | 'wrong';
 type Option = { id: string; label: string; text: string; isCorrect: boolean };
 
 export function MultipleChoiceScreen({ navigation, route }: Props) {
-  const { setId, cardLimit, dueCardIds, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0, phaseFailedIds, challengeMode, timeLimit: paramTimeLimit, sniperMode, forgottenMode, lesson } = route.params;
+  const { setId, cardLimit, dueCardIds, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0, phaseFailedIds, challengeMode, timeLimit: paramTimeLimit, sniperMode, forgottenMode, lesson, session } = route.params;
   const colors = useThemeColors();
   const set = useSetsStore((s) => s.getSet(setId));
   const updateSetStats = useSetsStore((s) => s.updateSetStats);
@@ -92,7 +92,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
   const applySrsUpdate = React.useCallback(
     (card: Card, isCorrect: boolean, chosenCardId: string, timeSpentMs: number) => {
       // Урок дня: считаем по состоянию карточки до ответа
-      const lessonPhase = lessonPhaseForAnswer(lesson?.part, card);
+      const lessonPhase = lessonPhaseForAnswer(lesson?.part, card) ?? (session ? sessionPhaseForAnswer(card) : null);
       if (lessonPhase) useLessonStore.getState().recordAnswer(lessonPhase, card.id);
       // Замер виджета (plan/new/widgets.md, 4.1): точность на словах из виджета и контрольной половины
       if (lessonPhase === 'review') reportWidgetReview(card.id, isCorrect);
@@ -113,7 +113,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
         masteredCount: statsSnapshot.masteredCount,
       });
     },
-    [updateSetStats, incrementTodayCards, lesson?.part]
+    [updateSetStats, incrementTodayCards, lesson?.part, session]
   );
 
   const shuffle = <T,>(arr: T[]): T[] => {
@@ -374,9 +374,10 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
         streakIncreased: streakResult.streakIncreased,
         newStreakCount: streakResult.newStreakCount,
         lesson,
+        session,
       });
     },
-    [finishStudySession, navigation, setId, totalQuestions, cardLimit, dueCardIds, studiedInPhase, phaseOffset, phaseFailedList, questions, lesson]
+    [finishStudySession, navigation, setId, totalQuestions, cardLimit, dueCardIds, studiedInPhase, phaseOffset, phaseFailedList, questions, lesson, session]
   );
 
   const handleSelectOption = (option: Option) => {
