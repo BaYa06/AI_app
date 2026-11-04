@@ -14,7 +14,13 @@
  * вернут 409 после льготы — это обрабатывает сам экран теста.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Dimensions, Platform, useWindowDimensions, type AppStateStatus } from 'react-native';
+import {
+  AppState,
+  Dimensions,
+  Platform,
+  useWindowDimensions,
+  type AppStateStatus,
+} from 'react-native';
 import { supabase } from '@/services/supabaseClient';
 import { API_BASE } from '@/config/apiBase';
 import { log } from '@/utils/logger';
@@ -85,11 +91,14 @@ export function useExamExitGuard({ participantId, enabled, onLeft }: Options) {
   const onLeftRef = useRef(onLeft);
   onLeftRef.current = onLeft;
 
-  const goAway = useCallback((reason: 'background' | 'split') => {
-    if (awayRef.current) return;
-    // Ответ не нужен; ошибку глотаем — тогда `back` сам засчитает выход.
-    awayRef.current = postExam('away', { participantId, reason }).catch(() => {});
-  }, [participantId]);
+  const goAway = useCallback(
+    (reason: 'background' | 'split') => {
+      if (awayRef.current) return;
+      // Ответ не нужен; ошибку глотаем — тогда `back` сам засчитает выход.
+      awayRef.current = postExam('away', { participantId, reason }).catch(() => {});
+    },
+    [participantId]
+  );
 
   const comeBack = useCallback(async () => {
     const pendingAway = awayRef.current;

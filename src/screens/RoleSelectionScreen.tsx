@@ -23,7 +23,12 @@ type Props = {
 };
 
 const OPTIONS: RoleOption[] = [
-  { id: 'student', title: 'Я учусь', description: 'Создавай карточки и учи новое', icon: GraduationCap },
+  {
+    id: 'student',
+    title: 'Я учусь',
+    description: 'Создавай карточки и учи новое',
+    icon: GraduationCap,
+  },
   { id: 'teacher', title: 'Я преподаю', description: 'Создавай курсы для учеников', icon: Users },
 ];
 

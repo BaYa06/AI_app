@@ -4,7 +4,14 @@
  */
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Languages, Calculator, FlaskConical, BookOpen, Briefcase, MoreHorizontal } from 'lucide-react-native';
+import {
+  Languages,
+  Calculator,
+  FlaskConical,
+  BookOpen,
+  Briefcase,
+  MoreHorizontal,
+} from 'lucide-react-native';
 import { Button, type IconComponent } from '@/components/ui';
 import { OnboardingOption } from '@/components/onboarding/OnboardingOption';
 import { OnboardingStep } from '@/components/onboarding/OnboardingStep';
@@ -24,11 +31,36 @@ type Props = {
 
 const OPTIONS: SubjectOption[] = [
   { id: 'languages', title: 'Языки', description: 'Иностранные и родной язык', icon: Languages },
-  { id: 'math', title: 'Математика', description: 'Алгебра, геометрия, статистика', icon: Calculator },
-  { id: 'sciences', title: 'Естественные науки', description: 'Физика, химия, биология', icon: FlaskConical },
-  { id: 'humanities', title: 'Гуманитарные', description: 'История, литература, право', icon: BookOpen },
-  { id: 'corporate', title: 'Корпоративное', description: 'Бизнес-обучение и тренинги', icon: Briefcase },
-  { id: 'other', title: 'Другое', description: 'Музыка, спорт, другие предметы', icon: MoreHorizontal },
+  {
+    id: 'math',
+    title: 'Математика',
+    description: 'Алгебра, геометрия, статистика',
+    icon: Calculator,
+  },
+  {
+    id: 'sciences',
+    title: 'Естественные науки',
+    description: 'Физика, химия, биология',
+    icon: FlaskConical,
+  },
+  {
+    id: 'humanities',
+    title: 'Гуманитарные',
+    description: 'История, литература, право',
+    icon: BookOpen,
+  },
+  {
+    id: 'corporate',
+    title: 'Корпоративное',
+    description: 'Бизнес-обучение и тренинги',
+    icon: Briefcase,
+  },
+  {
+    id: 'other',
+    title: 'Другое',
+    description: 'Музыка, спорт, другие предметы',
+    icon: MoreHorizontal,
+  },
 ];
 
 export function TeacherSubjectScreen({ onContinue, onBack }: Props) {

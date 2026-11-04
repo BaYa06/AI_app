@@ -51,14 +51,20 @@ export function AboutMeForm({ value, onChange }: Props) {
   const colors = useThemeColors();
   const set = (patch: Partial<AboutMeValue>) => onChange({ ...value, ...patch });
   const toggleDay = (day: string) =>
-    set({ classDays: value.classDays.includes(day) ? value.classDays.filter((d) => d !== day) : [...value.classDays, day] });
+    set({
+      classDays: value.classDays.includes(day)
+        ? value.classDays.filter((d) => d !== day)
+        : [...value.classDays, day],
+    });
   const shiftHour = (delta: number) =>
     set({ classHour: Math.min(MAX_CLASS_HOUR, Math.max(MIN_CLASS_HOUR, value.classHour + delta)) });
 
   return (
     <View style={st.form}>
       <View style={st.block}>
-        <Text variant="label" color="secondary">Сколько тебе лет?</Text>
+        <Text variant="label" color="secondary">
+          Сколько тебе лет?
+        </Text>
         <View style={st.chips} accessibilityRole="radiogroup">
           {AGE_OPTIONS.map((o) => (
             <Chip
@@ -72,10 +78,20 @@ export function AboutMeForm({ value, onChange }: Props) {
       </View>
 
       <View style={st.block}>
-        <Text variant="label" color="secondary">Ходишь на курсы или в учебный центр?</Text>
+        <Text variant="label" color="secondary">
+          Ходишь на курсы или в учебный центр?
+        </Text>
         <View style={st.chips} accessibilityRole="radiogroup">
-          <Chip label="Да" selected={value.attendsClasses === true} onPress={() => set({ attendsClasses: true })} />
-          <Chip label="Нет" selected={value.attendsClasses === false} onPress={() => set({ attendsClasses: false })} />
+          <Chip
+            label="Да"
+            selected={value.attendsClasses === true}
+            onPress={() => set({ attendsClasses: true })}
+          />
+          <Chip
+            label="Нет"
+            selected={value.attendsClasses === false}
+            onPress={() => set({ attendsClasses: false })}
+          />
         </View>
       </View>
 
@@ -84,15 +100,30 @@ export function AboutMeForm({ value, onChange }: Props) {
           <Text variant="bodySmall" color="secondary">
             Напомним повторить слова за пару часов до занятия
           </Text>
-          <Text variant="label" color="secondary">В какие дни</Text>
+          <Text variant="label" color="secondary">
+            В какие дни
+          </Text>
           <View style={st.days}>
             {WEEK_DAYS.map((d) => (
-              <Chip key={d.key} label={d.label} selected={value.classDays.includes(d.key)} onPress={() => toggleDay(d.key)} />
+              <Chip
+                key={d.key}
+                label={d.label}
+                selected={value.classDays.includes(d.key)}
+                onPress={() => toggleDay(d.key)}
+              />
             ))}
           </View>
-          <Text variant="label" color="secondary">Во сколько начинается</Text>
+          <Text variant="label" color="secondary">
+            Во сколько начинается
+          </Text>
           <View style={st.hourRow}>
-            <Button variant="icon" icon={ChevronDown} background="none" accessibilityLabel="Раньше на час" onPress={() => shiftHour(-1)} />
+            <Button
+              variant="icon"
+              icon={ChevronDown}
+              background="none"
+              accessibilityLabel="Раньше на час"
+              onPress={() => shiftHour(-1)}
+            />
             <Text
               variant="h2"
               accessibilityLabel={`Занятие в ${value.classHour}:00`}
@@ -100,7 +131,13 @@ export function AboutMeForm({ value, onChange }: Props) {
             >
               {`${value.classHour}:00`}
             </Text>
-            <Button variant="icon" icon={ChevronUp} background="none" accessibilityLabel="Позже на час" onPress={() => shiftHour(1)} />
+            <Button
+              variant="icon"
+              icon={ChevronUp}
+              background="none"
+              accessibilityLabel="Позже на час"
+              onPress={() => shiftHour(1)}
+            />
           </View>
         </View>
       )}

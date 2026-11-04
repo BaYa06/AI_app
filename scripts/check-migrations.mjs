@@ -23,10 +23,21 @@ const DIR = path.join(ROOT, 'database', 'migrations');
 // Применялись вручную до автоматических миграций — в _db-init.js их нет. Список закрыт: новые
 // миграции добавляются только в _db-init.js.
 const MANUAL = new Set([
-  '001_add_learning_step', '002_add_courses', '003_add_streak_system', '004_add_user_name',
-  '005_library', '006_add_teacher_role', '007_course_invites', '008_card_progress',
-  '009_add_diamond', '010_add_onboarding_fields', '012_add_join_code', '013_course_invites_unique',
-  '015_teacher_aggregate_indexes', '016_drop_is_disqualified', '017_book_catalog',
+  '001_add_learning_step',
+  '002_add_courses',
+  '003_add_streak_system',
+  '004_add_user_name',
+  '005_library',
+  '006_add_teacher_role',
+  '007_course_invites',
+  '008_card_progress',
+  '009_add_diamond',
+  '010_add_onboarding_fields',
+  '012_add_join_code',
+  '013_course_invites_unique',
+  '015_teacher_aggregate_indexes',
+  '016_drop_is_disqualified',
+  '017_book_catalog',
   '018_protect_official_sets',
 ]);
 const ALLOWED_DUPLICATES = new Set(['012']);
@@ -37,7 +48,10 @@ const errors = [];
 const named = new Set([...code.matchAll(/Migration (\d{3}_[a-z0-9_]+) failed/g)].map((m) => m[1]));
 const commented = new Set([...code.matchAll(/\/\/ Migration (\d{3})\b/g)].map((m) => m[1]));
 const namedNumbers = new Set([...named].map((n) => n.slice(0, 3)));
-const files = fs.readdirSync(DIR).filter((f) => f.endsWith('.sql')).map((f) => f.slice(0, -4));
+const files = fs
+  .readdirSync(DIR)
+  .filter((f) => f.endsWith('.sql'))
+  .map((f) => f.slice(0, -4));
 const fileSet = new Set(files);
 
 for (const name of [...named].sort()) {
@@ -49,7 +63,7 @@ for (const name of [...named].sort()) {
 for (const num of [...commented].sort()) {
   if (!namedNumbers.has(num)) {
     errors.push(
-      `миграция ${num} в _db-init.js без catch с именем — допиши log.error('db-init', 'Migration ${num}_<имя> failed', e)`,
+      `миграция ${num} в _db-init.js без catch с именем — допиши log.error('db-init', 'Migration ${num}_<имя> failed', e)`
     );
   }
 }
@@ -57,7 +71,7 @@ for (const num of [...commented].sort()) {
 for (const name of files.sort()) {
   if (!named.has(name) && !MANUAL.has(name)) {
     errors.push(
-      `файл ${name}.sql не применяется: добавь миграцию в api/_db-init.js (catch с 'Migration ${name} failed')`,
+      `файл ${name}.sql не применяется: добавь миграцию в api/_db-init.js (catch с 'Migration ${name} failed')`
     );
   }
 }
@@ -80,7 +94,7 @@ if (!version) {
 } else if (maxNumber && version !== `schema_${maxNumber}`) {
   errors.push(
     `SCHEMA_VERSION = '${version}', а последняя миграция ${maxNumber} — подними до 'schema_${maxNumber}', ` +
-      'иначе на сервере с отметкой старой версии миграции не выполнятся',
+      'иначе на сервере с отметкой старой версии миграции не выполнятся'
   );
 }
 
@@ -90,5 +104,5 @@ if (errors.length > 0) {
   process.exit(1);
 }
 console.log(
-  `✓ Миграции сходятся: ${named.size} в _db-init.js, ${MANUAL.size} ручных, SCHEMA_VERSION = ${version}`,
+  `✓ Миграции сходятся: ${named.size} в _db-init.js, ${MANUAL.size} ручных, SCHEMA_VERSION = ${version}`
 );

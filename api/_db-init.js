@@ -46,9 +46,9 @@ async function runDatabaseInit(sql) {
         WHERE table_name = 'users'
       );
     `;
-    
+
     const exists = result[0]?.exists;
-    
+
     if (!exists) {
       log.info('db-init', 'Database not initialized. Creating tables...');
       await initDatabase(sql);
@@ -700,7 +700,8 @@ async function applyMigrations(sql) {
         `,
       ]);
     }
-    const owned = await sql`SELECT 1 FROM card_sets WHERE is_official AND user_id IS NOT NULL LIMIT 1`;
+    const owned =
+      await sql`SELECT 1 FROM card_sets WHERE is_official AND user_id IS NOT NULL LIMIT 1`;
     if (owned.length > 0) {
       await sql.transaction([
         sql`SET LOCAL flashly.official_write = 'on'`,

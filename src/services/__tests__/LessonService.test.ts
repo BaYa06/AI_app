@@ -96,7 +96,10 @@ describe('buildLessonPlan', () => {
     expect(plan.reviewIds).toEqual([]);
     expect(plan.newIds).toHaveLength(10);
     expect(plan.focusSetId).toBe('s1');
-    const expected = fx.cards.filter((c) => c.setId === 's1').slice(0, 10).map((c) => c.id);
+    const expected = fx.cards
+      .filter((c) => c.setId === 's1')
+      .slice(0, 10)
+      .map((c) => c.id);
     expect(plan.newIds).toEqual(expected);
     expect(plan.focusSetSeen).toBe(0);
     expect(plan.focusSetTotal).toBe(30);
@@ -153,8 +156,12 @@ describe('buildLessonPlan', () => {
     const base = input(fx);
     // Ответили на 30: у них срок сдвинулся вперёд
     const reviewed = waiting.slice(0, 30);
-    for (const c of reviewed) base.cards[c.id] = { ...c, learningStep: 3, nextReviewDate: NOW + 7 * DAY };
-    const plan = buildLessonPlan({ ...base, day: { ...base.day, reviewedIds: reviewed.map((c) => c.id) } });
+    for (const c of reviewed)
+      base.cards[c.id] = { ...c, learningStep: 3, nextReviewDate: NOW + 7 * DAY };
+    const plan = buildLessonPlan({
+      ...base,
+      day: { ...base.day, reviewedIds: reviewed.map((c) => c.id) },
+    });
     expect(plan.newIds).toHaveLength(0);
     expect(plan.reviewIds).toHaveLength(0);
     expect(plan.state).toBe('done');
@@ -179,7 +186,10 @@ describe('buildLessonPlan', () => {
   });
 
   it('все слова изучены и ничего не ждёт — finished', () => {
-    const fx: Fixture = { sets: [makeSet('s1')], cards: Array.from({ length: 5 }, () => studiedCard('s1', 3 * DAY)) };
+    const fx: Fixture = {
+      sets: [makeSet('s1')],
+      cards: Array.from({ length: 5 }, () => studiedCard('s1', 3 * DAY)),
+    };
     const plan = buildLessonPlan(input(fx));
     expect(plan.state).toBe('finished');
     expect(plan.minutes).toBe(0);
@@ -190,8 +200,12 @@ describe('buildLessonPlan', () => {
     const fx = freshLibrary(1, 30);
     const base = input(fx);
     const intro = fx.cards.slice(0, 10);
-    for (const c of intro) base.cards[c.id] = { ...c, learningStep: 1, nextReviewDate: NOW + DAY - 60 * 60 * 1000 };
-    const plan = buildLessonPlan({ ...base, day: { ...base.day, introducedIds: intro.map((c) => c.id) } });
+    for (const c of intro)
+      base.cards[c.id] = { ...c, learningStep: 1, nextReviewDate: NOW + DAY - 60 * 60 * 1000 };
+    const plan = buildLessonPlan({
+      ...base,
+      day: { ...base.day, introducedIds: intro.map((c) => c.id) },
+    });
     expect(plan.state).toBe('done');
     expect(plan.tomorrowCount).toBe(10);
     expect(plan.focusSetSeen).toBe(10);
@@ -202,8 +216,12 @@ describe('buildLessonPlan', () => {
     const base = input(fx);
     const intro = fx.cards.slice(0, 10);
     // 8 слов — «Уверенно», 2 — «Не знаю» (остались на шаге 0)
-    for (const c of intro.slice(0, 8)) base.cards[c.id] = { ...c, learningStep: 1, nextReviewDate: NOW + DAY };
-    const plan = buildLessonPlan({ ...base, day: { ...base.day, introducedIds: intro.map((c) => c.id) } });
+    for (const c of intro.slice(0, 8))
+      base.cards[c.id] = { ...c, learningStep: 1, nextReviewDate: NOW + DAY };
+    const plan = buildLessonPlan({
+      ...base,
+      day: { ...base.day, introducedIds: intro.map((c) => c.id) },
+    });
     expect(plan.state).toBe('mistakes');
     expect(plan.mistakeIds).toEqual(intro.slice(8).map((c) => c.id));
     expect(plan.newIds).toHaveLength(0);
@@ -239,7 +257,10 @@ describe('buildLessonPlan', () => {
     fx.cards = fx.cards.filter((c) => c.setId !== 's2');
     fx.cards.push(studiedCard('s2', 3 * DAY));
     const base = input(fx);
-    const introduced = fx.cards.filter((c) => c.setId === 's1').slice(0, 4).map((c) => c.id);
+    const introduced = fx.cards
+      .filter((c) => c.setId === 's1')
+      .slice(0, 4)
+      .map((c) => c.id);
     const plan = buildLessonPlan({ ...base, day: { ...base.day, introducedIds: introduced } });
     expect(plan.newSets).toEqual([
       { setId: 's1', title: 'Набор s1', newLeft: 6 },
@@ -330,7 +351,11 @@ describe('buildSetSessionPlan', () => {
   const LATER = 2 * DAY;
   const set = makeSet('s1');
 
-  function session(cards: Card[], day: Partial<LessonDay> = {}, extra: Partial<SetSessionInput> = {}) {
+  function session(
+    cards: Card[],
+    day: Partial<LessonDay> = {},
+    extra: Partial<SetSessionInput> = {}
+  ) {
     return buildSetSessionPlan({
       set,
       cards,
@@ -342,13 +367,19 @@ describe('buildSetSessionPlan', () => {
   }
   const fresh = (n: number) => Array.from({ length: n }, () => newCard('s1'));
   /** Изучали, повторять рано */
-  const seen = (n: number, step = 1) => Array.from({ length: n }, () => studiedCard('s1', LATER, step));
+  const seen = (n: number, step = 1) =>
+    Array.from({ length: n }, () => studiedCard('s1', LATER, step));
   /** Ошиблись после «Уверенно»: шаг упал до 0, но ответ был */
   const failed = () => ({ ...newCard('s1'), lastReviewDate: NOW - DAY, nextReviewDate: NOW - DAY });
 
   it('пустой набор и меньше 4 слов', () => {
     expect(session([])).toMatchObject({ mode: 'empty', cardIds: [], stages: [], minutes: 0 });
-    expect(session(fresh(3))).toMatchObject({ mode: 'tooFew', cardIds: [], missingCards: 1, totalCount: 3 });
+    expect(session(fresh(3))).toMatchObject({
+      mode: 'tooFew',
+      cardIds: [],
+      missingCards: 1,
+      totalCount: 3,
+    });
   });
 
   it('новый набор: первые 5 слов по порядку добавления, 6 этапов, около 7 минут', () => {
@@ -398,7 +429,9 @@ describe('buildSetSessionPlan', () => {
   });
 
   it('повторение — не больше 10 слов', () => {
-    const cards = Array.from({ length: 14 }, (_, i) => studiedCard('s1', -(i + 1) * 60 * 60 * 1000));
+    const cards = Array.from({ length: 14 }, (_, i) =>
+      studiedCard('s1', -(i + 1) * 60 * 60 * 1000)
+    );
     const plan = session(cards);
     expect(plan.cardIds).toHaveLength(10);
     expect(plan.minutes).toBe(4);

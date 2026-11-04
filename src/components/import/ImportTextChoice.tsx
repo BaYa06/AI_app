@@ -42,15 +42,25 @@ const OPTIONS: Array<{ goal: TextGoal; title: string; hint: string }> = [
   },
 ];
 
-export const ImportTextChoice = memo(function ImportTextChoice({ excerpt, level, onLevelChange, onContinue, onBack }: Props) {
+export const ImportTextChoice = memo(function ImportTextChoice({
+  excerpt,
+  level,
+  onLevelChange,
+  onContinue,
+  onBack,
+}: Props) {
   const colors = useThemeColors();
   const [goal, setGoal] = useState<TextGoal>('pick_words');
 
   return (
     <View style={styles.root}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text variant="h2" style={{ color: colors.textPrimary }}>Это текст, а не список слов</Text>
-        <Text variant="body" color="secondary">Что из него сделать?</Text>
+        <Text variant="h2" style={{ color: colors.textPrimary }}>
+          Это текст, а не список слов
+        </Text>
+        <Text variant="body" color="secondary">
+          Что из него сделать?
+        </Text>
 
         {!!excerpt && (
           <View style={[styles.excerpt, { backgroundColor: colors.surfaceMuted }]}>
@@ -60,7 +70,7 @@ export const ImportTextChoice = memo(function ImportTextChoice({ excerpt, level,
           </View>
         )}
 
-        {OPTIONS.map(option => {
+        {OPTIONS.map((option) => {
           const selected = goal === option.goal;
           return (
             <Pressable
@@ -76,14 +86,31 @@ export const ImportTextChoice = memo(function ImportTextChoice({ excerpt, level,
                 },
               ]}
             >
-              <View style={[styles.radio, { borderColor: selected ? colors.primary : colors.border, borderWidth: selected ? 6 : 2 }]} />
+              <View
+                style={[
+                  styles.radio,
+                  {
+                    borderColor: selected ? colors.primary : colors.border,
+                    borderWidth: selected ? 6 : 2,
+                  },
+                ]}
+              />
               <View style={styles.optionText}>
-                <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>{option.title}</Text>
-                <Text variant="bodySmall" color="secondary">{option.hint}</Text>
+                <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
+                  {option.title}
+                </Text>
+                <Text variant="bodySmall" color="secondary">
+                  {option.hint}
+                </Text>
                 {selected && option.goal === 'pick_words' && (
                   <View style={styles.levels}>
-                    {LEVELS.map(l => (
-                      <Chip key={l} label={l} selected={level === l} onPress={() => onLevelChange(l)} />
+                    {LEVELS.map((l) => (
+                      <Chip
+                        key={l}
+                        label={l}
+                        selected={level === l}
+                        onPress={() => onLevelChange(l)}
+                      />
                     ))}
                   </View>
                 )}
@@ -103,7 +130,12 @@ export const ImportTextChoice = memo(function ImportTextChoice({ excerpt, level,
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  content: { paddingHorizontal: screenPadding, paddingTop: spacing.m, paddingBottom: spacing.l, gap: spacing.s },
+  content: {
+    paddingHorizontal: screenPadding,
+    paddingTop: spacing.m,
+    paddingBottom: spacing.l,
+    gap: spacing.s,
+  },
   excerpt: { borderRadius: borderRadius.l, padding: spacing.m, marginBottom: spacing.xs },
   option: {
     flexDirection: 'row',

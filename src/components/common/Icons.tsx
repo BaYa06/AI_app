@@ -17,14 +17,4 @@ import {
   Bell,
 } from 'lucide-react-native';
 
-export {
-  School,
-  Search,
-  Plus,
-  Flame,
-  Play,
-  BookOpen,
-  CheckCircle2,
-  AlertCircle,
-  Bell,
-};
+export { School, Search, Plus, Flame, Play, BookOpen, CheckCircle2, AlertCircle, Bell };

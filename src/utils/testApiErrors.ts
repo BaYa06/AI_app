@@ -8,14 +8,23 @@
 const KNOWN: Array<[RegExp, string]> = [
   [/not authenticated|unauthorized/i, 'Нужно войти в аккаунт.'],
   [/too many attempts/i, 'Слишком много попыток. Подожди минуту и попробуй снова.'],
-  [/test not found or already finished/i, 'Тест с таким кодом не найден или уже закончился. Проверь код.'],
-  [/not a member of this course/i, 'Ты не состоишь в курсе этого теста. Попроси у учителя код курса.'],
+  [
+    /test not found or already finished/i,
+    'Тест с таким кодом не найден или уже закончился. Проверь код.',
+  ],
+  [
+    /not a member of this course/i,
+    'Ты не состоишь в курсе этого теста. Попроси у учителя код курса.',
+  ],
   [/no cards in this set/i, 'В наборе нет карточек — тест не из чего собрать.'],
   [/not course owner/i, 'Создавать тест может только учитель этого курса.'],
   [/test already started/i, 'Тест уже начался.'],
   [/test not active/i, 'Тест сейчас не идёт.'],
   [/session not found/i, 'Тест не найден.'],
-  [/network request failed|failed to fetch|aborted/i, 'Нет соединения. Проверь интернет и попробуй снова.'],
+  [
+    /network request failed|failed to fetch|aborted/i,
+    'Нет соединения. Проверь интернет и попробуй снова.',
+  ],
 ];
 
 /** Сообщение для пользователя: известная ошибка — по смыслу, иначе `fallback` */

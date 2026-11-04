@@ -13,7 +13,20 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, X, GraduationCap, FileText, Mic, Clock, AlertTriangle, BookOpen, Trophy, Flame, CalendarClock, UserPlus } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  X,
+  GraduationCap,
+  FileText,
+  Mic,
+  Clock,
+  AlertTriangle,
+  BookOpen,
+  Trophy,
+  Flame,
+  CalendarClock,
+  UserPlus,
+} from 'lucide-react-native';
 import { CourseScheduleSheet } from '@/components/push/CourseScheduleSheet';
 import { CourseJoinCodeDialog } from '@/components/CourseJoinCodeDialog';
 import { Text } from '@/components/common';
@@ -59,7 +72,10 @@ function getStudentStatus(lastActiveDate: string | null): StudentStatus {
   return 'inactive';
 }
 
-function formatLastActive(lastActiveDate: string | null, colors: ReturnType<typeof useThemeColors>): { text: string; color: string } | null {
+function formatLastActive(
+  lastActiveDate: string | null,
+  colors: ReturnType<typeof useThemeColors>
+): { text: string; color: string } | null {
   if (!lastActiveDate) return null;
   const now = new Date();
   const last = new Date(lastActiveDate + 'T12:00:00Z');
@@ -73,14 +89,27 @@ function formatLastActive(lastActiveDate: string | null, colors: ReturnType<type
 // ==================== CHART HELPER ====================
 
 const DAY_NAMES = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
-const MONTH_NAMES = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+const MONTH_NAMES = [
+  'янв',
+  'фев',
+  'мар',
+  'апр',
+  'май',
+  'июн',
+  'июл',
+  'авг',
+  'сен',
+  'окт',
+  'ноя',
+  'дек',
+];
 
 function buildChartDays(
   raw: { date: string; count: number }[],
   days: number,
-  totalStudents: number,
+  totalStudents: number
 ): { day: string; pct: number; count: number }[] {
-  const map = new Map(raw.map(r => [r.date, r.count]));
+  const map = new Map(raw.map((r) => [r.date, r.count]));
 
   if (days === 7) {
     const result: { day: string; pct: number; count: number }[] = [];
@@ -120,9 +149,10 @@ function buildChartDays(
 
     const avg = daysInChunk > 0 ? total / daysInChunk : 0;
     const pct = totalStudents > 0 ? avg / totalStudents : 0;
-    const label = firstDate && lastDate
-      ? `${firstDate.getDate()}–${lastDate.getDate()} ${MONTH_NAMES[lastDate.getMonth()]}`
-      : '';
+    const label =
+      firstDate && lastDate
+        ? `${firstDate.getDate()}–${lastDate.getDate()} ${MONTH_NAMES[lastDate.getMonth()]}`
+        : '';
 
     chunks.push({ day: label, pct: Math.min(pct, 1), count: Math.round(avg) });
   }
@@ -135,24 +165,35 @@ function buildChartDays(
 function AvatarPlaceholder({ member, colors }: { member: CourseMember; colors: any }) {
   const isInactive = member.status === 'inactive';
   const dotColor =
-    member.status === 'online'   ? colors.success :
-    member.status === 'away'     ? colors.warning :
-    member.status === 'offline'  ? colors.error : colors.textTertiary;
+    member.status === 'online'
+      ? colors.success
+      : member.status === 'away'
+        ? colors.warning
+        : member.status === 'offline'
+          ? colors.error
+          : colors.textTertiary;
   const lastActive = formatLastActive(member.lastActiveDate, colors);
 
   return (
     <View style={styles.studentItem}>
       <View style={styles.avatarWrap}>
-        <View style={[styles.avatar, { backgroundColor: isInactive ? (colors.border) : alpha(colors.primary, 20) }]}>
-          <Text style={[styles.avatarInitials, { color: isInactive ? colors.textSecondary : colors.primary }]}>
+        <View
+          style={[
+            styles.avatar,
+            { backgroundColor: isInactive ? colors.border : alpha(colors.primary, 20) },
+          ]}
+        >
+          <Text
+            style={[
+              styles.avatarInitials,
+              { color: isInactive ? colors.textSecondary : colors.primary },
+            ]}
+          >
             {member.initials}
           </Text>
         </View>
         <View
-          style={[
-            styles.onlineDot,
-            { backgroundColor: dotColor, borderColor: colors.background },
-          ]}
+          style={[styles.onlineDot, { backgroundColor: dotColor, borderColor: colors.background }]}
         />
       </View>
       <Text style={[styles.studentName, { color: colors.textPrimary }]} numberOfLines={1}>
@@ -200,7 +241,9 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
   const [chartError, setChartError] = useState(false);
 
   // Sets stats
-  const [setsStats, setSetsStats] = useState<Awaited<ReturnType<typeof NeonService.loadCourseSetStats>>>([]);
+  const [setsStats, setSetsStats] = useState<
+    Awaited<ReturnType<typeof NeonService.loadCourseSetStats>>
+  >([]);
   const [setsLoading, setSetsLoading] = useState(true);
   const [setsError, setSetsError] = useState(false);
 
@@ -214,7 +257,10 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
     setSetsError(false);
     NeonService.loadCourseSetStats(route.params.courseId)
       .then(setSetsStats)
-      .catch((e) => { log.error('TeacherCourseStats', 'Failed to load set stats', e); setSetsError(true); })
+      .catch((e) => {
+        log.error('TeacherCourseStats', 'Failed to load set stats', e);
+        setSetsError(true);
+      })
       .finally(() => setSetsLoading(false));
   }, [isOwner, route.params.courseId, retryTick]);
 
@@ -234,15 +280,19 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
             status: getStudentStatus(m.lastActiveDate),
             streak: m.streak,
             lastActiveDate: m.lastActiveDate,
-          })),
+          }))
         );
       })
       .catch((e) => {
         log.error('TeacherCourseStats', 'Failed to load members', e);
         if (mounted) setMembersError(true);
       })
-      .finally(() => { if (mounted) setMembersLoading(false); });
-    return () => { mounted = false; };
+      .finally(() => {
+        if (mounted) setMembersLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
   }, [isOwner, route.params.courseId, retryTick]);
 
   const activeStudents = members.filter((s) => s.status === 'online' || s.status === 'away');
@@ -295,7 +345,9 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
       }
     };
     checkOwnership();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [route.params.courseId]);
 
   const cardBg = colors.surface;
@@ -340,7 +392,8 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
         {/* Действия курса — одним блоком, с плотным отступом (у ScrollView gap крупный, для секций) */}
         <View style={styles.actionList}>
           {/* Test Lobby Button */}
-          <Pressable accessibilityRole="button"
+          <Pressable
+            accessibilityRole="button"
             style={({ pressed }) => [
               styles.testLobbyBtn,
               {
@@ -354,9 +407,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
             <View style={[styles.testLobbyIcon, { backgroundColor: colors.primaryFill }]}>
               <GraduationCap size={18} color={colors.onPrimary} />
             </View>
-            <Text style={[styles.testLobbyText, { color: colors.textPrimary }]}>
-              Живой тест
-            </Text>
+            <Text style={[styles.testLobbyText, { color: colors.textPrimary }]}>Живой тест</Text>
             <ArrowLeft
               size={16}
               color={colors.textSecondary}
@@ -365,7 +416,8 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
           </Pressable>
 
           {/* Код подключения к курсу — тот же код, что в «Пригласить учеников» */}
-          <Pressable accessibilityRole="button"
+          <Pressable
+            accessibilityRole="button"
             style={({ pressed }) => [
               styles.testLobbyBtn,
               {
@@ -390,7 +442,8 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
           </Pressable>
 
           {/* История тестов */}
-          <Pressable accessibilityRole="button"
+          <Pressable
+            accessibilityRole="button"
             style={({ pressed }) => [
               styles.testLobbyBtn,
               {
@@ -399,10 +452,12 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
               },
               pressed && { opacity: 0.75, transform: [{ scale: 0.985 }] },
             ]}
-            onPress={() => navigation.navigate('TestHistory', {
-              courseId: route.params.courseId,
-              courseTitle: route.params.courseTitle,
-            })}
+            onPress={() =>
+              navigation.navigate('TestHistory', {
+                courseId: route.params.courseId,
+                courseTitle: route.params.courseTitle,
+              })
+            }
           >
             <View style={[styles.testLobbyIcon, { backgroundColor: colors.primaryFill }]}>
               <Clock size={18} color={colors.onPrimary} />
@@ -418,7 +473,8 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
           </Pressable>
 
           {/* Рейтинг недели (план, этап 4): места учеников, награды, включение рейтинга */}
-          <Pressable accessibilityRole="button"
+          <Pressable
+            accessibilityRole="button"
             style={({ pressed }) => [
               styles.testLobbyBtn,
               {
@@ -427,10 +483,12 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
               },
               pressed && { opacity: 0.75, transform: [{ scale: 0.985 }] },
             ]}
-            onPress={() => navigation.navigate('CourseLeaderboard', {
-              courseId: route.params.courseId,
-              courseTitle: route.params.courseTitle,
-            })}
+            onPress={() =>
+              navigation.navigate('CourseLeaderboard', {
+                courseId: route.params.courseId,
+                courseTitle: route.params.courseTitle,
+              })
+            }
           >
             <View style={[styles.testLobbyIcon, { backgroundColor: colors.warning }]}>
               <Trophy size={18} color={colors.onPrimary} />
@@ -446,7 +504,8 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
           </Pressable>
 
           {/* Расписание занятий (plan/new/push_notifications.md, 2.8): ученикам — «Скоро занятие» за 1–2 часа */}
-          <Pressable accessibilityRole="button"
+          <Pressable
+            accessibilityRole="button"
             style={({ pressed }) => [
               styles.testLobbyBtn,
               {
@@ -471,7 +530,8 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
           </Pressable>
 
           {/* Учебники курса (каталог книг): план юнитов этой группы */}
-          <Pressable accessibilityRole="button"
+          <Pressable
+            accessibilityRole="button"
             style={({ pressed }) => [
               styles.testLobbyBtn,
               {
@@ -480,10 +540,12 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
               },
               pressed && { opacity: 0.75, transform: [{ scale: 0.985 }] },
             ]}
-            onPress={() => navigation.navigate('CourseBooks', {
-              courseId: route.params.courseId,
-              courseTitle: route.params.courseTitle,
-            })}
+            onPress={() =>
+              navigation.navigate('CourseBooks', {
+                courseId: route.params.courseId,
+                courseTitle: route.params.courseTitle,
+              })
+            }
           >
             <View style={[styles.testLobbyIcon, { backgroundColor: colors.primaryFill }]}>
               <BookOpen size={18} color={colors.onPrimary} />
@@ -502,32 +564,42 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
         {/* Metric tiles */}
         <View style={styles.metricsGrid}>
           {/* Active today */}
-          <Pressable accessibilityRole="button"
+          <Pressable
+            accessibilityRole="button"
             style={[styles.metricCard, { backgroundColor: cardBg, borderColor: cardBorder }]}
             onPress={() => setStudentModal('active')}
           >
-            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>АКТИВНЫХ СЕГОДНЯ</Text>
+            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
+              АКТИВНЫХ СЕГОДНЯ
+            </Text>
             {membersLoading ? (
               <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 8 }} />
             ) : membersError ? (
               <Text style={[styles.metricValue, { color: colors.textSecondary }]}>—</Text>
             ) : (
-              <Text style={[styles.metricValue, { color: colors.primary }]}>{activeStudents.length}</Text>
+              <Text style={[styles.metricValue, { color: colors.primary }]}>
+                {activeStudents.length}
+              </Text>
             )}
           </Pressable>
 
           {/* Inactive 7d+ */}
-          <Pressable accessibilityRole="button"
+          <Pressable
+            accessibilityRole="button"
             style={[styles.metricCard, { backgroundColor: cardBg, borderColor: cardBorder }]}
             onPress={() => setStudentModal('inactive')}
           >
-            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>НЕ ЗАХОДИЛИ 7Д+</Text>
+            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
+              НЕ ЗАХОДИЛИ 7Д+
+            </Text>
             {membersLoading ? (
               <ActivityIndicator size="small" color={colors.error} style={{ marginTop: 8 }} />
             ) : membersError ? (
               <Text style={[styles.metricValue, { color: colors.textSecondary }]}>—</Text>
             ) : (
-              <Text style={[styles.metricValue, { color: colors.error }]}>{inactiveStudents.length}</Text>
+              <Text style={[styles.metricValue, { color: colors.error }]}>
+                {inactiveStudents.length}
+              </Text>
             )}
           </Pressable>
         </View>
@@ -535,29 +607,43 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
         {/* Activity Chart */}
         <View style={styles.section}>
           <View style={styles.sectionRow}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Активность группы</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+              Активность группы
+            </Text>
             <View style={[styles.togglePill, { backgroundColor: colors.surfaceMuted }]}>
-              <Pressable accessibilityRole="button" accessibilityState={{ selected: chartPeriod === '7d' }}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: chartPeriod === '7d' }}
                 style={[
                   styles.toggleBtn,
-                  chartPeriod === '7d' && { backgroundColor: colors.background,
-                     },
+                  chartPeriod === '7d' && { backgroundColor: colors.background },
                 ]}
                 onPress={() => setChartPeriod('7d')}
               >
-                <Text style={[styles.toggleText, { color: chartPeriod === '7d' ? colors.textPrimary : colors.textSecondary }]}>
+                <Text
+                  style={[
+                    styles.toggleText,
+                    { color: chartPeriod === '7d' ? colors.textPrimary : colors.textSecondary },
+                  ]}
+                >
                   7д
                 </Text>
               </Pressable>
-              <Pressable accessibilityRole="button" accessibilityState={{ selected: chartPeriod === '30d' }}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: chartPeriod === '30d' }}
                 style={[
                   styles.toggleBtn,
-                  chartPeriod === '30d' && { backgroundColor: colors.background,
-                     },
+                  chartPeriod === '30d' && { backgroundColor: colors.background },
                 ]}
                 onPress={() => setChartPeriod('30d')}
               >
-                <Text style={[styles.toggleText, { color: chartPeriod === '30d' ? colors.textPrimary : colors.textSecondary }]}>
+                <Text
+                  style={[
+                    styles.toggleText,
+                    { color: chartPeriod === '30d' ? colors.textPrimary : colors.textSecondary },
+                  ]}
+                >
                   30д
                 </Text>
               </Pressable>
@@ -566,52 +652,66 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
 
           {/* Bar chart */}
           {chartLoading ? (
-            <View style={{ height: CHART_HEIGHT + 20, justifyContent: 'center', alignItems: 'center' }}>
+            <View
+              style={{ height: CHART_HEIGHT + 20, justifyContent: 'center', alignItems: 'center' }}
+            >
               <ActivityIndicator size="small" color={colors.primary} />
             </View>
           ) : chartError ? (
             // Раньше сбой графика выглядел как пустой график без каких-либо данных — теперь
             // видно, что это ошибка, а не "активности не было". См. план, пункт 29.
-            <View style={{ height: CHART_HEIGHT + 20, justifyContent: 'center', alignItems: 'center', gap: 8 }}>
+            <View
+              style={{
+                height: CHART_HEIGHT + 20,
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
               <AlertTriangle size={20} color={colors.textSecondary} />
-              <Text style={[styles.emptyMembers, { color: colors.textSecondary }]}>Не удалось загрузить график</Text>
+              <Text style={[styles.emptyMembers, { color: colors.textSecondary }]}>
+                Не удалось загрузить график
+              </Text>
               <Pressable accessibilityRole="button" onPress={() => setRetryTick((t) => t + 1)}>
                 <Text style={[styles.viewAll, { color: colors.primary }]}>Повторить</Text>
               </Pressable>
             </View>
           ) : (
-          <View style={[styles.chartWrap, { height: CHART_HEIGHT + 20 }]}>
-            {chartData.map((item, idx) => (
-              <View key={idx} style={styles.barCol}>
-                <View style={{ flex: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
-                  {chartTooltip?.index === idx && (
-                    <View style={[styles.chartTooltip, { backgroundColor: colors.textPrimary }]}
+            <View style={[styles.chartWrap, { height: CHART_HEIGHT + 20 }]}>
+              {chartData.map((item, idx) => (
+                <View key={idx} style={styles.barCol}>
+                  <View style={{ flex: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
+                    {chartTooltip?.index === idx && (
+                      <View style={[styles.chartTooltip, { backgroundColor: colors.textPrimary }]}>
+                        <Text style={[styles.chartTooltipText, { color: colors.onPrimary }]}>
+                          {chartTooltip.day}: {chartTooltip.count}
+                        </Text>
+                        <View
+                          style={[styles.chartTooltipArrow, { borderTopColor: colors.textPrimary }]}
+                        />
+                      </View>
+                    )}
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`${item.day}: ${item.count}`}
+                      onPress={() => handleBarPress(idx, item.day, item.count)}
+                      hitSlop={8}
                     >
-                      <Text style={[styles.chartTooltipText, { color: colors.onPrimary }]}>
-                        {chartTooltip.day}: {chartTooltip.count}
-                      </Text>
-                      <View style={[styles.chartTooltipArrow, { borderTopColor: colors.textPrimary }]} />
-                    </View>
-                  )}
-                  <Pressable accessibilityRole="button" accessibilityLabel={`${item.day}: ${item.count}`}
-                    onPress={() => handleBarPress(idx, item.day, item.count)}
-                    hitSlop={8}
-                  >
-                    <View
-                      style={[
-                        styles.bar,
-                        {
-                          height: item.pct * CHART_HEIGHT,
-                          backgroundColor: colors.primary,
-                        },
-                      ]}
-                    />
-                  </Pressable>
+                      <View
+                        style={[
+                          styles.bar,
+                          {
+                            height: item.pct * CHART_HEIGHT,
+                            backgroundColor: colors.primary,
+                          },
+                        ]}
+                      />
+                    </Pressable>
+                  </View>
+                  <Text style={[styles.barLabel, { color: colors.textSecondary }]}>{item.day}</Text>
                 </View>
-                <Text style={[styles.barLabel, { color: colors.textSecondary }]}>{item.day}</Text>
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
           )}
         </View>
 
@@ -621,12 +721,24 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
               Ученики{!membersLoading && ` (${members.length})`}
             </Text>
-            <Pressable accessibilityRole="button" onPress={() => navigation.navigate('TeacherStudents', { courseId: route.params.courseId, courseTitle: route.params.courseTitle })}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() =>
+                navigation.navigate('TeacherStudents', {
+                  courseId: route.params.courseId,
+                  courseTitle: route.params.courseTitle,
+                })
+              }
+            >
               <Text style={[styles.viewAll, { color: colors.primary }]}>Все →</Text>
             </Pressable>
           </View>
           {membersLoading ? (
-            <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: spacing.m }} />
+            <ActivityIndicator
+              size="small"
+              color={colors.primary}
+              style={{ marginVertical: spacing.m }}
+            />
           ) : membersError ? (
             <View style={{ alignItems: 'flex-start', gap: 6, marginVertical: spacing.s }}>
               <Text style={[styles.emptyMembers, { color: colors.textSecondary }]}>
@@ -659,7 +771,11 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
             Наборы{setsStats.length > 0 ? ` (${setsStats.length})` : ''}
           </Text>
           {setsLoading ? (
-            <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: spacing.m }} />
+            <ActivityIndicator
+              size="small"
+              color={colors.primary}
+              style={{ marginVertical: spacing.m }}
+            />
           ) : setsError ? (
             <View style={{ alignItems: 'flex-start', gap: 6, marginVertical: spacing.s }}>
               <Text style={[styles.emptyMembers, { color: colors.textSecondary }]}>
@@ -683,13 +799,21 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
                   {set.isOfficial && (
                     <View style={styles.unitTag}>
                       <BookOpen size={12} color={colors.primary} />
-                      <Text style={[styles.unitTagText, { color: colors.primary }]} numberOfLines={1}>
-                        {[set.bookTitle, set.unitOpen === false ? 'закрыт' : 'открыт'].filter(Boolean).join(' · ')}
+                      <Text
+                        style={[styles.unitTagText, { color: colors.primary }]}
+                        numberOfLines={1}
+                      >
+                        {[set.bookTitle, set.unitOpen === false ? 'закрыт' : 'открыт']
+                          .filter(Boolean)
+                          .join(' · ')}
                       </Text>
                     </View>
                   )}
                   <View style={styles.setCardHeader}>
-                    <Text style={[styles.setCardTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                    <Text
+                      style={[styles.setCardTitle, { color: colors.textPrimary }]}
+                      numberOfLines={1}
+                    >
                       {set.title}
                     </Text>
                     <Text style={[styles.setCardWords, { color: colors.textSecondary }]}>
@@ -702,7 +826,10 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
                     <View
                       style={[
                         styles.progressFill,
-                        { width: `${Math.min(set.progressPct, 100)}%` as any, backgroundColor: colors.primary },
+                        {
+                          width: `${Math.min(set.progressPct, 100)}%` as any,
+                          backgroundColor: colors.primary,
+                        },
                       ]}
                     />
                   </View>
@@ -710,7 +837,9 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
                   <View style={styles.setCardMeta}>
                     <Text style={[styles.setCardMetaText, { color: colors.textSecondary }]}>
                       {set.studentsStarted} из {members.length} начали
-                      {members.length > set.studentsStarted ? ` · ${members.length - set.studentsStarted} не начинали` : ''}
+                      {members.length > set.studentsStarted
+                        ? ` · ${members.length - set.studentsStarted} не начинали`
+                        : ''}
                       {` · ${set.studentsCompleted} завершили`}
                     </Text>
                     <Text style={[styles.setCardAccuracy, { color: colors.primary }]}>
@@ -731,8 +860,13 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
         animationType="fade"
         onRequestClose={() => setStudentModal(null)}
       >
-        <Pressable accessible={false} style={[styles.modalOverlay, { backgroundColor: colors.overlay }]} onPress={() => setStudentModal(null)}>
-          <Pressable accessible={false}
+        <Pressable
+          accessible={false}
+          style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}
+          onPress={() => setStudentModal(null)}
+        >
+          <Pressable
+            accessible={false}
             style={[styles.modalContent, { backgroundColor: colors.surface }]}
             onPress={() => {}}
           >
@@ -740,27 +874,44 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
               <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>{modalTitle}</Text>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Закрыть" onPress={() => setStudentModal(null)} hitSlop={8}>
+                accessibilityLabel="Закрыть"
+                onPress={() => setStudentModal(null)}
+                hitSlop={8}
+              >
                 <X size={20} color={colors.textSecondary} />
               </Pressable>
             </View>
 
             <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
               {modalStudents.length === 0 ? (
-                <Text style={[styles.emptyMembers, { color: colors.textSecondary, paddingVertical: spacing.l }]}>
+                <Text
+                  style={[
+                    styles.emptyMembers,
+                    { color: colors.textSecondary, paddingVertical: spacing.l },
+                  ]}
+                >
                   Нет учеников
                 </Text>
               ) : (
                 modalStudents.map((s) => {
                   const dotColor =
-                    s.status === 'online'   ? colors.success :
-                    s.status === 'away'     ? colors.warning :
-                    s.status === 'offline'  ? colors.error : colors.textTertiary;
+                    s.status === 'online'
+                      ? colors.success
+                      : s.status === 'away'
+                        ? colors.warning
+                        : s.status === 'offline'
+                          ? colors.error
+                          : colors.textTertiary;
                   const lastActive = formatLastActive(s.lastActiveDate, colors);
                   return (
-                    <View key={s.id} style={[styles.modalStudentRow, { borderBottomColor: colors.border }]}>
+                    <View
+                      key={s.id}
+                      style={[styles.modalStudentRow, { borderBottomColor: colors.border }]}
+                    >
                       <View style={styles.modalAvatarWrap}>
-                        <View style={[styles.avatar, { backgroundColor: alpha(colors.primary, 20) }]}>
+                        <View
+                          style={[styles.avatar, { backgroundColor: alpha(colors.primary, 20) }]}
+                        >
                           <Text style={[styles.avatarInitials, { color: colors.primary }]}>
                             {s.initials}
                           </Text>
@@ -776,7 +927,9 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
                         />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={[styles.modalStudentName, { color: colors.textPrimary }]}>{s.name}</Text>
+                        <Text style={[styles.modalStudentName, { color: colors.textPrimary }]}>
+                          {s.name}
+                        </Text>
                         {lastActive && (
                           <Text style={{ fontSize: 12, color: lastActive.color, marginTop: 1 }}>
                             {lastActive.text}
@@ -784,9 +937,16 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
                         )}
                       </View>
                       {s.streak > 0 && (
-                        <View style={[styles.modalStreakBadge, { backgroundColor: alpha(colors.streak, 10) }]}>
+                        <View
+                          style={[
+                            styles.modalStreakBadge,
+                            { backgroundColor: alpha(colors.streak, 10) },
+                          ]}
+                        >
                           <Flame size={iconSize.xs} color={colors.streak} />
-                          <Text style={[styles.modalStreakText, { color: colors.warningText }]}>{s.streak}</Text>
+                          <Text style={[styles.modalStreakText, { color: colors.warningText }]}>
+                            {s.streak}
+                          </Text>
                         </View>
                       )}
                     </View>
@@ -818,8 +978,13 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
         animationType="slide"
         onRequestClose={() => setLobbyModal(false)}
       >
-        <Pressable accessible={false} style={styles.sheetOverlay} onPress={() => setLobbyModal(false)}>
-          <Pressable accessible={false}
+        <Pressable
+          accessible={false}
+          style={styles.sheetOverlay}
+          onPress={() => setLobbyModal(false)}
+        >
+          <Pressable
+            accessible={false}
             style={[
               styles.sheetContent,
               {
@@ -829,13 +994,14 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
             ]}
             onPress={() => {}}
           >
-            <View style={[styles.sheetHandle, { backgroundColor: alpha(colors.textTertiary, 40) }]} />
-            <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>
-              Выбери тип теста
-            </Text>
+            <View
+              style={[styles.sheetHandle, { backgroundColor: alpha(colors.textTertiary, 40) }]}
+            />
+            <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>Выбери тип теста</Text>
 
             {/* Exam option */}
-            <Pressable accessibilityRole="button"
+            <Pressable
+              accessibilityRole="button"
               style={({ pressed }) => [
                 styles.sheetOption,
                 {
@@ -846,7 +1012,10 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
               ]}
               onPress={() => {
                 setLobbyModal(false);
-                navigation.navigate('ExamLobby', { courseId: route.params.courseId, courseTitle: route.params.courseTitle });
+                navigation.navigate('ExamLobby', {
+                  courseId: route.params.courseId,
+                  courseTitle: route.params.courseTitle,
+                });
               }}
             >
               <View style={[styles.sheetOptionIcon, { backgroundColor: colors.primaryFill }]}>
@@ -868,7 +1037,8 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
             </Pressable>
 
             {/* Oral test option */}
-            <Pressable accessibilityRole="button"
+            <Pressable
+              accessibilityRole="button"
               style={({ pressed }) => [
                 styles.sheetOption,
                 {
@@ -879,7 +1049,10 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
               ]}
               onPress={() => {
                 setLobbyModal(false);
-                navigation.navigate('OralTestLobby', { courseId: route.params.courseId, courseTitle: route.params.courseTitle });
+                navigation.navigate('OralTestLobby', {
+                  courseId: route.params.courseId,
+                  courseTitle: route.params.courseTitle,
+                });
               }}
             >
               <View style={[styles.sheetOptionIcon, { backgroundColor: colors.streak }]}>
@@ -918,9 +1091,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.m,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    ...Platform.select({
+    ...(Platform.select({
       web: { backdropFilter: 'blur(12px)' },
-    }) as any,
+    }) as any),
   },
   backBtn: {
     padding: spacing.xs,
@@ -1198,7 +1371,6 @@ const styles = StyleSheet.create({
     maxHeight: '70%',
     borderRadius: borderRadius.l,
     padding: spacing.l,
-    
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1249,7 +1421,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: borderRadius.l,
     paddingHorizontal: spacing.l,
     paddingTop: 12,
-    
   },
   sheetHandle: {
     width: 36,

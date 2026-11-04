@@ -68,7 +68,13 @@ export function PushStreakNudge({ permission, onClose }: Props) {
           Включи напоминания, чтобы не потерять серию
         </Text>
       </Pressable>
-      <Button variant="icon" icon={X} background="none" accessibilityLabel="Скрыть" onPress={handleDismiss} />
+      <Button
+        variant="icon"
+        icon={X}
+        background="none"
+        accessibilityLabel="Скрыть"
+        onPress={handleDismiss}
+      />
     </View>
   );
 }

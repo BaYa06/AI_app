@@ -5,7 +5,14 @@
  * Android, веб и сборки без нативного модуля — общий Sheet в SharedSetPreviewModal.
  */
 import React from 'react';
-import { NativeModules, Platform, UIManager, processColor, requireNativeComponent, type ViewProps } from 'react-native';
+import {
+  NativeModules,
+  Platform,
+  UIManager,
+  processColor,
+  requireNativeComponent,
+  type ViewProps,
+} from 'react-native';
 import type { ShareReportReason } from '@/services';
 
 export interface NativeMenuItem {
@@ -25,12 +32,19 @@ interface NativeMenuButtonProps extends ViewProps {
 }
 
 const hasNativeMenu = Platform.OS === 'ios' && UIManager.hasViewManagerConfig('ShareMenuButton');
-const NativeMenuButton = hasNativeMenu ? requireNativeComponent<NativeMenuButtonProps>('ShareMenuButton') : null;
+const NativeMenuButton = hasNativeMenu
+  ? requireNativeComponent<NativeMenuButtonProps>('ShareMenuButton')
+  : null;
 
 export const isNativeShareMenu = !!NativeMenuButton;
 
 /** Кнопка «…» с системным меню. Только когда isNativeShareMenu. */
-export function ShareMenuButton({ items, title, tint, onSelect }: {
+export function ShareMenuButton({
+  items,
+  title,
+  tint,
+  onSelect,
+}: {
   items: NativeMenuItem[];
   title: string;
   tint: string;
@@ -59,7 +73,15 @@ const reportSheet: ReportSheetModule | undefined =
 export const isNativeReportSheet = !!reportSheet;
 
 // Токены, которые читает лист (StudyModePalette в Swift)
-const COLOR_KEYS = ['surface', 'border', 'textPrimary', 'textSecondary', 'primary', 'primaryFill', 'onPrimary'] as const;
+const COLOR_KEYS = [
+  'surface',
+  'border',
+  'textPrimary',
+  'textSecondary',
+  'primary',
+  'primaryFill',
+  'onPrimary',
+] as const;
 
 /** Системный лист жалобы. null — закрыли без отправки. */
 export function presentNativeReportSheet(options: {

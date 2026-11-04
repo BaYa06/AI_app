@@ -12,7 +12,12 @@ import type { SetKind } from '@/types';
 
 const OPTIONS: { value: SetKind; title: string; hint: string; Icon: typeof Languages }[] = [
   { value: 'language', title: 'Язык', hint: 'Слова и фразы с переводом', Icon: Languages },
-  { value: 'subject', title: 'Предмет', hint: 'История, география, ОРТ: вопрос → ответ', Icon: BookOpen },
+  {
+    value: 'subject',
+    title: 'Предмет',
+    hint: 'История, география, ОРТ: вопрос → ответ',
+    Icon: BookOpen,
+  },
 ];
 
 interface SetKindPickerProps {
@@ -22,7 +27,12 @@ interface SetKindPickerProps {
   disabled?: boolean;
 }
 
-export function SetKindPicker({ value, onChange, hasError = false, disabled = false }: SetKindPickerProps) {
+export function SetKindPicker({
+  value,
+  onChange,
+  hasError = false,
+  disabled = false,
+}: SetKindPickerProps) {
   const colors = useThemeColors();
 
   return (

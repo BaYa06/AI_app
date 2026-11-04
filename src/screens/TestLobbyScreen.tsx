@@ -14,13 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { triggerHaptic } from '@/utils/haptic';
-import {
-  GraduationCap,
-  Copy,
-  UserPlus,
-  CheckCircle2,
-  ArrowRight,
-} from 'lucide-react-native';
+import { GraduationCap, Copy, UserPlus, CheckCircle2, ArrowRight } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha, type ColorToken } from '@/constants';
@@ -98,13 +92,16 @@ export function TestLobbyScreen({ navigation, route }: Props) {
     channel
       .on('broadcast', { event: 'student_joined' }, ({ payload }) => {
         if (!payload) return;
-        setStudents(prev => {
-          if (prev.some(s => s.id === payload.userId)) return prev;
-          return [...prev, {
-            id: payload.userId,
-            name: payload.displayName || 'Ученик',
-            initials: payload.initials || '??',
-          }];
+        setStudents((prev) => {
+          if (prev.some((s) => s.id === payload.userId)) return prev;
+          return [
+            ...prev,
+            {
+              id: payload.userId,
+              name: payload.displayName || 'Ученик',
+              initials: payload.initials || '??',
+            },
+          ];
         });
       })
       .subscribe();
@@ -171,11 +168,10 @@ export function TestLobbyScreen({ navigation, route }: Props) {
       >
         <View style={styles.headerLeft}>
           <GraduationCap size={22} color={colors.primary} />
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-            Лобби теста
-          </Text>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Лобби теста</Text>
         </View>
-        <Pressable accessibilityRole="button"
+        <Pressable
+          accessibilityRole="button"
           style={({ pressed }) => [
             styles.endBtn,
             {
@@ -203,8 +199,11 @@ export function TestLobbyScreen({ navigation, route }: Props) {
             </View>
           </View>
           <View style={[styles.codeCardShare, { backgroundColor: alpha(colors.onPrimary, 10) }]}>
-            <Text style={[styles.shareText, { color: colors.onPrimary }]}>Отправь код ученикам</Text>
-            <Pressable accessibilityRole="button"
+            <Text style={[styles.shareText, { color: colors.onPrimary }]}>
+              Отправь код ученикам
+            </Text>
+            <Pressable
+              accessibilityRole="button"
               style={({ pressed }) => [
                 [styles.copyBtn, { backgroundColor: colors.surface }],
                 pressed && { opacity: 0.7 },
@@ -216,7 +215,9 @@ export function TestLobbyScreen({ navigation, route }: Props) {
               ) : (
                 <Copy size={14} color={colors.primaryFill} />
               )}
-              <Text style={[styles.copyBtnText, { color: colors.primary }]}>{copied ? 'Скопировано' : 'Копировать'}</Text>
+              <Text style={[styles.copyBtnText, { color: colors.primary }]}>
+                {copied ? 'Скопировано' : 'Копировать'}
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -244,10 +245,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
           {students.map((s, idx) => (
             <View
               key={s.id}
-              style={[
-                styles.studentRow,
-                { backgroundColor: cardBg, borderColor: cardBorder },
-              ]}
+              style={[styles.studentRow, { backgroundColor: cardBg, borderColor: cardBorder }]}
             >
               <View style={styles.studentLeft}>
                 <View
@@ -269,9 +267,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
                   </Text>
                 </View>
                 <View>
-                  <Text style={[styles.studentName, { color: colors.textPrimary }]}>
-                    {s.name}
-                  </Text>
+                  <Text style={[styles.studentName, { color: colors.textPrimary }]}>{s.name}</Text>
                   <Text style={[styles.studentStatus, { color: colors.textSecondary }]}>
                     Готов к тесту
                   </Text>
@@ -282,18 +278,8 @@ export function TestLobbyScreen({ navigation, route }: Props) {
           ))}
 
           {/* Empty placeholder */}
-          <View
-            style={[
-              styles.emptySlot,
-              { borderColor: colors.border },
-            ]}
-          >
-            <View
-              style={[
-                styles.emptyAvatar,
-                { backgroundColor: colors.surfaceMuted },
-              ]}
-            >
+          <View style={[styles.emptySlot, { borderColor: colors.border }]}>
+            <View style={[styles.emptyAvatar, { backgroundColor: colors.surfaceMuted }]}>
               <UserPlus size={18} color={colors.textSecondary} />
             </View>
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
@@ -330,23 +316,28 @@ export function TestLobbyScreen({ navigation, route }: Props) {
                 </View>
               ))}
             </View>
-            <Text style={[styles.crewLabel, { color: colors.textSecondary }]}>
-              Подключились
-            </Text>
+            <Text style={[styles.crewLabel, { color: colors.textSecondary }]}>Подключились</Text>
           </View>
         )}
       </ScrollView>
 
       {/* Footer CTA */}
       <BottomBar style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        <Pressable accessibilityRole="button"
+        <Pressable
+          accessibilityRole="button"
           style={({ pressed }) => [
             styles.ctaBtn,
-            { backgroundColor: students.length === 0 || starting ? colors.textSecondary : colors.primary },
+            {
+              backgroundColor:
+                students.length === 0 || starting ? colors.textSecondary : colors.primary,
+            },
             pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
           ]}
           disabled={students.length === 0 || starting}
-          onPress={() => { triggerHaptic('selection'); handleStart(); }}
+          onPress={() => {
+            triggerHaptic('selection');
+            handleStart();
+          }}
         >
           {starting ? (
             <ActivityIndicator color={colors.onPrimary} />
@@ -374,9 +365,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.l,
     paddingBottom: spacing.m,
-    ...Platform.select({
+    ...(Platform.select({
       web: { backdropFilter: 'blur(12px)' },
-    }) as any,
+    }) as any),
   },
   headerLeft: {
     flexDirection: 'row',
@@ -510,7 +501,6 @@ const styles = StyleSheet.create({
     padding: spacing.s,
     borderRadius: borderRadius.m,
     borderWidth: 1,
-    
   },
   studentLeft: {
     flexDirection: 'row',
@@ -607,7 +597,6 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: borderRadius.l,
     gap: 8,
-    
   },
   ctaText: {
     fontSize: 16,

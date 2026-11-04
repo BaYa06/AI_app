@@ -27,7 +27,6 @@ export async function getAdminStats(sql) {
     liveTests7d,
     recentEvents,
   ] = await Promise.all([
-
     sql`SELECT COUNT(*) as count FROM users WHERE is_anonymous = false OR is_anonymous IS NULL`,
 
     sql`SELECT COUNT(*) as count FROM users
@@ -153,33 +152,33 @@ export async function getAdminStats(sql) {
   return {
     generatedAt: new Date().toISOString(),
     users: {
-      total:       Number(usersTotal[0].count),
-      new7d:       Number(usersNew7d[0].count),
-      teachers:    Number(teacherCount[0].count),
-      anonymous:   Number(anonymousCount[0].count),
+      total: Number(usersTotal[0].count),
+      new7d: Number(usersNew7d[0].count),
+      teachers: Number(teacherCount[0].count),
+      anonymous: Number(anonymousCount[0].count),
       activeToday: Number(activeToday[0].count),
-      active7d:    Number(activeLast7d[0].count),
+      active7d: Number(activeLast7d[0].count),
     },
-    registrations: registrationsByDay.map(r => ({ day: r.day, count: Number(r.count) })),
-    dailyActiveUsers: dailyActiveUsers.map(r => ({ day: r.day, count: Number(r.count) })),
+    registrations: registrationsByDay.map((r) => ({ day: r.day, count: Number(r.count) })),
+    dailyActiveUsers: dailyActiveUsers.map((r) => ({ day: r.day, count: Number(r.count) })),
     retention: {
-      d1:  Number(retentionD1[0]?.pct  ?? 0),
-      d7:  Number(retentionD7[0]?.pct  ?? 0),
+      d1: Number(retentionD1[0]?.pct ?? 0),
+      d7: Number(retentionD7[0]?.pct ?? 0),
       d30: Number(retentionD30[0]?.pct ?? 0),
     },
-    heatmap: heatmap.map(r => ({ dow: r.dow, users: Number(r.users), cards: Number(r.cards) })),
+    heatmap: heatmap.map((r) => ({ dow: r.dow, users: Number(r.users), cards: Number(r.cards) })),
     activity: {
-      weeklyCards:    Number(weeklyCards[0]?.total ?? 0),
+      weeklyCards: Number(weeklyCards[0]?.total ?? 0),
       avgCardsPerDay: Math.round(Number(weeklyCards[0]?.avg_per_user_day ?? 0)),
     },
     corporate: {
-      courses:        Number(corporateCourses[0].count),
-      avgStudents:    Number(avgStudents[0]?.avg ?? 0),
-      joins7d:        Number(courseJoins7d[0].count),
+      courses: Number(corporateCourses[0].count),
+      avgStudents: Number(avgStudents[0]?.avg ?? 0),
+      joins7d: Number(courseJoins7d[0].count),
       activeTeachers: Number(activeTeachers[0].count),
-      liveTests7d:    Number(liveTests7d[0].count),
+      liveTests7d: Number(liveTests7d[0].count),
     },
-    events: recentEvents.map(e => ({ type: e.type, label: e.label, ts: e.ts })),
+    events: recentEvents.map((e) => ({ type: e.type, label: e.label, ts: e.ts })),
   };
 }
 
@@ -237,7 +236,8 @@ export async function getAdminFeedbackThread(sql, id) {
         WHERE r.feedback_id = ${id}::uuid
         ORDER BY r.created_at`,
   ]);
-  const f = await sql`SELECT id, status, read_at, user_seen_at, last_admin_reply_at FROM app_feedback WHERE id = ${id}::uuid`;
+  const f =
+    await sql`SELECT id, status, read_at, user_seen_at, last_admin_reply_at FROM app_feedback WHERE id = ${id}::uuid`;
   if (!f[0]) return null;
   return { ...f[0], justRead: rows.length > 0, replies };
 }
@@ -324,4 +324,3 @@ export async function disableShareByReport(sql, id) {
   `;
   return { ok: true };
 }
-

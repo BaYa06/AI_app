@@ -44,7 +44,11 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <>
           {this.props.children}
-          <ErrorDialog error={this.state.error} errorInfo={this.state.errorInfo} onDismiss={this.handleDismiss} />
+          <ErrorDialog
+            error={this.state.error}
+            errorInfo={this.state.errorInfo}
+            onDismiss={this.handleDismiss}
+          />
         </>
       );
     }
@@ -72,13 +76,19 @@ function ErrorDialog({
     <Modal visible transparent animationType="fade" onRequestClose={onDismiss}>
       <View style={[styles.overlay, { backgroundColor: colors.overlay }]}>
         <View accessibilityViewIsModal style={[styles.modal, { backgroundColor: colors.surface }]}>
-          <Text variant="h3" accessibilityRole="header" style={[styles.title, { color: colors.errorText }]}>
+          <Text
+            variant="h3"
+            accessibilityRole="header"
+            style={[styles.title, { color: colors.errorText }]}
+          >
             Что-то пошло не так
           </Text>
           <ScrollView style={styles.scroll}>
             {/* Технический текст ошибки — только разработчику */}
             <Text variant="bodySmall" style={{ color: colors.textPrimary }}>
-              {__DEV__ ? error?.toString() : 'Закрой это окно и попробуй ещё раз. Если повторится — напиши нам: Профиль → «Написать нам».'}
+              {__DEV__
+                ? error?.toString()
+                : 'Закрой это окно и попробуй ещё раз. Если повторится — напиши нам: Профиль → «Написать нам».'}
             </Text>
             {__DEV__ && errorInfo?.componentStack && (
               <Text variant="caption" style={[styles.stackText, { color: colors.textTertiary }]}>

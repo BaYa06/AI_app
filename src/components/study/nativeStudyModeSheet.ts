@@ -10,7 +10,13 @@
 import { useEffect, useRef } from 'react';
 import { NativeEventEmitter, NativeModules, Platform, processColor } from 'react-native';
 import { useCardsStore, useSettingsStore, useThemeColors } from '@/store';
-import type { SetSheetSession, StudyMode, StudyModeGame, StudyModeSettings, WordLimit } from './StudyModeSheet';
+import type {
+  SetSheetSession,
+  StudyMode,
+  StudyModeGame,
+  StudyModeSettings,
+  WordLimit,
+} from './StudyModeSheet';
 import { sessionSheetMeta, sessionSheetStages, sessionSheetText } from './sessionSheetText';
 
 interface StudyModeSheetModule {
@@ -35,9 +41,23 @@ export const isNativeStudyModeSheet = !!native;
 
 // Токены, которые использует нативная шторка (StudyModeSheet.swift: кнопка сессии, режимы, Chip)
 const COLOR_KEYS = [
-  'surface', 'surfaceMuted', 'border', 'textPrimary', 'textSecondary', 'textTertiary',
-  'primary', 'primaryFill', 'onPrimary', 'ratingAgain', 'ratingHard', 'ratingEasy', 'ratingGood',
-  'errorText', 'warningText', 'info', 'successText',
+  'surface',
+  'surfaceMuted',
+  'border',
+  'textPrimary',
+  'textSecondary',
+  'textTertiary',
+  'primary',
+  'primaryFill',
+  'onPrimary',
+  'ratingAgain',
+  'ratingHard',
+  'ratingEasy',
+  'ratingGood',
+  'errorText',
+  'warningText',
+  'info',
+  'successText',
 ] as const;
 
 interface Options {
@@ -114,7 +134,12 @@ export function useNativeStudyModeSheet(options: Options) {
         home: !setSession,
         noWords: plan?.mode === 'empty',
         session: plan ? sessionSheetText(plan, sessionSheetStages(plan, cardsMap)) : null,
-        games: games.map(({ mode, title, tag, description }) => ({ mode, title, tag, description })),
+        games: games.map(({ mode, title, tag, description }) => ({
+          mode,
+          title,
+          tag,
+          description,
+        })),
         settings: { onlyHard: settings.onlyHard, wordLimit: settings.wordLimit },
         colors: Object.fromEntries(COLOR_KEYS.map((key) => [key, processColor(theme[key])])),
         dark: isDark,

@@ -11,11 +11,11 @@ interface StudyState {
   // Текущая сессия
   session: StudySession | null;
   currentCard: Card | null;
-  
+
   // UI состояние
   isFlipped: boolean;
   isLoading: boolean;
-  
+
   // Время
   cardStartTime: number;
 }
@@ -24,21 +24,21 @@ interface StudyActions {
   // Управление сессией
   startSession: (config: StudySessionConfig, cards: Card[]) => void;
   endSession: () => StudySession | null;
-  
+
   // Навигация
   showAnswer: () => void;
   hideAnswer: () => void;
   nextCard: () => Card | null;
   previousCard: () => void;
-  
+
   // Ответы
   recordAnswer: (isCorrect: boolean) => void;
-  
+
   // Геттеры
   getProgress: () => { current: number; total: number; percentage: number };
   getTimeSpent: () => number;
   getCurrentCardTime: () => number;
-  
+
   // Сброс
   reset: () => void;
 }
@@ -56,9 +56,9 @@ export const useStudyStore = create<StudyState & StudyActions>()(
     ...initialState,
 
     // ==================== СЕССИЯ ====================
-    
+
     startSession: (config, cards) => {
-      const queue = config.shuffleCards 
+      const queue = config.shuffleCards
         ? [...cards].sort(() => Math.random() - 0.5).map((c) => c.id)
         : cards.map((c) => c.id);
 
@@ -92,9 +92,10 @@ export const useStudyStore = create<StudyState & StudyActions>()(
       const finalSession = {
         ...session,
         totalTimeSpent: Date.now() - session.startedAt,
-        averageTimePerCard: session.completedCards > 0 
-          ? (Date.now() - session.startedAt) / session.completedCards 
-          : 0,
+        averageTimePerCard:
+          session.completedCards > 0
+            ? (Date.now() - session.startedAt) / session.completedCards
+            : 0,
       };
 
       set((state) => {
@@ -107,7 +108,7 @@ export const useStudyStore = create<StudyState & StudyActions>()(
     },
 
     // ==================== НАВИГАЦИЯ ====================
-    
+
     showAnswer: () => {
       set((state) => {
         state.isFlipped = true;
@@ -156,7 +157,7 @@ export const useStudyStore = create<StudyState & StudyActions>()(
     },
 
     // ==================== ОТВЕТЫ ====================
-    
+
     recordAnswer: (isCorrect) => {
       set((state) => {
         if (state.session) {
@@ -170,7 +171,7 @@ export const useStudyStore = create<StudyState & StudyActions>()(
     },
 
     // ==================== ГЕТТЕРЫ ====================
-    
+
     getProgress: () => {
       const { session } = get();
       if (!session) return { current: 0, total: 0, percentage: 0 };
@@ -195,7 +196,7 @@ export const useStudyStore = create<StudyState & StudyActions>()(
     },
 
     // ==================== СБРОС ====================
-    
+
     reset: () => {
       set(initialState);
     },

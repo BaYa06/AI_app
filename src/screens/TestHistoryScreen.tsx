@@ -3,14 +3,7 @@
  * @description Список завершённых экзаменных тестов курса
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  ScrollView,
-  StyleSheet,
-  Pressable,
-  ActivityIndicator,
-  Platform,
-} from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable, ActivityIndicator, Platform } from 'react-native';
 import {
   ArrowLeft,
   Trophy,
@@ -78,10 +71,9 @@ export function TestHistoryScreen({ navigation, route }: Props) {
         setError('Не авторизован');
         return;
       }
-      const res = await fetch(
-        `${API_BASE}/test?action=history&courseId=${courseId}`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
+      const res = await fetch(`${API_BASE}/test?action=history&courseId=${courseId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         setError(describeError(body.error, 'Не удалось загрузить историю'));
@@ -96,7 +88,9 @@ export function TestHistoryScreen({ navigation, route }: Props) {
     }
   }, [courseId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -121,9 +115,7 @@ export function TestHistoryScreen({ navigation, route }: Props) {
           <ArrowLeft size={22} color={colors.textPrimary} />
         </Pressable>
         <View style={{ flex: 1, marginLeft: spacing.m }}>
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-            История тестов
-          </Text>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>История тестов</Text>
           <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
             {courseTitle}
           </Text>
@@ -144,7 +136,8 @@ export function TestHistoryScreen({ navigation, route }: Props) {
           <Text style={[styles.emptyTitle, { color: colors.textPrimary, marginTop: 12 }]}>
             {error}
           </Text>
-          <Pressable accessibilityRole="button"
+          <Pressable
+            accessibilityRole="button"
             onPress={load}
             style={({ pressed }) => [
               styles.retryBtn,
@@ -161,9 +154,7 @@ export function TestHistoryScreen({ navigation, route }: Props) {
       {!loading && !error && items.length === 0 && (
         <View style={styles.centerState}>
           <FileText size={48} color={colors.textSecondary} />
-          <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
-            Тестов пока нет
-          </Text>
+          <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>Тестов пока нет</Text>
           <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
             Проведи первый тест, и он{'\n'}появится здесь
           </Text>
@@ -172,12 +163,10 @@ export function TestHistoryScreen({ navigation, route }: Props) {
 
       {/* List */}
       {!loading && !error && items.length > 0 && (
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          showsVerticalScrollIndicator={false}
-        >
+        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           {items.map((item) => (
-            <Pressable accessibilityRole="button"
+            <Pressable
+              accessibilityRole="button"
               key={item.sessionId}
               onPress={() =>
                 navigation.navigate('TestResultsTeacher', {
@@ -193,17 +182,16 @@ export function TestHistoryScreen({ navigation, route }: Props) {
               ]}
             >
               {/* Icon */}
-              <View style={[styles.historyIcon, { backgroundColor: alpha(colors.primaryFill, 10) }]}>
+              <View
+                style={[styles.historyIcon, { backgroundColor: alpha(colors.primaryFill, 10) }]}
+              >
                 <Trophy size={20} color={colors.primaryFill} />
               </View>
 
               {/* Content */}
               <View style={{ flex: 1, gap: 4 }}>
                 <View style={styles.historyCardRow}>
-                  <Text
-                    style={[styles.cardTitle, { color: colors.textPrimary }]}
-                    numberOfLines={1}
-                  >
+                  <Text style={[styles.cardTitle, { color: colors.textPrimary }]} numberOfLines={1}>
                     {item.setTitle}
                   </Text>
                   <Text style={[styles.cardScore, { color: scoreColor(item.avgScore, colors) }]}>
@@ -245,9 +233,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.m,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    ...Platform.select({
+    ...(Platform.select({
       web: { backdropFilter: 'blur(12px)' },
-    }) as any,
+    }) as any),
   },
   backBtn: {
     padding: spacing.xs,

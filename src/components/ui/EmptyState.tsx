@@ -50,17 +50,28 @@ export const EmptyState = memo(function EmptyState({
       <View style={[styles.iconCircle, { backgroundColor: alpha(accent, 10) }]}>
         <Icon size={iconSize.xl} color={accent} />
       </View>
-      <Text variant="h3" align="center" accessibilityRole="header" style={{ color: colors.textPrimary }}>
+      <Text
+        variant="h3"
+        align="center"
+        accessibilityRole="header"
+        style={{ color: colors.textPrimary }}
+      >
         {title}
       </Text>
       {description ? (
-        <Text variant="bodySmall" align="center" style={[styles.description, { color: colors.textSecondary }]}>
+        <Text
+          variant="bodySmall"
+          align="center"
+          style={[styles.description, { color: colors.textSecondary }]}
+        >
           {description}
         </Text>
       ) : null}
       {action || secondaryAction ? (
         <View style={styles.actions}>
-          {action ? <Button title={action.label} icon={action.icon} onPress={action.onPress} fullWidth /> : null}
+          {action ? (
+            <Button title={action.label} icon={action.icon} onPress={action.onPress} fullWidth />
+          ) : null}
           {secondaryAction ? (
             <Button
               variant="secondary"

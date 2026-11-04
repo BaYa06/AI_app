@@ -18,7 +18,10 @@ config({ path: path.resolve(process.cwd(), '.env.local'), quiet: true });
 
 /** Минимальный интерфейс соединения, которым пользуются скрипты. */
 export interface Db {
-  query<R = Record<string, unknown>>(text: string, params?: unknown[]): Promise<{ rows: R[]; rowCount: number | null }>;
+  query<R = Record<string, unknown>>(
+    text: string,
+    params?: unknown[]
+  ): Promise<{ rows: R[]; rowCount: number | null }>;
   end(): Promise<void>;
 }
 
@@ -51,7 +54,9 @@ export async function connect(): Promise<Db> {
   }
 
   if (typeof globalThis.WebSocket !== 'function') {
-    throw new Error('Нужен Node.js 22+ (встроенный WebSocket) для подключения к Neon через порт 443');
+    throw new Error(
+      'Нужен Node.js 22+ (встроенный WebSocket) для подключения к Neon через порт 443'
+    );
   }
   neonConfig.webSocketConstructor = globalThis.WebSocket;
   const pool = new Pool({ connectionString: url });
@@ -89,7 +94,9 @@ export function getAdminUserId(): string {
 export function getLibraryAuthorId(): string {
   const id = (process.env.LIBRARY_AUTHOR_ID || '').trim();
   if (!/^[0-9a-f-]{36}$/i.test(id)) {
-    throw new Error('Нет LIBRARY_AUTHOR_ID в .env.local — создайте автора: npx tsx scripts/create-library-author.ts');
+    throw new Error(
+      'Нет LIBRARY_AUTHOR_ID в .env.local — создайте автора: npx tsx scripts/create-library-author.ts'
+    );
   }
   return id;
 }

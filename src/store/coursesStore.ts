@@ -19,13 +19,14 @@ const getSetsStore = () => require('./setsStore').useSetsStore;
 // Удаление курса вместе с наборами — через очередь с повтором: если запрос не дошёл, при
 // следующей загрузке наборы вернулись бы в «Мои наборы»
 SyncQueueService.registerExecutor('deleteCourseWithSets', (p) =>
-  NeonService.deleteCourse(p as string, { withSets: true }));
+  NeonService.deleteCourse(p as string, { withSets: true })
+);
 
 interface CoursesState {
   // Данные
   courses: Course[];
   activeCourseId: string | null; // null = «Мои наборы»
-  
+
   // Загрузка
   isLoading: boolean;
   error: string | null;
@@ -40,15 +41,15 @@ interface CoursesActions {
 
   // Выбор активного курса
   setActiveCourse: (id: string | null) => void;
-  
+
   // Селекторы
   getCourse: (id: string) => Course | undefined;
   getActiveCourse: () => Course | undefined;
-  
+
   // Состояние
   setLoading: (isLoading: boolean) => void;
   setError: (error: string | null) => void;
-  
+
   // Загрузка/сохранение
   loadCourses: () => void;
   saveCourses: () => void;
@@ -64,7 +65,7 @@ export const useCoursesStore = create<CoursesState & CoursesActions>()(
     error: null,
 
     // ==================== CRUD ====================
-    
+
     createCourse: (title) => {
       const now = Date.now();
       const newCourse: Course = {
@@ -149,7 +150,7 @@ export const useCoursesStore = create<CoursesState & CoursesActions>()(
 
     deleteCourse: (id) => {
       const state = get();
-      
+
       // Если удаляем активный курс, переключаемся на «Мои наборы»
       if (state.activeCourseId === id) {
         set((s) => {
@@ -181,7 +182,9 @@ export const useCoursesStore = create<CoursesState & CoursesActions>()(
     removeLocalCourse: (id) => {
       const state = get();
       if (state.activeCourseId === id) {
-        set((s) => { s.activeCourseId = null; });
+        set((s) => {
+          s.activeCourseId = null;
+        });
       }
       set((s) => {
         const index = s.courses.findIndex((c) => c.id === id);
@@ -205,7 +208,7 @@ export const useCoursesStore = create<CoursesState & CoursesActions>()(
     },
 
     // ==================== СЕЛЕКТОРЫ ====================
-    
+
     getCourse: (id) => {
       return get().courses.find((c) => c.id === id);
     },
@@ -217,7 +220,7 @@ export const useCoursesStore = create<CoursesState & CoursesActions>()(
     },
 
     // ==================== СОСТОЯНИЕ ====================
-    
+
     setLoading: (isLoading) => {
       set((state) => {
         state.isLoading = isLoading;
@@ -231,7 +234,7 @@ export const useCoursesStore = create<CoursesState & CoursesActions>()(
     },
 
     // ==================== ЗАГРУЗКА/СОХРАНЕНИЕ ====================
-    
+
     loadCourses: () => {
       try {
         const data = StorageService.getObject<{

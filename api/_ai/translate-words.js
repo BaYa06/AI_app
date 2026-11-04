@@ -50,14 +50,19 @@ Return EXACTLY ${batch.length} items in the SAME order.
 Reply ONLY with a JSON array: [{"front": "<word exactly as given>", "back": "<translation>"}]
 Example (German → Russian): [{"front": "der Hund, -e", "back": "собака"}, {"front": "sich freuen auf", "back": "радоваться (чему-либо)"}]`;
 
-    const text = await generateJson({ models: MODELS.text, prompt, temperature: 0.2, maxOutputTokens: 4096 });
-    const translations = parseJsonArray(text).filter(t => t && typeof t === 'object');
+    const text = await generateJson({
+      models: MODELS.text,
+      prompt,
+      temperature: 0.2,
+      maxOutputTokens: 4096,
+    });
+    const translations = parseJsonArray(text).filter((t) => t && typeof t === 'object');
 
     // Match translations back to original words by index
     const result_translations = batch.map((word, i) => {
       const frontLower = word.toLowerCase().trim();
       const match = translations.find(
-        t => t.front && t.front.toLowerCase().trim() === frontLower
+        (t) => t.front && t.front.toLowerCase().trim() === frontLower
       );
       return {
         front: word,

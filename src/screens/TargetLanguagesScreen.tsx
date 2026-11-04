@@ -30,7 +30,9 @@ export function TargetLanguagesScreen({ nativeLanguage, onContinue, onBack }: Pr
       return;
     }
     if (selected.length >= MAX_TARGET_LANGUAGES) {
-      toast.info('Можно выбрать до 3 языков. Сначала убери один из выбранных, чтобы добавить другой.');
+      toast.info(
+        'Можно выбрать до 3 языков. Сначала убери один из выбранных, чтобы добавить другой.'
+      );
       return;
     }
     setSelected([...selected, code]);

@@ -25,14 +25,21 @@ export function sessionSheetMeta(plan: SetSessionPlan): string {
 }
 
 /** Этапы после отбора слов: слово без примера не попадёт в «Слово в контексте» и т.п. */
-export function sessionSheetStages(plan: SetSessionPlan, cardsMap: Record<string, Card | undefined>): SessionStage[] {
+export function sessionSheetStages(
+  plan: SetSessionPlan,
+  cardsMap: Record<string, Card | undefined>
+): SessionStage[] {
   const cards = plan.cardIds.map((id) => cardsMap[id]).filter((c): c is Card => !!c);
   return buildSessionStages(plan.stages, cards).map((s) => s.stage);
 }
 
 export function sessionSheetText(plan: SetSessionPlan, stages: SessionStage[]): SessionSheetText {
   if (plan.mode === 'empty') {
-    return { kind: 'empty', title: 'В наборе пока нет слов', text: 'Добавьте хотя бы 4 слова, и приложение соберёт первую сессию.' };
+    return {
+      kind: 'empty',
+      title: 'В наборе пока нет слов',
+      text: 'Добавьте хотя бы 4 слова, и приложение соберёт первую сессию.',
+    };
   }
   if (plan.mode === 'tooFew') {
     return {

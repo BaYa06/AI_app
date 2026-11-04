@@ -13,13 +13,7 @@ import {
   Share,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  Trophy,
-  AlertTriangle,
-  Download,
-  Crown,
-  X,
-} from 'lucide-react-native';
+import { Trophy, AlertTriangle, Download, Crown, X } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha, type ColorToken } from '@/constants';
@@ -117,14 +111,13 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
     if (!data) return;
 
     const header = 'Место,Имя,Результат (%),Верно,Всего,Завершил,Досрочный выход,Коротких выходов';
-    const rows = data.participants.map((p, idx) =>
-      `${idx + 1},"${p.name}",${p.score},${p.correct},${p.total},${p.finished ? 'Да' : 'Нет'},` +
-      `${p.leftReason ? LEFT_LABELS[p.leftReason] || p.leftReason : 'Нет'},${p.awayCount || 0}`
+    const rows = data.participants.map(
+      (p, idx) =>
+        `${idx + 1},"${p.name}",${p.score},${p.correct},${p.total},${p.finished ? 'Да' : 'Нет'},` +
+        `${p.leftReason ? LEFT_LABELS[p.leftReason] || p.leftReason : 'Нет'},${p.awayCount || 0}`
     );
     const hardHeader = '\n\nСамые трудные слова\nСлово,Подсказка,Ошибок,Всего';
-    const hardRows = data.hardestCards.map(c =>
-      `"${c.word}","${c.hint}",${c.missed},${c.total}`
-    );
+    const hardRows = data.hardestCards.map((c) => `"${c.word}","${c.hint}",${c.missed},${c.total}`);
 
     const csv = [
       `Результаты теста: ${data.setTitle}`,
@@ -171,7 +164,8 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
         <Text style={[styles.errorText, { color: colors.textPrimary }]}>
           {error || 'Нет данных'}
         </Text>
-        <Pressable accessibilityRole="button"
+        <Pressable
+          accessibilityRole="button"
           style={({ pressed }) => [
             styles.retryBtn,
             { backgroundColor: colors.primaryFill },
@@ -202,7 +196,8 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
           },
         ]}
       >
-        <Pressable hitSlop={spacing.xs}
+        <Pressable
+          hitSlop={spacing.xs}
           accessibilityRole="button"
           accessibilityLabel="Закрыть"
           style={({ pressed }) => [
@@ -214,10 +209,9 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
         >
           <X size={18} color={colors.textPrimary} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-          Результаты теста
-        </Text>
-        <Pressable accessibilityRole="button"
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Результаты теста</Text>
+        <Pressable
+          accessibilityRole="button"
           style={({ pressed }) => [
             styles.exportHeaderBtn,
             { borderColor: colors.primary },
@@ -244,11 +238,18 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
           <View style={styles.summaryBottom}>
             <View>
               <Text style={[styles.summaryScore, { color: colors.onPrimary }]}>{avgScore}%</Text>
-              <Text style={[styles.summaryScoreLabel, { color: colors.onPrimary }]}>Средний результат</Text>
+              <Text style={[styles.summaryScoreLabel, { color: colors.onPrimary }]}>
+                Средний результат
+              </Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={[styles.summaryStudents, { color: colors.onPrimary }]}>{participants.length} {pluralize(participants.length, 'ученик', 'ученика', 'учеников')}</Text>
-              <Text style={[styles.summaryQuestions, { color: colors.onPrimary }]}>Всего {totalQuestions} {pluralize(totalQuestions, 'вопрос', 'вопроса', 'вопросов')}</Text>
+              <Text style={[styles.summaryStudents, { color: colors.onPrimary }]}>
+                {participants.length}{' '}
+                {pluralize(participants.length, 'ученик', 'ученика', 'учеников')}
+              </Text>
+              <Text style={[styles.summaryQuestions, { color: colors.onPrimary }]}>
+                Всего {totalQuestions} {pluralize(totalQuestions, 'вопрос', 'вопроса', 'вопросов')}
+              </Text>
             </View>
           </View>
         </View>
@@ -268,13 +269,15 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
                 const isFirst = place === 1;
                 const avatarSize = isFirst ? 68 : 56;
                 const pedestalHeight = isFirst ? 88 : place === 2 ? 56 : 40;
-                const borderColor = place === 1
-                  ? colors[PODIUM_TOKENS.first]
-                  : place === 2 ? colors[PODIUM_TOKENS.second] : colors[PODIUM_TOKENS.third];
-                const pedestalBg = isFirst
-                  ? (alpha(colors.primary, 10))
-                  : (colors.surfaceMuted);
-                const placeLabel = place === 1 ? 'Победитель' : place === 2 ? '2-е место' : '3-е место';
+                const borderColor =
+                  place === 1
+                    ? colors[PODIUM_TOKENS.first]
+                    : place === 2
+                      ? colors[PODIUM_TOKENS.second]
+                      : colors[PODIUM_TOKENS.third];
+                const pedestalBg = isFirst ? alpha(colors.primary, 10) : colors.surfaceMuted;
+                const placeLabel =
+                  place === 1 ? 'Победитель' : place === 2 ? '2-е место' : '3-е место';
                 const globalIdx = participants.indexOf(student);
 
                 return (
@@ -295,7 +298,10 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
                           height: avatarSize,
                           borderRadius: avatarSize / 2,
                           borderColor,
-                          backgroundColor: alpha(colors[AVATAR_TOKENS[globalIdx % AVATAR_TOKENS.length]], 20),
+                          backgroundColor: alpha(
+                            colors[AVATAR_TOKENS[globalIdx % AVATAR_TOKENS.length]],
+                            20
+                          ),
                         },
                       ]}
                     >
@@ -347,22 +353,20 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
 
         {/* Leaderboard */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-            Рейтинг
-          </Text>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Рейтинг</Text>
           <View style={styles.leaderList}>
             {participants.map((student, idx) => (
               <View
                 key={student.name + idx}
                 style={[styles.leaderRow, { backgroundColor: cardBg, borderColor: cardBorder }]}
               >
-                <Text style={[styles.leaderRank, { color: colors.textSecondary }]}>
-                  {idx + 1}
-                </Text>
+                <Text style={[styles.leaderRank, { color: colors.textSecondary }]}>{idx + 1}</Text>
                 <View
                   style={[
                     styles.leaderAvatar,
-                    { backgroundColor: alpha(colors[AVATAR_TOKENS[idx % AVATAR_TOKENS.length]], 20) },
+                    {
+                      backgroundColor: alpha(colors[AVATAR_TOKENS[idx % AVATAR_TOKENS.length]], 20),
+                    },
                   ]}
                 >
                   <Text
@@ -375,7 +379,10 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
                   </Text>
                 </View>
                 <View style={styles.leaderNameCol}>
-                  <Text style={[styles.leaderName, { color: colors.textPrimary }]} numberOfLines={1}>
+                  <Text
+                    style={[styles.leaderName, { color: colors.textPrimary }]}
+                    numberOfLines={1}
+                  >
                     {student.name}
                   </Text>
                   {(student.leftReason || (student.awayCount || 0) > 0) && (
@@ -446,9 +453,13 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
       </ScrollView>
 
       {/* Footer CTA */}
-      <BottomBar webFade={70} style={[styles.footer, { paddingBottom: insets.bottom + 16, borderTopColor: cardBorder }]}>
+      <BottomBar
+        webFade={70}
+        style={[styles.footer, { paddingBottom: insets.bottom + 16, borderTopColor: cardBorder }]}
+      >
         <View style={styles.footerRow}>
-          <Pressable accessibilityRole="button"
+          <Pressable
+            accessibilityRole="button"
             style={({ pressed }) => [
               styles.backBtn,
               { borderColor: colors.border },
@@ -458,7 +469,8 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
           >
             <Text style={[styles.backBtnText, { color: colors.textPrimary }]}>К курсу</Text>
           </Pressable>
-          <Pressable accessibilityRole="button"
+          <Pressable
+            accessibilityRole="button"
             style={({ pressed }) => [
               styles.ctaBtn,
               { backgroundColor: colors.primaryFill },
@@ -513,9 +525,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.m,
     paddingBottom: spacing.s,
-    ...Platform.select({
+    ...(Platform.select({
       web: { backdropFilter: 'blur(12px)' },
-    }) as any,
+    }) as any),
   },
   headerTitle: {
     fontSize: 16,
@@ -651,7 +663,6 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.l,
     borderWidth: 1,
     gap: 12,
-    
   },
   leaderRank: {
     width: 24,
@@ -763,7 +774,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: borderRadius.l,
     gap: 8,
-    
   },
   ctaText: {
     fontSize: 16,

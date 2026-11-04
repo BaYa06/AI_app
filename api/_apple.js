@@ -21,11 +21,15 @@ const DEFAULT_CLIENT_ID = 'com.baiirbek.flashly';
 
 export function isAppleUser(user) {
   const meta = user?.app_metadata ?? {};
-  return meta.provider === 'apple' || (Array.isArray(meta.providers) && meta.providers.includes('apple'));
+  return (
+    meta.provider === 'apple' || (Array.isArray(meta.providers) && meta.providers.includes('apple'))
+  );
 }
 
 export function isAppleRevokeConfigured() {
-  return Boolean(process.env.APPLE_TEAM_ID && process.env.APPLE_KEY_ID && process.env.APPLE_PRIVATE_KEY);
+  return Boolean(
+    process.env.APPLE_TEAM_ID && process.env.APPLE_KEY_ID && process.env.APPLE_PRIVATE_KEY
+  );
 }
 
 function clientId() {
@@ -58,7 +62,11 @@ async function postForm(path, fields) {
   });
   const text = await resp.text();
   let json = null;
-  try { json = text ? JSON.parse(text) : null; } catch { /* revoke отвечает пустым телом */ }
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    /* revoke отвечает пустым телом */
+  }
   return { ok: resp.ok, status: resp.status, json };
 }
 
@@ -75,7 +83,9 @@ export async function revokeAppleAuthorization(authorizationCode) {
     grant_type: 'authorization_code',
   });
   if (!tokenResp.ok) {
-    throw new Error(`Apple token exchange failed: ${tokenResp.status} ${tokenResp.json?.error ?? ''}`);
+    throw new Error(
+      `Apple token exchange failed: ${tokenResp.status} ${tokenResp.json?.error ?? ''}`
+    );
   }
 
   const { refresh_token: refreshToken, access_token: accessToken } = tokenResp.json ?? {};

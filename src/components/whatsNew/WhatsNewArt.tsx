@@ -43,16 +43,32 @@ function SwipeArt() {
   return (
     <>
       <View style={styles.sideRow}>
-        <Text variant="caption" style={[styles.side, { color: colors.errorText, backgroundColor: alpha(colors.error, 10) }]}>
+        <Text
+          variant="caption"
+          style={[
+            styles.side,
+            { color: colors.errorText, backgroundColor: alpha(colors.error, 10) },
+          ]}
+        >
           ← Не знаю
         </Text>
-        <Text variant="caption" style={[styles.side, { color: colors.successText, backgroundColor: alpha(colors.success, 10) }]}>
+        <Text
+          variant="caption"
+          style={[
+            styles.side,
+            { color: colors.successText, backgroundColor: alpha(colors.success, 10) },
+          ]}
+        >
           Уверенно →
         </Text>
       </View>
       <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Text variant="h3" style={{ color: colors.textPrimary }}>serendipity</Text>
-        <Text variant="caption" style={{ color: colors.textTertiary }}>свайпни</Text>
+        <Text variant="h3" style={{ color: colors.textPrimary }}>
+          serendipity
+        </Text>
+        <Text variant="caption" style={{ color: colors.textTertiary }}>
+          свайпни
+        </Text>
       </View>
       <View style={styles.rateRow}>
         {[
@@ -60,7 +76,11 @@ function SwipeArt() {
           ['Почти', colors.warningText],
           ['Уверенно', colors.successText],
         ].map(([label, color]) => (
-          <Text key={label} variant="caption" style={[styles.rate, { color, backgroundColor: colors.surface }]}>
+          <Text
+            key={label}
+            variant="caption"
+            style={[styles.rate, { color, backgroundColor: colors.surface }]}
+          >
             {label}
           </Text>
         ))}
@@ -76,15 +96,24 @@ function ShareArt() {
       <View style={[styles.setRow, { backgroundColor: colors.surface }]}>
         <View style={[styles.setIcon, { backgroundColor: colors.gameTeal }]} />
         <View>
-          <Text variant="label" style={{ color: colors.textPrimary }}>{SAMPLE_SET_TITLE}</Text>
-          <Text variant="caption" style={{ color: colors.textSecondary }}>48 карточек</Text>
+          <Text variant="label" style={{ color: colors.textPrimary }}>
+            {SAMPLE_SET_TITLE}
+          </Text>
+          <Text variant="caption" style={{ color: colors.textSecondary }}>
+            48 карточек
+          </Text>
         </View>
       </View>
       <View style={[styles.link, { backgroundColor: colors.primaryFill }]}>
-        <Text variant="label" style={{ color: colors.onPrimary }}>…/s/K7Q2MX</Text>
+        <Text variant="label" style={{ color: colors.onPrimary }}>
+          …/s/K7Q2MX
+        </Text>
         <Copy size={iconSize.xs} color={colors.onPrimary} />
       </View>
-      <Text variant="bodySmall" style={[styles.bubble, { color: colors.textPrimary, backgroundColor: colors.surface }]}>
+      <Text
+        variant="bodySmall"
+        style={[styles.bubble, { color: colors.textPrimary, backgroundColor: colors.surface }]}
+      >
         Держи, тут все глаголы к тесту
       </Text>
     </View>
@@ -104,7 +133,9 @@ function BooksArt() {
       {books.map(([title, color, height]) => (
         <View key={title} style={[styles.book, { backgroundColor: color, height }]}>
           <View style={[styles.spine, { backgroundColor: alpha(colors.textPrimary, 20) }]} />
-          <Text variant="caption" style={[styles.bookTitle, { color: colors.onPrimary }]}>{title}</Text>
+          <Text variant="caption" style={[styles.bookTitle, { color: colors.onPrimary }]}>
+            {title}
+          </Text>
         </View>
       ))}
     </View>
@@ -116,12 +147,30 @@ function GlassArt() {
   return (
     <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.primary }]}>
       <View style={[styles.glow, { backgroundColor: colors.streak }]} />
-      <View style={[styles.capsule, { backgroundColor: alpha(colors.onPrimary, 20), borderColor: alpha(colors.onPrimary, 40) }]}>
-        <Text variant="caption" style={[styles.capsuleActive, { color: colors.onPrimary, backgroundColor: alpha(colors.onPrimary, 40) }]}>
+      <View
+        style={[
+          styles.capsule,
+          {
+            backgroundColor: alpha(colors.onPrimary, 20),
+            borderColor: alpha(colors.onPrimary, 40),
+          },
+        ]}
+      >
+        <Text
+          variant="caption"
+          style={[
+            styles.capsuleActive,
+            { color: colors.onPrimary, backgroundColor: alpha(colors.onPrimary, 40) },
+          ]}
+        >
           Главная
         </Text>
-        <Text variant="caption" style={{ color: colors.onPrimary }}>Наборы</Text>
-        <Text variant="caption" style={{ color: colors.onPrimary }}>Профиль</Text>
+        <Text variant="caption" style={{ color: colors.onPrimary }}>
+          Наборы
+        </Text>
+        <Text variant="caption" style={{ color: colors.onPrimary }}>
+          Профиль
+        </Text>
       </View>
     </View>
   );
@@ -132,15 +181,24 @@ function XpArt() {
   return (
     <View style={[styles.xp, { backgroundColor: colors.surface }]}>
       <View style={styles.xpHead}>
-        <Text variant="label" style={{ color: colors.textPrimary }}>Уровень 7</Text>
-        <Text variant="bodySmall" style={{ color: colors.textSecondary, fontVariant: ['tabular-nums'] }}>1 240 / 2 000</Text>
+        <Text variant="label" style={{ color: colors.textPrimary }}>
+          Уровень 7
+        </Text>
+        <Text
+          variant="bodySmall"
+          style={{ color: colors.textSecondary, fontVariant: ['tabular-nums'] }}
+        >
+          1 240 / 2 000
+        </Text>
       </View>
       <View style={[styles.bar, { backgroundColor: colors.surfaceMuted }]}>
         <View style={[styles.barFill, { backgroundColor: colors.primary }]} />
       </View>
       <View style={styles.xpNote}>
         <Check size={iconSize.xs} color={colors.successText} />
-        <Text variant="caption" style={{ color: colors.successText }}>Опыт только за честные ответы</Text>
+        <Text variant="caption" style={{ color: colors.successText }}>
+          Опыт только за честные ответы
+        </Text>
       </View>
     </View>
   );

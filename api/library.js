@@ -92,17 +92,21 @@ export default async function handler(req, res) {
       if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
       return res.status(200).json({ canPublish: await isAdmin(sql, userId) });
     }
-    if (action === 'like')            return await toggleLike(req, res, sql);
-    if (action === 'rate')            return await rateSet(req, res, sql);
-    if (action === 'report')          return await reportSet(req, res, sql);
-    if (action === 'import')          return await importSet(req, res, sql);
-    if (action === 'cards')           return await getLibraryCards(req, res, sql, id);
+    if (action === 'like') return await toggleLike(req, res, sql);
+    if (action === 'rate') return await rateSet(req, res, sql);
+    if (action === 'report') return await reportSet(req, res, sql);
+    if (action === 'import') return await importSet(req, res, sql);
+    if (action === 'cards') return await getLibraryCards(req, res, sql, id);
     if (action === 'publish') {
       switch (req.method) {
-        case 'POST':   return await publishSet(req, res, sql);
-        case 'PUT':    return await updatePublication(req, res, sql);
-        case 'DELETE': return await unpublishSet(req, res, sql);
-        default:       return res.status(405).json({ error: 'Method not allowed' });
+        case 'POST':
+          return await publishSet(req, res, sql);
+        case 'PUT':
+          return await updatePublication(req, res, sql);
+        case 'DELETE':
+          return await unpublishSet(req, res, sql);
+        default:
+          return res.status(405).json({ error: 'Method not allowed' });
       }
     }
 
@@ -177,13 +181,17 @@ async function getLibrarySets(req, res, sql) {
   }
 
   if (cardsMin) {
-    conditions.push(`(SELECT COUNT(*) FROM library_cards lc WHERE lc.library_set_id = ls.id) >= $${paramIndex}`);
+    conditions.push(
+      `(SELECT COUNT(*) FROM library_cards lc WHERE lc.library_set_id = ls.id) >= $${paramIndex}`
+    );
     params.push(parseInt(cardsMin, 10));
     paramIndex++;
   }
 
   if (cardsMax) {
-    conditions.push(`(SELECT COUNT(*) FROM library_cards lc WHERE lc.library_set_id = ls.id) <= $${paramIndex}`);
+    conditions.push(
+      `(SELECT COUNT(*) FROM library_cards lc WHERE lc.library_set_id = ls.id) <= $${paramIndex}`
+    );
     params.push(parseInt(cardsMax, 10));
     paramIndex++;
   }
@@ -198,7 +206,8 @@ async function getLibrarySets(req, res, sql) {
   let orderBy;
   switch (sort) {
     case 'top_rated':
-      orderBy = 'CASE WHEN ls.rating_count > 0 THEN ls.rating_sum::float / ls.rating_count ELSE 0 END DESC, ls.rating_count DESC';
+      orderBy =
+        'CASE WHEN ls.rating_count > 0 THEN ls.rating_sum::float / ls.rating_count ELSE 0 END DESC, ls.rating_count DESC';
       break;
     case 'newest':
       orderBy = 'ls.published_at DESC';
@@ -269,7 +278,8 @@ async function getSetDetail(req, res, sql, id, userId) {
     importedSelect = `, false AS is_imported, false AS is_liked, NULL::smallint AS user_rating`;
   }
 
-  const setRows = await sql.query(`
+  const setRows = await sql.query(
+    `
     SELECT ls.*,
       '${TEAM_AUTHOR_NAME}' AS author_name,
       CASE WHEN ls.rating_count > 0 THEN ROUND(ls.rating_sum::numeric / ls.rating_count, 1) ELSE NULL END AS average_rating,
@@ -278,19 +288,24 @@ async function getSetDetail(req, res, sql, id, userId) {
     FROM library_sets ls
     LEFT JOIN users u ON u.id = ls.user_id
     WHERE ls.id = $1 AND ls.status = 'published' AND ${ADMIN_AUTHOR}
-  `, params);
+  `,
+    params
+  );
 
   if (setRows.length === 0) {
     return res.status(404).json({ error: 'Set not found' });
   }
 
   // Get preview cards (first 10)
-  const cards = await sql.query(`
+  const cards = await sql.query(
+    `
     SELECT * FROM library_cards
     WHERE library_set_id = $1
     ORDER BY order_index ASC
     LIMIT 10
-  `, [id]);
+  `,
+    [id]
+  );
 
   const detail = { ...setRows[0], preview_cards: cards };
   return res.status(200).json(detail);
@@ -356,7 +371,8 @@ async function checkPublished(req, res, sql) {
 async function toggleLike(req, res, sql) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { userId, librarySetId } = req.body;
-  if (!userId || !librarySetId) return res.status(400).json({ error: 'userId and librarySetId are required' });
+  if (!userId || !librarySetId)
+    return res.status(400).json({ error: 'userId and librarySetId are required' });
 
   const existing = await sql`
     SELECT id FROM library_likes WHERE user_id = ${userId} AND library_set_id = ${librarySetId}
@@ -382,10 +398,12 @@ async function toggleLike(req, res, sql) {
 async function rateSet(req, res, sql) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { userId, librarySetId, rating } = req.body;
-  if (!userId || !librarySetId || !rating) return res.status(400).json({ error: 'userId, librarySetId, and rating are required' });
+  if (!userId || !librarySetId || !rating)
+    return res.status(400).json({ error: 'userId, librarySetId, and rating are required' });
 
   const ratingNum = parseInt(rating, 10);
-  if (!(ratingNum >= 1 && ratingNum <= 5)) return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+  if (!(ratingNum >= 1 && ratingNum <= 5))
+    return res.status(400).json({ error: 'Rating must be between 1 and 5' });
 
   const existing = await sql`
     SELECT id, rating FROM library_ratings
@@ -401,9 +419,11 @@ async function rateSet(req, res, sql) {
     await sql`UPDATE library_sets SET rating_sum = rating_sum + ${ratingNum}, rating_count = rating_count + 1 WHERE id = ${librarySetId}`;
   }
 
-  const updated = await sql`SELECT rating_sum, rating_count FROM library_sets WHERE id = ${librarySetId}`;
+  const updated =
+    await sql`SELECT rating_sum, rating_count FROM library_sets WHERE id = ${librarySetId}`;
   const { rating_sum, rating_count } = updated[0];
-  const average_rating = rating_count > 0 ? Math.round((rating_sum / rating_count) * 10) / 10 : null;
+  const average_rating =
+    rating_count > 0 ? Math.round((rating_sum / rating_count) * 10) / 10 : null;
   return res.status(200).json({ user_rating: ratingNum, average_rating, rating_count });
 }
 
@@ -411,7 +431,8 @@ async function rateSet(req, res, sql) {
 async function reportSet(req, res, sql) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { userId, librarySetId, reason } = req.body;
-  if (!userId || !librarySetId) return res.status(400).json({ error: 'userId and librarySetId are required' });
+  if (!userId || !librarySetId)
+    return res.status(400).json({ error: 'userId and librarySetId are required' });
 
   await sql`INSERT INTO library_reports (user_id, library_set_id, reason) VALUES (${userId}, ${librarySetId}, ${reason || null})`;
   return res.status(201).json({ success: true });
@@ -428,11 +449,13 @@ async function importSet(req, res, sql) {
 
   // Набор можно положить только в свой курс (не в курс, где пользователь ученик).
   if (courseId) {
-    const course = await sql`SELECT id FROM courses WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid`;
+    const course =
+      await sql`SELECT id FROM courses WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid`;
     if (course.length === 0) return res.status(403).json({ error: 'Not the owner of the course' });
   }
 
-  const existingImport = await sql`SELECT id FROM library_imports WHERE user_id = ${userId} AND library_set_id = ${librarySetId}`;
+  const existingImport =
+    await sql`SELECT id FROM library_imports WHERE user_id = ${userId} AND library_set_id = ${librarySetId}`;
   if (existingImport.length > 0) return res.status(400).json({ error: 'Set already imported' });
 
   const libSet = await sql`
@@ -468,7 +491,9 @@ async function importSet(req, res, sql) {
     SELECT (SELECT id FROM new_set) AS id, (SELECT COUNT(*) FROM copied) AS cards
   `;
 
-  return res.status(201).json({ newSetId: created[0].id, courseId, cardsCopied: Number(created[0].cards) || 0 });
+  return res
+    .status(201)
+    .json({ newSetId: created[0].id, courseId, cardsCopied: Number(created[0].cards) || 0 });
 }
 
 async function publishSet(req, res, sql) {
@@ -476,13 +501,16 @@ async function publishSet(req, res, sql) {
   if (!userId || !setId) return res.status(400).json({ error: 'userId and setId are required' });
 
   const setRows = await sql`SELECT * FROM card_sets WHERE id = ${setId} AND user_id = ${userId}`;
-  if (setRows.length === 0) return res.status(404).json({ error: 'Set not found or access denied' });
+  if (setRows.length === 0)
+    return res.status(404).json({ error: 'Set not found or access denied' });
   const cardSet = setRows[0];
 
   const cardCount = await sql`SELECT COUNT(*) as cnt FROM cards WHERE set_id = ${setId}`;
-  if (parseInt(cardCount[0].cnt, 10) < 5) return res.status(400).json({ error: 'At least 5 cards are required to publish' });
+  if (parseInt(cardCount[0].cnt, 10) < 5)
+    return res.status(400).json({ error: 'At least 5 cards are required to publish' });
 
-  const existing = await sql`SELECT id FROM library_sets WHERE original_set_id = ${setId} AND status = 'published'`;
+  const existing =
+    await sql`SELECT id FROM library_sets WHERE original_set_id = ${setId} AND status = 'published'`;
   if (existing.length > 0) return res.status(400).json({ error: 'Set is already published' });
 
   const libSet = await sql`
@@ -496,11 +524,23 @@ async function publishSet(req, res, sql) {
   `;
   const librarySetId = libSet[0].id;
 
-  const cards = await sql`SELECT front, back, example FROM cards WHERE set_id = ${setId} ORDER BY created_at ASC`;
+  const cards =
+    await sql`SELECT front, back, example FROM cards WHERE set_id = ${setId} ORDER BY created_at ASC`;
   if (cards.length > 0) {
-    const placeholders = cards.map((_, i) => `($${i * 5 + 1}, $${i * 5 + 2}, $${i * 5 + 3}, $${i * 5 + 4}, $${i * 5 + 5})`).join(', ');
-    const params = cards.flatMap((card, i) => [librarySetId, card.front, card.back, card.example || null, i]);
-    await sql.query(`INSERT INTO library_cards (library_set_id, front, back, hint, order_index) VALUES ${placeholders}`, params);
+    const placeholders = cards
+      .map((_, i) => `($${i * 5 + 1}, $${i * 5 + 2}, $${i * 5 + 3}, $${i * 5 + 4}, $${i * 5 + 5})`)
+      .join(', ');
+    const params = cards.flatMap((card, i) => [
+      librarySetId,
+      card.front,
+      card.back,
+      card.example || null,
+      i,
+    ]);
+    await sql.query(
+      `INSERT INTO library_cards (library_set_id, front, back, hint, order_index) VALUES ${placeholders}`,
+      params
+    );
   }
 
   return res.status(201).json({ librarySetId });
@@ -508,10 +548,13 @@ async function publishSet(req, res, sql) {
 
 async function updatePublication(req, res, sql) {
   const { userId, librarySetId, description, category, coverEmoji } = req.body;
-  if (!userId || !librarySetId) return res.status(400).json({ error: 'userId and librarySetId are required' });
+  if (!userId || !librarySetId)
+    return res.status(400).json({ error: 'userId and librarySetId are required' });
 
-  const libSet = await sql`SELECT * FROM library_sets WHERE id = ${librarySetId} AND user_id = ${userId} AND status = 'published'`;
-  if (libSet.length === 0) return res.status(404).json({ error: 'Publication not found or access denied' });
+  const libSet =
+    await sql`SELECT * FROM library_sets WHERE id = ${librarySetId} AND user_id = ${userId} AND status = 'published'`;
+  if (libSet.length === 0)
+    return res.status(404).json({ error: 'Publication not found or access denied' });
 
   const originalSetId = libSet[0].original_set_id;
   if (!originalSetId) return res.status(400).json({ error: 'Original set reference is missing' });
@@ -522,15 +565,28 @@ async function updatePublication(req, res, sql) {
   const cardSet = setRows[0];
 
   const cardCount = await sql`SELECT COUNT(*) as cnt FROM cards WHERE set_id = ${originalSetId}`;
-  if (parseInt(cardCount[0].cnt, 10) < 5) return res.status(400).json({ error: 'Original set must have at least 5 cards' });
+  if (parseInt(cardCount[0].cnt, 10) < 5)
+    return res.status(400).json({ error: 'Original set must have at least 5 cards' });
 
   await sql`DELETE FROM library_cards WHERE library_set_id = ${librarySetId}`;
 
-  const cards = await sql`SELECT front, back, example FROM cards WHERE set_id = ${originalSetId} ORDER BY created_at ASC`;
+  const cards =
+    await sql`SELECT front, back, example FROM cards WHERE set_id = ${originalSetId} ORDER BY created_at ASC`;
   if (cards.length > 0) {
-    const placeholders = cards.map((_, i) => `($${i * 5 + 1}, $${i * 5 + 2}, $${i * 5 + 3}, $${i * 5 + 4}, $${i * 5 + 5})`).join(', ');
-    const params = cards.flatMap((card, i) => [librarySetId, card.front, card.back, card.example || null, i]);
-    await sql.query(`INSERT INTO library_cards (library_set_id, front, back, hint, order_index) VALUES ${placeholders}`, params);
+    const placeholders = cards
+      .map((_, i) => `($${i * 5 + 1}, $${i * 5 + 2}, $${i * 5 + 3}, $${i * 5 + 4}, $${i * 5 + 5})`)
+      .join(', ');
+    const params = cards.flatMap((card, i) => [
+      librarySetId,
+      card.front,
+      card.back,
+      card.example || null,
+      i,
+    ]);
+    await sql.query(
+      `INSERT INTO library_cards (library_set_id, front, back, hint, order_index) VALUES ${placeholders}`,
+      params
+    );
   }
 
   // Update metadata from original set
@@ -552,13 +608,15 @@ async function updatePublication(req, res, sql) {
 
 async function unpublishSet(req, res, sql) {
   const { userId, librarySetId } = req.body;
-  if (!userId || !librarySetId) return res.status(400).json({ error: 'userId and librarySetId are required' });
+  if (!userId || !librarySetId)
+    return res.status(400).json({ error: 'userId and librarySetId are required' });
 
   const result = await sql`
     UPDATE library_sets SET status = 'archived'
     WHERE id = ${librarySetId} AND user_id = ${userId} AND status = 'published'
     RETURNING id
   `;
-  if (result.length === 0) return res.status(404).json({ error: 'Publication not found or access denied' });
+  if (result.length === 0)
+    return res.status(404).json({ error: 'Publication not found or access denied' });
   return res.status(200).json({ success: true });
 }

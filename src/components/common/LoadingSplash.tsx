@@ -22,10 +22,19 @@ export function LoadingSplash() {
         <Text variant="h1" align="center" style={[styles.title, { color: palette.textPrimary }]}>
           Flashly
         </Text>
-        <Text variant="bodyLarge" align="center" style={[styles.subtitle, { color: palette.textSecondary }]}>
+        <Text
+          variant="bodyLarge"
+          align="center"
+          style={[styles.subtitle, { color: palette.textSecondary }]}
+        >
           Учись умнее. Запоминай надолго.
         </Text>
-        <ActivityIndicator size="large" color={palette.primary} accessibilityLabel="Загрузка" style={styles.spinner} />
+        <ActivityIndicator
+          size="large"
+          color={palette.primary}
+          accessibilityLabel="Загрузка"
+          style={styles.spinner}
+        />
       </View>
     </View>
   );

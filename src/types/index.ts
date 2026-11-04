@@ -31,8 +31,8 @@ export type CardStatus = 'new' | 'learning' | 'relearning' | 'young' | 'mature';
  */
 export interface Card {
   id: string;
- setId: string;
-  
+  setId: string;
+
   // Контент
   frontText: string;
   backText: string;
@@ -47,13 +47,13 @@ export interface Card {
   backImage?: string;
   frontAudio?: string;
   backAudio?: string;
-  
+
   // Метаданные
   createdAt: number; // timestamp
   updatedAt: number;
-  
+
   // SRS данные (упрощенная система)
-  learningStep: number;   // Текущий шаг обучения (0, 1, 2, 3...)
+  learningStep: number; // Текущий шаг обучения (0, 1, 2, 3...)
   nextReviewDate: number; // Timestamp следующего повторения
   lastReviewDate: number; // Timestamp последнего повторения
   status: CardStatus;
@@ -97,7 +97,7 @@ export interface UpdateCardInput {
 /**
  * Категория набора карточек
  */
-export type SetCategory = 
+export type SetCategory =
   | 'general'
   | 'travel'
   | 'food'
@@ -142,7 +142,7 @@ export interface CardSet {
   id: string;
   userId: string;
   courseId?: string | null; // ID курса, к которому принадлежит набор (null = глобальный)
-  
+
   // Основная информация
   title: string;
   description?: string;
@@ -151,23 +151,23 @@ export interface CardSet {
   icon?: string; // Emoji или имя иконки
   color?: string; // Цвет набора
   languageFrom?: string; // Язык лицевой стороны
-  languageTo?: string;   // Язык оборотной стороны
-  kind?: SetKind;        // Тип набора; нет — язык (isSubjectSet в src/utils/setKind.ts)
-  
+  languageTo?: string; // Язык оборотной стороны
+  kind?: SetKind; // Тип набора; нет — язык (isSubjectSet в src/utils/setKind.ts)
+
   // Метаданные
   createdAt: number;
   updatedAt: number;
   lastStudiedAt?: number;
-  
+
   // Статистика (кешированные значения для быстрого отображения)
   cardCount: number;
-  newCount: number;      // Новые карточки
+  newCount: number; // Новые карточки
   learningCount: number; // В процессе изучения (шаги 1–2)
-  youngCount?: number;   // Знаю (шаги 3–4); нет — набор пришёл с сервера без разбивки
-  matureCount?: number;  // Выучено надолго (шаг 5+)
-  reviewCount: number;   // На повторении сегодня
+  youngCount?: number; // Знаю (шаги 3–4); нет — набор пришёл с сервера без разбивки
+  matureCount?: number; // Выучено надолго (шаг 5+)
+  reviewCount: number; // На повторении сегодня
   masteredCount: number; // Выученные
-  
+
   // Флаги
   isPublic: boolean;
   isFavorite: boolean;
@@ -234,11 +234,11 @@ export interface ReviewLog {
   cardId: string;
   setId: string;
   userId: string;
-  
+
   rating: Rating;
   reviewDate: number;
   timeTaken: number; // Время на ответ в миллисекундах
-  
+
   // Состояние до и после
   previousLearningStep: number;
   newLearningStep: number;
@@ -268,15 +268,15 @@ export type StudyMode = 'classic' | 'quiz' | 'write' | 'audio';
 export interface StudySessionConfig {
   setId: string;
   mode: StudyMode;
-  
+
   // Лимиты
-  newCardsLimit: number;      // Макс новых карточек
-  reviewCardsLimit: number;   // Макс карточек на повторение
-  
+  newCardsLimit: number; // Макс новых карточек
+  reviewCardsLimit: number; // Макс карточек на повторение
+
   // Порядок
   shuffleCards: boolean;
   prioritizeOverdue: boolean;
-  
+
   // Таймер
   showTimer: boolean;
   timeLimit?: number; // В секундах
@@ -290,17 +290,17 @@ export interface StudySession {
   setId: string;
   mode: StudyMode;
   startedAt: number;
-  
+
   // Очередь карточек
-  queue: string[];        // ID карточек в очереди
+  queue: string[]; // ID карточек в очереди
   currentIndex: number;
-  
+
   // Статистика сессии
   totalCards: number;
   completedCards: number;
   correctAnswers: number;
   incorrectAnswers: number;
-  
+
   // Временные метрики
   totalTimeSpent: number;
   averageTimePerCard: number;
@@ -316,10 +316,10 @@ export interface User {
   email: string;
   displayName?: string;
   avatarUrl?: string;
-  
+
   createdAt: number;
   lastLoginAt: number;
-  
+
   // Подписка
   isPremium: boolean;
   premiumExpiresAt?: number;
@@ -350,11 +350,11 @@ export interface UserSettings {
   // Уведомления
   reminderEnabled: boolean;
   reminderTime?: string; // HH:mm
-  
+
   // Внешний вид
   theme: ThemeMode;
   language: 'ru' | 'en';
-  
+
   // Звук
   soundEnabled: boolean;
   hapticEnabled: boolean;
@@ -372,17 +372,17 @@ export interface UserSettings {
  */
 export interface DailyStats {
   date: string; // YYYY-MM-DD
-  
+
   cardsStudied: number;
   cardsNew: number;
   cardsReviewed: number;
-  
+
   correctAnswers: number;
   incorrectAnswers: number;
   accuracy: number; // 0-100
-  
+
   timeSpent: number; // В секундах
-  streak: number;    // Текущий streak на эту дату
+  streak: number; // Текущий streak на эту дату
 }
 
 /**
@@ -392,13 +392,13 @@ export interface UserStats {
   totalCards: number;
   totalSets: number;
   totalReviews: number;
-  
+
   currentStreak: number;
   longestStreak: number;
-  
+
   averageAccuracy: number;
   totalTimeSpent: number;
-  
+
   // По дням (последние 30 дней)
   dailyStats: DailyStats[];
 }

@@ -50,13 +50,18 @@ export function CourseScheduleSheet({ visible, courseId, onClose }: Props) {
       .finally(() => setLoading(false));
   }, [visible, courseId]);
 
-  const toggleDay = (day: string) => setDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
-  const shift = (delta: number) => setMinutes((m) => Math.min(MAX_MINUTES, Math.max(MIN_MINUTES, m + delta)));
+  const toggleDay = (day: string) =>
+    setDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
+  const shift = (delta: number) =>
+    setMinutes((m) => Math.min(MAX_MINUTES, Math.max(MIN_MINUTES, m + delta)));
 
   const handleSave = async () => {
     if (saving) return;
     setSaving(true);
-    const ok = await NeonService.setCourseSchedule(courseId, days.map((day) => ({ day, time: toTime(minutes) })));
+    const ok = await NeonService.setCourseSchedule(
+      courseId,
+      days.map((day) => ({ day, time: toTime(minutes) }))
+    );
     setSaving(false);
     if (ok) {
       toast.success(days.length ? 'Расписание сохранено' : 'Расписание убрано');
@@ -71,7 +76,14 @@ export function CourseScheduleSheet({ visible, courseId, onClose }: Props) {
       visible={visible}
       onClose={onClose}
       title="Расписание занятий"
-      footer={<Button title={saving ? 'Сохранение…' : 'Сохранить'} onPress={handleSave} disabled={saving || loading} fullWidth />}
+      footer={
+        <Button
+          title={saving ? 'Сохранение…' : 'Сохранить'}
+          onPress={handleSave}
+          disabled={saving || loading}
+          fullWidth
+        />
+      }
     >
       {loading ? (
         <View style={st.loading}>
@@ -82,21 +94,48 @@ export function CourseScheduleSheet({ visible, courseId, onClose }: Props) {
           <Text variant="body" color="secondary">
             За 1–2 часа до занятия ученики получат напоминание повторить слова курса.
           </Text>
-          <Text variant="label" color="secondary">Дни занятий</Text>
+          <Text variant="label" color="secondary">
+            Дни занятий
+          </Text>
           <View style={st.days}>
             {WEEK_DAYS.map((d) => (
-              <Chip key={d.key} label={d.label} selected={days.includes(d.key)} onPress={() => toggleDay(d.key)} />
+              <Chip
+                key={d.key}
+                label={d.label}
+                selected={days.includes(d.key)}
+                onPress={() => toggleDay(d.key)}
+              />
             ))}
           </View>
-          <Text variant="label" color="secondary">Начало занятия</Text>
+          <Text variant="label" color="secondary">
+            Начало занятия
+          </Text>
           <View style={st.timeRow}>
-            <Button variant="icon" icon={ChevronDown} background="none" accessibilityLabel="Раньше на 15 минут" onPress={() => shift(-STEP_MIN)} />
-            <Text variant="h2" accessibilityLabel={`Начало в ${toTime(minutes)}`} style={{ color: colors.textPrimary }}>
+            <Button
+              variant="icon"
+              icon={ChevronDown}
+              background="none"
+              accessibilityLabel="Раньше на 15 минут"
+              onPress={() => shift(-STEP_MIN)}
+            />
+            <Text
+              variant="h2"
+              accessibilityLabel={`Начало в ${toTime(minutes)}`}
+              style={{ color: colors.textPrimary }}
+            >
               {toTime(minutes)}
             </Text>
-            <Button variant="icon" icon={ChevronUp} background="none" accessibilityLabel="Позже на 15 минут" onPress={() => shift(STEP_MIN)} />
+            <Button
+              variant="icon"
+              icon={ChevronUp}
+              background="none"
+              accessibilityLabel="Позже на 15 минут"
+              onPress={() => shift(STEP_MIN)}
+            />
           </View>
-          <Text variant="caption" color="secondary">Время — по часовому поясу курса</Text>
+          <Text variant="caption" color="secondary">
+            Время — по часовому поясу курса
+          </Text>
         </View>
       )}
     </Sheet>

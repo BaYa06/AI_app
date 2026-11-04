@@ -146,16 +146,28 @@ export function SignInScreen({ onBack, onCreateAccount }: Props) {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView
+        style={styles.screen}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         {/* Top app bar */}
         <ScreenHeader onBack={onBack} />
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.headerText}>
-            <Text variant="h1" align="center" accessibilityRole="header" style={{ color: colors.textPrimary }}>
+            <Text
+              variant="h1"
+              align="center"
+              accessibilityRole="header"
+              style={{ color: colors.textPrimary }}
+            >
               С возвращением
             </Text>
-            <Text variant="body" align="center" style={[styles.subheader, { color: colors.textSecondary }]}>
+            <Text
+              variant="body"
+              align="center"
+              style={[styles.subheader, { color: colors.textSecondary }]}
+            >
               Войди, чтобы продолжить обучение в Flashly
             </Text>
           </View>
@@ -169,14 +181,21 @@ export function SignInScreen({ onBack, onCreateAccount }: Props) {
               disabled={isLoading}
             />
             {error && (
-              <Text variant="bodySmall" align="center" accessibilityRole="alert" style={{ color: colors.errorText }}>
+              <Text
+                variant="bodySmall"
+                align="center"
+                accessibilityRole="alert"
+                style={{ color: colors.errorText }}
+              >
                 {error}
               </Text>
             )}
             {/* Guest login */}
             <View style={styles.dividerRow}>
               <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-              <Text variant="bodySmall" style={{ color: colors.textTertiary }}>или</Text>
+              <Text variant="bodySmall" style={{ color: colors.textTertiary }}>
+                или
+              </Text>
               <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
             </View>
             <Button

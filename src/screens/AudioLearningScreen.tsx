@@ -3,15 +3,7 @@
  * @description Экран режима Audio Tap - произнеси перевод слова за 5 секунд
  */
 import React, { useCallback, useState, useEffect, useMemo, useRef } from 'react';
-import {
-  View,
-  StyleSheet,
-  Pressable,
-  Dimensions,
-  Vibration,
-  Animated,
-  Modal,
-} from 'react-native';
+import { View, StyleSheet, Pressable, Dimensions, Vibration, Animated, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Settings, Mic, Check, X, AudioLines } from 'lucide-react-native';
 import { useThemeColors, useSettingsStore, useCardsStore, useSetsStore } from '@/store';
@@ -51,7 +43,16 @@ type SessionState = 'idle' | 'listening' | 'correct' | 'incorrect';
 type Props = RootStackScreenProps<'AudioLearning'>;
 
 export function AudioLearningScreen({ navigation, route }: Props) {
-  const { setId, cardLimit, dueCardIds, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0, phaseFailedIds } = route.params;
+  const {
+    setId,
+    cardLimit,
+    dueCardIds,
+    phaseId,
+    totalPhaseCards,
+    studiedInPhase = 0,
+    phaseOffset = 0,
+    phaseFailedIds,
+  } = route.params;
   const colors = useThemeColors();
 
   // Store
@@ -69,7 +70,9 @@ export function AudioLearningScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
 
   // Phase refs
-  const currentPhaseId = useRef(phaseId || `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+  const currentPhaseId = useRef(
+    phaseId || `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  );
   const currentTotalPhaseCards = useRef(totalPhaseCards || 0);
   const sessionStartTime = useRef(Date.now());
 
@@ -102,7 +105,7 @@ export function AudioLearningScreen({ navigation, route }: Props) {
       allCards = dueCardIds.map((id) => state.cards[id]).filter(Boolean) as Card[];
     } else {
       const now = Date.now();
-      allCards = getCardsBySet(setId).filter(c => c.nextReviewDate <= now);
+      allCards = getCardsBySet(setId).filter((c) => c.nextReviewDate <= now);
     }
 
     if (phaseId) {
@@ -114,8 +117,8 @@ export function AudioLearningScreen({ navigation, route }: Props) {
         .filter((c): c is Card => Boolean(c));
 
       const remaining = phaseOffset > 0 ? allCards.slice(phaseOffset) : allCards;
-      const pendingIdsSet = new Set(pendingCards.map(c => c.id));
-      const filteredRemaining = remaining.filter(c => !pendingIdsSet.has(c.id));
+      const pendingIdsSet = new Set(pendingCards.map((c) => c.id));
+      const filteredRemaining = remaining.filter((c) => !pendingIdsSet.has(c.id));
 
       const map = new Map<string, Card>();
       [...pendingCards, ...filteredRemaining].forEach((card) => {
@@ -178,8 +181,8 @@ export function AudioLearningScreen({ navigation, route }: Props) {
       learnedCards,
       timeSpent,
       errors: errors.length,
-      errorCards: errors.map(id => {
-        const card = cards.find(c => c.id === id);
+      errorCards: errors.map((id) => {
+        const card = cards.find((c) => c.id === id);
         return {
           id,
           front: card?.frontText || '',
@@ -197,80 +200,56 @@ export function AudioLearningScreen({ navigation, route }: Props) {
       phaseOffset: phaseOffset + newCardsInBatch,
       phaseFailedIds: errors,
     });
-  }, [cards, navigation, setId, cardLimit, dueCardIds, studiedInPhase, phaseOffset, phaseFailedIds]);
+  }, [
+    cards,
+    navigation,
+    setId,
+    cardLimit,
+    dueCardIds,
+    studiedInPhase,
+    phaseOffset,
+    phaseFailedIds,
+  ]);
 
   // Process one card then auto-continue (mic stays on between cards)
-  const processCard = useCallback(async (idx: number, technicalRetries = 0) => {
-    if (!isRunningRef.current) return;
+  const processCard = useCallback(
+    async (idx: number, technicalRetries = 0) => {
+      if (!isRunningRef.current) return;
 
-    const card = cards[idx];
-    if (!card) return;
+      const card = cards[idx];
+      if (!card) return;
 
-    const isReversed = reverseRef.current;
-    const expectedAnswer = isReversed ? (card.frontText || '') : (card.backText || '');
+      const isReversed = reverseRef.current;
+      const expectedAnswer = isReversed ? card.frontText || '' : card.backText || '';
 
-    // Skip empty cards
-    if (!expectedAnswer.trim()) {
-      if (idx < cards.length - 1) {
-        const next = idx + 1;
-        currentIndexRef.current = next;
-        setCurrentIndex(next);
-        setTimeout(() => processCard(next), 100);
-      } else {
-        finishSession();
-      }
-      return;
-    }
-
-    // Start listening for this card (mic is already running)
-    setSessionState('listening');
-    setPartialText('');
-    setRecognizedText('');
-    // Discard whatever the still-running native session already transcribed for previous
-    // cards, so this card's partial/final results only reflect speech said from now on.
-    resetContinuousBaseline();
-
-    // Wait for correct answer or "Не знаю" skip
-    const result = await new Promise<RecognitionResult>((resolve) => {
-      let settled = false;
-      let allAlternatives: string[] = [];
-
-      // Allow "Не знаю" button to resolve the promise
-      skipResolveRef.current = () => {
-        if (!settled) {
-          settled = true;
-          skipResolveRef.current = null;
-          setContinuousHandlers(null, null);
-          resolve({
-            recognized: false,
-            alternatives: allAlternatives,
-            isCorrect: false,
-            timedOut: false,
-          });
+      // Skip empty cards
+      if (!expectedAnswer.trim()) {
+        if (idx < cards.length - 1) {
+          const next = idx + 1;
+          currentIndexRef.current = next;
+          setCurrentIndex(next);
+          setTimeout(() => processCard(next), 100);
+        } else {
+          finishSession();
         }
-      };
+        return;
+      }
 
-      setContinuousHandlers(
-        (results) => {
-          allAlternatives = results;
-          if (isAnswerCorrect(results, expectedAnswer)) {
-            if (!settled) {
-              settled = true;
-              skipResolveRef.current = null;
-              setContinuousHandlers(null, null);
-              resolve({
-                recognized: true,
-                alternatives: results,
-                isCorrect: true,
-                timedOut: false,
-              });
-            }
-          }
-        },
-        (partial) => setPartialText(partial),
-        () => {
-          // Реальный сбой движка (не "не расслышал") — не должен засчитываться как
-          // неправильный ответ. См. план, пункт 51.
+      // Start listening for this card (mic is already running)
+      setSessionState('listening');
+      setPartialText('');
+      setRecognizedText('');
+      // Discard whatever the still-running native session already transcribed for previous
+      // cards, so this card's partial/final results only reflect speech said from now on.
+      resetContinuousBaseline();
+
+      // Wait for correct answer or "Не знаю" skip
+      const result = await new Promise<RecognitionResult>((resolve) => {
+        let settled = false;
+        let allAlternatives: string[] = [];
+
+        // Allow "Не знаю" button to resolve the promise
+        skipResolveRef.current = () => {
           if (!settled) {
             settled = true;
             skipResolveRef.current = null;
@@ -280,80 +259,119 @@ export function AudioLearningScreen({ navigation, route }: Props) {
               alternatives: allAlternatives,
               isCorrect: false,
               timedOut: false,
-              technicalError: true,
             });
           }
-        },
-      );
-    });
+        };
 
-    // Stopped while listening?
-    if (!isRunningRef.current) {
-      setSessionState('idle');
-      return;
-    }
+        setContinuousHandlers(
+          (results) => {
+            allAlternatives = results;
+            if (isAnswerCorrect(results, expectedAnswer)) {
+              if (!settled) {
+                settled = true;
+                skipResolveRef.current = null;
+                setContinuousHandlers(null, null);
+                resolve({
+                  recognized: true,
+                  alternatives: results,
+                  isCorrect: true,
+                  timedOut: false,
+                });
+              }
+            }
+          },
+          (partial) => setPartialText(partial),
+          () => {
+            // Реальный сбой движка (не "не расслышал") — не должен засчитываться как
+            // неправильный ответ. См. план, пункт 51.
+            if (!settled) {
+              settled = true;
+              skipResolveRef.current = null;
+              setContinuousHandlers(null, null);
+              resolve({
+                recognized: false,
+                alternatives: allAlternatives,
+                isCorrect: false,
+                timedOut: false,
+                technicalError: true,
+              });
+            }
+          }
+        );
+      });
 
-    const advance = () => {
-      if (idx < cards.length - 1) {
-        const next = idx + 1;
-        currentIndexRef.current = next;
-        setCurrentIndex(next);
-        setSessionState('listening');
-        setPartialText('');
-        setRecognizedText('');
-        setTimeout(() => processCard(next), 200);
-      } else {
-        finishSession();
+      // Stopped while listening?
+      if (!isRunningRef.current) {
+        setSessionState('idle');
+        return;
       }
-    };
 
-    // Технический сбой распознавания — не засчитываем как неправильный ответ, просто слушаем
-    // эту же карточку ещё раз (мик уже перезапускается автоматически). После нескольких сбоев
-    // подряд на одной карточке не блокируем сессию бесконечно — переходим дальше без штрафа.
-    // См. план, пункт 51.
-    if (result.technicalError) {
-      if (technicalRetries < 2) {
-        setTimeout(() => processCard(idx, technicalRetries + 1), 300);
-      } else {
-        advance();
+      const advance = () => {
+        if (idx < cards.length - 1) {
+          const next = idx + 1;
+          currentIndexRef.current = next;
+          setCurrentIndex(next);
+          setSessionState('listening');
+          setPartialText('');
+          setRecognizedText('');
+          setTimeout(() => processCard(next), 200);
+        } else {
+          finishSession();
+        }
+      };
+
+      // Технический сбой распознавания — не засчитываем как неправильный ответ, просто слушаем
+      // эту же карточку ещё раз (мик уже перезапускается автоматически). После нескольких сбоев
+      // подряд на одной карточке не блокируем сессию бесконечно — переходим дальше без штрафа.
+      // См. план, пункт 51.
+      if (result.technicalError) {
+        if (technicalRetries < 2) {
+          setTimeout(() => processCard(idx, technicalRetries + 1), 300);
+        } else {
+          advance();
+        }
+        return;
       }
-      return;
-    }
 
-    // Show result
-    setRecognizedText(result.alternatives[0] || '');
+      // Show result
+      setRecognizedText(result.alternatives[0] || '');
 
-    if (result.isCorrect) {
-      setSessionState('correct');
-      playCorrectSound();
-      if (useSettingsStore.getState().settings.hapticEnabled) Vibration.vibrate(20);
-    } else {
-      setSessionState('incorrect');
-      errorCardIdsRef.current = [...errorCardIdsRef.current, card.id];
-      setErrorCardIds([...errorCardIdsRef.current]);
-      if (useSettingsStore.getState().settings.hapticEnabled) Vibration.vibrate([0, 50, 50, 50]);
-    }
+      if (result.isCorrect) {
+        setSessionState('correct');
+        playCorrectSound();
+        if (useSettingsStore.getState().settings.hapticEnabled) Vibration.vibrate(20);
+      } else {
+        setSessionState('incorrect');
+        errorCardIdsRef.current = [...errorCardIdsRef.current, card.id];
+        setErrorCardIds([...errorCardIdsRef.current]);
+        if (useSettingsStore.getState().settings.hapticEnabled) Vibration.vibrate([0, 50, 50, 50]);
+      }
 
-    // Show result: 1s for correct, 2s for incorrect (to read the answer)
-    await new Promise(r => setTimeout(r, result.isCorrect ? 1000 : 2000));
+      // Show result: 1s for correct, 2s for incorrect (to read the answer)
+      await new Promise((r) => setTimeout(r, result.isCorrect ? 1000 : 2000));
 
-    if (!isRunningRef.current) {
-      setSessionState('idle');
-      return;
-    }
+      if (!isRunningRef.current) {
+        setSessionState('idle');
+        return;
+      }
 
-    advance();
-  }, [cards, finishSession]);
+      advance();
+    },
+    [cards, finishSession]
+  );
 
   // Compute the STT language based on current reverse state
-  const getAnswerLang = useCallback((isReversed: boolean) => {
-    // Normal: front=languageFrom is shown, user speaks answer in languageTo
-    // Reversed: back=languageTo is shown, user speaks answer in languageFrom
-    const lang = isReversed
-      ? (currentSet?.languageFrom || currentSet?.languageTo || 'en')
-      : (currentSet?.languageTo || currentSet?.languageFrom || 'en');
-    return normalizeLangForSTT(lang);
-  }, [currentSet]);
+  const getAnswerLang = useCallback(
+    (isReversed: boolean) => {
+      // Normal: front=languageFrom is shown, user speaks answer in languageTo
+      // Reversed: back=languageTo is shown, user speaks answer in languageFrom
+      const lang = isReversed
+        ? currentSet?.languageFrom || currentSet?.languageTo || 'en'
+        : currentSet?.languageTo || currentSet?.languageFrom || 'en';
+      return normalizeLangForSTT(lang);
+    },
+    [currentSet]
+  );
 
   const handleBack = useCallback(() => {
     isRunningRef.current = false;
@@ -367,7 +385,9 @@ export function AudioLearningScreen({ navigation, route }: Props) {
 
     const hasPermission = await requestMicrophonePermission();
     if (!hasPermission) {
-      toast.error('Нет доступа к микрофону. Разреши его в настройках телефона, чтобы заниматься в режиме «Аудио»');
+      toast.error(
+        'Нет доступа к микрофону. Разреши его в настройках телефона, чтобы заниматься в режиме «Аудио»'
+      );
       return;
     }
 
@@ -388,7 +408,9 @@ export function AudioLearningScreen({ navigation, route }: Props) {
       log.error('AudioLearning', 'Failed to start listening', e);
       isRunningRef.current = false;
       setIsRunning(false);
-      toast.error('Не удалось запустить микрофон. Разреши доступ в настройках устройства и попробуй снова');
+      toast.error(
+        'Не удалось запустить микрофон. Разреши доступ в настройках устройства и попробуй снова'
+      );
     }
   }, [processCard, getAnswerLang]);
 
@@ -417,7 +439,7 @@ export function AudioLearningScreen({ navigation, route }: Props) {
         Animated.sequence([
           Animated.timing(pulseAnim, { toValue: 0.4, duration: 800, useNativeDriver: true }),
           Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
-        ]),
+        ])
       );
       animation.start();
       return () => animation.stop();
@@ -446,25 +468,28 @@ export function AudioLearningScreen({ navigation, route }: Props) {
     ]).start(() => setIsSettingsOpen(false));
   }, [backdropOpacity, sheetTranslate]);
 
-  const handleToggleReverse = useCallback(async (value: boolean) => {
-    updateSettings({ reverseCards: value });
-    DatabaseService.saveSettings();
-    // If session is running, restart STT with the new answer language
-    if (isRunningRef.current) {
-      const newLang = getAnswerLang(value);
-      await stopContinuousListening();
-      await startContinuousListening(newLang);
-    }
-  }, [updateSettings, getAnswerLang]);
+  const handleToggleReverse = useCallback(
+    async (value: boolean) => {
+      updateSettings({ reverseCards: value });
+      DatabaseService.saveSettings();
+      // If session is running, restart STT with the new answer language
+      if (isRunningRef.current) {
+        const newLang = getAnswerLang(value);
+        await stopContinuousListening();
+        await startContinuousListening(newLang);
+      }
+    },
+    [updateSettings, getAnswerLang]
+  );
 
   // Reverse logic: swap question/answer
-  const questionText = reverseEnabled
-    ? (currentCard?.backText || '')
-    : (currentCard?.frontText || '');
-  const answerText = reverseEnabled
-    ? (currentCard?.frontText || '')
-    : (currentCard?.backText || '');
-  const answerReserve = spacing.s + 26 * 2 + spacing.xxs + estimateLines(answerText, 16, AUDIO_TEXT_WIDTH, 'regular') * 24;
+  const questionText = reverseEnabled ? currentCard?.backText || '' : currentCard?.frontText || '';
+  const answerText = reverseEnabled ? currentCard?.frontText || '' : currentCard?.backText || '';
+  const answerReserve =
+    spacing.s +
+    26 * 2 +
+    spacing.xxs +
+    estimateLines(answerText, 16, AUDIO_TEXT_WIDTH, 'regular') * 24;
   const questionFit = fitText(questionText, {
     width: AUDIO_TEXT_WIDTH,
     height: CARD_HEIGHT - 2 - spacing.xxs - answerReserve,
@@ -475,10 +500,14 @@ export function AudioLearningScreen({ navigation, route }: Props) {
   // Рамка карточки по состоянию: слушаем — warning, верно — success, неверно — error
   const cardBorderColor = useMemo(() => {
     switch (sessionState) {
-      case 'listening': return colors.warning;
-      case 'correct': return colors.success;
-      case 'incorrect': return colors.error;
-      default: return colors.border;
+      case 'listening':
+        return colors.warning;
+      case 'correct':
+        return colors.success;
+      case 'incorrect':
+        return colors.error;
+      default:
+        return colors.border;
     }
   }, [sessionState, colors]);
 
@@ -548,7 +577,6 @@ export function AudioLearningScreen({ navigation, route }: Props) {
       scroll={false}
       footer={bottomActions}
     >
-
       {/* Main Content Area */}
       <View style={styles.contentArea}>
         {/* Card Stack */}
@@ -558,7 +586,10 @@ export function AudioLearningScreen({ navigation, route }: Props) {
             style={[
               styles.cardBase,
               styles.cardThird,
-              { backgroundColor: alpha(colors.primary, 10), borderColor: alpha(colors.primary, 10) },
+              {
+                backgroundColor: alpha(colors.primary, 10),
+                borderColor: alpha(colors.primary, 10),
+              },
             ]}
           />
 
@@ -567,7 +598,10 @@ export function AudioLearningScreen({ navigation, route }: Props) {
             style={[
               styles.cardBase,
               styles.cardSecond,
-              { backgroundColor: alpha(colors.primary, 20), borderColor: alpha(colors.primary, 20) },
+              {
+                backgroundColor: alpha(colors.primary, 20),
+                borderColor: alpha(colors.primary, 20),
+              },
             ]}
           />
 
@@ -588,21 +622,36 @@ export function AudioLearningScreen({ navigation, route }: Props) {
               <Text
                 variant="h1"
                 numberOfLines={questionFit.numberOfLines}
-                style={[styles.cardWord, { color: colors.textPrimary, fontSize: questionFit.fontSize, lineHeight: questionFit.lineHeight }]}
+                style={[
+                  styles.cardWord,
+                  {
+                    color: colors.textPrimary,
+                    fontSize: questionFit.fontSize,
+                    lineHeight: questionFit.lineHeight,
+                  },
+                ]}
               >
                 {questionText}
               </Text>
 
               {/* Partial recognition text (during listening) */}
               {sessionState === 'listening' && partialText ? (
-                <Text variant="h3" align="center" style={[styles.partialText, { color: colors.textSecondary }]}>
+                <Text
+                  variant="h3"
+                  align="center"
+                  style={[styles.partialText, { color: colors.textSecondary }]}
+                >
                   {partialText}
                 </Text>
               ) : null}
 
               {/* Recognized text (after result) */}
               {sessionState === 'correct' && recognizedText ? (
-                <Text variant="bodyLarge" align="center" style={[styles.semibold, { color: colors.successText }]}>
+                <Text
+                  variant="bodyLarge"
+                  align="center"
+                  style={[styles.semibold, { color: colors.successText }]}
+                >
                   {recognizedText}
                 </Text>
               ) : null}
@@ -610,7 +659,11 @@ export function AudioLearningScreen({ navigation, route }: Props) {
               {sessionState === 'incorrect' ? (
                 <View style={styles.incorrectInfo}>
                   {recognizedText ? (
-                    <Text variant="bodyLarge" align="center" style={[styles.semibold, { color: colors.errorText }]}>
+                    <Text
+                      variant="bodyLarge"
+                      align="center"
+                      style={[styles.semibold, { color: colors.errorText }]}
+                    >
                       {recognizedText}
                     </Text>
                   ) : null}
@@ -622,7 +675,6 @@ export function AudioLearningScreen({ navigation, route }: Props) {
             </View>
           </View>
         </View>
-
       </View>
 
       {/* Settings Modal */}
@@ -634,10 +686,18 @@ export function AudioLearningScreen({ navigation, route }: Props) {
         onRequestClose={closeSettings}
       >
         <View style={styles.modalRoot}>
-          <Pressable accessibilityRole="button" style={styles.backdrop} onPress={closeSettings} accessibilityLabel="Закрыть настройки">
+          <Pressable
+            accessibilityRole="button"
+            style={styles.backdrop}
+            onPress={closeSettings}
+            accessibilityLabel="Закрыть настройки"
+          >
             <Animated.View
               pointerEvents="none"
-              style={[styles.backdropTint, { opacity: backdropOpacity, backgroundColor: colors.overlay }]}
+              style={[
+                styles.backdropTint,
+                { opacity: backdropOpacity, backgroundColor: colors.overlay },
+              ]}
             />
           </Pressable>
 
@@ -654,8 +714,14 @@ export function AudioLearningScreen({ navigation, route }: Props) {
             ]}
           >
             <View style={styles.settingsRow}>
-              <Text variant="body" style={[styles.semibold, { color: colors.textPrimary }]}>Реверс</Text>
-              <Switch value={reverseEnabled} onValueChange={handleToggleReverse} accessibilityLabel="Реверс" />
+              <Text variant="body" style={[styles.semibold, { color: colors.textPrimary }]}>
+                Реверс
+              </Text>
+              <Switch
+                value={reverseEnabled}
+                onValueChange={handleToggleReverse}
+                accessibilityLabel="Реверс"
+              />
             </View>
           </Animated.View>
         </View>

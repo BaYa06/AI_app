@@ -27,7 +27,8 @@ import { log } from './_log.js';
  */
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://yiwsmjbeirgomkrckoju.supabase.co';
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
+const SUPABASE_SERVICE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
 
 function getSupabase() {
@@ -70,21 +71,24 @@ export default async function handler(req, res) {
   const { action } = req.query;
 
   try {
-    if (action === 'create')       return await createTest(req, res, sql, userId);
-    if (action === 'join')         return await joinTest(req, res, sql, userId);
-    if (action === 'start')        return await startTest(req, res, sql, userId);
-    if (action === 'answer')       return await answerQuestion(req, res, sql, userId);
-    if (action === 'monitor')      return await monitorTest(req, res, sql, userId);
-    if (action === 'finish')       return await finishTest(req, res, sql, userId);
-    if (action === 'results')      return await getResults(req, res, sql, userId);
+    if (action === 'create') return await createTest(req, res, sql, userId);
+    if (action === 'join') return await joinTest(req, res, sql, userId);
+    if (action === 'start') return await startTest(req, res, sql, userId);
+    if (action === 'answer') return await answerQuestion(req, res, sql, userId);
+    if (action === 'monitor') return await monitorTest(req, res, sql, userId);
+    if (action === 'finish') return await finishTest(req, res, sql, userId);
+    if (action === 'results') return await getResults(req, res, sql, userId);
     if (action === 'get-question') return await getQuestion(req, res, sql, userId);
-    if (action === 'history')      return await getHistory(req, res, sql, userId);
-    if (action === 'away')         return await markAway(req, res, sql, userId);
-    if (action === 'back')         return await markBack(req, res, sql, userId);
-    if (action === 'leave')        return await leaveTest(req, res, sql, userId);
-    if (action === 'reinstate')    return await reinstateParticipant(req, res, sql, userId);
+    if (action === 'history') return await getHistory(req, res, sql, userId);
+    if (action === 'away') return await markAway(req, res, sql, userId);
+    if (action === 'back') return await markBack(req, res, sql, userId);
+    if (action === 'leave') return await leaveTest(req, res, sql, userId);
+    if (action === 'reinstate') return await reinstateParticipant(req, res, sql, userId);
 
-    return res.status(400).json({ error: 'Unknown action. Use: create, join, start, answer, monitor, finish, results, get-question, history, away, back, leave, reinstate' });
+    return res.status(400).json({
+      error:
+        'Unknown action. Use: create, join, start, answer, monitor, finish, results, get-question, history, away, back, leave, reinstate',
+    });
   } catch (error) {
     log.error('test', 'Test API error', error);
     return res.status(500).json({ error: error.message });
@@ -110,7 +114,9 @@ async function checkJoinRateLimit(sql, userId) {
   `;
   const windowSeconds = 60;
   const maxAttempts = 10;
-  const windowStart = new Date(Math.floor(Date.now() / (windowSeconds * 1000)) * windowSeconds * 1000).toISOString();
+  const windowStart = new Date(
+    Math.floor(Date.now() / (windowSeconds * 1000)) * windowSeconds * 1000
+  ).toISOString();
   const result = await sql`
     INSERT INTO api_rate_limits (user_id, action, window_start, attempts)
     VALUES (${userId}::uuid, 'live-test-code-guess', ${windowStart}::timestamptz, 1)
@@ -185,7 +191,8 @@ const NO_TIME_LIMIT_SEC_PER_QUESTION = 60; // консервативная оц�
 async function autoFinishIfStale(sql, sessionId, session) {
   if (session.status !== 'active' || !session.started_at) return session;
 
-  const perQuestion = session.time_per_question > 0 ? session.time_per_question : NO_TIME_LIMIT_SEC_PER_QUESTION;
+  const perQuestion =
+    session.time_per_question > 0 ? session.time_per_question : NO_TIME_LIMIT_SEC_PER_QUESTION;
   const maxDurationSec = perQuestion * session.question_count + AUTO_FINISH_MARGIN_SEC;
   const elapsedSec = (Date.now() - new Date(session.started_at).getTime()) / 1000;
   if (elapsedSec <= maxDurationSec) return session;
@@ -339,7 +346,12 @@ async function joinTest(req, res, sql, userId) {
     // завершается с причиной relaunch. Исключение — учитель разрешил продолжить
     // (rejoin_allowed, флаг одноразовый). Старых клиентов не трогаем: они не умеют показать
     // «Тест завершён» и открыли бы пустой экран вопроса.
-    if (session.exit_control && clientExitControl && session.status === 'active' && !ex.finished_at) {
+    if (
+      session.exit_control &&
+      clientExitControl &&
+      session.status === 'active' &&
+      !ex.finished_at
+    ) {
       if (ex.rejoin_allowed) {
         await sql`
           UPDATE test_participants SET rejoin_allowed = false, client_exit_control = true
@@ -380,7 +392,7 @@ async function joinTest(req, res, sql, userId) {
   }
 
   // Перемешать и выбрать нужное кол-во
-  const shuffled = shuffle(cards.map(c => c.id));
+  const shuffled = shuffle(cards.map((c) => c.id));
   const questionOrder = shuffled.slice(0, Math.min(session.question_count, shuffled.length));
 
   // Получить имя ученика
@@ -400,7 +412,12 @@ async function joinTest(req, res, sql, userId) {
   // (broadcast без контроля доступа), рассылка чужого participantId в открытом виде позволяла бы
   // слать ответы от чужого имени (см. план, пункт 36). participantId возвращается только в этом
   // прямом HTTP-ответе — только вызывающему ученику.
-  const initials = displayName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+  const initials = displayName
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
   await broadcast(session.id, 'student_joined', {
     userId,
     displayName,
@@ -499,7 +516,8 @@ async function answerQuestion(req, res, sql, userId) {
   }
 
   const correctAnswer = card[0].back;
-  const isCorrect = (chosenAnswer || '').trim().toLowerCase() === correctAnswer.trim().toLowerCase();
+  const isCorrect =
+    (chosenAnswer || '').trim().toLowerCase() === correctAnswer.trim().toLowerCase();
 
   // UNIQUE(participant_id, card_id) + ON CONFLICT DO NOTHING: повторная отправка того же
   // вопроса (например, retry после обрыва связи, см. план пункт 37) не создаёт вторую строку
@@ -560,10 +578,12 @@ async function answerQuestion(req, res, sql, userId) {
   // тем, что клиент уже получил, и не может быть использовано, чтобы задним числом изменить счёт.
   const resultRow = isFirstSubmission
     ? { is_correct: isCorrect, correct_answer: correctAnswer }
-    : (await sql`
+    : (
+        await sql`
         SELECT is_correct, correct_answer FROM test_answers
         WHERE participant_id = ${participantId}::uuid AND card_id = ${cardId}::uuid
-      `)[0];
+      `
+      )[0];
 
   return res.status(200).json({
     isCorrect: resultRow.is_correct,
@@ -642,8 +662,13 @@ async function monitorTest(req, res, sql, userId) {
     timePerQuestion: session[0].time_per_question,
     questionCount: session[0].question_count,
     exitControl,
-    participants: participants.map(p => {
-      const initials = (p.display_name || 'S').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    participants: participants.map((p) => {
+      const initials = (p.display_name || 'S')
+        .split(' ')
+        .map((w) => w[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2);
       return {
         userId: p.user_id,
         name: p.display_name,
@@ -654,12 +679,14 @@ async function monitorTest(req, res, sql, userId) {
         done: p.done,
         // Контроль выхода (plan/done/exam_lockdown.md) — только учителю: monitor доступен и
         // ученикам, а кто выходил из приложения, одноклассникам видеть незачем.
-        ...(isTeacher ? {
-          leftReason: p.left_reason || null,
-          awayCount: p.away_count || 0,
-          away: p.away,
-          clientExitControl: p.client_exit_control,
-        } : {}),
+        ...(isTeacher
+          ? {
+              leftReason: p.left_reason || null,
+              awayCount: p.away_count || 0,
+              away: p.away,
+              clientExitControl: p.client_exit_control,
+            }
+          : {}),
       };
     }),
   });
@@ -756,9 +783,10 @@ async function getResults(req, res, sql, userId) {
   `;
 
   // Средний score
-  const avgScore = participants.length > 0
-    ? Math.round(participants.reduce((sum, p) => sum + (p.score || 0), 0) / participants.length)
-    : 0;
+  const avgScore =
+    participants.length > 0
+      ? Math.round(participants.reduce((sum, p) => sum + (p.score || 0), 0) / participants.length)
+      : 0;
 
   // Самые сложные карточки
   const hardestCards = await sql`
@@ -780,7 +808,7 @@ async function getResults(req, res, sql, userId) {
     date: session[0].created_at,
     totalQuestions: session[0].question_count,
     avgScore,
-    participants: participants.map(p => ({
+    participants: participants.map((p) => ({
       name: p.display_name,
       initial: (p.display_name || '?')[0].toUpperCase(),
       score: p.score || 0,
@@ -793,7 +821,7 @@ async function getResults(req, res, sql, userId) {
       awayCount: p.away_count || 0,
       clientExitControl: p.client_exit_control,
     })),
-    hardestCards: hardestCards.map(c => ({
+    hardestCards: hardestCards.map((c) => ({
       word: c.word,
       hint: c.hint,
       missed: Number(c.missed),
@@ -854,10 +882,7 @@ async function getQuestion(req, res, sql, userId) {
   `;
 
   // Составить варианты: 1 правильный + до 3 неправильных
-  const options = shuffle([
-    card[0].back,
-    ...wrongOptions.map(w => w.back),
-  ]);
+  const options = shuffle([card[0].back, ...wrongOptions.map((w) => w.back)]);
 
   return res.status(200).json({
     cardId: card[0].id,
@@ -1030,7 +1055,11 @@ async function markAway(req, res, sql, userId) {
   `;
   if (rows.length > 0) {
     const reason = req.body.reason === 'split' ? 'split' : 'background';
-    await broadcast(p.session_id, 'student_away', { userId: p.user_id, displayName: p.display_name, reason });
+    await broadcast(p.session_id, 'student_away', {
+      userId: p.user_id,
+      displayName: p.display_name,
+      reason,
+    });
   }
   return res.status(200).json({ ok: true, tracked: true });
 }

@@ -60,7 +60,7 @@ interface OverlayProps {
 function useOverlayAnimation(
   visible: boolean,
   ready: boolean,
-  durations: { open: number; close: number },
+  durations: { open: number; close: number }
 ) {
   const [mounted, setMounted] = useState(visible);
   const progress = useRef(new Animated.Value(0)).current;
@@ -126,7 +126,11 @@ function OverlayHeader({
   if (!title && !headerRight) return null;
   return (
     <View style={[styles.header, !inset && styles.headerFlush]}>
-      <Text variant="h3" accessibilityRole="header" style={[styles.headerTitle, { color: colors.textPrimary }]}>
+      <Text
+        variant="h3"
+        accessibilityRole="header"
+        style={[styles.headerTitle, { color: colors.textPrimary }]}
+      >
         {title}
       </Text>
       {headerRight}
@@ -158,7 +162,11 @@ export function Sheet({
   // Лист уезжает на свою высоту, а не на высоту экрана: путь короче — движение ровнее.
   // Пока высота не измерена, лист стоит за экраном и анимация не стартует.
   const [sheetHeight, setSheetHeight] = useState(0);
-  const { mounted, progress, moving, openedCount } = useOverlayAnimation(visible, sheetHeight > 0, SHEET_DURATIONS);
+  const { mounted, progress, moving, openedCount } = useOverlayAnimation(
+    visible,
+    sheetHeight > 0,
+    SHEET_DURATIONS
+  );
   // Высота, измеренная, пока лист ехал: применяем, когда он остановится
   const pendingHeight = useRef(0);
 
@@ -166,18 +174,22 @@ export function Sheet({
     if (!mounted) setSheetHeight(0);
   }, [mounted]);
 
-  const handleLayout = useCallback((e: LayoutChangeEvent) => {
-    const next = Math.ceil(e.nativeEvent.layout.height) + (isGlassSupported ? GLASS_SHEET_INSET : 0);
-    // Путь анимации меняется только в покое: иначе лист перескакивает на ходу
-    setSheetHeight((prev) => {
-      if (Math.abs(prev - next) <= 1) return prev;
-      if (prev > 0 && moving.current) {
-        pendingHeight.current = next;
-        return prev;
-      }
-      return next;
-    });
-  }, [moving]);
+  const handleLayout = useCallback(
+    (e: LayoutChangeEvent) => {
+      const next =
+        Math.ceil(e.nativeEvent.layout.height) + (isGlassSupported ? GLASS_SHEET_INSET : 0);
+      // Путь анимации меняется только в покое: иначе лист перескакивает на ходу
+      setSheetHeight((prev) => {
+        if (Math.abs(prev - next) <= 1) return prev;
+        if (prev > 0 && moving.current) {
+          pendingHeight.current = next;
+          return prev;
+        }
+        return next;
+      });
+    },
+    [moving]
+  );
 
   useEffect(() => {
     if (!pendingHeight.current) return;
@@ -188,7 +200,7 @@ export function Sheet({
   // Один узел анимации на высоту: новый узел на каждой перерисовке дёргает лист на нативном драйвере
   const translateY = useMemo(
     () => progress.interpolate({ inputRange: [0, 1], outputRange: [sheetHeight || height, 0] }),
-    [progress, sheetHeight, height],
+    [progress, sheetHeight, height]
   );
 
   if (!mounted) return null;
@@ -199,9 +211,17 @@ export function Sheet({
 
   return (
     <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
-      <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView
+        style={styles.fill}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <View style={styles.sheetWrapper}>
-          <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: colors.overlay, opacity: progress }]}>
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: colors.overlay, opacity: progress },
+            ]}
+          >
             <Pressable
               style={styles.fill}
               onPress={dismissOnBackdrop ? onClose : undefined}
@@ -222,23 +242,34 @@ export function Sheet({
             ]}
           >
             {isGlassSupported ? (
-              <GlassView fallbackColor={colors.surface} cornerRadius={GLASS_SHEET_RADIUS} style={StyleSheet.absoluteFill} />
+              <GlassView
+                fallbackColor={colors.surface}
+                cornerRadius={GLASS_SHEET_RADIUS}
+                style={StyleSheet.absoluteFill}
+              />
             ) : null}
             <View style={[styles.handle, { backgroundColor: alpha(colors.textTertiary, 40) }]} />
             <OverlayHeader title={title} headerRight={headerRight} />
             {scroll ? (
               <ScrollView
                 style={styles.body}
-                contentContainerStyle={[styles.content, !footer && { paddingBottom: bottomPadding }]}
+                contentContainerStyle={[
+                  styles.content,
+                  !footer && { paddingBottom: bottomPadding },
+                ]}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
               >
                 {children}
               </ScrollView>
             ) : (
-              <View style={[styles.content, !footer && { paddingBottom: bottomPadding }]}>{children}</View>
+              <View style={[styles.content, !footer && { paddingBottom: bottomPadding }]}>
+                {children}
+              </View>
             )}
-            {footer ? <View style={[styles.footer, { paddingBottom: bottomPadding }]}>{footer}</View> : null}
+            {footer ? (
+              <View style={[styles.footer, { paddingBottom: bottomPadding }]}>{footer}</View>
+            ) : null}
           </Animated.View>
         </View>
       </KeyboardAvoidingView>
@@ -280,11 +311,16 @@ export function Dialog({
         style={[
           styles.fill,
           styles.dialogWrapper,
-          placement === 'top' && { justifyContent: 'flex-start', paddingTop: insets.top + spacing.xl },
+          placement === 'top' && {
+            justifyContent: 'flex-start',
+            paddingTop: insets.top + spacing.xl,
+          },
         ]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: colors.overlay, opacity: progress }]}>
+        <Animated.View
+          style={[StyleSheet.absoluteFill, { backgroundColor: colors.overlay, opacity: progress }]}
+        >
           <Pressable
             style={styles.fill}
             onPress={dismissOnBackdrop ? onClose : undefined}

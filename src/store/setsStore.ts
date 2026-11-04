@@ -20,8 +20,7 @@ SyncQueueService.registerExecutor('createSet', (p) => {
   return NeonService.createSet(payload as Parameters<typeof NeonService.createSet>[0]);
 });
 
-SyncQueueService.registerExecutor('deleteSet', (p) =>
-  NeonService.deleteSet(p as string));
+SyncQueueService.registerExecutor('deleteSet', (p) => NeonService.deleteSet(p as string));
 
 SyncQueueService.registerExecutor('updateSetCourse', (p) => {
   const { setId, courseId } = p as { setId: string; courseId: string | null };
@@ -29,7 +28,15 @@ SyncQueueService.registerExecutor('updateSetCourse', (p) => {
 });
 
 SyncQueueService.registerExecutor('updateSetMeta', (p) => {
-  const { setId, ...fields } = p as { setId: string; title?: string; description?: string; category?: string; languageFrom?: string; languageTo?: string; kind?: SetKind };
+  const { setId, ...fields } = p as {
+    setId: string;
+    title?: string;
+    description?: string;
+    category?: string;
+    languageFrom?: string;
+    languageTo?: string;
+    kind?: SetKind;
+  };
   return NeonService.updateSetMeta(setId, fields);
 });
 
@@ -37,7 +44,7 @@ interface SetsState {
   // Данные - объект для O(1) доступа
   sets: Record<string, CardSet>;
   setsOrder: string[]; // Порядок отображения
-  
+
   // Загрузка
   isLoading: boolean;
   error: string | null;
@@ -48,13 +55,13 @@ interface SetsActions {
   addSet: (input: CreateSetInput) => Promise<CardSet>;
   updateSet: (setId: string, input: UpdateSetInput) => void;
   deleteSet: (setId: string) => void;
-  
+
   // Действия
   toggleFavorite: (setId: string) => void;
   archiveSet: (setId: string) => void;
   unarchiveSet: (setId: string) => void;
   updateLastStudied: (setId: string) => void;
-  
+
   // Read-only наборы с сервера (официальные наборы каталога книг): добавить/обновить без синка в Neon
   mergeSets: (sets: CardSet[]) => void;
 
@@ -62,18 +69,32 @@ interface SetsActions {
   moveSetsFromCourse: (courseId: string) => void; // Перемещает наборы из курса в «Мои наборы»
   deleteSetsOfCourse: (courseId: string) => void; // Удаление курса: его наборы и карточки — локально (MySets 4)
   getSetsByCourse: (courseId: string | null) => CardSet[]; // Получить наборы по курсу
-  
+
   // Обновление статистики набора
-  updateSetStats: (setId: string, stats: Partial<Pick<CardSet, 'cardCount' | 'newCount' | 'learningCount' | 'youngCount' | 'matureCount' | 'reviewCount' | 'masteredCount'>>) => void;
+  updateSetStats: (
+    setId: string,
+    stats: Partial<
+      Pick<
+        CardSet,
+        | 'cardCount'
+        | 'newCount'
+        | 'learningCount'
+        | 'youngCount'
+        | 'matureCount'
+        | 'reviewCount'
+        | 'masteredCount'
+      >
+    >
+  ) => void;
   incrementCardCount: (setId: string) => void;
   decrementCardCount: (setId: string) => void;
-  
+
   // Селекторы
   getSet: (setId: string) => CardSet | undefined;
   getAllSets: () => CardSet[];
   getFavoriteSets: () => CardSet[];
   getRecentSets: (limit?: number) => CardSet[];
-  
+
   // Состояние
   setLoading: (isLoading: boolean) => void;
   setError: (error: string | null) => void;
@@ -108,7 +129,7 @@ export const useSetsStore = create<SetsState & SetsActions>()(
     error: null,
 
     // ==================== CRUD ====================
-    
+
     addSet: async (input) => {
       const now = Date.now();
       const currentUserId = NeonService.isEnabled()
@@ -189,7 +210,14 @@ export const useSetsStore = create<SetsState & SetsActions>()(
       }
 
       // Синхронизируем мета-поля набора в Neon
-      const metaKeys = ['title', 'description', 'category', 'languageFrom', 'languageTo', 'kind'] as const;
+      const metaKeys = [
+        'title',
+        'description',
+        'category',
+        'languageFrom',
+        'languageTo',
+        'kind',
+      ] as const;
       const hasMeta = metaKeys.some((k) => k in input);
       if (NeonService.isEnabled() && hasMeta) {
         const fields: Record<string, string | undefined> = {};
@@ -232,7 +260,7 @@ export const useSetsStore = create<SetsState & SetsActions>()(
     },
 
     // ==================== ДЕЙСТВИЯ ====================
-    
+
     toggleFavorite: (setId) => {
       set((state) => {
         const cardSet = state.sets[setId];
@@ -273,7 +301,7 @@ export const useSetsStore = create<SetsState & SetsActions>()(
     },
 
     // ==================== СТАТИСТИКА ====================
-    
+
     updateSetStats: (setId, stats) => {
       set((state) => {
         const cardSet = state.sets[setId];
@@ -303,16 +331,14 @@ export const useSetsStore = create<SetsState & SetsActions>()(
     },
 
     // ==================== СЕЛЕКТОРЫ ====================
-    
+
     getSet: (setId) => {
       return get().sets[setId];
     },
 
     getAllSets: () => {
       const state = get();
-      return state.setsOrder
-        .map((id) => state.sets[id])
-        .filter((s) => s && !s.isArchived);
+      return state.setsOrder.map((id) => state.sets[id]).filter((s) => s && !s.isArchived);
     },
 
     getFavoriteSets: () => {
@@ -365,7 +391,13 @@ export const useSetsStore = create<SetsState & SetsActions>()(
 
       // Сохраняем изменения
       DatabaseService.saveSets();
-      log.debug('Sets', 'Наборы перемещены из курса в «Мои наборы»', courseId, '· удалено read-only:', readOnlySetIds.length);
+      log.debug(
+        'Sets',
+        'Наборы перемещены из курса в «Мои наборы»',
+        courseId,
+        '· удалено read-only:',
+        readOnlySetIds.length
+      );
     },
 
     deleteSetsOfCourse: (courseId) => {
@@ -412,7 +444,7 @@ export const useSetsStore = create<SetsState & SetsActions>()(
     },
 
     // ==================== СОСТОЯНИЕ ====================
-    
+
     setLoading: (isLoading) => {
       set((state) => {
         state.isLoading = isLoading;

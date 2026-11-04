@@ -66,7 +66,12 @@ export const ScreenHeader = memo(function ScreenHeader({
             {back}
             <View style={styles.rootTitle}>
               {center ?? (
-                <Text variant="h2" numberOfLines={1} accessibilityRole="header" style={{ color: colors.textPrimary }}>
+                <Text
+                  variant="h2"
+                  numberOfLines={1}
+                  accessibilityRole="header"
+                  style={{ color: colors.textPrimary }}
+                >
                   {title}
                 </Text>
               )}

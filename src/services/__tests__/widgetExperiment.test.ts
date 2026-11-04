@@ -8,7 +8,10 @@ describe('widgetExperiment', () => {
   it('запоминает обе группы и не переписывает слово, уже попавшее в группу', () => {
     let map: ExposureMap = {};
     map = recordExposures(map, { pool: [card('a')], control: [card('b')] }, '2026-10-07');
-    expect(map).toEqual({ a: { inWidget: true, day: '2026-10-07' }, b: { inWidget: false, day: '2026-10-07' } });
+    expect(map).toEqual({
+      a: { inWidget: true, day: '2026-10-07' },
+      b: { inWidget: false, day: '2026-10-07' },
+    });
     const same = recordExposures(map, { pool: [card('b')], control: [card('a')] }, '2026-10-08');
     expect(same).toBe(map);
   });

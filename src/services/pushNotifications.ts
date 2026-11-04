@@ -132,7 +132,10 @@ async function getMainSWRegistration(): Promise<ServiceWorkerRegistration> {
   // Ищем уже активную регистрацию sw.js
   const allRegs = await navigator.serviceWorker.getRegistrations();
   for (const reg of allRegs) {
-    if (reg.active?.scriptURL.includes('sw.js') && !reg.active.scriptURL.includes('firebase-messaging-sw.js')) {
+    if (
+      reg.active?.scriptURL.includes('sw.js') &&
+      !reg.active.scriptURL.includes('firebase-messaging-sw.js')
+    ) {
       log.debug('Push', 'Found active main SW', reg.scope);
       return reg;
     }
@@ -145,11 +148,22 @@ async function getMainSWRegistration(): Promise<ServiceWorkerRegistration> {
   // Ждём активации
   await new Promise<void>((resolve, reject) => {
     const sw = registration.installing || registration.waiting;
-    if (registration.active) { resolve(); return; }
-    if (!sw) { reject(new Error('No service worker after registration')); return; }
+    if (registration.active) {
+      resolve();
+      return;
+    }
+    if (!sw) {
+      reject(new Error('No service worker after registration'));
+      return;
+    }
     sw.addEventListener('statechange', function handler() {
-      if (sw.state === 'activated') { sw.removeEventListener('statechange', handler); resolve(); }
-      else if (sw.state === 'redundant') { sw.removeEventListener('statechange', handler); reject(new Error('SW became redundant')); }
+      if (sw.state === 'activated') {
+        sw.removeEventListener('statechange', handler);
+        resolve();
+      } else if (sw.state === 'redundant') {
+        sw.removeEventListener('statechange', handler);
+        reject(new Error('SW became redundant'));
+      }
     });
   });
 
@@ -167,7 +181,12 @@ export async function requestPushPermission(userId?: string | null): Promise<Pus
   // 1. Проверка поддержки
   const supported = await isPushSupported();
   if (!supported) {
-    return { permission: 'unsupported', token: null, isSupported: false, error: 'Push notifications not supported' };
+    return {
+      permission: 'unsupported',
+      token: null,
+      isSupported: false,
+      error: 'Push notifications not supported',
+    };
   }
 
   try {
@@ -267,7 +286,9 @@ export async function refreshPushToken(userId?: string | null): Promise<string |
 /**
  * Подписка на foreground-сообщения (пока вкладка активна).
  */
-export async function subscribeForegroundMessages(handler: ForegroundMessageHandler): Promise<void> {
+export async function subscribeForegroundMessages(
+  handler: ForegroundMessageHandler
+): Promise<void> {
   const supported = await isPushSupported();
   if (!supported) return;
 
@@ -308,7 +329,11 @@ export async function getInitialPushData(): Promise<Record<string, string> | nul
   params.delete('push_id');
   params.delete('push_type');
   const query = params.toString();
-  window.history.replaceState(window.history.state, '', `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`);
+  window.history.replaceState(
+    window.history.state,
+    '',
+    `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`
+  );
   return { push_id: pushId, type };
 }
 
@@ -380,7 +405,12 @@ async function sendTokenToBackend(token: string, userId?: string | null): Promis
     const res = await fetch(`${API_BASE}?action=subscribe`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-      body: JSON.stringify({ token, platform: 'web', userId: userId || null, appVersion: APP_VERSION }),
+      body: JSON.stringify({
+        token,
+        platform: 'web',
+        userId: userId || null,
+        appVersion: APP_VERSION,
+      }),
     });
     if (!res.ok) {
       log.warn('Push', 'Backend subscribe failed', res.status);

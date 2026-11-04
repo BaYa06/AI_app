@@ -14,10 +14,15 @@ jest.mock('@/services/StreakService', () => ({
     fetchUserStats: async () => null,
   },
 }));
-jest.mock('react-native', () => ({ Appearance: { getColorScheme: () => 'light', addChangeListener: () => {} } }));
+jest.mock('react-native', () => ({
+  Appearance: { getColorScheme: () => 'light', addChangeListener: () => {} },
+}));
 jest.mock('@/constants', () => ({ colors: { light: {}, dark: {} } }));
 jest.mock('@/services/localCache', () => ({ readCache: () => undefined }));
-jest.mock('@/services/StorageService', () => ({ StorageService: { getObject: () => null }, STORAGE_KEYS: {} }));
+jest.mock('@/services/StorageService', () => ({
+  StorageService: { getObject: () => null },
+  STORAGE_KEYS: {},
+}));
 jest.mock('@/services/NeonService', () => ({ NeonService: {} }));
 jest.mock('@/services', () => ({ supabase: {} }));
 jest.mock('@/services/LessonService', () => ({ DEFAULT_NEW_PER_DAY: 10 }));

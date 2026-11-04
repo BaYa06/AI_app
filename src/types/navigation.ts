@@ -316,15 +316,16 @@ export type MainTabParamList = {
 // ==================== SCREEN PROPS ====================
 
 // Root Stack
-export type RootStackScreenProps<T extends keyof RootStackParamList> = 
-  NativeStackScreenProps<RootStackParamList, T>;
+export type RootStackScreenProps<T extends keyof RootStackParamList> = NativeStackScreenProps<
+  RootStackParamList,
+  T
+>;
 
 // Main Tabs
-export type MainTabScreenProps<T extends keyof MainTabParamList> = 
-  CompositeScreenProps<
-    BottomTabScreenProps<MainTabParamList, T>,
-    NativeStackScreenProps<RootStackParamList>
-  >;
+export type MainTabScreenProps<T extends keyof MainTabParamList> = CompositeScreenProps<
+  BottomTabScreenProps<MainTabParamList, T>,
+  NativeStackScreenProps<RootStackParamList>
+>;
 
 // ==================== TYPE HELPERS ====================
 

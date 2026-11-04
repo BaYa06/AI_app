@@ -132,7 +132,10 @@ export const StageLayout = memo(function StageLayout({
             accessibilityLabel={`Этап ${session.index + 1} из ${session.stages.length}`}
           >
             {session.stages.map((s, i) => (
-              <View key={`${s.stage}-${i}`} style={[styles.segment, { backgroundColor: colors.surfaceMuted }]}>
+              <View
+                key={`${s.stage}-${i}`}
+                style={[styles.segment, { backgroundColor: colors.surfaceMuted }]}
+              >
                 <View
                   style={[
                     styles.segmentFill,
@@ -146,10 +149,18 @@ export const StageLayout = memo(function StageLayout({
             ))}
           </View>
         ) : (
-          <ProgressBar progress={Math.round(fraction * 100)} accessibilityLabel="Прогресс" style={styles.flex1} />
+          <ProgressBar
+            progress={Math.round(fraction * 100)}
+            accessibilityLabel="Прогресс"
+            style={styles.flex1}
+          />
         )}
         {session ? (
-          <Text variant="label" style={[styles.counter, { color: colors.warningText }]} accessibilityLabel={`Плюс ${xp} опыта`}>
+          <Text
+            variant="label"
+            style={[styles.counter, { color: colors.warningText }]}
+            accessibilityLabel={`Плюс ${xp} опыта`}
+          >
             +{xp} опыта
           </Text>
         ) : (
@@ -172,11 +183,17 @@ export const StageLayout = memo(function StageLayout({
       )}
 
       {footer ? (
-        <View style={[styles.footer, { paddingBottom: Math.max(bottomInset, spacing.m) }]}>{footer}</View>
+        <View style={[styles.footer, { paddingBottom: Math.max(bottomInset, spacing.m) }]}>
+          {footer}
+        </View>
       ) : null}
 
       {introVisible && session ? (
-        <StageIntro session={session} onStart={() => setIntroVisible(false)} bottomInset={bottomInset} />
+        <StageIntro
+          session={session}
+          onStart={() => setIntroVisible(false)}
+          bottomInset={bottomInset}
+        />
       ) : null}
 
       <Dialog
@@ -234,7 +251,13 @@ function StageIntro({
   if (!info) return null;
 
   return (
-    <View style={[StyleSheet.absoluteFill, styles.intro, { backgroundColor: colors.background, paddingBottom: Math.max(bottomInset, spacing.m) }]}>
+    <View
+      style={[
+        StyleSheet.absoluteFill,
+        styles.intro,
+        { backgroundColor: colors.background, paddingBottom: Math.max(bottomInset, spacing.m) },
+      ]}
+    >
       <View style={styles.introBody} accessibilityLiveRegion="polite">
         <Text variant="overline" style={{ color: colors.primary }}>
           Этап {session.index + 1} из {session.stages.length}
@@ -248,7 +271,12 @@ function StageIntro({
         <View style={styles.route}>
           {session.stages.map((s, i) => {
             const state = i < session.index ? 'done' : i === session.index ? 'current' : 'next';
-            const tint = state === 'current' ? colors.primary : state === 'done' ? colors.successText : colors.textSecondary;
+            const tint =
+              state === 'current'
+                ? colors.primary
+                : state === 'done'
+                  ? colors.successText
+                  : colors.textSecondary;
             return (
               <View
                 key={`${s.stage}-${i}`}
@@ -256,7 +284,8 @@ function StageIntro({
                   styles.routeChip,
                   {
                     borderColor: state === 'next' ? colors.border : tint,
-                    backgroundColor: state === 'current' ? alpha(colors.primary, 10) : 'transparent',
+                    backgroundColor:
+                      state === 'current' ? alpha(colors.primary, 10) : 'transparent',
                   },
                 ]}
               >
@@ -283,14 +312,22 @@ interface AnswerPanelProps {
 }
 
 /** Нижняя панель ответа — одинаковая во всех режимах */
-export const AnswerPanel = memo(function AnswerPanel({ correct, answer, hint, onNext }: AnswerPanelProps) {
+export const AnswerPanel = memo(function AnswerPanel({
+  correct,
+  answer,
+  hint,
+  onNext,
+}: AnswerPanelProps) {
   const colors = useThemeColors();
   const tone = correct ? colors.success : colors.error;
   const toneText = correct ? colors.successText : colors.errorText;
   const Icon = correct ? Check : X;
 
   return (
-    <View style={[styles.panel, { backgroundColor: alpha(tone, 10) }]} accessibilityLiveRegion="polite">
+    <View
+      style={[styles.panel, { backgroundColor: alpha(tone, 10) }]}
+      accessibilityLiveRegion="polite"
+    >
       <View style={styles.panelTitle}>
         <Icon size={iconSize.s} color={toneText} strokeWidth={3} />
         <Text variant="h3" style={{ color: toneText }}>
@@ -299,7 +336,10 @@ export const AnswerPanel = memo(function AnswerPanel({ correct, answer, hint, on
       </View>
       {!correct && answer ? (
         <Text variant="body" style={{ color: colors.textPrimary }}>
-          Правильно: <Text variant="body" style={styles.semibold}>{answer}</Text>
+          Правильно:{' '}
+          <Text variant="body" style={styles.semibold}>
+            {answer}
+          </Text>
         </Text>
       ) : null}
       {!correct && hint ? (

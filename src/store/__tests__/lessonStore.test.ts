@@ -34,7 +34,11 @@ describe('lessonStore', () => {
     store().recordAnswer('review', 'c1');
     store().recordAnswer('new', 'c2');
     store().addExtraNew();
-    const saved = mockMemory.get('user-a:lesson_day') as { reviewedIds: string[]; introducedIds: string[]; extraNew: number };
+    const saved = mockMemory.get('user-a:lesson_day') as {
+      reviewedIds: string[];
+      introducedIds: string[];
+      extraNew: number;
+    };
     expect(saved.reviewedIds).toEqual(['c1']);
     expect(saved.introducedIds).toEqual(['c2']);
     expect(saved.extraNew).toBe(10);
@@ -47,7 +51,12 @@ describe('lessonStore', () => {
     store().setFocusSet('s2');
     mockToday = '2026-10-02';
     const next = store().ensureToday(4);
-    expect(next).toMatchObject({ date: '2026-10-02', startWaiting: 4, reviewedIds: [], focusSetId: 's2' });
+    expect(next).toMatchObject({
+      date: '2026-10-02',
+      startWaiting: 4,
+      reviewedIds: [],
+      focusSetId: 's2',
+    });
   });
 
   it('другой аккаунт не видит чужой урок', () => {

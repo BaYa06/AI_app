@@ -16,25 +16,67 @@ async function main(): Promise<void> {
   const workbook = new ExcelJS.Workbook();
 
   const book = workbook.addWorksheet(BOOK_SHEET);
-  book.columns = BOOK_COLUMNS.map((key) => ({ header: key, key, width: key === 'title' ? 36 : 16 }));
+  book.columns = BOOK_COLUMNS.map((key) => ({
+    header: key,
+    key,
+    width: key === 'title' ? 36 : 16,
+  }));
   book.addRow({
-    title: 'Solutions Pre-Intermediate', edition: '3rd', level: 'A2', subject: 'English',
-    language_from: 'en', language_to: 'ru', publisher: 'Oxford',
+    title: 'Solutions Pre-Intermediate',
+    edition: '3rd',
+    level: 'A2',
+    subject: 'English',
+    language_from: 'en',
+    language_to: 'ru',
+    publisher: 'Oxford',
   });
   styleHeader(book);
 
   const cards = workbook.addWorksheet(CARDS_SHEET);
   const widths: Record<(typeof CARD_COLUMNS)[number], number> = {
-    unit: 8, unit_title: 22, pages: 10, term: 24, translation: 28, example: 44,
+    unit: 8,
+    unit_title: 22,
+    pages: 10,
+    term: 24,
+    translation: 28,
+    example: 44,
   };
   cards.columns = CARD_COLUMNS.map((key) => ({ header: key, key, width: widths[key] }));
   // Текстовый формат, чтобы Excel не превращал «8-17» в дату.
   cards.getColumn('pages').numFmt = '@';
   const rows = [
-    { unit: 1, unit_title: 'Feelings', pages: '8–17', term: 'happy', translation: 'счастливый', example: "I'm happy to see you." },
-    { unit: 1, unit_title: 'Feelings', pages: '8–17', term: 'angry', translation: 'злой, сердитый', example: 'Why are you angry?' },
-    { unit: 1, unit_title: 'Feelings', pages: '8–17', term: 'be afraid of', translation: 'бояться', example: 'She is afraid of dogs.' },
-    { unit: 2, unit_title: 'Adventure', pages: '18–27', term: 'climb', translation: 'взбираться, лезть', example: '' },
+    {
+      unit: 1,
+      unit_title: 'Feelings',
+      pages: '8–17',
+      term: 'happy',
+      translation: 'счастливый',
+      example: "I'm happy to see you.",
+    },
+    {
+      unit: 1,
+      unit_title: 'Feelings',
+      pages: '8–17',
+      term: 'angry',
+      translation: 'злой, сердитый',
+      example: 'Why are you angry?',
+    },
+    {
+      unit: 1,
+      unit_title: 'Feelings',
+      pages: '8–17',
+      term: 'be afraid of',
+      translation: 'бояться',
+      example: 'She is afraid of dogs.',
+    },
+    {
+      unit: 2,
+      unit_title: 'Adventure',
+      pages: '18–27',
+      term: 'climb',
+      translation: 'взбираться, лезть',
+      example: '',
+    },
   ];
   for (const row of rows) cards.addRow(row);
   styleHeader(cards);

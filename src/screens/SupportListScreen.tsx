@@ -6,17 +6,37 @@
 import React, { useCallback, useState } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Bug, HelpCircle, Lightbulb, MessageSquare, Meh, ThumbsDown, ThumbsUp, Plus } from 'lucide-react-native';
+import {
+  Bug,
+  HelpCircle,
+  Lightbulb,
+  MessageSquare,
+  Meh,
+  ThumbsDown,
+  ThumbsUp,
+  Plus,
+} from 'lucide-react-native';
 import { Text } from '@/components/common';
 import {
-  Badge, Button, Card, EmptyState, ErrorState, Screen, ScreenHeader, SkeletonList,
-  type BadgeTone, type IconComponent,
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  Screen,
+  ScreenHeader,
+  SkeletonList,
+  type BadgeTone,
+  type IconComponent,
 } from '@/components/ui';
 import { useThemeColors } from '@/store';
 import { spacing, iconSize } from '@/constants';
 import {
-  FEEDBACK_CATEGORY_LABELS, loadSupportTickets, satisfactionLabel,
-  type SupportStatus, type SupportTicket,
+  FEEDBACK_CATEGORY_LABELS,
+  loadSupportTickets,
+  satisfactionLabel,
+  type SupportStatus,
+  type SupportTicket,
 } from '@/services/feedback';
 
 const STATUS: Record<SupportStatus, { label: string; tone: BadgeTone }> = {
@@ -25,7 +45,11 @@ const STATUS: Record<SupportStatus, { label: string; tone: BadgeTone }> = {
   answered: { label: 'Есть ответ', tone: 'primary' },
 };
 
-const CATEGORY_ICON: Record<string, IconComponent> = { problem: Bug, idea: Lightbulb, question: HelpCircle };
+const CATEGORY_ICON: Record<string, IconComponent> = {
+  problem: Bug,
+  idea: Lightbulb,
+  question: HelpCircle,
+};
 
 function ticketIcon(t: SupportTicket): IconComponent {
   if (t.kind === 'message') return CATEGORY_ICON[t.category || ''] || MessageSquare;
@@ -33,9 +57,15 @@ function ticketIcon(t: SupportTicket): IconComponent {
   return t.rating >= 4 ? ThumbsUp : t.rating === 3 ? Meh : ThumbsDown;
 }
 
-export function ticketTitle(t: { kind: string; category: string | null; rating: number | null }): string {
+export function ticketTitle(t: {
+  kind: string;
+  category: string | null;
+  rating: number | null;
+}): string {
   if (t.kind === 'rating') return `Отзыв: «${satisfactionLabel(t.rating)}»`;
-  return FEEDBACK_CATEGORY_LABELS[t.category as keyof typeof FEEDBACK_CATEGORY_LABELS] || 'Сообщение';
+  return (
+    FEEDBACK_CATEGORY_LABELS[t.category as keyof typeof FEEDBACK_CATEGORY_LABELS] || 'Сообщение'
+  );
 }
 
 export function formatSupportDate(iso: string, withTime = false): string {
@@ -78,7 +108,7 @@ export function SupportListScreen({ navigation }: any) {
   useFocusEffect(
     useCallback(() => {
       load();
-    }, [load]),
+    }, [load])
   );
 
   const handleRefresh = useCallback(async () => {
@@ -88,7 +118,12 @@ export function SupportListScreen({ navigation }: any) {
   }, [load]);
 
   const writeButton = (
-    <Button title="Написать нам" icon={Plus} onPress={() => navigation.navigate('Feedback')} fullWidth />
+    <Button
+      title="Написать нам"
+      icon={Plus}
+      onPress={() => navigation.navigate('Feedback')}
+      fullWidth
+    />
   );
 
   return (
@@ -97,7 +132,11 @@ export function SupportListScreen({ navigation }: any) {
         <ScreenHeader
           title="Мои обращения"
           // Пришли из переписки, открытой push-уведомлением, — возвращаемся в профиль
-          onBack={() => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Main', { screen: 'Profile' }))}
+          onBack={() =>
+            navigation.canGoBack()
+              ? navigation.goBack()
+              : navigation.navigate('Main', { screen: 'Profile' })
+          }
           bordered
         />
       }
@@ -137,11 +176,20 @@ export function SupportListScreen({ navigation }: any) {
                 >
                   <View style={st.ticketTop}>
                     <Icon size={iconSize.xs} color={colors.textSecondary} />
-                    <Text variant="label" style={[st.flex, { color: colors.textPrimary }]} numberOfLines={1}>
+                    <Text
+                      variant="label"
+                      style={[st.flex, { color: colors.textPrimary }]}
+                      numberOfLines={1}
+                    >
                       {ticketTitle(t)}
-                      <Text variant="caption" color="secondary">{'  ·  ' + formatSupportDate(t.lastMessageAt)}</Text>
+                      <Text variant="caption" color="secondary">
+                        {'  ·  ' + formatSupportDate(t.lastMessageAt)}
+                      </Text>
                     </Text>
-                    <Badge label={t.closed && !unread ? 'Закрыто' : status.label} tone={t.closed && !unread ? 'neutral' : status.tone} />
+                    <Badge
+                      label={t.closed && !unread ? 'Закрыто' : status.label}
+                      tone={t.closed && !unread ? 'neutral' : status.tone}
+                    />
                   </View>
                   <Text variant="bodySmall" color="secondary" numberOfLines={2}>
                     {preview}

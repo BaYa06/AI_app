@@ -6,13 +6,28 @@
  */
 import React, { memo, useEffect } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import { Check, Gem } from 'lucide-react-native';
 import { useThemeColors } from '@/store';
 import type { ChallengeId, ChallengeStatus } from '@/store';
 import { Text } from '@/components/common/Text';
 import type { IconComponent } from '@/components/ui';
-import { alpha, borderRadius, heights, iconSize, screenPadding, spacing, typography } from '@/constants';
+import {
+  alpha,
+  borderRadius,
+  heights,
+  iconSize,
+  screenPadding,
+  spacing,
+  typography,
+} from '@/constants';
 
 export interface ChallengeTile {
   id: ChallengeId;
@@ -38,16 +53,22 @@ const REWARD = 10;
 const ICON_BOX = 36;
 
 /** «Забрать» на выполненной мини-игре — мягко пульсирует, пока награду не забрали */
-function ClaimButton({ onPress, buttonRef }: { onPress: () => void; buttonRef: (el: View | null) => void }) {
+function ClaimButton({
+  onPress,
+  buttonRef,
+}: {
+  onPress: () => void;
+  buttonRef: (el: View | null) => void;
+}) {
   const colors = useThemeColors();
   const scale = useSharedValue(1);
   useEffect(() => {
     scale.value = withRepeat(
       withSequence(
         withTiming(1.06, { duration: 650, easing: Easing.inOut(Easing.quad) }),
-        withTiming(1, { duration: 650, easing: Easing.inOut(Easing.quad) }),
+        withTiming(1, { duration: 650, easing: Easing.inOut(Easing.quad) })
       ),
-      -1,
+      -1
     );
   }, [scale]);
   const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
@@ -61,19 +82,29 @@ function ClaimButton({ onPress, buttonRef }: { onPress: () => void; buttonRef: (
         accessibilityRole="button"
         accessibilityLabel={`Забрать ${REWARD} алмазов`}
       >
-        <Text variant="caption" style={[styles.bold, { color: colors.onPrimary }]}>Забрать</Text>
+        <Text variant="caption" style={[styles.bold, { color: colors.onPrimary }]}>
+          Забрать
+        </Text>
         <Gem size={iconSize.xs} color={colors.onPrimary} />
       </Pressable>
     </Animated.View>
   );
 }
 
-export const ChallengeTiles = memo(function ChallengeTiles({ tiles, statuses, hoursUntilTomorrow, onClaim, claimRef }: Props) {
+export const ChallengeTiles = memo(function ChallengeTiles({
+  tiles,
+  statuses,
+  hoursUntilTomorrow,
+  onClaim,
+  claimRef,
+}: Props) {
   const colors = useThemeColors();
 
   return (
     <View style={styles.section}>
-      <Text variant="overline" color="secondary" style={styles.label}>Разминка</Text>
+      <Text variant="overline" color="secondary" style={styles.label}>
+        Разминка
+      </Text>
       <View style={styles.row}>
         {tiles.map(({ id, title, badge, icon: Icon, accent, onPlay }) => {
           const status = statuses[id];
@@ -82,13 +113,23 @@ export const ChallengeTiles = memo(function ChallengeTiles({ tiles, statuses, ho
             return (
               <View
                 key={id}
-                style={[styles.tile, { backgroundColor: alpha(colors.success, 10), borderColor: alpha(colors.success, 40) }]}
+                style={[
+                  styles.tile,
+                  {
+                    backgroundColor: alpha(colors.success, 10),
+                    borderColor: alpha(colors.success, 40),
+                  },
+                ]}
               >
                 <View style={[styles.iconBox, { backgroundColor: alpha(colors.success, 20) }]}>
                   <Check size={iconSize.s} color={colors.successText} />
                 </View>
-                <Text variant="label" numberOfLines={2} style={styles.title}>{title}</Text>
-                <Text variant="caption" style={{ color: colors.successText }}>Выполнено</Text>
+                <Text variant="label" numberOfLines={2} style={styles.title}>
+                  {title}
+                </Text>
+                <Text variant="caption" style={{ color: colors.successText }}>
+                  Выполнено
+                </Text>
                 <View style={styles.bottom}>
                   <ClaimButton buttonRef={(el) => claimRef(id, el)} onPress={() => onClaim(id)} />
                 </View>
@@ -102,14 +143,25 @@ export const ChallengeTiles = memo(function ChallengeTiles({ tiles, statuses, ho
                 key={id}
                 accessible
                 accessibilityLabel={`${title}: награда получена, снова через ${hoursUntilTomorrow} ч`}
-                style={[styles.tile, { backgroundColor: colors.surfaceMuted, borderColor: colors.surfaceMuted }]}
+                style={[
+                  styles.tile,
+                  { backgroundColor: colors.surfaceMuted, borderColor: colors.surfaceMuted },
+                ]}
               >
                 <View style={[styles.iconBox, { backgroundColor: alpha(colors.success, 10) }]}>
                   <Check size={iconSize.s} color={colors.successText} />
                 </View>
-                <Text variant="label" numberOfLines={2} style={[styles.title, { color: colors.textSecondary }]}>{title}</Text>
+                <Text
+                  variant="label"
+                  numberOfLines={2}
+                  style={[styles.title, { color: colors.textSecondary }]}
+                >
+                  {title}
+                </Text>
                 <View style={styles.bottom}>
-                  <Text variant="caption" color="tertiary">Снова через {hoursUntilTomorrow} ч</Text>
+                  <Text variant="caption" color="tertiary">
+                    Снова через {hoursUntilTomorrow} ч
+                  </Text>
                 </View>
               </View>
             );
@@ -130,11 +182,17 @@ export const ChallengeTiles = memo(function ChallengeTiles({ tiles, statuses, ho
               <View style={[styles.iconBox, { backgroundColor: alpha(accent, 10) }]}>
                 <Icon size={iconSize.s} color={accent} />
               </View>
-              <Text variant="label" numberOfLines={2} style={styles.title}>{title}</Text>
-              <Text variant="caption" color="secondary">{badge}</Text>
+              <Text variant="label" numberOfLines={2} style={styles.title}>
+                {title}
+              </Text>
+              <Text variant="caption" color="secondary">
+                {badge}
+              </Text>
               <View style={[styles.bottom, styles.reward]}>
                 <Gem size={iconSize.xs} color={colors.diamond} />
-                <Text variant="caption" style={styles.bold}>+{REWARD}</Text>
+                <Text variant="caption" style={styles.bold}>
+                  +{REWARD}
+                </Text>
               </View>
             </Pressable>
           );

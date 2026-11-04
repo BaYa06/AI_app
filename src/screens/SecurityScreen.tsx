@@ -3,13 +3,7 @@
  * @description Экран настроек безопасности аккаунта
  */
 import React, { useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  Switch,
-} from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable, Switch } from 'react-native';
 import { Text, Container } from '@/components/common';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius } from '@/constants';
@@ -56,9 +50,12 @@ const SESSIONS = [
 
 function SessionIcon({ type, color }: { type: 'phone' | 'laptop' | 'tablet'; color: string }) {
   switch (type) {
-    case 'phone': return <Smartphone size={20} color={color} />;
-    case 'laptop': return <Laptop size={20} color={color} />;
-    case 'tablet': return <Tablet size={20} color={color} />;
+    case 'phone':
+      return <Smartphone size={20} color={color} />;
+    case 'laptop':
+      return <Laptop size={20} color={color} />;
+    case 'tablet':
+      return <Tablet size={20} color={color} />;
   }
 }
 
@@ -75,7 +72,9 @@ export function SecurityScreen({ navigation }: Props) {
   return (
     <Container padded={false} edges={['top', 'bottom']}>
       {/* Header */}
-      <View style={[s.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+      <View
+        style={[s.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}
+      >
         <Pressable onPress={() => navigation.goBack()} hitSlop={10} style={s.headerIcon}>
           <ArrowLeft size={22} color={colors.textPrimary} />
         </Pressable>
@@ -85,15 +84,10 @@ export function SecurityScreen({ navigation }: Props) {
         <View style={s.headerIcon} />
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={s.scrollContent}
-      >
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
         {/* Login Credentials */}
         <View style={s.section}>
-          <Text style={[s.sectionLabel, { color: colors.textTertiary }]}>
-            Учётные данные
-          </Text>
+          <Text style={[s.sectionLabel, { color: colors.textTertiary }]}>Учётные данные</Text>
           <View style={[s.card, { backgroundColor: cardBg, borderColor: cardBorder }]}>
             {/* Email */}
             <View style={s.credRow}>
@@ -120,7 +114,10 @@ export function SecurityScreen({ navigation }: Props) {
                 <Text variant="caption" style={{ color: colors.textTertiary }}>
                   Пароль
                 </Text>
-                <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '600', letterSpacing: 3 }}>
+                <Text
+                  variant="body"
+                  style={{ color: colors.textPrimary, fontWeight: '600', letterSpacing: 3 }}
+                >
                   ••••••••••••
                 </Text>
               </View>
@@ -135,7 +132,9 @@ export function SecurityScreen({ navigation }: Props) {
 
         {/* Two-Factor Authentication */}
         <View style={s.section}>
-          <View style={[s.card, s.twoFactorCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+          <View
+            style={[s.card, s.twoFactorCard, { backgroundColor: cardBg, borderColor: cardBorder }]}
+          >
             <View style={[s.twoFactorIcon, { backgroundColor: colors.primary + '15' }]}>
               <ShieldCheck size={22} color={colors.primary} />
             </View>
@@ -159,9 +158,7 @@ export function SecurityScreen({ navigation }: Props) {
         {/* Active Sessions */}
         <View style={s.section}>
           <View style={s.sectionHeader}>
-            <Text style={[s.sectionLabel, { color: colors.textTertiary }]}>
-              Активные сессии
-            </Text>
+            <Text style={[s.sectionLabel, { color: colors.textTertiary }]}>Активные сессии</Text>
             <Pressable>
               <Text variant="caption" style={{ color: colors.primary, fontWeight: '700' }}>
                 Завершить все
@@ -213,7 +210,9 @@ export function SecurityScreen({ navigation }: Props) {
 
         {/* Login History */}
         <View style={s.section}>
-          <Pressable style={[s.card, s.historyRow, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+          <Pressable
+            style={[s.card, s.historyRow, { backgroundColor: cardBg, borderColor: cardBorder }]}
+          >
             <View style={s.historyLeft}>
               <History size={20} color={colors.textTertiary} />
               <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '600' }}>

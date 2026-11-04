@@ -61,7 +61,7 @@ export type LibrarySortType = 'popular' | 'newest' | 'top_rated' | 'featured';
 export interface LibraryFilters {
   search?: string;
   category?: string;
-  language?: string;     // combined key e.g. 'en-ru'
+  language?: string; // combined key e.g. 'en-ru'
   sort?: LibrarySortType;
   cardsMin?: number;
   cardsMax?: number | null;

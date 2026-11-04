@@ -34,9 +34,9 @@ export default async function handler(req, res) {
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache');
-    return res.status(200).send(
-      renderPage({ courseTitle: course_title, teacherName: teacher_name, token })
-    );
+    return res
+      .status(200)
+      .send(renderPage({ courseTitle: course_title, teacherName: teacher_name, token }));
   } catch (error) {
     log.error('join', 'Join page error', error);
     return res.status(500).send(renderPage({ error: 'Ошибка сервера' }));
@@ -44,14 +44,14 @@ export default async function handler(req, res) {
 }
 
 function renderPage({ courseTitle, teacherName, token, error }) {
-  const title = courseTitle
-    ? `${courseTitle} — Flashly`
-    : 'Приглашение в курс — Flashly';
+  const title = courseTitle ? `${courseTitle} — Flashly` : 'Приглашение в курс — Flashly';
   const description = courseTitle
     ? `${teacherName} приглашает тебя в курс «${courseTitle}»`
     : 'Присоединяйся к курсу на Flashly';
 
-  const pwaUrl = token ? `https://ai-app-seven-zeta.vercel.app/join/${token}` : 'https://ai-app-seven-zeta.vercel.app';
+  const pwaUrl = token
+    ? `https://ai-app-seven-zeta.vercel.app/join/${token}`
+    : 'https://ai-app-seven-zeta.vercel.app';
   const deepLink = token ? `flashly://join/${token}` : 'flashly://';
 
   return `<!DOCTYPE html>
@@ -160,18 +160,22 @@ function renderPage({ courseTitle, teacherName, token, error }) {
 </head>
 <body>
   <div class="card">
-    ${error ? `
+    ${
+      error
+        ? `
       <div class="icon">😔</div>
       <p class="error">${esc(error)}</p>
       <a href="https://ai-app-seven-zeta.vercel.app" class="btn btn-primary">Открыть Flashly</a>
-    ` : `
+    `
+        : `
       <div class="icon">🎓</div>
       <div class="badge">Приглашение в курс</div>
       <h1>${esc(courseTitle)}</h1>
       <p class="teacher">Учитель: ${esc(teacherName)}</p>
       <p class="desc">Присоединяйся к курсу, чтобы изучать материалы учителя с интервальным повторением</p>
       <a href="https://ai-app-seven-zeta.vercel.app/?join=${esc(token)}" class="btn btn-primary">Открыть Flashly</a>
-    `}
+    `
+    }
     <p class="logo">Flashly — учи слова эффективно</p>
   </div>
 

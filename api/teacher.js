@@ -56,27 +56,28 @@ export default async function handler(req, res) {
   const { action } = req.query;
 
   try {
-    if (action === 'delete-course')       return await deleteCourse(req, res, sql, userId);
-    if (action === 'rename-course')       return await renameCourse(req, res, sql, userId);
-    if (action === 'get-schedule')        return await getSchedule(req, res, sql, userId);
-    if (action === 'set-schedule')        return await setSchedule(req, res, sql, userId);
-    if (action === 'create-invite')       return await createInvite(req, res, sql, userId);
-    if (action === 'regenerate-invite')   return await regenerateInvite(req, res, sql, userId);
+    if (action === 'delete-course') return await deleteCourse(req, res, sql, userId);
+    if (action === 'rename-course') return await renameCourse(req, res, sql, userId);
+    if (action === 'get-schedule') return await getSchedule(req, res, sql, userId);
+    if (action === 'set-schedule') return await setSchedule(req, res, sql, userId);
+    if (action === 'create-invite') return await createInvite(req, res, sql, userId);
+    if (action === 'regenerate-invite') return await regenerateInvite(req, res, sql, userId);
     if (action === 'invite-info-by-code') return await inviteInfoByCode(req, res, sql, userId);
-    if (action === 'invite-info-by-token')return await inviteInfoByToken(req, res, sql);
-    if (action === 'join-by-code')        return await joinByCode(req, res, sql, userId);
-    if (action === 'join-by-token')       return await joinByToken(req, res, sql, userId);
-    if (action === 'leave-course')        return await leaveCourse(req, res, sql, userId);
-    if (action === 'remove-student')      return await removeStudent(req, res, sql, userId);
-    if (action === 'list-members')        return await listMembers(req, res, sql, userId);
-    if (action === 'student-stats')       return await studentStats(req, res, sql, userId);
-    if (action === 'toggle-set-hidden')   return await toggleSetHidden(req, res, sql, userId);
-    if (action === 'check-owner')         return await checkOwner(req, res, sql, userId);
-    if (action === 'remind-review')       return await remindReview(req, res, sql, userId);
-    if (action === 'course-activity-chart')      return await courseActivityChart(req, res, sql, userId);
-    if (action === 'course-set-stats')           return await courseSetStats(req, res, sql, userId);
-    if (action === 'set-hard-cards')             return await setHardCards(req, res, sql, userId);
-    if (action === 'course-sets-by-membership')  return await courseSetsByMembership(req, res, sql, userId);
+    if (action === 'invite-info-by-token') return await inviteInfoByToken(req, res, sql);
+    if (action === 'join-by-code') return await joinByCode(req, res, sql, userId);
+    if (action === 'join-by-token') return await joinByToken(req, res, sql, userId);
+    if (action === 'leave-course') return await leaveCourse(req, res, sql, userId);
+    if (action === 'remove-student') return await removeStudent(req, res, sql, userId);
+    if (action === 'list-members') return await listMembers(req, res, sql, userId);
+    if (action === 'student-stats') return await studentStats(req, res, sql, userId);
+    if (action === 'toggle-set-hidden') return await toggleSetHidden(req, res, sql, userId);
+    if (action === 'check-owner') return await checkOwner(req, res, sql, userId);
+    if (action === 'remind-review') return await remindReview(req, res, sql, userId);
+    if (action === 'course-activity-chart') return await courseActivityChart(req, res, sql, userId);
+    if (action === 'course-set-stats') return await courseSetStats(req, res, sql, userId);
+    if (action === 'set-hard-cards') return await setHardCards(req, res, sql, userId);
+    if (action === 'course-sets-by-membership')
+      return await courseSetsByMembership(req, res, sql, userId);
 
     return res.status(400).json({ error: 'Unknown action' });
   } catch (error) {
@@ -103,7 +104,8 @@ async function deleteCourse(req, res, sql, userId) {
     return res.status(200).json({ ok: true, deletedSets: 0 });
   }
 
-  const owned = await sql`SELECT 1 FROM courses WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid`;
+  const owned =
+    await sql`SELECT 1 FROM courses WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid`;
   if (owned.length === 0) {
     return res.status(403).json({ error: 'Not found or not the owner' });
   }
@@ -147,11 +149,15 @@ function parseSchedule(value) {
     const day = item?.day;
     const m = typeof item?.time === 'string' ? item.time.match(/^(\d{1,2}):(\d{2})$/) : null;
     if (!SCHEDULE_DAYS.includes(day) || !m) continue;
-    const h = Number(m[1]), min = Number(m[2]);
+    const h = Number(m[1]),
+      min = Number(m[2]);
     if (h > 23 || min > 59 || min % 15 !== 0) continue;
     byDay.set(day, `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`);
   }
-  const schedule = SCHEDULE_DAYS.filter((d) => byDay.has(d)).map((day) => ({ day, time: byDay.get(day) }));
+  const schedule = SCHEDULE_DAYS.filter((d) => byDay.has(d)).map((day) => ({
+    day,
+    time: byDay.get(day),
+  }));
   return schedule.length ? schedule : null;
 }
 
@@ -328,12 +334,16 @@ async function inviteInfoByCode(req, res, sql, userId) {
   if (!code) return res.status(400).json({ error: 'code required', reason: 'bad_request' });
 
   if (!(await checkRateLimit(sql, userId, 'invite-code-guess', 10, 60))) {
-    return res.status(429).json({ error: 'Too many attempts, try again in a minute', reason: 'rate_limited' });
+    return res
+      .status(429)
+      .json({ error: 'Too many attempts, try again in a minute', reason: 'rate_limited' });
   }
 
   const lookup = await lookupInviteByCode(sql, code);
-  if (lookup.reason === 'not_found') return res.status(404).json({ error: 'Invite not found', reason: 'not_found' });
-  if (lookup.reason === 'expired') return res.status(410).json({ error: 'Invite expired', reason: 'expired' });
+  if (lookup.reason === 'not_found')
+    return res.status(404).json({ error: 'Invite not found', reason: 'not_found' });
+  if (lookup.reason === 'expired')
+    return res.status(410).json({ error: 'Invite expired', reason: 'expired' });
   return res.status(200).json({
     ok: true,
     courseId: lookup.courseId,
@@ -347,8 +357,10 @@ async function inviteInfoByToken(req, res, sql) {
   if (!token) return res.status(400).json({ error: 'token required', reason: 'bad_request' });
 
   const lookup = await lookupInviteByToken(sql, token);
-  if (lookup.reason === 'not_found') return res.status(404).json({ error: 'Invite not found', reason: 'not_found' });
-  if (lookup.reason === 'expired') return res.status(410).json({ error: 'Invite expired', reason: 'expired' });
+  if (lookup.reason === 'not_found')
+    return res.status(404).json({ error: 'Invite not found', reason: 'not_found' });
+  if (lookup.reason === 'expired')
+    return res.status(410).json({ error: 'Invite expired', reason: 'expired' });
   return res.status(200).json({
     ok: true,
     courseId: lookup.courseId,
@@ -362,20 +374,27 @@ async function joinByCode(req, res, sql, userId) {
   if (!code) return res.status(400).json({ error: 'code required', reason: 'bad_request' });
 
   if (!(await checkRateLimit(sql, userId, 'invite-code-guess', 10, 60))) {
-    return res.status(429).json({ error: 'Too many attempts, try again in a minute', reason: 'rate_limited' });
+    return res
+      .status(429)
+      .json({ error: 'Too many attempts, try again in a minute', reason: 'rate_limited' });
   }
 
   const lookup = await lookupInviteByCode(sql, code);
-  if (lookup.reason === 'not_found') return res.status(404).json({ error: 'Invite not found', reason: 'not_found' });
-  if (lookup.reason === 'expired') return res.status(410).json({ error: 'Invite expired', reason: 'expired' });
-  if (lookup.ownerId === userId) return res.status(400).json({ error: 'Cannot join your own course', reason: 'own_course' });
+  if (lookup.reason === 'not_found')
+    return res.status(404).json({ error: 'Invite not found', reason: 'not_found' });
+  if (lookup.reason === 'expired')
+    return res.status(410).json({ error: 'Invite expired', reason: 'expired' });
+  if (lookup.ownerId === userId)
+    return res.status(400).json({ error: 'Cannot join your own course', reason: 'own_course' });
 
   await sql`
     INSERT INTO course_members (course_id, user_id, role)
     VALUES (${lookup.courseId}::uuid, ${userId}::uuid, 'student')
     ON CONFLICT (course_id, user_id) DO NOTHING
   `;
-  return res.status(200).json({ ok: true, courseId: lookup.courseId, courseTitle: lookup.courseTitle });
+  return res
+    .status(200)
+    .json({ ok: true, courseId: lookup.courseId, courseTitle: lookup.courseTitle });
 }
 
 async function joinByToken(req, res, sql, userId) {
@@ -383,16 +402,21 @@ async function joinByToken(req, res, sql, userId) {
   if (!token) return res.status(400).json({ error: 'token required', reason: 'bad_request' });
 
   const lookup = await lookupInviteByToken(sql, token);
-  if (lookup.reason === 'not_found') return res.status(404).json({ error: 'Invite not found', reason: 'not_found' });
-  if (lookup.reason === 'expired') return res.status(410).json({ error: 'Invite expired', reason: 'expired' });
-  if (lookup.ownerId === userId) return res.status(400).json({ error: 'Cannot join your own course', reason: 'own_course' });
+  if (lookup.reason === 'not_found')
+    return res.status(404).json({ error: 'Invite not found', reason: 'not_found' });
+  if (lookup.reason === 'expired')
+    return res.status(410).json({ error: 'Invite expired', reason: 'expired' });
+  if (lookup.ownerId === userId)
+    return res.status(400).json({ error: 'Cannot join your own course', reason: 'own_course' });
 
   await sql`
     INSERT INTO course_members (course_id, user_id, role)
     VALUES (${lookup.courseId}::uuid, ${userId}::uuid, 'student')
     ON CONFLICT (course_id, user_id) DO NOTHING
   `;
-  return res.status(200).json({ ok: true, courseId: lookup.courseId, courseTitle: lookup.courseTitle });
+  return res
+    .status(200)
+    .json({ ok: true, courseId: lookup.courseId, courseTitle: lookup.courseTitle });
 }
 
 async function leaveCourse(req, res, sql, userId) {
@@ -413,7 +437,8 @@ async function leaveCourse(req, res, sql, userId) {
 
 async function removeStudent(req, res, sql, userId) {
   const { courseId, studentUserId } = req.body || {};
-  if (!courseId || !studentUserId) return res.status(400).json({ error: 'courseId and studentUserId required' });
+  if (!courseId || !studentUserId)
+    return res.status(400).json({ error: 'courseId and studentUserId required' });
 
   const course = await sql`
     SELECT id FROM courses WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid
@@ -510,7 +535,8 @@ async function listMembers(req, res, sql, userId) {
 
 async function studentStats(req, res, sql, userId) {
   const { courseId, studentId } = req.query;
-  if (!courseId || !studentId) return res.status(400).json({ error: 'courseId and studentId required' });
+  if (!courseId || !studentId)
+    return res.status(400).json({ error: 'courseId and studentId required' });
 
   const course = await sql`
     SELECT id FROM courses WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid
@@ -805,7 +831,8 @@ async function courseSetsByMembership(req, res, sql, userId) {
   const membership = await sql`
     SELECT id FROM course_members WHERE course_id = ${courseId}::uuid AND user_id = ${userId}::uuid
   `;
-  if (membership.length === 0) return res.status(403).json({ error: 'Not a member of this course' });
+  if (membership.length === 0)
+    return res.status(403).json({ error: 'Not a member of this course' });
 
   return res.status(200).json({ ok: true, sets: await courseSetsForStudent(sql, courseId) });
 }
@@ -840,7 +867,10 @@ async function remindReview(req, res, sql, userId) {
   `;
   let sent = 0;
   for (const s of students) {
-    const result = await sendNotification(sql, s.user_id, 'teacher_review', { teacher: course[0].teacher, count: s.waiting });
+    const result = await sendNotification(sql, s.user_id, 'teacher_review', {
+      teacher: course[0].teacher,
+      count: s.waiting,
+    });
     if (result.ok) sent++;
   }
   if (!studentId) {

@@ -20,6 +20,9 @@ const LANGUAGE_ONLY_MODES: readonly string[] = ['wordBuilder', 'audio', 'context
  * Можно ли запускать режим по этим наборам. Главная собирает карточки из разных наборов курса —
  * языковой режим доступен, только если среди них нет ни одного предметного.
  */
-export function isModeAllowedForSets(mode: string, sets: ReadonlyArray<Pick<CardSet, 'kind'> | null | undefined>): boolean {
+export function isModeAllowedForSets(
+  mode: string,
+  sets: ReadonlyArray<Pick<CardSet, 'kind'> | null | undefined>
+): boolean {
   return !LANGUAGE_ONLY_MODES.includes(mode) || !sets.some(isSubjectSet);
 }

@@ -40,7 +40,10 @@ const GROUPS: Group[] = [
     icon: AlertCircle,
     tone: 'warning',
     rows: [
-      ['Сплошной текст', 'статья, диалог — предложим выбрать незнакомые слова, пример возьмём из текста'],
+      [
+        'Сплошной текст',
+        'статья, диалог — предложим выбрать незнакомые слова, пример возьмём из текста',
+      ],
       ['Рукописная тетрадь', 'проверь слова перед добавлением'],
       ['Несколько страниц', 'лучше по одному фото на страницу'],
     ],
@@ -64,13 +67,19 @@ const FORMATS: Array<[string, string]> = [
 
 export const ImportGuideSheet = memo(function ImportGuideSheet({ visible, onClose }: Props) {
   const colors = useThemeColors();
-  const toneColor = { success: colors.successText, warning: colors.warningText, error: colors.errorText };
+  const toneColor = {
+    success: colors.successText,
+    warning: colors.warningText,
+    error: colors.errorText,
+  };
   const toneBg = { success: colors.success, warning: colors.warning, error: colors.error };
 
   return (
     <Sheet visible={visible} onClose={onClose} title="Что понимает ИИ">
       <View style={[styles.sample, { backgroundColor: colors.surfaceMuted }]}>
-        <Text variant="bodySmall" style={{ color: colors.textPrimary, fontWeight: '700' }}>Wortschatz · Kapitel 3</Text>
+        <Text variant="bodySmall" style={{ color: colors.textPrimary, fontWeight: '700' }}>
+          Wortschatz · Kapitel 3
+        </Text>
         <Text variant="bodySmall" style={{ color: colors.textPrimary }}>
           {'der Hund, -e — собака\nlaufen — бегать\ndie Stadt — город'}
         </Text>
@@ -79,17 +88,24 @@ export const ImportGuideSheet = memo(function ImportGuideSheet({ visible, onClos
         </Text>
       </View>
 
-      {GROUPS.map(group => {
+      {GROUPS.map((group) => {
         const Icon = group.icon;
         return (
-          <View key={group.title} style={[styles.group, { backgroundColor: alpha(toneBg[group.tone], 10) }]}>
+          <View
+            key={group.title}
+            style={[styles.group, { backgroundColor: alpha(toneBg[group.tone], 10) }]}
+          >
             <View style={styles.groupTitle}>
               <Icon size={iconSize.xs} color={toneColor[group.tone]} />
-              <Text variant="label" style={{ color: toneColor[group.tone] }}>{group.title}</Text>
+              <Text variant="label" style={{ color: toneColor[group.tone] }}>
+                {group.title}
+              </Text>
             </View>
             {group.rows.map(([bold, rest]) => (
               <Text key={bold} variant="bodySmall" style={{ color: colors.textSecondary }}>
-                <Text variant="bodySmall" style={{ color: colors.textPrimary, fontWeight: '700' }}>{bold}</Text>
+                <Text variant="bodySmall" style={{ color: colors.textPrimary, fontWeight: '700' }}>
+                  {bold}
+                </Text>
                 {` — ${rest}`}
               </Text>
             ))}
@@ -100,8 +116,12 @@ export const ImportGuideSheet = memo(function ImportGuideSheet({ visible, onClos
       <View style={styles.formats}>
         {FORMATS.map(([label, value]) => (
           <View key={label} style={[styles.formatRow, { borderBottomColor: colors.border }]}>
-            <Text variant="bodySmall" color="secondary">{label}</Text>
-            <Text variant="bodySmall" style={{ color: colors.textPrimary, fontWeight: '600' }}>{value}</Text>
+            <Text variant="bodySmall" color="secondary">
+              {label}
+            </Text>
+            <Text variant="bodySmall" style={{ color: colors.textPrimary, fontWeight: '600' }}>
+              {value}
+            </Text>
           </View>
         ))}
       </View>

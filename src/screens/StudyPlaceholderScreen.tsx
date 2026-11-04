@@ -9,7 +9,15 @@ import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha } from '@/constants';
 import Svg, { Circle, Path, Rect, Defs, LinearGradient, Stop } from 'react-native-svg';
 
-function StudyIllustration({ color, tint: _tint, surface }: { color: string; tint: string; surface: string }) {
+function StudyIllustration({
+  color,
+  tint: _tint,
+  surface,
+}: {
+  color: string;
+  tint: string;
+  surface: string;
+}) {
   return (
     <View style={s.illustrationWrap}>
       <Svg width={200} height={160} viewBox="0 0 200 160">
@@ -22,7 +30,17 @@ function StudyIllustration({ color, tint: _tint, surface }: { color: string; tin
         {/* Background circle */}
         <Circle cx={100} cy={80} r={70} fill="url(#grad)" />
         {/* Book */}
-        <Rect x={62} y={55} width={76} height={56} rx={6} fill={surface} stroke={color} strokeWidth={2} strokeOpacity={0.3} />
+        <Rect
+          x={62}
+          y={55}
+          width={76}
+          height={56}
+          rx={6}
+          fill={surface}
+          stroke={color}
+          strokeWidth={2}
+          strokeOpacity={0.3}
+        />
         <Path d="M100 55 L100 111" stroke={color} strokeWidth={1.5} strokeOpacity={0.2} />
         {/* Lines on left page */}
         <Rect x={72} y={68} width={20} height={3} rx={1.5} fill={color} opacity={0.25} />
@@ -34,9 +52,17 @@ function StudyIllustration({ color, tint: _tint, surface }: { color: string; tin
         <Rect x={108} y={76} width={18} height={3} rx={1.5} fill={color} opacity={0.15} />
         <Rect x={108} y={84} width={20} height={3} rx={1.5} fill={color} opacity={0.2} />
         {/* Sparkle top-right */}
-        <Path d="M152 30 L155 38 L163 41 L155 44 L152 52 L149 44 L141 41 L149 38 Z" fill={color} opacity={0.3} />
+        <Path
+          d="M152 30 L155 38 L163 41 L155 44 L152 52 L149 44 L141 41 L149 38 Z"
+          fill={color}
+          opacity={0.3}
+        />
         {/* Sparkle top-left */}
-        <Path d="M52 22 L54 27 L59 29 L54 31 L52 36 L50 31 L45 29 L50 27 Z" fill={color} opacity={0.2} />
+        <Path
+          d="M52 22 L54 27 L59 29 L54 31 L52 36 L50 31 L45 29 L50 27 Z"
+          fill={color}
+          opacity={0.2}
+        />
         {/* Small dots */}
         <Circle cx={40} cy={70} r={3} fill={color} opacity={0.1} />
         <Circle cx={165} cy={95} r={4} fill={color} opacity={0.12} />
@@ -57,18 +83,21 @@ export function StudyPlaceholderScreen() {
     <View style={[s.container, { backgroundColor: colors.background }]}>
       {/* Main card */}
       <View style={[s.card, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-        <StudyIllustration color={colors.primary} tint={colors.surfaceMuted} surface={colors.surface} />
+        <StudyIllustration
+          color={colors.primary}
+          tint={colors.surfaceMuted}
+          surface={colors.surface}
+        />
 
         <View style={[s.badge, { backgroundColor: chipBg }]}>
           <Text style={[s.badgeText, { color: colors.primary }]}>Скоро</Text>
         </View>
 
-        <Text style={[s.title, { color: colors.textPrimary }]}>
-          Режим обучения
-        </Text>
+        <Text style={[s.title, { color: colors.textPrimary }]}>Режим обучения</Text>
 
         <Text style={[s.subtitle, { color: colors.textSecondary }]}>
-          Мы работаем над интерактивным режимом обучения с умным повторением и адаптивными упражнениями.
+          Мы работаем над интерактивным режимом обучения с умным повторением и адаптивными
+          упражнениями.
         </Text>
 
         {/* Feature chips */}
@@ -78,7 +107,13 @@ export function StudyPlaceholderScreen() {
             { icon: '🎯', label: 'Адаптивные тесты' },
             { icon: '⚡', label: 'Быстрые сессии' },
           ].map((f) => (
-            <View key={f.label} style={[s.featureChip, { backgroundColor: colors.surfaceMuted, borderColor: cardBorder }]}>
+            <View
+              key={f.label}
+              style={[
+                s.featureChip,
+                { backgroundColor: colors.surfaceMuted, borderColor: cardBorder },
+              ]}
+            >
               <Text style={s.featureIcon}>{f.icon}</Text>
               <Text style={[s.featureLabel, { color: colors.textSecondary }]}>{f.label}</Text>
             </View>

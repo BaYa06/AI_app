@@ -3,12 +3,7 @@
  * @description Режим "Слово в контексте" — выбери слово по предложению с пропуском
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  View,
-  StyleSheet,
-  Pressable,
-  ActivityIndicator,
-} from 'react-native';
+import { View, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { Dumbbell, PartyPopper, ThumbsUp } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import { Button, ScreenHeader, toast } from '@/components/ui';
@@ -105,7 +100,7 @@ export function ContextFillScreen({ navigation, route }: Props) {
         session,
       });
     },
-    [session, navigation, setId],
+    [session, navigation, setId]
   );
 
   // ── Подготовка ──────────────────────────────────────────────────────────
@@ -137,7 +132,7 @@ export function ContextFillScreen({ navigation, route }: Props) {
         const results = await apiService.generateExamples(
           noExample.map((c) => ({ front: c.frontText, back: c.backText })),
           set?.languageFrom,
-          set?.languageTo,
+          set?.languageTo
         );
 
         for (let i = 0; i < noExample.length; i++) {
@@ -163,7 +158,12 @@ export function ContextFillScreen({ navigation, route }: Props) {
           if (c.example) return c;
           const gen = genMap.get(c.frontText);
           return gen?.example
-            ? { ...c, example: gen.example, wordForm: gen.wordForm || c.wordForm, wordType: (gen.wordType as Card['wordType']) || c.wordType }
+            ? {
+                ...c,
+                example: gen.example,
+                wordForm: gen.wordForm || c.wordForm,
+                wordType: (gen.wordType as Card['wordType']) || c.wordType,
+              }
             : c;
         });
       } catch {
@@ -186,7 +186,16 @@ export function ContextFillScreen({ navigation, route }: Props) {
 
     setQuestions(ready);
     setPrepLoading(false);
-  }, [setId, cardLimit, dueCardIds, session, finishSessionStage, getCardsBySet, updateCard, navigation]);
+  }, [
+    setId,
+    cardLimit,
+    dueCardIds,
+    session,
+    finishSessionStage,
+    getCardsBySet,
+    updateCard,
+    navigation,
+  ]);
 
   useEffect(() => {
     prep();
@@ -207,7 +216,7 @@ export function ContextFillScreen({ navigation, route }: Props) {
         setOptionsLoading(false);
       }
     },
-    [allCards],
+    [allCards]
   );
 
   useEffect(() => {
@@ -233,9 +242,8 @@ export function ContextFillScreen({ navigation, route }: Props) {
         setCorrectCount((n) => n + 1);
         correctIdsRef.current = [...correctIdsRef.current, currentCard.id];
       }
-
     },
-    [selectedOption, optionsLoading, questions, currentIndex, session],
+    [selectedOption, optionsLoading, questions, currentIndex, session]
   );
 
   // Дальше — по кнопке в нижней панели (общий скелет режима)
@@ -272,10 +280,20 @@ export function ContextFillScreen({ navigation, route }: Props) {
   // Подготовка — в том же скелете, чтобы экран этапа сессии не прерывался
   if (prepLoading) {
     return (
-      <StageLayout session={session} progress={{ done: 0, total: 0 }} onExit={handleExit} showIntro={!!session} scroll={false}>
+      <StageLayout
+        session={session}
+        progress={{ done: 0, total: 0 }}
+        onExit={handleExit}
+        showIntro={!!session}
+        scroll={false}
+      >
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text variant="body" align="center" style={[styles.prepText, { color: colors.textSecondary }]}>
+          <Text
+            variant="body"
+            align="center"
+            style={[styles.prepText, { color: colors.textSecondary }]}
+          >
             {prepStatus}
           </Text>
         </View>
@@ -286,9 +304,7 @@ export function ContextFillScreen({ navigation, route }: Props) {
   // ── Экран: результат ─────────────────────────────────────────────────────
 
   if (finished) {
-    const accuracy = questions.length > 0
-      ? Math.round((correctCount / questions.length) * 100)
-      : 0;
+    const accuracy = questions.length > 0 ? Math.round((correctCount / questions.length) * 100) : 0;
     // Вместо эмодзи 🎉 👍 💪 — иконки lucide (брендбук, раздел 6)
     const ResultIcon = accuracy >= 80 ? PartyPopper : accuracy >= 50 ? ThumbsUp : Dumbbell;
 
@@ -303,13 +319,23 @@ export function ContextFillScreen({ navigation, route }: Props) {
             style={[styles.resultCard, { backgroundColor: colors.primaryFill }]}
           >
             <ResultIcon size={iconSize.xl} color={colors.onPrimary} />
-            <Text variant="display" style={{ color: colors.onPrimary }}>{correctCount}/{questions.length}</Text>
-            <Text variant="body" style={[styles.semibold, styles.onFillMuted, { color: colors.onPrimary }]}>
+            <Text variant="display" style={{ color: colors.onPrimary }}>
+              {correctCount}/{questions.length}
+            </Text>
+            <Text
+              variant="body"
+              style={[styles.semibold, styles.onFillMuted, { color: colors.onPrimary }]}
+            >
               {accuracy}% точность
             </Text>
           </View>
 
-          <Button title="Готово" onPress={() => navigation.goBack()} fullWidth style={styles.doneBtn} />
+          <Button
+            title="Готово"
+            onPress={() => navigation.goBack()}
+            fullWidth
+            style={styles.doneBtn}
+          />
         </View>
       </View>
     );
@@ -333,95 +359,110 @@ export function ContextFillScreen({ navigation, route }: Props) {
           <AnswerPanel
             correct={optionState === 'correct'}
             answer={currentCard.frontText}
-            hint={{ front: currentCard.frontText, back: currentCard.backText, example: currentCard.example || undefined }}
+            hint={{
+              front: currentCard.frontText,
+              back: currentCard.backText,
+              example: currentCard.example || undefined,
+            }}
             onNext={handleNext}
           />
         ) : null
       }
     >
-        {/* Question card */}
-        <View style={[styles.questionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text variant="h2" style={{ color: colors.textPrimary }}>{sentenceWithBlank}</Text>
+      {/* Question card */}
+      <View
+        style={[
+          styles.questionCard,
+          { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}
+      >
+        <Text variant="h2" style={{ color: colors.textPrimary }}>
+          {sentenceWithBlank}
+        </Text>
+      </View>
+
+      {/* Options */}
+      {optionsLoading ? (
+        <View style={styles.optionsLoading}>
+          <ActivityIndicator color={colors.primary} />
         </View>
+      ) : (
+        <View style={styles.optionsList}>
+          {options.map((option, idx) => {
+            const isSelected = selectedOption === option;
+            const isCorrectAnswer = option === currentCard?.frontText;
 
-        {/* Options */}
-        {optionsLoading ? (
-          <View style={styles.optionsLoading}>
-            <ActivityIndicator color={colors.primary} />
-          </View>
-        ) : (
-          <View style={styles.optionsList}>
-            {options.map((option, idx) => {
-              const isSelected = selectedOption === option;
-              const isCorrectAnswer = option === currentCard?.frontText;
+            let borderColor = colors.border;
+            let bgColor = colors.surface;
+            let labelBg = colors.surfaceMuted;
+            let labelTextColor = colors.textSecondary;
+            let textColor = colors.textPrimary;
 
-              let borderColor = colors.border;
-              let bgColor = colors.surface;
-              let labelBg = colors.surfaceMuted;
-              let labelTextColor = colors.textSecondary;
-              let textColor = colors.textPrimary;
-
-              if (selectedOption !== null) {
-                if (isCorrectAnswer) {
-                  borderColor = colors.success;
-                  bgColor = alpha(colors.success, 10);
-                  labelBg = colors.success;
-                  labelTextColor = colors.onPrimary;
-                  textColor = colors.successText;
-                } else if (isSelected) {
-                  borderColor = colors.error;
-                  bgColor = alpha(colors.error, 10);
-                  labelBg = colors.error;
-                  labelTextColor = colors.onPrimary;
-                  textColor = colors.errorText;
-                } else {
-                  bgColor = colors.surfaceMuted;
-                }
-              } else if (isSelected) {
-                borderColor = colors.primary;
-                bgColor = alpha(colors.primary, 10);
-                labelBg = colors.primaryFill;
+            if (selectedOption !== null) {
+              if (isCorrectAnswer) {
+                borderColor = colors.success;
+                bgColor = alpha(colors.success, 10);
+                labelBg = colors.success;
                 labelTextColor = colors.onPrimary;
-                textColor = colors.primary;
+                textColor = colors.successText;
+              } else if (isSelected) {
+                borderColor = colors.error;
+                bgColor = alpha(colors.error, 10);
+                labelBg = colors.error;
+                labelTextColor = colors.onPrimary;
+                textColor = colors.errorText;
+              } else {
+                bgColor = colors.surfaceMuted;
               }
+            } else if (isSelected) {
+              borderColor = colors.primary;
+              bgColor = alpha(colors.primary, 10);
+              labelBg = colors.primaryFill;
+              labelTextColor = colors.onPrimary;
+              textColor = colors.primary;
+            }
 
-              return (
-                <Pressable
-                  key={idx}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${OPTION_LABELS[idx]}. ${option}${
-                    selectedOption !== null && isCorrectAnswer ? ', верно' : selectedOption !== null && isSelected ? ', неверно' : ''
-                  }`}
-                  style={({ pressed }) => [
-                    styles.optionBtn,
-                    {
-                      backgroundColor: bgColor,
-                      borderColor,
-                      borderWidth: isSelected || (selectedOption !== null && isCorrectAnswer) ? 2 : 1,
-                    },
-                    selectedOption !== null && !isSelected && !isCorrectAnswer && styles.optionDimmed,
-                    pressed && selectedOption === null && styles.optionPressed,
-                  ]}
-                  onPress={() => handleSelect(option)}
-                  disabled={selectedOption !== null}
-                >
-                  <View style={[styles.optionLabel, { backgroundColor: labelBg }]}>
-                    <Text variant="label" style={[styles.bold, { color: labelTextColor }]}>
-                      {OPTION_LABELS[idx]}
-                    </Text>
-                  </View>
-                  <Text
-                    variant="body"
-                    style={[styles.optionText, { color: textColor }, isSelected && styles.semibold]}
-                    numberOfLines={2}
-                  >
-                    {option}
+            return (
+              <Pressable
+                key={idx}
+                accessibilityRole="button"
+                accessibilityLabel={`${OPTION_LABELS[idx]}. ${option}${
+                  selectedOption !== null && isCorrectAnswer
+                    ? ', верно'
+                    : selectedOption !== null && isSelected
+                      ? ', неверно'
+                      : ''
+                }`}
+                style={({ pressed }) => [
+                  styles.optionBtn,
+                  {
+                    backgroundColor: bgColor,
+                    borderColor,
+                    borderWidth: isSelected || (selectedOption !== null && isCorrectAnswer) ? 2 : 1,
+                  },
+                  selectedOption !== null && !isSelected && !isCorrectAnswer && styles.optionDimmed,
+                  pressed && selectedOption === null && styles.optionPressed,
+                ]}
+                onPress={() => handleSelect(option)}
+                disabled={selectedOption !== null}
+              >
+                <View style={[styles.optionLabel, { backgroundColor: labelBg }]}>
+                  <Text variant="label" style={[styles.bold, { color: labelTextColor }]}>
+                    {OPTION_LABELS[idx]}
                   </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        )}
+                </View>
+                <Text
+                  variant="body"
+                  style={[styles.optionText, { color: textColor }, isSelected && styles.semibold]}
+                  numberOfLines={2}
+                >
+                  {option}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
     </StageLayout>
   );
 }

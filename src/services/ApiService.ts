@@ -51,8 +51,10 @@ class ApiService {
   async generateExamples(
     words: Array<{ front: string; back: string }>,
     languageFrom?: string,
-    languageTo?: string,
-  ): Promise<Array<{ front: string; back: string; example: string; wordForm?: string; wordType?: string }>> {
+    languageTo?: string
+  ): Promise<
+    Array<{ front: string; back: string; example: string; wordForm?: string; wordType?: string }>
+  > {
     requireAiConsent();
     const response = await fetch(`${AI_BASE_URL}/generate-examples`, {
       method: 'POST',

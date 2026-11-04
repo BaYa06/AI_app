@@ -8,7 +8,13 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Check, CheckCircle } from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { selectSetStats, useCardsStore, useCoursesStore, useSetsStore, useThemeColors } from '@/store';
+import {
+  selectSetStats,
+  useCardsStore,
+  useCoursesStore,
+  useSetsStore,
+  useThemeColors,
+} from '@/store';
 import { TOP_LANGUAGES, alpha, borderRadius, iconSize, screenPadding, spacing } from '@/constants';
 import {
   Badge,
@@ -84,13 +90,20 @@ function SaveModal({
   const renderLanguageRow = (
     label: string,
     selected: string | null,
-    onSelect: (code: string) => void,
+    onSelect: (code: string) => void
   ) => (
     <View style={styles.langBlock}>
-      <Text variant="label" style={{ color: showValidation && !selected ? colors.errorText : colors.textSecondary }}>
+      <Text
+        variant="label"
+        style={{ color: showValidation && !selected ? colors.errorText : colors.textSecondary }}
+      >
         {label}
       </Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.langChips}>
           {TOP_LANGUAGES.map((lang) => {
             const active = selected === lang.code;
@@ -104,11 +117,18 @@ function SaveModal({
                   styles.langChip,
                   {
                     backgroundColor: active ? colors.primaryFill : colors.surfaceMuted,
-                    borderColor: active ? colors.primaryFill : showValidation && !selected ? colors.error : colors.surfaceMuted,
+                    borderColor: active
+                      ? colors.primaryFill
+                      : showValidation && !selected
+                        ? colors.error
+                        : colors.surfaceMuted,
                   },
                 ]}
               >
-                <Text variant="label" style={{ color: active ? colors.onPrimary : colors.textPrimary }}>
+                <Text
+                  variant="label"
+                  style={{ color: active ? colors.onPrimary : colors.textPrimary }}
+                >
                   {lang.flag} {lang.label}
                 </Text>
               </Pressable>
@@ -128,7 +148,13 @@ function SaveModal({
       title="Новый набор"
       footer={
         <View style={styles.modalActions}>
-          <Button variant="quiet" tone="secondary" title="Отмена" onPress={onCancel} style={styles.flex1} />
+          <Button
+            variant="quiet"
+            tone="secondary"
+            title="Отмена"
+            onPress={onCancel}
+            style={styles.flex1}
+          />
           <Button
             title="Сохранить"
             onPress={handleConfirm}
@@ -148,14 +174,25 @@ function SaveModal({
       />
 
       <View style={styles.langBlock}>
-        <Text variant="label" style={{ color: showValidation && !kind ? colors.errorText : colors.textSecondary }}>
+        <Text
+          variant="label"
+          style={{ color: showValidation && !kind ? colors.errorText : colors.textSecondary }}
+        >
           Тип *
         </Text>
         <SetKindPicker value={kind} onChange={setKind} hasError={showValidation && !kind} />
       </View>
 
-      {renderLanguageRow(isSubject ? 'Язык вопросов *' : 'Язык слов *', languageFrom, setLanguageFrom)}
-      {renderLanguageRow(isSubject ? 'Язык ответов *' : 'Язык перевода *', languageTo, setLanguageTo)}
+      {renderLanguageRow(
+        isSubject ? 'Язык вопросов *' : 'Язык слов *',
+        languageFrom,
+        setLanguageFrom
+      )}
+      {renderLanguageRow(
+        isSubject ? 'Язык ответов *' : 'Язык перевода *',
+        languageTo,
+        setLanguageTo
+      )}
       {showValidation && !languagesSelected && (
         <Text variant="caption" style={{ color: colors.errorText, marginTop: spacing.xs }}>
           Выбери оба языка
@@ -203,18 +240,18 @@ async function addExamples(
   cards: ImportCard[],
   languageFrom: string | undefined,
   languageTo: string | undefined,
-  onProgress: (done: number) => void,
+  onProgress: (done: number) => void
 ): Promise<ImportCard[]> {
   const result = [...cards];
-  const missing = result.map((c, i) => (c.example ? -1 : i)).filter(i => i >= 0);
+  const missing = result.map((c, i) => (c.example ? -1 : i)).filter((i) => i >= 0);
   let done = 0;
   for (let start = 0; start < missing.length; start += EXAMPLE_BATCH) {
     const batch = missing.slice(start, start + EXAMPLE_BATCH);
     try {
       const generated = await apiService.generateExamples(
-        batch.map(i => ({ front: result[i].front, back: result[i].back })),
+        batch.map((i) => ({ front: result[i].front, back: result[i].back })),
         languageFrom,
-        languageTo,
+        languageTo
       );
       batch.forEach((cardIndex, j) => {
         const gen = generated[j];
@@ -268,7 +305,11 @@ const ItemRow = React.memo(function ItemRow({
       style={[
         styles.row,
         {
-          backgroundColor: editing ? colors.surface : lowConfidence ? alpha(colors.warning, 10) : colors.surfaceMuted,
+          backgroundColor: editing
+            ? colors.surface
+            : lowConfidence
+              ? alpha(colors.warning, 10)
+              : colors.surfaceMuted,
           borderColor: editing ? colors.primary : 'transparent',
           opacity: item.checked || editing ? 1 : 0.6,
         },
@@ -296,23 +337,34 @@ const ItemRow = React.memo(function ItemRow({
           onPress={() => onEdit(editing ? null : item.key)}
           style={styles.rowTexts}
         >
-          <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>{item.front}</Text>
-          <Text variant="bodySmall" style={{ color: item.back ? colors.textSecondary : colors.warningText }}>
+          <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
+            {item.front}
+          </Text>
+          <Text
+            variant="bodySmall"
+            style={{ color: item.back ? colors.textSecondary : colors.warningText }}
+          >
             {item.back || 'без перевода — нажми, чтобы вписать'}
           </Text>
         </Pressable>
-        {item.duplicate ? <Badge label="Уже есть" tone="neutral" />
-          : lowConfidence ? <Badge label="Проверь" tone="warning" />
-            : null}
+        {item.duplicate ? (
+          <Badge label="Уже есть" tone="neutral" />
+        ) : lowConfidence ? (
+          <Badge label="Проверь" tone="warning" />
+        ) : null}
       </View>
       {editing && (
         <View style={styles.editor}>
-          <TextField label="Слово" value={item.front} onChangeText={t => onChange(item.key, { front: t })} />
+          <TextField
+            label="Слово"
+            value={item.front}
+            onChangeText={(t) => onChange(item.key, { front: t })}
+          />
           <TextField
             label="Перевод"
             value={item.back}
             placeholder="Впиши перевод"
-            onChangeText={t => onChange(item.key, { back: t })}
+            onChangeText={(t) => onChange(item.key, { back: t })}
           />
           <Button size="s" title="Готово" onPress={() => onEdit(null)} />
         </View>
@@ -324,21 +376,29 @@ const ItemRow = React.memo(function ItemRow({
 // ─── Экран ────────────────────────────────────────────────────────────────────
 
 export function PreviewImportScreen({ navigation, route }: Props) {
-  const { cards, suggestedTitle = '', setId, languageFrom: defaultLanguageFrom, languageTo: defaultLanguageTo } = route.params;
+  const {
+    cards,
+    suggestedTitle = '',
+    setId,
+    languageFrom: defaultLanguageFrom,
+    languageTo: defaultLanguageTo,
+  } = route.params;
   const draftKey = route.params.draftKey ?? setId;
   const colors = useThemeColors();
   const bottomInset = useScreenBottomInset();
 
-  const set = useSetsStore(s => (setId ? s.getSet(setId) : undefined));
+  const set = useSetsStore((s) => (setId ? s.getSet(setId) : undefined));
   const isSubject = isSubjectSet(set);
-  const addSet = useSetsStore(s => s.addSet);
-  const updateSetStats = useSetsStore(s => s.updateSetStats);
-  const addCards = useCardsStore(s => s.addCards);
-  const updateCard = useCardsStore(s => s.updateCard);
+  const addSet = useSetsStore((s) => s.addSet);
+  const updateSetStats = useSetsStore((s) => s.updateSetStats);
+  const addCards = useCardsStore((s) => s.addCards);
+  const updateCard = useCardsStore((s) => s.updateCard);
 
   const [items, setItems] = useState<Item[]>(() => {
     const existing = new Set(
-      (setId ? useCardsStore.getState().getCardsBySet(setId) : []).map(c => normalizeFront(c.frontText)),
+      (setId ? useCardsStore.getState().getCardsBySet(setId) : []).map((c) =>
+        normalizeFront(c.frontText)
+      )
     );
     const seen = new Set<string>();
     return cards.map((card, i) => {
@@ -355,27 +415,38 @@ export function PreviewImportScreen({ navigation, route }: Props) {
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
 
-  const checked = items.filter(i => i.checked && i.front.trim());
-  const counts = useMemo(() => ({
-    duplicate: items.filter(i => i.duplicate).length,
-    noTranslation: items.filter(i => !i.back.trim()).length,
-    check: items.filter(i => i.confidence === 'low').length,
-  }), [items]);
-  const visible = useMemo(() => items.filter(i =>
-    filter === 'all' ? true
-      : filter === 'duplicate' ? i.duplicate
-        : filter === 'noTranslation' ? !i.back.trim()
-          : i.confidence === 'low'), [items, filter]);
-  const allChecked = items.every(i => i.checked);
+  const checked = items.filter((i) => i.checked && i.front.trim());
+  const counts = useMemo(
+    () => ({
+      duplicate: items.filter((i) => i.duplicate).length,
+      noTranslation: items.filter((i) => !i.back.trim()).length,
+      check: items.filter((i) => i.confidence === 'low').length,
+    }),
+    [items]
+  );
+  const visible = useMemo(
+    () =>
+      items.filter((i) =>
+        filter === 'all'
+          ? true
+          : filter === 'duplicate'
+            ? i.duplicate
+            : filter === 'noTranslation'
+              ? !i.back.trim()
+              : i.confidence === 'low'
+      ),
+    [items, filter]
+  );
+  const allChecked = items.every((i) => i.checked);
 
   const toggle = useCallback((key: string) => {
-    setItems(prev => prev.map(i => (i.key === key ? { ...i, checked: !i.checked } : i)));
+    setItems((prev) => prev.map((i) => (i.key === key ? { ...i, checked: !i.checked } : i)));
   }, []);
   const change = useCallback((key: string, patch: Partial<Pick<Item, 'front' | 'back'>>) => {
-    setItems(prev => prev.map(i => (i.key === key ? { ...i, ...patch } : i)));
+    setItems((prev) => prev.map((i) => (i.key === key ? { ...i, ...patch } : i)));
   }, []);
   const toggleAll = useCallback(() => {
-    setItems(prev => prev.map(i => ({ ...i, checked: !allChecked })));
+    setItems((prev) => prev.map((i) => ({ ...i, checked: !allChecked })));
   }, [allChecked]);
 
   /** «+ Фото»: правки сохраняем в черновик, новые страницы допишутся к этому же списку */
@@ -392,65 +463,101 @@ export function PreviewImportScreen({ navigation, route }: Props) {
 
   // ── сохранение ────────────────────────────────────────────────────────────
 
-  const save = useCallback(async (target: { setId: string; isNew: boolean; languageFrom?: string; languageTo?: string; subject?: boolean }) => {
-    let toAdd: ImportCard[] = checked.map(({ key: _key, checked: _checked, duplicate: _duplicate, ...card }) => card);
-    // Примеры предложений — для «Слова в контексте», которого у предмета нет (plan/new/set_kind.md)
-    const needExamples = examplesOn && !target.subject && toAdd.some(c => !c.example);
-    // Примеры пишет ИИ — без согласия добавляем без них
-    const examplesWanted = needExamples && (await ensureAiConsent());
+  const save = useCallback(
+    async (target: {
+      setId: string;
+      isNew: boolean;
+      languageFrom?: string;
+      languageTo?: string;
+      subject?: boolean;
+    }) => {
+      let toAdd: ImportCard[] = checked.map(
+        ({ key: _key, checked: _checked, duplicate: _duplicate, ...card }) => card
+      );
+      // Примеры предложений — для «Слова в контексте», которого у предмета нет (plan/new/set_kind.md)
+      const needExamples = examplesOn && !target.subject && toAdd.some((c) => !c.example);
+      // Примеры пишет ИИ — без согласия добавляем без них
+      const examplesWanted = needExamples && (await ensureAiConsent());
 
-    if (examplesWanted) {
-      const total = toAdd.filter(c => !c.example).length;
-      setProgress({ done: 0, total });
-      toAdd = await addExamples(toAdd, target.languageFrom, target.languageTo, done => setProgress({ done, total }));
-    }
+      if (examplesWanted) {
+        const total = toAdd.filter((c) => !c.example).length;
+        setProgress({ done: 0, total });
+        toAdd = await addExamples(toAdd, target.languageFrom, target.languageTo, (done) =>
+          setProgress({ done, total })
+        );
+      }
 
-    const created = addCards(toAdd.map(c => toCardInput(target.setId, c)));
-    const stats = selectSetStats(target.setId);
-    updateSetStats(target.setId, {
-      cardCount: stats.total,
-      newCount: stats.newCount,
-      learningCount: stats.learningCount,
-      youngCount: stats.youngCount,
-      matureCount: stats.matureCount,
-      reviewCount: stats.reviewCount,
-      masteredCount: stats.masteredCount,
-    });
-    clearImportDraft(draftKey);
-    setProgress(null);
-    setSummary({
-      setId: target.setId,
-      added: created.length,
-      withExamples: created.filter(c => c.example).length,
-      missingIds: created.filter(c => !c.example).map(c => c.id),
-      skippedDuplicates: items.filter(i => i.duplicate && !i.checked).length,
-      examplesWanted,
-    });
-  }, [checked, examplesOn, addCards, updateSetStats, draftKey, items]);
+      const created = addCards(toAdd.map((c) => toCardInput(target.setId, c)));
+      const stats = selectSetStats(target.setId);
+      updateSetStats(target.setId, {
+        cardCount: stats.total,
+        newCount: stats.newCount,
+        learningCount: stats.learningCount,
+        youngCount: stats.youngCount,
+        matureCount: stats.matureCount,
+        reviewCount: stats.reviewCount,
+        masteredCount: stats.masteredCount,
+      });
+      clearImportDraft(draftKey);
+      setProgress(null);
+      setSummary({
+        setId: target.setId,
+        added: created.length,
+        withExamples: created.filter((c) => c.example).length,
+        missingIds: created.filter((c) => !c.example).map((c) => c.id),
+        skippedDuplicates: items.filter((i) => i.duplicate && !i.checked).length,
+        examplesWanted,
+      });
+    },
+    [checked, examplesOn, addCards, updateSetStats, draftKey, items]
+  );
 
   const handleSaveToExisting = useCallback(async () => {
     if (checked.length === 0) return;
     try {
-      await save({ setId, isNew: false, languageFrom: set?.languageFrom, languageTo: set?.languageTo, subject: isSubject });
+      await save({
+        setId,
+        isNew: false,
+        languageFrom: set?.languageFrom,
+        languageTo: set?.languageTo,
+        subject: isSubject,
+      });
     } catch (e) {
       setProgress(null);
       toast.error(describeError(e, 'Не удалось сохранить карточки'));
     }
   }, [checked.length, save, setId, set?.languageFrom, set?.languageTo, isSubject]);
 
-  const handleSaveConfirm = useCallback(async (title: string, languageFrom: string, languageTo: string, kind: SetKind) => {
-    try {
-      // Новый набор — в открытый свой курс (как в SetEditorScreen), иначе в «Мои наборы»
-      const { activeCourseId, courses } = useCoursesStore.getState();
-      const courseId = courses.some((c) => c.id === activeCourseId && !c.isStudentCourse) ? activeCourseId : null;
-      const newSet = await addSet({ title: title.trim() || 'Импорт', languageFrom, languageTo, kind, courseId });
-      setModalVisible(false);
-      await save({ setId: newSet.id, isNew: true, languageFrom, languageTo, subject: kind === 'subject' });
-    } catch (e) {
-      setProgress(null);
-      toast.error(describeError(e, 'Не удалось сохранить набор'));
-    }
-  }, [addSet, save]);
+  const handleSaveConfirm = useCallback(
+    async (title: string, languageFrom: string, languageTo: string, kind: SetKind) => {
+      try {
+        // Новый набор — в открытый свой курс (как в SetEditorScreen), иначе в «Мои наборы»
+        const { activeCourseId, courses } = useCoursesStore.getState();
+        const courseId = courses.some((c) => c.id === activeCourseId && !c.isStudentCourse)
+          ? activeCourseId
+          : null;
+        const newSet = await addSet({
+          title: title.trim() || 'Импорт',
+          languageFrom,
+          languageTo,
+          kind,
+          courseId,
+        });
+        setModalVisible(false);
+        await save({
+          setId: newSet.id,
+          isNew: true,
+          languageFrom,
+          languageTo,
+          subject: kind === 'subject',
+        });
+      } catch (e) {
+        setProgress(null);
+        toast.error(describeError(e, 'Не удалось сохранить набор'));
+      }
+    },
+    [addSet, save]
+  );
 
   /** «Догенерировать»: примеры для уже добавленных карточек без них */
   const retryExamples = useCallback(async () => {
@@ -458,41 +565,61 @@ export function PreviewImportScreen({ navigation, route }: Props) {
     const target = useSetsStore.getState().getSet(summary.setId);
     const state = useCardsStore.getState();
     const missing = summary.missingIds
-      .map(id => state.getCard(id))
+      .map((id) => state.getCard(id))
       .filter((c): c is NonNullable<typeof c> => !!c);
     const total = missing.length;
     setProgress({ done: 0, total });
     const filled = await addExamples(
-      missing.map(c => ({ front: c.frontText, back: c.backText })),
+      missing.map((c) => ({ front: c.frontText, back: c.backText })),
       target?.languageFrom,
       target?.languageTo,
-      done => setProgress({ done, total }),
+      (done) => setProgress({ done, total })
     );
     const stillMissing: string[] = [];
     filled.forEach((c, i) => {
-      if (c.example) updateCard(missing[i].id, { example: c.example, wordForm: c.wordForm, wordType: c.wordType });
+      if (c.example)
+        updateCard(missing[i].id, {
+          example: c.example,
+          wordForm: c.wordForm,
+          wordType: c.wordType,
+        });
       else stillMissing.push(missing[i].id);
     });
     setProgress(null);
-    setSummary(prev => prev && {
-      ...prev,
-      withExamples: prev.added - stillMissing.length,
-      missingIds: stillMissing,
-    });
+    setSummary(
+      (prev) =>
+        prev && {
+          ...prev,
+          withExamples: prev.added - stillMissing.length,
+          missingIds: stillMissing,
+        }
+    );
   }, [summary, updateCard]);
 
   // ── render ────────────────────────────────────────────────────────────────
 
   if (progress) {
     return (
-      <View style={[styles.root, styles.centered, { backgroundColor: colors.background, paddingBottom: bottomInset }]}>
-        <Text variant="h2" align="center" style={{ color: colors.textPrimary }}>Пишем примеры</Text>
+      <View
+        style={[
+          styles.root,
+          styles.centered,
+          { backgroundColor: colors.background, paddingBottom: bottomInset },
+        ]}
+      >
+        <Text variant="h2" align="center" style={{ color: colors.textPrimary }}>
+          Пишем примеры
+        </Text>
         <Text variant="body" align="center" color="secondary">
           {`Примеры: ${progress.done} из ${progress.total}`}
         </Text>
-        <ProgressBar progress={progress.total ? (progress.done / progress.total) * 100 : 0} style={styles.progress} />
+        <ProgressBar
+          progress={progress.total ? (progress.done / progress.total) * 100 : 0}
+          style={styles.progress}
+        />
         <Text variant="bodySmall" align="center" color="secondary">
-          Для режима «Слово в контексте». Если сервер занят, добавим без примера — их можно дописать позже.
+          Для режима «Слово в контексте». Если сервер занят, добавим без примера — их можно дописать
+          позже.
         </Text>
       </View>
     );
@@ -501,12 +628,32 @@ export function PreviewImportScreen({ navigation, route }: Props) {
   if (summary) {
     const missing = summary.missingIds.length;
     const rows: Array<[string, number, string?]> = [
-      ...(summary.examplesWanted ? [['С примерами', summary.withExamples] as [string, number]] : []),
-      ...(summary.examplesWanted && missing > 0 ? [['Без примера — сервер был занят', missing, colors.warningText] as [string, number, string]] : []),
-      ...(summary.skippedDuplicates > 0 ? [['Пропущено дублей', summary.skippedDuplicates, colors.textSecondary] as [string, number, string]] : []),
+      ...(summary.examplesWanted
+        ? [['С примерами', summary.withExamples] as [string, number]]
+        : []),
+      ...(summary.examplesWanted && missing > 0
+        ? [
+            ['Без примера — сервер был занят', missing, colors.warningText] as [
+              string,
+              number,
+              string,
+            ],
+          ]
+        : []),
+      ...(summary.skippedDuplicates > 0
+        ? [
+            ['Пропущено дублей', summary.skippedDuplicates, colors.textSecondary] as [
+              string,
+              number,
+              string,
+            ],
+          ]
+        : []),
     ];
     return (
-      <View style={[styles.root, { backgroundColor: colors.background, paddingBottom: bottomInset }]}>
+      <View
+        style={[styles.root, { backgroundColor: colors.background, paddingBottom: bottomInset }]}
+      >
         <View style={styles.doneBody}>
           <View style={[styles.doneIcon, { backgroundColor: alpha(colors.success, 10) }]}>
             <CheckCircle size={iconSize.xl} color={colors.successText} />
@@ -518,15 +665,26 @@ export function PreviewImportScreen({ navigation, route }: Props) {
             <View style={styles.doneRows}>
               {rows.map(([label, value, color]) => (
                 <View key={label} style={[styles.doneRow, { borderBottomColor: colors.border }]}>
-                  <Text variant="body" style={{ color: colors.textPrimary }}>{label}</Text>
-                  <Text variant="body" style={{ color: color ?? colors.textPrimary, fontWeight: '700' }}>{value}</Text>
+                  <Text variant="body" style={{ color: colors.textPrimary }}>
+                    {label}
+                  </Text>
+                  <Text
+                    variant="body"
+                    style={{ color: color ?? colors.textPrimary, fontWeight: '700' }}
+                  >
+                    {value}
+                  </Text>
                 </View>
               ))}
             </View>
           )}
         </View>
         <View style={styles.doneActions}>
-          <Button title="К набору" onPress={() => navigation.navigate('SetDetail', { setId: summary.setId })} fullWidth />
+          <Button
+            title="К набору"
+            onPress={() => navigation.navigate('SetDetail', { setId: summary.setId })}
+            fullWidth
+          />
           {summary.examplesWanted && missing > 0 && (
             <Button
               variant="secondary"
@@ -543,7 +701,11 @@ export function PreviewImportScreen({ navigation, route }: Props) {
   const filters: Array<{ key: Filter; label: string; count: number }> = [
     { key: 'all', label: 'Все', count: items.length },
     { key: 'duplicate', label: 'Уже есть', count: counts.duplicate },
-    { key: 'noTranslation', label: isSubject ? 'Без ответа' : 'Без перевода', count: counts.noTranslation },
+    {
+      key: 'noTranslation',
+      label: isSubject ? 'Без ответа' : 'Без перевода',
+      count: counts.noTranslation,
+    },
     { key: 'check', label: 'Проверить', count: counts.check },
   ];
 
@@ -553,24 +715,49 @@ export function PreviewImportScreen({ navigation, route }: Props) {
       <ScreenHeader
         title={isSubject ? 'Проверь карточки' : 'Проверь слова'}
         onBack={() => navigation.goBack()}
-        right={<Button variant="quiet" size="s" title={allChecked ? 'Снять все' : 'Отметить все'} onPress={toggleAll} />}
+        right={
+          <Button
+            variant="quiet"
+            size="s"
+            title={allChecked ? 'Снять все' : 'Отметить все'}
+            onPress={toggleAll}
+          />
+        }
       />
       <Text variant="bodySmall" color="secondary" style={styles.subtitle}>
         {`Будет добавлено ${checked.length} из ${items.length}`}
       </Text>
 
       {/* flexGrow/flexShrink 0: иначе при длинном списке ScrollView сжимается и чипы уходят под FlatList */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersBar} contentContainerStyle={styles.filters}>
-        {filters.filter(f => f.key === 'all' || f.count > 0).map(f => (
-          <Chip key={f.key} label={`${f.label} ${f.count}`} selected={filter === f.key} onPress={() => setFilter(f.key)} />
-        ))}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filtersBar}
+        contentContainerStyle={styles.filters}
+      >
+        {filters
+          .filter((f) => f.key === 'all' || f.count > 0)
+          .map((f) => (
+            <Chip
+              key={f.key}
+              label={`${f.label} ${f.count}`}
+              selected={filter === f.key}
+              onPress={() => setFilter(f.key)}
+            />
+          ))}
       </ScrollView>
 
       <FlatList
         data={visible}
-        keyExtractor={item => item.key}
+        keyExtractor={(item) => item.key}
         renderItem={({ item }) => (
-          <ItemRow item={item} editing={editingKey === item.key} onToggle={toggle} onEdit={setEditingKey} onChange={change} />
+          <ItemRow
+            item={item}
+            editing={editingKey === item.key}
+            onToggle={toggle}
+            onEdit={setEditingKey}
+            onChange={change}
+          />
         )}
         style={styles.flex1}
         contentContainerStyle={styles.list}
@@ -579,22 +766,37 @@ export function PreviewImportScreen({ navigation, route }: Props) {
         ItemSeparatorComponent={() => <View style={styles.separator} />}
       />
 
-      <View style={[styles.bottom, { borderTopColor: colors.border, backgroundColor: colors.background }]}>
+      <View
+        style={[
+          styles.bottom,
+          { borderTopColor: colors.border, backgroundColor: colors.background },
+        ]}
+      >
         {!isSubject && (
           <View style={styles.switchRow}>
             <View style={styles.switchText}>
-              <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '600' }}>Примеры предложений</Text>
-              <Text variant="caption" color="secondary">ИИ допишет к каждой карточке — для «Слова в контексте»</Text>
+              <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '600' }}>
+                Примеры предложений
+              </Text>
+              <Text variant="caption" color="secondary">
+                ИИ допишет к каждой карточке — для «Слова в контексте»
+              </Text>
             </View>
-            <Switch value={examplesOn} onValueChange={setExamplesOn} accessibilityLabel="Примеры предложений" />
+            <Switch
+              value={examplesOn}
+              onValueChange={setExamplesOn}
+              accessibilityLabel="Примеры предложений"
+            />
           </View>
         )}
         <View style={styles.bottomButtons}>
           {setId ? <Button variant="secondary" title="+ Фото" onPress={addMorePhotos} /> : null}
           <Button
-            title={checked.length === 0
-              ? 'Ничего не выбрано'
-              : `${setId ? 'Добавить' : 'Сохранить'} ${checked.length} ${pluralize(checked.length, 'карточку', 'карточки', 'карточек')}`}
+            title={
+              checked.length === 0
+                ? 'Ничего не выбрано'
+                : `${setId ? 'Добавить' : 'Сохранить'} ${checked.length} ${pluralize(checked.length, 'карточку', 'карточки', 'карточек')}`
+            }
             onPress={setId ? handleSaveToExisting : () => setModalVisible(true)}
             disabled={checked.length === 0}
             style={styles.flex1}
@@ -642,14 +844,37 @@ const styles = StyleSheet.create({
   },
   rowTexts: { flex: 1, gap: spacing.xxs },
   editor: { gap: spacing.s },
-  bottom: { paddingHorizontal: screenPadding, paddingTop: spacing.s, paddingBottom: spacing.m, borderTopWidth: 1, gap: spacing.s },
+  bottom: {
+    paddingHorizontal: screenPadding,
+    paddingTop: spacing.s,
+    paddingBottom: spacing.m,
+    borderTopWidth: 1,
+    gap: spacing.s,
+  },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.s },
   switchText: { flex: 1, gap: spacing.xxs },
   bottomButtons: { flexDirection: 'row', gap: spacing.s },
-  doneBody: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: screenPadding, gap: spacing.s },
-  doneIcon: { width: 84, height: 84, borderRadius: borderRadius.xl, alignItems: 'center', justifyContent: 'center' },
+  doneBody: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: screenPadding,
+    gap: spacing.s,
+  },
+  doneIcon: {
+    width: 84,
+    height: 84,
+    borderRadius: borderRadius.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   doneRows: { alignSelf: 'stretch', marginTop: spacing.m },
-  doneRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.s, borderBottomWidth: StyleSheet.hairlineWidth },
+  doneRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.s,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
   doneActions: { paddingHorizontal: screenPadding, paddingBottom: spacing.l, gap: spacing.s },
   // Модалка нового набора
   titleField: { marginBottom: spacing.m },

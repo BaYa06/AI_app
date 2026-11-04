@@ -3,14 +3,7 @@
  * @description Экран создания экзамена для учителя
  */
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  ScrollView,
-  StyleSheet,
-  Pressable,
-  Platform,
-  ActivityIndicator,
-} from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable, Platform, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { triggerHaptic } from '@/utils/haptic';
 import {
@@ -79,10 +72,12 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
         if (mounted) setLoadingSets(false);
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [route.params.courseId]);
 
-  const selectedSet = sets.find(s => s.setId === selectedSetId);
+  const selectedSet = sets.find((s) => s.setId === selectedSetId);
   const maxQuestions = Math.min(50, selectedSet?.totalCards || 50);
 
   const cardBg = colors.surface;
@@ -90,11 +85,13 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
   const pillBg = colors.surfaceMuted;
 
   // disabled — режим ещё не готов: в списке его нет (плашка «Скоро» — отказ App Review 2.1)
-  const modes = ([
-    { key: 'multiple', label: 'Тест', icon: ListChecks },
-    { key: 'writing', label: 'Письменный', icon: PenLine, disabled: true },
-    { key: 'mixed', label: 'Смешанный', icon: Layers, disabled: true },
-  ] as { key: TestMode; label: string; icon: typeof ListChecks; disabled?: boolean }[]).filter((m) => !m.disabled);
+  const modes = (
+    [
+      { key: 'multiple', label: 'Тест', icon: ListChecks },
+      { key: 'writing', label: 'Письменный', icon: PenLine, disabled: true },
+      { key: 'mixed', label: 'Смешанный', icon: Layers, disabled: true },
+    ] as { key: TestMode; label: string; icon: typeof ListChecks; disabled?: boolean }[]
+  ).filter((m) => !m.disabled);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -118,9 +115,7 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
         >
           <ArrowLeft size={22} color={colors.textPrimary} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-          Новый тест
-        </Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Новый тест</Text>
       </View>
 
       <ScrollView
@@ -129,21 +124,26 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
       >
         {/* Select Set — Dropdown */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-            Набор карточек
-          </Text>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Набор карточек</Text>
 
           {loadingSets ? (
             <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />
           ) : sets.length === 0 ? (
-            <Text style={[styles.setCardMeta, { color: colors.textSecondary, textAlign: 'center', marginVertical: 20 }]}>
+            <Text
+              style={[
+                styles.setCardMeta,
+                { color: colors.textSecondary, textAlign: 'center', marginVertical: 20 },
+              ]}
+            >
               Нет доступных наборов
             </Text>
           ) : (
             <View>
               {/* Selected value / trigger */}
-              <Pressable accessibilityRole="button" accessibilityState={{ expanded: dropdownOpen }}
-                onPress={() => setDropdownOpen(prev => !prev)}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: dropdownOpen }}
+                onPress={() => setDropdownOpen((prev) => !prev)}
                 style={({ pressed }) => [
                   styles.dropdownTrigger,
                   {
@@ -154,11 +154,16 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
                 ]}
               >
                 <View style={styles.dropdownTriggerLeft}>
-                  <View style={[styles.dropdownIcon, { backgroundColor: alpha(colors.primary, 10) }]}>
+                  <View
+                    style={[styles.dropdownIcon, { backgroundColor: alpha(colors.primary, 10) }]}
+                  >
                     <ListChecks size={18} color={colors.primary} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.setCardTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                    <Text
+                      style={[styles.setCardTitle, { color: colors.textPrimary }]}
+                      numberOfLines={1}
+                    >
                       {selectedSet?.title || 'Выбери набор'}
                     </Text>
                     {selectedSet && (
@@ -177,21 +182,32 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
 
               {/* Dropdown list */}
               {dropdownOpen && (
-                <View style={[styles.dropdownList, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+                <View
+                  style={[
+                    styles.dropdownList,
+                    { backgroundColor: cardBg, borderColor: cardBorder },
+                  ]}
+                >
                   {sets.map((s, idx) => {
                     const isActive = s.setId === selectedSetId;
                     return (
-                      <Pressable accessibilityRole="button" accessibilityState={{ selected: isActive }}
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: isActive }}
                         key={s.setId}
                         onPress={() => {
                           setSelectedSetId(s.setId);
                           setDropdownOpen(false);
-                          if (totalQuestions > s.totalCards) setTotalQuestions(Math.max(5, Math.min(s.totalCards, totalQuestions)));
+                          if (totalQuestions > s.totalCards)
+                            setTotalQuestions(Math.max(5, Math.min(s.totalCards, totalQuestions)));
                         }}
                         style={({ pressed }) => [
                           styles.dropdownItem,
                           isActive && { backgroundColor: alpha(colors.primary, 10) },
-                          idx < sets.length - 1 && { borderBottomWidth: 1, borderBottomColor: cardBorder },
+                          idx < sets.length - 1 && {
+                            borderBottomWidth: 1,
+                            borderBottomColor: cardBorder,
+                          },
                           pressed && { opacity: 0.7 },
                         ]}
                       >
@@ -222,15 +238,15 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
         {/* Test Mode — выбор показываем, когда готово больше одного режима (неготовые не показываем, App Review 2.1) */}
         {modes.length > 1 && (
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-              Тип теста
-            </Text>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Тип теста</Text>
             <View style={styles.modesGrid}>
               {modes.map((m) => {
                 const active = testMode === m.key;
                 const Icon = m.icon;
                 return (
-                  <Pressable accessibilityRole="button" accessibilityState={{ selected: active, disabled: !!m.disabled }}
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active, disabled: !!m.disabled }}
                     key={m.key}
                     style={({ pressed }) => [
                       styles.modeCard,
@@ -240,16 +256,21 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
                         borderWidth: active ? 2 : 1,
                       },
                       active && {
-                        ...Platform.select({
+                        ...(Platform.select({
                           web: { boxShadow: `0 0 0 4px ${alpha(colors.primary, 10)}` },
-                        }) as any,
+                        }) as any),
                         shadowColor: colors.primary,
                       },
                       m.disabled && { opacity: 0.45 },
                       !active && !m.disabled && { opacity: 0.6 },
                       pressed && !m.disabled && { opacity: 0.5 },
                     ]}
-                    onPress={() => { if (!m.disabled) { triggerHaptic('selection'); setTestMode(m.key); } }}
+                    onPress={() => {
+                      if (!m.disabled) {
+                        triggerHaptic('selection');
+                        setTestMode(m.key);
+                      }
+                    }}
                   >
                     {active && (
                       <View style={[styles.modeCheck, { backgroundColor: colors.primaryFill }]}>
@@ -258,16 +279,16 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
                     )}
                     {m.disabled && (
                       <View style={[styles.modeSoon, { backgroundColor: colors.surfaceMuted }]}>
-                        <Text style={[styles.modeSoonText, { color: colors.textSecondary }]}>Скоро</Text>
+                        <Text style={[styles.modeSoonText, { color: colors.textSecondary }]}>
+                          Скоро
+                        </Text>
                       </View>
                     )}
                     <View
                       style={[
                         styles.modeIcon,
                         {
-                          backgroundColor: active
-                            ? alpha(colors.primary, 10)
-                            : colors.surfaceMuted,
+                          backgroundColor: active ? alpha(colors.primary, 10) : colors.surfaceMuted,
                         },
                       ]}
                     >
@@ -291,9 +312,7 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
 
         {/* Settings */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-            Настройки
-          </Text>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Настройки</Text>
 
           {/* Total Questions Stepper */}
           <View style={[styles.settingCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
@@ -306,7 +325,8 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
               </Text>
             </View>
             <View style={[styles.stepper, { backgroundColor: pillBg }]}>
-              <Pressable hitSlop={spacing.xs}
+              <Pressable
+                hitSlop={spacing.xs}
                 accessibilityRole="button"
                 accessibilityLabel="Меньше вопросов"
                 style={({ pressed }) => [
@@ -321,7 +341,8 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
               <Text style={[styles.stepperValue, { color: colors.textPrimary }]}>
                 {totalQuestions}
               </Text>
-              <Pressable hitSlop={spacing.xs}
+              <Pressable
+                hitSlop={spacing.xs}
                 accessibilityRole="button"
                 accessibilityLabel="Больше вопросов"
                 style={({ pressed }) => [
@@ -345,13 +366,14 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
               {TIME_OPTIONS.map((opt) => {
                 const active = timePerQuestion === opt.value;
                 return (
-                  <Pressable accessibilityRole="button" accessibilityState={{ selected: active }}
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
                     key={opt.value}
                     style={[
                       styles.timeOption,
                       active && {
                         backgroundColor: colors.surface,
-                        
                       },
                     ]}
                     onPress={() => setTimePerQuestion(opt.value)}
@@ -372,7 +394,13 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
           </View>
 
           {/* Exit control */}
-          <View style={[styles.settingCard, styles.switchCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+          <View
+            style={[
+              styles.settingCard,
+              styles.switchCard,
+              { backgroundColor: cardBg, borderColor: cardBorder },
+            ]}
+          >
             <View style={styles.switchText}>
               <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>
                 Контроль выхода из приложения
@@ -392,7 +420,8 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
 
       {/* Footer CTA */}
       <BottomBar style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        <Pressable accessibilityRole="button"
+        <Pressable
+          accessibilityRole="button"
           style={({ pressed }) => [
             styles.ctaBtn,
             { backgroundColor: !selectedSetId || creating ? colors.textSecondary : colors.primary },
@@ -464,9 +493,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.m,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    ...Platform.select({
+    ...(Platform.select({
       web: { backdropFilter: 'blur(12px)' },
-    }) as any,
+    }) as any),
   },
   backBtn: {
     padding: spacing.xs,
@@ -639,7 +668,6 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.s,
     alignItems: 'center',
     justifyContent: 'center',
-    
   },
   stepperValue: {
     fontSize: 18,
@@ -681,7 +709,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: borderRadius.l,
     gap: 8,
-    
   },
   ctaText: {
     fontSize: 16,

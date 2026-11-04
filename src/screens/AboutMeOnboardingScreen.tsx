@@ -48,7 +48,13 @@ export function AboutMeOnboardingScreen({ onBack, onContinue }: Props) {
       footer={
         <>
           <Button title="Готово" onPress={handleContinue} fullWidth />
-          <Button title="Пропустить" variant="quiet" tone="secondary" onPress={() => onContinue({})} fullWidth />
+          <Button
+            title="Пропустить"
+            variant="quiet"
+            tone="secondary"
+            onPress={() => onContinue({})}
+            fullWidth
+          />
           <Text variant="caption" align="center" style={{ color: colors.textTertiary }}>
             Изменить или стереть ответы можно в «Профиль → Мои данные»
           </Text>

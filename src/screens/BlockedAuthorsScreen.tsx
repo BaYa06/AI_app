@@ -7,7 +7,17 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { UserX } from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { Button, EmptyState, ErrorState, ListGroup, ListRow, Screen, ScreenHeader, SkeletonList, toast } from '@/components/ui';
+import {
+  Button,
+  EmptyState,
+  ErrorState,
+  ListGroup,
+  ListRow,
+  Screen,
+  ScreenHeader,
+  SkeletonList,
+  toast,
+} from '@/components/ui';
 import { spacing } from '@/constants';
 import { ShareService, type BlockedAuthor } from '@/services';
 import { describeError } from '@/utils/userErrors';
@@ -39,7 +49,12 @@ export function BlockedAuthorsScreen({ navigation }: any) {
   }, []);
 
   return (
-    <Screen header={<ScreenHeader title="Заблокированные авторы" onBack={() => navigation.goBack()} bordered />} contentStyle={st.content}>
+    <Screen
+      header={
+        <ScreenHeader title="Заблокированные авторы" onBack={() => navigation.goBack()} bordered />
+      }
+      contentStyle={st.content}
+    >
       {loadFailed ? (
         <ErrorState onRetry={load} />
       ) : !blocks ? (

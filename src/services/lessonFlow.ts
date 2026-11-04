@@ -31,7 +31,7 @@ function stepFor(
   ids: string[],
   base: Omit<LessonRouteParams, 'part'>,
   setIdOf: SetIdOf,
-  now: number,
+  now: number
 ): LessonStep | null {
   if (ids.length === 0) return null;
   const setId = setIdOf(ids[0]) ?? '';
@@ -46,7 +46,10 @@ function stepFor(
     lesson,
   };
   if (part === 'review' || part === 'check') {
-    return { screen: 'MultipleChoice', params: { setId, questionIndex: 1, totalQuestions: ids.length, ...phase } };
+    return {
+      screen: 'MultipleChoice',
+      params: { setId, questionIndex: 1, totalQuestions: ids.length, ...phase },
+    };
   }
   return { screen: 'Study', params: { setId, mode: 'classic', studyAll: true, ...phase } };
 }
@@ -64,17 +67,34 @@ export function firstLessonStep(
     reviewCount?: number;
   },
   setIdOf: SetIdOf,
-  now: number = Date.now(),
+  now: number = Date.now()
 ): LessonStep | null {
   if (queue.mistakeIds && queue.mistakeIds.length > 0) {
-    return stepFor('mistakes', queue.mistakeIds, { newIds: [], startedAt: now, reviewCount: queue.mistakeIds.length }, setIdOf, now);
+    return stepFor(
+      'mistakes',
+      queue.mistakeIds,
+      { newIds: [], startedAt: now, reviewCount: queue.mistakeIds.length },
+      setIdOf,
+      now
+    );
   }
-  const base = { newIds: queue.newIds, startedAt: now, reviewCount: queue.reviewCount ?? queue.reviewIds.length };
-  return stepFor('review', queue.reviewIds, base, setIdOf, now) ?? stepFor('new', queue.newIds, base, setIdOf, now);
+  const base = {
+    newIds: queue.newIds,
+    startedAt: now,
+    reviewCount: queue.reviewCount ?? queue.reviewIds.length,
+  };
+  return (
+    stepFor('review', queue.reviewIds, base, setIdOf, now) ??
+    stepFor('new', queue.newIds, base, setIdOf, now)
+  );
 }
 
 /** Следующая часть после завершённой фазы; null — урок окончен, на главную */
-export function nextLessonStep(lesson: LessonRouteParams, setIdOf: SetIdOf, now: number = Date.now()): LessonStep | null {
+export function nextLessonStep(
+  lesson: LessonRouteParams,
+  setIdOf: SetIdOf,
+  now: number = Date.now()
+): LessonStep | null {
   const { part, ...base } = lesson;
   if (part === 'review') return stepFor('new', lesson.newIds, base, setIdOf, now);
   if (part === 'new') return stepFor('check', lesson.newIds, base, setIdOf, now);
@@ -82,7 +102,10 @@ export function nextLessonStep(lesson: LessonRouteParams, setIdOf: SetIdOf, now:
 }
 
 /** Подпись главной кнопки итогов, когда фаза урока завершена */
-export function nextLessonLabel(lesson: LessonRouteParams, pluralizeWords: (n: number) => string): string {
+export function nextLessonLabel(
+  lesson: LessonRouteParams,
+  pluralizeWords: (n: number) => string
+): string {
   const n = lesson.newIds.length;
   if (lesson.part === 'review' && n > 0) return `Дальше: ${n} ${pluralizeWords(n)}`;
   if (lesson.part === 'new' && n > 0) return 'Дальше: проверка';
@@ -94,7 +117,11 @@ export function nextLessonLabel(lesson: LessonRouteParams, pluralizeWords: (n: n
  * повторение — только слово, которому пришёл срок; новое — только слово на шаге 0.
  * Проверка новых и исправление ошибок день не меняют: эти слова уже записаны.
  */
-export function lessonPhaseForAnswer(part: LessonPart | undefined, card: Card, now: number = Date.now()): LessonPhase | null {
+export function lessonPhaseForAnswer(
+  part: LessonPart | undefined,
+  card: Card,
+  now: number = Date.now()
+): LessonPhase | null {
   if (part === 'review') return isCardWaitingReview(card, now) ? 'review' : null;
   if (part === 'new') return (card.learningStep || 0) === 0 ? 'new' : null;
   return null;
@@ -128,7 +155,10 @@ export function fitsSessionStage(stage: SessionStage, card: Card): boolean {
 /** Слова под каждый этап; этап без подходящих слов убирается до старта */
 export function buildSessionStages(stages: SessionStage[], cards: Card[]): SessionStageRoute[] {
   return stages
-    .map((stage) => ({ stage, cardIds: cards.filter((c) => fitsSessionStage(stage, c)).map((c) => c.id) }))
+    .map((stage) => ({
+      stage,
+      cardIds: cards.filter((c) => fitsSessionStage(stage, c)).map((c) => c.id),
+    }))
     .filter((s) => s.cardIds.length > 0);
 }
 
@@ -141,7 +171,11 @@ export interface SessionPortion {
   phaseFailedIds?: string[];
 }
 
-function sessionStepAt(session: SessionRouteParams, portion: SessionPortion | null, now: number): SessionStep | null {
+function sessionStepAt(
+  session: SessionRouteParams,
+  portion: SessionPortion | null,
+  now: number
+): SessionStep | null {
   const current = session.stages[session.index];
   if (!current) return null;
   const ids = current.cardIds;
@@ -161,7 +195,12 @@ function sessionStepAt(session: SessionRouteParams, portion: SessionPortion | nu
     case 'listen':
       return {
         screen: 'MultipleChoice',
-        params: { ...base, questionIndex: 1, totalQuestions: ids.length, ...(current.stage === 'listen' ? { listen: true } : {}) },
+        params: {
+          ...base,
+          questionIndex: 1,
+          totalQuestions: ids.length,
+          ...(current.stage === 'listen' ? { listen: true } : {}),
+        },
       };
     case 'context':
       // Порций и повтора ошибок у режима нет — все слова этапа сразу
@@ -177,9 +216,13 @@ export function firstSessionStep(
   stages: SessionStage[],
   cards: Card[],
   now: number = Date.now(),
-  xpBase?: number,
+  xpBase?: number
 ): SessionStep | null {
-  return sessionStepAt({ setId, stages: buildSessionStages(stages, cards), index: 0, startedAt: now, xpBase }, null, now);
+  return sessionStepAt(
+    { setId, stages: buildSessionStages(stages, cards), index: 0, startedAt: now, xpBase },
+    null,
+    now
+  );
 }
 
 /**
@@ -191,9 +234,12 @@ export function sessionStepAfterPortion(
   session: SessionRouteParams,
   portion: SessionPortion & { complete: boolean },
   streakCount?: number,
-  now: number = Date.now(),
+  now: number = Date.now()
 ): SessionStep | null {
-  const carried: SessionRouteParams = { ...session, streakCount: streakCount ?? session.streakCount };
+  const carried: SessionRouteParams = {
+    ...session,
+    streakCount: streakCount ?? session.streakCount,
+  };
   const { complete, ...phase } = portion;
   if (!complete) return sessionStepAt(carried, phase, now);
   return sessionStepAt({ ...carried, index: session.index + 1 }, null, now);
@@ -215,7 +261,9 @@ export function sessionPhaseForAnswer(card: Card, now: number = Date.now()): Les
  * Ошибка только в Парах / На слух / Слове в контексте уровень не меняет — слово не слабое.
  */
 export function isSessionWordWeak(card: Card, now: number = Date.now()): boolean {
-  return ((card.learningStep || 0) === 0 && card.lastReviewDate > 0) || isCardWaitingReview(card, now);
+  return (
+    ((card.learningStep || 0) === 0 && card.lastReviewDate > 0) || isCardWaitingReview(card, now)
+  );
 }
 
 /** Все слова сессии без повторов, в порядке первого появления */

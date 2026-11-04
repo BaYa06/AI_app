@@ -35,7 +35,8 @@ function normalizeText(text: string): string {
 
 /** Levenshtein distance between two strings */
 function levenshtein(a: string, b: string): number {
-  const m = a.length, n = b.length;
+  const m = a.length,
+    n = b.length;
   const dp: number[] = Array.from({ length: n + 1 }, (_, i) => i);
   for (let i = 1; i <= m; i++) {
     let prev = i;
@@ -68,10 +69,7 @@ function wordOverlap(recognized: string, expected: string): number {
   return matched / expWords.length;
 }
 
-export function isAnswerCorrect(
-  recognizedAlternatives: string[],
-  expectedAnswer: string,
-): boolean {
+export function isAnswerCorrect(recognizedAlternatives: string[], expectedAnswer: string): boolean {
   const expected = normalizeText(expectedAnswer);
   if (!expected) return false;
 
@@ -99,15 +97,12 @@ export async function requestMicrophonePermission(): Promise<boolean> {
   if (Platform.OS === 'ios') return true;
 
   try {
-    const granted = await PermissionsAndroid.request(
-      PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-      {
-        title: 'Доступ к микрофону',
-        message: 'Для распознавания речи нужен доступ к микрофону.',
-        buttonPositive: 'OK',
-        buttonNegative: 'Отмена',
-      },
-    );
+    const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO, {
+      title: 'Доступ к микрофону',
+      message: 'Для распознавания речи нужен доступ к микрофону.',
+      buttonPositive: 'OK',
+      buttonNegative: 'Отмена',
+    });
     return granted === PermissionsAndroid.RESULTS.GRANTED;
   } catch (err) {
     log.warn('SpeechRecognition', 'Permission error', err);
@@ -139,9 +134,15 @@ const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /** Fully tear down the previous Voice session so Android releases the SpeechRecognizer. */
 async function ensureVoiceStopped(): Promise<void> {
-  try { Voice.removeAllListeners(); } catch {}
-  try { await Voice.stop(); } catch {}
-  try { await Voice.destroy(); } catch {}
+  try {
+    Voice.removeAllListeners();
+  } catch {}
+  try {
+    await Voice.stop();
+  } catch {}
+  try {
+    await Voice.destroy();
+  } catch {}
   // Android needs a moment after destroy before a new session can start
   if (Platform.OS === 'android') await delay(300);
 }
@@ -149,12 +150,7 @@ async function ensureVoiceStopped(): Promise<void> {
 const MAX_RETRIES = 2;
 
 export async function listenForAnswer(options: ListenOptions): Promise<RecognitionResult> {
-  const {
-    lang,
-    expectedAnswer,
-    timeoutMs = 5000,
-    onPartialResult,
-  } = options;
+  const { lang, expectedAnswer, timeoutMs = 5000, onPartialResult } = options;
 
   // Make sure any previous session is fully released
   await ensureVoiceStopped();
@@ -166,7 +162,7 @@ export async function listenForAnswer(options: ListenOptions): Promise<Recogniti
       return await _listenOnce(lang, expectedAnswer, timeoutMs, onPartialResult);
     } catch (err: any) {
       lastError = err;
-      const code = typeof err === 'object' ? err?.code ?? err?.message : String(err);
+      const code = typeof err === 'object' ? (err?.code ?? err?.message) : String(err);
       // Error code 5 = "Client side error" — retry after a pause
       if (String(code) === '5' && attempt < MAX_RETRIES) {
         log.warn('SpeechRecognition', `Error 5, retry ${attempt + 1}/${MAX_RETRIES}`);
@@ -186,7 +182,7 @@ function _listenOnce(
   lang: string,
   expectedAnswer: string,
   timeoutMs: number,
-  onPartialResult?: (partial: string) => void,
+  onPartialResult?: (partial: string) => void
 ): Promise<RecognitionResult> {
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -243,7 +239,11 @@ function _listenOnce(
       const code = String(e.error?.code ?? e.error?.message ?? '');
       if (code === '5') {
         // Reject so the outer loop can retry
-        if (!settled) { settled = true; clearTimeout(timeoutId); Voice.removeAllListeners(); }
+        if (!settled) {
+          settled = true;
+          clearTimeout(timeoutId);
+          Voice.removeAllListeners();
+        }
         reject(e.error);
         return;
       }
@@ -272,16 +272,26 @@ function _listenOnce(
     // Start
     Voice.start(lang).catch((err) => {
       log.error('SpeechRecognition', 'Voice.start failed', err);
-      if (!settled) { settled = true; clearTimeout(timeoutId); Voice.removeAllListeners(); }
+      if (!settled) {
+        settled = true;
+        clearTimeout(timeoutId);
+        Voice.removeAllListeners();
+      }
       reject(err);
     });
   });
 }
 
 export async function cancelListening(): Promise<void> {
-  try { await Voice.cancel(); } catch {}
-  try { Voice.removeAllListeners(); } catch {}
-  try { await Voice.destroy(); } catch {}
+  try {
+    await Voice.cancel();
+  } catch {}
+  try {
+    Voice.removeAllListeners();
+  } catch {}
+  try {
+    await Voice.destroy();
+  } catch {}
 }
 
 // ---- Continuous listening mode ----
@@ -330,9 +340,15 @@ export async function stopContinuousListening(): Promise<void> {
   _errorCallback = null;
   _sessionBaseline = '';
   _lastRawText = '';
-  try { Voice.removeAllListeners(); } catch {}
-  try { await Voice.stop(); } catch {}
-  try { await Voice.destroy(); } catch {}
+  try {
+    Voice.removeAllListeners();
+  } catch {}
+  try {
+    await Voice.stop();
+  } catch {}
+  try {
+    await Voice.destroy();
+  } catch {}
 }
 
 export function setContinuousHandlers(
@@ -341,7 +357,7 @@ export function setContinuousHandlers(
   // Технический сбой распознавания (не "не понял", а реальная ошибка движка) — раньше просто
   // молча перезапускал сессию, ничего не сообщая вызывающему коду, из-за чего экран мог
   // зависнуть в "идёт сессия" без обратной связи. См. план, пункт 51.
-  onError?: (() => void) | null,
+  onError?: (() => void) | null
 ): void {
   _resultCallback = onResult;
   _partialCallback = onPartial;

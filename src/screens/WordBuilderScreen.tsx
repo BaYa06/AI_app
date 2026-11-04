@@ -19,7 +19,12 @@ import type { Card, Rating } from '@/types';
 import { spacing, borderRadius, iconSize, alpha } from '@/constants';
 import { ProgressService } from '@/services/ProgressService';
 import { speak, resolveSpeechLang, prefetchSpeech, cardSpeechLangs } from '@/utils/speech';
-import { playCorrectSound2 as playCorrectSound, playSessionSfx, preloadSessionSfx, preloadSound } from '@/utils/sound';
+import {
+  playCorrectSound2 as playCorrectSound,
+  playSessionSfx,
+  preloadSessionSfx,
+  preloadSound,
+} from '@/utils/sound';
 import { log } from '@/utils/logger';
 
 type Props = RootStackScreenProps<'WordBuilder'>;
@@ -53,7 +58,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
   const incrementTodayCards = useSettingsStore((s) => s.incrementTodayCards);
   const finishStudySession = useSettingsStore((s) => s.finishStudySession);
   const { ids, map } = useCardsStore(
-    useCallback((s) => ({ ids: s.cardsBySet[setId] || [], map: s.cards }), [setId]),
+    useCallback((s) => ({ ids: s.cardsBySet[setId] || [], map: s.cards }), [setId])
   );
   const cards = useMemo(() => {
     if (dueCardIds && dueCardIds.length > 0) {
@@ -98,24 +103,19 @@ export function WordBuilderScreen({ navigation, route }: Props) {
 
   const phaseFailedList = useMemo(
     () => phaseFailedIds || [],
-    [phaseFailedIds ? phaseFailedIds.join('|') : ''],
+    [phaseFailedIds ? phaseFailedIds.join('|') : '']
   );
   const phaseFailedKey = useMemo(
     () => (phaseFailedIds ? phaseFailedIds.join(',') : 'none'),
-    [phaseFailedIds ? phaseFailedIds.join(',') : 'none'],
+    [phaseFailedIds ? phaseFailedIds.join(',') : 'none']
   );
 
   const initKey = useMemo(
     () =>
-      [
-        setId,
-        cardLimit ?? 'all',
-        phaseId || 'noPhase',
-        phaseOffset,
-        phaseFailedKey,
-        cardsKey,
-      ].join('|'),
-    [setId, cardLimit, phaseId, phaseOffset, phaseFailedKey, cardsKey],
+      [setId, cardLimit ?? 'all', phaseId || 'noPhase', phaseOffset, phaseFailedKey, cardsKey].join(
+        '|'
+      ),
+    [setId, cardLimit, phaseId, phaseOffset, phaseFailedKey, cardsKey]
   );
 
   useEffect(() => {
@@ -174,14 +174,21 @@ export function WordBuilderScreen({ navigation, route }: Props) {
 
   const currentCard = cardsQueue[currentIndex];
 
-
   const getFront = (card: Card) => card.frontText ?? (card as any).front ?? '';
   const getBack = (card: Card) => card.backText ?? (card as any).back ?? '';
 
   // Заранее озвучиваем слово текущей и следующей карточки — кнопка динамика играет сразу
   useEffect(() => {
-    const upcoming = [cardsQueue[currentIndex], cardsQueue[currentIndex + 1]].filter(Boolean) as Card[];
-    prefetchSpeech(upcoming.map((c) => ({ text: getFront(c), counterpart: getBack(c), lang: cardSpeechLangs(c).front })));
+    const upcoming = [cardsQueue[currentIndex], cardsQueue[currentIndex + 1]].filter(
+      Boolean
+    ) as Card[];
+    prefetchSpeech(
+      upcoming.map((c) => ({
+        text: getFront(c),
+        counterpart: getBack(c),
+        lang: cardSpeechLangs(c).front,
+      }))
+    );
   }, [cardsQueue, currentIndex]);
 
   const { promptText, targetWord } = useMemo(() => {
@@ -234,7 +241,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
   const normalizeWord = useCallback((value: string) => value.trim().toLowerCase(), []);
   const targetNormalized = useMemo(
     () => (targetWord ? normalizeWord(targetWord) : ''),
-    [normalizeWord, targetWord],
+    [normalizeWord, targetWord]
   );
 
   // Когда показано текущее слово — для времени ответа
@@ -268,13 +275,13 @@ export function WordBuilderScreen({ navigation, route }: Props) {
         masteredCount: statsSnapshot.masteredCount,
       });
     },
-    [updateSetStats, incrementTodayCards],
+    [updateSetStats, incrementTodayCards]
   );
 
   const finishSession = useCallback(
     async (
       errorsCount: number,
-      errorList: Array<{ id?: string; front: string; back: string; rating: number }>,
+      errorList: Array<{ id?: string; front: string; back: string; rating: number }>
     ) => {
       const timeSpent = Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000));
       const learnedCards = Math.max(0, totalWords - errorsCount);
@@ -335,7 +342,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
       phaseOffset,
       cardsQueue,
       phaseFailedList,
-    ],
+    ]
   );
 
   const handleTilePress = useCallback(
@@ -366,11 +373,9 @@ export function WordBuilderScreen({ navigation, route }: Props) {
 
       if (!placed) return;
 
-      setTiles((prevTiles) =>
-        prevTiles.map((t) => (t.id === tileId ? { ...t, used: true } : t)),
-      );
+      setTiles((prevTiles) => prevTiles.map((t) => (t.id === tileId ? { ...t, used: true } : t)));
     },
-    [tiles, slots, isLocked, session],
+    [tiles, slots, isLocked, session]
   );
 
   const handleSlotPress = useCallback(
@@ -382,41 +387,37 @@ export function WordBuilderScreen({ navigation, route }: Props) {
 
       setSlots((prevSlots) =>
         prevSlots.map((s) =>
-          s.id === slotId ? { ...s, char: null, tileId: null, isFilled: false } : s,
-        ),
+          s.id === slotId ? { ...s, char: null, tileId: null, isFilled: false } : s
+        )
       );
 
       setTiles((prevTiles) =>
-        prevTiles.map((t) => (t.id === slot.tileId ? { ...t, used: false } : t)),
+        prevTiles.map((t) => (t.id === slot.tileId ? { ...t, used: false } : t))
       );
     },
-    [slots, isLocked, session],
+    [slots, isLocked, session]
   );
 
   // Обработчик озвучивания
-  const handleSpeak = useCallback(
-    (text: string, counterpartText?: string, langHint?: string) => {
-      if (!text) return;
-      const normalized = text.trim().split(/\r?\n/)[0].trim();
-      if (!normalized) return;
-      const lang = resolveSpeechLang(normalized, langHint, counterpartText);
-      speak(normalized, lang).catch((error) => {
-        log.warn('WordBuilder', 'Speech error', error);
-      });
-    },
-    [],
-  );
+  const handleSpeak = useCallback((text: string, counterpartText?: string, langHint?: string) => {
+    if (!text) return;
+    const normalized = text.trim().split(/\r?\n/)[0].trim();
+    if (!normalized) return;
+    const lang = resolveSpeechLang(normalized, langHint, counterpartText);
+    speak(normalized, lang).catch((error) => {
+      log.warn('WordBuilder', 'Speech error', error);
+    });
+  }, []);
 
   const resultBorderColor = useMemo(() => {
     if (!wordResult) return null;
     return wordResult === 'correct' ? colors.success : colors.error;
   }, [wordResult, colors.success, colors.error]);
 
-
   const advanceToNextCard = useCallback(
     (
       errorsCount: number,
-      errorList: Array<{ id?: string; front: string; back: string; rating: number }>,
+      errorList: Array<{ id?: string; front: string; back: string; rating: number }>
     ) => {
       const isLast = currentIndex >= totalWords - 1;
       if (isLast) {
@@ -431,7 +432,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
       setIsLocked(false);
       setCurrentIndex((idx) => Math.min(totalWords - 1, idx + 1));
     },
-    [currentIndex, totalWords, finishSession],
+    [currentIndex, totalWords, finishSession]
   );
 
   const handleCompleteWord = useCallback(() => {
@@ -531,130 +532,139 @@ export function WordBuilderScreen({ navigation, route }: Props) {
           <AnswerPanel
             correct={wordResult === 'correct'}
             answer={targetWord}
-            hint={{ front: targetWord, back: promptText, example: currentCard.example || undefined }}
+            hint={{
+              front: targetWord,
+              back: promptText,
+              example: currentCard.example || undefined,
+            }}
             onNext={handleConfirmNext}
           />
         ) : null
       }
     >
-        {/* Card */}
-        <View
-          style={[
-            styles.card,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-            },
-          ]}
-        >
-          <View style={styles.wordBlock}>
-            <Text variant="h1" style={[styles.word, { color: colors.textPrimary }]}>
-              {promptText}
-            </Text>
-          </View>
-
-          {wordResult === 'wrong' && (
-            <Pressable
-              style={({ pressed }) => [
-                styles.audioButton,
-                {
-                  backgroundColor: pressed ? alpha(colors.primary, 20) : colors.surfaceMuted,
-                  borderColor: colors.border,
-                },
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel="Прослушать слово"
-              onPress={() => handleSpeak(targetWord, promptText, cardSpeechLangs(currentCard).front)}
-            >
-              <Volume2 size={iconSize.m} color={colors.primary} />
-            </Pressable>
-          )}
+      {/* Card */}
+      <View
+        style={[
+          styles.card,
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+          },
+        ]}
+      >
+        <View style={styles.wordBlock}>
+          <Text variant="h1" style={[styles.word, { color: colors.textPrimary }]}>
+            {promptText}
+          </Text>
         </View>
 
-        {/* Slots */}
-        <View style={styles.slotsSection}>
-          <View style={styles.slotsRow}>
-            {slots.map((slot, index) => {
-              // Проверяем правильность каждой буквы отдельно
-              const expectedChar = targetWord[index]?.toLowerCase();
-              const actualChar = slot.char?.toLowerCase();
-              const isSlotCorrect = expectedChar === actualChar;
-              
-              // Определяем цвет границы для каждой ячейки
-              let slotBorderColor: string = slot.isFilled ? colors.primary : colors.border;
-              let slotBgColor: string = slot.isFilled ? alpha(colors.primary, 10) : colors.surfaceMuted;
-              let slotTextColor: string = slot.isFilled ? colors.primary : colors.textSecondary;
-              
-              if (wordResult && slot.isFilled) {
-                slotBorderColor = isSlotCorrect ? colors.success : colors.error;
-                slotBgColor = isSlotCorrect ? alpha(colors.success, 20) : alpha(colors.error, 20);
-                slotTextColor = isSlotCorrect ? colors.successText : colors.errorText;
-              }
-              
-              return (
-                <Pressable
-                  key={slot.id}
-                  disabled={!slot.isFilled || isLocked}
-                  accessibilityRole="button"
-                  accessibilityLabel={slot.char ? `Буква ${slot.char}, убрать` : 'Пустая ячейка'}
-                  onPress={() => handleSlotPress(slot.id)}
-                  style={({ pressed }) => [
-                    styles.slot,
-                    {
-                      borderColor: slotBorderColor,
-                      backgroundColor: slotBgColor,
-                      borderWidth: wordResult ? 3 : 2,
-                    },
-                    pressed && slot.isFilled && { transform: [{ translateY: 1 }] },
-                  ]}
-                  hitSlop={6}
-                >
-                  <Text variant="h3" style={[styles.bold, { color: slotTextColor }]}>
-                    {slot.char ?? ''}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
+        {wordResult === 'wrong' && (
+          <Pressable
+            style={({ pressed }) => [
+              styles.audioButton,
+              {
+                backgroundColor: pressed ? alpha(colors.primary, 20) : colors.surfaceMuted,
+                borderColor: colors.border,
+              },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Прослушать слово"
+            onPress={() => handleSpeak(targetWord, promptText, cardSpeechLangs(currentCard).front)}
+          >
+            <Volume2 size={iconSize.m} color={colors.primary} />
+          </Pressable>
+        )}
+      </View>
 
-        {/* Letters grid */}
-        {wordResult !== 'wrong' && (
-          <View style={styles.grid}>
-            {tiles.map((tile) => (
+      {/* Slots */}
+      <View style={styles.slotsSection}>
+        <View style={styles.slotsRow}>
+          {slots.map((slot, index) => {
+            // Проверяем правильность каждой буквы отдельно
+            const expectedChar = targetWord[index]?.toLowerCase();
+            const actualChar = slot.char?.toLowerCase();
+            const isSlotCorrect = expectedChar === actualChar;
+
+            // Определяем цвет границы для каждой ячейки
+            let slotBorderColor: string = slot.isFilled ? colors.primary : colors.border;
+            let slotBgColor: string = slot.isFilled
+              ? alpha(colors.primary, 10)
+              : colors.surfaceMuted;
+            let slotTextColor: string = slot.isFilled ? colors.primary : colors.textSecondary;
+
+            if (wordResult && slot.isFilled) {
+              slotBorderColor = isSlotCorrect ? colors.success : colors.error;
+              slotBgColor = isSlotCorrect ? alpha(colors.success, 20) : alpha(colors.error, 20);
+              slotTextColor = isSlotCorrect ? colors.successText : colors.errorText;
+            }
+
+            return (
               <Pressable
-                key={tile.id}
-                disabled={tile.used || isLocked}
+                key={slot.id}
+                disabled={!slot.isFilled || isLocked}
                 accessibilityRole="button"
-                accessibilityLabel={`Буква ${tile.char}`}
-                accessibilityState={{ disabled: tile.used || isLocked }}
-                onPress={() => handleTilePress(tile.id)}
+                accessibilityLabel={slot.char ? `Буква ${slot.char}, убрать` : 'Пустая ячейка'}
+                onPress={() => handleSlotPress(slot.id)}
                 style={({ pressed }) => [
-                  styles.tile,
+                  styles.slot,
                   {
-                    backgroundColor:
-                      resultBorderColor && tile.used
-                        ? alpha(resultBorderColor, 20)
-                        : tile.used
-                          ? colors.surfaceMuted
-                          : colors.surface,
-                    borderColor:
-                      resultBorderColor && tile.used
-                        ? resultBorderColor
-                        : tile.used
-                          ? colors.surfaceMuted
-                          : colors.border,
+                    borderColor: slotBorderColor,
+                    backgroundColor: slotBgColor,
+                    borderWidth: wordResult ? 3 : 2,
                   },
-                  pressed && !tile.used && { transform: [{ translateY: 1 }] },
+                  pressed && slot.isFilled && { transform: [{ translateY: 1 }] },
                 ]}
+                hitSlop={6}
               >
-                <Text variant="h2" style={{ color: tile.used ? colors.textTertiary : colors.textPrimary }}>
-                  {tile.char}
+                <Text variant="h3" style={[styles.bold, { color: slotTextColor }]}>
+                  {slot.char ?? ''}
                 </Text>
               </Pressable>
-            ))}
-          </View>
-        )}
+            );
+          })}
+        </View>
+      </View>
+
+      {/* Letters grid */}
+      {wordResult !== 'wrong' && (
+        <View style={styles.grid}>
+          {tiles.map((tile) => (
+            <Pressable
+              key={tile.id}
+              disabled={tile.used || isLocked}
+              accessibilityRole="button"
+              accessibilityLabel={`Буква ${tile.char}`}
+              accessibilityState={{ disabled: tile.used || isLocked }}
+              onPress={() => handleTilePress(tile.id)}
+              style={({ pressed }) => [
+                styles.tile,
+                {
+                  backgroundColor:
+                    resultBorderColor && tile.used
+                      ? alpha(resultBorderColor, 20)
+                      : tile.used
+                        ? colors.surfaceMuted
+                        : colors.surface,
+                  borderColor:
+                    resultBorderColor && tile.used
+                      ? resultBorderColor
+                      : tile.used
+                        ? colors.surfaceMuted
+                        : colors.border,
+                },
+                pressed && !tile.used && { transform: [{ translateY: 1 }] },
+              ]}
+            >
+              <Text
+                variant="h2"
+                style={{ color: tile.used ? colors.textTertiary : colors.textPrimary }}
+              >
+                {tile.char}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
     </StageLayout>
   );
 }

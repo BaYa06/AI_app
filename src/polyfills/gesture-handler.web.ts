@@ -3,10 +3,10 @@ import React, { useEffect, useRef } from 'react';
 import { View, ViewProps } from 'react-native-web';
 
 // GestureHandlerRootView - just a passthrough View on web
-export const GestureHandlerRootView: React.FC<ViewProps & { children?: React.ReactNode }> = ({ 
-  children, 
+export const GestureHandlerRootView: React.FC<ViewProps & { children?: React.ReactNode }> = ({
+  children,
   style,
-  ...props 
+  ...props
 }) => {
   return React.createElement(View, { style: [{ flex: 1 }, style], ...props }, children);
 };
@@ -51,16 +51,16 @@ export const Swipeable: React.FC<{ children?: React.ReactNode }> = ({ children }
 };
 
 // RectButton - basic touchable
-export const RectButton: React.FC<{ 
+export const RectButton: React.FC<{
   children?: React.ReactNode;
   onPress?: () => void;
   style?: any;
 }> = ({ children, onPress, style }) => {
   return React.createElement(
     'div',
-    { 
+    {
       onClick: onPress,
-      style: { cursor: onPress ? 'pointer' : 'default', ...style }
+      style: { cursor: onPress ? 'pointer' : 'default', ...style },
     },
     children
   );
@@ -77,7 +77,14 @@ export const BorderlessButton = RectButton;
 type Offset = number | number[];
 type HitSlopValue =
   | number
-  | { left?: number; right?: number; top?: number; bottom?: number; width?: number; height?: number }
+  | {
+      left?: number;
+      right?: number;
+      top?: number;
+      bottom?: number;
+      width?: number;
+      height?: number;
+    }
   | null;
 
 interface PanEventLike {
@@ -100,13 +107,29 @@ function exceedsOffset(offset: Offset | undefined, delta: number): boolean {
   return offset >= 0 ? delta > offset : delta < offset;
 }
 
-function isWithinHitSlop(hitSlop: HitSlopValue, localX: number, localY: number, width: number, height: number): boolean {
+function isWithinHitSlop(
+  hitSlop: HitSlopValue,
+  localX: number,
+  localY: number,
+  width: number,
+  height: number
+): boolean {
   if (hitSlop == null) return true;
   if (typeof hitSlop === 'number') return true;
   const left = hitSlop.left ?? (hitSlop.width != null && hitSlop.right == null ? 0 : -Infinity);
-  const right = hitSlop.right != null ? width - hitSlop.right : hitSlop.width != null ? left + hitSlop.width : Infinity;
+  const right =
+    hitSlop.right != null
+      ? width - hitSlop.right
+      : hitSlop.width != null
+        ? left + hitSlop.width
+        : Infinity;
   const top = hitSlop.top ?? (hitSlop.height != null && hitSlop.bottom == null ? 0 : -Infinity);
-  const bottom = hitSlop.bottom != null ? height - hitSlop.bottom : hitSlop.height != null ? top + hitSlop.height : Infinity;
+  const bottom =
+    hitSlop.bottom != null
+      ? height - hitSlop.bottom
+      : hitSlop.height != null
+        ? top + hitSlop.height
+        : Infinity;
   return localX >= left && localX <= right && localY >= top && localY <= bottom;
 }
 
@@ -213,7 +236,15 @@ export const GestureDetector: React.FC<{ gesture: AnyWebGesture; children: React
       const candidates = flattenGestures(gestureRef.current);
       const rect = el.getBoundingClientRect();
       const usable = candidates.filter(
-        (g) => g._enabled && isWithinHitSlop(g._hitSlop, e.clientX - rect.left, e.clientY - rect.top, rect.width, rect.height)
+        (g) =>
+          g._enabled &&
+          isWithinHitSlop(
+            g._hitSlop,
+            e.clientX - rect.left,
+            e.clientY - rect.top,
+            rect.width,
+            rect.height
+          )
       );
       if (usable.length === 0) return;
       phase = 'pending';
@@ -248,12 +279,26 @@ export const GestureDetector: React.FC<{ gesture: AnyWebGesture; children: React
             active = g;
             phase = 'active';
             el.setPointerCapture?.(e.pointerId);
-            g._onBegin?.({ x: startX, y: startY, translationX: 0, translationY: 0, velocityX: 0, velocityY: 0 });
+            g._onBegin?.({
+              x: startX,
+              y: startY,
+              translationX: 0,
+              translationY: 0,
+              velocityX: 0,
+              velocityY: 0,
+            });
             break;
           }
         }
       } else if (phase === 'active' && active) {
-        active._onUpdate?.({ x: e.clientX, y: e.clientY, translationX: dx, translationY: dy, velocityX, velocityY: 0 });
+        active._onUpdate?.({
+          x: e.clientX,
+          y: e.clientY,
+          translationX: dx,
+          translationY: dy,
+          velocityX,
+          velocityY: 0,
+        });
       }
     };
 
@@ -262,7 +307,14 @@ export const GestureDetector: React.FC<{ gesture: AnyWebGesture; children: React
       if (phase === 'active' && active) {
         const dx = e.clientX - startX;
         const dy = e.clientY - startY;
-        active._onEnd?.({ x: e.clientX, y: e.clientY, translationX: dx, translationY: dy, velocityX, velocityY: 0 });
+        active._onEnd?.({
+          x: e.clientX,
+          y: e.clientY,
+          translationX: dx,
+          translationY: dy,
+          velocityX,
+          velocityY: 0,
+        });
       }
       reset();
     };

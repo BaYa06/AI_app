@@ -109,7 +109,9 @@ function getYesterdayKey(timezone: string = getDeviceTimezone()): string {
  * Записать активность за сессию — прибавку с прошлой отправки.
  * saved — активность записана (иначе прибавку надо отправить ещё раз); counted — день засчитан в серию.
  */
-export async function recordActivity(params: RecordActivityParams): Promise<{ saved: boolean; counted: boolean }> {
+export async function recordActivity(
+  params: RecordActivityParams
+): Promise<{ saved: boolean; counted: boolean }> {
   const { wordsDelta = 0, minutesDelta = 0, cardsDelta = 0 } = params;
 
   try {
@@ -139,7 +141,13 @@ export async function recordActivity(params: RecordActivityParams): Promise<{ sa
     const localDate = getLocalDateKey(timezone);
     const yesterdayDate = getYesterdayKey(timezone);
 
-    log.debug('Streak', 'записываем активность', { userId, localDate, wordsDelta, minutesDelta, cardsDelta });
+    log.debug('Streak', 'записываем активность', {
+      userId,
+      localDate,
+      wordsDelta,
+      minutesDelta,
+      cardsDelta,
+    });
 
     // 1. Upsert в daily_activity
     const activityResult = await upsertDailyActivity(userId, localDate, {
@@ -161,7 +169,10 @@ export async function recordActivity(params: RecordActivityParams): Promise<{ sa
       cardsDelta,
     });
 
-    log.debug('Streak', counted ? 'день засчитан' : 'активность записана, день в серию пока не засчитан');
+    log.debug(
+      'Streak',
+      counted ? 'день засчитан' : 'активность записана, день в серию пока не засчитан'
+    );
     // daily_activity уже записан — повторная отправка задвоила бы его, поэтому saved даже без итогов
     return { saved: true, counted };
   } catch (error) {
@@ -207,7 +218,12 @@ async function updateUserStats(
   }
 
   try {
-    const result = await NeonService.updateUserStatsStreak(userId, localDate, yesterdayDate, deltas);
+    const result = await NeonService.updateUserStatsStreak(
+      userId,
+      localDate,
+      yesterdayDate,
+      deltas
+    );
     return result;
   } catch (error) {
     log.error('Streak', 'ошибка обновления user_stats', error);
@@ -232,7 +248,8 @@ export async function fetchWeekActivity(days: number = 7): Promise<DailyActivity
     return activity;
   } catch (error) {
     // Нет сети — последнее сохранённое
-    if (error instanceof NetworkLoadError) return readCache<DailyActivity[]>(`activity_${days}`) ?? [];
+    if (error instanceof NetworkLoadError)
+      return readCache<DailyActivity[]>(`activity_${days}`) ?? [];
     log.error('Streak', 'ошибка получения активности за неделю', error);
     return [];
   }
@@ -270,7 +287,7 @@ export function buildWeekStatus(
 ): WeekDayStatus[] {
   const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
   const today = new Date();
-  
+
   // Определяем день недели из todayKey (timezone-safe)
   const todayParsed = new Date(todayKey + 'T12:00:00');
   const todayDayOfWeek = (todayParsed.getDay() + 6) % 7; // Пн = 0, Вс = 6
@@ -299,7 +316,7 @@ export function buildWeekStatus(
     const dayActivity = activityMap.get(dateKey);
 
     let status: WeekDayStatus['status'];
-    
+
     if (dateKey === todayKey) {
       status = 'today';
     } else if (dateKey > todayKey) {

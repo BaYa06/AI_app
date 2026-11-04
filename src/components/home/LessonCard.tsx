@@ -28,7 +28,12 @@ interface Props {
 }
 
 /** Кольцо прогресса дня: «6/20» в центре */
-const ProgressRing = memo(function ProgressRing({ done, total, color, track }: {
+const ProgressRing = memo(function ProgressRing({
+  done,
+  total,
+  color,
+  track,
+}: {
   done: number;
   total: number;
   color: string;
@@ -40,7 +45,14 @@ const ProgressRing = memo(function ProgressRing({ done, total, color, track }: {
   return (
     <View style={styles.ring} accessible={false}>
       <Svg width={RING_SIZE} height={RING_SIZE}>
-        <Circle cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={r} stroke={track} strokeWidth={RING_STROKE} fill="none" />
+        <Circle
+          cx={RING_SIZE / 2}
+          cy={RING_SIZE / 2}
+          r={r}
+          stroke={track}
+          strokeWidth={RING_STROKE}
+          fill="none"
+        />
         {part > 0 && (
           <Circle
             cx={RING_SIZE / 2}
@@ -65,7 +77,12 @@ const ProgressRing = memo(function ProgressRing({ done, total, color, track }: {
   );
 });
 
-export const LessonCard = memo(function LessonCard({ content, onPress, onSecondaryPress, style }: Props) {
+export const LessonCard = memo(function LessonCard({
+  content,
+  onPress,
+  onSecondaryPress,
+  style,
+}: Props) {
   const colors = useThemeColors();
   const { calm, overline, title, meta, hint, action, kind, progress, secondary } = content;
   const a11yLabel = [title, meta, hint, action].filter(Boolean).join('. ');
@@ -78,10 +95,20 @@ export const LessonCard = memo(function LessonCard({ content, onPress, onSeconda
       <Card style={[styles.gap, style]}>
         <View style={styles.row}>
           <View style={styles.texts}>
-            <Text variant="overline" color="secondary">{overline}</Text>
+            <Text variant="overline" color="secondary">
+              {overline}
+            </Text>
             <Text variant="h3">{title}</Text>
-            {meta ? <Text variant="body" style={styles.semibold}>{meta}</Text> : null}
-            {hint ? <Text variant="bodySmall" color="secondary">{hint}</Text> : null}
+            {meta ? (
+              <Text variant="body" style={styles.semibold}>
+                {meta}
+              </Text>
+            ) : null}
+            {hint ? (
+              <Text variant="bodySmall" color="secondary">
+                {hint}
+              </Text>
+            ) : null}
           </View>
           <View style={[styles.badge, { backgroundColor: alpha(tint, 10) }]}>
             <Icon size={iconSize.m} color={iconColor} />
@@ -103,16 +130,37 @@ export const LessonCard = memo(function LessonCard({ content, onPress, onSeconda
       >
         <View style={styles.row}>
           <View style={styles.texts}>
-            <Text variant="overline" style={[styles.muted, { color: on }]}>{overline}</Text>
-            <Text variant="h3" style={{ color: on }}>{title}</Text>
-            {meta ? <Text variant="body" style={[styles.semibold, { color: on }]}>{meta}</Text> : null}
-            {hint ? <Text variant="bodySmall" style={[styles.muted, { color: on }]}>{hint}</Text> : null}
+            <Text variant="overline" style={[styles.muted, { color: on }]}>
+              {overline}
+            </Text>
+            <Text variant="h3" style={{ color: on }}>
+              {title}
+            </Text>
+            {meta ? (
+              <Text variant="body" style={[styles.semibold, { color: on }]}>
+                {meta}
+              </Text>
+            ) : null}
+            {hint ? (
+              <Text variant="bodySmall" style={[styles.muted, { color: on }]}>
+                {hint}
+              </Text>
+            ) : null}
           </View>
-          {progress ? <ProgressRing done={progress.done} total={progress.total} color={on} track={alpha(on, 20)} /> : null}
+          {progress ? (
+            <ProgressRing
+              done={progress.done}
+              total={progress.total}
+              color={on}
+              track={alpha(on, 20)}
+            />
+          ) : null}
         </View>
         {/* Вид кнопки; нажимается вся верхняя часть карточки */}
         <View style={[styles.action, { backgroundColor: on }]}>
-          <Text variant="button" style={[styles.noLetterSpacing, { color: colors.primaryFill }]}>{action}</Text>
+          <Text variant="button" style={[styles.noLetterSpacing, { color: colors.primaryFill }]}>
+            {action}
+          </Text>
         </View>
       </Pressable>
       {secondary && onSecondaryPress ? (
@@ -123,7 +171,9 @@ export const LessonCard = memo(function LessonCard({ content, onPress, onSeconda
           hitSlop={spacing.s}
           style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}
         >
-          <Text variant="label" align="center" style={{ color: on }}>{secondary}</Text>
+          <Text variant="label" align="center" style={{ color: on }}>
+            {secondary}
+          </Text>
         </Pressable>
       ) : null}
     </View>

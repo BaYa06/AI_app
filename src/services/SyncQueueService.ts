@@ -14,7 +14,7 @@ import { log } from '@/utils/logger';
 
 interface SyncTask {
   id: string;
-  type: string;          // 'createSet' | 'createCard' | 'updateCardSRS' | ...
+  type: string; // 'createSet' | 'createCard' | 'updateCardSRS' | ...
   payload: unknown;
   createdAt: number;
   retries: number;

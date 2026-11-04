@@ -63,16 +63,26 @@ export interface ShareLinkStatus extends ShareLink {
 
 /** Ошибка api/share.js: `code` — машинный код сервера (empty_set, not_found, …). */
 export class ShareApiError extends Error {
-  constructor(public code: string, public status: number, public payload: Record<string, unknown> = {}) {
+  constructor(
+    public code: string,
+    public status: number,
+    public payload: Record<string, unknown> = {}
+  ) {
     super(code);
   }
 }
 
 async function callShareApi<T>(
   action: string,
-  { method = 'GET', params, body }: { method?: 'GET' | 'POST'; params?: Record<string, string>; body?: object } = {},
+  {
+    method = 'GET',
+    params,
+    body,
+  }: { method?: 'GET' | 'POST'; params?: Record<string, string>; body?: object } = {}
 ): Promise<T> {
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
   const token = session?.access_token;
   const query = new URLSearchParams({ action, ...params });
   const resp = await fetchWithTimeout(`${SHARE_API}?${query}`, {
@@ -124,7 +134,9 @@ class ShareServiceClass {
 
   /** Действующая ссылка своего набора или null. */
   async getStatus(setId: string): Promise<ShareLinkStatus | null> {
-    const { share } = await callShareApi<{ share: ShareLinkStatus | null }>('status', { params: { setId } });
+    const { share } = await callShareApi<{ share: ShareLinkStatus | null }>('status', {
+      params: { setId },
+    });
     return share;
   }
 
@@ -149,7 +161,10 @@ class ShareServiceClass {
    * @returns id нового набора
    */
   async importSet(code: string, courseId: string | null): Promise<string> {
-    const { newSetId } = await callShareApi<{ newSetId: string }>('import', { method: 'POST', body: { code, courseId } });
+    const { newSetId } = await callShareApi<{ newSetId: string }>('import', {
+      method: 'POST',
+      body: { code, courseId },
+    });
     return newSetId;
   }
 

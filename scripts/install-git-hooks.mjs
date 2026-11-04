@@ -15,7 +15,10 @@ const SRC = path.join(ROOT, 'scripts', 'git-hooks');
 
 let hooksDir;
 try {
-  hooksDir = execSync('git rev-parse --git-path hooks', { cwd: ROOT, stdio: ['ignore', 'pipe', 'ignore'] })
+  hooksDir = execSync('git rev-parse --git-path hooks', {
+    cwd: ROOT,
+    stdio: ['ignore', 'pipe', 'ignore'],
+  })
     .toString()
     .trim();
 } catch {

@@ -48,7 +48,12 @@ export function DailyGoalScreen({ onContinue, onBack }: Props) {
           <Text variant="bodySmall" align="center" style={{ color: colors.textTertiary }}>
             Это можно изменить в настройках профиля.
           </Text>
-          <Button title="Начать обучение" icon={Rocket} onPress={() => onContinue?.(selected)} fullWidth />
+          <Button
+            title="Начать обучение"
+            icon={Rocket}
+            onPress={() => onContinue?.(selected)}
+            fullWidth
+          />
         </>
       }
     >

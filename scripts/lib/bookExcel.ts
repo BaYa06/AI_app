@@ -4,13 +4,35 @@
  */
 
 import ExcelJS from 'exceljs';
-import { cellText, findSheet, isLanguageCode, normalizeTerm, readHeaders, rowIsEmpty } from './excel';
+import {
+  cellText,
+  findSheet,
+  isLanguageCode,
+  normalizeTerm,
+  readHeaders,
+  rowIsEmpty,
+} from './excel';
 
 export const BOOK_SHEET = 'Книга';
 export const CARDS_SHEET = 'Карточки';
 
-export const BOOK_COLUMNS = ['title', 'edition', 'level', 'subject', 'language_from', 'language_to', 'publisher'] as const;
-export const CARD_COLUMNS = ['unit', 'unit_title', 'pages', 'term', 'translation', 'example'] as const;
+export const BOOK_COLUMNS = [
+  'title',
+  'edition',
+  'level',
+  'subject',
+  'language_from',
+  'language_to',
+  'publisher',
+] as const;
+export const CARD_COLUMNS = [
+  'unit',
+  'unit_title',
+  'pages',
+  'term',
+  'translation',
+  'example',
+] as const;
 
 type BookColumn = (typeof BOOK_COLUMNS)[number];
 type CardColumn = (typeof CARD_COLUMNS)[number];
@@ -75,7 +97,9 @@ export async function parseBookWorkbook(filePath: string): Promise<ParseResult> 
       errors.push(`Лист «${BOOK_SHEET}»: нет строки с данными книги (строка 2)`);
     } else {
       if (dataRows.length > 1) {
-        warnings.push(`Лист «${BOOK_SHEET}»: строк с данными ${dataRows.length}, используется только строка ${dataRows[0].number}`);
+        warnings.push(
+          `Лист «${BOOK_SHEET}»: строк с данными ${dataRows.length}, используется только строка ${dataRows[0].number}`
+        );
       }
       const row = dataRows[0];
       const get = (c: BookColumn): string => {
@@ -86,9 +110,14 @@ export async function parseBookWorkbook(filePath: string): Promise<ParseResult> 
       const languageFrom = get('language_from').toLowerCase();
       const languageTo = get('language_to').toLowerCase();
       if (!title) errors.push(`Лист «${BOOK_SHEET}», строка ${row.number}: пустой title`);
-      for (const [name, value] of [['language_from', languageFrom], ['language_to', languageTo]] as const) {
+      for (const [name, value] of [
+        ['language_from', languageFrom],
+        ['language_to', languageTo],
+      ] as const) {
         if (!isLanguageCode(value)) {
-          errors.push(`Лист «${BOOK_SHEET}», строка ${row.number}: ${name} должен быть кодом языка (en, ru, ky…), сейчас «${value}»`);
+          errors.push(
+            `Лист «${BOOK_SHEET}», строка ${row.number}: ${name} должен быть кодом языка (en, ru, ky…), сейчас «${value}»`
+          );
         }
       }
       book = {
@@ -131,11 +160,22 @@ export async function parseBookWorkbook(filePath: string): Promise<ParseResult> 
         errors.push(`Строка ${r}: unit должен быть целым числом ≥ 0, сейчас «${unitRaw}»`);
         rowOk = false;
       }
-      if (!unitTitle) { errors.push(`Строка ${r}: пустой unit_title`); rowOk = false; }
-      if (!term) { errors.push(`Строка ${r}: пустой term`); rowOk = false; }
-      if (!translation) { errors.push(`Строка ${r}: пустой translation`); rowOk = false; }
+      if (!unitTitle) {
+        errors.push(`Строка ${r}: пустой unit_title`);
+        rowOk = false;
+      }
+      if (!term) {
+        errors.push(`Строка ${r}: пустой term`);
+        rowOk = false;
+      }
+      if (!translation) {
+        errors.push(`Строка ${r}: пустой translation`);
+        rowOk = false;
+      }
       if (pagesCell.isDate) {
-        errors.push(`Строка ${r}: Excel превратил pages в дату (${pagesCell.text}). Сделайте колонку текстовой или пишите через длинное тире: 8–17`);
+        errors.push(
+          `Строка ${r}: Excel превратил pages в дату (${pagesCell.text}). Сделайте колонку текстовой или пишите через длинное тире: 8–17`
+        );
         rowOk = false;
       }
       if (!rowOk) continue;
@@ -150,11 +190,15 @@ export async function parseBookWorkbook(filePath: string): Promise<ParseResult> 
       } else {
         const { firstRow } = meta.get(unitNumber)!;
         if (unit.title !== unitTitle) {
-          errors.push(`Строка ${r}: у Unit ${unitNumber} другое название «${unitTitle}», в строке ${firstRow} — «${unit.title}»`);
+          errors.push(
+            `Строка ${r}: у Unit ${unitNumber} другое название «${unitTitle}», в строке ${firstRow} — «${unit.title}»`
+          );
           continue;
         }
         if (unit.pages !== pages) {
-          errors.push(`Строка ${r}: у Unit ${unitNumber} другие страницы «${pages ?? ''}», в строке ${firstRow} — «${unit.pages ?? ''}»`);
+          errors.push(
+            `Строка ${r}: у Unit ${unitNumber} другие страницы «${pages ?? ''}», в строке ${firstRow} — «${unit.pages ?? ''}»`
+          );
           continue;
         }
       }
@@ -163,7 +207,9 @@ export async function parseBookWorkbook(filePath: string): Promise<ParseResult> 
       const key = normalizeTerm(term);
       const dupRow = seen.get(key);
       if (dupRow !== undefined) {
-        warnings.push(`Строка ${r}: «${term}» уже есть в Unit ${unitNumber} (строка ${dupRow}) — дубль пропущен`);
+        warnings.push(
+          `Строка ${r}: «${term}» уже есть в Unit ${unitNumber} (строка ${dupRow}) — дубль пропущен`
+        );
         continue;
       }
       seen.set(key, r);

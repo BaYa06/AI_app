@@ -22,7 +22,7 @@ async function main(): Promise<void> {
     await db.query('BEGIN');
     const existing = await db.query<{ id: string; email: string | null; is_admin: boolean }>(
       'SELECT id, email, is_admin FROM users WHERE user_name = $1 FOR UPDATE',
-      [USER_NAME],
+      [USER_NAME]
     );
 
     let id: string;
@@ -31,7 +31,7 @@ async function main(): Promise<void> {
       const inserted = await db.query<{ id: string }>(
         `INSERT INTO users (id, email, display_name, user_name, is_anonymous, is_admin, onboarding_completed)
          VALUES (gen_random_uuid(), NULL, $1, $2, false, true, true) RETURNING id`,
-        [DISPLAY_NAME, USER_NAME],
+        [DISPLAY_NAME, USER_NAME]
       );
       id = inserted.rows[0].id;
       status = 'создан';
@@ -39,7 +39,9 @@ async function main(): Promise<void> {
       const row = existing.rows[0];
       // Ник могли занять настоящим аккаунтом — такой не годится: в него можно войти и удалить.
       if (row.email !== null) {
-        throw new Error(`${USER_NAME} уже занят пользователем ${row.id} с email — это не служебный аккаунт`);
+        throw new Error(
+          `${USER_NAME} уже занят пользователем ${row.id} с email — это не служебный аккаунт`
+        );
       }
       if (!row.is_admin) await db.query('UPDATE users SET is_admin = true WHERE id = $1', [row.id]);
       id = row.id;

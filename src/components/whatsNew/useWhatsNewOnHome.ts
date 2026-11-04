@@ -48,7 +48,12 @@ interface Options {
   openedFrom?: string;
 }
 
-export function useWhatsNewOnHome({ navigation, isTeacher, blocked, openedFrom }: Options): WhatsNewSheetProps {
+export function useWhatsNewOnHome({
+  navigation,
+  isTeacher,
+  blocked,
+  openedFrom,
+}: Options): WhatsNewSheetProps {
   const isFocused = useIsFocused();
   const [pages, setPages] = useState<WhatsNewPage[]>([]);
   const [visible, setVisible] = useState(false);
@@ -118,7 +123,7 @@ export function useWhatsNewOnHome({ navigation, isTeacher, blocked, openedFrom }
         toast.info('Что нового — всегда в Профиле');
       }
     },
-    [navigation, pages.length],
+    [navigation, pages.length]
   );
 
   const onPage = useCallback((index: number) => tracker.current?.page(index), []);

@@ -33,7 +33,10 @@ function setCards(setId: string): Card[] {
 }
 
 /** План сессии набора по данным на сейчас; null — набора нет */
-export function currentSetSessionPlan(setId: string, now: number = Date.now()): SetSessionInfo | null {
+export function currentSetSessionPlan(
+  setId: string,
+  now: number = Date.now()
+): SetSessionInfo | null {
   const set = useSetsStore.getState().getSet(setId);
   if (!set) return null;
   const cards = setCards(setId);
@@ -42,7 +45,10 @@ export function currentSetSessionPlan(setId: string, now: number = Date.now()): 
   // День урока общий с главной; до первого открытия главной за день — считаем, что день начинается сейчас
   const stored = useLessonStore.getState().day;
   const today = localDay();
-  const day = stored?.date === today ? stored : ensureLessonDay(stored, today, countWaitingReview(sets, cardsBySet, cardsMap, now));
+  const day =
+    stored?.date === today
+      ? stored
+      : ensureLessonDay(stored, today, countWaitingReview(sets, cardsBySet, cardsMap, now));
   const plan = buildSetSessionPlan({
     set,
     cards,
@@ -51,7 +57,8 @@ export function currentSetSessionPlan(setId: string, now: number = Date.now()): 
     now,
   });
   const tomorrowCount = cards.filter(
-    (c) => (c.learningStep || 0) >= 1 && !isCardWaitingReview(c, now) && c.nextReviewDate <= now + DAY_MS,
+    (c) =>
+      (c.learningStep || 0) >= 1 && !isCardWaitingReview(c, now) && c.nextReviewDate <= now + DAY_MS
   ).length;
   return { plan, tomorrowCount };
 }
@@ -64,7 +71,7 @@ export function startSetSession(
   navigation: NativeStackNavigationProp<RootStackParamList>,
   setId: string,
   plan: SetSessionPlan,
-  how: 'push' | 'replace' = 'push',
+  how: 'push' | 'replace' = 'push'
 ): boolean {
   if (plan.cardIds.length === 0) return false;
   const { cards } = useCardsStore.getState();

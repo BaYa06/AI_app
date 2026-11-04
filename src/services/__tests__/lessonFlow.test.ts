@@ -53,7 +53,13 @@ describe('ход урока', () => {
 
     const second = nextLessonStep({ part: 'review', newIds: fresh }, setIdOf, NOW);
     expect(second?.screen).toBe('Study');
-    expect(second?.params).toMatchObject({ setId: 'b', mode: 'classic', studyAll: true, dueCardIds: fresh, lesson: { part: 'new' } });
+    expect(second?.params).toMatchObject({
+      setId: 'b',
+      mode: 'classic',
+      studyAll: true,
+      dueCardIds: fresh,
+      lesson: { part: 'new' },
+    });
 
     const third = nextLessonStep({ part: 'new', newIds: fresh }, setIdOf, NOW);
     expect(third?.screen).toBe('MultipleChoice');
@@ -64,11 +70,20 @@ describe('ход урока', () => {
 
   it('время начала и число повторений доходят до последней части (для lesson_completed)', () => {
     const padded = [...review, 'a-9', 'a-8'];
-    const first = firstLessonStep({ reviewIds: padded, newIds: fresh, reviewCount: 2 }, setIdOf, NOW);
+    const first = firstLessonStep(
+      { reviewIds: padded, newIds: fresh, reviewCount: 2 },
+      setIdOf,
+      NOW
+    );
     expect(first?.params.lesson).toMatchObject({ startedAt: NOW, reviewCount: 2 });
     const second = nextLessonStep(first!.params.lesson!, setIdOf, NOW + 60_000);
     const third = nextLessonStep(second!.params.lesson!, setIdOf, NOW + 120_000);
-    expect(third?.params.lesson).toMatchObject({ part: 'check', startedAt: NOW, reviewCount: 2, newIds: fresh });
+    expect(third?.params.lesson).toMatchObject({
+      part: 'check',
+      startedAt: NOW,
+      reviewCount: 2,
+      newIds: fresh,
+    });
   });
 
   it('у каждой части свой phaseId — порции разных частей не смешиваются', () => {
@@ -88,9 +103,16 @@ describe('ход урока', () => {
   });
 
   it('ошибки дня — одна часть карточками', () => {
-    const first = firstLessonStep({ reviewIds: review, newIds: fresh, mistakeIds: ['c-1'] }, setIdOf, NOW);
+    const first = firstLessonStep(
+      { reviewIds: review, newIds: fresh, mistakeIds: ['c-1'] },
+      setIdOf,
+      NOW
+    );
     expect(first?.screen).toBe('Study');
-    expect(first?.params).toMatchObject({ dueCardIds: ['c-1'], lesson: { part: 'mistakes', newIds: [] } });
+    expect(first?.params).toMatchObject({
+      dueCardIds: ['c-1'],
+      lesson: { part: 'mistakes', newIds: [] },
+    });
     expect(nextLessonStep({ part: 'mistakes', newIds: [] }, setIdOf, NOW)).toBeNull();
   });
 
@@ -146,13 +168,23 @@ describe('сессия набора', () => {
     expect(fitsSessionStage('build', word('a-6', 'müde'))).toBe(true);
     const stages = buildSessionStages([...LEARN], cards);
     expect(stages.map((s) => s.stage)).toEqual([...LEARN]);
-    expect(stages.find((s) => s.stage === 'context')!.cardIds).toEqual(['a-1', 'a-2', 'a-4', 'a-5']);
+    expect(stages.find((s) => s.stage === 'context')!.cardIds).toEqual([
+      'a-1',
+      'a-2',
+      'a-4',
+      'a-5',
+    ]);
     expect(stages.find((s) => s.stage === 'build')!.cardIds).toEqual(['a-1', 'a-2', 'a-3']);
   });
 
   it('этап без подходящих слов убирается до старта', () => {
     const noExamples = [word('a-1', 'guten Tag'), word('a-2', 'auf Wiedersehen')];
-    expect(buildSessionStages([...LEARN], noExamples).map((s) => s.stage)).toEqual(['cards', 'pairs', 'test', 'listen']);
+    expect(buildSessionStages([...LEARN], noExamples).map((s) => s.stage)).toEqual([
+      'cards',
+      'pairs',
+      'test',
+      'listen',
+    ]);
   });
 
   it('первый этап — карточки по словам сессии одной порцией', () => {
@@ -181,7 +213,14 @@ describe('сессия набора', () => {
   }
 
   it('ошибки в порции — тот же этап следующей порцией, без итогов', () => {
-    const portion = { complete: false, phaseId: 'p1', totalPhaseCards: 5, studiedInPhase: 4, phaseOffset: 5, phaseFailedIds: ['a-2'] };
+    const portion = {
+      complete: false,
+      phaseId: 'p1',
+      totalPhaseCards: 5,
+      studiedInPhase: 4,
+      phaseOffset: 5,
+      phaseFailedIds: ['a-2'],
+    };
     const step = sessionStepAfterPortion(session(2), portion, undefined, NOW)!;
     expect(step.screen).toBe('MultipleChoice');
     expect(step.params).toMatchObject({ phaseId: 'p1', phaseOffset: 5, phaseFailedIds: ['a-2'] });
@@ -194,7 +233,10 @@ describe('сессия набора', () => {
     expect(listen.screen).toBe('MultipleChoice');
     expect(listen.params).toMatchObject({ listen: true, phaseOffset: 0 });
     const context = sessionStepAfterPortion(session(3), done, undefined, NOW)!;
-    expect(context).toMatchObject({ screen: 'ContextFill', params: { dueCardIds: ['a-1', 'a-2', 'a-4', 'a-5'] } });
+    expect(context).toMatchObject({
+      screen: 'ContextFill',
+      params: { dueCardIds: ['a-1', 'a-2', 'a-4', 'a-5'] },
+    });
     expect(sessionStepAfterPortion(session(4), done, undefined, NOW)!.screen).toBe('WordBuilder');
     expect(sessionStepAfterPortion(session(5), done, undefined, NOW)).toBeNull();
   });
@@ -202,13 +244,20 @@ describe('сессия набора', () => {
   it('рост серии посреди сессии доезжает до итогов', () => {
     const next = sessionStepAfterPortion(session(0), { complete: true }, 7, NOW)!;
     expect(next.params.session!.streakCount).toBe(7);
-    const later = sessionStepAfterPortion(next.params.session!, { complete: true }, undefined, NOW)!;
+    const later = sessionStepAfterPortion(
+      next.params.session!,
+      { complete: true },
+      undefined,
+      NOW
+    )!;
     expect(later.params.session!.streakCount).toBe(7);
   });
 
   it('ответ в сессии идёт в квоту дня: новое — если ни разу не отвечали, повторение — если пора', () => {
     expect(sessionPhaseForAnswer(card(0, 0), NOW)).toBe('new');
-    expect(sessionPhaseForAnswer({ ...card(0, NOW - DAY), lastReviewDate: NOW - DAY }, NOW)).toBeNull();
+    expect(
+      sessionPhaseForAnswer({ ...card(0, NOW - DAY), lastReviewDate: NOW - DAY }, NOW)
+    ).toBeNull();
     expect(sessionPhaseForAnswer(card(2, NOW - DAY), NOW)).toBe('review');
     expect(sessionPhaseForAnswer(card(2, NOW + 3 * DAY), NOW)).toBeNull();
   });

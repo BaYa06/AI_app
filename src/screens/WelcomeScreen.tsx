@@ -3,15 +3,17 @@
  * @description Экран приветствия с Google OAuth авторизацией.
  */
 import React, { useCallback, useEffect, useState } from 'react';
+import { View, StyleSheet, ScrollView, Platform, Linking, ActivityIndicator } from 'react-native';
 import {
-  View,
-  StyleSheet,
-  ScrollView,
-  Platform,
-  Linking,
-  ActivityIndicator,
-} from 'react-native';
-import { Zap, Sparkles, BookOpen, Lightbulb, Download, Share, PlusSquare, CheckCircle2 } from 'lucide-react-native';
+  Zap,
+  Sparkles,
+  BookOpen,
+  Lightbulb,
+  Download,
+  Share,
+  PlusSquare,
+  CheckCircle2,
+} from 'lucide-react-native';
 import InAppBrowser from 'react-native-inappbrowser-reborn';
 import appleAuth, { AppleButton } from '@invertase/react-native-apple-authentication';
 import { Text } from '@/components/common';
@@ -58,7 +60,6 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
 
   const loading = isLoading || externalLoading;
   const canUseAppleSignIn = Platform.OS === 'ios' && appleAuth.isSupported;
-
 
   const getParamFromCallbackUrl = useCallback((rawUrl: string, name: string): string | null => {
     if (!rawUrl || !name) return null;
@@ -162,7 +163,8 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
       }
 
       // Имя приходит только при первом входе — запоминаем до входа, его заберёт App
-      const appleName = [fullName?.givenName, fullName?.familyName].filter(Boolean).join(' ').trim() || null;
+      const appleName =
+        [fullName?.givenName, fullName?.familyName].filter(Boolean).join(' ').trim() || null;
       setAppleSignInName(appleName);
 
       const { error } = await supabase.auth.signInWithIdToken({
@@ -207,15 +209,28 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
             <View style={[styles.logoCircle, { backgroundColor: colors.surfaceMuted }]}>
               <Zap size={iconSize.l} color={colors.primary} fill={colors.primary} />
             </View>
-            <Text variant="h1" align="center" accessibilityRole="header" style={{ color: colors.textPrimary }}>
+            <Text
+              variant="h1"
+              align="center"
+              accessibilityRole="header"
+              style={{ color: colors.textPrimary }}
+            >
               Flashly
             </Text>
-            <Text variant="bodyLarge" align="center" style={[styles.subtitle, { color: colors.textSecondary }]}>
+            <Text
+              variant="bodyLarge"
+              align="center"
+              style={[styles.subtitle, { color: colors.textSecondary }]}
+            >
               Учись умнее. Запоминай надолго.
             </Text>
           </View>
 
-          <View style={styles.illustration} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <View
+            style={styles.illustration}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
             <View style={styles.tilesGrid}>
               {TILES.map(({ icon: Glyph, fill, rotate, offset }, idx) => (
                 <View
@@ -223,13 +238,17 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
                   style={[
                     styles.tile,
                     {
-                      backgroundColor: fill === 'solid' ? colors.primaryFill : alpha(colors.primary, fill),
+                      backgroundColor:
+                        fill === 'solid' ? colors.primaryFill : alpha(colors.primary, fill),
                       transform: [{ rotate }],
                       marginTop: offset,
                     },
                   ]}
                 >
-                  <Glyph size={iconSize.l} color={fill === 'solid' ? colors.onPrimary : colors.primary} />
+                  <Glyph
+                    size={iconSize.l}
+                    color={fill === 'solid' ? colors.onPrimary : colors.primary}
+                  />
                 </View>
               ))}
             </View>
@@ -245,7 +264,12 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
               />
             ) : (
               <>
-                <Button title="Войти через Google" icon={GoogleIcon} onPress={signInWithGoogle} fullWidth />
+                <Button
+                  title="Войти через Google"
+                  icon={GoogleIcon}
+                  onPress={signInWithGoogle}
+                  fullWidth
+                />
                 {canUseAppleSignIn && (
                   <AppleButton
                     buttonStyle={AppleButton.Style.BLACK}
@@ -258,7 +282,12 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
               </>
             )}
             {authError && (
-              <Text variant="bodySmall" align="center" accessibilityRole="alert" style={{ color: colors.errorText }}>
+              <Text
+                variant="bodySmall"
+                align="center"
+                accessibilityRole="alert"
+                style={{ color: colors.errorText }}
+              >
                 {authError}
               </Text>
             )}

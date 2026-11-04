@@ -17,7 +17,7 @@ const storage = new MMKV({
  */
 export const StorageService = {
   // ==================== STRING ====================
-  
+
   getString: (key: string): string | undefined => {
     return storage.getString(key);
   },
@@ -27,7 +27,7 @@ export const StorageService = {
   },
 
   // ==================== NUMBER ====================
-  
+
   getNumber: (key: string): number | undefined => {
     return storage.getNumber(key);
   },
@@ -37,7 +37,7 @@ export const StorageService = {
   },
 
   // ==================== BOOLEAN ====================
-  
+
   getBoolean: (key: string): boolean | undefined => {
     return storage.getBoolean(key);
   },
@@ -47,11 +47,11 @@ export const StorageService = {
   },
 
   // ==================== OBJECT/JSON ====================
-  
+
   getObject: <T>(key: string): T | undefined => {
     const json = storage.getString(key);
     if (!json) return undefined;
-    
+
     try {
       return JSON.parse(json) as T;
     } catch {
@@ -70,7 +70,7 @@ export const StorageService = {
   },
 
   // ==================== UTILITY ====================
-  
+
   delete: (key: string): void => {
     storage.delete(key);
   },
@@ -88,7 +88,7 @@ export const StorageService = {
   },
 
   // ==================== BATCH OPERATIONS ====================
-  
+
   /**
    * Сохранить несколько объектов за один раз
    */
@@ -123,26 +123,26 @@ export const STORAGE_KEYS = {
   SETS: 'sets',
   COURSES: 'courses',
   REVIEW_LOGS: 'review_logs',
-  
+
   // Настройки
   SETTINGS: 'settings',
   THEME: 'theme',
   HOME_SETS_SORT: 'home_sets_sort',
-  
+
   // Пользователь
   USER: 'user',
   AUTH_TOKEN: 'auth_token',
-  
+
   // Статистика
   DAILY_STATS: 'daily_stats',
   STREAK: 'streak',
-  
+
   // Синхронизация
   LAST_SYNC: 'last_sync',
   SYNC_QUEUE: 'sync_queue',
-  
+
   // Кеш
   IMAGE_CACHE: 'image_cache',
 } as const;
 
-export type StorageKey = typeof STORAGE_KEYS[keyof typeof STORAGE_KEYS];
+export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];

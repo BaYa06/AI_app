@@ -33,7 +33,7 @@ export function addLessonDay(state: WidgetPromptState, date: string): WidgetProm
 export function shouldShowWidgetPrompt(
   state: WidgetPromptState,
   today: string,
-  opts: { supported: boolean; installed: boolean },
+  opts: { supported: boolean; installed: boolean }
 ): boolean {
   if (!opts.supported || opts.installed) return false;
   if (state.shownDays.length >= PROMPT_MAX_SHOWS || state.shownDays.includes(today)) return false;

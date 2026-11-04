@@ -18,7 +18,8 @@ const getStores = () => ({
 });
 
 /** Лог только в деве — эти сообщения не секретные, но не нужны в продовых логах. */
-const devLog = (message: string, ...details: unknown[]) => log.debug('Database', message, ...details);
+const devLog = (message: string, ...details: unknown[]) =>
+  log.debug('Database', message, ...details);
 
 /**
  * Интерфейс сохраненных данных
@@ -51,8 +52,9 @@ async function runStudentCoursesSync(): Promise<void> {
   let serverCards: Card[] = [];
   try {
     studentCourses = await NeonService.loadStudentCourses(me, strict);
-    const hadCourseSets = Object.values(stores.useSetsStore.getState().sets as Record<string, CardSet>)
-      .some((s) => isTeacherCourseSet(s, me));
+    const hadCourseSets = Object.values(
+      stores.useSetsStore.getState().sets as Record<string, CardSet>
+    ).some((s) => isTeacherCourseSet(s, me));
     // Не ученик ни в одном курсе и нечего убирать — карточки не запрашиваем
     const needCards = studentCourses.length > 0 || hadCourseSets;
     [setsByCourse, serverCards] = await Promise.all([
@@ -77,9 +79,11 @@ async function runStudentCoursesSync(): Promise<void> {
 
   // ── Наборы курсов учителя
   const incoming = new Map<string, CardSet>();
-  setsByCourse.forEach((list) => list.forEach((set) => {
-    if (!set.isOfficial && !incoming.has(set.id)) incoming.set(set.id, set);
-  }));
+  setsByCourse.forEach((list) =>
+    list.forEach((set) => {
+      if (!set.isOfficial && !incoming.has(set.id)) incoming.set(set.id, set);
+    })
+  );
 
   const setsState = stores.useSetsStore.getState();
   const sets: Record<string, CardSet> = { ...setsState.sets };
@@ -126,7 +130,13 @@ async function runStudentCoursesSync(): Promise<void> {
       // ложная дата. Слово на шаге 0, на которое сервер ответов не знает, — берём серверное.
       const stalePrev = !!prev && card.lastReviewDate === 0 && (prev.learningStep || 0) === 0;
       return prev && !stalePrev && prev.lastReviewDate > card.lastReviewDate
-        ? { ...card, learningStep: prev.learningStep, nextReviewDate: prev.nextReviewDate, lastReviewDate: prev.lastReviewDate, status: prev.status }
+        ? {
+            ...card,
+            learningStep: prev.learningStep,
+            nextReviewDate: prev.nextReviewDate,
+            lastReviewDate: prev.lastReviewDate,
+            status: prev.status,
+          }
         : card;
     });
     for (const card of merged) cards[card.id] = card;
@@ -165,9 +175,18 @@ export const DatabaseService = {
     try {
       const owner = StorageService.getString(CACHE_OWNER_KEY);
       if (!owner) return null;
-      const setsData = StorageService.getObject<{ sets: Record<string, CardSet>; setsOrder: string[] }>(STORAGE_KEYS.SETS);
-      const cardsData = StorageService.getObject<{ cards: Record<string, any>; cardsBySet: Record<string, string[]> }>(STORAGE_KEYS.CARDS);
-      const coursesData = StorageService.getObject<{ courses: Course[]; activeCourseId: string | null }>(STORAGE_KEYS.COURSES);
+      const setsData = StorageService.getObject<{
+        sets: Record<string, CardSet>;
+        setsOrder: string[];
+      }>(STORAGE_KEYS.SETS);
+      const cardsData = StorageService.getObject<{
+        cards: Record<string, any>;
+        cardsBySet: Record<string, string[]>;
+      }>(STORAGE_KEYS.CARDS);
+      const coursesData = StorageService.getObject<{
+        courses: Course[];
+        activeCourseId: string | null;
+      }>(STORAGE_KEYS.COURSES);
       if (!setsData?.sets && !coursesData?.courses) return null;
 
       const stores = getStores();
@@ -177,10 +196,16 @@ export const DatabaseService = {
         stores.useSetsStore.setState({ sets: setsData.sets, setsOrder });
       }
       if (cardsData?.cards) {
-        stores.useCardsStore.setState({ cards: cardsData.cards, cardsBySet: cardsData.cardsBySet || {} });
+        stores.useCardsStore.setState({
+          cards: cardsData.cards,
+          cardsBySet: cardsData.cardsBySet || {},
+        });
       }
       if (coursesData?.courses) {
-        stores.useCoursesStore.setState({ courses: coursesData.courses, activeCourseId: coursesData.activeCourseId ?? null });
+        stores.useCoursesStore.setState({
+          courses: coursesData.courses,
+          activeCourseId: coursesData.activeCourseId ?? null,
+        });
       }
       return owner;
     } catch (error) {
@@ -207,7 +232,7 @@ export const DatabaseService = {
     try {
       // Определяем текущего авторизованного пользователя (если есть)
       let currentUserId: string | undefined;
-      
+
       if (supabase?.auth?.getSession) {
         try {
           const { data: sessionData } = await supabase.auth.getSession();
@@ -220,7 +245,7 @@ export const DatabaseService = {
       }
 
       devLog('🔄 Загрузка данных из Neon PostgreSQL...');
-      
+
       // Пытаемся загрузить данные с сервера. Сетевая ошибка — не «пусто»: тогда ничего не заменяем,
       // на экране остаются сохранённые данные (иначе без интернета наборы пропадали, а автосохранение
       // затирало ими кэш на устройстве)
@@ -237,7 +262,8 @@ export const DatabaseService = {
           boot = await NeonService.bootstrap();
         } catch (error) {
           if (!(error instanceof NetworkLoadError)) throw error;
-          if (error.status !== 400 && error.status !== 404) return this.keepCachedData(currentUserId);
+          if (error.status !== 400 && error.status !== 404)
+            return this.keepCachedData(currentUserId);
         }
       }
 
@@ -264,7 +290,7 @@ export const DatabaseService = {
       const setsMap: Record<string, CardSet> = {};
       const setsOrder: string[] = [];
 
-      sets.forEach(set => {
+      sets.forEach((set) => {
         setsMap[set.id] = set;
         setsOrder.push(set.id);
       });
@@ -278,7 +304,7 @@ export const DatabaseService = {
 
       // TTL-проверка: используем локальные данные только если они свежие
       const localSetsValid = localSetsData?.savedAt
-        ? (Date.now() - localSetsData.savedAt) < LOCAL_DATA_TTL_MS
+        ? Date.now() - localSetsData.savedAt < LOCAL_DATA_TTL_MS
         : true; // Если savedAt нет — старый формат, используем
 
       if (localSetsData && localSetsValid) {
@@ -301,8 +327,7 @@ export const DatabaseService = {
         activeCourseId: string | null;
       }>(STORAGE_KEYS.COURSES);
 
-      const allCourses: Course[] =
-        currentUserId ? courses : localCoursesData?.courses || courses;
+      const allCourses: Course[] = currentUserId ? courses : localCoursesData?.courses || courses;
 
       // Официальный набор (юнит книги) → курс, под которым его показывать
       const officialCourseIdBySet: Record<string, string> = {};
@@ -310,7 +335,9 @@ export const DatabaseService = {
       // Загружаем курсы где пользователь — ученик
       if (currentUserId) {
         try {
-          const studentCourses = boot ? boot.studentCourses : await NeonService.loadStudentCourses(currentUserId, strict);
+          const studentCourses = boot
+            ? boot.studentCourses
+            : await NeonService.loadStudentCourses(currentUserId, strict);
           if (studentCourses.length > 0) {
             allCourses.push(...studentCourses);
             devLog(`🎓 Загружено курсов ученика: ${studentCourses.length}`);
@@ -319,10 +346,12 @@ export const DatabaseService = {
             // при 5 курсах последовательные запросы заметно затягивали экран загрузки
             const setsByCourse = boot
               ? studentCourses.map((sc) => boot!.courseSets[sc.id] || [])
-              : await Promise.all(studentCourses.map((sc) => NeonService.loadCourseSetsByMembership(sc.id, strict)));
+              : await Promise.all(
+                  studentCourses.map((sc) => NeonService.loadCourseSetsByMembership(sc.id, strict))
+                );
             studentCourses.forEach((sc, i) => {
               const teacherSets = setsByCourse[i];
-              teacherSets.forEach(ts => {
+              teacherSets.forEach((ts) => {
                 // Набор уже есть (свой набор ученика, положенный в курс учителя, или тот же юнит
                 // в двух курсах) — второй раз не добавляем: дубль в setsOrder удваивал его карточки
                 // в «Повторении дня» и в тестах (одинаковые варианты ответа).
@@ -368,9 +397,9 @@ export const DatabaseService = {
       const cardsMap: Record<string, Card> = {};
       const cardsBySet: Record<string, string[]> = {};
 
-      allCards.forEach(card => {
+      allCards.forEach((card) => {
         cardsMap[card.id] = card;
-        
+
         if (!cardsBySet[card.setId]) {
           cardsBySet[card.setId] = [];
         }
@@ -385,7 +414,7 @@ export const DatabaseService = {
       }>(STORAGE_KEYS.CARDS);
 
       const localCardsValid = localCardsData?.savedAt
-        ? (Date.now() - localCardsData.savedAt) < LOCAL_DATA_TTL_MS
+        ? Date.now() - localCardsData.savedAt < LOCAL_DATA_TTL_MS
         : true;
 
       if (localCardsData && localCardsValid) {
@@ -394,9 +423,12 @@ export const DatabaseService = {
           if (!cardsMap[id]) {
             // Добавляем карточку только если её набор принадлежит текущему пользователю
             const cardSet = setsMap[card.setId];
-            if (cardSet && (!currentUserId || cardSet.userId === currentUserId || cardSet.userId === 'local')) {
+            if (
+              cardSet &&
+              (!currentUserId || cardSet.userId === currentUserId || cardSet.userId === 'local')
+            ) {
               cardsMap[id] = card;
-              
+
               if (!cardsBySet[card.setId]) {
                 cardsBySet[card.setId] = [];
               }
@@ -419,7 +451,7 @@ export const DatabaseService = {
         try {
           const bundle = await BookService.loadOfficialSets(
             Object.keys(officialCourseIdBySet),
-            officialCourseIdBySet,
+            officialCourseIdBySet
           );
           if (bundle) {
             BookService.applyOfficialSets(bundle);
@@ -579,7 +611,7 @@ export const DatabaseService = {
    */
   clearAll(): void {
     StorageService.clearAll();
-    
+
     const stores = getStores();
     // Сбрасываем store
     stores.useCardsStore.getState().clearCards();

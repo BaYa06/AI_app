@@ -19,7 +19,10 @@ export const STATUS_LABEL: Record<CardStatus, string> = {
 };
 
 /** Цвет статуса: заливка (фон, рамка, сегмент полоски) и галочка; у new цвета нет */
-export function statusColors(colors: ColorScheme, status: CardStatus): { fill: string; ink: string } | null {
+export function statusColors(
+  colors: ColorScheme,
+  status: CardStatus
+): { fill: string; ink: string } | null {
   switch (status) {
     case 'learning':
     case 'relearning':

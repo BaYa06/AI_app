@@ -120,7 +120,7 @@ export function initSwRecovery(): void {
     _source?: string,
     _lineno?: number,
     _colno?: number,
-    error?: Error,
+    error?: Error
   ) {
     if (isChunkLoadError(error) || isChunkLoadError(message)) {
       handleChunkLoadError(error || message);
@@ -128,7 +128,12 @@ export function initSwRecovery(): void {
     }
     if (typeof originalOnError === 'function') {
       return (originalOnError as OnErrorEventHandler)?.call(
-        window, message, _source, _lineno, _colno, error,
+        window,
+        message,
+        _source,
+        _lineno,
+        _colno,
+        error
       );
     }
     return false;
@@ -150,7 +155,7 @@ function handleChunkLoadError(error: unknown): void {
     log.error(
       'Recovery',
       'Already attempted recovery recently. Skipping to avoid loop. ' +
-      'User needs to manually clear browser data.',
+        'User needs to manually clear browser data.'
     );
     return;
   }

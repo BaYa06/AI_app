@@ -37,9 +37,7 @@ export default async function handler(req, res) {
 
   try {
     // Формируем список слов для промпта
-    const wordList = batch
-      .map((w, i) => `${i + 1}. ${w.front} — ${w.back}`)
-      .join('\n');
+    const wordList = batch.map((w, i) => `${i + 1}. ${w.front} — ${w.back}`).join('\n');
 
     const langFrom = languageName(languageFrom, 'the language of the LEFT-side words (detect it)');
     const langTo = languageName(languageTo, "the user's native language");
@@ -70,7 +68,12 @@ Reply ONLY with a JSON array: [{"word": "<LEFT word exactly as given>", "example
 Example: [{"word": "der Hund, -e", "example": "Jeden Morgen geht der Hund mit mir im Park spazieren.", "wordForm": "der Hund", "wordType": "noun"}, {"word": "anrufen", "example": "Ich weiß, dass du mich heute Abend anrufen wirst.", "wordForm": "anrufen", "wordType": "verb"}]`;
 
     // 100 слов × ~25 токенов на пример — 4096 впритык, берём с запасом
-    const text = await generateJson({ models: MODELS.text, prompt, temperature: 0.7, maxOutputTokens: 8192 });
+    const text = await generateJson({
+      models: MODELS.text,
+      prompt,
+      temperature: 0.7,
+      maxOutputTokens: 8192,
+    });
     const examples = parseJsonArray(text);
 
     const VALID_WORD_TYPES = ['noun', 'verb', 'adjective', 'adverb', 'other'];
@@ -85,15 +88,14 @@ Example: [{"word": "der Hund, -e", "example": "Jeden Morgen geht der Hund mit mi
         if (typeof examples[0] === 'object' && examples[0] !== null) {
           // Формат: массив объектов {word, example, wordType}
           const frontLower = w.front.toLowerCase().trim();
-          const match = examples.find(
-            e => e.word && e.word.toLowerCase().trim() === frontLower
-          );
+          const match = examples.find((e) => e.word && e.word.toLowerCase().trim() === frontLower);
           const entry = match || examples[i];
           if (entry) {
             example = entry.example || '';
             wordForm = entry.wordForm || null;
             // Пропуск ставится по точному совпадению — форма, которой нет в предложении, бесполезна
-            if (wordForm && !example.toLowerCase().includes(wordForm.toLowerCase())) wordForm = null;
+            if (wordForm && !example.toLowerCase().includes(wordForm.toLowerCase()))
+              wordForm = null;
             wordType = VALID_WORD_TYPES.includes(entry.wordType) ? entry.wordType : null;
           }
         } else {

@@ -22,7 +22,9 @@ const safeStorage = AsyncStorage?.getItem
  * - PKCE flow is required for mobile OAuth.
  */
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://yiwsmjbeirgomkrckoju.supabase.co';
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlpd3NtamJlaXJnb21rcmNrb2p1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1NzUzMTksImV4cCI6MjA4NTE1MTMxOX0.d8ck5zaELDtMYLyLHVrYEyiytj3a_8Q7XikSLWM1o3Q';
+const SUPABASE_ANON_KEY =
+  process.env.SUPABASE_ANON_KEY ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlpd3NtamJlaXJnb21rcmNrb2p1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1NzUzMTksImV4cCI6MjA4NTE1MTMxOX0.d8ck5zaELDtMYLyLHVrYEyiytj3a_8Q7XikSLWM1o3Q';
 
 log.debug('Supabase', 'URL', SUPABASE_URL ? 'SET' : 'NOT SET');
 log.debug('Supabase', 'ANON_KEY', SUPABASE_ANON_KEY ? 'SET' : 'NOT SET');
@@ -33,13 +35,13 @@ const defaultWebRedirect =
     ? `${window.location.origin}/auth-callback`
     : '';
 const SUPABASE_REDIRECT_URI = isWeb
-  ? process.env.SUPABASE_WEB_REDIRECT_URI ?? defaultWebRedirect
-  : process.env.SUPABASE_REDIRECT_URI ?? 'flashly://auth-callback';
+  ? (process.env.SUPABASE_WEB_REDIRECT_URI ?? defaultWebRedirect)
+  : (process.env.SUPABASE_REDIRECT_URI ?? 'flashly://auth-callback');
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   log.warn(
     'Supabase',
-    'Missing SUPABASE_URL / SUPABASE_ANON_KEY. Set them in your mobile env (e.g. .env, Xcode/Gradle).',
+    'Missing SUPABASE_URL / SUPABASE_ANON_KEY. Set them in your mobile env (e.g. .env, Xcode/Gradle).'
   );
 }
 

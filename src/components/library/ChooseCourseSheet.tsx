@@ -55,10 +55,16 @@ export function ChooseCourseSheet({
         <>
           {showStudentsHint && selected !== null && (
             <Text variant="caption" color="secondary">
-              Если в курсе есть ученики, они сразу увидят этот набор. Скрыть его можно в меню набора.
+              Если в курсе есть ученики, они сразу увидят этот набор. Скрыть его можно в меню
+              набора.
             </Text>
           )}
-          <Button title="Добавить" onPress={() => onSubmit(selected)} loading={isSubmitting} fullWidth />
+          <Button
+            title="Добавить"
+            onPress={() => onSubmit(selected)}
+            loading={isSubmitting}
+            fullWidth
+          />
         </>
       }
     >
@@ -80,10 +86,18 @@ export function ChooseCourseSheet({
                 pressed && styles.pressed,
               ]}
             >
-              <View style={[styles.radio, { borderColor: isSelected ? colors.primary : colors.border }]}>
-                {isSelected && <View style={[styles.radioDot, { backgroundColor: colors.primary }]} />}
+              <View
+                style={[styles.radio, { borderColor: isSelected ? colors.primary : colors.border }]}
+              >
+                {isSelected && (
+                  <View style={[styles.radioDot, { backgroundColor: colors.primary }]} />
+                )}
               </View>
-              <Text variant="body" style={[styles.optionTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+              <Text
+                variant="body"
+                style={[styles.optionTitle, { color: colors.textPrimary }]}
+                numberOfLines={1}
+              >
                 {option.title}
               </Text>
             </Pressable>

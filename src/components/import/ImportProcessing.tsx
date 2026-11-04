@@ -26,18 +26,23 @@ function hintFor(seconds: number): string {
   return 'Пробуем другую модель ИИ — это бывает при большой нагрузке';
 }
 
-export const ImportProcessing = memo(function ImportProcessing({ photoCount, fileCount, onCancel }: Props) {
+export const ImportProcessing = memo(function ImportProcessing({
+  photoCount,
+  fileCount,
+  onCancel,
+}: Props) {
   const colors = useThemeColors();
   const [seconds, setSeconds] = useState(0);
 
   useEffect(() => {
-    const timer = setInterval(() => setSeconds(s => s + 1), 1000);
+    const timer = setInterval(() => setSeconds((s) => s + 1), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  const uploaded = photoCount > 0
-    ? `${photoCount} ${pluralize(photoCount, 'фото', 'фото', 'фото')}`
-    : `${fileCount} ${pluralize(fileCount, 'файл', 'файла', 'файлов')}`;
+  const uploaded =
+    photoCount > 0
+      ? `${photoCount} ${pluralize(photoCount, 'фото', 'фото', 'фото')}`
+      : `${fileCount} ${pluralize(fileCount, 'файл', 'файла', 'файлов')}`;
   // Плавно к 90 %: настоящего прогресса сервер не сообщает
   const progress = Math.min(90, 10 + 80 * (1 - Math.exp(-seconds / 15)));
 
@@ -49,10 +54,12 @@ export const ImportProcessing = memo(function ImportProcessing({ photoCount, fil
 
   return (
     <View style={styles.root}>
-      <Text variant="h2" style={{ color: colors.textPrimary }}>Создаём карточки</Text>
+      <Text variant="h2" style={{ color: colors.textPrimary }}>
+        Создаём карточки
+      </Text>
 
       <View style={styles.steps} accessibilityLiveRegion="polite">
-        {steps.map(step => (
+        {steps.map((step) => (
           <View key={step.title} style={[styles.step, step.state === 'pending' && styles.pending]}>
             <View
               style={[
@@ -63,11 +70,17 @@ export const ImportProcessing = memo(function ImportProcessing({ photoCount, fil
               ]}
             >
               {step.state === 'done' && <Check size={iconSize.xs} color={colors.onPrimary} />}
-              {step.state === 'active' && <View style={[styles.activeCore, { backgroundColor: colors.primary }]} />}
+              {step.state === 'active' && (
+                <View style={[styles.activeCore, { backgroundColor: colors.primary }]} />
+              )}
             </View>
             <View style={styles.stepText}>
-              <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>{step.title}</Text>
-              <Text variant="bodySmall" color="secondary">{step.hint}</Text>
+              <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
+                {step.title}
+              </Text>
+              <Text variant="bodySmall" color="secondary">
+                {step.hint}
+              </Text>
             </View>
           </View>
         ))}
@@ -76,7 +89,8 @@ export const ImportProcessing = memo(function ImportProcessing({ photoCount, fil
       <ProgressBar progress={progress} accessibilityLabel="Создание карточек" />
 
       <Text variant="bodySmall" color="secondary">
-        Лучше не сворачивать приложение. Если связь оборвётся — файлы останутся, повторим одной кнопкой.
+        Лучше не сворачивать приложение. Если связь оборвётся — файлы останутся, повторим одной
+        кнопкой.
       </Text>
 
       <View style={styles.spacer} />
@@ -86,11 +100,23 @@ export const ImportProcessing = memo(function ImportProcessing({ photoCount, fil
 });
 
 const styles = StyleSheet.create({
-  root: { flex: 1, paddingHorizontal: screenPadding, paddingTop: spacing.l, paddingBottom: spacing.l, gap: spacing.l },
+  root: {
+    flex: 1,
+    paddingHorizontal: screenPadding,
+    paddingTop: spacing.l,
+    paddingBottom: spacing.l,
+    gap: spacing.l,
+  },
   steps: { gap: spacing.m },
   step: { flexDirection: 'row', gap: spacing.s, alignItems: 'flex-start' },
   pending: { opacity: 0.5 },
-  dot: { width: 28, height: 28, borderRadius: borderRadius.full, alignItems: 'center', justifyContent: 'center' },
+  dot: {
+    width: 28,
+    height: 28,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   activeCore: { width: 10, height: 10, borderRadius: borderRadius.full },
   stepText: { flex: 1, gap: spacing.xxs },
   spacer: { flex: 1 },

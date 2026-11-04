@@ -36,7 +36,14 @@ export interface ChipProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export const Chip = memo(function Chip({ label, selected = false, onPress, icon: Icon, disabled, style }: ChipProps) {
+export const Chip = memo(function Chip({
+  label,
+  selected = false,
+  onPress,
+  icon: Icon,
+  disabled,
+  style,
+}: ChipProps) {
   const colors = useThemeColors();
   const textColor = selected ? colors.primary : colors.textPrimary;
 
@@ -76,7 +83,12 @@ export interface BadgeProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export const Badge = memo(function Badge({ label, tone = 'primary', icon: Icon, style }: BadgeProps) {
+export const Badge = memo(function Badge({
+  label,
+  tone = 'primary',
+  icon: Icon,
+  style,
+}: BadgeProps) {
   const colors = useThemeColors();
   const palette: Record<BadgeTone, { fill: string; text: string }> = {
     primary: { fill: alpha(colors.primary, 20), text: colors.primary },
@@ -212,7 +224,13 @@ const TRACK_HEIGHT = 28;
 const THUMB = 24;
 const THUMB_OFFSET = TRACK_WIDTH - THUMB - 4;
 
-export const Switch = memo(function Switch({ value, onValueChange, disabled, accessibilityLabel, style }: SwitchProps) {
+export const Switch = memo(function Switch({
+  value,
+  onValueChange,
+  disabled,
+  accessibilityLabel,
+  style,
+}: SwitchProps) {
   const colors = useThemeColors();
   const position = useRef(new Animated.Value(value ? 1 : 0)).current;
 
@@ -245,7 +263,9 @@ export const Switch = memo(function Switch({ value, onValueChange, disabled, acc
         style,
       ]}
     >
-      <Animated.View style={[styles.thumb, { backgroundColor: colors.onPrimary, transform: [{ translateX }] }]} />
+      <Animated.View
+        style={[styles.thumb, { backgroundColor: colors.onPrimary, transform: [{ translateX }] }]}
+      />
     </Pressable>
   );
 });

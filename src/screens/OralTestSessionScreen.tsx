@@ -3,15 +3,7 @@
  * @description Основной экран устного теста — свайп карточек
  */
 import React, { useState, useRef, useEffect } from 'react';
-import {
-  View,
-  StyleSheet,
-  Pressable,
-  Animated,
-  PanResponder,
-  Platform,
-  Alert,
-} from 'react-native';
+import { View, StyleSheet, Pressable, Animated, PanResponder, Platform, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, X, Check } from 'lucide-react-native';
 import { Text } from '@/components/common';
@@ -84,14 +76,10 @@ export function OralTestSessionScreen({ navigation, route }: Props) {
       confirmFinish();
       return;
     }
-    Alert.alert(
-      'Завершить тест раньше времени?',
-      'Оставшиеся карточки не будут пройдены.',
-      [
-        { text: 'Отмена', style: 'cancel' },
-        { text: 'Завершить', style: 'destructive', onPress: () => confirmFinish() },
-      ],
-    );
+    Alert.alert('Завершить тест раньше времени?', 'Оставшиеся карточки не будут пройдены.', [
+      { text: 'Отмена', style: 'cancel' },
+      { text: 'Завершить', style: 'destructive', onPress: () => confirmFinish() },
+    ]);
   }
 
   function handleSwipe(direction: 'left' | 'right') {
@@ -105,7 +93,9 @@ export function OralTestSessionScreen({ navigation, route }: Props) {
       useNativeDriver: true,
     }).start(() => {
       const newKnown = isKnown ? [...knownIdsRef.current, currentCard.id] : knownIdsRef.current;
-      const newUnknown = !isKnown ? [...unknownIdsRef.current, currentCard.id] : unknownIdsRef.current;
+      const newUnknown = !isKnown
+        ? [...unknownIdsRef.current, currentCard.id]
+        : unknownIdsRef.current;
 
       knownIdsRef.current = newKnown;
       unknownIdsRef.current = newUnknown;
@@ -143,7 +133,7 @@ export function OralTestSessionScreen({ navigation, route }: Props) {
           }).start();
         }
       },
-    }),
+    })
   ).current;
 
   // Анимированные значения
@@ -235,16 +225,10 @@ export function OralTestSessionScreen({ navigation, route }: Props) {
               styles.card,
               {
                 backgroundColor: cardBg,
-                transform: [
-                  { translateX: pan.x },
-                  { translateY: pan.y },
-                  { rotate: rotation },
-                ],
+                transform: [{ translateX: pan.x }, { translateY: pan.y }, { rotate: rotation }],
               },
-              Platform.select({
-              }) as any,
-              {
-              },
+              Platform.select({}) as any,
+              {},
             ]}
             {...panResponder.panHandlers}
           >
@@ -275,15 +259,11 @@ export function OralTestSessionScreen({ navigation, route }: Props) {
             </Animated.View>
 
             {/* Content */}
-            <Text style={[styles.frontText, { color: colors.textPrimary }]}>
-              {card.frontText}
-            </Text>
+            <Text style={[styles.frontText, { color: colors.textPrimary }]}>{card.frontText}</Text>
 
             <View style={[styles.divider, { backgroundColor: colors.surfaceMuted }]} />
 
-            <Text style={[styles.backText, { color: colors.textSecondary }]}>
-              {card.backText}
-            </Text>
+            <Text style={[styles.backText, { color: colors.textSecondary }]}>{card.backText}</Text>
           </Animated.View>
         ) : null}
       </View>
@@ -296,7 +276,8 @@ export function OralTestSessionScreen({ navigation, route }: Props) {
 
       {/* Finish button */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        <Pressable accessibilityRole="button"
+        <Pressable
+          accessibilityRole="button"
           onPress={handleEarlyExit}
           style={({ pressed }) => [
             styles.finishBtn,
@@ -304,9 +285,7 @@ export function OralTestSessionScreen({ navigation, route }: Props) {
             pressed && { opacity: 0.6 },
           ]}
         >
-          <Text style={[styles.finishText, { color: colors.textSecondary }]}>
-            Закончить
-          </Text>
+          <Text style={[styles.finishText, { color: colors.textSecondary }]}>Закончить</Text>
         </Pressable>
       </View>
     </View>
@@ -328,9 +307,9 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: 1,
     zIndex: 10,
-    ...Platform.select({
+    ...(Platform.select({
       web: { backdropFilter: 'blur(12px)' },
-    }) as any,
+    }) as any),
   },
   backBtn: {
     padding: spacing.xs,

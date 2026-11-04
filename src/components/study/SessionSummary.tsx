@@ -32,7 +32,13 @@ const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padSta
 // Ниже этой высоты экрана (iPhone SE — 667) картинка и промежутки меньше, чтобы всё влезло без прокрутки
 const COMPACT_HEIGHT = 700;
 
-export function SessionSummary({ session, streakCount }: { session: SessionRouteParams; streakCount?: number }) {
+export function SessionSummary({
+  session,
+  streakCount,
+}: {
+  session: SessionRouteParams;
+  streakCount?: number;
+}) {
   const colors = useThemeColors();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
@@ -49,7 +55,9 @@ export function SessionSummary({ session, streakCount }: { session: SessionRoute
   // Считаем один раз — на момент окончания сессии
   const { list, weakIds, info, xp, seconds } = useMemo(() => {
     const now = Date.now();
-    const cards = sessionCardIds(session).map((id) => cardsMap[id]).filter((c): c is Card => !!c);
+    const cards = sessionCardIds(session)
+      .map((id) => cardsMap[id])
+      .filter((c): c is Card => !!c);
     const weak = new Set(cards.filter((c) => isSessionWordWeak(c, now)).map((c) => c.id));
     return {
       // В шторке слабые слова первыми — с них начнётся следующая сессия
@@ -83,7 +91,8 @@ export function SessionSummary({ session, streakCount }: { session: SessionRoute
   const tailStyle = useAnimatedStyle(() => ({ opacity: motion.tailOpacity.value }));
 
   const plan = info?.plan;
-  const canContinue = !!plan && (plan.mode === 'review' || plan.mode === 'learn' || plan.mode === 'more');
+  const canContinue =
+    !!plan && (plan.mode === 'review' || plan.mode === 'learn' || plan.mode === 'more');
   const goToSet = () => navigation.navigate('SetDetail', { setId: session.setId });
   // Серия выросла — празднуем после итогов, по нажатию кнопки, и уже потом уходим с экрана (решение 14)
   const leave = (go: () => void) => {
@@ -114,13 +123,42 @@ export function SessionSummary({ session, streakCount }: { session: SessionRoute
 
   const [xpShown, accuracyShown, secondsShown] = motion.values;
   const stats: StatTileProps[] = [
-    { icon: Zap, value: `+${xpShown}`, final: `+${xp}`, label: 'опыта', fg: colors.warningText, tint: colors.warning, motion: motion.tiles[0] },
-    { icon: Target, value: `${accuracyShown}%`, final: `${accuracy}%`, label: 'точность', fg: colors.successText, tint: colors.success, motion: motion.tiles[1] },
-    { icon: Clock, value: mmss(secondsShown), final: mmss(seconds), label: 'время', fg: colors.primary, tint: colors.primary, motion: motion.tiles[2] },
+    {
+      icon: Zap,
+      value: `+${xpShown}`,
+      final: `+${xp}`,
+      label: 'опыта',
+      fg: colors.warningText,
+      tint: colors.warning,
+      motion: motion.tiles[0],
+    },
+    {
+      icon: Target,
+      value: `${accuracyShown}%`,
+      final: `${accuracy}%`,
+      label: 'точность',
+      fg: colors.successText,
+      tint: colors.success,
+      motion: motion.tiles[1],
+    },
+    {
+      icon: Clock,
+      value: mmss(secondsShown),
+      final: mmss(seconds),
+      label: 'время',
+      fg: colors.primary,
+      tint: colors.primary,
+      motion: motion.tiles[2],
+    },
   ];
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + spacing.xs }]}>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: colors.background, paddingTop: insets.top + spacing.xs },
+      ]}
+    >
       <View style={styles.top}>
         {canContinue ? (
           <Button variant="icon" icon={X} accessibilityLabel="К набору" onPress={toSet} />
@@ -133,7 +171,12 @@ export function SessionSummary({ session, streakCount }: { session: SessionRoute
         </Animated.View>
 
         <View style={styles.titles}>
-          <Text variant="h1" align="center" accessibilityRole="header" style={{ color: colors.textPrimary }}>
+          <Text
+            variant="h1"
+            align="center"
+            accessibilityRole="header"
+            style={{ color: colors.textPrimary }}
+          >
             {title}
           </Text>
           <Text variant="bodyLarge" align="center" style={{ color: colors.textSecondary }}>
@@ -151,10 +194,20 @@ export function SessionSummary({ session, streakCount }: { session: SessionRoute
           <Pressable
             onPress={() => setWordsOpen(true)}
             accessibilityRole="button"
-            accessibilityLabel={weak > 0 ? `${words(weak)} на повторение. Показать слова сессии` : 'Показать слова сессии'}
-            style={({ pressed }) => [styles.wordsLink, { backgroundColor: colors.surfaceMuted }, pressed && styles.pressed]}
+            accessibilityLabel={
+              weak > 0
+                ? `${words(weak)} на повторение. Показать слова сессии`
+                : 'Показать слова сессии'
+            }
+            style={({ pressed }) => [
+              styles.wordsLink,
+              { backgroundColor: colors.surfaceMuted },
+              pressed && styles.pressed,
+            ]}
           >
-            <View style={[styles.dot, { backgroundColor: weak > 0 ? colors.warning : colors.success }]} />
+            <View
+              style={[styles.dot, { backgroundColor: weak > 0 ? colors.warning : colors.success }]}
+            />
             <Text variant="label" style={{ color: colors.textPrimary }}>
               {weak > 0 ? `${words(weak)} на повторение` : 'Слова сессии'}
             </Text>
@@ -184,7 +237,14 @@ export function SessionSummary({ session, streakCount }: { session: SessionRoute
             onPress={() => setWordsOpen(false)}
           />
         }
-        footer={<Button title="Понятно" variant="secondary" fullWidth onPress={() => setWordsOpen(false)} />}
+        footer={
+          <Button
+            title="Понятно"
+            variant="secondary"
+            fullWidth
+            onPress={() => setWordsOpen(false)}
+          />
+        }
       >
         {weak > 0 ? (
           <Text variant="bodySmall" style={[styles.sheetLead, { color: colors.textSecondary }]}>
@@ -197,19 +257,31 @@ export function SessionSummary({ session, streakCount }: { session: SessionRoute
             style={[styles.wordRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
           >
             <View style={styles.wordText}>
-              <Text variant="body" numberOfLines={2} style={[styles.semibold, { color: colors.textPrimary }]}>
+              <Text
+                variant="body"
+                numberOfLines={2}
+                style={[styles.semibold, { color: colors.textPrimary }]}
+              >
                 {card.frontText}
               </Text>
               <Text variant="bodySmall" numberOfLines={2} style={{ color: colors.textSecondary }}>
                 {card.backText}
               </Text>
             </View>
-            {weakIds.has(card.id) ? <Badge label="Повторить" tone="warning" /> : <Badge label="Уверенно" tone="success" />}
+            {weakIds.has(card.id) ? (
+              <Badge label="Повторить" tone="warning" />
+            ) : (
+              <Badge label="Уверенно" tone="success" />
+            )}
           </View>
         ))}
       </Sheet>
 
-      <StreakCelebration visible={streakVisible} streakCount={streakCount ?? 0} onClose={handleStreakClose} />
+      <StreakCelebration
+        visible={streakVisible}
+        streakCount={streakCount ?? 0}
+        onClose={handleStreakClose}
+      />
     </View>
   );
 }

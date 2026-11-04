@@ -20,14 +20,23 @@ export function cellText(cell: ExcelJS.Cell): { text: string; isDate: boolean } 
   if (v === null || v === undefined) return { text: '', isDate: false };
   if (v instanceof Date) return { text: v.toISOString().slice(0, 10), isDate: true };
   if (typeof v === 'string') return { text: v.trim(), isDate: false };
-  if (typeof v === 'number' || typeof v === 'boolean') return { text: String(v).trim(), isDate: false };
+  if (typeof v === 'number' || typeof v === 'boolean')
+    return { text: String(v).trim(), isDate: false };
   if (typeof v === 'object') {
-    if ('richText' in v) return { text: v.richText.map((part) => part.text).join('').trim(), isDate: false };
+    if ('richText' in v)
+      return {
+        text: v.richText
+          .map((part) => part.text)
+          .join('')
+          .trim(),
+        isDate: false,
+      };
     if ('text' in v && typeof v.text === 'string') return { text: v.text.trim(), isDate: false };
     if ('result' in v) {
       const r = v.result;
       if (r instanceof Date) return { text: r.toISOString().slice(0, 10), isDate: true };
-      if (r === null || r === undefined || typeof r === 'object') return { text: '', isDate: false };
+      if (r === null || r === undefined || typeof r === 'object')
+        return { text: '', isDate: false };
       return { text: String(r).trim(), isDate: false };
     }
   }
@@ -44,7 +53,7 @@ export function readHeaders<T extends string>(
   sheet: ExcelJS.Worksheet,
   known: readonly T[],
   required: T[],
-  errors: string[],
+  errors: string[]
 ): Map<T, number> | null {
   const map = new Map<T, number>();
   sheet.getRow(1).eachCell((cell, col) => {
@@ -54,7 +63,9 @@ export function readHeaders<T extends string>(
   });
   const missing = required.filter((c) => !map.has(c));
   if (missing.length > 0) {
-    errors.push(`Лист «${sheet.name}»: нет обязательных колонок: ${missing.join(', ')} (строка 1 — заголовки)`);
+    errors.push(
+      `Лист «${sheet.name}»: нет обязательных колонок: ${missing.join(', ')} (строка 1 — заголовки)`
+    );
     return null;
   }
   return map;

@@ -26,13 +26,16 @@ const EMPTY: PushPromptState = { shownDays: [] };
 export function shouldShowPushPrompt(
   state: PushPromptState,
   today: string,
-  opts: { permission: string; supported: boolean },
+  opts: { permission: string; supported: boolean }
 ): boolean {
   if (!opts.supported || opts.permission !== 'default') return false;
   if (state.shownDays.length >= PUSH_PROMPT_MAX_ATTEMPTS) return false;
   const last = state.shownDays[state.shownDays.length - 1];
   if (!last) return true;
-  return Date.parse(`${today}T00:00:00Z`) - Date.parse(`${last}T00:00:00Z`) >= PUSH_PROMPT_RETRY_DAYS * DAY_MS;
+  return (
+    Date.parse(`${today}T00:00:00Z`) - Date.parse(`${last}T00:00:00Z`) >=
+    PUSH_PROMPT_RETRY_DAYS * DAY_MS
+  );
 }
 
 export function markPushPromptShown(state: PushPromptState, date: string): PushPromptState {
@@ -75,7 +78,9 @@ export async function saveReminderHour(hour: number): Promise<boolean> {
     const accessToken = data.session?.access_token;
     if (!accessToken) return false;
     const headers = { Authorization: `Bearer ${accessToken}` };
-    const current = await fetch(`${API_BASE}/push?action=settings`, { headers }).then((r) => r.json());
+    const current = await fetch(`${API_BASE}/push?action=settings`, { headers }).then((r) =>
+      r.json()
+    );
     const days = typeof current?.notifDays === 'string' ? current.notifDays : undefined;
     const res = await fetch(`${API_BASE}/push?action=settings`, {
       method: 'POST',
@@ -112,12 +117,16 @@ export const STREAK_NUDGE_INTERVAL_DAYS = 14;
 export function shouldShowStreakNudge(
   lastShownDay: string | undefined,
   today: string,
-  opts: { streak: number; permission: string; supported: boolean },
+  opts: { streak: number; permission: string; supported: boolean }
 ): boolean {
-  if (!opts.supported || opts.permission === 'granted' || opts.permission === 'unsupported') return false;
+  if (!opts.supported || opts.permission === 'granted' || opts.permission === 'unsupported')
+    return false;
   if (opts.streak < STREAK_NUDGE_MIN_STREAK) return false;
   if (!lastShownDay) return true;
-  return Date.parse(`${today}T00:00:00Z`) - Date.parse(`${lastShownDay}T00:00:00Z`) >= STREAK_NUDGE_INTERVAL_DAYS * DAY_MS;
+  return (
+    Date.parse(`${today}T00:00:00Z`) - Date.parse(`${lastShownDay}T00:00:00Z`) >=
+    STREAK_NUDGE_INTERVAL_DAYS * DAY_MS
+  );
 }
 
 export function loadStreakNudgeDay(): string | undefined {

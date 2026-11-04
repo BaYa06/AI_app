@@ -38,7 +38,10 @@ const OWN_HOST_RE = /^(ai-app-[a-z0-9-]+\.vercel\.app|localhost(:\d+)?|127\.0\.0
 
 function originFor(req) {
   if (SHARE_ORIGIN) return SHARE_ORIGIN;
-  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim().toLowerCase();
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '')
+    .split(',')[0]
+    .trim()
+    .toLowerCase();
   if (!OWN_HOST_RE.test(host)) return DEFAULT_ORIGIN;
   return `${host.startsWith('localhost') || host.startsWith('127.') ? 'http' : 'https'}://${host}`;
 }
@@ -80,7 +83,8 @@ export default async function handler(req, res) {
   const body = req.body || {};
   const setId = body.setId ?? req.query.setId;
   const code = body.code ?? req.query.code;
-  if (setId !== undefined && !isUuid(setId)) return res.status(400).json({ error: 'setId must be a uuid' });
+  if (setId !== undefined && !isUuid(setId))
+    return res.status(400).json({ error: 'setId must be a uuid' });
   if (code !== undefined && !CODE_RE.test(code)) {
     if (action === 'page') {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -94,18 +98,20 @@ export default async function handler(req, res) {
 
   try {
     const isGet = req.method === 'GET';
-    if (action === 'preview' && isGet)  return await preview(res, sql, userId, code, origin);
-    if (action === 'page' && isGet)     return await page(res, sql, code, origin);
-    if (action === 'cards' && isGet)    return await allCards(res, sql, code);
-    if (action === 'status' && isGet)   return await status(res, sql, userId, setId, origin);
-    if (action === 'blocks' && isGet)   return await listBlocks(res, sql, userId);
+    if (action === 'preview' && isGet) return await preview(res, sql, userId, code, origin);
+    if (action === 'page' && isGet) return await page(res, sql, code, origin);
+    if (action === 'cards' && isGet) return await allCards(res, sql, code);
+    if (action === 'status' && isGet) return await status(res, sql, userId, setId, origin);
+    if (action === 'blocks' && isGet) return await listBlocks(res, sql, userId);
     if (isGet) return res.status(405).json({ error: 'Method not allowed' });
 
-    if (action === 'create')  return await createShare(res, sql, userId, setId, origin);
+    if (action === 'create') return await createShare(res, sql, userId, setId, origin);
     if (action === 'disable') return await disableShare(res, sql, userId, setId);
-    if (action === 'import')  return await importShared(res, sql, userId, code, body.courseId ?? null);
-    if (action === 'report')  return await reportShared(res, sql, userId, code, body.reason, body.comment);
-    if (action === 'block')   return await blockAuthor(res, sql, userId, code);
+    if (action === 'import')
+      return await importShared(res, sql, userId, code, body.courseId ?? null);
+    if (action === 'report')
+      return await reportShared(res, sql, userId, code, body.reason, body.comment);
+    if (action === 'block') return await blockAuthor(res, sql, userId, code);
     if (action === 'unblock') return await unblockAuthor(res, sql, userId, body.userId);
     return res.status(400).json({ error: 'Unknown action' });
   } catch (error) {
@@ -116,7 +122,8 @@ export default async function handler(req, res) {
 
 // Ссылка вместе с отметкой о закрытии; удалённый набор уносит её строку (ON DELETE CASCADE).
 async function findShare(sql, code) {
-  const rows = await sql`SELECT code, set_id, owner_id, disabled_at FROM set_shares WHERE code = ${code}`;
+  const rows =
+    await sql`SELECT code, set_id, owner_id, disabled_at FROM set_shares WHERE code = ${code}`;
   return rows[0] || null;
 }
 
@@ -133,8 +140,12 @@ async function createShare(res, sql, userId, setId, origin) {
   if (cards === 0) return res.status(400).json({ error: 'empty_set' });
   if (cards > MAX_CARDS) return res.status(400).json({ error: 'too_many_cards', max: MAX_CARDS });
 
-  const existing = await sql`SELECT code FROM set_shares WHERE set_id = ${setId}::uuid AND disabled_at IS NULL`;
-  if (existing.length > 0) return res.status(200).json({ code: existing[0].code, url: shareUrl(origin, existing[0].code) });
+  const existing =
+    await sql`SELECT code FROM set_shares WHERE set_id = ${setId}::uuid AND disabled_at IS NULL`;
+  if (existing.length > 0)
+    return res
+      .status(200)
+      .json({ code: existing[0].code, url: shareUrl(origin, existing[0].code) });
 
   // Совпадение кода почти невозможно, но повторяем; гонку двух «Поделиться» ловит частичный
   // уникальный индекс по set_id — тогда отдаём ссылку, которую создал соседний запрос.
@@ -145,8 +156,10 @@ async function createShare(res, sql, userId, setId, origin) {
       return res.status(201).json({ code: newCode, url: shareUrl(origin, newCode) });
     } catch (e) {
       if (e.code !== '23505') throw e;
-      const raced = await sql`SELECT code FROM set_shares WHERE set_id = ${setId}::uuid AND disabled_at IS NULL`;
-      if (raced.length > 0) return res.status(200).json({ code: raced[0].code, url: shareUrl(origin, raced[0].code) });
+      const raced =
+        await sql`SELECT code FROM set_shares WHERE set_id = ${setId}::uuid AND disabled_at IS NULL`;
+      if (raced.length > 0)
+        return res.status(200).json({ code: raced[0].code, url: shareUrl(origin, raced[0].code) });
     }
   }
   return res.status(500).json({ error: 'code_generation_failed' });
@@ -214,7 +227,10 @@ async function preview(res, sql, userId, code, origin) {
   }
 
   // Без токена ответ одинаков для всех — кэшируем на CDN (views тогда считаются по промахам кэша).
-  res.setHeader('Cache-Control', userId ? 'private, no-store' : 'public, s-maxage=60, stale-while-revalidate=60');
+  res.setHeader(
+    'Cache-Control',
+    userId ? 'private, no-store' : 'public, s-maxage=60, stale-while-revalidate=60'
+  );
   return res.status(200).json({ ...content, viewer });
 }
 
@@ -252,7 +268,12 @@ async function loadContent(sql, share, origin) {
       cardsCount: Number(set.cards_count) || 0,
     },
     author: { name: set.author_name || null },
-    cards: cards.map((c) => ({ front: c.front, back: c.back, example: c.example || null, wordForm: c.word_form || null })),
+    cards: cards.map((c) => ({
+      front: c.front,
+      back: c.back,
+      example: c.example || null,
+      wordForm: c.word_form || null,
+    })),
   };
 }
 
@@ -266,7 +287,9 @@ async function page(res, sql, code, origin) {
   const share = code ? await findShare(sql, code) : null;
   if (!share || share.disabled_at) {
     res.setHeader('Cache-Control', 'public, s-maxage=60');
-    return res.status(share ? 410 : 404).send(renderShareErrorPage(share ? 'disabled' : 'not_found', url));
+    return res
+      .status(share ? 410 : 404)
+      .send(renderShareErrorPage(share ? 'disabled' : 'not_found', url));
   }
 
   const content = await loadContent(sql, share, origin);
@@ -307,7 +330,8 @@ async function allCards(res, sql, code) {
 // ── action=import ─────────────────────────────────────────────────────────────
 async function importShared(res, sql, userId, code, courseId) {
   if (!code) return res.status(400).json({ error: 'code required' });
-  if (courseId !== null && !isUuid(courseId)) return res.status(400).json({ error: 'courseId must be uuid or null' });
+  if (courseId !== null && !isUuid(courseId))
+    return res.status(400).json({ error: 'courseId must be uuid or null' });
 
   const share = await findShare(sql, code);
   if (!share) return res.status(404).json({ error: 'not_found' });
@@ -323,7 +347,8 @@ async function importShared(res, sql, userId, code, courseId) {
 
   // Набор можно положить только в свой курс (не в курс, где пользователь ученик).
   if (courseId) {
-    const course = await sql`SELECT id FROM courses WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid`;
+    const course =
+      await sql`SELECT id FROM courses WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid`;
     if (course.length === 0) return res.status(403).json({ error: 'Not the owner of the course' });
   }
 
@@ -332,13 +357,15 @@ async function importShared(res, sql, userId, code, courseId) {
     WHERE user_id = ${userId}::uuid AND code = ${code}
       AND course_id IS NOT DISTINCT FROM ${courseId}::uuid
   `;
-  if (existing.length > 0) return res.status(409).json({ error: 'already_imported', setId: existing[0].new_set_id });
+  if (existing.length > 0)
+    return res.status(409).json({ error: 'already_imported', setId: existing[0].new_set_id });
 
   const recent = await sql`
     SELECT COUNT(*) AS n FROM set_share_imports
     WHERE user_id = ${userId}::uuid AND created_at > NOW() - INTERVAL '1 hour'
   `;
-  if (Number(recent[0].n) >= IMPORTS_PER_HOUR) return res.status(429).json({ error: 'rate_limited' });
+  if (Number(recent[0].n) >= IMPORTS_PER_HOUR)
+    return res.status(429).json({ error: 'rate_limited' });
 
   const source = await sql`
     SELECT cs.title, cs.description, cs.category, cs.language_from, cs.language_to, cs.kind,
@@ -347,7 +374,8 @@ async function importShared(res, sql, userId, code, courseId) {
   `;
   if (source.length === 0) return res.status(404).json({ error: 'not_found' });
   const s = source[0];
-  if (Number(s.cards_count) > MAX_CARDS) return res.status(400).json({ error: 'too_many_cards', max: MAX_CARDS });
+  if (Number(s.cards_count) > MAX_CARDS)
+    return res.status(400).json({ error: 'too_many_cards', max: MAX_CARDS });
 
   // Одним запросом (атомарно): набор + копии карточек (без прогресса) + отметка + счётчик.
   // Двойной тап упрётся в уникальный индекс idx_set_share_imports_place, и весь запрос откатится.
@@ -375,7 +403,9 @@ async function importShared(res, sql, userId, code, courseId) {
       )
       SELECT (SELECT id FROM new_set) AS id, (SELECT COUNT(*) FROM copied) AS cards
     `;
-    return res.status(201).json({ newSetId: created[0].id, courseId, cardsCopied: Number(created[0].cards) || 0 });
+    return res
+      .status(201)
+      .json({ newSetId: created[0].id, courseId, cardsCopied: Number(created[0].cards) || 0 });
   } catch (e) {
     if (e.code !== '23505') throw e;
     const again = await sql`
@@ -431,7 +461,11 @@ async function listBlocks(res, sql, userId) {
     ORDER BY b.created_at DESC
   `;
   return res.status(200).json({
-    blocks: rows.map((r) => ({ userId: r.blocked_user_id, name: r.name || null, blockedAt: r.created_at })),
+    blocks: rows.map((r) => ({
+      userId: r.blocked_user_id,
+      name: r.name || null,
+      blockedAt: r.created_at,
+    })),
   });
 }
 

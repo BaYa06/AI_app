@@ -3,9 +3,26 @@
  * @description Экран изучения карточек с CSS-анимациями для web
  */
 import React, { useCallback, useEffect, useState, useRef } from 'react';
-import { View, StyleSheet, Pressable, Dimensions, Animated, Modal, AppState, Platform, type LayoutChangeEvent } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  Pressable,
+  Dimensions,
+  Animated,
+  Modal,
+  AppState,
+  Platform,
+  type LayoutChangeEvent,
+} from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { useCardsStore, useSetsStore, useStudyStore, useThemeColors, useSettingsStore, selectSetStats } from '@/store';
+import {
+  useCardsStore,
+  useSetsStore,
+  useStudyStore,
+  useThemeColors,
+  useSettingsStore,
+  selectSetStats,
+} from '@/store';
 import { Text, Loading } from '@/components/common';
 import { Button, Switch } from '@/components/ui';
 import { StageLayout } from '@/components/study/StageLayout';
@@ -19,7 +36,13 @@ import { DatabaseService, Analytics } from '@/services';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Rating, Card } from '@/types';
 import { Settings, Volume2 } from 'lucide-react-native';
-import { speak, resolveSpeechLang, prefetchSpeech, cardSpeechLangs, isCardSpeakable } from '@/utils/speech';
+import {
+  speak,
+  resolveSpeechLang,
+  prefetchSpeech,
+  cardSpeechLangs,
+  isCardSpeakable,
+} from '@/utils/speech';
 import { triggerHaptic } from '@/utils/haptic';
 import { fitText, fitWordWithExample } from '@/utils/fitText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -66,7 +89,22 @@ const CARD_IN_DELAY_MS = 32;
 type Props = RootStackScreenProps<'Study'>;
 
 export function StudyScreen({ navigation, route }: Props) {
-  const { setId, mode, errorCardsFronts, studyAll, cardLimit, onlyHard, dueCardIds, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0, phaseFailedIds, lesson, session: sessionRoute } = route.params;
+  const {
+    setId,
+    mode,
+    errorCardsFronts,
+    studyAll,
+    cardLimit,
+    onlyHard,
+    dueCardIds,
+    phaseId,
+    totalPhaseCards,
+    studiedInPhase = 0,
+    phaseOffset = 0,
+    phaseFailedIds,
+    lesson,
+    session: sessionRoute,
+  } = route.params;
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const settings = useSettingsStore((s) => s.settings);
@@ -77,9 +115,11 @@ export function StudyScreen({ navigation, route }: Props) {
     () => phaseFailedIds || [],
     [phaseFailedIds ? phaseFailedIds.join('|') : '']
   );
-  
+
   // Генерируем phaseId при первом запуске (если не передан)
-  const currentPhaseId = useRef(phaseId || `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+  const currentPhaseId = useRef(
+    phaseId || `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  );
   const currentTotalPhaseCards = useRef(totalPhaseCards || 0);
   // Количество ошибочных карточек из прошлых порций в текущей очереди
   const pendingCardsInQueueRef = useRef(0);
@@ -105,12 +145,12 @@ export function StudyScreen({ navigation, route }: Props) {
   const [showSwipeHint, setShowSwipeHint] = useState(false);
   const swipeHintCheckedRef = useRef(false);
   const reduceMotion = useReducedMotion();
-  
+
   // Store
   const updateLastStudied = useSetsStore((s) => s.updateLastStudied);
   const updateSetStats = useSetsStore((s) => s.updateSetStats);
   const getCardsBySet = useCardsStore((s) => s.getCardsBySet);
-  
+
   // Study store
   const session = useStudyStore((s) => s.session);
   const isFlipped = useStudyStore((s) => s.isFlipped);
@@ -123,7 +163,9 @@ export function StudyScreen({ navigation, route }: Props) {
   // Локальное состояние
   const [currentCard, setCurrentCard] = useState<Card | null>(null);
   const [textBox, setTextBox] = useState(DEFAULT_TEXT_BOX);
-  const [errorCards, setErrorCards] = useState<Array<{ id: string; front: string; back: string; rating: number }>>([]);
+  const [errorCards, setErrorCards] = useState<
+    Array<{ id: string; front: string; back: string; rating: number }>
+  >([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   // Индекс карточки, которая уже показана, — по нему проявляем следующую (повтор «Почти» — та же карточка)
   const [shownIndex, setShownIndex] = useState(-1);
@@ -132,17 +174,14 @@ export function StudyScreen({ navigation, route }: Props) {
   const sheetTranslate = useRef(new Animated.Value(-220)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const currentStatus = currentCard ? getCardStatus(currentCard) : 'new';
-  const handleSpeak = useCallback(
-    (text: string, langHint?: string, counterpart?: string) => {
-      const normalized = (text || '').trim();
-      if (!normalized) return;
-      const lang = resolveSpeechLang(normalized, langHint, counterpart);
-      speak(normalized, lang).catch((error) => {
-        log.warn('Study', 'TTS error', error);
-      });
-    },
-    []
-  );
+  const handleSpeak = useCallback((text: string, langHint?: string, counterpart?: string) => {
+    const normalized = (text || '').trim();
+    if (!normalized) return;
+    const lang = resolveSpeechLang(normalized, langHint, counterpart);
+    speak(normalized, lang).catch((error) => {
+      log.warn('Study', 'TTS error', error);
+    });
+  }, []);
 
   // Инициализация сессии
   useEffect(() => {
@@ -155,31 +194,31 @@ export function StudyScreen({ navigation, route }: Props) {
       cards = getCardsBySet(setId);
     }
     const onlyUnmastered = Boolean(onlyHard);
-    
+
     if (phaseId) {
       // Собираем карточки для фазы: сначала невыполненные ошибки прошлых порций, потом оставшиеся по offset
       const pendingIds = phaseFailedList || [];
       const state = useCardsStore.getState();
-      
+
       // Получаем ошибочные карточки по ID
       const pendingCards: Card[] = pendingIds
         .map((id) => state.getCard(id))
         .filter((c): c is Card => Boolean(c));
-      
+
       // Если не смогли найти карточки по ID, пробуем найти их в текущем наборе
       if (pendingIds.length > 0 && pendingCards.length === 0) {
         log.warn('Study', 'Не удалось найти ошибочные карточки по ID, пробуем найти в наборе');
         const pendingSet = new Set(pendingIds);
-        const foundInSet = cards.filter(c => pendingSet.has(c.id));
+        const foundInSet = cards.filter((c) => pendingSet.has(c.id));
         pendingCards.push(...foundInSet);
       }
 
       // Получаем оставшиеся карточки по offset
       const remaining = phaseOffset > 0 ? cards.slice(phaseOffset) : cards;
-      
+
       // Исключаем из remaining те, что уже есть в pendingCards (ошибочные)
-      const pendingIdsSet = new Set(pendingCards.map(c => c.id));
-      const filteredRemaining = remaining.filter(c => !pendingIdsSet.has(c.id));
+      const pendingIdsSet = new Set(pendingCards.map((c) => c.id));
+      const filteredRemaining = remaining.filter((c) => !pendingIdsSet.has(c.id));
 
       // Собираем уникальные карточки: сначала ошибочные, потом новые
       const map = new Map<string, Card>();
@@ -189,32 +228,32 @@ export function StudyScreen({ navigation, route }: Props) {
         }
       });
       cards = Array.from(map.values());
-      
+
       log.debug('Study', 'Фаза', {
         phaseId,
         phaseOffset,
         pendingIds: pendingIds.length,
         pendingCards: pendingCards.length,
         remaining: filteredRemaining.length,
-        total: cards.length
+        total: cards.length,
       });
-      
+
       // Сохраняем количество ошибочных карточек для правильного расчёта phaseOffset
       pendingCardsInQueueRef.current = pendingCards.length;
     } else {
       pendingCardsInQueueRef.current = 0;
     }
-    
+
     // Если переданы ошибочные карточки, фильтруем только их
     if (isErrorReview && errorCardsFronts) {
-      cards = cards.filter(card => {
+      cards = cards.filter((card) => {
         const front = card.frontText ?? (card as any).front ?? '';
         return errorCardsFronts.includes(front);
       });
       // В фазах повторяем ошибки сразу, без проверки расписания SRS (nextReviewDate)
       if (!phaseId) {
         const now = Date.now();
-        cards = cards.filter(card => card.nextReviewDate <= now);
+        cards = cards.filter((card) => card.nextReviewDate <= now);
       }
       // Очищаем список ошибок для новой сессии повторения
       setErrorCards([]);
@@ -225,7 +264,7 @@ export function StudyScreen({ navigation, route }: Props) {
     if (studyAll && onlyUnmastered) {
       const now = Date.now();
       const failedIdsSet = new Set(phaseFailedList || []);
-      cards = cards.filter(card => {
+      cards = cards.filter((card) => {
         // Ошибочные карточки фазы всегда включаем
         if (failedIdsSet.has(card.id)) {
           return true;
@@ -247,16 +286,12 @@ export function StudyScreen({ navigation, route }: Props) {
     };
 
     const queue = isErrorReview
-      // Для повторения ошибок берем только ошибочные карточки, игнорируя расписание SRS
-      ? cards
+      ? // Для повторения ошибок берем только ошибочные карточки, игнорируя расписание SRS
+        cards
       : studyAll
-        // "Учить всё" — включаем все карточки набора (или выбранное число) вне зависимости от статуса
-        ? limitCards(cards)
-        : buildStudyQueue(
-            cards,
-            settings.dailyNewCardsLimit,
-            settings.dailyReviewLimit
-          );
+        ? // "Учить всё" — включаем все карточки набора (или выбранное число) вне зависимости от статуса
+          limitCards(cards)
+        : buildStudyQueue(cards, settings.dailyNewCardsLimit, settings.dailyReviewLimit);
 
     log.debug('Study', 'Очередь сформирована', {
       queueLength: queue.length,
@@ -266,20 +301,20 @@ export function StudyScreen({ navigation, route }: Props) {
       cardLimit,
       phaseId,
       phaseOffset,
-      phaseFailedList: phaseFailedList?.length || 0
+      phaseFailedList: phaseFailedList?.length || 0,
     });
 
     if (queue.length === 0) {
       log.warn('Study', 'Пустая очередь');
-      
+
       // Если есть ошибочные карточки, но очередь пустая - это баг, логируем детали
       if (phaseFailedList && phaseFailedList.length > 0) {
         log.error('Study', 'Есть ошибочные карточки, но очередь пустая!', {
           phaseFailedList,
-          allCards: getCardsBySet(setId).map(c => c.id)
+          allCards: getCardsBySet(setId).map((c) => c.id),
         });
       }
-      
+
       navigation.goBack();
       return;
     }
@@ -311,7 +346,17 @@ export function StudyScreen({ navigation, route }: Props) {
         setShowSwipeHint(true);
       }
     }
-  }, [setId, errorCardsFronts, studyAll, cardLimit, onlyHard, dueCardIds, phaseId, phaseOffset, phaseFailedList]);
+  }, [
+    setId,
+    errorCardsFronts,
+    studyAll,
+    cardLimit,
+    onlyHard,
+    dueCardIds,
+    phaseId,
+    phaseOffset,
+    phaseFailedList,
+  ]);
 
   // Получить текущую карточку из очереди
   useEffect(() => {
@@ -346,8 +391,8 @@ export function StudyScreen({ navigation, route }: Props) {
       withSequence(
         withTiming(-28, { duration: 220 }),
         withTiming(28, { duration: 320 }),
-        withTiming(0, { duration: 220 }),
-      ),
+        withTiming(0, { duration: 220 })
+      )
     );
   }, [showSwipeHint]);
 
@@ -374,10 +419,18 @@ export function StudyScreen({ navigation, route }: Props) {
       const isRepeat = Boolean(session) && session!.currentIndex >= baseQueueLengthRef.current;
       // «Почти» — слово ещё раз в конце сессии: один раз и только если после него есть другие слова
       const repeatLater =
-        rating === 3 && !isRepeat && Boolean(session) && session!.currentIndex + 1 < session!.queue.length;
+        rating === 3 &&
+        !isRepeat &&
+        Boolean(session) &&
+        session!.currentIndex + 1 < session!.queue.length;
 
       // Analytics: card_answered
-      const ratingMap: Record<number, 'again' | 'hard' | 'good' | 'easy'> = { 1: 'again', 2: 'hard', 3: 'good', 4: 'easy' };
+      const ratingMap: Record<number, 'again' | 'hard' | 'good' | 'easy'> = {
+        1: 'again',
+        2: 'hard',
+        3: 'good',
+        4: 'easy',
+      };
       if (!isRepeat) {
         Analytics.cardAnswered({
           correct: isCorrect,
@@ -387,21 +440,26 @@ export function StudyScreen({ navigation, route }: Props) {
           input,
         });
       }
-      
+
       // Если ошибка, добавляем в список ошибочных карточек (с id для фаз)
       if (!isCorrect) {
-        setErrorCards(prev => [...prev, {
-          id: currentCard.id,
-          front: currentCard.frontText ?? (currentCard as any).front ?? '',
-          back: currentCard.backText ?? (currentCard as any).back ?? '',
-          rating,
-        }]);
+        setErrorCards((prev) => [
+          ...prev,
+          {
+            id: currentCard.id,
+            front: currentCard.frontText ?? (currentCard as any).front ?? '',
+            back: currentCard.backText ?? (currentCard as any).back ?? '',
+            rating,
+          },
+        ]);
       }
 
       // Урок дня: считаем по состоянию карточки до ответа
       const lessonPhase =
-        lessonPhaseForAnswer(lesson?.part, currentCard) ?? (sessionRoute ? sessionPhaseForAnswer(currentCard) : null);
-      if (lessonPhase && !isRepeat) useLessonStore.getState().recordAnswer(lessonPhase, currentCard.id);
+        lessonPhaseForAnswer(lesson?.part, currentCard) ??
+        (sessionRoute ? sessionPhaseForAnswer(currentCard) : null);
+      if (lessonPhase && !isRepeat)
+        useLessonStore.getState().recordAnswer(lessonPhase, currentCard.id);
       // Самооценка: уровень считает сервер (очков рейтинга она не даёт — план §1.3), экран обновляется сразу
       ProgressService.recordAnswer(currentCard, {
         mode: 'flashcard',
@@ -430,12 +488,17 @@ export function StudyScreen({ navigation, route }: Props) {
       if (session && session.currentIndex + 1 >= session.queue.length) {
         // Переходим на экран результатов
         const totalCards = baseQueueLengthRef.current;
-        const finalErrorCards = isCorrect ? errorCards : [...errorCards, {
-          id: currentCard.id,
-          front: currentCard.frontText ?? (currentCard as any).front ?? '',
-          back: currentCard.backText ?? (currentCard as any).back ?? '',
-          rating,
-        }];
+        const finalErrorCards = isCorrect
+          ? errorCards
+          : [
+              ...errorCards,
+              {
+                id: currentCard.id,
+                front: currentCard.frontText ?? (currentCard as any).front ?? '',
+                back: currentCard.backText ?? (currentCard as any).back ?? '',
+                rating,
+              },
+            ];
         const learnedCards = totalCards - finalErrorCards.length;
         const timeSpent = Math.floor((Date.now() - session.startedAt) / 1000);
         const errors = finalErrorCards.length;
@@ -456,7 +519,7 @@ export function StudyScreen({ navigation, route }: Props) {
           ...card,
           id: resolveErrorId(card) ?? card.id,
         }));
-        
+
         // Обновляем прогресс фазы
         // Считаем сколько НОВЫХ карточек было в этой порции (не включая повторные ошибки)
         const newCardsInBatch = totalCards - pendingCardsInQueueRef.current;
@@ -488,19 +551,19 @@ export function StudyScreen({ navigation, route }: Props) {
           }
         });
         const newPhaseFailedIds = Array.from(prevFailed);
-        
+
         log.debug('Study', 'Завершение порции', {
           totalCards,
           newCardsInBatch,
           pendingCardsInQueue: pendingCardsInQueueRef.current,
           learnedCards,
           errors,
-          errorCardsWithIds: errorCardsWithIds.map(c => ({ id: c.id, front: c.front })),
+          errorCardsWithIds: errorCardsWithIds.map((c) => ({ id: c.id, front: c.front })),
           effectiveErrorIds,
           newPhaseFailedIds,
           newStudiedInPhase,
           newPhaseOffset,
-          phaseTotal
+          phaseTotal,
         });
 
         // Завершаем сессию и проверяем стрик
@@ -542,7 +605,10 @@ export function StudyScreen({ navigation, route }: Props) {
                 currentIndex: s.session.currentIndex + 1,
                 // Повтор «Почти» — в конец очереди; знаменатель прогресса растёт, чтобы полоса не ушла за 100%
                 ...(repeatLater
-                  ? { queue: [...s.session.queue, currentCard.id], totalCards: s.session.totalCards + 1 }
+                  ? {
+                      queue: [...s.session.queue, currentCard.id],
+                      totalCards: s.session.totalCards + 1,
+                    }
                   : {}),
               }
             : null,
@@ -550,7 +616,20 @@ export function StudyScreen({ navigation, route }: Props) {
         }));
       }
     },
-    [currentCard, incrementTodayCards, session, setId, updateSetStats, navigation, errorCards, studiedInPhase, phaseOffset, isErrorReview, lesson, sessionRoute]
+    [
+      currentCard,
+      incrementTodayCards,
+      session,
+      setId,
+      updateSetStats,
+      navigation,
+      errorCards,
+      studiedInPhase,
+      phaseOffset,
+      isErrorReview,
+      lesson,
+      sessionRoute,
+    ]
   );
 
   const openSettings = useCallback(() => {
@@ -652,14 +731,17 @@ export function StudyScreen({ navigation, route }: Props) {
 
   // Свайп влево — «Не знаю», вправо — «Уверенно»; работает на обеих сторонах (plan/done/card_rating.md).
   // Касание ловит Pressable карточки — протягивание его отменяет. На вебе только кнопки
-  const handleSwipe = useCallback((direction: number) => {
-    // Свайп освоен — подсказка больше не нужна
-    if (useSettingsStore.getState().settings.swipeHintsLeft > 0) {
-      updateSettings({ swipeHintsLeft: 0 });
-      DatabaseService.saveSettings();
-    }
-    handleRate(direction > 0 ? 4 : 1, 'swipe');
-  }, [handleRate, updateSettings]);
+  const handleSwipe = useCallback(
+    (direction: number) => {
+      // Свайп освоен — подсказка больше не нужна
+      if (useSettingsStore.getState().settings.swipeHintsLeft > 0) {
+        updateSettings({ swipeHintsLeft: 0 });
+        DatabaseService.saveSettings();
+      }
+      handleRate(direction > 0 ? 4 : 1, 'swipe');
+    },
+    [handleRate, updateSettings]
+  );
 
   const cardSwipeGesture = Gesture.Pan()
     .enabled(Platform.OS !== 'web' && !isSettingsOpen)
@@ -676,7 +758,9 @@ export function StudyScreen({ navigation, route }: Props) {
     })
     .onEnd((e) => {
       if (swipeFlying.value) return;
-      const flick = Math.abs(e.velocityX) > SWIPE_VELOCITY && Math.sign(e.velocityX) === Math.sign(e.translationX);
+      const flick =
+        Math.abs(e.velocityX) > SWIPE_VELOCITY &&
+        Math.sign(e.velocityX) === Math.sign(e.translationX);
       if (Math.abs(e.translationX) < SWIPE_DISTANCE && !flick) {
         swipeX.value = withSpring(0, { damping: 18, stiffness: 220 });
         swipePastThreshold.value = false;
@@ -684,29 +768,44 @@ export function StudyScreen({ navigation, route }: Props) {
       }
       const direction = e.translationX > 0 ? 1 : -1;
       swipeFlying.value = true;
-      swipeX.value = withTiming(direction * SCREEN_WIDTH * 1.2, { duration: SWIPE_OUT_MS }, (finished) => {
-        if (!finished) return;
-        // Улетела — прячем и возвращаем в центр лицом в одном кадре, пока на экране ещё её текст
-        cardOpacity.value = 0;
-        cardScale.value = 0.96;
-        swipeX.value = 0;
-        flipProgress.value = 0;
-        runOnJS(handleSwipe)(direction);
-      });
+      swipeX.value = withTiming(
+        direction * SCREEN_WIDTH * 1.2,
+        { duration: SWIPE_OUT_MS },
+        (finished) => {
+          if (!finished) return;
+          // Улетела — прячем и возвращаем в центр лицом в одном кадре, пока на экране ещё её текст
+          cardOpacity.value = 0;
+          cardScale.value = 0.96;
+          swipeX.value = 0;
+          flipProgress.value = 0;
+          runOnJS(handleSwipe)(direction);
+        }
+      );
     });
 
   const swipeStyle = useAnimatedStyle(() => {
     'worklet';
-    const rotate = interpolate(swipeX.value, [-CARD_WIDTH, 0, CARD_WIDTH], [-12, 0, 12], Extrapolation.CLAMP);
+    const rotate = interpolate(
+      swipeX.value,
+      [-CARD_WIDTH, 0, CARD_WIDTH],
+      [-12, 0, 12],
+      Extrapolation.CLAMP
+    );
     return {
       opacity: cardOpacity.value,
-      transform: [{ translateX: swipeX.value }, { rotate: `${rotate}deg` }, { scale: cardScale.value }],
+      transform: [
+        { translateX: swipeX.value },
+        { rotate: `${rotate}deg` },
+        { scale: cardScale.value },
+      ],
     };
   });
   // Подписи свайпа проступают вместе со сдвигом и на пороге видны полностью
   const swipeLeftStyle = useAnimatedStyle(() => {
     'worklet';
-    return { opacity: interpolate(-swipeX.value, [0, SWIPE_DISTANCE], [0, 1], Extrapolation.CLAMP) };
+    return {
+      opacity: interpolate(-swipeX.value, [0, SWIPE_DISTANCE], [0, 1], Extrapolation.CLAMP),
+    };
   });
   const swipeRightStyle = useAnimatedStyle(() => {
     'worklet';
@@ -716,7 +815,10 @@ export function StudyScreen({ navigation, route }: Props) {
   // Заранее озвучиваем вопрос и ответ текущей и следующей карточки — кнопка динамика играет сразу
   useEffect(() => {
     if (!session) return;
-    const ids = [session.queue[session.currentIndex], session.queue[session.currentIndex + 1]].filter(Boolean);
+    const ids = [
+      session.queue[session.currentIndex],
+      session.queue[session.currentIndex + 1],
+    ].filter(Boolean);
     const items: Array<{ text: string; lang: string }> = [];
     for (const id of ids) {
       const card = useCardsStore.getState().cards[id];
@@ -742,7 +844,12 @@ export function StudyScreen({ navigation, route }: Props) {
   const questionText = reverseEnabled ? baseBack : baseFront;
   const answerText = reverseEnabled ? baseFront : baseBack;
   // Длинный текст — шрифт мельче, чтобы не выходил за карточку
-  const questionFit = fitText(questionText, { width: textBox.width, height: textBox.front, weight: 'bold', ...WORD_FIT });
+  const questionFit = fitText(questionText, {
+    width: textBox.width,
+    height: textBox.front,
+    weight: 'bold',
+    ...WORD_FIT,
+  });
   const answerFit = fitWordWithExample(answerText, example, {
     width: textBox.width,
     height: textBox.back,
@@ -753,7 +860,9 @@ export function StudyScreen({ navigation, route }: Props) {
   const measureTextBox = (side: 'front' | 'back') => (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     const sideHeight = height - spacing.xxs;
-    setTextBox((box) => (box.width === width && box[side] === sideHeight ? box : { ...box, width, [side]: sideHeight }));
+    setTextBox((box) =>
+      box.width === width && box[side] === sideHeight ? box : { ...box, width, [side]: sideHeight }
+    );
   };
   const { front: frontLang, back: backLang } = cardSpeechLangs(currentCard);
   const questionLang = reverseEnabled ? backLang : frontLang;
@@ -776,11 +885,18 @@ export function StudyScreen({ navigation, route }: Props) {
       </View>
       {canSpeak ? (
         <Pressable
-          style={({ pressed }) => [styles.audioButton, { backgroundColor: pressed ? alpha(colors.primary, 20) : colors.surfaceMuted }]}
+          style={({ pressed }) => [
+            styles.audioButton,
+            { backgroundColor: pressed ? alpha(colors.primary, 20) : colors.surfaceMuted },
+          ]}
           hitSlop={spacing.xxs}
           accessibilityRole="button"
           accessibilityLabel="Прослушать"
-          onPress={(e) => { e.stopPropagation(); triggerHaptic('selection'); onSpeak(); }}
+          onPress={(e) => {
+            e.stopPropagation();
+            triggerHaptic('selection');
+            onSpeak();
+          }}
         >
           <Volume2 size={iconSize.s} color={colors.primary} />
         </Pressable>
@@ -808,7 +924,11 @@ export function StudyScreen({ navigation, route }: Props) {
       scroll={false}
       footer={
         <View>
-          <Text variant="bodySmall" align="center" style={[styles.rateHint, { color: colors.textSecondary }]}>
+          <Text
+            variant="bodySmall"
+            align="center"
+            style={[styles.rateHint, { color: colors.textSecondary }]}
+          >
             Оцени, насколько уверенно знаешь
           </Text>
           <View style={styles.ratingGrid}>
@@ -818,9 +938,15 @@ export function StudyScreen({ navigation, route }: Props) {
                 onPress={() => handleRate(rating)}
                 accessibilityRole="button"
                 accessibilityLabel={label}
-                style={({ pressed }) => [styles.ratingButton, { backgroundColor: bg }, pressed && styles.pressed]}
+                style={({ pressed }) => [
+                  styles.ratingButton,
+                  { backgroundColor: bg },
+                  pressed && styles.pressed,
+                ]}
               >
-                <Text variant="label" numberOfLines={1} style={{ color: text }}>{label}</Text>
+                <Text variant="label" numberOfLines={1} style={{ color: text }}>
+                  {label}
+                </Text>
               </Pressable>
             ))}
           </View>
@@ -835,42 +961,82 @@ export function StudyScreen({ navigation, route }: Props) {
             <Pressable
               onPress={handleToggleCard}
               accessibilityRole="button"
-              accessibilityLabel={isFlipped ? `Ответ: ${answerText}. Нажми, чтобы перевернуть` : `${questionText}. Нажми, чтобы перевернуть`}
+              accessibilityLabel={
+                isFlipped
+                  ? `Ответ: ${answerText}. Нажми, чтобы перевернуть`
+                  : `${questionText}. Нажми, чтобы перевернуть`
+              }
               style={styles.cardWrapper}
             >
               {/* Передняя сторона (вопрос) */}
-              <ReAnimated.View style={[styles.cardAnim, frontAnimStyle]} pointerEvents={isFlipped ? 'none' : 'auto'}>
-                <View style={[styles.cardInner, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <ReAnimated.View
+                style={[styles.cardAnim, frontAnimStyle]}
+                pointerEvents={isFlipped ? 'none' : 'auto'}
+              >
+                <View
+                  style={[
+                    styles.cardInner,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                  ]}
+                >
                   {renderCardTop(() => handleSpeak(questionText, questionLang, answerText))}
 
                   <View style={styles.cardContent} onLayout={measureTextBox('front')}>
                     <Text
                       variant="h2"
                       numberOfLines={questionFit.numberOfLines}
-                      style={[styles.cardWord, { color: colors.textPrimary, fontSize: questionFit.fontSize, lineHeight: questionFit.lineHeight }]}
+                      style={[
+                        styles.cardWord,
+                        {
+                          color: colors.textPrimary,
+                          fontSize: questionFit.fontSize,
+                          lineHeight: questionFit.lineHeight,
+                        },
+                      ]}
                     >
                       {questionText}
                     </Text>
                   </View>
 
                   <View style={styles.cardBottom}>
-                    <Text variant="bodySmall" align="center" style={{ color: colors.textSecondary }}>
-                      {showSwipeHint && session?.currentIndex === 0 ? '← Не знаю · Уверенно →' : 'Нажми, чтобы перевернуть'}
+                    <Text
+                      variant="bodySmall"
+                      align="center"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      {showSwipeHint && session?.currentIndex === 0
+                        ? '← Не знаю · Уверенно →'
+                        : 'Нажми, чтобы перевернуть'}
                     </Text>
                   </View>
                 </View>
               </ReAnimated.View>
 
               {/* Задняя сторона (ответ) */}
-              <ReAnimated.View style={[styles.cardAnim, backAnimStyle]} pointerEvents={isFlipped ? 'auto' : 'none'}>
-                <View style={[styles.cardInner, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <ReAnimated.View
+                style={[styles.cardAnim, backAnimStyle]}
+                pointerEvents={isFlipped ? 'auto' : 'none'}
+              >
+                <View
+                  style={[
+                    styles.cardInner,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                  ]}
+                >
                   {renderCardTop(() => handleSpeak(answerText, answerLang, questionText))}
 
                   <View style={styles.cardContent} onLayout={measureTextBox('back')}>
                     <Text
                       variant="h2"
                       numberOfLines={answerFit.word.numberOfLines}
-                      style={[styles.cardWord, { color: colors.textPrimary, fontSize: answerFit.word.fontSize, lineHeight: answerFit.word.lineHeight }]}
+                      style={[
+                        styles.cardWord,
+                        {
+                          color: colors.textPrimary,
+                          fontSize: answerFit.word.fontSize,
+                          lineHeight: answerFit.word.lineHeight,
+                        },
+                      ]}
                     >
                       {answerText}
                     </Text>
@@ -880,7 +1046,11 @@ export function StudyScreen({ navigation, route }: Props) {
                         variant="bodyLarge"
                         align="center"
                         numberOfLines={answerFit.example.numberOfLines}
-                        style={{ color: colors.textSecondary, fontSize: answerFit.example.fontSize, lineHeight: answerFit.example.lineHeight }}
+                        style={{
+                          color: colors.textSecondary,
+                          fontSize: answerFit.example.fontSize,
+                          lineHeight: answerFit.example.lineHeight,
+                        }}
                       >
                         {example}
                       </Text>
@@ -894,18 +1064,43 @@ export function StudyScreen({ navigation, route }: Props) {
               {/* Подписи свайпа: влево — «Не знаю», вправо — «Уверенно» */}
               <ReAnimated.View
                 pointerEvents="none"
-                style={[styles.swipeOverlay, { borderColor: colors.ratingAgain, backgroundColor: alpha(colors.ratingAgain, 10) }, swipeLeftStyle]}
+                style={[
+                  styles.swipeOverlay,
+                  {
+                    borderColor: colors.ratingAgain,
+                    backgroundColor: alpha(colors.ratingAgain, 10),
+                  },
+                  swipeLeftStyle,
+                ]}
               >
-                <View style={[styles.swipeLabel, { borderColor: colors.ratingAgain, backgroundColor: colors.surface }]}>
-                  <Text variant="label" style={{ color: colors.errorText }}>Не знаю</Text>
+                <View
+                  style={[
+                    styles.swipeLabel,
+                    { borderColor: colors.ratingAgain, backgroundColor: colors.surface },
+                  ]}
+                >
+                  <Text variant="label" style={{ color: colors.errorText }}>
+                    Не знаю
+                  </Text>
                 </View>
               </ReAnimated.View>
               <ReAnimated.View
                 pointerEvents="none"
-                style={[styles.swipeOverlay, { borderColor: colors.ratingGood, backgroundColor: alpha(colors.ratingGood, 10) }, swipeRightStyle]}
+                style={[
+                  styles.swipeOverlay,
+                  { borderColor: colors.ratingGood, backgroundColor: alpha(colors.ratingGood, 10) },
+                  swipeRightStyle,
+                ]}
               >
-                <View style={[styles.swipeLabel, { borderColor: colors.ratingGood, backgroundColor: colors.surface }]}>
-                  <Text variant="label" style={{ color: colors.successText }}>Уверенно</Text>
+                <View
+                  style={[
+                    styles.swipeLabel,
+                    { borderColor: colors.ratingGood, backgroundColor: colors.surface },
+                  ]}
+                >
+                  <Text variant="label" style={{ color: colors.successText }}>
+                    Уверенно
+                  </Text>
                 </View>
               </ReAnimated.View>
             </Pressable>
@@ -921,10 +1116,18 @@ export function StudyScreen({ navigation, route }: Props) {
         onRequestClose={closeSettings}
       >
         <View style={styles.modalRoot}>
-          <Pressable accessibilityRole="button" style={styles.backdrop} onPress={closeSettings} accessibilityLabel="Закрыть настройки">
+          <Pressable
+            accessibilityRole="button"
+            style={styles.backdrop}
+            onPress={closeSettings}
+            accessibilityLabel="Закрыть настройки"
+          >
             <Animated.View
               pointerEvents="none"
-              style={[styles.backdropTint, { opacity: backdropOpacity, backgroundColor: colors.overlay }]}
+              style={[
+                styles.backdropTint,
+                { opacity: backdropOpacity, backgroundColor: colors.overlay },
+              ]}
             />
           </Pressable>
 
@@ -941,21 +1144,28 @@ export function StudyScreen({ navigation, route }: Props) {
             ]}
           >
             <View style={styles.settingsRow}>
-              <View style={[styles.settingsIconWrap, { backgroundColor: alpha(colors.primary, 10) }]}>
+              <View
+                style={[styles.settingsIconWrap, { backgroundColor: alpha(colors.primary, 10) }]}
+              >
                 <Settings size={iconSize.s} color={colors.primary} />
               </View>
               <View style={styles.settingsTexts}>
-                <Text variant="body" style={[styles.semibold, { color: colors.textPrimary }]}>Реверс карточек</Text>
+                <Text variant="body" style={[styles.semibold, { color: colors.textPrimary }]}>
+                  Реверс карточек
+                </Text>
                 <Text variant="caption" style={{ color: colors.textSecondary }}>
                   Сначала показывать обратную сторону
                 </Text>
               </View>
-              <Switch value={reverseEnabled} onValueChange={handleToggleReverse} accessibilityLabel="Реверс карточек" />
+              <Switch
+                value={reverseEnabled}
+                onValueChange={handleToggleReverse}
+                accessibilityLabel="Реверс карточек"
+              />
             </View>
           </Animated.View>
         </View>
       </Modal>
-
     </StageLayout>
   );
 }

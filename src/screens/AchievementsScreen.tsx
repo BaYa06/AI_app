@@ -3,12 +3,7 @@
  * @description Grid of unlocked and locked achievements
  */
 import React, { useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-} from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { Text } from '@/components/common';
 import { Badge, Card, ProgressBar, ScreenHeader, type IconComponent } from '@/components/ui';
 import { useThemeColors } from '@/store';
@@ -85,48 +80,94 @@ const ACHIEVEMENTS: Achievement[] = [
 
 // ---- Components ----
 
-function UnlockedCard({ item, colors }: { item: Achievement; colors: ReturnType<typeof useThemeColors> }) {
+function UnlockedCard({
+  item,
+  colors,
+}: {
+  item: Achievement;
+  colors: ReturnType<typeof useThemeColors>;
+}) {
   const Icon = item.icon;
   return (
     <View
       accessible
       accessibilityLabel={`${item.title}. ${item.description ?? ''}. ${item.unlockedLabel ?? ''}`}
-      style={[st.gridCard, st.unlockedCard, { backgroundColor: colors.surface, borderColor: colors.border, borderTopColor: colors.primary }]}
+      style={[
+        st.gridCard,
+        st.unlockedCard,
+        {
+          backgroundColor: colors.surface,
+          borderColor: colors.border,
+          borderTopColor: colors.primary,
+        },
+      ]}
     >
       <View style={[st.iconCircle, { backgroundColor: alpha(colors.primary, 10) }]}>
         <Icon size={iconSize.l} color={colors.primary} />
       </View>
-      <Text variant="body" align="center" style={[st.cardTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+      <Text
+        variant="body"
+        align="center"
+        style={[st.cardTitle, { color: colors.textPrimary }]}
+        numberOfLines={1}
+      >
         {item.title}
       </Text>
       <Text variant="caption" align="center" color="secondary" numberOfLines={2}>
         {item.description}
       </Text>
-      {item.unlockedLabel ? <Badge label={item.unlockedLabel} tone="success" style={st.unlockedBadge} /> : null}
+      {item.unlockedLabel ? (
+        <Badge label={item.unlockedLabel} tone="success" style={st.unlockedBadge} />
+      ) : null}
     </View>
   );
 }
 
-function LockedCard({ item, colors }: { item: Achievement; colors: ReturnType<typeof useThemeColors> }) {
+function LockedCard({
+  item,
+  colors,
+}: {
+  item: Achievement;
+  colors: ReturnType<typeof useThemeColors>;
+}) {
   const Icon = item.icon;
   return (
     <View
       accessible
       accessibilityLabel={`${item.title}, закрыто. ${item.progressLabel ?? ''}`}
-      style={[st.gridCard, st.lockedCard, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}
+      style={[
+        st.gridCard,
+        st.lockedCard,
+        { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
+      ]}
     >
       <View style={st.lockedIconWrap}>
         <View style={[st.iconCircle, { backgroundColor: colors.surfaceVariant }]}>
           <Icon size={iconSize.l} color={colors.textTertiary} />
         </View>
-        <View style={[st.lockBadge, { backgroundColor: colors.textTertiary, borderColor: colors.surfaceMuted }]}>
+        <View
+          style={[
+            st.lockBadge,
+            { backgroundColor: colors.textTertiary, borderColor: colors.surfaceMuted },
+          ]}
+        >
           <Lock size={10} color={colors.onPrimary} />
         </View>
       </View>
-      <Text variant="body" align="center" style={[st.cardTitle, { color: colors.textSecondary }]} numberOfLines={1}>
+      <Text
+        variant="body"
+        align="center"
+        style={[st.cardTitle, { color: colors.textSecondary }]}
+        numberOfLines={1}
+      >
         {item.title}
       </Text>
-      <ProgressBar progress={item.progressPercent ?? 0} color={colors.textTertiary} animated={false} style={st.lockedBar} />
+      <ProgressBar
+        progress={item.progressPercent ?? 0}
+        color={colors.textTertiary}
+        animated={false}
+        style={st.lockedBar}
+      />
       <Text variant="caption" color="secondary">
         {item.progressLabel}
       </Text>
@@ -166,7 +207,9 @@ export function AchievementsScreen({ navigation }: any) {
                 Общий прогресс
               </Text>
             </View>
-            <Text variant="h2" style={{ color: colors.primary }}>48%</Text>
+            <Text variant="h2" style={{ color: colors.primary }}>
+              48%
+            </Text>
           </View>
           <ProgressBar progress={48} accessibilityLabel="Общий прогресс" />
           <Text variant="caption" color="secondary" style={st.progressHint}>
@@ -183,7 +226,8 @@ export function AchievementsScreen({ navigation }: any) {
           {TABS.map((tab, i) => {
             const isActive = activeTab === i;
             return (
-              <Pressable hitSlop={{ top: spacing.xxs, bottom: spacing.xxs }}
+              <Pressable
+                hitSlop={{ top: spacing.xxs, bottom: spacing.xxs }}
                 key={tab}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: isActive }}
@@ -195,7 +239,10 @@ export function AchievementsScreen({ navigation }: any) {
                 ]}
                 onPress={() => setActiveTab(i)}
               >
-                <Text variant="label" style={{ color: isActive ? colors.onPrimary : colors.textSecondary }}>
+                <Text
+                  variant="label"
+                  style={{ color: isActive ? colors.onPrimary : colors.textSecondary }}
+                >
                   {tab}
                 </Text>
               </Pressable>
@@ -210,7 +257,7 @@ export function AchievementsScreen({ navigation }: any) {
               <UnlockedCard key={item.id} item={item} colors={colors} />
             ) : (
               <LockedCard key={item.id} item={item} colors={colors} />
-            ),
+            )
           )}
         </View>
       </ScrollView>

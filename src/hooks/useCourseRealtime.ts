@@ -22,7 +22,7 @@ export function useCourseRealtime(userId: string | null | undefined) {
       .filter((c) => c.isStudentCourse)
       .map((c) => c.id)
       .sort()
-      .join(','),
+      .join(',')
   );
 
   useEffect(() => {
@@ -37,12 +37,14 @@ export function useCourseRealtime(userId: string | null | undefined) {
       }, SYNC_DEBOUNCE_MS);
     };
 
-    const channels = courseIdsKey.split(',').map((courseId) =>
-      supabase
-        .channel(`course:${courseId}`)
-        .on('broadcast', { event: COURSE_CHANGED_EVENT }, scheduleSync)
-        .subscribe(),
-    );
+    const channels = courseIdsKey
+      .split(',')
+      .map((courseId) =>
+        supabase
+          .channel(`course:${courseId}`)
+          .on('broadcast', { event: COURSE_CHANGED_EVENT }, scheduleSync)
+          .subscribe()
+      );
 
     return () => {
       if (timer) clearTimeout(timer);

@@ -30,12 +30,25 @@ export function WidgetPromptCard({ onHowTo, onDismiss }: Props) {
             Учи слова прямо с экрана блокировки
           </Text>
           <Text variant="bodySmall" color="secondary">
-            Виджет покажет слово из сегодняшнего урока, а потом перевод. Вспоминать можно, не открывая приложение.
+            Виджет покажет слово из сегодняшнего урока, а потом перевод. Вспоминать можно, не
+            открывая приложение.
           </Text>
         </View>
-        <Button variant="icon" icon={X} background="none" accessibilityLabel="Не сейчас" onPress={onDismiss} />
+        <Button
+          variant="icon"
+          icon={X}
+          background="none"
+          accessibilityLabel="Не сейчас"
+          onPress={onDismiss}
+        />
       </View>
-      <Button title="Как добавить" variant="secondary" size="s" onPress={onHowTo} style={st.action} />
+      <Button
+        title="Как добавить"
+        variant="secondary"
+        size="s"
+        onPress={onHowTo}
+        style={st.action}
+      />
     </Card>
   );
 }

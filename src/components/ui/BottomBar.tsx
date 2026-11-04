@@ -29,7 +29,11 @@ export function BottomBar({ color, webFade = 60, style, children, ...rest }: Bot
   return (
     <View {...rest} style={[fill, style]}>
       {isGlassSupported ? (
-        <GlassView pointerEvents="none" fallbackColor={background} style={StyleSheet.absoluteFill} />
+        <GlassView
+          pointerEvents="none"
+          fallbackColor={background}
+          style={StyleSheet.absoluteFill}
+        />
       ) : null}
       {children}
     </View>

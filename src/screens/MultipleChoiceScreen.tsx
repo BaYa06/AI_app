@@ -7,14 +7,33 @@ import { View, StyleSheet, Pressable, ScrollView, AppState } from 'react-native'
 import { triggerHaptic } from '@/utils/haptic';
 import { Check, Layers, Volume2, X } from 'lucide-react-native';
 import { Container, Text, Loading } from '@/components/common';
-import { Button, CelebrationIcon, EmptyState, ProgressBar, ScreenHeader, type CelebrationKind } from '@/components/ui';
-import { useCardsStore, useSetsStore, useThemeColors, useSettingsStore, selectSetStats } from '@/store';
+import {
+  Button,
+  CelebrationIcon,
+  EmptyState,
+  ProgressBar,
+  ScreenHeader,
+  type CelebrationKind,
+} from '@/components/ui';
+import {
+  useCardsStore,
+  useSetsStore,
+  useThemeColors,
+  useSettingsStore,
+  selectSetStats,
+} from '@/store';
 import { spacing, borderRadius, heights, iconSize, screenPadding, alpha } from '@/constants';
 import { ProgressService } from '@/services/ProgressService';
 import { lessonPhaseForAnswer, sessionPhaseForAnswer } from '@/services/lessonFlow';
 import { useLessonStore } from '@/store/lessonStore';
 import { reportWidgetReview } from '@/services/WidgetService';
-import { speak, resolveSpeechLang, prefetchSpeech, cardSpeechLangs, isCardSpeakable } from '@/utils/speech';
+import {
+  speak,
+  resolveSpeechLang,
+  prefetchSpeech,
+  cardSpeechLangs,
+  isCardSpeakable,
+} from '@/utils/speech';
 import { playCorrectSound, playSessionSfx, preloadSessionSfx, preloadSound } from '@/utils/sound';
 import { buildDistractorPool, pickSimilarDistractors } from '@/utils/choiceDistractors';
 import { Analytics } from '@/services/analytics';
@@ -40,31 +59,50 @@ type OptionState = 'neutral' | 'correct' | 'wrong';
 type Option = { id: string; label: string; text: string; isCorrect: boolean };
 
 export function MultipleChoiceScreen({ navigation, route }: Props) {
-  const { setId, cardLimit, dueCardIds, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0, phaseFailedIds, challengeMode, timeLimit: paramTimeLimit, sniperMode, forgottenMode, lesson, session, listen } = route.params;
+  const {
+    setId,
+    cardLimit,
+    dueCardIds,
+    phaseId,
+    totalPhaseCards,
+    studiedInPhase = 0,
+    phaseOffset = 0,
+    phaseFailedIds,
+    challengeMode,
+    timeLimit: paramTimeLimit,
+    sniperMode,
+    forgottenMode,
+    lesson,
+    session,
+    listen,
+  } = route.params;
   const colors = useThemeColors();
   const set = useSetsStore((s) => s.getSet(setId));
   const updateSetStats = useSetsStore((s) => s.updateSetStats);
   const incrementTodayCards = useSettingsStore((s) => s.incrementTodayCards);
   const finishStudySession = useSettingsStore((s) => s.finishStudySession);
-  
+
   // Мемоизируем список ошибочных карточек из фазы
   const phaseFailedList = useMemo(
     () => phaseFailedIds || [],
     [phaseFailedIds ? phaseFailedIds.join('|') : '']
   );
   const initKey = useMemo(
-    () => [
-      setId,
-      cardLimit ?? 'all',
-      phaseId || 'noPhase',
-      phaseOffset,
-      phaseFailedList.join(','),
-    ].join('|'),
+    () =>
+      [
+        setId,
+        cardLimit ?? 'all',
+        phaseId || 'noPhase',
+        phaseOffset,
+        phaseFailedList.join(','),
+      ].join('|'),
     [setId, cardLimit, phaseId, phaseOffset, phaseFailedList]
   );
-  
+
   // Генерируем phaseId при первом запуске (если не передан)
-  const currentPhaseId = useRef(phaseId || `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+  const currentPhaseId = useRef(
+    phaseId || `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  );
   const currentTotalPhaseCards = useRef(totalPhaseCards || 0);
   // Количество ошибочных карточек из прошлых порций в текущей очереди
   const pendingCardsInQueueRef = useRef(0);
@@ -74,7 +112,9 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [errors, setErrors] = useState(0);
-  const [errorCards, setErrorCards] = useState<Array<{ id: string; front: string; back: string; rating: number }>>([]);
+  const [errorCards, setErrorCards] = useState<
+    Array<{ id: string; front: string; back: string; rating: number }>
+  >([]);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const startedAtRef = useRef<number>(Date.now());
   const cardShownAtRef = useRef<number>(Date.now());
@@ -107,11 +147,17 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
   const applySrsUpdate = React.useCallback(
     (card: Card, isCorrect: boolean, chosenCardId: string, timeSpentMs: number) => {
       // Урок дня: считаем по состоянию карточки до ответа
-      const lessonPhase = lessonPhaseForAnswer(lesson?.part, card) ?? (session ? sessionPhaseForAnswer(card) : null);
+      const lessonPhase =
+        lessonPhaseForAnswer(lesson?.part, card) ?? (session ? sessionPhaseForAnswer(card) : null);
       if (lessonPhase) useLessonStore.getState().recordAnswer(lessonPhase, card.id);
       // Замер виджета (plan/new/widgets.md, 4.1): точность на словах из виджета и контрольной половины
       if (lessonPhase === 'review') reportWidgetReview(card.id, isCorrect);
-      ProgressService.recordAnswer(card, { mode: 'test', correct: isCorrect, chosen: chosenCardId, timeSpentMs });
+      ProgressService.recordAnswer(card, {
+        mode: 'test',
+        correct: isCorrect,
+        chosen: chosenCardId,
+        timeSpentMs,
+      });
 
       if (isCorrect) {
         incrementTodayCards();
@@ -146,38 +192,40 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
     } else {
       const ids = state.cardsBySet[setId] || [];
       const now = Date.now();
-      cards = ids.map((id) => state.cards[id]).filter((c): c is Card => Boolean(c) && c.nextReviewDate <= now);
+      cards = ids
+        .map((id) => state.cards[id])
+        .filter((c): c is Card => Boolean(c) && c.nextReviewDate <= now);
     }
 
     let questionCards: Card[] = [];
-    
+
     if (phaseId) {
       // Собираем карточки для фазы: сначала ошибочные из прошлых порций, потом новые по offset
       const pendingIds = phaseFailedList || [];
-      
+
       // Получаем ошибочные карточки по ID
       const pendingCards: Card[] = pendingIds
-        .map((id) => cards.find(c => c.id === id))
+        .map((id) => cards.find((c) => c.id === id))
         .filter((c): c is Card => Boolean(c));
-      
+
       // Получаем оставшиеся карточки по offset
       const remaining = phaseOffset > 0 ? cards.slice(phaseOffset) : cards;
-      
+
       // Исключаем из remaining те, что уже есть в pendingCards
-      const pendingIdsSet = new Set(pendingCards.map(c => c.id));
-      const filteredRemaining = remaining.filter(c => !pendingIdsSet.has(c.id));
-      
+      const pendingIdsSet = new Set(pendingCards.map((c) => c.id));
+      const filteredRemaining = remaining.filter((c) => !pendingIdsSet.has(c.id));
+
       // Собираем: сначала ошибочные, потом новые
       const combined = [...pendingCards, ...filteredRemaining];
-      
+
       // Применяем лимит
       const limited = cardLimit && cardLimit > 0 ? combined.slice(0, cardLimit) : combined;
       questionCards = shuffle(limited);
-      
+
       // Сохраняем количество ошибочных карточек в очереди
-      const pendingInQueue = limited.filter(c => pendingIdsSet.has(c.id)).length;
+      const pendingInQueue = limited.filter((c) => pendingIdsSet.has(c.id)).length;
       pendingCardsInQueueRef.current = pendingInQueue;
-      
+
       log.debug('MultipleChoice', 'Фаза', {
         phaseId,
         phaseOffset,
@@ -185,16 +233,17 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
         pendingCards: pendingCards.length,
         remaining: filteredRemaining.length,
         pendingInQueue,
-        total: questionCards.length
+        total: questionCards.length,
       });
     } else {
       // Без фазы - просто берём карточки
       const availableCards = cards.slice(phaseOffset);
-      const limited = !cardLimit || cardLimit <= 0 ? availableCards : availableCards.slice(0, cardLimit);
+      const limited =
+        !cardLimit || cardLimit <= 0 ? availableCards : availableCards.slice(0, cardLimit);
       questionCards = shuffle(limited);
       pendingCardsInQueueRef.current = 0;
     }
-    
+
     // Одна карточка — один вопрос: дубли давали повторяющиеся варианты с одинаковым key,
     // и React не убирал старые кнопки (вариантов становилось 5, 6, …)
     const seen = new Set<string>();
@@ -224,7 +273,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
         log.warn('MultipleChoice', 'Speech error', error);
       });
     },
-    [],
+    []
   );
 
   const totalQuestions = questions.length;
@@ -232,15 +281,28 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
 
   // Заранее озвучиваем слово текущей и следующей карточки — кнопка динамика играет сразу
   useEffect(() => {
-    const upcoming = [questions[currentIndex], questions[currentIndex + 1]].filter((c): c is Card => !!c && isCardSpeakable(c));
-    prefetchSpeech(upcoming.map((c) => ({ text: getFront(c), counterpart: getBack(c), lang: cardSpeechLangs(c).front })));
+    const upcoming = [questions[currentIndex], questions[currentIndex + 1]].filter(
+      (c): c is Card => !!c && isCardSpeakable(c)
+    );
+    prefetchSpeech(
+      upcoming.map((c) => ({
+        text: getFront(c),
+        counterpart: getBack(c),
+        lang: cardSpeechLangs(c).front,
+      }))
+    );
   }, [questions, currentIndex]);
   const playWord = React.useCallback(
     (slow = false) => {
       if (!currentCard) return;
-      handleSpeak(getFront(currentCard), getBack(currentCard), cardSpeechLangs(currentCard).front, slow ? 0.6 : undefined);
+      handleSpeak(
+        getFront(currentCard),
+        getBack(currentCard),
+        cardSpeechLangs(currentCard).front,
+        slow ? 0.6 : undefined
+      );
     },
-    [currentCard, handleSpeak],
+    [currentCard, handleSpeak]
   );
   // «На слух»: слово звучит само при каждом новом вопросе
   useEffect(() => {
@@ -249,13 +311,20 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
     return () => clearTimeout(timer);
   }, [isListen, introDone, currentCard?.id]);
 
-  const progressPercent = totalQuestions ? Math.round(((currentIndex + 1) / totalQuestions) * 100) : 0;
+  const progressPercent = totalQuestions
+    ? Math.round(((currentIndex + 1) / totalQuestions) * 100)
+    : 0;
 
   const options = useMemo(() => {
     if (!currentCard) return [];
     // Неверные варианты — из всего набора (не только из порции) и похожие на правильный ответ
     const { cards: cardsMap, cardsBySet } = useCardsStore.getState();
-    const pool = buildDistractorPool(currentCard, cardsBySet, cardsMap, useSetsStore.getState().sets);
+    const pool = buildDistractorPool(
+      currentCard,
+      cardsBySet,
+      cardsMap,
+      useSetsStore.getState().sets
+    );
     const distractors = pickSimilarDistractors(currentCard, pool, 3);
     const baseOptions = shuffle([currentCard, ...distractors]).slice(0, 4);
     const labels = ['A', 'B', 'C', 'D'];
@@ -288,8 +357,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
   }, [currentIndex]);
 
   // Challenge timer
-  const formatTime = (s: number) =>
-    `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  const formatTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
   const handleTimeUp = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -337,22 +405,25 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
   }, [paramTimeLimit, handleTimeUp]);
 
   const finishQuiz = React.useCallback(
-    async (errorsCount: number, errorList: Array<{ id: string; front: string; back: string; rating: number }>) => {
+    async (
+      errorsCount: number,
+      errorList: Array<{ id: string; front: string; back: string; rating: number }>
+    ) => {
       const timeSpent = Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000));
       const learnedCards = Math.max(0, totalQuestions - errorsCount);
-      
+
       // Считаем сколько НОВЫХ карточек было в этой порции
       const newCardsInBatch = totalQuestions - pendingCardsInQueueRef.current;
-      
+
       // Обновляем прогресс фазы
       const newStudiedInPhase = studiedInPhase + learnedCards;
       // phaseOffset увеличивается только на количество НОВЫХ карточек
       const newPhaseOffset = phaseOffset + newCardsInBatch;
       const phaseTotal = currentTotalPhaseCards.current || totalQuestions;
-      
+
       // Собираем ID ошибочных карточек
-      const errorIds = new Set(errorList.map(c => c.id).filter(Boolean));
-      
+      const errorIds = new Set(errorList.map((c) => c.id).filter(Boolean));
+
       // Обновляем список незавершенных карточек фазы
       const prevFailed = new Set(phaseFailedList || []);
       // Убираем те, что исправили (были в очереди, но не в ошибках)
@@ -368,7 +439,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
         }
       });
       const newPhaseFailedIds = Array.from(prevFailed);
-      
+
       log.debug('MultipleChoice', 'Завершение порции', {
         totalQuestions,
         newCardsInBatch,
@@ -379,9 +450,9 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
         newPhaseFailedIds,
         newStudiedInPhase,
         newPhaseOffset,
-        phaseTotal
+        phaseTotal,
       });
-      
+
       // Серия: результат нужен экрану итогов — там праздник, если день засчитан впервые
       const streakResult = await finishStudySession();
 
@@ -408,7 +479,20 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
         session,
       });
     },
-    [finishStudySession, navigation, setId, totalQuestions, cardLimit, dueCardIds, studiedInPhase, phaseOffset, phaseFailedList, questions, lesson, session]
+    [
+      finishStudySession,
+      navigation,
+      setId,
+      totalQuestions,
+      cardLimit,
+      dueCardIds,
+      studiedInPhase,
+      phaseOffset,
+      phaseFailedList,
+      questions,
+      lesson,
+      session,
+    ]
   );
 
   const handleSelectOption = (option: Option) => {
@@ -470,29 +554,32 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
         setSniperStreak(0);
       }
 
-      timeoutRef.current = setTimeout(() => {
-        if (isCorrect) {
-          // Advance to next card, or loop if at end
-          const isLast = currentIndex >= totalQuestions - 1;
-          if (isLast) {
-            // Reshuffle and restart from 0
-            setQuestions((prev) => {
-              const shuffled = [...prev];
-              for (let i = shuffled.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-              }
-              return shuffled;
-            });
-            setCurrentIndex(0);
-          } else {
-            setCurrentIndex((idx) => idx + 1);
+      timeoutRef.current = setTimeout(
+        () => {
+          if (isCorrect) {
+            // Advance to next card, or loop if at end
+            const isLast = currentIndex >= totalQuestions - 1;
+            if (isLast) {
+              // Reshuffle and restart from 0
+              setQuestions((prev) => {
+                const shuffled = [...prev];
+                for (let i = shuffled.length - 1; i > 0; i--) {
+                  const j = Math.floor(Math.random() * (i + 1));
+                  [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                }
+                return shuffled;
+              });
+              setCurrentIndex(0);
+            } else {
+              setCurrentIndex((idx) => idx + 1);
+            }
           }
-        }
-        // Wrong answer: stay on same card (don't change currentIndex)
-        setSelectedOption(null);
-        setShowResult(false);
-      }, isCorrect ? 650 : 1000);
+          // Wrong answer: stay on same card (don't change currentIndex)
+          setSelectedOption(null);
+          setShowResult(false);
+        },
+        isCorrect ? 650 : 1000
+      );
       return;
     }
 
@@ -642,15 +729,29 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
     <Container padded={false}>
       <View style={styles.challengeResultContainer}>
         <CelebrationIcon kind={kind} style={styles.challengeResultIcon} />
-        <Text variant="h2" align="center" accessibilityRole="header" style={[styles.challengeResultTitle, { color: colors.textPrimary }]}>
+        <Text
+          variant="h2"
+          align="center"
+          accessibilityRole="header"
+          style={[styles.challengeResultTitle, { color: colors.textPrimary }]}
+        >
           {title}
         </Text>
-        <Text variant="body" align="center" style={[styles.challengeResultSubtitle, { color: colors.textSecondary }]}>
+        <Text
+          variant="body"
+          align="center"
+          style={[styles.challengeResultSubtitle, { color: colors.textSecondary }]}
+        >
           {subtitle}
         </Text>
         <View style={styles.challengeResultButtons}>
           {onRetry ? <Button title="Повторить" onPress={onRetry} fullWidth /> : null}
-          <Button variant={onRetry ? 'secondary' : 'primary'} title="Закрыть" onPress={handleClose} fullWidth />
+          <Button
+            variant={onRetry ? 'secondary' : 'primary'}
+            title="Закрыть"
+            onPress={handleClose}
+            fullWidth
+          />
         </View>
       </View>
     </Container>
@@ -704,7 +805,11 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
 
     return renderChallengeResult({
       kind: isSuccess ? 'trophy' : challengeResult.timesUp ? 'time' : 'strength',
-      title: isSuccess ? 'Поздравляем!' : challengeResult.timesUp ? 'Время вышло!' : 'Не получилось...',
+      title: isSuccess
+        ? 'Поздравляем!'
+        : challengeResult.timesUp
+          ? 'Время вышло!'
+          : 'Не получилось...',
       subtitle: isSuccess
         ? `Все ${challengeResult.total} ${pluralize(challengeResult.total, 'слово', 'слова', 'слов')} угаданы без ошибок за ${formatTime(challengeResult.timeSpent ?? 0)}! Алмазы ждут тебя на главной.`
         : challengeResult.timesUp
@@ -732,7 +837,9 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
               onPress={() => playWord()}
               style={({ pressed }) => [
                 styles.listenButton,
-                { backgroundColor: pressed ? alpha(colors.primary, 20) : alpha(colors.primary, 10) },
+                {
+                  backgroundColor: pressed ? alpha(colors.primary, 20) : alpha(colors.primary, 10),
+                },
               ]}
             >
               <Volume2 size={iconSize.l} color={colors.primary} />
@@ -757,7 +864,13 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
                 borderColor: colors.border,
               },
             ]}
-            onPress={() => handleSpeak(getFront(currentCard), getBack(currentCard), cardSpeechLangs(currentCard).front)}
+            onPress={() =>
+              handleSpeak(
+                getFront(currentCard),
+                getBack(currentCard),
+                cardSpeechLangs(currentCard).front
+              )
+            }
           >
             <Volume2 size={iconSize.m} color={colors.primary} />
           </Pressable>
@@ -794,16 +907,24 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
                 styles.option,
                 {
                   borderColor: baseBorder,
-                  backgroundColor: pressed && !isCorrect && !isWrong ? alpha(colors.primary, 10) : baseBg,
+                  backgroundColor:
+                    pressed && !isCorrect && !isWrong ? alpha(colors.primary, 10) : baseBg,
                 },
               ]}
             >
-              <View style={[styles.optionBadge, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
+              <View
+                style={[
+                  styles.optionBadge,
+                  { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
+                ]}
+              >
                 <Text variant="label" style={{ color: colors.textSecondary }}>
                   {option.label}
                 </Text>
               </View>
-              <Text variant="bodyLarge" style={[styles.optionText, { color: textColor }]}>{option.text}</Text>
+              <Text variant="bodyLarge" style={[styles.optionText, { color: textColor }]}>
+                {option.text}
+              </Text>
               {/* Верно/неверно — цвет и иконка, не только цвет (брендбук, 11) */}
               {isCorrect ? (
                 <Check size={iconSize.s} color={colors.successText} strokeWidth={3} />
@@ -844,7 +965,9 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
       <StageLayout
         session={session}
         progress={{ done: currentIndex + (showResult ? 1 : 0), total: totalQuestions }}
-        task={isListen ? 'Что вы слышите?' : isSubjectSet(set) ? 'Выберите ответ' : 'Как переводится?'}
+        task={
+          isListen ? 'Что вы слышите?' : isSubjectSet(set) ? 'Выберите ответ' : 'Как переводится?'
+        }
         taskAction={
           isListen && session && !showResult ? (
             <Button variant="quiet" size="s" title="Не могу слушать" onPress={skipListen} />
@@ -858,7 +981,11 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
             <AnswerPanel
               correct={feedback.correct}
               answer={isListen ? getFront(currentCard) : getBack(currentCard)}
-              hint={{ front: getFront(currentCard), back: getBack(currentCard), example: currentCard.example || undefined }}
+              hint={{
+                front: getFront(currentCard),
+                back: getBack(currentCard),
+                example: currentCard.example || undefined,
+              }}
               onNext={handleNextQuestion}
             />
           ) : null
@@ -883,7 +1010,10 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
             <Text
               variant="button"
               accessibilityLabel={`Осталось ${timeLeft} секунд`}
-              style={[styles.timerText, { color: timeLeft <= 10 ? colors.errorText : colors.textPrimary }]}
+              style={[
+                styles.timerText,
+                { color: timeLeft <= 10 ? colors.errorText : colors.textPrimary },
+              ]}
             >
               {formatTime(timeLeft)}
             </Text>
@@ -900,16 +1030,13 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
           </Text>
         </View>
         <ProgressBar
-          progress={sniperMode
-            ? Math.round((sniperStreak / TARGET_STREAK) * 100)
-            : progressPercent}
+          progress={sniperMode ? Math.round((sniperStreak / TARGET_STREAK) * 100) : progressPercent}
           accessibilityLabel="Прогресс"
         />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {questionView}
-
       </ScrollView>
     </Container>
   );

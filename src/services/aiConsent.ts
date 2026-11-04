@@ -37,7 +37,9 @@ export function ensureAiConsent(): Promise<boolean> {
   if (hasAiConsent()) return Promise.resolve(true);
 
   if (Platform.OS === 'web') {
-    const granted = window.confirm(`${TITLE}\n\n${MESSAGE}\n\nПолитика конфиденциальности: ${PRIVACY_POLICY_URL}`);
+    const granted = window.confirm(
+      `${TITLE}\n\n${MESSAGE}\n\nПолитика конфиденциальности: ${PRIVACY_POLICY_URL}`
+    );
     if (granted) setAiConsent(true);
     return Promise.resolve(granted);
   }
@@ -63,7 +65,7 @@ export function ensureAiConsent(): Promise<boolean> {
           },
         },
       ],
-      { cancelable: true, onDismiss: () => resolve(false) },
+      { cancelable: true, onDismiss: () => resolve(false) }
     );
   });
 }

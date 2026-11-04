@@ -26,11 +26,7 @@ interface FlashCardProps {
   onFlip?: () => void;
 }
 
-export const FlashCard = memo<FlashCardProps>(function FlashCard({
-  card,
-  isFlipped,
-  onFlip,
-}) {
+export const FlashCard = memo<FlashCardProps>(function FlashCard({ card, isFlipped, onFlip }) {
   const colors = useThemeColors();
   const front = card.frontText ?? (card as any).front ?? '';
   const back = card.backText ?? (card as any).back ?? '';
@@ -80,7 +76,12 @@ export const FlashCard = memo<FlashCardProps>(function FlashCard({
   };
 
   return (
-    <Pressable accessibilityRole="button" accessibilityHint="Нажми, чтобы перевернуть" onPress={handlePress} style={styles.container}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityHint="Нажми, чтобы перевернуть"
+      onPress={handlePress}
+      style={styles.container}
+    >
       {/* Передняя сторона */}
       <Animated.View style={[styles.card, cardStyle, frontAnimatedStyle]}>
         <View style={styles.content}>

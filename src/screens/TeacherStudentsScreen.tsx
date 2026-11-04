@@ -54,7 +54,7 @@ interface Student {
 type FilterKey = 'all' | 'active' | 'away3d' | 'away7d';
 
 const FILTERS: { key: FilterKey; label: string }[] = [
-  { key: 'all',    label: 'Все' },
+  { key: 'all', label: 'Все' },
   { key: 'active', label: 'Активные' },
   { key: 'away3d', label: 'Не заходили 3д' },
   { key: 'away7d', label: 'Не заходили 7д+' },
@@ -79,7 +79,10 @@ function getStudentStatus(lastActiveDate: string | null): StudentStatus {
   return 'inactive';
 }
 
-function formatLastActivity(lastActiveDate: string | null, colors: ReturnType<typeof useThemeColors>): { text: string; color: string } {
+function formatLastActivity(
+  lastActiveDate: string | null,
+  colors: ReturnType<typeof useThemeColors>
+): { text: string; color: string } {
   if (!lastActiveDate) return { text: 'Нет активности', color: colors.textTertiary };
   const now = new Date();
   const last = new Date(lastActiveDate + 'T12:00:00Z');
@@ -94,10 +97,14 @@ function formatLastActivity(lastActiveDate: string | null, colors: ReturnType<ty
   return { text: `${months} мес. назад`, color: colors.textTertiary };
 }
 
-
 // ==================== STUDENT ROW ====================
 
-function StudentRow({ student, colors, onPress, onRemove }: {
+function StudentRow({
+  student,
+  colors,
+  onPress,
+  onRemove,
+}: {
   student: Student;
   colors: any;
   onPress: () => void;
@@ -106,12 +113,8 @@ function StudentRow({ student, colors, onPress, onRemove }: {
   const isInactive = student.status === 'inactive';
   const dotColor = student.lastActivityColor;
 
-  const avatarBg = isInactive
-    ? (colors.surfaceMuted)
-    : alpha(colors.primary, 20);
-  const avatarTextColor = isInactive
-    ? (colors.textSecondary)
-    : colors.primary;
+  const avatarBg = isInactive ? colors.surfaceMuted : alpha(colors.primary, 20);
+  const avatarTextColor = isInactive ? colors.textSecondary : colors.primary;
 
   return (
     <Pressable
@@ -133,15 +136,10 @@ function StudentRow({ student, colors, onPress, onRemove }: {
       {/* Avatar */}
       <View style={styles.avatarContainer}>
         <View style={[styles.avatar, { backgroundColor: avatarBg }]}>
-          <Text style={[styles.avatarText, { color: avatarTextColor }]}>
-            {student.initials}
-          </Text>
+          <Text style={[styles.avatarText, { color: avatarTextColor }]}>{student.initials}</Text>
         </View>
         <View
-          style={[
-            styles.statusDot,
-            { backgroundColor: dotColor, borderColor: colors.background },
-          ]}
+          style={[styles.statusDot, { backgroundColor: dotColor, borderColor: colors.background }]}
         />
       </View>
 
@@ -160,7 +158,9 @@ function StudentRow({ student, colors, onPress, onRemove }: {
           {student.streak > 0 && (
             <View style={[styles.streakBadge, { backgroundColor: alpha(colors.streak, 10) }]}>
               <Flame size={iconSize.xs} color={colors.streak} />
-              <Text style={[styles.streakText, { color: colors.warningText }]}>{student.streak}</Text>
+              <Text style={[styles.streakText, { color: colors.warningText }]}>
+                {student.streak}
+              </Text>
             </View>
           )}
         </View>
@@ -171,7 +171,8 @@ function StudentRow({ student, colors, onPress, onRemove }: {
           {student.todayCards > 0 && (
             <View style={[styles.cardsBadge, { backgroundColor: alpha(colors.success, 10) }]}>
               <Text style={[styles.cardsBadgeText, { color: colors.successText }]}>
-                {student.todayCards} {pluralize(student.todayCards, 'карточка', 'карточки', 'карточек')}
+                {student.todayCards}{' '}
+                {pluralize(student.todayCards, 'карточка', 'карточки', 'карточек')}
               </Text>
             </View>
           )}
@@ -192,10 +193,7 @@ function StudentRow({ student, colors, onPress, onRemove }: {
         onPress={onRemove}
         activeOpacity={0.6}
         hitSlop={8}
-        style={[
-          styles.removeBtn,
-          { backgroundColor: alpha(colors.error, 10) },
-        ]}
+        style={[styles.removeBtn, { backgroundColor: alpha(colors.error, 10) }]}
       >
         <Trash2 size={16} color={colors.error} />
       </TouchableOpacity>
@@ -300,16 +298,20 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
                 todayCards: m.todayCards,
                 waitingReviews: m.waitingReviews,
               };
-            }),
+            })
           );
         })
         .catch((e) => {
           log.error('TeacherStudents', 'Failed to load members', e);
           if (mounted) setLoadError(true);
         })
-        .finally(() => { if (mounted) setLoading(false); });
-      return () => { mounted = false; };
-    }, [isOwner, route.params.courseId, retryTick]),
+        .finally(() => {
+          if (mounted) setLoading(false);
+        });
+      return () => {
+        mounted = false;
+      };
+    }, [isOwner, route.params.courseId, retryTick])
   );
 
   useEffect(() => {
@@ -337,7 +339,9 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
       }
     };
     checkOwnership();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [route.params.courseId]);
 
   const filtered = useMemo(() => {
@@ -374,47 +378,55 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
     } else if (!result) {
       toast.error('Не получилось. Проверь соединение и попробуй ещё раз');
     } else {
-      toast.success(`Напоминание отправлено: ученикам с уведомлениями ${result.sent} из ${result.students}`);
+      toast.success(
+        `Напоминание отправлено: ученикам с уведомлениями ${result.sent} из ${result.students}`
+      );
     }
   }, [reminding, route.params.courseId]);
 
-  const handleRemoveStudent = useCallback(async (student: Student) => {
-    const confirmed = Platform.OS === 'web'
-      ? window.confirm(`Удалить ученика?\n${student.name} больше не будет иметь доступ к курсу`)
-      : await new Promise<boolean>((resolve) =>
-          Alert.alert(
-            'Удалить ученика?',
-            `${student.name} больше не будет иметь доступ к курсу`,
-            [
-              { text: 'Отмена', style: 'cancel', onPress: () => resolve(false) },
-              { text: 'Удалить', style: 'destructive', onPress: () => resolve(true) },
-            ],
-          ),
+  const handleRemoveStudent = useCallback(
+    async (student: Student) => {
+      const confirmed =
+        Platform.OS === 'web'
+          ? window.confirm(`Удалить ученика?\n${student.name} больше не будет иметь доступ к курсу`)
+          : await new Promise<boolean>((resolve) =>
+              Alert.alert(
+                'Удалить ученика?',
+                `${student.name} больше не будет иметь доступ к курсу`,
+                [
+                  { text: 'Отмена', style: 'cancel', onPress: () => resolve(false) },
+                  { text: 'Удалить', style: 'destructive', onPress: () => resolve(true) },
+                ]
+              )
+            );
+
+      if (!confirmed) return;
+
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (!session?.user) return;
+
+        const success = await NeonService.removeStudentFromCourse(
+          route.params.courseId,
+          student.id,
+          session.user.id
         );
 
-    if (!confirmed) return;
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) return;
-
-      const success = await NeonService.removeStudentFromCourse(
-        route.params.courseId,
-        student.id,
-        session.user.id,
-      );
-
-      if (success) {
-        setStudents(prev => prev.filter(s => s.id !== student.id));
-      } else {
+        if (success) {
+          setStudents((prev) => prev.filter((s) => s.id !== student.id));
+        } else {
+          if (Platform.OS === 'web') window.alert('Не удалось удалить ученика');
+          else toast.error('Не удалось удалить ученика');
+        }
+      } catch {
         if (Platform.OS === 'web') window.alert('Не удалось удалить ученика');
         else toast.error('Не удалось удалить ученика');
       }
-    } catch {
-      if (Platform.OS === 'web') window.alert('Не удалось удалить ученика');
-      else toast.error('Не удалось удалить ученика');
-    }
-  }, [route.params.courseId]);
+    },
+    [route.params.courseId]
+  );
 
   const inputBg = colors.surfaceMuted;
   const pillActiveBg = colors.primary;
@@ -456,7 +468,7 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
       }
 
       return undefined;
-    }, [navigateBackToTeacher]),
+    }, [navigateBackToTeacher])
   );
 
   return (
@@ -469,7 +481,7 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
             paddingTop: 12,
             backgroundColor: colors.background,
             borderBottomColor: colors.border,
-            ...Platform.select({ web: { backdropFilter: 'blur(12px)' } }) as any,
+            ...(Platform.select({ web: { backdropFilter: 'blur(12px)' } }) as any),
           },
         ]}
       >
@@ -514,7 +526,8 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
         </View>
 
         {/* Right: add button */}
-        <Pressable accessibilityRole="button"
+        <Pressable
+          accessibilityRole="button"
           style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.6 }]}
           hitSlop={8}
           onPress={openInviteModal}
@@ -549,13 +562,12 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
           {FILTERS.map((f) => {
             const active = activeFilter === f.key;
             return (
-              <Pressable accessibilityRole="button" accessibilityState={{ selected: active }}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
                 key={f.key}
                 onPress={() => setActiveFilter(f.key)}
-                style={[
-                  styles.pill,
-                  { backgroundColor: active ? pillActiveBg : pillInactiveBg },
-                ]}
+                style={[styles.pill, { backgroundColor: active ? pillActiveBg : pillInactiveBg }]}
               >
                 <Text
                   style={[
@@ -584,7 +596,8 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
           <Text style={[styles.emptyText, { color: colors.textPrimary, marginTop: spacing.s }]}>
             Не удалось загрузить учеников
           </Text>
-          <Pressable accessibilityRole="button"
+          <Pressable
+            accessibilityRole="button"
             style={[styles.retryBtn, { backgroundColor: colors.primaryFill }]}
             onPress={() => setRetryTick((t) => t + 1)}
           >
@@ -599,12 +612,17 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
             studentsWaiting > 0 ? (
               <View style={[styles.remindBanner, { backgroundColor: alpha(colors.warning, 10) }]}>
                 <Text style={[styles.remindText, { color: colors.textPrimary }]}>
-                  У {studentsWaiting} {studentsWaiting === 1 ? 'ученика' : 'учеников'} есть слова к повторению
+                  У {studentsWaiting} {studentsWaiting === 1 ? 'ученика' : 'учеников'} есть слова к
+                  повторению
                 </Text>
-                <Pressable accessibilityRole="button"
+                <Pressable
+                  accessibilityRole="button"
                   onPress={handleRemindAll}
                   disabled={reminding}
-                  style={[styles.remindBtn, { backgroundColor: colors.primaryFill, opacity: reminding ? 0.6 : 1 }]}
+                  style={[
+                    styles.remindBtn,
+                    { backgroundColor: colors.primaryFill, opacity: reminding ? 0.6 : 1 },
+                  ]}
                 >
                   <Text style={[styles.remindBtnText, { color: colors.onPrimary }]}>Напомнить</Text>
                 </Pressable>
@@ -643,17 +661,32 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
       )}
 
       {/* ── Invite Modal ── */}
-      <Modal visible={inviteModalOpen} transparent animationType="fade" onRequestClose={() => setInviteModalOpen(false)}>
-        <Pressable accessible={false} style={[styles.modalOverlay, { backgroundColor: colors.overlay }]} onPress={() => setInviteModalOpen(false)}>
-          <Pressable accessible={false}
+      <Modal
+        visible={inviteModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setInviteModalOpen(false)}
+      >
+        <Pressable
+          accessible={false}
+          style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}
+          onPress={() => setInviteModalOpen(false)}
+        >
+          <Pressable
+            accessible={false}
             style={[styles.inviteCard, { backgroundColor: colors.background }]}
             onPress={(e) => e.stopPropagation()}
           >
             <View style={styles.inviteHeader}>
-              <Text style={[styles.inviteTitle, { color: colors.textPrimary }]}>Пригласить ученика</Text>
+              <Text style={[styles.inviteTitle, { color: colors.textPrimary }]}>
+                Пригласить ученика
+              </Text>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Закрыть" onPress={() => setInviteModalOpen(false)} hitSlop={8}>
+                accessibilityLabel="Закрыть"
+                onPress={() => setInviteModalOpen(false)}
+                hitSlop={8}
+              >
                 <X size={20} color={colors.textSecondary} />
               </Pressable>
             </View>
@@ -665,9 +698,12 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
             ) : inviteJoinCode ? (
               <>
                 <View style={[styles.inviteCodeBox, { backgroundColor: colors.surfaceMuted }]}>
-                  <Text style={[styles.inviteCodeText, { color: colors.primary }]}>{inviteJoinCode}</Text>
+                  <Text style={[styles.inviteCodeText, { color: colors.primary }]}>
+                    {inviteJoinCode}
+                  </Text>
                 </View>
-                <Pressable accessibilityRole="button"
+                <Pressable
+                  accessibilityRole="button"
                   style={[styles.inviteActionBtn, { backgroundColor: colors.primaryFill }]}
                   onPress={handleCopyInviteCode}
                 >
@@ -675,14 +711,23 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
                     {inviteCopied ? '✓ Скопировано' : 'Копировать код'}
                   </Text>
                 </Pressable>
-                <Pressable accessibilityRole="button" onPress={handleRegenerateInvite} style={{ marginTop: spacing.s }}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={handleRegenerateInvite}
+                  style={{ marginTop: spacing.s }}
+                >
                   <Text style={[styles.inviteRegenerateText, { color: colors.textSecondary }]}>
                     Обновить код приглашения
                   </Text>
                 </Pressable>
               </>
             ) : (
-              <Text style={[styles.inviteDescription, { color: colors.textSecondary, marginVertical: spacing.m }]}>
+              <Text
+                style={[
+                  styles.inviteDescription,
+                  { color: colors.textSecondary, marginVertical: spacing.m },
+                ]}
+              >
                 Не удалось создать приглашение
               </Text>
             )}

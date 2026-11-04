@@ -108,7 +108,12 @@ async function registerToken(userId?: string | null): Promise<string> {
  */
 export async function requestPushPermission(userId?: string | null): Promise<PushStatus> {
   if (!IS_SUPPORTED) {
-    return { permission: 'unsupported', token: null, isSupported: false, error: 'Push notifications not supported' };
+    return {
+      permission: 'unsupported',
+      token: null,
+      isSupported: false,
+      error: 'Push notifications not supported',
+    };
   }
   try {
     const permission = toPermission(await requestPermission(messaging()));
@@ -119,7 +124,12 @@ export async function requestPushPermission(userId?: string | null): Promise<Pus
     return { permission, token, isSupported: true };
   } catch (error: any) {
     log.error('Push', 'requestPushPermission failed', error);
-    return { permission: 'default', token: null, isSupported: true, error: error?.message || 'Unknown error' };
+    return {
+      permission: 'default',
+      token: null,
+      isSupported: true,
+      error: error?.message || 'Unknown error',
+    };
   }
 }
 
@@ -136,10 +146,20 @@ export async function requestProvisionalPermission(userId?: string | null): Prom
     const permission = toPermission(status);
     if (permission !== 'granted') return { permission, token: null, isSupported: true };
     const token = await registerToken(userId);
-    return { permission, token, isSupported: true, provisional: status === AuthorizationStatus.PROVISIONAL };
+    return {
+      permission,
+      token,
+      isSupported: true,
+      provisional: status === AuthorizationStatus.PROVISIONAL,
+    };
   } catch (error: any) {
     log.error('Push', 'requestProvisionalPermission failed', error);
-    return { permission: 'default', token: null, isSupported: true, error: error?.message || 'Unknown error' };
+    return {
+      permission: 'default',
+      token: null,
+      isSupported: true,
+      error: error?.message || 'Unknown error',
+    };
   }
 }
 
@@ -164,7 +184,9 @@ export async function refreshPushToken(userId?: string | null): Promise<string |
  * Сообщения, пришедшие при открытом приложении. Баннер iOS показывает сам
  * (см. firebase.json → messaging_ios_foreground_presentation_options), здесь — только колбэк.
  */
-export async function subscribeForegroundMessages(handler: ForegroundMessageHandler): Promise<void> {
+export async function subscribeForegroundMessages(
+  handler: ForegroundMessageHandler
+): Promise<void> {
   if (!IS_SUPPORTED) return;
   foregroundUnsubscribe?.();
   foregroundUnsubscribe = onMessage(messaging(), (message) => {
@@ -244,8 +266,13 @@ export async function getPushStatus(): Promise<PushStatus> {
   try {
     const status = await hasPermission(messaging());
     const permission = toPermission(status);
-    const token = permission === 'granted' ? currentToken ?? (await getToken(messaging())) : null;
-    return { permission, token, isSupported: true, provisional: status === AuthorizationStatus.PROVISIONAL };
+    const token = permission === 'granted' ? (currentToken ?? (await getToken(messaging()))) : null;
+    return {
+      permission,
+      token,
+      isSupported: true,
+      provisional: status === AuthorizationStatus.PROVISIONAL,
+    };
   } catch {
     return { permission: 'default', token: null, isSupported: true };
   }
@@ -260,14 +287,21 @@ async function authHeaders(): Promise<Record<string, string>> {
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
 }
 
-async function sendTokenToBackend(token: string, permission?: ServerPermission | null): Promise<void> {
+async function sendTokenToBackend(
+  token: string,
+  permission?: ServerPermission | null
+): Promise<void> {
   try {
     const res = await fetch(`${API_BASE}?action=subscribe`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       // appVersion — сервер шлёт пуши с новыми экранами только версиям, которые их знают (support_reply)
       body: JSON.stringify({
-        token, platform: Platform.OS, userId: currentUserId, permission: permission ?? undefined, appVersion: APP_VERSION,
+        token,
+        platform: Platform.OS,
+        userId: currentUserId,
+        permission: permission ?? undefined,
+        appVersion: APP_VERSION,
       }),
     });
     if (!res.ok) log.warn('Push', 'Backend subscribe failed', res.status);

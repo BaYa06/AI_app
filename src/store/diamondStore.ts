@@ -10,8 +10,14 @@ import { log } from '@/utils/logger';
 // сервер (api/push.js?action=claim-reward), он же не даёт забрать награду дважды за день.
 const REWARDS_API = `${API_BASE}/push`;
 
-async function callRewardsApi(action: string, init: { method: 'GET' | 'POST'; body?: object }, day: string) {
-  const { data: { session } } = await supabase.auth.getSession();
+async function callRewardsApi(
+  action: string,
+  init: { method: 'GET' | 'POST'; body?: object },
+  day: string
+) {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
   const token = session?.access_token;
   if (!token) return null;
   try {
@@ -57,7 +63,10 @@ export const useDiamondStore = create<DiamondState>((set) => ({
     if (!data) return null;
     const cached = readCache<{ day: string; claimed: string[] }>('challenges_claimed');
     const claimed = cached?.day === day ? cached.claimed : [];
-    writeCache('challenges_claimed', { day, claimed: Array.from(new Set([...claimed, challenge])) });
+    writeCache('challenges_claimed', {
+      day,
+      claimed: Array.from(new Set([...claimed, challenge])),
+    });
     return data.diamonds;
   },
   setDiamonds: (diamonds) => {

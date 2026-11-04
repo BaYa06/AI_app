@@ -159,7 +159,9 @@ export function SetEditorScreen({ navigation, route }: Props) {
     if (!isEditing || !setId) return;
     (async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         if (!session?.user?.id) return;
         const result = await LibraryService.checkPublished(setId, session.user.id);
         setCanPublish(result.canPublish === true);
@@ -178,7 +180,9 @@ export function SetEditorScreen({ navigation, route }: Props) {
   const [isDisablingShare, setIsDisablingShare] = useState(false);
   const loadShareLink = useCallback(() => {
     if (!setId) return;
-    ShareService.getStatus(setId).then(setShareLink).catch(() => {});
+    ShareService.getStatus(setId)
+      .then(setShareLink)
+      .catch(() => {});
   }, [setId]);
   useEffect(() => {
     if (canShare) loadShareLink();
@@ -191,7 +195,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
       'Закрыть доступ по ссылке?',
       'Ссылка перестанет открываться. Те, кто уже добавил набор, сохранят свою копию.',
       'Закрыть доступ',
-      { destructive: true },
+      { destructive: true }
     );
     if (!confirmed) return;
     setIsDisablingShare(true);
@@ -228,7 +232,6 @@ export function SetEditorScreen({ navigation, route }: Props) {
       setPublishFormInitialized(false);
     }
   }, [showPublishForm, publishFormInitialized, description, category]);
-
 
   const selectedCourseTitle = useMemo(() => {
     if (!courseId) return 'Без курса';
@@ -302,7 +305,9 @@ export function SetEditorScreen({ navigation, route }: Props) {
 
     setIsPublishing(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session?.user?.id) {
         toast.error('Нужно войти в аккаунт');
         return;
@@ -319,7 +324,10 @@ export function SetEditorScreen({ navigation, route }: Props) {
         });
         toast.success('Публикация обновлена');
       } else {
-        const tags = publishTags.split(',').map(t => t.trim()).filter(Boolean);
+        const tags = publishTags
+          .split(',')
+          .map((t) => t.trim())
+          .filter(Boolean);
         await LibraryService.publishSet(session.user.id, {
           setId,
           description: publishDescription.trim() || undefined,
@@ -336,13 +344,24 @@ export function SetEditorScreen({ navigation, route }: Props) {
     } finally {
       setIsPublishing(false);
     }
-  }, [setId, isPublished, librarySetId, publishDescription, publishCategory, publishTags, category, getCardsBySet]);
+  }, [
+    setId,
+    isPublished,
+    librarySetId,
+    publishDescription,
+    publishCategory,
+    publishTags,
+    category,
+    getCardsBySet,
+  ]);
 
   // Снятие с публикации
   const handleUnpublish = useCallback(async () => {
     if (!librarySetId) return;
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session?.user?.id) return;
       await LibraryService.unpublishSet(session.user.id, librarySetId);
       setIsPublished(false);
@@ -390,7 +409,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
           languageTo: langTo,
           kind,
         });
-        
+
         // Переход к новому набору
         navigation.replace('SetDetail', { setId: newSet.id });
         return;
@@ -402,7 +421,21 @@ export function SetEditorScreen({ navigation, route }: Props) {
     } finally {
       setIsSaving(false);
     }
-  }, [title, description, category, kind, sourceLanguage, targetLanguage, isEditing, setId, updateSet, addSet, navigation, closeSheet, courseId]);
+  }, [
+    title,
+    description,
+    category,
+    kind,
+    sourceLanguage,
+    targetLanguage,
+    isEditing,
+    setId,
+    updateSet,
+    addSet,
+    navigation,
+    closeSheet,
+    courseId,
+  ]);
 
   // Удаление
   const handleDelete = useCallback(() => {
@@ -442,411 +475,520 @@ export function SetEditorScreen({ navigation, route }: Props) {
 
   return (
     // Верхний safe area уже учтён в App.tsx; снизу — свой (экран без панели вкладок)
-    <View style={[styles.container, { backgroundColor: colors.background, paddingBottom: bottomInset }]}>
-      <Animated.View style={[styles.animatedWrapper, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-          <View style={styles.headerRow}>
-            <Text variant="h2" style={[styles.headerTitle, { color: colors.textPrimary }]}>
-              {isReadOnly ? 'Настройки набора' : isEditing ? 'Редактировать набор' : 'Создать набор'}
+    <View
+      style={[styles.container, { backgroundColor: colors.background, paddingBottom: bottomInset }]}
+    >
+      <Animated.View
+        style={[
+          styles.animatedWrapper,
+          { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+        ]}
+      >
+        <View style={styles.headerRow}>
+          <Text variant="h2" style={[styles.headerTitle, { color: colors.textPrimary }]}>
+            {isReadOnly ? 'Настройки набора' : isEditing ? 'Редактировать набор' : 'Создать набор'}
+          </Text>
+        </View>
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.content}
+        >
+          {/* Название */}
+          <View style={styles.field}>
+            <Text variant="label" color="primary" style={styles.fieldLabel}>
+              Название набора <Text style={{ color: colors.error }}>*</Text>
+            </Text>
+
+            <View
+              style={[
+                styles.inputContainer,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: titleError
+                    ? colors.error
+                    : titleFocused
+                      ? colors.primary
+                      : colors.border,
+                  shadowColor: colors.shadow,
+                },
+              ]}
+            >
+              <TextInput
+                value={title}
+                onChangeText={setTitle}
+                placeholder="Например: Путешествия (A1)"
+                placeholderTextColor={colors.textTertiary}
+                style={[
+                  styles.input,
+                  { color: colors.textPrimary },
+                  Platform.OS === 'web' && { outlineStyle: 'none' },
+                ]}
+                onFocus={() => setTitleFocused(true)}
+                onBlur={() => setTitleFocused(false)}
+                maxLength={100}
+                editable={!isReadOnly}
+              />
+            </View>
+
+            {titleError ? (
+              <Text variant="caption" color="error" style={styles.helperText}>
+                Введи название
+              </Text>
+            ) : (
+              <Text variant="caption" color="tertiary" style={styles.helperText}>
+                Название будет видно в каталоге
+              </Text>
+            )}
+          </View>
+
+          {/* Описание */}
+          <View style={styles.field}>
+            <View style={styles.labelRow}>
+              <Text variant="label" color="primary">
+                Описание
+              </Text>
+              <Text variant="caption" color="secondary">
+                {`${description.length}/${DESCRIPTION_LIMIT}`}
+              </Text>
+            </View>
+
+            <View
+              style={[
+                styles.textareaContainer,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: descriptionFocused ? colors.primary : colors.border,
+                  shadowColor: colors.shadow,
+                },
+              ]}
+            >
+              <TextInput
+                value={description}
+                onChangeText={setDescription}
+                placeholder="Для каких тем/уровня и как использовать"
+                placeholderTextColor={colors.textTertiary}
+                style={[
+                  styles.textarea,
+                  { color: colors.textPrimary },
+                  Platform.OS === 'web' && { outlineStyle: 'none' },
+                ]}
+                multiline
+                maxLength={DESCRIPTION_LIMIT}
+                onFocus={() => setDescriptionFocused(true)}
+                onBlur={() => setDescriptionFocused(false)}
+                textAlignVertical="top"
+                editable={!isReadOnly}
+              />
+            </View>
+          </View>
+
+          {/* Тип набора */}
+          <View style={styles.field}>
+            <Text variant="label" color="primary" style={styles.fieldLabel}>
+              Тип <Text style={{ color: colors.error }}>*</Text>
+            </Text>
+            <SetKindPicker
+              value={kind}
+              onChange={setKind}
+              hasError={kindError}
+              disabled={isReadOnly}
+            />
+            {kindError ? (
+              <Text variant="caption" color="error" style={styles.helperText}>
+                Выбери тип набора
+              </Text>
+            ) : null}
+          </View>
+
+          {/* Языки */}
+          <View style={styles.field}>
+            <Text variant="label" color="primary" style={styles.fieldLabel}>
+              Языки <Text style={{ color: colors.error }}>*</Text>
+            </Text>
+            <View style={styles.languageRow}>
+              <View style={styles.languageSelectWrapper}>
+                <SelectPill
+                  label={sourceLanguage}
+                  placeholder={isSubject ? 'Язык вопросов' : 'Язык слов'}
+                  onPress={toggleSourcePicker}
+                  isOpen={sourcePickerOpen}
+                  hasError={languageError && !sourceLanguage}
+                  colors={colors}
+                />
+                {sourcePickerOpen && (
+                  <LanguageDropdown
+                    options={SOURCE_LANGUAGES}
+                    selected={sourceLanguage}
+                    onSelect={handleSelectSourceLanguage}
+                    colors={colors}
+                  />
+                )}
+              </View>
+
+              <Pressable
+                onPress={swapLanguages}
+                accessibilityRole="button"
+                accessibilityLabel="Поменять языки местами"
+                style={[
+                  styles.swapButton,
+                  { backgroundColor: colors.surface, borderColor: colors.border },
+                ]}
+              >
+                <ArrowLeftRight size={iconSize.s} color={colors.primary} />
+              </Pressable>
+
+              <View style={styles.languageSelectWrapper}>
+                <SelectPill
+                  label={targetLanguage}
+                  placeholder={isSubject ? 'Язык ответов' : 'Язык перевода'}
+                  onPress={toggleTargetPicker}
+                  isOpen={targetPickerOpen}
+                  hasError={languageError && !targetLanguage}
+                  colors={colors}
+                />
+                {targetPickerOpen && (
+                  <LanguageDropdown
+                    options={TARGET_LANGUAGES}
+                    selected={targetLanguage}
+                    onSelect={handleSelectTargetLanguage}
+                    colors={colors}
+                  />
+                )}
+              </View>
+            </View>
+            <Text
+              variant="caption"
+              color={languageError ? 'error' : 'tertiary'}
+              style={styles.helperText}
+            >
+              {languageError
+                ? 'Выбери оба языка'
+                : isSubject
+                  ? 'На каком языке вопросы и ответы'
+                  : 'Выбери язык слов и язык перевода'}
             </Text>
           </View>
 
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={styles.content}
-          >
-            {/* Название */}
-            <View style={styles.field}>
-              <Text variant="label" color="primary" style={styles.fieldLabel}>
-                Название набора <Text style={{ color: colors.error }}>*</Text>
-              </Text>
-
-              <View
-                style={[
-                  styles.inputContainer,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: titleError
-                      ? colors.error
-                      : titleFocused
-                      ? colors.primary
-                      : colors.border,
-                    shadowColor: colors.shadow,
-                  },
-                ]}
-              >
-                <TextInput
-                  value={title}
-                  onChangeText={setTitle}
-                  placeholder="Например: Путешествия (A1)"
-                  placeholderTextColor={colors.textTertiary}
-                  style={[styles.input, { color: colors.textPrimary }, Platform.OS === 'web' && { outlineStyle: 'none' }]}
-                  onFocus={() => setTitleFocused(true)}
-                  onBlur={() => setTitleFocused(false)}
-                  maxLength={100}
-                  editable={!isReadOnly}
+          {/* Курс */}
+          <View style={styles.field}>
+            <Text variant="label" color="primary" style={styles.fieldLabel}>
+              Курс
+            </Text>
+            <View style={styles.courseSelectContainer}>
+              <SelectPill
+                label={selectedCourseTitle}
+                onPress={toggleCoursePicker}
+                isOpen={coursePickerOpen}
+                colors={colors}
+                fullWidth
+              />
+              {coursePickerOpen && (
+                <CourseDropdown
+                  courses={courses}
+                  selectedCourseId={courseId}
+                  onSelect={(value) => {
+                    setCourseId(value);
+                    setCoursePickerOpen(false);
+                    setSourcePickerOpen(false);
+                    setTargetPickerOpen(false);
+                  }}
+                  colors={colors}
                 />
-              </View>
-
-              {titleError ? (
-                <Text variant="caption" color="error" style={styles.helperText}>
-                  Введи название
-                </Text>
-              ) : (
-                <Text variant="caption" color="tertiary" style={styles.helperText}>
-                  Название будет видно в каталоге
-                </Text>
               )}
             </View>
+            <Text variant="caption" color="tertiary" style={styles.helperText}>
+              Организуй наборы по курсам для удобного управления
+            </Text>
+          </View>
 
-            {/* Описание */}
-            <View style={styles.field}>
-              <View style={styles.labelRow}>
-                <Text variant="label" color="primary">
-                  Описание
-                </Text>
-                <Text variant="caption" color="secondary">
-                  {`${description.length}/${DESCRIPTION_LIMIT}`}
-                </Text>
-              </View>
-
-              <View
-                style={[
-                  styles.textareaContainer,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: descriptionFocused ? colors.primary : colors.border,
-                    shadowColor: colors.shadow,
-                  },
-                ]}
-              >
-                <TextInput
-                  value={description}
-                  onChangeText={setDescription}
-                  placeholder="Для каких тем/уровня и как использовать"
-                  placeholderTextColor={colors.textTertiary}
-                  style={[styles.textarea, { color: colors.textPrimary }, Platform.OS === 'web' && { outlineStyle: 'none' }]}
-                  multiline
-                  maxLength={DESCRIPTION_LIMIT}
-                  onFocus={() => setDescriptionFocused(true)}
-                  onBlur={() => setDescriptionFocused(false)}
-                  textAlignVertical="top"
-                  editable={!isReadOnly}
-                />
-              </View>
-            </View>
-
-            {/* Тип набора */}
+          {/* Публикация в библиотеку */}
+          {COMMUNITY_LIBRARY_ENABLED && canPublish && isEditing && !isReadOnly && (
             <View style={styles.field}>
               <Text variant="label" color="primary" style={styles.fieldLabel}>
-                Тип <Text style={{ color: colors.error }}>*</Text>
+                Библиотека
               </Text>
-              <SetKindPicker value={kind} onChange={setKind} hasError={kindError} disabled={isReadOnly} />
-              {kindError ? (
-                <Text variant="caption" color="error" style={styles.helperText}>
-                  Выбери тип набора
-                </Text>
-              ) : null}
-            </View>
 
-            {/* Языки */}
-            <View style={styles.field}>
-              <Text variant="label" color="primary" style={styles.fieldLabel}>
-                Языки <Text style={{ color: colors.error }}>*</Text>
-              </Text>
-              <View style={styles.languageRow}>
-                <View style={styles.languageSelectWrapper}>
-                  <SelectPill
-                    label={sourceLanguage}
-                    placeholder={isSubject ? 'Язык вопросов' : 'Язык слов'}
-                    onPress={toggleSourcePicker}
-                    isOpen={sourcePickerOpen}
-                    hasError={languageError && !sourceLanguage}
-                    colors={colors}
-                  />
-                  {sourcePickerOpen && (
-                    <LanguageDropdown
-                      options={SOURCE_LANGUAGES}
-                      selected={sourceLanguage}
-                      onSelect={handleSelectSourceLanguage}
-                      colors={colors}
-                    />
-                  )}
-                </View>
-
-                <Pressable
-                  onPress={swapLanguages}
-                  accessibilityRole="button"
-                  accessibilityLabel="Поменять языки местами"
-                  style={[styles.swapButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                >
-                  <ArrowLeftRight size={iconSize.s} color={colors.primary} />
-                </Pressable>
-
-                <View style={styles.languageSelectWrapper}>
-                  <SelectPill
-                    label={targetLanguage}
-                    placeholder={isSubject ? 'Язык ответов' : 'Язык перевода'}
-                    onPress={toggleTargetPicker}
-                    isOpen={targetPickerOpen}
-                    hasError={languageError && !targetLanguage}
-                    colors={colors}
-                  />
-                  {targetPickerOpen && (
-                    <LanguageDropdown
-                      options={TARGET_LANGUAGES}
-                      selected={targetLanguage}
-                      onSelect={handleSelectTargetLanguage}
-                      colors={colors}
-                    />
-                  )}
-                </View>
-              </View>
-              <Text variant="caption" color={languageError ? 'error' : 'tertiary'} style={styles.helperText}>
-                {languageError
-                  ? 'Выбери оба языка'
-                  : isSubject
-                  ? 'На каком языке вопросы и ответы'
-                  : 'Выбери язык слов и язык перевода'}
-              </Text>
-            </View>
-
-            {/* Курс */}
-            <View style={styles.field}>
-              <Text variant="label" color="primary" style={styles.fieldLabel}>
-                Курс
-              </Text>
-              <View style={styles.courseSelectContainer}>
-                <SelectPill
-                  label={selectedCourseTitle}
-                  onPress={toggleCoursePicker}
-                  isOpen={coursePickerOpen}
-                  colors={colors}
-                  fullWidth
-                />
-                {coursePickerOpen && (
-                  <CourseDropdown
-                    courses={courses}
-                    selectedCourseId={courseId}
-                    onSelect={(value) => {
-                      setCourseId(value);
-                      setCoursePickerOpen(false);
-                      setSourcePickerOpen(false);
-                      setTargetPickerOpen(false);
-                    }}
-                    colors={colors}
-                  />
-                )}
-              </View>
-              <Text variant="caption" color="tertiary" style={styles.helperText}>
-                Организуй наборы по курсам для удобного управления
-              </Text>
-            </View>
-
-            {/* Публикация в библиотеку */}
-            {COMMUNITY_LIBRARY_ENABLED && canPublish && isEditing && !isReadOnly && (
-              <View style={styles.field}>
-                <Text variant="label" color="primary" style={styles.fieldLabel}>
-                  Библиотека
-                </Text>
-
-                {isPublished && !showPublishForm ? (
-                  <View style={{ gap: spacing.s }}>
-                    <View style={[styles.publishedBadge, { backgroundColor: alpha(colors.success, 10), borderColor: alpha(colors.success, 20) }]}>
-                      <Globe size={16} color={colors.success} />
-                      <Text variant="bodySmall" style={{ color: colors.success, fontWeight: '600' }}>
-                        Опубликовано в библиотеке
-                      </Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', gap: spacing.s }}>
-                      <Pressable
-                        onPress={() => setShowPublishForm(true)}
-                        accessibilityRole="button"
-                        style={[styles.publishActionBtn, { borderColor: colors.primary }]}
-                      >
-                        <Text variant="bodySmall" style={{ color: colors.primary, fontWeight: '600' }}>
-                          Обновить
-                        </Text>
-                      </Pressable>
-                      <Pressable
-                        onPress={handleUnpublish}
-                        accessibilityRole="button"
-                        style={[styles.publishActionBtn, { borderColor: alpha(colors.error, 40) }]}
-                      >
-                        <Text variant="bodySmall" style={{ color: colors.errorText, fontWeight: '600' }}>
-                          Снять
-                        </Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                ) : !showPublishForm ? (
-                  <Pressable accessibilityRole="button"
-                    onPress={() => setShowPublishForm(true)}
-                    style={[styles.publishButton, { backgroundColor: alpha(colors.primary, 10), borderColor: alpha(colors.primary, 20) }]}
+              {isPublished && !showPublishForm ? (
+                <View style={{ gap: spacing.s }}>
+                  <View
+                    style={[
+                      styles.publishedBadge,
+                      {
+                        backgroundColor: alpha(colors.success, 10),
+                        borderColor: alpha(colors.success, 20),
+                      },
+                    ]}
                   >
-                    <Globe size={18} color={colors.primary} />
-                    <Text variant="body" style={{ color: colors.primary, fontWeight: '600' }}>
-                      Опубликовать в библиотеке
+                    <Globe size={16} color={colors.success} />
+                    <Text variant="bodySmall" style={{ color: colors.success, fontWeight: '600' }}>
+                      Опубликовано в библиотеке
                     </Text>
-                  </Pressable>
-                ) : null}
-
-                {showPublishForm && (
-                  <View style={[styles.publishForm, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                    <TextInput
-                      value={publishDescription}
-                      onChangeText={setPublishDescription}
-                      placeholder="Описание для библиотеки (необязательно)"
-                      placeholderTextColor={colors.textTertiary}
-                      style={[styles.publishInput, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background }]}
-                      multiline
-                      maxLength={500}
-                    />
-
-                    <Text variant="caption" color="secondary" style={{ marginTop: spacing.xs }}>
-                      Категория
-                    </Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: spacing.xs }}>
-                      <View style={{ flexDirection: 'row', gap: spacing.xs }}>
-                        {LIBRARY_CATEGORIES.map((cat) => (
-                          <Pressable
-                            key={cat.key}
-                            onPress={() => setPublishCategory(publishCategory === cat.key ? '' : cat.key)}
-                            accessibilityRole="button"
-                            accessibilityState={{ selected: publishCategory === cat.key }}
-                            style={[
-                              styles.publishChip,
-                              {
-                                backgroundColor: publishCategory === cat.key ? colors.primaryFill : colors.surfaceMuted,
-                                borderColor: publishCategory === cat.key ? colors.primaryFill : colors.surfaceMuted,
-                              },
-                            ]}
-                          >
-                            {/* Раньше здесь выводилось имя иконки Ionicons текстом («text-outline») */}
-                            <CategoryIcon
-                              category={cat.key}
-                              size="xs"
-                              color={publishCategory === cat.key ? colors.onPrimary : colors.textSecondary}
-                            />
-                            <Text variant="label" style={{ color: publishCategory === cat.key ? colors.onPrimary : colors.textPrimary }}>
-                              {cat.label}
-                            </Text>
-                          </Pressable>
-                        ))}
-                      </View>
-                    </ScrollView>
-
-                    <TextInput
-                      value={publishTags}
-                      onChangeText={setPublishTags}
-                      placeholder="Теги через запятую (необязательно)"
-                      placeholderTextColor={colors.textTertiary}
-                      style={[styles.publishInput, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background, marginTop: spacing.s }]}
-                      maxLength={200}
-                    />
-
-                    <View style={styles.publishActions}>
-                      <Button
-                        variant="quiet"
-                        tone="secondary"
-                        size="s"
-                        title="Отмена"
-                        onPress={() => setShowPublishForm(false)}
-                        style={styles.flex1}
-                      />
-                      <Button
-                        size="s"
-                        title={isPublishing ? 'Публикация...' : isPublished ? 'Обновить' : 'Опубликовать'}
-                        onPress={handlePublish}
-                        disabled={isPublishing}
-                        style={styles.flex1}
-                      />
-                    </View>
                   </View>
-                )}
-
-                <Text variant="caption" color="tertiary" style={styles.helperText}>
-                  Опубликованные наборы доступны всем пользователям
-                </Text>
-              </View>
-            )}
-
-            {canShare && existingSet && (
-              <View style={styles.field}>
-                <Text variant="label" color="primary" style={styles.fieldLabel}>
-                  Поделиться набором
-                </Text>
-                <Button
-                  variant="secondary"
-                  title="Поделиться"
-                  icon={Share2}
-                  loading={isSharing}
-                  onPress={() => share(existingSet)}
-                  fullWidth
-                />
-                {shareLink && (
-                  <View style={[styles.shareRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                    <View style={[styles.shareIcon, { backgroundColor: alpha(colors.primary, 10) }]}>
-                      <Link2 size={iconSize.s} color={colors.primary} />
-                    </View>
-                    <View style={styles.flex1}>
-                      <Text variant="body" color="primary">Ссылка действует</Text>
-                      <Text variant="caption" color="secondary">
-                        {`Открыли ${shareLink.views} · добавили ${shareLink.imports} ${pluralize(shareLink.imports, 'раз', 'раза', 'раз')}`}
-                      </Text>
-                    </View>
+                  <View style={{ flexDirection: 'row', gap: spacing.s }}>
                     <Pressable
+                      onPress={() => setShowPublishForm(true)}
                       accessibilityRole="button"
-                      onPress={handleDisableShare}
-                      disabled={isDisablingShare}
-                      hitSlop={10}
-                      style={({ pressed }) => [styles.shareDisable, (pressed || isDisablingShare) && { opacity: 0.5 }]}
+                      style={[styles.publishActionBtn, { borderColor: colors.primary }]}
                     >
-                      <Text variant="label" style={{ color: colors.errorText }}>Закрыть доступ</Text>
+                      <Text
+                        variant="bodySmall"
+                        style={{ color: colors.primary, fontWeight: '600' }}
+                      >
+                        Обновить
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={handleUnpublish}
+                      accessibilityRole="button"
+                      style={[styles.publishActionBtn, { borderColor: alpha(colors.error, 40) }]}
+                    >
+                      <Text
+                        variant="bodySmall"
+                        style={{ color: colors.errorText, fontWeight: '600' }}
+                      >
+                        Снять
+                      </Text>
                     </Pressable>
                   </View>
-                )}
-                <Text variant="caption" color="tertiary" style={styles.helperText}>
-                  Отправь ссылку — друг сможет добавить все карточки себе. Набор видят только те, у кого есть ссылка
-                </Text>
-              </View>
-            )}
+                </View>
+              ) : !showPublishForm ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => setShowPublishForm(true)}
+                  style={[
+                    styles.publishButton,
+                    {
+                      backgroundColor: alpha(colors.primary, 10),
+                      borderColor: alpha(colors.primary, 20),
+                    },
+                  ]}
+                >
+                  <Globe size={18} color={colors.primary} />
+                  <Text variant="body" style={{ color: colors.primary, fontWeight: '600' }}>
+                    Опубликовать в библиотеке
+                  </Text>
+                </Pressable>
+              ) : null}
 
-            {isEditing && !isReadOnly && (
-              <Pressable accessibilityRole="button"
-                onPress={handleDelete}
-                style={styles.deleteLink}
+              {showPublishForm && (
+                <View
+                  style={[
+                    styles.publishForm,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                  ]}
+                >
+                  <TextInput
+                    value={publishDescription}
+                    onChangeText={setPublishDescription}
+                    placeholder="Описание для библиотеки (необязательно)"
+                    placeholderTextColor={colors.textTertiary}
+                    style={[
+                      styles.publishInput,
+                      {
+                        color: colors.textPrimary,
+                        borderColor: colors.border,
+                        backgroundColor: colors.background,
+                      },
+                    ]}
+                    multiline
+                    maxLength={500}
+                  />
+
+                  <Text variant="caption" color="secondary" style={{ marginTop: spacing.xs }}>
+                    Категория
+                  </Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={{ marginTop: spacing.xs }}
+                  >
+                    <View style={{ flexDirection: 'row', gap: spacing.xs }}>
+                      {LIBRARY_CATEGORIES.map((cat) => (
+                        <Pressable
+                          key={cat.key}
+                          onPress={() =>
+                            setPublishCategory(publishCategory === cat.key ? '' : cat.key)
+                          }
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: publishCategory === cat.key }}
+                          style={[
+                            styles.publishChip,
+                            {
+                              backgroundColor:
+                                publishCategory === cat.key
+                                  ? colors.primaryFill
+                                  : colors.surfaceMuted,
+                              borderColor:
+                                publishCategory === cat.key
+                                  ? colors.primaryFill
+                                  : colors.surfaceMuted,
+                            },
+                          ]}
+                        >
+                          {/* Раньше здесь выводилось имя иконки Ionicons текстом («text-outline») */}
+                          <CategoryIcon
+                            category={cat.key}
+                            size="xs"
+                            color={
+                              publishCategory === cat.key ? colors.onPrimary : colors.textSecondary
+                            }
+                          />
+                          <Text
+                            variant="label"
+                            style={{
+                              color:
+                                publishCategory === cat.key ? colors.onPrimary : colors.textPrimary,
+                            }}
+                          >
+                            {cat.label}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </ScrollView>
+
+                  <TextInput
+                    value={publishTags}
+                    onChangeText={setPublishTags}
+                    placeholder="Теги через запятую (необязательно)"
+                    placeholderTextColor={colors.textTertiary}
+                    style={[
+                      styles.publishInput,
+                      {
+                        color: colors.textPrimary,
+                        borderColor: colors.border,
+                        backgroundColor: colors.background,
+                        marginTop: spacing.s,
+                      },
+                    ]}
+                    maxLength={200}
+                  />
+
+                  <View style={styles.publishActions}>
+                    <Button
+                      variant="quiet"
+                      tone="secondary"
+                      size="s"
+                      title="Отмена"
+                      onPress={() => setShowPublishForm(false)}
+                      style={styles.flex1}
+                    />
+                    <Button
+                      size="s"
+                      title={
+                        isPublishing ? 'Публикация...' : isPublished ? 'Обновить' : 'Опубликовать'
+                      }
+                      onPress={handlePublish}
+                      disabled={isPublishing}
+                      style={styles.flex1}
+                    />
+                  </View>
+                </View>
+              )}
+
+              <Text variant="caption" color="tertiary" style={styles.helperText}>
+                Опубликованные наборы доступны всем пользователям
+              </Text>
+            </View>
+          )}
+
+          {canShare && existingSet && (
+            <View style={styles.field}>
+              <Text variant="label" color="primary" style={styles.fieldLabel}>
+                Поделиться набором
+              </Text>
+              <Button
+                variant="secondary"
+                title="Поделиться"
+                icon={Share2}
+                loading={isSharing}
+                onPress={() => share(existingSet)}
+                fullWidth
+              />
+              {shareLink && (
+                <View
+                  style={[
+                    styles.shareRow,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                  ]}
+                >
+                  <View style={[styles.shareIcon, { backgroundColor: alpha(colors.primary, 10) }]}>
+                    <Link2 size={iconSize.s} color={colors.primary} />
+                  </View>
+                  <View style={styles.flex1}>
+                    <Text variant="body" color="primary">
+                      Ссылка действует
+                    </Text>
+                    <Text variant="caption" color="secondary">
+                      {`Открыли ${shareLink.views} · добавили ${shareLink.imports} ${pluralize(shareLink.imports, 'раз', 'раза', 'раз')}`}
+                    </Text>
+                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={handleDisableShare}
+                    disabled={isDisablingShare}
+                    hitSlop={10}
+                    style={({ pressed }) => [
+                      styles.shareDisable,
+                      (pressed || isDisablingShare) && { opacity: 0.5 },
+                    ]}
+                  >
+                    <Text variant="label" style={{ color: colors.errorText }}>
+                      Закрыть доступ
+                    </Text>
+                  </Pressable>
+                </View>
+              )}
+              <Text variant="caption" color="tertiary" style={styles.helperText}>
+                Отправь ссылку — друг сможет добавить все карточки себе. Набор видят только те, у
+                кого есть ссылка
+              </Text>
+            </View>
+          )}
+
+          {isEditing && !isReadOnly && (
+            <Pressable
+              accessibilityRole="button"
+              onPress={handleDelete}
+              style={styles.deleteLink}
+              disabled={isSaving}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text variant="bodySmall" style={{ color: colors.error, fontWeight: '600' }}>
+                Удалить набор
+              </Text>
+            </Pressable>
+          )}
+        </ScrollView>
+
+        <View
+          style={[
+            styles.actions,
+            { borderTopColor: colors.border, backgroundColor: 'transparent' },
+          ]}
+        >
+          {isReadOnly ? (
+            <Button title="Назад" onPress={() => navigation.goBack()} style={styles.flex1} />
+          ) : (
+            <>
+              <Button
+                variant="secondary"
+                title="Отмена"
+                onPress={() => navigation.goBack()}
                 disabled={isSaving}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Text variant="bodySmall" style={{ color: colors.error, fontWeight: '600' }}>
-                  Удалить набор
-                </Text>
-              </Pressable>
-            )}
-          </ScrollView>
-
-          <View
-            style={[
-              styles.actions,
-              { borderTopColor: colors.border, backgroundColor: 'transparent' },
-            ]}
-          >
-            {isReadOnly ? (
-              <Button title="Назад" onPress={() => navigation.goBack()} style={styles.flex1} />
-            ) : (
-              <>
-                <Button
-                  variant="secondary"
-                  title="Отмена"
-                  onPress={() => navigation.goBack()}
-                  disabled={isSaving}
-                  style={styles.flex1}
-                />
-                <Button title="Сохранить" onPress={handleSave} disabled={isSaveDisabled} style={styles.flex1} />
-              </>
-            )}
-          </View>
+                style={styles.flex1}
+              />
+              <Button
+                title="Сохранить"
+                onPress={handleSave}
+                disabled={isSaveDisabled}
+                style={styles.flex1}
+              />
+            </>
+          )}
+        </View>
       </Animated.View>
     </View>
   );
@@ -872,7 +1014,9 @@ function SelectPill({
   hasError?: boolean;
 }) {
   return (
-    <Pressable accessibilityRole="button" accessibilityState={{ expanded: !!isOpen }}
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ expanded: !!isOpen }}
       onPress={onPress}
       style={[
         styles.select,
@@ -880,7 +1024,7 @@ function SelectPill({
         {
           backgroundColor: colors.surface,
           borderColor: hasError ? colors.error : isOpen ? colors.primary : colors.border,
-          shadowColor: colors.shadow
+          shadowColor: colors.shadow,
         },
       ]}
     >
@@ -935,17 +1079,20 @@ function LanguageDropdown({
           const isFirst = index === 0;
           const isLast = index === options.length - 1;
           return (
-            <Pressable accessibilityRole="button" accessibilityState={{ selected: isActive }}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: isActive }}
               key={option}
               onPress={() => onSelect(option)}
               style={({ pressed }) => [
                 styles.languageDropdownOption,
                 {
-                  backgroundColor: pressed && !isActive
-                    ? colors.surfaceVariant
-                    : isActive
-                    ? alpha(colors.primary, 10)
-                    : colors.surface,
+                  backgroundColor:
+                    pressed && !isActive
+                      ? colors.surfaceVariant
+                      : isActive
+                        ? alpha(colors.primary, 10)
+                        : colors.surface,
                   borderBottomColor: colors.border,
                 },
                 isFirst && styles.languageDropdownOptionFirst,
@@ -1009,17 +1156,20 @@ function CourseDropdown({
           const isFirst = index === 0;
           const isLast = index === items.length - 1;
           return (
-            <Pressable accessibilityRole="button" accessibilityState={{ selected: isActive }}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: isActive }}
               key={course.id ?? 'none'}
               onPress={() => onSelect(course.id)}
               style={({ pressed }) => [
                 styles.courseDropdownOption,
                 {
-                  backgroundColor: pressed && !isActive
-                    ? colors.surfaceVariant
-                    : isActive
-                    ? alpha(colors.primary, 10)
-                    : colors.surface,
+                  backgroundColor:
+                    pressed && !isActive
+                      ? colors.surfaceVariant
+                      : isActive
+                        ? alpha(colors.primary, 10)
+                        : colors.surface,
                   borderBottomColor: colors.border,
                 },
                 isFirst && styles.courseDropdownOptionFirst,

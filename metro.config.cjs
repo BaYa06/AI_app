@@ -1,5 +1,5 @@
 const path = require('path');
-const {getDefaultConfig, mergeConfig} = require('@react-native/metro-config');
+const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
 const dotenv = require('dotenv');
 
 // Load env vars for Metro so babel inline plugin can replace process.env.*

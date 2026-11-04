@@ -29,7 +29,8 @@ export function rowToItem(r) {
     title: r.title,
     text: r.text,
     art: r.art,
-    action: r.action_label && r.action_route ? { label: r.action_label, route: r.action_route } : null,
+    action:
+      r.action_label && r.action_route ? { label: r.action_label, route: r.action_route } : null,
     publishedAt: day(r.published_at),
     expiresAt: day(r.expires_at),
   };
@@ -45,8 +46,15 @@ export async function getPublicNews(sql) {
 
 export async function listNewsAdmin(sql) {
   try {
-    const rows = await sql`SELECT * FROM whats_new ORDER BY published DESC, min_version DESC, priority DESC, id`;
-    return { items: rows.map((r) => ({ ...rowToItem(r), published: r.published, updatedAt: r.updated_at })) };
+    const rows =
+      await sql`SELECT * FROM whats_new ORDER BY published DESC, min_version DESC, priority DESC, id`;
+    return {
+      items: rows.map((r) => ({
+        ...rowToItem(r),
+        published: r.published,
+        updatedAt: r.updated_at,
+      })),
+    };
   } catch (e) {
     // Таблицы ещё нет — создастся после деплоя API (миграция 037)
     if (e?.code === '42P01') return { missing: true, items: [] };
@@ -64,18 +72,22 @@ const isDay = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 export function validateNews(input) {
   const p = input || {};
   const id = str(p.id, 64);
-  if (!/^[a-z0-9][a-z0-9-]*$/.test(id)) return { error: 'id: латиница в нижнем регистре, цифры и дефис' };
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(id))
+    return { error: 'id: латиница в нижнем регистре, цифры и дефис' };
   const minVersion = str(p.minVersion, 20);
   if (!/^\d+(\.\d+){0,3}$/.test(minVersion)) return { error: 'Версия: например 1.7.0' };
   const roles = Array.isArray(p.roles) ? ROLES.filter((r) => p.roles.includes(r)) : [];
   if (!roles.length) return { error: 'Выбери хотя бы одну роль' };
-  const platforms = Array.isArray(p.platforms) ? PLATFORMS.filter((x) => p.platforms.includes(x)) : [];
+  const platforms = Array.isArray(p.platforms)
+    ? PLATFORMS.filter((x) => p.platforms.includes(x))
+    : [];
   if (!platforms.length) return { error: 'Выбери хотя бы одну платформу' };
   const minOs = str(p.minOs, 10) || null;
   if (minOs && !/^\d+(\.\d+){0,2}$/.test(minOs)) return { error: 'Мин. версия ОС: например 26' };
   const title = str(p.title, 60);
   if (!title) return { error: 'Нужен заголовок' };
-  if (title.length > 40) return { error: `Заголовок ${title.length} символов — нужно не больше 40` };
+  if (title.length > 40)
+    return { error: `Заголовок ${title.length} символов — нужно не больше 40` };
   const text = str(p.text, 200);
   if (text.length > 140) return { error: `Текст ${text.length} символов — нужно не больше 140` };
   const actionLabel = str(p.action?.label, 40) || null;
@@ -85,13 +97,26 @@ export function validateNews(input) {
   }
   const publishedAt = isDay(p.publishedAt) ? p.publishedAt : new Date().toISOString().slice(0, 10);
   const expiresAt = isDay(p.expiresAt) ? p.expiresAt : null;
-  if (expiresAt && expiresAt < publishedAt) return { error: 'Дата окончания раньше даты публикации' };
+  if (expiresAt && expiresAt < publishedAt)
+    return { error: 'Дата окончания раньше даты публикации' };
   const priority = Math.max(-1000, Math.min(1000, Math.trunc(Number(p.priority) || 0)));
   return {
     item: {
-      id, minVersion, roles, platforms, minOs, priority,
-      tag: str(p.tag, 40), title, text, art: str(p.art, 20) || null,
-      actionLabel, actionRoute, publishedAt, expiresAt, published: p.published === true,
+      id,
+      minVersion,
+      roles,
+      platforms,
+      minOs,
+      priority,
+      tag: str(p.tag, 40),
+      title,
+      text,
+      art: str(p.art, 20) || null,
+      actionLabel,
+      actionRoute,
+      publishedAt,
+      expiresAt,
+      published: p.published === true,
     },
   };
 }

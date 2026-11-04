@@ -16,7 +16,7 @@ console.log('[webpack] GCLOUD TTS SA loaded:', !!envVars.EXPO_PUBLIC_GCLOUD_TTS_
 
 module.exports = (env, argv) => {
   const isDev = argv.mode === 'development';
-  
+
   return {
     mode: argv.mode || 'production',
     target: 'web',
@@ -29,26 +29,37 @@ module.exports = (env, argv) => {
       clean: true,
       globalObject: 'self',
     },
-    optimization: isDev ? undefined : {
-      splitChunks: {
-        chunks: 'all',
-        cacheGroups: {
-          vendor: {
-            test: /[\\/]node_modules[\\/]/,
-            name: 'vendor',
+    optimization: isDev
+      ? undefined
+      : {
+          splitChunks: {
             chunks: 'all',
-            priority: 10,
+            cacheGroups: {
+              vendor: {
+                test: /[\\/]node_modules[\\/]/,
+                name: 'vendor',
+                chunks: 'all',
+                priority: 10,
+              },
+            },
           },
         },
-      },
-    },
     resolve: {
       alias: {
         'react-native$': 'react-native-web',
-        '@invertase/react-native-apple-authentication': path.resolve(__dirname, 'src/polyfills/apple-authentication.web.ts'),
-        'react-native-gesture-handler': path.resolve(__dirname, 'src/polyfills/gesture-handler.web.ts'),
+        '@invertase/react-native-apple-authentication': path.resolve(
+          __dirname,
+          'src/polyfills/apple-authentication.web.ts'
+        ),
+        'react-native-gesture-handler': path.resolve(
+          __dirname,
+          'src/polyfills/gesture-handler.web.ts'
+        ),
         'react-native-mmkv': path.resolve(__dirname, 'src/polyfills/mmkv.web.ts'),
-        'react-native-document-picker': path.resolve(__dirname, 'src/polyfills/document-picker.web.ts'),
+        'react-native-document-picker': path.resolve(
+          __dirname,
+          'src/polyfills/document-picker.web.ts'
+        ),
         'react-native-tts': path.resolve(__dirname, 'src/polyfills/tts.web.ts'),
         'react-native-fs': path.resolve(__dirname, 'src/polyfills/react-native-fs.web.ts'),
         'react-native-image-picker': path.resolve(__dirname, 'src/polyfills/image-picker.web.ts'),
@@ -62,19 +73,23 @@ module.exports = (env, argv) => {
       rules: [
         {
           test: /\.(js|jsx|ts|tsx)$/,
-          exclude: /node_modules\/(?!(@react-native|react-native-svg|lucide-react-native|@react-navigation|react-native-vector-icons|react-native-inappbrowser-reborn)\/).*/,
+          exclude:
+            /node_modules\/(?!(@react-native|react-native-svg|lucide-react-native|@react-navigation|react-native-vector-icons|react-native-inappbrowser-reborn)\/).*/,
           use: {
             loader: 'babel-loader',
             options: {
               cacheDirectory: true,
               sourceType: 'unambiguous',
               presets: [
-                ['@babel/preset-env', {
-                  modules: false,
-                  targets: {
-                    browsers: ['last 2 versions', 'not dead']
-                  }
-                }],
+                [
+                  '@babel/preset-env',
+                  {
+                    modules: false,
+                    targets: {
+                      browsers: ['last 2 versions', 'not dead'],
+                    },
+                  },
+                ],
                 ['@babel/preset-react', { runtime: 'automatic' }],
                 '@babel/preset-typescript',
                 ['@babel/preset-flow', { allowDeclareFields: true }],
@@ -135,13 +150,20 @@ module.exports = (env, argv) => {
           { from: 'public/privacy.html', to: 'privacy.html' },
           { from: 'public/terms.html', to: 'terms.html' },
           // Universal Links: iOS открывает /join/* сразу в приложении
-          { from: 'public/.well-known/apple-app-site-association', to: '.well-known/apple-app-site-association', toType: 'file' },
+          {
+            from: 'public/.well-known/apple-app-site-association',
+            to: '.well-known/apple-app-site-association',
+            toType: 'file',
+          },
           { from: 'public/icons', to: 'icons' },
           // Аудио-файлы для звуковых эффектов викторин
           { from: 'public/correct.wav', to: 'correct.wav' },
           { from: 'public/correct2.wav', to: 'correct2.wav' },
           // Шрифты для react-native-vector-icons
-          { from: 'node_modules/react-native-vector-icons/Fonts/Ionicons.ttf', to: 'fonts/Ionicons.ttf' },
+          {
+            from: 'node_modules/react-native-vector-icons/Fonts/Ionicons.ttf',
+            to: 'fonts/Ionicons.ttf',
+          },
         ],
       }),
       new webpack.DefinePlugin({
@@ -151,22 +173,32 @@ module.exports = (env, argv) => {
           JEST_WORKER_ID: null,
           SUPABASE_URL: envVars.SUPABASE_URL || process.env.SUPABASE_URL || '',
           SUPABASE_ANON_KEY: envVars.SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '',
-          SUPABASE_REDIRECT_URI: envVars.SUPABASE_REDIRECT_URI || process.env.SUPABASE_REDIRECT_URI || '',
-          SUPABASE_WEB_REDIRECT_URI: envVars.SUPABASE_WEB_REDIRECT_URI || process.env.SUPABASE_WEB_REDIRECT_URI || '',
-          EXPO_PUBLIC_GCLOUD_TTS_KEY: envVars.EXPO_PUBLIC_GCLOUD_TTS_KEY || process.env.EXPO_PUBLIC_GCLOUD_TTS_KEY || '',
-          EXPO_PUBLIC_GCLOUD_TTS_SA: envVars.EXPO_PUBLIC_GCLOUD_TTS_SA || process.env.EXPO_PUBLIC_GCLOUD_TTS_SA || '',
+          SUPABASE_REDIRECT_URI:
+            envVars.SUPABASE_REDIRECT_URI || process.env.SUPABASE_REDIRECT_URI || '',
+          SUPABASE_WEB_REDIRECT_URI:
+            envVars.SUPABASE_WEB_REDIRECT_URI || process.env.SUPABASE_WEB_REDIRECT_URI || '',
+          EXPO_PUBLIC_GCLOUD_TTS_KEY:
+            envVars.EXPO_PUBLIC_GCLOUD_TTS_KEY || process.env.EXPO_PUBLIC_GCLOUD_TTS_KEY || '',
+          EXPO_PUBLIC_GCLOUD_TTS_SA:
+            envVars.EXPO_PUBLIC_GCLOUD_TTS_SA || process.env.EXPO_PUBLIC_GCLOUD_TTS_SA || '',
           GCLOUD_TTS_KEY: envVars.GCLOUD_TTS_KEY || process.env.GCLOUD_TTS_KEY || '',
           GCLOUD_TTS_SA: envVars.GCLOUD_TTS_SA || process.env.GCLOUD_TTS_SA || '',
-          REACT_APP_GCLOUD_TTS_KEY: envVars.REACT_APP_GCLOUD_TTS_KEY || process.env.REACT_APP_GCLOUD_TTS_KEY || '',
-          REACT_APP_GCLOUD_TTS_SA: envVars.REACT_APP_GCLOUD_TTS_SA || process.env.REACT_APP_GCLOUD_TTS_SA || '',
+          REACT_APP_GCLOUD_TTS_KEY:
+            envVars.REACT_APP_GCLOUD_TTS_KEY || process.env.REACT_APP_GCLOUD_TTS_KEY || '',
+          REACT_APP_GCLOUD_TTS_SA:
+            envVars.REACT_APP_GCLOUD_TTS_SA || process.env.REACT_APP_GCLOUD_TTS_SA || '',
           // Firebase config for web build
           FIREBASE_API_KEY: envVars.FIREBASE_API_KEY || process.env.FIREBASE_API_KEY || '',
-          FIREBASE_AUTH_DOMAIN: envVars.FIREBASE_AUTH_DOMAIN || process.env.FIREBASE_AUTH_DOMAIN || '',
+          FIREBASE_AUTH_DOMAIN:
+            envVars.FIREBASE_AUTH_DOMAIN || process.env.FIREBASE_AUTH_DOMAIN || '',
           FIREBASE_PROJECT_ID: envVars.FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || '',
-          FIREBASE_STORAGE_BUCKET: envVars.FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET || '',
-          FIREBASE_MESSAGING_SENDER_ID: envVars.FIREBASE_MESSAGING_SENDER_ID || process.env.FIREBASE_MESSAGING_SENDER_ID || '',
+          FIREBASE_STORAGE_BUCKET:
+            envVars.FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET || '',
+          FIREBASE_MESSAGING_SENDER_ID:
+            envVars.FIREBASE_MESSAGING_SENDER_ID || process.env.FIREBASE_MESSAGING_SENDER_ID || '',
           FIREBASE_APP_ID: envVars.FIREBASE_APP_ID || process.env.FIREBASE_APP_ID || '',
-          FIREBASE_MEASUREMENT_ID: envVars.FIREBASE_MEASUREMENT_ID || process.env.FIREBASE_MEASUREMENT_ID || '',
+          FIREBASE_MEASUREMENT_ID:
+            envVars.FIREBASE_MEASUREMENT_ID || process.env.FIREBASE_MEASUREMENT_ID || '',
           FIREBASE_VAPID_KEY: envVars.FIREBASE_VAPID_KEY || process.env.FIREBASE_VAPID_KEY || '',
         }),
       }),
@@ -174,140 +206,142 @@ module.exports = (env, argv) => {
         process: 'process/browser',
       }),
     ],
-    devServer: isDev ? {
-      port: process.env.PORT ? parseInt(process.env.PORT) : 3000,
-      host: '0.0.0.0',
-      allowedHosts: 'all',
-      hot: true,
-      open: false,
-      historyApiFallback: true,
-      static: {
-        directory: path.join(__dirname, 'public'),
-        publicPath: '/',
-      },
-      // Force plain HTTP dev server to avoid certificate prompts in PWA testing
-      server: { type: 'http' },
-      headers: {
-        'Cache-Control': 'no-store',
-      },
-      setupMiddlewares: (middlewares, devServer) => {
-        const app = devServer.app;
+    devServer: isDev
+      ? {
+          port: process.env.PORT ? parseInt(process.env.PORT) : 3000,
+          host: '0.0.0.0',
+          allowedHosts: 'all',
+          hot: true,
+          open: false,
+          historyApiFallback: true,
+          static: {
+            directory: path.join(__dirname, 'public'),
+            publicPath: '/',
+          },
+          // Force plain HTTP dev server to avoid certificate prompts in PWA testing
+          server: { type: 'http' },
+          headers: {
+            'Cache-Control': 'no-store',
+          },
+          setupMiddlewares: (middlewares, devServer) => {
+            const app = devServer.app;
 
-        // Override default body parser limit for PDF uploads
-        app.use(express.json({ limit: '50mb' }));
+            // Override default body parser limit for PDF uploads
+            app.use(express.json({ limit: '50mb' }));
 
-        // Custom API middleware (must be added at the BEGINNING)
-        const apiMiddleware = express.Router();
-        
-        apiMiddleware.post('/api/push/subscribe', async (req, res) => {
-          console.log('[devServer] POST /api/push/subscribe called');
-          try {
-            const mod = await import('./api/push.js');
-            req.query = { ...req.query, action: 'subscribe' };
-            return mod.default(req, res);
-          } catch (e) {
-            console.error('[devServer] push/subscribe error', e);
-            return res.status(500).json({ error: 'dev-server error', message: e.message });
-          }
-        });
+            // Custom API middleware (must be added at the BEGINNING)
+            const apiMiddleware = express.Router();
 
-        apiMiddleware.post('/api/push/unsubscribe', async (req, res) => {
-          console.log('[devServer] POST /api/push/unsubscribe called');
-          try {
-            const mod = await import('./api/push.js');
-            req.query = { ...req.query, action: 'unsubscribe' };
-            return mod.default(req, res);
-          } catch (e) {
-            console.error('[devServer] push/unsubscribe error', e);
-            return res.status(500).json({ error: 'dev-server error', message: e.message });
-          }
-        });
+            apiMiddleware.post('/api/push/subscribe', async (req, res) => {
+              console.log('[devServer] POST /api/push/subscribe called');
+              try {
+                const mod = await import('./api/push.js');
+                req.query = { ...req.query, action: 'subscribe' };
+                return mod.default(req, res);
+              } catch (e) {
+                console.error('[devServer] push/subscribe error', e);
+                return res.status(500).json({ error: 'dev-server error', message: e.message });
+              }
+            });
 
-        apiMiddleware.post('/api/generate-examples', async (req, res) => {
-          console.log('[devServer] POST /api/generate-examples called');
-          try {
-            const mod = await import('./api/generate-examples.js');
-            return mod.default(req, res);
-          } catch (e) {
-            console.error('[devServer] generate-examples error', e);
-            return res.status(500).json({ error: 'dev-server error', message: e.message });
-          }
-        });
+            apiMiddleware.post('/api/push/unsubscribe', async (req, res) => {
+              console.log('[devServer] POST /api/push/unsubscribe called');
+              try {
+                const mod = await import('./api/push.js');
+                req.query = { ...req.query, action: 'unsubscribe' };
+                return mod.default(req, res);
+              } catch (e) {
+                console.error('[devServer] push/unsubscribe error', e);
+                return res.status(500).json({ error: 'dev-server error', message: e.message });
+              }
+            });
 
-        apiMiddleware.post('/api/extract-pdf', async (req, res) => {
-          console.log('[devServer] POST /api/extract-pdf called');
-          try {
-            const mod = await import('./api/extract-pdf.js');
-            return mod.default(req, res);
-          } catch (e) {
-            console.error('[devServer] extract-pdf error', e);
-            return res.status(500).json({ error: 'dev-server error', message: e.message });
-          }
-        });
+            apiMiddleware.post('/api/generate-examples', async (req, res) => {
+              console.log('[devServer] POST /api/generate-examples called');
+              try {
+                const mod = await import('./api/generate-examples.js');
+                return mod.default(req, res);
+              } catch (e) {
+                console.error('[devServer] generate-examples error', e);
+                return res.status(500).json({ error: 'dev-server error', message: e.message });
+              }
+            });
 
-        apiMiddleware.post('/api/extract-image', async (req, res) => {
-          console.log('[devServer] POST /api/extract-image called');
-          try {
-            const mod = await import('./api/extract-image.js');
-            return mod.default(req, res);
-          } catch (e) {
-            console.error('[devServer] extract-image error', e);
-            return res.status(500).json({ error: 'dev-server error', message: e.message });
-          }
-        });
+            apiMiddleware.post('/api/extract-pdf', async (req, res) => {
+              console.log('[devServer] POST /api/extract-pdf called');
+              try {
+                const mod = await import('./api/extract-pdf.js');
+                return mod.default(req, res);
+              } catch (e) {
+                console.error('[devServer] extract-pdf error', e);
+                return res.status(500).json({ error: 'dev-server error', message: e.message });
+              }
+            });
 
-        apiMiddleware.post('/api/translate-words', async (req, res) => {
-          console.log('[devServer] POST /api/translate-words called');
-          try {
-            const mod = await import('./api/translate-words.js');
-            return mod.default(req, res);
-          } catch (e) {
-            console.error('[devServer] translate-words error', e);
-            return res.status(500).json({ error: 'dev-server error', message: e.message });
-          }
-        });
+            apiMiddleware.post('/api/extract-image', async (req, res) => {
+              console.log('[devServer] POST /api/extract-image called');
+              try {
+                const mod = await import('./api/extract-image.js');
+                return mod.default(req, res);
+              } catch (e) {
+                console.error('[devServer] extract-image error', e);
+                return res.status(500).json({ error: 'dev-server error', message: e.message });
+              }
+            });
 
-        // Live test API (all methods — GET and POST)
-        apiMiddleware.all('/api/test', async (req, res) => {
-          console.log('[devServer] /api/test called, action:', req.query?.action || req.url);
-          try {
-            const mod = await import('./api/test.js');
-            return mod.default(req, res);
-          } catch (e) {
-            console.error('[devServer] test error', e);
-            return res.status(500).json({ error: 'dev-server error', message: e.message });
-          }
-        });
+            apiMiddleware.post('/api/translate-words', async (req, res) => {
+              console.log('[devServer] POST /api/translate-words called');
+              try {
+                const mod = await import('./api/translate-words.js');
+                return mod.default(req, res);
+              } catch (e) {
+                console.error('[devServer] translate-words error', e);
+                return res.status(500).json({ error: 'dev-server error', message: e.message });
+              }
+            });
 
-        // Admin stats (local only — api/admin.js is gitignored)
-        // Uses /admin-api path to bypass vercel dev function interception
-        apiMiddleware.get('/admin-api', async (req, res) => {
-          try {
-            const mod = await import('./api/admin.js');
-            return mod.default(req, res);
-          } catch (e) {
-            if (e.code === 'ERR_MODULE_NOT_FOUND') {
-              return res.status(404).json({ error: 'Admin API not available locally' });
-            }
-            console.error('[devServer] admin error', e);
-            return res.status(500).json({ error: e.message });
-          }
-        });
+            // Live test API (all methods — GET and POST)
+            apiMiddleware.all('/api/test', async (req, res) => {
+              console.log('[devServer] /api/test called, action:', req.query?.action || req.url);
+              try {
+                const mod = await import('./api/test.js');
+                return mod.default(req, res);
+              } catch (e) {
+                console.error('[devServer] test error', e);
+                return res.status(500).json({ error: 'dev-server error', message: e.message });
+              }
+            });
 
-        // Debug: log all API requests
-        apiMiddleware.use('/api', (req, res, next) => {
-          console.log('[devServer] API request:', req.method, req.url);
-          next();
-        });
+            // Admin stats (local only — api/admin.js is gitignored)
+            // Uses /admin-api path to bypass vercel dev function interception
+            apiMiddleware.get('/admin-api', async (req, res) => {
+              try {
+                const mod = await import('./api/admin.js');
+                return mod.default(req, res);
+              } catch (e) {
+                if (e.code === 'ERR_MODULE_NOT_FOUND') {
+                  return res.status(404).json({ error: 'Admin API not available locally' });
+                }
+                console.error('[devServer] admin error', e);
+                return res.status(500).json({ error: e.message });
+              }
+            });
 
-        // Insert custom API middleware at the BEGINNING of the stack
-        middlewares.unshift({
-          name: 'api-routes',
-          middleware: apiMiddleware,
-        });
+            // Debug: log all API requests
+            apiMiddleware.use('/api', (req, res, next) => {
+              console.log('[devServer] API request:', req.method, req.url);
+              next();
+            });
 
-        return middlewares;
-      },
-    } : undefined,
+            // Insert custom API middleware at the BEGINNING of the stack
+            middlewares.unshift({
+              name: 'api-routes',
+              middleware: apiMiddleware,
+            });
+
+            return middlewares;
+          },
+        }
+      : undefined,
   };
 };

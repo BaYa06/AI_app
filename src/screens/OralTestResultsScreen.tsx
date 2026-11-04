@@ -3,13 +3,7 @@
  * @description Экран итогов устного теста
  */
 import React from 'react';
-import {
-  View,
-  ScrollView,
-  StyleSheet,
-  Pressable,
-  Platform,
-} from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/common';
 import { useThemeColors } from '@/store';
@@ -19,7 +13,6 @@ import type { RootStackParamList } from '@/types/navigation';
 import { CelebrationIcon, BottomBar } from '@/components/ui';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OralTestResults'>;
-
 
 export function OralTestResultsScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
@@ -50,12 +43,8 @@ export function OralTestResultsScreen({ navigation, route }: Props) {
           },
         ]}
       >
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-          Результаты
-        </Text>
-        <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-          {setTitle}
-        </Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Результаты</Text>
+        <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>{setTitle}</Text>
       </View>
 
       <ScrollView
@@ -81,9 +70,7 @@ export function OralTestResultsScreen({ navigation, route }: Props) {
               <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>
                 Пройдено карточек
               </Text>
-              <Text style={[styles.summaryCount, { color: colors.textPrimary }]}>
-                {total}
-              </Text>
+              <Text style={[styles.summaryCount, { color: colors.textPrimary }]}>{total}</Text>
             </>
           )}
         </View>
@@ -92,14 +79,24 @@ export function OralTestResultsScreen({ navigation, route }: Props) {
           <>
             {/* Known / Unknown blocks */}
             <View style={styles.statsRow}>
-              <View style={[styles.statBlock, { backgroundColor: alpha(GREEN, 10), borderColor: alpha(GREEN, 20) }]}>
+              <View
+                style={[
+                  styles.statBlock,
+                  { backgroundColor: alpha(GREEN, 10), borderColor: alpha(GREEN, 20) },
+                ]}
+              >
                 <Text style={[styles.statIcon]}>✓</Text>
                 <Text style={[styles.statLabel, { color: GREEN }]}>Знает</Text>
                 <Text style={[styles.statCount, { color: colors.textPrimary }]}>{known}</Text>
                 <Text style={[styles.statPct, { color: GREEN }]}>{knownPct}%</Text>
               </View>
 
-              <View style={[styles.statBlock, { backgroundColor: alpha(RED, 10), borderColor: alpha(RED, 20) }]}>
+              <View
+                style={[
+                  styles.statBlock,
+                  { backgroundColor: alpha(RED, 10), borderColor: alpha(RED, 20) },
+                ]}
+              >
                 <Text style={[styles.statIcon]}>✗</Text>
                 <Text style={[styles.statLabel, { color: RED }]}>Не знает</Text>
                 <Text style={[styles.statCount, { color: colors.textPrimary }]}>{unknown}</Text>
@@ -128,10 +125,9 @@ export function OralTestResultsScreen({ navigation, route }: Props) {
 
       {/* Footer buttons */}
       <BottomBar style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        <Pressable accessibilityRole="button"
-          onPress={() =>
-            navigation.replace('OralTestLobby', { courseId, courseTitle })
-          }
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => navigation.replace('OralTestLobby', { courseId, courseTitle })}
           style={({ pressed }) => [
             styles.outlineBtn,
             { borderColor: colors.textSecondary },
@@ -143,7 +139,8 @@ export function OralTestResultsScreen({ navigation, route }: Props) {
           </Text>
         </Pressable>
 
-        <Pressable accessibilityRole="button"
+        <Pressable
+          accessibilityRole="button"
           onPress={() => navigation.goBack()}
           style={({ pressed }) => [
             styles.primaryBtn,
@@ -167,9 +164,9 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
     borderBottomWidth: 1,
     alignItems: 'center',
-    ...Platform.select({
+    ...(Platform.select({
       web: { backdropFilter: 'blur(12px)' },
-    }) as any,
+    }) as any),
   },
   headerTitle: {
     fontSize: 20,
@@ -286,7 +283,6 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.l,
     paddingVertical: 16,
     alignItems: 'center',
-    
   },
   primaryText: {
     fontSize: 16,

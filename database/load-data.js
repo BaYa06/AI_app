@@ -21,7 +21,7 @@ async function loadData() {
   try {
     // Проверка наличия переменной окружения
     const connectionString = process.env.POSTGRES_URL;
-    
+
     if (!connectionString) {
       console.error('❌ Ошибка: POSTGRES_URL не найден в переменных окружения');
       console.log('\n📝 Создайте файл .env.local с вашей строкой подключения:');
@@ -37,18 +37,18 @@ async function loadData() {
     const sqlContent = readFileSync(sqlFilePath, 'utf-8');
 
     console.log('📄 Загрузка SQL файла...');
-    
+
     // Удаляем комментарии и разбиваем на команды
     const cleanedSQL = sqlContent
       .split('\n')
-      .filter(line => !line.trim().startsWith('--'))
+      .filter((line) => !line.trim().startsWith('--'))
       .join('\n');
-    
+
     // Разбиваем на команды более аккуратно
     const commands = cleanedSQL
       .split(';')
-      .map(cmd => cmd.trim())
-      .filter(cmd => cmd.length > 10); // Игнорируем пустые или очень короткие
+      .map((cmd) => cmd.trim())
+      .filter((cmd) => cmd.length > 10); // Игнорируем пустые или очень короткие
 
     console.log(`📊 Найдено ${commands.length} SQL команд`);
     console.log('⏳ Выполнение...\n');
@@ -57,11 +57,11 @@ async function loadData() {
     let tablesCreated = 0;
     let indexesCreated = 0;
     let rowsInserted = 0;
-    
+
     for (const cmd of commands) {
       try {
         await sql.unsafe(cmd);
-        
+
         if (cmd.includes('CREATE TABLE')) {
           tablesCreated++;
           const match = cmd.match(/CREATE TABLE.*?(\w+)\s*\(/);
@@ -80,15 +80,17 @@ async function loadData() {
         }
       }
     }
-    
-    console.log(`\n📈 Создано: ${tablesCreated} таблиц, ${indexesCreated} индексов, ${rowsInserted} записей`);
+
+    console.log(
+      `\n📈 Создано: ${tablesCreated} таблиц, ${indexesCreated} индексов, ${rowsInserted} записей`
+    );
 
     // Небольшая задержка для применения изменений
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     // Получаем статистику
     console.log('\n📊 Статистика базы данных:');
-    
+
     try {
       const stats = await sql`
         SELECT 
@@ -96,7 +98,7 @@ async function loadData() {
           (SELECT COUNT(*) FROM card_sets) as sets_count,
           (SELECT COUNT(*) FROM cards) as cards_count
       `;
-      
+
       console.log(`   👥 Пользователей: ${stats[0].users_count}`);
       console.log(`   📚 Наборов: ${stats[0].sets_count}`);
       console.log(`   🃏 Карточек: ${stats[0].cards_count}`);
@@ -109,11 +111,10 @@ async function loadData() {
         ORDER BY tablename
       `;
       console.log('   📋 Созданные таблицы:');
-      tables.forEach(t => console.log(`      - ${t.tablename}`));
+      tables.forEach((t) => console.log(`      - ${t.tablename}`));
     }
 
     console.log('\n✅ База данных успешно инициализирована!');
-    
   } catch (error) {
     console.error('❌ Ошибка:', error.message);
     process.exit(1);

@@ -167,7 +167,12 @@ export function pickPool(cards: Card[], answered: Answered, dayStart: number, no
 }
 
 /** Пул с контрольной половиной: каждая половина — первые WIDGET_POOL_MAX своих слов по приоритету */
-export function pickPoolSplit(cards: Card[], answered: Answered, dayStart: number, now: number): PoolSplit {
+export function pickPoolSplit(
+  cards: Card[],
+  answered: Answered,
+  dayStart: number,
+  now: number
+): PoolSplit {
   const ranked = rankCandidates(cards, answered, dayStart, now);
   return {
     pool: ranked.filter((c) => !isControlCard(c.id)).slice(0, WIDGET_POOL_MAX),
@@ -196,7 +201,8 @@ function rankCandidates(cards: Card[], answered: Answered, dayStart: number, now
     else if (step >= 2 && c.nextReviewDate > now + DAY) groups[3].push(c);
   }
 
-  const recentFirst = (a: Card, b: Card) => b.lastReviewDate - a.lastReviewDate || a.id.localeCompare(b.id);
+  const recentFirst = (a: Card, b: Card) =>
+    b.lastReviewDate - a.lastReviewDate || a.id.localeCompare(b.id);
   return groups.flatMap((g) => g.sort(recentFirst));
 }
 
@@ -204,7 +210,8 @@ function rankCandidates(cards: Card[], answered: Answered, dayStart: number, now
 function countWaiting(cards: Card[], answered: Answered, t: number): number {
   let n = 0;
   for (const c of cards) {
-    if (isCardWaitingReview(c, t) && !answered.reviewed.has(c.id) && !answered.introduced.has(c.id)) n++;
+    if (isCardWaitingReview(c, t) && !answered.reviewed.has(c.id) && !answered.introduced.has(c.id))
+      n++;
   }
   return n;
 }
@@ -224,7 +231,9 @@ class Rotation {
     const stat = (c: Card) => this.shows.get(c.id) ?? { count: 0, last: -Infinity };
     const ready = (c: Card) => {
       const s = stat(c);
-      return s.count === 0 || t - s.last >= SHOW_GAPS_MS[Math.min(s.count - 1, SHOW_GAPS_MS.length - 1)];
+      return (
+        s.count === 0 || t - s.last >= SHOW_GAPS_MS[Math.min(s.count - 1, SHOW_GAPS_MS.length - 1)]
+      );
     };
     // Пул в порядке приоритета; sort стабильный: среди готовых — реже показанные, затем по приоритету
     const card = this.pool.filter(ready).sort((a, b) => stat(a).count - stat(b).count)[0];
@@ -235,7 +244,12 @@ class Rotation {
   }
 }
 
-function cardFields(card: Card, showIndex: number, phase: 'question' | 'answer', direction: WidgetDirection) {
+function cardFields(
+  card: Card,
+  showIndex: number,
+  phase: 'question' | 'answer',
+  direction: WidgetDirection
+) {
   const reverse =
     direction === 'reverse' ||
     (direction === 'auto' && stepOf(card) >= 2 && showIndex % REVERSE_EVERY === REVERSE_EVERY - 1);
@@ -260,7 +274,8 @@ export function buildTimeline(input: WidgetPlanInput): WidgetEntry[] {
   const end = now + WIDGET_HORIZON_MS;
   const entries: WidgetEntry[] = [];
 
-  const lessonDoneToday = plan.state === 'done' || plan.state === 'finished' || plan.state === 'mistakes';
+  const lessonDoneToday =
+    plan.state === 'done' || plan.state === 'finished' || plan.state === 'mistakes';
   const nothingStudied = plan.state === 'first';
   const newLeft = cards.filter((c) => stepOf(c) === 0).length;
 
@@ -268,9 +283,10 @@ export function buildTimeline(input: WidgetPlanInput): WidgetEntry[] {
     const dayStart = addDays(today, d);
     if (dayStart >= end) break;
     const isToday = d === 0;
-    const answered: Answered = isToday && day
-      ? { reviewed: new Set(day.reviewedIds), introduced: new Set(day.introducedIds) }
-      : { reviewed: new Set(), introduced: new Set() };
+    const answered: Answered =
+      isToday && day
+        ? { reviewed: new Set(day.reviewedIds), introduced: new Set(day.introducedIds) }
+        : { reviewed: new Set(), introduced: new Set() };
     const done = isToday && lessonDoneToday;
     // Серия в этот день: сегодня — как есть; завтра — сохранится, только если сегодня цель выполнена
     // (иначе приложение откроют и расписание пересчитается); дальше — неизвестно, не предупреждаем
@@ -285,7 +301,7 @@ export function buildTimeline(input: WidgetPlanInput): WidgetEntry[] {
     const rotation = new Rotation(
       input.controlGroup
         ? pickPoolSplit(poolCards, answered, dayStart, poolNow).pool
-        : pickPool(poolCards, answered, dayStart, poolNow),
+        : pickPool(poolCards, answered, dayStart, poolNow)
     );
 
     // Ночь до 07:00 (только если сейчас ещё ночь) — итог вчерашнего дня не знаем, показываем сегодняшний
@@ -317,14 +333,31 @@ export function buildTimeline(input: WidgetPlanInput): WidgetEntry[] {
 
       const pick = rotation.next(slot);
       if (!pick) {
-        entries.push({ at: slot, state, ...base, ...(hoursLeft !== null && state === 'streak' ? { hoursLeft } : {}) });
+        entries.push({
+          at: slot,
+          state,
+          ...base,
+          ...(hoursLeft !== null && state === 'streak' ? { hoursLeft } : {}),
+        });
         continue;
       }
       const extra = state === 'streak' && hoursLeft !== null ? { hoursLeft } : {};
-      entries.push({ at: slot, state, ...base, ...extra, ...cardFields(pick.card, pick.showIndex, 'question', direction) });
+      entries.push({
+        at: slot,
+        state,
+        ...base,
+        ...extra,
+        ...cardFields(pick.card, pick.showIndex, 'question', direction),
+      });
       const answerAt = slot + CYCLE_QUESTION_MIN * MINUTE;
       if (answerAt < end) {
-        entries.push({ at: answerAt, state, ...base, ...extra, ...cardFields(pick.card, pick.showIndex, 'answer', direction) });
+        entries.push({
+          at: answerAt,
+          state,
+          ...base,
+          ...extra,
+          ...cardFields(pick.card, pick.showIndex, 'answer', direction),
+        });
       }
     }
 
@@ -351,7 +384,17 @@ export function buildTimeline(input: WidgetPlanInput): WidgetEntry[] {
 }
 
 function nightEntry(at: number, done: number, streak: number): WidgetEntry {
-  return { at, state: 'night', waiting: 0, newCount: 0, minutes: 0, streak, done, total: done, fading: 0 };
+  return {
+    at,
+    state: 'night',
+    waiting: 0,
+    newCount: 0,
+    minutes: 0,
+    streak,
+    done,
+    total: done,
+    fading: 0,
+  };
 }
 
 /** Сегодняшний пул и контрольная половина — для учёта замера (widgetExperiment) */

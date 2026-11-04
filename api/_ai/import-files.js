@@ -37,12 +37,21 @@ import { log } from '../_log.js';
  */
 
 const BINARY_MIME_TYPES = new Set([
-  'image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+  'application/pdf',
 ]);
 const TEXT_MIME_TYPES = new Set(['text/csv', 'text/tab-separated-values', 'text/plain']);
 
 // Выбор фото на iOS (react-native-image-picker) отдаёт нестандартный 'image/jpg'
-const MIME_ALIASES = { 'image/jpg': 'image/jpeg', 'image/pjpeg': 'image/jpeg', 'text/tsv': 'text/tab-separated-values' };
+const MIME_ALIASES = {
+  'image/jpg': 'image/jpeg',
+  'image/pjpeg': 'image/jpeg',
+  'text/tsv': 'text/tab-separated-values',
+};
 
 function normalizeMime(mimeType) {
   const value = typeof mimeType === 'string' ? mimeType.trim().toLowerCase() : '';
@@ -84,7 +93,10 @@ ${vocabExtractionRules(langFrom, langTo)}`;
 }
 
 function buildPrompt({ goal, level, userPrompt, languageFrom, languageTo, subject }) {
-  const langFrom = languageName(languageFrom, subject ? 'the language of the content' : 'the language being learned');
+  const langFrom = languageName(
+    languageFrom,
+    subject ? 'the language of the content' : 'the language being learned'
+  );
   const langTo = languageName(languageTo, "the user's native language");
   // Предметный набор (история, география, ОРТ) — не изучение языка: без перевода
   const setLine = subject
@@ -147,11 +159,13 @@ function validateFiles(files) {
     if (file) file.mimeType = normalizeMime(file.mimeType);
     if (file?.type === 'binary') {
       if (!BINARY_MIME_TYPES.has(file.mimeType)) return `Unsupported file type: ${file.mimeType}`;
-      if (typeof file.base64 !== 'string' || !file.base64) return `Missing base64 for: ${file.name || 'file'}`;
+      if (typeof file.base64 !== 'string' || !file.base64)
+        return `Missing base64 for: ${file.name || 'file'}`;
       total += file.base64.length;
     } else if (file?.type === 'text') {
       if (!TEXT_MIME_TYPES.has(file.mimeType)) return `Unsupported file type: ${file.mimeType}`;
-      if (typeof file.content !== 'string' || !file.content.trim()) return `Missing content for: ${file.name || 'text'}`;
+      if (typeof file.content !== 'string' || !file.content.trim())
+        return `Missing content for: ${file.name || 'text'}`;
       total += file.content.length;
     } else {
       return 'Each file needs type "binary" or "text"';
@@ -170,7 +184,15 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { files, goal: rawGoal, level: rawLevel, prompt, languageFrom, languageTo, setKind } = req.body || {};
+  const {
+    files,
+    goal: rawGoal,
+    level: rawLevel,
+    prompt,
+    languageFrom,
+    languageTo,
+    setKind,
+  } = req.body || {};
 
   const invalid = validateFiles(files);
   if (invalid) {
@@ -191,28 +213,35 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Failed to check usage' });
   }
   if (!quota.ok) {
-    return res.status(429).json({ error: 'daily_limit', limit: quota.usage.limit, resetAt: quota.usage.resetAt });
+    return res
+      .status(429)
+      .json({ error: 'daily_limit', limit: quota.usage.limit, resetAt: quota.usage.resetAt });
   }
 
   const subject = setKind === 'subject';
   const goal = subject
-    ? (SUBJECT_GOALS.has(rawGoal) ? rawGoal : 'qa')
-    : (GOALS.has(rawGoal) ? rawGoal : 'vocab');
+    ? SUBJECT_GOALS.has(rawGoal)
+      ? rawGoal
+      : 'qa'
+    : GOALS.has(rawGoal)
+      ? rawGoal
+      : 'vocab';
   const level = LEVELS.has(rawLevel) ? rawLevel : 'B1';
   const userPrompt = typeof prompt === 'string' ? prompt.trim().slice(0, 500) : '';
 
   try {
     const binaryFiles = files
-      .filter(f => f.type === 'binary')
-      .map(f => ({ mimeType: f.mimeType, data: f.base64 }));
+      .filter((f) => f.type === 'binary')
+      .map((f) => ({ mimeType: f.mimeType, data: f.base64 }));
     // Текстовые файлы — прямо в промпт, с именем файла как контекстом (заголовки CSV помогают понять столбцы)
     const textBlocks = files
-      .filter(f => f.type === 'text')
-      .map(f => `[File: ${f.name || 'text'} (${f.mimeType})]\n${f.content}`)
+      .filter((f) => f.type === 'text')
+      .map((f) => `[File: ${f.name || 'text'} (${f.mimeType})]\n${f.content}`)
       .join('\n\n');
 
-    const fullPrompt = buildPrompt({ goal, level, userPrompt, languageFrom, languageTo, subject })
-      + (textBlocks ? `\n\nFiles content:\n${textBlocks}` : '');
+    const fullPrompt =
+      buildPrompt({ goal, level, userPrompt, languageFrom, languageTo, subject }) +
+      (textBlocks ? `\n\nFiles content:\n${textBlocks}` : '');
 
     const text = await generateJson({
       models: MODELS.vision,
@@ -225,24 +254,33 @@ export default async function handler(req, res) {
     const parsed = parseJsonObject(text);
 
     const cards = (Array.isArray(parsed.cards) ? parsed.cards : [])
-      .filter(c => c && typeof c.front === 'string' && c.front.trim())
-      .map(c => ({
+      .filter((c) => c && typeof c.front === 'string' && c.front.trim())
+      .map((c) => ({
         front: c.front.trim(),
         back: typeof c.back === 'string' ? c.back.trim() : '',
         ...cardExtras(c),
         ...(c.confidence === 'low' ? { confidence: 'low' } : {}),
       }));
 
-    const kind = KINDS.has(parsed.kind) ? parsed.kind : (cards.length ? 'vocab' : 'empty');
-    const lang = typeof parsed.lang === 'string' && /^[a-z]{2}$/i.test(parsed.lang) ? parsed.lang.toLowerCase() : null;
+    const kind = KINDS.has(parsed.kind) ? parsed.kind : cards.length ? 'vocab' : 'empty';
+    const lang =
+      typeof parsed.lang === 'string' && /^[a-z]{2}$/i.test(parsed.lang)
+        ? parsed.lang.toLowerCase()
+        : null;
     const suggestedTitle = typeof parsed.title === 'string' ? parsed.title.trim() : '';
-    const excerpt = kind === 'text' && typeof parsed.excerpt === 'string' ? parsed.excerpt.trim().slice(0, 300) : undefined;
+    const excerpt =
+      kind === 'text' && typeof parsed.excerpt === 'string'
+        ? parsed.excerpt.trim().slice(0, 300)
+        : undefined;
 
     // Ничего не нашли (текст, упражнение, пусто) — распознавание не засчитываем:
     // следующим запросом пользователь выберет, что делать с текстом
     if (cards.length === 0) await quota.refund();
 
-    log.info('import-files', `files=${files.length} goal=${goal} subject=${subject} kind=${kind} lang=${lang} cards=${cards.length}`);
+    log.info(
+      'import-files',
+      `files=${files.length} goal=${goal} subject=${subject} kind=${kind} lang=${lang} cards=${cards.length}`
+    );
 
     return res.status(200).json({
       cards,

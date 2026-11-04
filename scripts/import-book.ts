@@ -57,7 +57,9 @@ function parseArgs(argv: string[]): Args {
   const unknown = [...flags].filter((f) => !known.has(f));
   if (unknown.length > 0 || positional.length !== 1) {
     if (unknown.length > 0) console.error(`Неизвестные флаги: ${unknown.join(', ')}`);
-    console.error('Использование: npx tsx scripts/import-book.ts path/to/book.xlsx [--dry-run] [--publish] [--prune]');
+    console.error(
+      'Использование: npx tsx scripts/import-book.ts path/to/book.xlsx [--dry-run] [--publish] [--prune]'
+    );
     process.exit(2);
   }
   return {
@@ -70,19 +72,32 @@ function parseArgs(argv: string[]): Args {
 
 async function upsertBook(db: Db, book: ParsedBook, stats: Stats): Promise<string> {
   const existing = await db.query<{
-    id: string; level: string | null; subject: string | null; language_from: string;
-    language_to: string; publisher: string | null; is_published: boolean;
+    id: string;
+    level: string | null;
+    subject: string | null;
+    language_from: string;
+    language_to: string;
+    publisher: string | null;
+    is_published: boolean;
   }>(
     `SELECT id, level, subject, language_from, language_to, publisher, is_published
        FROM books WHERE title = $1 AND edition = $2 FOR UPDATE`,
-    [book.title, book.edition],
+    [book.title, book.edition]
   );
 
   if (existing.rows.length === 0) {
     const inserted = await db.query<{ id: string }>(
       `INSERT INTO books (title, edition, level, subject, language_from, language_to, publisher)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-      [book.title, book.edition, book.level, book.subject, book.languageFrom, book.languageTo, book.publisher],
+      [
+        book.title,
+        book.edition,
+        book.level,
+        book.subject,
+        book.languageFrom,
+        book.languageTo,
+        book.publisher,
+      ]
     );
     stats.bookStatus = 'создана';
     stats.isPublished = false;
@@ -92,28 +107,42 @@ async function upsertBook(db: Db, book: ParsedBook, stats: Stats): Promise<strin
   const row = existing.rows[0];
   stats.isPublished = row.is_published;
   const changed =
-    row.level !== book.level || row.subject !== book.subject || row.language_from !== book.languageFrom ||
-    row.language_to !== book.languageTo || row.publisher !== book.publisher;
+    row.level !== book.level ||
+    row.subject !== book.subject ||
+    row.language_from !== book.languageFrom ||
+    row.language_to !== book.languageTo ||
+    row.publisher !== book.publisher;
   if (changed) {
     await db.query(
       `UPDATE books SET level = $2, subject = $3, language_from = $4, language_to = $5, publisher = $6, updated_at = NOW()
         WHERE id = $1`,
-      [row.id, book.level, book.subject, book.languageFrom, book.languageTo, book.publisher],
+      [row.id, book.level, book.subject, book.languageFrom, book.languageTo, book.publisher]
     );
     stats.bookStatus = 'обновлена';
   }
   return row.id;
 }
 
-async function upsertUnit(db: Db, bookId: string, unit: ParsedUnit, sortOrder: number, stats: Stats): Promise<string> {
-  const existing = await db.query<{ id: string; title: string; pages: string | null; sort_order: number }>(
-    'SELECT id, title, pages, sort_order FROM book_units WHERE book_id = $1 AND number = $2',
-    [bookId, unit.number],
-  );
+async function upsertUnit(
+  db: Db,
+  bookId: string,
+  unit: ParsedUnit,
+  sortOrder: number,
+  stats: Stats
+): Promise<string> {
+  const existing = await db.query<{
+    id: string;
+    title: string;
+    pages: string | null;
+    sort_order: number;
+  }>('SELECT id, title, pages, sort_order FROM book_units WHERE book_id = $1 AND number = $2', [
+    bookId,
+    unit.number,
+  ]);
   if (existing.rows.length === 0) {
     const inserted = await db.query<{ id: string }>(
       'INSERT INTO book_units (book_id, number, title, pages, sort_order) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-      [bookId, unit.number, unit.title, unit.pages, sortOrder],
+      [bookId, unit.number, unit.title, unit.pages, sortOrder]
     );
     stats.unitsNew++;
     return inserted.rows[0].id;
@@ -121,7 +150,10 @@ async function upsertUnit(db: Db, bookId: string, unit: ParsedUnit, sortOrder: n
   const row = existing.rows[0];
   if (row.title !== unit.title || row.pages !== unit.pages || row.sort_order !== sortOrder) {
     await db.query('UPDATE book_units SET title = $2, pages = $3, sort_order = $4 WHERE id = $1', [
-      row.id, unit.title, unit.pages, sortOrder,
+      row.id,
+      unit.title,
+      unit.pages,
+      sortOrder,
     ]);
     stats.unitsUpdated++;
   } else {
@@ -136,37 +168,55 @@ async function upsertUnit(db: Db, bookId: string, unit: ParsedUnit, sortOrder: n
  * «свои» — и удалились вместе с его наборами 01.11.2026.
  */
 async function upsertOfficialSet(
-  db: Db, unitId: string, unit: ParsedUnit, book: ParsedBook,
+  db: Db,
+  unitId: string,
+  unit: ParsedUnit,
+  book: ParsedBook
 ): Promise<string> {
   const title = `Unit ${unit.number} — ${unit.title}`;
-  const existing = await db.query<{ id: string; title: string; language_from: string | null; language_to: string | null }>(
+  const existing = await db.query<{
+    id: string;
+    title: string;
+    language_from: string | null;
+    language_to: string | null;
+  }>(
     `SELECT id, title, language_from, language_to FROM card_sets
       WHERE unit_id = $1 AND is_official = true ORDER BY created_at LIMIT 1`,
-    [unitId],
+    [unitId]
   );
   if (existing.rows.length === 0) {
     const inserted = await db.query<{ id: string }>(
       `INSERT INTO card_sets (user_id, title, description, category, language_from, language_to,
                               is_public, unit_id, is_official, total_cards)
        VALUES (NULL, $1, '', 'general', $2, $3, false, $4, true, 0) RETURNING id`,
-      [title, book.languageFrom, book.languageTo, unitId],
+      [title, book.languageFrom, book.languageTo, unitId]
     );
     return inserted.rows[0].id;
   }
   const row = existing.rows[0];
-  if (row.title !== title || row.language_from !== book.languageFrom || row.language_to !== book.languageTo) {
+  if (
+    row.title !== title ||
+    row.language_from !== book.languageFrom ||
+    row.language_to !== book.languageTo
+  ) {
     await db.query(
       'UPDATE card_sets SET title = $2, language_from = $3, language_to = $4, updated_at = NOW() WHERE id = $1',
-      [row.id, title, book.languageFrom, book.languageTo],
+      [row.id, title, book.languageFrom, book.languageTo]
     );
   }
   return row.id;
 }
 
 async function syncCards(db: Db, setId: string, unit: ParsedUnit, stats: Stats): Promise<void> {
-  const existing = await db.query<{ id: string; front: string; back: string; example: string | null; sort_order: number | null }>(
+  const existing = await db.query<{
+    id: string;
+    front: string;
+    back: string;
+    example: string | null;
+    sort_order: number | null;
+  }>(
     'SELECT id, front, back, example, sort_order FROM cards WHERE set_id = $1 ORDER BY sort_order NULLS LAST, created_at',
-    [setId],
+    [setId]
   );
   const byKey = new Map<string, (typeof existing.rows)[number]>();
   for (const row of existing.rows) {
@@ -175,8 +225,19 @@ async function syncCards(db: Db, setId: string, unit: ParsedUnit, stats: Stats):
   }
 
   const matched = new Set<string>();
-  const inserts = { front: [] as string[], back: [] as string[], example: [] as (string | null)[], sort: [] as number[] };
-  const updates = { id: [] as string[], front: [] as string[], back: [] as string[], example: [] as (string | null)[], sort: [] as number[] };
+  const inserts = {
+    front: [] as string[],
+    back: [] as string[],
+    example: [] as (string | null)[],
+    sort: [] as number[],
+  };
+  const updates = {
+    id: [] as string[],
+    front: [] as string[],
+    back: [] as string[],
+    example: [] as (string | null)[],
+    sort: [] as number[],
+  };
 
   unit.cards.forEach((card, index) => {
     const sortOrder = index + 1;
@@ -190,8 +251,10 @@ async function syncCards(db: Db, setId: string, unit: ParsedUnit, stats: Stats):
     }
     matched.add(row.id);
     const same =
-      row.front === card.term && row.back === card.translation &&
-      (row.example || null) === card.example && row.sort_order === sortOrder;
+      row.front === card.term &&
+      row.back === card.translation &&
+      (row.example || null) === card.example &&
+      row.sort_order === sortOrder;
     if (same) {
       stats.cardsUnchanged++;
       return;
@@ -208,7 +271,7 @@ async function syncCards(db: Db, setId: string, unit: ParsedUnit, stats: Stats):
       `INSERT INTO cards (set_id, front, back, example, sort_order)
        SELECT $1, v.front, v.back, v.example, v.sort_order
          FROM unnest($2::text[], $3::text[], $4::text[], $5::int[]) AS v(front, back, example, sort_order)`,
-      [setId, inserts.front, inserts.back, inserts.example, inserts.sort],
+      [setId, inserts.front, inserts.back, inserts.example, inserts.sort]
     );
     stats.cardsNew += inserts.front.length;
   }
@@ -218,13 +281,14 @@ async function syncCards(db: Db, setId: string, unit: ParsedUnit, stats: Stats):
       `UPDATE cards c SET front = v.front, back = v.back, example = v.example, sort_order = v.sort_order
          FROM unnest($1::uuid[], $2::text[], $3::text[], $4::text[], $5::int[]) AS v(id, front, back, example, sort_order)
         WHERE c.id = v.id`,
-      [updates.id, updates.front, updates.back, updates.example, updates.sort],
+      [updates.id, updates.front, updates.back, updates.example, updates.sort]
     );
     stats.cardsUpdated += updates.id.length;
   }
 
   const missing = existing.rows.filter((row) => !matched.has(row.id));
-  for (const row of missing) stats.missing.push({ id: row.id, unitNumber: unit.number, front: row.front });
+  for (const row of missing)
+    stats.missing.push({ id: row.id, unitNumber: unit.number, front: row.front });
   if (missing.length > 0 && inserts.front.length > 0) stats.suspectRenames.push(unit.number);
 }
 
@@ -247,11 +311,15 @@ async function prune(db: Db, stats: Stats, dryRun: boolean): Promise<void> {
   const ids = stats.missing.map((m) => m.id);
   const progress = await db.query<{ users: string; rows: string }>(
     'SELECT COUNT(DISTINCT user_id) AS users, COUNT(*) AS rows FROM card_progress WHERE card_id = ANY($1::uuid[])',
-    [ids],
+    [ids]
   );
   const users = Number(progress.rows[0].users);
-  console.log(`\n⚠️  --prune: будет удалено карточек: ${ids.length}. Прогресс по ним есть у учеников: ${users}.`);
-  console.log('   Вместе с карточками удалится их прогресс (card_progress) и история повторений (reviews).');
+  console.log(
+    `\n⚠️  --prune: будет удалено карточек: ${ids.length}. Прогресс по ним есть у учеников: ${users}.`
+  );
+  console.log(
+    '   Вместе с карточками удалится их прогресс (card_progress) и история повторений (reviews).'
+  );
   if (dryRun) {
     console.log('   (dry-run: ничего не удаляется)');
     return;
@@ -271,18 +339,21 @@ function printReport(book: ParsedBook, stats: Stats, args: Args): void {
   const missingNote = stats.pruned ? 'удалены' : 'не удалены';
 
   console.log('');
-  if (args.dryRun) console.log('DRY-RUN — всё откатено, база не изменена. Так будет после настоящего импорта:\n');
+  if (args.dryRun)
+    console.log('DRY-RUN — всё откатено, база не изменена. Так будет после настоящего импорта:\n');
   console.log(`Книга: ${book.title}${edition} — ${stats.bookStatus}, статус: ${status}`);
   console.log(
-    `Юниты: ${unitsTotal} (${stats.unitsNew} новых, ${stats.unitsUpdated} обновлено, ${stats.unitsUnchanged} без изменений)`,
+    `Юниты: ${unitsTotal} (${stats.unitsNew} новых, ${stats.unitsUpdated} обновлено, ${stats.unitsUnchanged} без изменений)`
   );
   console.log(
     `Карточки: +${stats.cardsNew} новых, ~${stats.cardsUpdated} обновлено, ${stats.cardsUnchanged} без изменений, ` +
-      `${stats.missing.length} отсутствуют в Excel${stats.missing.length > 0 ? ` (${missingNote})` : ''}`,
+      `${stats.missing.length} отсутствуют в Excel${stats.missing.length > 0 ? ` (${missingNote})` : ''}`
   );
 
   if (stats.unitsNotInExcel.length > 0) {
-    console.log(`\nЮниты есть в базе, но нет в Excel (не тронуты): ${stats.unitsNotInExcel.map((n) => `Unit ${n}`).join(', ')}`);
+    console.log(
+      `\nЮниты есть в базе, но нет в Excel (не тронуты): ${stats.unitsNotInExcel.map((n) => `Unit ${n}`).join(', ')}`
+    );
   }
   if (stats.missing.length > 0) {
     console.log(`\nКарточки, которых нет в Excel (${missingNote}):`);
@@ -292,7 +363,7 @@ function printReport(book: ParsedBook, stats: Stats, args: Args): void {
   if (stats.suspectRenames.length > 0) {
     console.log(
       `\n⚠️  В юнитах ${stats.suspectRenames.map((n) => `Unit ${n}`).join(', ')} одновременно есть новые и пропавшие карточки.\n` +
-        '   Если вы исправили опечатку в term — это считается новой карточкой, прогресс учеников по старой не перейдёт.',
+        '   Если вы исправили опечатку в term — это считается новой карточкой, прогресс учеников по старой не перейдёт.'
     );
   }
 }
@@ -320,9 +391,18 @@ async function main(): Promise<void> {
   const adminUserId = getAdminUserId();
   const db = await connect();
   const stats: Stats = {
-    bookStatus: 'без изменений', isPublished: false,
-    unitsNew: 0, unitsUpdated: 0, unitsUnchanged: 0, unitsNotInExcel: [],
-    cardsNew: 0, cardsUpdated: 0, cardsUnchanged: 0, missing: [], suspectRenames: [], pruned: false,
+    bookStatus: 'без изменений',
+    isPublished: false,
+    unitsNew: 0,
+    unitsUpdated: 0,
+    unitsUnchanged: 0,
+    unitsNotInExcel: [],
+    cardsNew: 0,
+    cardsUpdated: 0,
+    cardsUnchanged: 0,
+    missing: [],
+    suspectRenames: [],
+    pruned: false,
   };
 
   try {
@@ -332,7 +412,10 @@ async function main(): Promise<void> {
     // Не даём двум импортам идти одновременно.
     await db.query("SELECT pg_advisory_xact_lock(hashtext('flashly:import-book'))");
 
-    const admin = await db.query<{ is_admin: boolean }>('SELECT is_admin FROM users WHERE id = $1', [adminUserId]);
+    const admin = await db.query<{ is_admin: boolean }>(
+      'SELECT is_admin FROM users WHERE id = $1',
+      [adminUserId]
+    );
     if (admin.rows.length === 0 || !admin.rows[0].is_admin) {
       throw new Error(`ADMIN_USER_ID ${adminUserId} не найден в users или у него is_admin = false`);
     }
@@ -340,7 +423,10 @@ async function main(): Promise<void> {
     const bookId = await upsertBook(db, book, stats);
 
     const excelNumbers = new Set(parsed.units.map((u) => u.number));
-    const dbUnits = await db.query<{ number: number }>('SELECT number FROM book_units WHERE book_id = $1 ORDER BY number', [bookId]);
+    const dbUnits = await db.query<{ number: number }>(
+      'SELECT number FROM book_units WHERE book_id = $1 ORDER BY number',
+      [bookId]
+    );
     stats.unitsNotInExcel = dbUnits.rows.map((r) => r.number).filter((n) => !excelNumbers.has(n));
 
     const touchedSets: string[] = [];
@@ -356,11 +442,13 @@ async function main(): Promise<void> {
     await db.query(
       `UPDATE card_sets cs SET total_cards = (SELECT COUNT(*) FROM cards c WHERE c.set_id = cs.id)
         WHERE cs.id = ANY($1::uuid[])`,
-      [touchedSets],
+      [touchedSets]
     );
 
     if (args.publish && !stats.isPublished) {
-      await db.query('UPDATE books SET is_published = true, updated_at = NOW() WHERE id = $1', [bookId]);
+      await db.query('UPDATE books SET is_published = true, updated_at = NOW() WHERE id = $1', [
+        bookId,
+      ]);
       stats.isPublished = true;
       if (stats.bookStatus === 'без изменений') stats.bookStatus = 'обновлена';
     }

@@ -9,11 +9,11 @@ export interface LibraryCategoryDef {
 }
 
 export interface LibraryLanguageDef {
-  key: string;       // e.g. 'en-ru'
-  flag: string;      // e.g. '🇬🇧→🇷🇺'
-  label: string;     // e.g. 'Английский'
-  from: string;      // e.g. 'en'
-  to: string;        // e.g. 'ru'
+  key: string; // e.g. 'en-ru'
+  flag: string; // e.g. '🇬🇧→🇷🇺'
+  label: string; // e.g. 'Английский'
+  from: string; // e.g. 'en'
+  to: string; // e.g. 'ru'
 }
 
 export interface CardCountRange {
@@ -58,21 +58,21 @@ export const LIBRARY_SORT_OPTIONS = [
   { key: 'newest', label: 'Новые' },
 ] as const;
 
-export type LibrarySortKey = typeof LIBRARY_SORT_OPTIONS[number]['key'];
+export type LibrarySortKey = (typeof LIBRARY_SORT_OPTIONS)[number]['key'];
 
 /** Get category label by key */
 export function getCategoryLabel(key: string): string {
-  return LIBRARY_CATEGORIES.find(c => c.key === key)?.label ?? key;
+  return LIBRARY_CATEGORIES.find((c) => c.key === key)?.label ?? key;
 }
 
 /** Get language def by language_from + language_to */
 export function getLanguageDef(from: string, to: string): LibraryLanguageDef | undefined {
-  return LIBRARY_LANGUAGES.find(l => l.from === from && l.to === to);
+  return LIBRARY_LANGUAGES.find((l) => l.from === from && l.to === to);
 }
 
 /** Get language def by combined key (e.g. 'en-ru') */
 export function getLanguageByKey(key: string): LibraryLanguageDef | undefined {
-  return LIBRARY_LANGUAGES.find(l => l.key === key);
+  return LIBRARY_LANGUAGES.find((l) => l.key === key);
 }
 
 /** Format number with K suffix */

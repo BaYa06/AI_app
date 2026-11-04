@@ -3,12 +3,7 @@
  * @description Экран ожидания ученика — ждёт пока учитель запустит тест
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  Animated,
-  Easing,
-} from 'react-native';
+import { View, StyleSheet, Animated, Easing } from 'react-native';
 import { BookOpen, Play, ShieldAlert } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import { Badge, Button, Card, Screen, ScreenHeader } from '@/components/ui';
@@ -38,7 +33,15 @@ const MODE_LABELS: Record<string, string> = {
 export function TestWaitingScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
 
-  const { sessionId, participantId, setTitle, testMode, questionCount, timePerQuestion, exitControl } = route.params;
+  const {
+    sessionId,
+    participantId,
+    setTitle,
+    testMode,
+    questionCount,
+    timePerQuestion,
+    exitControl,
+  } = route.params;
 
   const [participants, setParticipants] = useState<Participant[]>([]);
 
@@ -88,14 +91,22 @@ export function TestWaitingScreen({ navigation, route }: Props) {
         if (!mounted) return;
         const list: Participant[] = (data.participants || []).map((p: any, idx: number) => ({
           id: String(idx),
-          initials: (p.name || '?').split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2) || '??',
+          initials:
+            (p.name || '?')
+              .split(' ')
+              .map((w: string) => w[0])
+              .join('')
+              .toUpperCase()
+              .slice(0, 2) || '??',
         }));
         setParticipants(list);
       } catch (e) {
         log.error('TestWaiting', 'Failed to load participants', e);
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [sessionId]);
 
   // Pulse animation
@@ -153,8 +164,8 @@ export function TestWaitingScreen({ navigation, route }: Props) {
       })
       .on('broadcast', { event: 'student_joined' }, ({ payload }) => {
         if (!payload) return;
-        setParticipants(prev => {
-          if (prev.some(p => p.id === payload.userId)) return prev;
+        setParticipants((prev) => {
+          if (prev.some((p) => p.id === payload.userId)) return prev;
           return [...prev, { id: payload.userId, initials: payload.initials || '??' }];
         });
       })
@@ -234,9 +245,10 @@ export function TestWaitingScreen({ navigation, route }: Props) {
     bounceDot(dot3, 300).start();
   }, []);
 
-  const timeText = timePerQuestion > 0
-    ? `${questionCount} ${pluralize(questionCount, 'вопрос', 'вопроса', 'вопросов')} • ${Math.round((timePerQuestion * questionCount) / 60)} мин`
-    : `${questionCount} ${pluralize(questionCount, 'вопрос', 'вопроса', 'вопросов')} • Без ограничения времени`;
+  const timeText =
+    timePerQuestion > 0
+      ? `${questionCount} ${pluralize(questionCount, 'вопрос', 'вопроса', 'вопросов')} • ${Math.round((timePerQuestion * questionCount) / 60)} мин`
+      : `${questionCount} ${pluralize(questionCount, 'вопрос', 'вопроса', 'вопросов')} • Без ограничения времени`;
 
   return (
     <Screen
@@ -285,7 +297,11 @@ export function TestWaitingScreen({ navigation, route }: Props) {
           <Card style={[styles.rulesCard, !rulesAccepted && { borderColor: colors.warning }]}>
             <View style={styles.rulesTitleRow}>
               <ShieldAlert size={iconSize.s} color={colors.warningText} />
-              <Text variant="label" accessibilityRole="header" style={{ color: colors.textPrimary }}>
+              <Text
+                variant="label"
+                accessibilityRole="header"
+                style={{ color: colors.textPrimary }}
+              >
                 Контролируемый режим
               </Text>
             </View>
@@ -339,9 +355,7 @@ export function TestWaitingScreen({ navigation, route }: Props) {
                     },
                   ]}
                 >
-                  <Text style={[styles.avatarText, { color: tint }]}>
-                    {s.initials[0]}
-                  </Text>
+                  <Text style={[styles.avatarText, { color: tint }]}>{s.initials[0]}</Text>
                 </View>
               );
             })}
@@ -357,7 +371,10 @@ export function TestWaitingScreen({ navigation, route }: Props) {
                   },
                 ]}
               >
-                <Text variant="caption" style={[styles.avatarOverflow, { color: colors.textSecondary }]}>
+                <Text
+                  variant="caption"
+                  style={[styles.avatarOverflow, { color: colors.textSecondary }]}
+                >
                   +{participants.length - MAX_VISIBLE_AVATARS}
                 </Text>
               </View>
@@ -385,7 +402,10 @@ export function TestWaitingScreen({ navigation, route }: Props) {
             {[dot1, dot2, dot3].map((dot, i) => (
               <Animated.View
                 key={i}
-                style={[styles.dot, { backgroundColor: colors.primary, transform: [{ translateY: dot }] }]}
+                style={[
+                  styles.dot,
+                  { backgroundColor: colors.primary, transform: [{ translateY: dot }] },
+                ]}
               />
             ))}
           </View>

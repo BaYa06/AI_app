@@ -22,7 +22,9 @@ describe('widgetLinks', () => {
   });
 
   it('разбирает цель, состояние и размер виджета', () => {
-    expect(parseWidgetUrl('flashly://lesson?from=widget&state=waiting&family=accessoryRectangular')).toEqual({
+    expect(
+      parseWidgetUrl('flashly://lesson?from=widget&state=waiting&family=accessoryRectangular')
+    ).toEqual({
       target: 'lesson',
       state: 'waiting',
       family: 'accessoryRectangular',

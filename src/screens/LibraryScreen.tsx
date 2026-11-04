@@ -16,7 +16,22 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { Text } from '@/components/common';
 import { useThemeColors, useLibraryStore } from '@/store';
-import { spacing, borderRadius, heights, iconSize, screenPadding, LIBRARY_CATEGORIES, LIBRARY_LANGUAGES, CARD_COUNT_RANGES, LIBRARY_SORT_OPTIONS, getCategoryLabel, getLanguageDef, formatCount, formatRelativeTime, alpha } from '@/constants';
+import {
+  spacing,
+  borderRadius,
+  heights,
+  iconSize,
+  screenPadding,
+  LIBRARY_CATEGORIES,
+  LIBRARY_LANGUAGES,
+  CARD_COUNT_RANGES,
+  LIBRARY_SORT_OPTIONS,
+  getCategoryLabel,
+  getLanguageDef,
+  formatCount,
+  formatRelativeTime,
+  alpha,
+} from '@/constants';
 import {
   Search,
   ArrowDownUp,
@@ -30,7 +45,16 @@ import {
   Flame,
   Sparkles,
 } from 'lucide-react-native';
-import { Badge, CategoryIcon, EmptyState, ErrorState, SkeletonCard, TextField, useTabBarOverlayInset, type IconComponent } from '@/components/ui';
+import {
+  Badge,
+  CategoryIcon,
+  EmptyState,
+  ErrorState,
+  SkeletonCard,
+  TextField,
+  useTabBarOverlayInset,
+  type IconComponent,
+} from '@/components/ui';
 import { pluralize } from '@/utils';
 import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'react-native-svg';
 import { supabase } from '@/services/supabaseClient';
@@ -59,7 +83,13 @@ function FadeEdge({ side, bgColor }: { side: 'left' | 'right'; bgColor: string }
     >
       <Svg width={FADE_WIDTH} height="100%">
         <Defs>
-          <SvgLinearGradient id={`fade_${side}`} x1={isLeft ? '0' : '1'} y1="0" x2={isLeft ? '1' : '0'} y2="0">
+          <SvgLinearGradient
+            id={`fade_${side}`}
+            x1={isLeft ? '0' : '1'}
+            y1="0"
+            x2={isLeft ? '1' : '0'}
+            y2="0"
+          >
             <Stop offset="0" stopColor={bgColor} stopOpacity="1" />
             <Stop offset="1" stopColor={bgColor} stopOpacity="0" />
           </SvgLinearGradient>
@@ -78,7 +108,10 @@ function FeaturedBadge({ colors }: { colors: ReturnType<typeof useThemeColors> }
     <View
       accessible
       accessibilityLabel="Рекомендуем"
-      style={[s.verifiedBadge, { backgroundColor: colors.primaryFill, borderColor: colors.surface }]}
+      style={[
+        s.verifiedBadge,
+        { backgroundColor: colors.primaryFill, borderColor: colors.surface },
+      ]}
     >
       <Star size={10} color={colors.onPrimary} fill={colors.onPrimary} />
     </View>
@@ -100,7 +133,9 @@ function SectionTitle({
   return (
     <View style={s.sectionTitleRow}>
       <Icon size={iconSize.s} color={color} />
-      <Text variant="h3" accessibilityRole="header" style={{ color: colors.textPrimary }}>{title}</Text>
+      <Text variant="h3" accessibilityRole="header" style={{ color: colors.textPrimary }}>
+        {title}
+      </Text>
     </View>
   );
 }
@@ -116,12 +151,12 @@ const HorizontalCard = memo(function HorizontalCard({
   onPress?: () => void;
   fullWidth?: boolean;
 }) {
-  const avgRating = item.rating_count > 0
-    ? Math.round((item.rating_sum / item.rating_count) * 10) / 10
-    : null;
-  const langDef = item.language_from && item.language_to
-    ? getLanguageDef(item.language_from, item.language_to)
-    : null;
+  const avgRating =
+    item.rating_count > 0 ? Math.round((item.rating_sum / item.rating_count) * 10) / 10 : null;
+  const langDef =
+    item.language_from && item.language_to
+      ? getLanguageDef(item.language_from, item.language_to)
+      : null;
 
   return (
     <Pressable
@@ -143,7 +178,9 @@ const HorizontalCard = memo(function HorizontalCard({
         {avgRating !== null && (
           <View style={[s.ratingBadge, { backgroundColor: alpha(colors.star, 10) }]}>
             <Star size={iconSize.xs} color={colors.star} fill={colors.star} />
-            <Text variant="caption" style={[s.bold, { color: colors.warningText }]}>{avgRating}</Text>
+            <Text variant="caption" style={[s.bold, { color: colors.warningText }]}>
+              {avgRating}
+            </Text>
           </View>
         )}
       </View>
@@ -153,7 +190,8 @@ const HorizontalCard = memo(function HorizontalCard({
           {item.title}
         </Text>
         <Text variant="caption" color="secondary" numberOfLines={1}>
-          {item.author_name || 'Автор неизвестен'}{langDef ? ` • ${langDef.flag} ${langDef.label}` : ''}
+          {item.author_name || 'Автор неизвестен'}
+          {langDef ? ` • ${langDef.flag} ${langDef.label}` : ''}
         </Text>
       </View>
 
@@ -166,11 +204,15 @@ const HorizontalCard = memo(function HorizontalCard({
         </View>
         <View style={s.statItem}>
           <Download size={iconSize.xs} color={colors.textTertiary} />
-          <Text variant="caption" color="secondary">{formatCount(item.imports_count)}</Text>
+          <Text variant="caption" color="secondary">
+            {formatCount(item.imports_count)}
+          </Text>
         </View>
         <View style={[s.statItem, s.statPushRight]}>
           <Heart size={iconSize.xs} color={colors.like} fill={colors.like} />
-          <Text variant="caption" color="secondary">{formatCount(item.likes_count)}</Text>
+          <Text variant="caption" color="secondary">
+            {formatCount(item.likes_count)}
+          </Text>
         </View>
       </View>
 
@@ -192,7 +234,11 @@ const RecentCard = memo(function RecentCard({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      style={({ pressed }) => [s.rCard, { backgroundColor: colors.surface, borderColor: colors.border }, pressed && s.pressed]}
+      style={({ pressed }) => [
+        s.rCard,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+        pressed && s.pressed,
+      ]}
     >
       <View style={[s.rCardIcon, { backgroundColor: alpha(colors.primary, 10) }]}>
         <CategoryIcon category={item.category} size="m" />
@@ -213,9 +259,15 @@ const RecentCard = memo(function RecentCard({
         <Text variant="caption" style={[s.bold, { color: colors.textSecondary }]}>
           {item.cards_count} {pluralize(item.cards_count, 'карточка', 'карточки', 'карточек')}
         </Text>
-        <Text variant="caption" style={{ color: colors.textTertiary }}>{formatRelativeTime(item.published_at)}</Text>
+        <Text variant="caption" style={{ color: colors.textTertiary }}>
+          {formatRelativeTime(item.published_at)}
+        </Text>
         {item.is_imported && (
-          <CheckCircle2 size={iconSize.xs} color={colors.successText} accessibilityLabel="Импортировано" />
+          <CheckCircle2
+            size={iconSize.xs}
+            color={colors.successText}
+            accessibilityLabel="Импортировано"
+          />
         )}
       </View>
     </Pressable>
@@ -237,7 +289,11 @@ const BookCard = memo(function BookCard({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      style={({ pressed }) => [s.bCard, { backgroundColor: colors.surface, borderColor: colors.border }, pressed && s.pressed]}
+      style={({ pressed }) => [
+        s.bCard,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+        pressed && s.pressed,
+      ]}
     >
       <View style={[s.bCardCover, { backgroundColor: alpha(cover.color, 10) }]}>
         <cover.icon size={iconSize.xl} color={cover.color} />
@@ -246,7 +302,9 @@ const BookCard = memo(function BookCard({
         {book.title}
       </Text>
       {meta ? (
-        <Text variant="caption" color="secondary" numberOfLines={1}>{meta}</Text>
+        <Text variant="caption" color="secondary" numberOfLines={1}>
+          {meta}
+        </Text>
       ) : null}
       <View style={s.statItem}>
         <BookOpen size={iconSize.xs} color={colors.textTertiary} />
@@ -341,65 +399,95 @@ export function LibraryScreen() {
   );
 
   // Debounced search
-  const onSearchChange = useCallback((text: string) => {
-    setSearchText(text);
-    if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    if (!COMMUNITY_LIBRARY_ENABLED) return;
-    searchTimeout.current = setTimeout(() => {
-      setFilters({ search: text || undefined }, userId);
-    }, 400);
-  }, [userId, setFilters]);
+  const onSearchChange = useCallback(
+    (text: string) => {
+      setSearchText(text);
+      if (searchTimeout.current) clearTimeout(searchTimeout.current);
+      if (!COMMUNITY_LIBRARY_ENABLED) return;
+      searchTimeout.current = setTimeout(() => {
+        setFilters({ search: text || undefined }, userId);
+      }, 400);
+    },
+    [userId, setFilters]
+  );
 
   // Category filter
-  const onCategoryPress = useCallback((key: string) => {
-    const newCat = activeCategory === key ? null : key;
-    setActiveCategory(newCat);
-    setFilters({ category: newCat || undefined }, userId);
-  }, [activeCategory, userId, setFilters]);
+  const onCategoryPress = useCallback(
+    (key: string) => {
+      const newCat = activeCategory === key ? null : key;
+      setActiveCategory(newCat);
+      setFilters({ category: newCat || undefined }, userId);
+    },
+    [activeCategory, userId, setFilters]
+  );
 
   // Language filter
-  const onLangPress = useCallback((key: string) => {
-    const newLang = activeLang === key ? null : key;
-    setActiveLang(newLang);
-    setFilters({ language: newLang || undefined }, userId);
-  }, [activeLang, userId, setFilters]);
+  const onLangPress = useCallback(
+    (key: string) => {
+      const newLang = activeLang === key ? null : key;
+      setActiveLang(newLang);
+      setFilters({ language: newLang || undefined }, userId);
+    },
+    [activeLang, userId, setFilters]
+  );
 
   // Card count filter
-  const onCardCountPress = useCallback((key: string) => {
-    const range = CARD_COUNT_RANGES.find(r => r.key === key);
-    if (!range) return;
-    const newKey = activeCardCount === key ? null : key;
-    setActiveCardCount(newKey);
-    setFilters({
-      cardsMin: newKey ? range.min : undefined,
-      cardsMax: newKey && range.max ? range.max : undefined,
-    }, userId);
-  }, [activeCardCount, userId, setFilters]);
+  const onCardCountPress = useCallback(
+    (key: string) => {
+      const range = CARD_COUNT_RANGES.find((r) => r.key === key);
+      if (!range) return;
+      const newKey = activeCardCount === key ? null : key;
+      setActiveCardCount(newKey);
+      setFilters(
+        {
+          cardsMin: newKey ? range.min : undefined,
+          cardsMax: newKey && range.max ? range.max : undefined,
+        },
+        userId
+      );
+    },
+    [activeCardCount, userId, setFilters]
+  );
 
   // Sort
-  const onSortSelect = useCallback((sortKey: string) => {
-    setFilters({ sort: sortKey as 'popular' | 'newest' | 'top_rated' }, userId);
-  }, [userId, setFilters]);
+  const onSortSelect = useCallback(
+    (sortKey: string) => {
+      setFilters({ sort: sortKey as 'popular' | 'newest' | 'top_rated' }, userId);
+    },
+    [userId, setFilters]
+  );
 
-  const navigateToDetail = useCallback((setId: string) => {
-    navigation.navigate('LibrarySetDetail' as any, { setId });
-  }, [navigation]);
+  const navigateToDetail = useCallback(
+    (setId: string) => {
+      navigation.navigate('LibrarySetDetail' as any, { setId });
+    },
+    [navigation]
+  );
 
-  const navigateToBook = useCallback((bookId: string) => {
-    navigation.navigate('BookDetail' as any, { bookId });
-  }, [navigation]);
+  const navigateToBook = useCallback(
+    (bookId: string) => {
+      navigation.navigate('BookDetail' as any, { bookId });
+    },
+    [navigation]
+  );
 
   const isEmpty = trendingSets.length === 0 && topRatedSets.length === 0 && recentSets.length === 0;
-  const isSearchActive = searchText.trim().length > 0 || activeCategory !== null || activeLang !== null || activeCardCount !== null;
+  const isSearchActive =
+    searchText.trim().length > 0 ||
+    activeCategory !== null ||
+    activeLang !== null ||
+    activeCardCount !== null;
 
   // Книги в режиме поиска — только по тексту запроса (название, издательство, предмет)
   const matchingBooks = React.useMemo(() => {
     const q = searchText.trim().toLowerCase();
     if (!q) return [];
     return books.filter((b) =>
-      [b.title, b.publisher, b.subject].some((field) => field?.toLowerCase().includes(q)));
+      [b.title, b.publisher, b.subject].some((field) => field?.toLowerCase().includes(q))
+    );
   }, [books, searchText]);
-  const nothingToShow = isEmpty && (isSearchActive ? matchingBooks.length === 0 : books.length === 0);
+  const nothingToShow =
+    isEmpty && (isSearchActive ? matchingBooks.length === 0 : books.length === 0);
 
   // Combine all results for search mode (deduplicated)
   const searchResults = React.useMemo(() => {
@@ -434,19 +522,19 @@ export function LibraryScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Сортировка"
-              style={({ pressed }) => [s.sortBtn, { backgroundColor: colors.surfaceMuted }, pressed && s.pressed]}
+              style={({ pressed }) => [
+                s.sortBtn,
+                { backgroundColor: colors.surfaceMuted },
+                pressed && s.pressed,
+              ]}
               onPress={() => {
-                Alert.alert(
-                  'Сортировка',
-                  undefined,
-                  [
-                    ...LIBRARY_SORT_OPTIONS.map(opt => ({
-                      text: opt.label,
-                      onPress: () => onSortSelect(opt.key),
-                    })),
-                    { text: 'Отмена', style: 'cancel' as const },
-                  ]
-                );
+                Alert.alert('Сортировка', undefined, [
+                  ...LIBRARY_SORT_OPTIONS.map((opt) => ({
+                    text: opt.label,
+                    onPress: () => onSortSelect(opt.key),
+                  })),
+                  { text: 'Отмена', style: 'cancel' as const },
+                ]);
               }}
             >
               <ArrowDownUp size={iconSize.s} color={colors.primary} />
@@ -457,16 +545,26 @@ export function LibraryScreen() {
 
       {/* Filter Chips */}
       {COMMUNITY_LIBRARY_ENABLED && (
-        <View style={[s.filtersContainer, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+        <View
+          style={[
+            s.filtersContainer,
+            { backgroundColor: colors.background, borderBottomColor: colors.border },
+          ]}
+        >
           {/* Category Chips */}
           <View style={{ position: 'relative' }}>
             <FadeEdge side="left" bgColor={colors.background} />
             <FadeEdge side="right" bgColor={colors.background} />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipsRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={s.chipsRow}
+            >
               {LIBRARY_CATEGORIES.map((cat) => {
                 const isActive = activeCategory === cat.key;
                 return (
-                  <Pressable hitSlop={{ top: spacing.xxs, bottom: spacing.xxs }}
+                  <Pressable
+                    hitSlop={{ top: spacing.xxs, bottom: spacing.xxs }}
                     key={cat.key}
                     accessibilityRole="button"
                     accessibilityState={{ selected: isActive }}
@@ -478,7 +576,10 @@ export function LibraryScreen() {
                     ]}
                     onPress={() => onCategoryPress(cat.key)}
                   >
-                    <Text variant="label" style={{ color: isActive ? colors.onPrimary : colors.textPrimary }}>
+                    <Text
+                      variant="label"
+                      style={{ color: isActive ? colors.onPrimary : colors.textPrimary }}
+                    >
                       {cat.label}
                     </Text>
                   </Pressable>
@@ -491,24 +592,40 @@ export function LibraryScreen() {
           <View style={{ position: 'relative' }}>
             <FadeEdge side="left" bgColor={colors.background} />
             <FadeEdge side="right" bgColor={colors.background} />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipsRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={s.chipsRow}
+            >
               {LIBRARY_LANGUAGES.map((lang) => {
                 const isActive = activeLang === lang.key;
                 return (
-                  <Pressable hitSlop={{ top: spacing.xs, bottom: spacing.xs }}
+                  <Pressable
+                    hitSlop={{ top: spacing.xs, bottom: spacing.xs }}
                     key={lang.key}
                     accessibilityRole="button"
                     accessibilityState={{ selected: isActive }}
                     style={[
                       s.langChip,
                       isActive
-                        ? { backgroundColor: alpha(colors.primary, 10), borderColor: colors.primary }
+                        ? {
+                            backgroundColor: alpha(colors.primary, 10),
+                            borderColor: colors.primary,
+                          }
                         : { backgroundColor: colors.surface, borderColor: colors.border },
                     ]}
                     onPress={() => onLangPress(lang.key)}
                   >
                     <Text variant="caption">{lang.flag}</Text>
-                    <Text variant="caption" style={[s.semibold, { color: isActive ? colors.primary : colors.textPrimary }]}>{lang.label}</Text>
+                    <Text
+                      variant="caption"
+                      style={[
+                        s.semibold,
+                        { color: isActive ? colors.primary : colors.textPrimary },
+                      ]}
+                    >
+                      {lang.label}
+                    </Text>
                   </Pressable>
                 );
               })}
@@ -516,20 +633,35 @@ export function LibraryScreen() {
               {CARD_COUNT_RANGES.map((range) => {
                 const isActive = activeCardCount === range.key;
                 return (
-                  <Pressable hitSlop={{ top: spacing.xs, bottom: spacing.xs }}
+                  <Pressable
+                    hitSlop={{ top: spacing.xs, bottom: spacing.xs }}
                     key={range.key}
                     accessibilityRole="button"
                     accessibilityState={{ selected: isActive }}
                     style={[
                       s.langChip,
                       isActive
-                        ? { backgroundColor: alpha(colors.primary, 10), borderColor: colors.primary }
+                        ? {
+                            backgroundColor: alpha(colors.primary, 10),
+                            borderColor: colors.primary,
+                          }
                         : { backgroundColor: colors.surface, borderColor: colors.border },
                     ]}
                     onPress={() => onCardCountPress(range.key)}
                   >
-                    <Layers size={iconSize.xs} color={isActive ? colors.primary : colors.textSecondary} />
-                    <Text variant="caption" style={[s.semibold, { color: isActive ? colors.primary : colors.textPrimary }]}>{range.label}</Text>
+                    <Layers
+                      size={iconSize.xs}
+                      color={isActive ? colors.primary : colors.textSecondary}
+                    />
+                    <Text
+                      variant="caption"
+                      style={[
+                        s.semibold,
+                        { color: isActive ? colors.primary : colors.textPrimary },
+                      ]}
+                    >
+                      {range.label}
+                    </Text>
                   </Pressable>
                 );
               })}
@@ -541,7 +673,11 @@ export function LibraryScreen() {
       {/* Content */}
       {(isLoading || (!COMMUNITY_LIBRARY_ENABLED && booksLoading)) && nothingToShow ? (
         // Заготовки в форме карточек вместо спиннера (брендбук, 7.8)
-        <View style={s.skeletons} accessibilityLabel="Загрузка библиотеки" accessibilityRole="progressbar">
+        <View
+          style={s.skeletons}
+          accessibilityLabel="Загрузка библиотеки"
+          accessibilityRole="progressbar"
+        >
           <SkeletonCard height={160} />
           <SkeletonCard height={88} />
           <SkeletonCard height={88} />
@@ -555,25 +691,54 @@ export function LibraryScreen() {
           onRetry={() => fetchAllSections(userId)}
         />
       ) : nothingToShow ? (
-        <ScrollView style={s.content} contentContainerStyle={[s.flexGrow, bottomPad]} refreshControl={refreshControl}>
+        <ScrollView
+          style={s.content}
+          contentContainerStyle={[s.flexGrow, bottomPad]}
+          refreshControl={refreshControl}
+        >
           <EmptyState
             icon={Search}
             title="Ничего не найдено"
-            description={COMMUNITY_LIBRARY_ENABLED ? 'Попробуй изменить фильтры или поисковый запрос' : 'Попробуй другой запрос'}
+            description={
+              COMMUNITY_LIBRARY_ENABLED
+                ? 'Попробуй изменить фильтры или поисковый запрос'
+                : 'Попробуй другой запрос'
+            }
           />
         </ScrollView>
       ) : isSearchActive ? (
         /* Search Results - vertical grid with HorizontalCard design */
-        <ScrollView style={s.content} contentContainerStyle={[s.scrollContent, bottomPad]} showsVerticalScrollIndicator={false} refreshControl={refreshControl}>
+        <ScrollView
+          style={s.content}
+          contentContainerStyle={[s.scrollContent, bottomPad]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={refreshControl}
+        >
           {matchingBooks.length > 0 && (
             <View style={s.section}>
               <View style={s.sectionHeader}>
-                <SectionTitle icon={Library} title="Учебники" color={colors.primary} colors={colors} />
-                <Text variant="label" color="secondary">{matchingBooks.length}</Text>
+                <SectionTitle
+                  icon={Library}
+                  title="Учебники"
+                  color={colors.primary}
+                  colors={colors}
+                />
+                <Text variant="label" color="secondary">
+                  {matchingBooks.length}
+                </Text>
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hScroll}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={s.hScroll}
+              >
                 {matchingBooks.map((book) => (
-                  <BookCard key={book.id} book={book} colors={colors} onPress={() => navigateToBook(book.id)} />
+                  <BookCard
+                    key={book.id}
+                    book={book}
+                    colors={colors}
+                    onPress={() => navigateToBook(book.id)}
+                  />
                 ))}
               </ScrollView>
             </View>
@@ -581,28 +746,60 @@ export function LibraryScreen() {
           {searchResults.length > 0 && (
             <View style={s.section}>
               <View style={s.sectionHeader}>
-                <SectionTitle icon={Search} title="Результаты поиска" color={colors.primary} colors={colors} />
-                <Text variant="label" color="secondary">{searchResults.length}</Text>
+                <SectionTitle
+                  icon={Search}
+                  title="Результаты поиска"
+                  color={colors.primary}
+                  colors={colors}
+                />
+                <Text variant="label" color="secondary">
+                  {searchResults.length}
+                </Text>
               </View>
               <View style={s.searchGrid}>
                 {searchResults.map((item) => (
-                  <HorizontalCard key={item.id} item={item} colors={colors} fullWidth onPress={() => navigateToDetail(item.id)} />
+                  <HorizontalCard
+                    key={item.id}
+                    item={item}
+                    colors={colors}
+                    fullWidth
+                    onPress={() => navigateToDetail(item.id)}
+                  />
                 ))}
               </View>
             </View>
           )}
         </ScrollView>
       ) : (
-        <ScrollView style={s.content} contentContainerStyle={[s.scrollContent, bottomPad]} showsVerticalScrollIndicator={false} refreshControl={refreshControl}>
+        <ScrollView
+          style={s.content}
+          contentContainerStyle={[s.scrollContent, bottomPad]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={refreshControl}
+        >
           {/* Books (каталог учебников) */}
           {books.length > 0 && (
             <View style={s.section}>
               <View style={s.sectionHeader}>
-                <SectionTitle icon={Library} title="Учебники" color={colors.primary} colors={colors} />
+                <SectionTitle
+                  icon={Library}
+                  title="Учебники"
+                  color={colors.primary}
+                  colors={colors}
+                />
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hScroll}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={s.hScroll}
+              >
                 {books.map((book) => (
-                  <BookCard key={book.id} book={book} colors={colors} onPress={() => navigateToBook(book.id)} />
+                  <BookCard
+                    key={book.id}
+                    book={book}
+                    colors={colors}
+                    onPress={() => navigateToBook(book.id)}
+                  />
                 ))}
               </ScrollView>
             </View>
@@ -612,11 +809,25 @@ export function LibraryScreen() {
           {trendingSets.length > 0 && (
             <View style={s.section}>
               <View style={s.sectionHeader}>
-                <SectionTitle icon={Flame} title="Популярные наборы" color={colors.streak} colors={colors} />
+                <SectionTitle
+                  icon={Flame}
+                  title="Популярные наборы"
+                  color={colors.streak}
+                  colors={colors}
+                />
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hScroll}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={s.hScroll}
+              >
                 {trendingSets.map((item) => (
-                  <HorizontalCard key={item.id} item={item} colors={colors} onPress={() => navigateToDetail(item.id)} />
+                  <HorizontalCard
+                    key={item.id}
+                    item={item}
+                    colors={colors}
+                    onPress={() => navigateToDetail(item.id)}
+                  />
                 ))}
               </ScrollView>
             </View>
@@ -626,11 +837,25 @@ export function LibraryScreen() {
           {topRatedSets.length > 0 && (
             <View style={s.section}>
               <View style={s.sectionHeader}>
-                <SectionTitle icon={Star} title="Лучшие по рейтингу" color={colors.star} colors={colors} />
+                <SectionTitle
+                  icon={Star}
+                  title="Лучшие по рейтингу"
+                  color={colors.star}
+                  colors={colors}
+                />
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hScroll}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={s.hScroll}
+              >
                 {topRatedSets.map((item) => (
-                  <HorizontalCard key={item.id} item={item} colors={colors} onPress={() => navigateToDetail(item.id)} />
+                  <HorizontalCard
+                    key={item.id}
+                    item={item}
+                    colors={colors}
+                    onPress={() => navigateToDetail(item.id)}
+                  />
                 ))}
               </ScrollView>
             </View>
@@ -640,15 +865,26 @@ export function LibraryScreen() {
           {recentSets.length > 0 && (
             <View style={s.section}>
               <View style={s.sectionHeader}>
-                <SectionTitle icon={Sparkles} title="Недавно добавленные" color={colors.primary} colors={colors} />
+                <SectionTitle
+                  icon={Sparkles}
+                  title="Недавно добавленные"
+                  color={colors.primary}
+                  colors={colors}
+                />
               </View>
               <View style={s.recentList}>
                 {recentSets.map((item) => (
-                  <RecentCard key={item.id} item={item} colors={colors} onPress={() => navigateToDetail(item.id)} />
+                  <RecentCard
+                    key={item.id}
+                    item={item}
+                    colors={colors}
+                    onPress={() => navigateToDetail(item.id)}
+                  />
                 ))}
               </View>
               {hasMoreRecent && (
-                <Pressable accessibilityRole="button"
+                <Pressable
+                  accessibilityRole="button"
                   style={[s.loadMoreBtn, { borderColor: alpha(colors.primary, 20) }]}
                   onPress={() => fetchMoreRecent(userId)}
                   disabled={isLoadingMore}
@@ -656,7 +892,9 @@ export function LibraryScreen() {
                   {isLoadingMore ? (
                     <ActivityIndicator size="small" color={colors.primary} />
                   ) : (
-                    <Text variant="label" style={{ color: colors.primary }}>Показать ещё</Text>
+                    <Text variant="label" style={{ color: colors.primary }}>
+                      Показать ещё
+                    </Text>
                   )}
                 </Pressable>
               )}
@@ -678,39 +916,150 @@ const s = StyleSheet.create({
   semibold: { fontWeight: '600' },
   bold: { fontWeight: '700' },
   pressed: { opacity: 0.85 },
-  header: { paddingHorizontal: screenPadding, paddingTop: spacing.m, paddingBottom: spacing.xs, gap: spacing.xs },
+  header: {
+    paddingHorizontal: screenPadding,
+    paddingTop: spacing.m,
+    paddingBottom: spacing.xs,
+    gap: spacing.xs,
+  },
   filtersContainer: { paddingBottom: spacing.xs, borderBottomWidth: 1, gap: spacing.xs },
-  searchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, marginBottom: spacing.xs },
-  sortBtn: { width: heights.input, height: heights.input, borderRadius: borderRadius.m, alignItems: 'center', justifyContent: 'center' },
-  chipsRow: { flexDirection: 'row', gap: spacing.xs, paddingVertical: spacing.xxs, paddingHorizontal: screenPadding },
-  chip: { minHeight: 36, justifyContent: 'center', paddingHorizontal: spacing.m, borderRadius: borderRadius.full, borderWidth: 1 },
-  langChip: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, minHeight: 32, paddingHorizontal: spacing.s, borderRadius: borderRadius.full, borderWidth: 1 },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+    marginBottom: spacing.xs,
+  },
+  sortBtn: {
+    width: heights.input,
+    height: heights.input,
+    borderRadius: borderRadius.m,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    paddingVertical: spacing.xxs,
+    paddingHorizontal: screenPadding,
+  },
+  chip: {
+    minHeight: 36,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.m,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+  },
+  langChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    minHeight: 32,
+    paddingHorizontal: spacing.s,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+  },
   chipSeparator: { width: 1, height: 24, marginHorizontal: spacing.xs, alignSelf: 'center' },
   content: { flex: 1 },
   scrollContent: { paddingTop: spacing.m, paddingBottom: spacing.xxl },
   skeletons: { padding: screenPadding, gap: spacing.s },
   section: { marginBottom: spacing.l },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: screenPadding, marginBottom: spacing.s },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: screenPadding,
+    marginBottom: spacing.s,
+  },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   hScroll: { paddingHorizontal: screenPadding, gap: spacing.s },
   searchGrid: { paddingHorizontal: screenPadding, gap: spacing.s },
-  bCard: { width: 150, padding: spacing.m, borderRadius: borderRadius.l, borderWidth: 1, gap: spacing.xs },
-  bCardCover: { width: '100%', height: 88, borderRadius: borderRadius.m, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xxs },
+  bCard: {
+    width: 150,
+    padding: spacing.m,
+    borderRadius: borderRadius.l,
+    borderWidth: 1,
+    gap: spacing.xs,
+  },
+  bCardCover: {
+    width: '100%',
+    height: 88,
+    borderRadius: borderRadius.m,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xxs,
+  },
   bCardTitle: { minHeight: 40 },
-  hCard: { width: 260, padding: spacing.m, borderRadius: borderRadius.l, borderWidth: 1, gap: spacing.s },
+  hCard: {
+    width: 260,
+    padding: spacing.m,
+    borderRadius: borderRadius.l,
+    borderWidth: 1,
+    gap: spacing.s,
+  },
   hCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  hCardIcon: { width: 48, height: 48, borderRadius: borderRadius.m, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  hCardIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: borderRadius.m,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
   hCardText: { gap: spacing.xxs / 2 },
-  ratingBadge: { flexDirection: 'row', alignItems: 'center', gap: spacing.xxs, paddingHorizontal: spacing.xs, paddingVertical: spacing.xxs / 2, borderRadius: borderRadius.s },
-  hCardStats: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, marginTop: spacing.xxs },
+  ratingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxs,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xxs / 2,
+    borderRadius: borderRadius.s,
+  },
+  hCardStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+    marginTop: spacing.xxs,
+  },
   statItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.xxs },
   statPushRight: { marginLeft: 'auto' },
-  verifiedBadge: { position: 'absolute', top: -spacing.xxs, right: -spacing.xxs, width: 18, height: 18, borderRadius: borderRadius.full, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5 },
+  verifiedBadge: {
+    position: 'absolute',
+    top: -spacing.xxs,
+    right: -spacing.xxs,
+    width: 18,
+    height: 18,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+  },
   recentList: { paddingHorizontal: screenPadding, gap: spacing.s },
-  rCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, padding: spacing.m, borderRadius: borderRadius.l, borderWidth: 1 },
-  rCardIcon: { width: 52, height: 52, borderRadius: borderRadius.m, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  rCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+    padding: spacing.m,
+    borderRadius: borderRadius.l,
+    borderWidth: 1,
+  },
+  rCardIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: borderRadius.m,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
   rCardBody: { flex: 1, gap: spacing.xxs },
   rCardMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   rCardRight: { alignItems: 'flex-end', gap: spacing.xxs / 2 },
-  loadMoreBtn: { marginHorizontal: screenPadding, marginTop: spacing.m, minHeight: heights.button, borderRadius: borderRadius.m, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  loadMoreBtn: {
+    marginHorizontal: screenPadding,
+    marginTop: spacing.m,
+    minHeight: heights.button,
+    borderRadius: borderRadius.m,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

@@ -4,13 +4,7 @@
  * План: plan/book_catalog_plan.md, часть 4.
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  ActivityIndicator,
-} from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { ChevronRight, Layers, BookOpen, Link2 } from 'lucide-react-native';
 import { Text, Container } from '@/components/common';
 import { AttachToCoursesSheet } from '@/components/books/AttachToCoursesSheet';
@@ -40,7 +34,6 @@ export function BookDetailScreen({ navigation, route }: Props) {
   const [attachVisible, setAttachVisible] = useState(false);
   const [attaching, setAttaching] = useState(false);
 
-
   const load = useCallback(async () => {
     setIsLoading(true);
     setFailed(false);
@@ -54,43 +47,57 @@ export function BookDetailScreen({ navigation, route }: Props) {
     load();
   }, [load]);
 
-  const openUnit = useCallback(async (unit: BookUnit) => {
-    const set = unit.sets[0];
-    if (!set || openingSetId) return;
-    setOpeningSetId(set.id);
-    const ok = await BookService.openOfficialSet(set.id);
-    setOpeningSetId(null);
-    if (!ok) {
-      toast.error('Не удалось открыть юнит. Проверь подключение к интернету и попробуй ещё раз');
-      return;
-    }
-    navigation.navigate('SetDetail', { setId: set.id });
-  }, [navigation, openingSetId]);
+  const openUnit = useCallback(
+    async (unit: BookUnit) => {
+      const set = unit.sets[0];
+      if (!set || openingSetId) return;
+      setOpeningSetId(set.id);
+      const ok = await BookService.openOfficialSet(set.id);
+      setOpeningSetId(null);
+      if (!ok) {
+        toast.error('Не удалось открыть юнит. Проверь подключение к интернету и попробуй ещё раз');
+        return;
+      }
+      navigation.navigate('SetDetail', { setId: set.id });
+    },
+    [navigation, openingSetId]
+  );
 
-  const attachToCourses = useCallback(async (courseIds: string[]) => {
-    if (!detail) return;
-    setAttaching(true);
-    const result = await BookService.attachToCourses(detail.book.id, courseIds);
-    setAttaching(false);
-    if (!result.ok) {
-      toast.error(`Не удалось подключить. ${result.status === 403 ? 'Можно подключать только к своим курсам.' : describeError(result.error, 'Попробуй ещё раз.')}`);
-      return;
-    }
-    const attached = [...result.data.attachedCourseIds, ...result.data.alreadyAttachedCourseIds];
-    setDetail((prev) => (prev ? { ...prev, attachedCourseIds: [...new Set([...prev.attachedCourseIds, ...attached])] } : prev));
-    setAttachVisible(false);
+  const attachToCourses = useCallback(
+    async (courseIds: string[]) => {
+      if (!detail) return;
+      setAttaching(true);
+      const result = await BookService.attachToCourses(detail.book.id, courseIds);
+      setAttaching(false);
+      if (!result.ok) {
+        toast.error(
+          `Не удалось подключить. ${result.status === 403 ? 'Можно подключать только к своим курсам.' : describeError(result.error, 'Попробуй ещё раз.')}`
+        );
+        return;
+      }
+      const attached = [...result.data.attachedCourseIds, ...result.data.alreadyAttachedCourseIds];
+      setDetail((prev) =>
+        prev
+          ? { ...prev, attachedCourseIds: [...new Set([...prev.attachedCourseIds, ...attached])] }
+          : prev
+      );
+      setAttachVisible(false);
 
-    const titles = courses.filter((c) => attached.includes(c.id)).map((c) => c.title);
-    const single = attached.length === 1 ? courses.find((c) => c.id === attached[0]) : undefined;
-    const message = `${titles.join(', ')}. Все юниты пока закрыты — открой их в «Учебниках курса».`;
-    if (!single) {
-      toast.success(`Книга подключена: ${message}`);
-      return;
-    }
-    if (await confirmAction('Книга подключена', message, 'Открыть юниты', { cancelText: 'Позже' })) {
-      navigation.navigate('CourseBooks', { courseId: single.id, courseTitle: single.title });
-    }
-  }, [detail, courses, navigation]);
+      const titles = courses.filter((c) => attached.includes(c.id)).map((c) => c.title);
+      const single = attached.length === 1 ? courses.find((c) => c.id === attached[0]) : undefined;
+      const message = `${titles.join(', ')}. Все юниты пока закрыты — открой их в «Учебниках курса».`;
+      if (!single) {
+        toast.success(`Книга подключена: ${message}`);
+        return;
+      }
+      if (
+        await confirmAction('Книга подключена', message, 'Открыть юниты', { cancelText: 'Позже' })
+      ) {
+        navigation.navigate('CourseBooks', { courseId: single.id, courseTitle: single.title });
+      }
+    },
+    [detail, courses, navigation]
+  );
 
   const header = <ScreenHeader onBack={() => navigation.goBack()} bordered />;
 
@@ -117,22 +124,32 @@ export function BookDetailScreen({ navigation, route }: Props) {
   const { book, units } = detail;
   const cover = getBookCover(book.subject);
   const langDef = getLanguageDef(book.languageFrom, book.languageTo);
-  const totalCards = units.reduce((sum, u) => sum + u.sets.reduce((acc, set) => acc + set.totalCards, 0), 0);
+  const totalCards = units.reduce(
+    (sum, u) => sum + u.sets.reduce((acc, set) => acc + set.totalCards, 0),
+    0
+  );
   const meta = formatBookMeta(book);
 
   return (
     <Container padded={false}>
       {header}
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: spacing.xxl }}
+      >
         {/* Hero */}
         <View style={[s.heroSection, { backgroundColor: colors.surface }]}>
           <View style={[s.heroCover, { backgroundColor: alpha(cover.color, 10) }]}>
             <cover.icon size={iconSize.xl} color={cover.color} />
           </View>
-          <Text variant="h1" style={[s.heroTitle, { color: colors.textPrimary }]}>{book.title}</Text>
+          <Text variant="h1" style={[s.heroTitle, { color: colors.textPrimary }]}>
+            {book.title}
+          </Text>
           {meta ? <Text style={[s.heroMeta, { color: colors.textSecondary }]}>{meta}</Text> : null}
           <Text style={[s.heroMeta, { color: colors.textTertiary }]}>
-            {langDef ? `${langDef.flag} ${langDef.label}` : `${book.languageFrom} → ${book.languageTo}`}
+            {langDef
+              ? `${langDef.flag} ${langDef.label}`
+              : `${book.languageFrom} → ${book.languageTo}`}
             {book.publisher ? ` · ${book.publisher}` : ''}
           </Text>
 
@@ -141,7 +158,13 @@ export function BookDetailScreen({ navigation, route }: Props) {
           )}
 
           {isTeacher && book.isPublished && (
-            <Button title="Подключить к курсу" icon={Link2} onPress={() => setAttachVisible(true)} fullWidth style={s.attachBtn} />
+            <Button
+              title="Подключить к курсу"
+              icon={Link2}
+              onPress={() => setAttachVisible(true)}
+              fullWidth
+              style={s.attachBtn}
+            />
           )}
           {isTeacher && detail.attachedCourseIds.length > 0 && (
             <Text style={[s.heroMeta, { color: colors.textTertiary, marginTop: spacing.xs }]}>
@@ -155,14 +178,18 @@ export function BookDetailScreen({ navigation, route }: Props) {
                 <BookOpen size={iconSize.xs} color={colors.primary} />
                 <Text style={[s.metricNumber, { color: colors.textPrimary }]}>{units.length}</Text>
               </View>
-              <Text variant="overline" color="secondary" style={s.metricLabel}>Юнитов</Text>
+              <Text variant="overline" color="secondary" style={s.metricLabel}>
+                Юнитов
+              </Text>
             </View>
             <View style={[s.metricCard, { borderColor: colors.border }]}>
               <View style={s.metricValue}>
                 <Layers size={iconSize.xs} color={colors.primary} />
                 <Text style={[s.metricNumber, { color: colors.textPrimary }]}>{totalCards}</Text>
               </View>
-              <Text variant="overline" color="secondary" style={s.metricLabel}>Слов</Text>
+              <Text variant="overline" color="secondary" style={s.metricLabel}>
+                Слов
+              </Text>
             </View>
           </View>
         </View>
@@ -171,7 +198,9 @@ export function BookDetailScreen({ navigation, route }: Props) {
         <View style={s.section}>
           <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>Юниты</Text>
           {units.length === 0 ? (
-            <Text variant="bodySmall" color="secondary">В книге пока нет юнитов</Text>
+            <Text variant="bodySmall" color="secondary">
+              В книге пока нет юнитов
+            </Text>
           ) : (
             <View style={s.unitList}>
               {units.map((unit) => {
@@ -193,12 +222,21 @@ export function BookDetailScreen({ navigation, route }: Props) {
                     ]}
                   >
                     <View style={[s.unitNumber, { backgroundColor: alpha(colors.primary, 10) }]}>
-                      <Text style={[s.unitNumberText, { color: colors.primary }]}>{unit.number}</Text>
+                      <Text style={[s.unitNumberText, { color: colors.primary }]}>
+                        {unit.number}
+                      </Text>
                     </View>
                     <View style={s.unitBody}>
-                      <Text style={[s.unitTitle, { color: colors.textPrimary }]} numberOfLines={1}>{unit.title}</Text>
+                      <Text style={[s.unitTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                        {unit.title}
+                      </Text>
                       <Text style={[s.unitMeta, { color: colors.textSecondary }]} numberOfLines={1}>
-                        {[unit.pages ? `стр. ${unit.pages}` : null, `${words} ${pluralize(words, 'слово', 'слова', 'слов')}`].filter(Boolean).join(' · ')}
+                        {[
+                          unit.pages ? `стр. ${unit.pages}` : null,
+                          `${words} ${pluralize(words, 'слово', 'слова', 'слов')}`,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
                       </Text>
                     </View>
                     {isOpening ? (
@@ -231,23 +269,62 @@ export function BookDetailScreen({ navigation, route }: Props) {
 }
 
 const s = StyleSheet.create({
-  centerContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.s, paddingHorizontal: spacing.xl },
-  heroSection: { alignItems: 'center', paddingHorizontal: spacing.l, paddingTop: spacing.xl, paddingBottom: spacing.l, gap: spacing.xxs },
-  heroCover: { width: 96, height: 96, borderRadius: borderRadius.xl, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.m },
+  centerContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.s,
+    paddingHorizontal: spacing.xl,
+  },
+  heroSection: {
+    alignItems: 'center',
+    paddingHorizontal: spacing.l,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.l,
+    gap: spacing.xxs,
+  },
+  heroCover: {
+    width: 96,
+    height: 96,
+    borderRadius: borderRadius.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.m,
+  },
   heroTitle: { textAlign: 'center', marginBottom: spacing.xxs },
   heroMeta: { fontSize: 14, fontWeight: '600', textAlign: 'center' },
   draftBadge: { marginTop: spacing.s, alignSelf: 'center' },
   attachBtn: { marginTop: spacing.m },
   metricsRow: { flexDirection: 'row', gap: spacing.s, width: '100%', marginTop: spacing.m },
-  metricCard: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.s, borderRadius: borderRadius.l, borderWidth: 1 },
+  metricCard: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.s,
+    borderRadius: borderRadius.l,
+    borderWidth: 1,
+  },
   metricValue: { flexDirection: 'row', alignItems: 'center', gap: spacing.xxs },
   metricNumber: { fontSize: 18, fontWeight: '700' },
   metricLabel: { marginTop: spacing.xxs / 2 },
   section: { paddingHorizontal: spacing.m, paddingTop: spacing.l, gap: spacing.s },
   sectionTitle: { fontSize: 18, fontWeight: '700' },
   unitList: { gap: spacing.s },
-  unitRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, padding: spacing.m, borderRadius: borderRadius.l, borderWidth: 1 },
-  unitNumber: { width: 40, height: 40, borderRadius: borderRadius.m, alignItems: 'center', justifyContent: 'center' },
+  unitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+    padding: spacing.m,
+    borderRadius: borderRadius.l,
+    borderWidth: 1,
+  },
+  unitNumber: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.m,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   unitNumberText: { fontSize: 16, fontWeight: '700' },
   unitBody: { flex: 1, gap: spacing.xxs / 2 },
   unitTitle: { fontSize: 16, fontWeight: '700' },

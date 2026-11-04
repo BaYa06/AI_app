@@ -12,8 +12,10 @@ const BOX_320 = { width: 238, front: 230, back: 250 };
 const BOX_375 = { width: 290, front: 290, back: 310 };
 
 // Худший реалистичный текст: длинные русские слова (самые широкие из ru/de/en)
-const RU = 'достопримечательность ответственность благодарность удовлетворение предприятие обязательство возможность';
-const DE = 'die Sehenswürdigkeit sich auseinandersetzen mit die Zusammenarbeit beeindruckend unverzüglich die Verantwortung';
+const RU =
+  'достопримечательность ответственность благодарность удовлетворение предприятие обязательство возможность';
+const DE =
+  'die Sehenswürdigkeit sich auseinandersetzen mit die Zusammenarbeit beeindruckend unverzüglich die Verantwortung';
 const take = (text: string, length: number) => text.repeat(5).slice(0, length).trim();
 
 describe('estimateLines', () => {
@@ -33,7 +35,10 @@ describe('estimateLines', () => {
 
 describe('fitText', () => {
   it('короткое слово — самый крупный размер', () => {
-    expect(fitText('scharf', { width: 290, height: 290, weight: 'bold', ...WORD_FIT })).toEqual({ fontSize: 24, lineHeight: 36 });
+    expect(fitText('scharf', { width: 290, height: 290, weight: 'bold', ...WORD_FIT })).toEqual({
+      fontSize: 24,
+      lineHeight: 36,
+    });
   });
 
   it('не помещается и на минимальном — обрезка по высоте рамки', () => {
@@ -49,7 +54,12 @@ describe('лимиты карточки помещаются без обрезк
     ['375 pt', BOX_375],
   ])('лицо: слово максимальной длины, %s', (_name, box) => {
     for (const text of [take(RU, maxCardFrontLength), take(DE, maxCardFrontLength)]) {
-      const result = fitText(text, { width: box.width, height: box.front, weight: 'bold', ...WORD_FIT });
+      const result = fitText(text, {
+        width: box.width,
+        height: box.front,
+        weight: 'bold',
+        ...WORD_FIT,
+      });
       expect(result.numberOfLines).toBeUndefined();
       expect(result.fontSize).toBeGreaterThanOrEqual(18);
     }

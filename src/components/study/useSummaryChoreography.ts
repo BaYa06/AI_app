@@ -5,9 +5,21 @@
  * чтобы они не разъехались. Движение (прозрачность, подскок) — на UI-потоке, цифры — по кадрам JS.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useReducedMotion, useSharedValue, withSequence, withTiming, type SharedValue } from 'react-native-reanimated';
+import {
+  useReducedMotion,
+  useSharedValue,
+  withSequence,
+  withTiming,
+  type SharedValue,
+} from 'react-native-reanimated';
 import { triggerHaptic } from '@/utils/haptic';
-import { SESSION_SFX_HIT_MS, playSessionSfx, preloadSessionSfx, stopSessionSfx, type SessionSfx } from '@/utils/sound';
+import {
+  SESSION_SFX_HIT_MS,
+  playSessionSfx,
+  preloadSessionSfx,
+  stopSessionSfx,
+  type SessionSfx,
+} from '@/utils/sound';
 
 /** Тайминги, мс от открытия экрана */
 const T = {
@@ -88,12 +100,20 @@ export function useSummaryChoreography(targets: number[]) {
     // События шкалы: звук и вибрация в нужную миллисекунду
     const events: Array<{ at: number; run: () => void }> = [
       { at: 0, run: () => playSessionSfx('reveal') },
-      { at: (SESSION_SFX_HIT_MS.reveal ?? 0) + T.hapticLagMs, run: () => triggerHaptic('impactLight') },
+      {
+        at: (SESSION_SFX_HIT_MS.reveal ?? 0) + T.hapticLagMs,
+        run: () => triggerHaptic('impactLight'),
+      },
     ];
     for (let i = 0; i < TILES; i++) {
       const tile = tiles[i];
       events.push(
-        { at: tileStart(i), run: () => { tile.opacity.value = withTiming(1, { duration: 150 }); } },
+        {
+          at: tileStart(i),
+          run: () => {
+            tile.opacity.value = withTiming(1, { duration: 150 });
+          },
+        },
         { at: tileDone(i) - T.countSfxMs, run: () => playSessionSfx('count') },
         {
           at: tileDone(i),
@@ -101,18 +121,29 @@ export function useSummaryChoreography(targets: number[]) {
             playSessionSfx('ding');
             tile.scale.value = withSequence(
               withTiming(1.08, { duration: T.popMs / 2 }),
-              withTiming(1, { duration: T.popMs / 2 }),
+              withTiming(1, { duration: T.popMs / 2 })
             );
           },
         },
         // На третьей плитке удар чуть резче
-        { at: tileDone(i) + T.hapticLagMs, run: () => triggerHaptic(i === TILES - 1 ? 'rigid' : 'impactMedium') },
+        {
+          at: tileDone(i) + T.hapticLagMs,
+          run: () => triggerHaptic(i === TILES - 1 ? 'rigid' : 'impactMedium'),
+        }
       );
     }
     events.push(
-      { at: tileDone(TILES - 1), run: () => { tailOpacity.value = withTiming(1, { duration: T.tailMs }); } },
+      {
+        at: tileDone(TILES - 1),
+        run: () => {
+          tailOpacity.value = withTiming(1, { duration: T.tailMs });
+        },
+      },
       { at: FINISH_AT, run: () => playSessionSfx('finish') },
-      { at: FINISH_AT + (SESSION_SFX_HIT_MS.finish ?? 0) + T.hapticLagMs, run: () => triggerHaptic('notificationSuccess') },
+      {
+        at: FINISH_AT + (SESSION_SFX_HIT_MS.finish ?? 0) + T.hapticLagMs,
+        run: () => triggerHaptic('notificationSuccess'),
+      }
     );
     events.sort((a, b) => a.at - b.at);
 

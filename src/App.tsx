@@ -11,7 +11,19 @@ import { LoadingSplash } from '@/components/common';
 import { ToastHost } from '@/components/ui/Toast';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { StagingBadge } from '@/components/common/StagingBadge';
-import { DatabaseService, setupAutoSave, supabase, NeonService, setAnalyticsUserId, SyncQueueService, Analytics, setAnalyticsUserProperties, setPushGroupProperty, setPushPermissionFlowProperty, pushPermissionFlowFor } from '@/services';
+import {
+  DatabaseService,
+  setupAutoSave,
+  supabase,
+  NeonService,
+  setAnalyticsUserId,
+  SyncQueueService,
+  Analytics,
+  setAnalyticsUserProperties,
+  setPushGroupProperty,
+  setPushPermissionFlowProperty,
+  pushPermissionFlowFor,
+} from '@/services';
 import { isWidgetUrl, parseWidgetUrl } from '@/services/widgetLinks';
 import { parseShareUrl, isShareCode, onOpenShareRequest } from '@/services/shareLinks';
 import { currentNews, initWhatsNew } from '@/services/whatsNew';
@@ -23,7 +35,14 @@ import { useCourseRealtime } from '@/hooks/useCourseRealtime';
 import { StorageService } from '@/services/StorageService';
 import { CACHE_OWNER_KEY } from '@/services/DatabaseService';
 import { initCrashReporting, setCrashUserId } from '@/services/crashReporting';
-import { refreshPushToken, subscribeForegroundMessages, requestPushPermission, isPushSupported, syncPushPermission, requestProvisionalPermission } from '@/services/pushNotifications';
+import {
+  refreshPushToken,
+  subscribeForegroundMessages,
+  requestPushPermission,
+  isPushSupported,
+  syncPushPermission,
+  requestProvisionalPermission,
+} from '@/services/pushNotifications';
 import { useThemeColors } from '@/store';
 import { X } from 'lucide-react-native';
 import { Text as ThemedText } from '@/components/common/Text';
@@ -43,27 +62,44 @@ import { AboutMeOnboardingScreen, type AboutMeAnswers } from '@/screens/AboutMeO
 import { TeacherSubjectScreen } from '@/screens/TeacherSubjectScreen';
 import { TeacherGroupSizeScreen } from '@/screens/TeacherGroupSizeScreen';
 
-import { SafeAreaProvider, initialWindowMetrics, useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  SafeAreaProvider,
+  initialWindowMetrics,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import { TouchableOpacity } from 'react-native';
 import { log } from '@/utils/logger';
 
 // Стили для веб-платформы (iOS PWA scroll fix)
-const webStyles = Platform.OS === 'web' ? StyleSheet.create({
-  scrollContainer: {
-    position: 'absolute' as any,
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    overflow: 'auto' as any,
-    // @ts-ignore - web-only properties
-    WebkitOverflowScrolling: 'touch',
-    overscrollBehavior: 'none',
-    overscrollBehaviorY: 'none',
-  },
-}) : undefined;
+const webStyles =
+  Platform.OS === 'web'
+    ? StyleSheet.create({
+        scrollContainer: {
+          position: 'absolute' as any,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          overflow: 'auto' as any,
+          // @ts-ignore - web-only properties
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehavior: 'none',
+          overscrollBehaviorY: 'none',
+        },
+      })
+    : undefined;
 
-type AuthStep = 'welcome' | 'name' | 'role' | 'native_language' | 'target_languages' | 'goal' | 'daily' | 'about' | 'teacher_subject' | 'teacher_size';
+type AuthStep =
+  | 'welcome'
+  | 'name'
+  | 'role'
+  | 'native_language'
+  | 'target_languages'
+  | 'goal'
+  | 'daily'
+  | 'about'
+  | 'teacher_subject'
+  | 'teacher_size';
 
 type AppRootProps = {
   isReady: boolean;
@@ -141,7 +177,8 @@ function AppRoot({
   const insets = useSafeAreaInsets();
   const signedIn = isReady && isAuthenticated && !needsOnboarding;
   const inviteOpen = isAuthenticated && !!pendingInviteToken;
-  const shareOpen = isReady && !!pendingShareCode && (signedIn || (!isAuthenticated && !shareDeferred));
+  const shareOpen =
+    isReady && !!pendingShareCode && (signedIn || (!isAuthenticated && !shareDeferred));
 
   // «Что нового» (plan/new/whats_new.md, News 3): новичок или старый пользователь — по сессии
   // при первом запуске; приглашение и набор по ссылке важнее и откладывают окно
@@ -178,7 +215,6 @@ function AppRoot({
   // Нижний отступ каждый низ экрана учитывает сам (панель вкладок — в AppNavigator).
   const top = insets.top;
 
-
   // Синхронизируем meta theme-color с текущей темой (только веб)
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof document === 'undefined') return;
@@ -202,71 +238,59 @@ function AppRoot({
         <LoadingSplash />
       ) : isAuthenticated && !needsOnboarding ? (
         <AppNavigator />
+      ) : authStep === 'welcome' ? (
+        <WelcomeScreen isLoading={authLoading} />
+      ) : authStep === 'name' ? (
+        <NameOnboardingScreen
+          onBack={onBackToWelcome}
+          onContinue={onSubmitName}
+          onSkip={onSubmitName}
+        />
+      ) : authStep === 'role' ? (
+        <RoleSelectionScreen onBack={onBackToName} onContinue={onSubmitRole} />
+      ) : authStep === 'native_language' ? (
+        <NativeLanguageScreen onBack={onBackToRole} onContinue={onSubmitNativeLanguage} />
+      ) : authStep === 'target_languages' ? (
+        <TargetLanguagesScreen
+          nativeLanguage={nativeLanguage}
+          onBack={onBackToNativeLanguage}
+          onContinue={onSubmitTargetLanguages}
+        />
+      ) : authStep === 'goal' ? (
+        <LearningGoalScreen onBack={onBackToTargetLanguages} onContinue={onSubmitGoal} />
+      ) : authStep === 'daily' ? (
+        <DailyGoalScreen onBack={onBackToGoal} onContinue={onSubmitDaily} />
+      ) : authStep === 'about' ? (
+        <AboutMeOnboardingScreen onBack={onBackToDaily} onContinue={onSubmitAboutMe} />
+      ) : authStep === 'teacher_subject' ? (
+        <TeacherSubjectScreen
+          onBack={onBackToTargetLanguages}
+          onContinue={onSubmitTeacherSubject}
+        />
+      ) : authStep === 'teacher_size' ? (
+        <TeacherGroupSizeScreen onBack={onBackToTeacherSubject} onContinue={onSubmitTeacherSize} />
       ) : (
-        authStep === 'welcome' ? (
-          <WelcomeScreen isLoading={authLoading} />
-        ) : authStep === 'name' ? (
-          <NameOnboardingScreen
-            onBack={onBackToWelcome}
-            onContinue={onSubmitName}
-            onSkip={onSubmitName}
-          />
-        ) : authStep === 'role' ? (
-          <RoleSelectionScreen
-            onBack={onBackToName}
-            onContinue={onSubmitRole}
-          />
-        ) : authStep === 'native_language' ? (
-          <NativeLanguageScreen
-            onBack={onBackToRole}
-            onContinue={onSubmitNativeLanguage}
-          />
-        ) : authStep === 'target_languages' ? (
-          <TargetLanguagesScreen
-            nativeLanguage={nativeLanguage}
-            onBack={onBackToNativeLanguage}
-            onContinue={onSubmitTargetLanguages}
-          />
-        ) : authStep === 'goal' ? (
-          <LearningGoalScreen
-            onBack={onBackToTargetLanguages}
-            onContinue={onSubmitGoal}
-          />
-        ) : authStep === 'daily' ? (
-          <DailyGoalScreen
-            onBack={onBackToGoal}
-            onContinue={onSubmitDaily}
-          />
-        ) : authStep === 'about' ? (
-          <AboutMeOnboardingScreen onBack={onBackToDaily} onContinue={onSubmitAboutMe} />
-        ) : authStep === 'teacher_subject' ? (
-          <TeacherSubjectScreen
-            onBack={onBackToTargetLanguages}
-            onContinue={onSubmitTeacherSubject}
-          />
-        ) : authStep === 'teacher_size' ? (
-          <TeacherGroupSizeScreen
-            onBack={onBackToTeacherSubject}
-            onContinue={onSubmitTeacherSize}
-          />
-        ) : (
-          <WelcomeScreen isLoading={authLoading} />
-        )
+        <WelcomeScreen isLoading={authLoading} />
       )}
     </>
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: isReady ? colors.background : palette.light.background }}>
+    <View
+      style={{ flex: 1, backgroundColor: isReady ? colors.background : palette.light.background }}
+    >
       {/* Safe-area зона сверху под цвет темы (светлая на загрузке — как заставка LoadingSplash) */}
-      <View style={{ height: top, backgroundColor: isReady ? colors.background : palette.light.background }} />
+      <View
+        style={{
+          height: top,
+          backgroundColor: isReady ? colors.background : palette.light.background,
+        }}
+      />
 
       <GestureHandlerRootView style={{ flex: 1 }}>
         {Platform.OS === 'web' ? (
           // На веб оборачиваем в scroll-контейнер для фиксации iOS overscroll
-          <View style={webStyles?.scrollContainer}>
-            {appContent}
-          </View>
+          <View style={webStyles?.scrollContainer}>{appContent}</View>
         ) : (
           // На нативных платформах используем как есть
           appContent
@@ -296,8 +320,15 @@ function AppRoot({
           }}
         >
           <View style={{ flex: 1 }}>
-            <ThemedText variant="label" style={{ color: colors.onPrimary, fontWeight: '700' }}>Включи уведомления</ThemedText>
-            <ThemedText variant="caption" style={{ color: colors.onPrimary, marginTop: spacing.xxs / 2 }}>Напомним когда пора заниматься и сохранить серию</ThemedText>
+            <ThemedText variant="label" style={{ color: colors.onPrimary, fontWeight: '700' }}>
+              Включи уведомления
+            </ThemedText>
+            <ThemedText
+              variant="caption"
+              style={{ color: colors.onPrimary, marginTop: spacing.xxs / 2 }}
+            >
+              Напомним когда пора заниматься и сохранить серию
+            </ThemedText>
           </View>
           <TouchableOpacity
             accessibilityRole="button"
@@ -309,7 +340,12 @@ function AppRoot({
               setShowPushBanner(false);
               localStorage.setItem('flashly_push_banner_dismissed', '1');
             }}
-            style={{ backgroundColor: colors.onPrimary, borderRadius: borderRadius.m, paddingHorizontal: spacing.s, paddingVertical: spacing.xs }}
+            style={{
+              backgroundColor: colors.onPrimary,
+              borderRadius: borderRadius.m,
+              paddingHorizontal: spacing.s,
+              paddingVertical: spacing.xs,
+            }}
           >
             <ThemedText variant="label" style={{ color: colors.primaryFill, fontWeight: '700' }}>
               {pushBannerLoading ? '...' : 'Разрешить'}
@@ -369,16 +405,18 @@ export default function App() {
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
   const [authStep, setAuthStep] = useState<AuthStep>('welcome');
-  const [onboardingData, setOnboardingData] = useState<{
-    displayName?: string;
-    role?: 'student' | 'teacher';
-    nativeLanguage?: string;
-    targetLanguages?: string[];
-    learningGoal?: string;
-    dailyGoal?: string;
-    teacherSubject?: string;
-    teacherGroupSize?: string;
-  } & AboutMeAnswers>({});
+  const [onboardingData, setOnboardingData] = useState<
+    {
+      displayName?: string;
+      role?: 'student' | 'teacher';
+      nativeLanguage?: string;
+      targetLanguages?: string[];
+      learningGoal?: string;
+      dailyGoal?: string;
+      teacherSubject?: string;
+      teacherGroupSize?: string;
+    } & AboutMeAnswers
+  >({});
   const [pendingInviteToken, setPendingInviteToken] = useState<string | null>(null);
   // Набор по ссылке: код, «ждём входа» (человек нажал «Войти и добавить») и «добавить сразу после входа»
   const [pendingShareCode, setPendingShareCode] = useState<string | null>(null);
@@ -446,7 +484,10 @@ export default function App() {
     const splashTimer = setTimeout(() => {
       if (isMounted && !splashReleased) {
         splashReleased = true;
-        log.warn('App', 'Startup: загрузка данных дольше 15 с — показываем приложение, данные догрузятся');
+        log.warn(
+          'App',
+          'Startup: загрузка данных дольше 15 с — показываем приложение, данные догрузятся'
+        );
         setIsReady(true);
         setAuthChecked(true);
       }
@@ -493,81 +534,82 @@ export default function App() {
   }, []);
 
   // Общая логика обработки сессии: определить новый/возвращающийся пользователь
-  const handleSession = useCallback(async (user: { id: string; email?: string; user_metadata?: any }) => {
-    setCurrentUserId(user.id);
+  const handleSession = useCallback(
+    async (user: { id: string; email?: string; user_metadata?: any }) => {
+      setCurrentUserId(user.id);
 
-    // Guest login — пропускаем NeonDB и онбординг
-    const isAnonymous = (user as any).is_anonymous === true;
-    if (isAnonymous) {
-      setIsAuthenticated(true);
-      setNeedsOnboarding(false);
-      Analytics.login('anonymous');
-      return;
-    }
-
-    // Sign in with Apple: имя уже дано Apple — не спрашиваем его повторно (App Review, Guideline 4)
-    const signedInWithApple = isAppleUser(user as any);
-    skipNameStepRef.current = signedInWithApple;
-    const appleName = takeAppleSignInName();
-    const displayName = (user.user_metadata as any)?.full_name || appleName || undefined;
-
-    if (ensuredUserIdRef.current !== user.id) {
-      ensuredUserIdRef.current = user.id;
-      await NeonService.ensureUserExists({
-        id: user.id,
-        email: user.email,
-        displayName,
-      });
-    }
-
-    setAuthLoading(true);
-    const completed = await NeonService.checkOnboardingCompleted(user.id);
-    setAuthLoading(false);
-
-    if (completed) {
-      setIsAuthenticated(true);
-      setNeedsOnboarding(false);
-      // Перезагружаем данные только если это новый пользователь (не тот, чьи данные уже загружены)
-      if (loadedUserIdRef.current !== user.id) {
-        loadedUserIdRef.current = user.id;
-        DatabaseService.reloadRemoteDataForUser(user.id);
+      // Guest login — пропускаем NeonDB и онбординг
+      const isAnonymous = (user as any).is_anonymous === true;
+      if (isAnonymous) {
+        setIsAuthenticated(true);
+        setNeedsOnboarding(false);
+        Analytics.login('anonymous');
+        return;
       }
-      setAnalyticsUserId(user.id);
-      setCrashUserId(user.id);
 
-      // Analytics: login + user properties
-      const provider = (user.user_metadata as any)?.iss?.includes('google') ? 'google' : 'email';
-      Analytics.login(provider as 'google' | 'email');
-      const createdAt = new Date((user as any).created_at ?? Date.now()).getTime();
-      const daysSince = Math.floor((Date.now() - createdAt) / 86400000);
-      setAnalyticsUserProperties({
-        subscription_tier: 'free',
-        language: 'ru',
-        days_since_registration:
-          daysSince <= 7 ? '0-7' :
-          daysSince <= 30 ? '8-30' :
-          daysSince <= 90 ? '31-90' : '90+',
-        total_sets_bucket: '0',
-        has_completed_onboarding: true,
-      });
-      setPushGroupProperty(user.id);
+      // Sign in with Apple: имя уже дано Apple — не спрашиваем его повторно (App Review, Guideline 4)
+      const signedInWithApple = isAppleUser(user as any);
+      skipNameStepRef.current = signedInWithApple;
+      const appleName = takeAppleSignInName();
+      const displayName = (user.user_metadata as any)?.full_name || appleName || undefined;
 
-      if (pushedTokenForUserRef.current !== user.id) {
-        pushedTokenForUserRef.current = user.id;
-        refreshPushToken(user.id).catch(() => {});
+      if (ensuredUserIdRef.current !== user.id) {
+        ensuredUserIdRef.current = user.id;
+        await NeonService.ensureUserExists({
+          id: user.id,
+          email: user.email,
+          displayName,
+        });
       }
-    } else {
-      // Новый пользователь — начинаем онбординг
-      setIsAuthenticated(true);
-      setNeedsOnboarding(true);
-      if (signedInWithApple) {
-        setOnboardingData((prev) => ({ ...prev, displayName }));
-        setAuthStep('role');
+
+      setAuthLoading(true);
+      const completed = await NeonService.checkOnboardingCompleted(user.id);
+      setAuthLoading(false);
+
+      if (completed) {
+        setIsAuthenticated(true);
+        setNeedsOnboarding(false);
+        // Перезагружаем данные только если это новый пользователь (не тот, чьи данные уже загружены)
+        if (loadedUserIdRef.current !== user.id) {
+          loadedUserIdRef.current = user.id;
+          DatabaseService.reloadRemoteDataForUser(user.id);
+        }
+        setAnalyticsUserId(user.id);
+        setCrashUserId(user.id);
+
+        // Analytics: login + user properties
+        const provider = (user.user_metadata as any)?.iss?.includes('google') ? 'google' : 'email';
+        Analytics.login(provider as 'google' | 'email');
+        const createdAt = new Date((user as any).created_at ?? Date.now()).getTime();
+        const daysSince = Math.floor((Date.now() - createdAt) / 86400000);
+        setAnalyticsUserProperties({
+          subscription_tier: 'free',
+          language: 'ru',
+          days_since_registration:
+            daysSince <= 7 ? '0-7' : daysSince <= 30 ? '8-30' : daysSince <= 90 ? '31-90' : '90+',
+          total_sets_bucket: '0',
+          has_completed_onboarding: true,
+        });
+        setPushGroupProperty(user.id);
+
+        if (pushedTokenForUserRef.current !== user.id) {
+          pushedTokenForUserRef.current = user.id;
+          refreshPushToken(user.id).catch(() => {});
+        }
       } else {
-        setAuthStep('name');
+        // Новый пользователь — начинаем онбординг
+        setIsAuthenticated(true);
+        setNeedsOnboarding(true);
+        if (signedInWithApple) {
+          setOnboardingData((prev) => ({ ...prev, displayName }));
+          setAuthStep('role');
+        } else {
+          setAuthStep('name');
+        }
       }
-    }
-  }, []);
+    },
+    []
+  );
 
   // Синхронизация isAuthenticated с сессией Supabase
   useEffect(() => {
@@ -619,7 +661,8 @@ export default function App() {
       if (session?.user) {
         const user = session.user;
         setTimeout(() => {
-          if (isMounted) handleSession(user).catch((e) => log.error('App', 'handleSession failed', e));
+          if (isMounted)
+            handleSession(user).catch((e) => log.error('App', 'handleSession failed', e));
         }, 0);
       } else {
         Analytics.logout();
@@ -650,7 +693,11 @@ export default function App() {
     subscribeForegroundMessages((msg) => {
       if (msg.title || msg.body) {
         // Показываем нативное браузерное уведомление, даже когда вкладка в фокусе
-        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        if (
+          typeof window !== 'undefined' &&
+          'Notification' in window &&
+          Notification.permission === 'granted'
+        ) {
           new Notification(msg.title || 'Flashly', { body: msg.body, icon: '/icons/icon-192.png' });
         }
       }
@@ -832,58 +879,64 @@ export default function App() {
     setAuthStep('target_languages');
   }, []);
 
-  const handleSubmitTargetLanguages = useCallback((codes: string[]) => {
-    setOnboardingData((prev) => ({ ...prev, targetLanguages: codes }));
-    setAuthStep(onboardingData.role === 'teacher' ? 'teacher_subject' : 'goal');
-  }, [onboardingData.role]);
+  const handleSubmitTargetLanguages = useCallback(
+    (codes: string[]) => {
+      setOnboardingData((prev) => ({ ...prev, targetLanguages: codes }));
+      setAuthStep(onboardingData.role === 'teacher' ? 'teacher_subject' : 'goal');
+    },
+    [onboardingData.role]
+  );
 
   const handleSubmitGoal = useCallback((goalId: string) => {
     setOnboardingData((prev) => ({ ...prev, learningGoal: goalId }));
     setAuthStep('daily');
   }, []);
 
-  const finishOnboarding = useCallback(async (finalData: typeof onboardingData) => {
-    if (!currentUserId) return;
-    await NeonService.saveOnboardingData(currentUserId, {
-      displayName: finalData.displayName,
-      teacher: finalData.role === 'teacher',
-      nativeLanguage: finalData.nativeLanguage,
-      targetLanguages: finalData.targetLanguages,
-      learningGoal: finalData.learningGoal,
-      dailyGoal: finalData.dailyGoal,
-      teacherSubject: finalData.teacherSubject,
-      teacherGroupSize: finalData.teacherGroupSize,
-      ageRange: finalData.ageRange ?? undefined,
-      classDays: finalData.classDays,
-      classHour: finalData.classHour,
-    });
-    setNeedsOnboarding(false);
-    DatabaseService.reloadRemoteDataForUser(currentUserId);
-    setAnalyticsUserId(currentUserId);
-    setCrashUserId(currentUserId);
-    Analytics.onboardingComplete();
-    setAnalyticsUserProperties({
-      subscription_tier: 'free',
-      language: 'ru',
-      days_since_registration: '0-7',
-      total_sets_bucket: '0',
-      has_completed_onboarding: true,
-    });
-    if (currentUserId) setPushGroupProperty(currentUserId);
-    // Эксперимент 4.3: половине новых учеников на iOS — тихие уведомления сразу, без диалога
-    if (currentUserId && finalData.role !== 'teacher' && Platform.OS === 'ios') {
-      setPushPermissionFlowProperty(currentUserId);
-      if (pushPermissionFlowFor(currentUserId) === 'provisional') {
-        pushedTokenForUserRef.current = currentUserId;
-        requestProvisionalPermission(currentUserId).catch(() => {});
-        return;
+  const finishOnboarding = useCallback(
+    async (finalData: typeof onboardingData) => {
+      if (!currentUserId) return;
+      await NeonService.saveOnboardingData(currentUserId, {
+        displayName: finalData.displayName,
+        teacher: finalData.role === 'teacher',
+        nativeLanguage: finalData.nativeLanguage,
+        targetLanguages: finalData.targetLanguages,
+        learningGoal: finalData.learningGoal,
+        dailyGoal: finalData.dailyGoal,
+        teacherSubject: finalData.teacherSubject,
+        teacherGroupSize: finalData.teacherGroupSize,
+        ageRange: finalData.ageRange ?? undefined,
+        classDays: finalData.classDays,
+        classHour: finalData.classHour,
+      });
+      setNeedsOnboarding(false);
+      DatabaseService.reloadRemoteDataForUser(currentUserId);
+      setAnalyticsUserId(currentUserId);
+      setCrashUserId(currentUserId);
+      Analytics.onboardingComplete();
+      setAnalyticsUserProperties({
+        subscription_tier: 'free',
+        language: 'ru',
+        days_since_registration: '0-7',
+        total_sets_bucket: '0',
+        has_completed_onboarding: true,
+      });
+      if (currentUserId) setPushGroupProperty(currentUserId);
+      // Эксперимент 4.3: половине новых учеников на iOS — тихие уведомления сразу, без диалога
+      if (currentUserId && finalData.role !== 'teacher' && Platform.OS === 'ios') {
+        setPushPermissionFlowProperty(currentUserId);
+        if (pushPermissionFlowFor(currentUserId) === 'provisional') {
+          pushedTokenForUserRef.current = currentUserId;
+          requestProvisionalPermission(currentUserId).catch(() => {});
+          return;
+        }
       }
-    }
-    if (currentUserId && pushedTokenForUserRef.current !== currentUserId) {
-      pushedTokenForUserRef.current = currentUserId;
-      refreshPushToken(currentUserId).catch(() => {});
-    }
-  }, [currentUserId]);
+      if (currentUserId && pushedTokenForUserRef.current !== currentUserId) {
+        pushedTokenForUserRef.current = currentUserId;
+        refreshPushToken(currentUserId).catch(() => {});
+      }
+    },
+    [currentUserId]
+  );
 
   const handleSubmitDaily = useCallback((dailyId: string) => {
     // Выбор «5 / 10 / 20 слов в день» — квота новых слов урока дня (plan/done/home_redesign.md, 1.5)
@@ -901,35 +954,47 @@ export default function App() {
     setAuthStep('daily');
   }, []);
 
-  const handleSubmitAboutMe = useCallback((answers: AboutMeAnswers) => {
-    const finalData = { ...onboardingData, ...answers };
-    setOnboardingData(finalData);
-    finishOnboarding(finalData);
-  }, [onboardingData, finishOnboarding]);
+  const handleSubmitAboutMe = useCallback(
+    (answers: AboutMeAnswers) => {
+      const finalData = { ...onboardingData, ...answers };
+      setOnboardingData(finalData);
+      finishOnboarding(finalData);
+    },
+    [onboardingData, finishOnboarding]
+  );
 
   const handleSubmitTeacherSubject = useCallback((subjectId: string) => {
     setOnboardingData((prev) => ({ ...prev, teacherSubject: subjectId }));
     setAuthStep('teacher_size');
   }, []);
 
-  const handleSubmitTeacherSize = useCallback((sizeId: string) => {
-    const finalData = { ...onboardingData, teacherGroupSize: sizeId };
-    setOnboardingData(finalData);
-    finishOnboarding(finalData);
-  }, [onboardingData, finishOnboarding]);
+  const handleSubmitTeacherSize = useCallback(
+    (sizeId: string) => {
+      const finalData = { ...onboardingData, teacherGroupSize: sizeId };
+      setOnboardingData(finalData);
+      finishOnboarding(finalData);
+    },
+    [onboardingData, finishOnboarding]
+  );
 
-  const handleInviteAccepted = useCallback((courseId: string, courseTitle: string) => {
-    setPendingInviteToken(null);
-    // Курс сразу в список, наборы курса — тихой синхронизацией (без мигания экрана)
-    const { courses } = useCoursesStore.getState();
-    if (!courses.some((c) => c.id === courseId)) {
-      useCoursesStore.setState({
-        courses: [...courses, { id: courseId, title: courseTitle, createdAt: Date.now(), isStudentCourse: true }],
-      });
-    }
-    DatabaseService.syncStudentCourses();
-    Alert.alert('Готово', `Ты присоединился к курсу "${courseTitle}"`);
-  }, [currentUserId]);
+  const handleInviteAccepted = useCallback(
+    (courseId: string, courseTitle: string) => {
+      setPendingInviteToken(null);
+      // Курс сразу в список, наборы курса — тихой синхронизацией (без мигания экрана)
+      const { courses } = useCoursesStore.getState();
+      if (!courses.some((c) => c.id === courseId)) {
+        useCoursesStore.setState({
+          courses: [
+            ...courses,
+            { id: courseId, title: courseTitle, createdAt: Date.now(), isStudentCourse: true },
+          ],
+        });
+      }
+      DatabaseService.syncStudentCourses();
+      Alert.alert('Готово', `Ты присоединился к курсу "${courseTitle}"`);
+    },
+    [currentUserId]
+  );
 
   const handleInviteDismiss = useCallback(() => {
     setPendingInviteToken(null);
@@ -947,12 +1012,15 @@ export default function App() {
   }, []);
 
   // Окно закрывается, затем открываем набор (навигатор под окном уже смонтирован — вход выполнен)
-  const handleShareOpenSet = useCallback((setId: string) => {
-    closeShare();
-    setTimeout(() => {
-      if (navigationRef.isReady()) navigationRef.navigate('SetDetail', { setId });
-    }, 350);
-  }, [closeShare]);
+  const handleShareOpenSet = useCallback(
+    (setId: string) => {
+      closeShare();
+      setTimeout(() => {
+        if (navigationRef.isReady()) navigationRef.navigate('SetDetail', { setId });
+      }, 350);
+    },
+    [closeShare]
+  );
 
   const appReady = isReady && authChecked;
 
@@ -960,51 +1028,54 @@ export default function App() {
   // Вместо полного обнуления используем урезание в AppRoot компоненте.
   // На нативе передаём initialWindowMetrics — значение доступно синхронно ещё до первого
   // рендера, поэтому экраны с useSafeAreaInsets() не мигают "0 → реальный отступ" при старте.
-  const webSafeAreaOverride = Platform.OS === 'web' ? {
-    frame: { x: 0, y: 0, width: 0, height: 0 },
-    insets: { top: 0, right: 0, bottom: 0, left: 0 },
-  } : initialWindowMetrics;
+  const webSafeAreaOverride =
+    Platform.OS === 'web'
+      ? {
+          frame: { x: 0, y: 0, width: 0, height: 0 },
+          insets: { top: 0, right: 0, bottom: 0, left: 0 },
+        }
+      : initialWindowMetrics;
 
   return (
     <ErrorBoundary>
-    <SafeAreaProvider initialMetrics={webSafeAreaOverride}>
-      <AppRoot
-        isReady={appReady}
-        isAuthenticated={isAuthenticated}
-        needsOnboarding={needsOnboarding}
-        pendingInviteToken={pendingInviteToken}
-        onInviteAccepted={handleInviteAccepted}
-        onInviteDismiss={handleInviteDismiss}
-        pendingShareCode={pendingShareCode}
-        shareDeferred={shareDeferred}
-        shareAutoAdd={shareAutoAdd}
-        onShareRequestSignIn={handleShareRequestSignIn}
-        onShareClose={closeShare}
-        onShareOpenSet={handleShareOpenSet}
-        currentUserId={currentUserId}
-        onBackToWelcome={handleBackToWelcome}
-        onBackToName={handleBackToName}
-        onBackToRole={handleBackToRole}
-        onBackToNativeLanguage={handleBackToNativeLanguage}
-        onBackToTargetLanguages={handleBackToTargetLanguages}
-        onBackToGoal={handleBackToGoal}
-        onBackToTeacherSubject={handleBackToTeacherSubject}
-        onSubmitName={handleSubmitName}
-        onSubmitRole={handleSubmitRole}
-        onSubmitNativeLanguage={handleSubmitNativeLanguage}
-        onSubmitTargetLanguages={handleSubmitTargetLanguages}
-        onSubmitGoal={handleSubmitGoal}
-        onSubmitDaily={handleSubmitDaily}
-        onBackToDaily={handleBackToDaily}
-        onSubmitAboutMe={handleSubmitAboutMe}
-        onSubmitTeacherSubject={handleSubmitTeacherSubject}
-        onSubmitTeacherSize={handleSubmitTeacherSize}
-        authStep={authStep}
-        authLoading={authLoading}
-        nativeLanguage={onboardingData.nativeLanguage}
-      />
-      <StagingBadge />
-    </SafeAreaProvider>
+      <SafeAreaProvider initialMetrics={webSafeAreaOverride}>
+        <AppRoot
+          isReady={appReady}
+          isAuthenticated={isAuthenticated}
+          needsOnboarding={needsOnboarding}
+          pendingInviteToken={pendingInviteToken}
+          onInviteAccepted={handleInviteAccepted}
+          onInviteDismiss={handleInviteDismiss}
+          pendingShareCode={pendingShareCode}
+          shareDeferred={shareDeferred}
+          shareAutoAdd={shareAutoAdd}
+          onShareRequestSignIn={handleShareRequestSignIn}
+          onShareClose={closeShare}
+          onShareOpenSet={handleShareOpenSet}
+          currentUserId={currentUserId}
+          onBackToWelcome={handleBackToWelcome}
+          onBackToName={handleBackToName}
+          onBackToRole={handleBackToRole}
+          onBackToNativeLanguage={handleBackToNativeLanguage}
+          onBackToTargetLanguages={handleBackToTargetLanguages}
+          onBackToGoal={handleBackToGoal}
+          onBackToTeacherSubject={handleBackToTeacherSubject}
+          onSubmitName={handleSubmitName}
+          onSubmitRole={handleSubmitRole}
+          onSubmitNativeLanguage={handleSubmitNativeLanguage}
+          onSubmitTargetLanguages={handleSubmitTargetLanguages}
+          onSubmitGoal={handleSubmitGoal}
+          onSubmitDaily={handleSubmitDaily}
+          onBackToDaily={handleBackToDaily}
+          onSubmitAboutMe={handleSubmitAboutMe}
+          onSubmitTeacherSubject={handleSubmitTeacherSubject}
+          onSubmitTeacherSize={handleSubmitTeacherSize}
+          authStep={authStep}
+          authLoading={authLoading}
+          nativeLanguage={onboardingData.nativeLanguage}
+        />
+        <StagingBadge />
+      </SafeAreaProvider>
     </ErrorBoundary>
   );
 }

@@ -11,7 +11,8 @@ import { spacing, config } from '@/constants';
 const { maxCardFrontLength, maxCardBackLength } = config.limits;
 
 // Счётчик символов — когда до лимита осталось ≤ 20%
-const counterHint = (text: string, max: number) => (text.length >= max * 0.8 ? `${text.length}/${max}` : undefined);
+const counterHint = (text: string, max: number) =>
+  text.length >= max * 0.8 ? `${text.length}/${max}` : undefined;
 import { Button, ScreenHeader, TextField, confirmDialog, toast } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
 
@@ -147,7 +148,7 @@ export function CardEditorScreen({ navigation, route }: Props) {
         backText: backText.trim(),
       });
       incrementCardCount(setId);
-      
+
       // Очистка формы
       setFrontText('');
       setBackText('');
@@ -165,7 +166,11 @@ export function CardEditorScreen({ navigation, route }: Props) {
         style={styles.header}
         center={
           <View style={styles.headerTitles} accessibilityRole="header">
-            <Text variant="button" numberOfLines={1} style={[styles.headerTitle, { color: colors.textPrimary }]}>
+            <Text
+              variant="button"
+              numberOfLines={1}
+              style={[styles.headerTitle, { color: colors.textPrimary }]}
+            >
               {isEditing ? 'Редактировать' : 'Новая карточка'}
             </Text>
             <Text variant="caption" color="secondary" numberOfLines={1}>
@@ -174,10 +179,7 @@ export function CardEditorScreen({ navigation, route }: Props) {
           </View>
         }
       />
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
+      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <TextField
           label={sourceLabel}
           placeholder="Например: scharf"
@@ -206,12 +208,7 @@ export function CardEditorScreen({ navigation, route }: Props) {
 
         {/* Кнопки */}
         <View style={styles.buttons}>
-          <Button
-            title="Сохранить"
-            onPress={handleSave}
-            loading={isSaving}
-            fullWidth
-          />
+          <Button title="Сохранить" onPress={handleSave} loading={isSaving} fullWidth />
 
           {!isEditing && (
             <Button

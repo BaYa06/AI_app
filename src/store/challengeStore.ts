@@ -7,8 +7,11 @@ export type ChallengeId = 'quick_round' | 'sniper' | 'forgotten';
 
 export const CHALLENGE_IDS: ChallengeId[] = ['quick_round', 'sniper', 'forgotten'];
 
-const allPending = (): Record<ChallengeId, ChallengeStatus> =>
-  ({ quick_round: 'pending', sniper: 'pending', forgotten: 'pending' });
+const allPending = (): Record<ChallengeId, ChallengeStatus> => ({
+  quick_round: 'pending',
+  sniper: 'pending',
+  forgotten: 'pending',
+});
 
 /** Сегодняшняя дата по локальному времени (YYYY-MM-DD) */
 export function localDay(): string {

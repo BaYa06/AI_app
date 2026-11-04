@@ -39,7 +39,10 @@ export default async function handler(req, res) {
 
   try {
     // Языки набора необязательны: старые клиенты их не присылают; приходят кодами ('de', 'ru'…)
-    const langFrom = languageName(languageFrom, 'the language being learned (the left side of the list)');
+    const langFrom = languageName(
+      languageFrom,
+      'the language being learned (the left side of the list)'
+    );
     const langTo = languageName(languageTo, 'the language of the translations in the PDF');
 
     const prompt = `You extract vocabulary for flashcards from a PDF vocabulary list.
@@ -63,8 +66,15 @@ Example: [{"front": "der Abschnitt, -e", "back": "раздел"}, {"front": "ste
 
     // Validate and clean cards
     const validCards = cards
-      .filter(c => c && typeof c.front === 'string' && typeof c.back === 'string' && c.front.trim() && c.back.trim())
-      .map(c => ({ front: c.front.trim(), back: c.back.trim() }));
+      .filter(
+        (c) =>
+          c &&
+          typeof c.front === 'string' &&
+          typeof c.back === 'string' &&
+          c.front.trim() &&
+          c.back.trim()
+      )
+      .map((c) => ({ front: c.front.trim(), back: c.back.trim() }));
 
     return res.status(200).json({ cards: validCards });
   } catch (error) {

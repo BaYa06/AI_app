@@ -6,18 +6,40 @@
 
 import ExcelJS from 'exceljs';
 import { LIBRARY_CATEGORIES } from '../../src/constants/library';
-import { cellText, findSheet, isLanguageCode, normalizeTerm, readHeaders, rowIsEmpty } from './excel';
+import {
+  cellText,
+  findSheet,
+  isLanguageCode,
+  normalizeTerm,
+  readHeaders,
+  rowIsEmpty,
+} from './excel';
 
 export const SETS_SHEET = 'Наборы';
 export const CARDS_SHEET = 'Карточки';
 
-export const SET_COLUMNS = ['title', 'kind', 'category', 'language_from', 'language_to', 'description', 'tags', 'cover_emoji'] as const;
+export const SET_COLUMNS = [
+  'title',
+  'kind',
+  'category',
+  'language_from',
+  'language_to',
+  'description',
+  'tags',
+  'cover_emoji',
+] as const;
 export const CARD_COLUMNS = ['set', 'term', 'translation', 'example'] as const;
 
 type SetColumn = (typeof SET_COLUMNS)[number];
 type CardColumn = (typeof CARD_COLUMNS)[number];
 
-const REQUIRED_SET_COLUMNS: SetColumn[] = ['title', 'kind', 'category', 'language_from', 'language_to'];
+const REQUIRED_SET_COLUMNS: SetColumn[] = [
+  'title',
+  'kind',
+  'category',
+  'language_from',
+  'language_to',
+];
 const REQUIRED_CARD_COLUMNS: CardColumn[] = ['set', 'term', 'translation'];
 
 /** Ограничения library_sets (миграция 005) и правило публикации (api/library.js). */
@@ -83,7 +105,10 @@ export async function parseLibraryWorkbook(filePath: string): Promise<LibraryPar
   // ── Лист «Наборы» ─────────────────────────────────────────────────────────
   const sets: ParsedLibrarySet[] = [];
   // Карточки ссылаются на набор по title — он должен быть уникален в файле.
-  const byTitle = new Map<string, { set: ParsedLibrarySet; row: number; seen: Map<string, number> }>();
+  const byTitle = new Map<
+    string,
+    { set: ParsedLibrarySet; row: number; seen: Map<string, number> }
+  >();
   const setCols = readHeaders(setsSheet, SET_COLUMNS, REQUIRED_SET_COLUMNS, errors);
   if (setCols) {
     for (let r = 2; r <= setsSheet.rowCount; r++) {
@@ -103,17 +128,28 @@ export async function parseLibraryWorkbook(filePath: string): Promise<LibraryPar
       const coverEmoji = get('cover_emoji') || null;
 
       let rowOk = true;
-      if (!title) { errors.push(`${where}: пустой title`); rowOk = false; }
-      if (title.length > MAX_TITLE) { errors.push(`${where}: title длиннее ${MAX_TITLE} символов`); rowOk = false; }
+      if (!title) {
+        errors.push(`${where}: пустой title`);
+        rowOk = false;
+      }
+      if (title.length > MAX_TITLE) {
+        errors.push(`${where}: title длиннее ${MAX_TITLE} символов`);
+        rowOk = false;
+      }
       if (!(SET_KINDS as readonly string[]).includes(kind)) {
         errors.push(`${where}: kind «${kind}» — нужно language (язык) или subject (предмет)`);
         rowOk = false;
       }
       if (!CATEGORY_KEYS.includes(category)) {
-        errors.push(`${where}: category «${category}» — нет такой категории. Можно: ${CATEGORY_KEYS.join(', ')}`);
+        errors.push(
+          `${where}: category «${category}» — нет такой категории. Можно: ${CATEGORY_KEYS.join(', ')}`
+        );
         rowOk = false;
       }
-      for (const [name, value] of [['language_from', languageFrom], ['language_to', languageTo]] as const) {
+      for (const [name, value] of [
+        ['language_from', languageFrom],
+        ['language_to', languageTo],
+      ] as const) {
         if (!isLanguageCode(value)) {
           errors.push(`${where}: ${name} должен быть кодом языка (en, ru, ky…), сейчас «${value}»`);
           rowOk = false;
@@ -132,7 +168,11 @@ export async function parseLibraryWorkbook(filePath: string): Promise<LibraryPar
         continue;
       }
       const set: ParsedLibrarySet = {
-        title, kind: kind as LibrarySetKind, category, languageFrom, languageTo,
+        title,
+        kind: kind as LibrarySetKind,
+        category,
+        languageFrom,
+        languageTo,
         description: get('description') || null,
         tags: parseTags(get('tags')),
         coverEmoji,
@@ -141,7 +181,8 @@ export async function parseLibraryWorkbook(filePath: string): Promise<LibraryPar
       byTitle.set(key, { set, row: r, seen: new Map() });
       sets.push(set);
     }
-    if (sets.length === 0 && errors.length === 0) errors.push(`Лист «${SETS_SHEET}»: нет ни одного набора`);
+    if (sets.length === 0 && errors.length === 0)
+      errors.push(`Лист «${SETS_SHEET}»: нет ни одного набора`);
   }
 
   // ── Лист «Карточки» ───────────────────────────────────────────────────────
@@ -163,16 +204,29 @@ export async function parseLibraryWorkbook(filePath: string): Promise<LibraryPar
 
       let rowOk = true;
       const entry = byTitle.get(normalizeTerm(setTitle));
-      if (!setTitle) { errors.push(`${where}: пустой set`); rowOk = false; }
-      else if (!entry) { errors.push(`${where}: набора «${setTitle}» нет на листе «${SETS_SHEET}»`); rowOk = false; }
-      if (!term) { errors.push(`${where}: пустой term`); rowOk = false; }
-      if (!translation) { errors.push(`${where}: пустой translation`); rowOk = false; }
+      if (!setTitle) {
+        errors.push(`${where}: пустой set`);
+        rowOk = false;
+      } else if (!entry) {
+        errors.push(`${where}: набора «${setTitle}» нет на листе «${SETS_SHEET}»`);
+        rowOk = false;
+      }
+      if (!term) {
+        errors.push(`${where}: пустой term`);
+        rowOk = false;
+      }
+      if (!translation) {
+        errors.push(`${where}: пустой translation`);
+        rowOk = false;
+      }
       if (!rowOk || !entry) continue;
 
       const key = normalizeTerm(term);
       const dupRow = entry.seen.get(key);
       if (dupRow !== undefined) {
-        warnings.push(`${where}: «${term}» уже есть в наборе «${entry.set.title}» (строка ${dupRow}) — дубль пропущен`);
+        warnings.push(
+          `${where}: «${term}» уже есть в наборе «${entry.set.title}» (строка ${dupRow}) — дубль пропущен`
+        );
         continue;
       }
       entry.seen.set(key, r);
@@ -182,7 +236,7 @@ export async function parseLibraryWorkbook(filePath: string): Promise<LibraryPar
     for (const { set, row } of byTitle.values()) {
       if (set.cards.length < MIN_CARDS) {
         errors.push(
-          `Набор «${set.title}» (лист «${SETS_SHEET}», строка ${row}): карточек ${set.cards.length}, нужно не меньше ${MIN_CARDS}`,
+          `Набор «${set.title}» (лист «${SETS_SHEET}», строка ${row}): карточек ${set.cards.length}, нужно не меньше ${MIN_CARDS}`
         );
       }
     }

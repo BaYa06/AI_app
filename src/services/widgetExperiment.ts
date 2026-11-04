@@ -22,7 +22,11 @@ export type ExposureMap = Record<string, Exposure>;
 const dayTime = (day: string) => new Date(`${day}T00:00:00`).getTime();
 
 /** Запомнить сегодняшние группы. Слово остаётся в группе, куда попало первым, до повторения. */
-export function recordExposures(map: ExposureMap, split: { pool: Card[]; control: Card[] }, today: string): ExposureMap {
+export function recordExposures(
+  map: ExposureMap,
+  split: { pool: Card[]; control: Card[] },
+  today: string
+): ExposureMap {
   const next: ExposureMap = {};
   const oldest = dayTime(today) - KEEP_DAYS * DAY_MS;
   for (const [id, exposure] of Object.entries(map)) {
@@ -45,7 +49,11 @@ export function recordExposures(map: ExposureMap, split: { pool: Card[]; control
  * Ответ в тесте урока. Слово было в группе в один из прошлых дней — возвращаем группу и убираем
  * слово из учёта (считаем только первое повторение). В тот же день не считаем: меряем память на следующий день.
  */
-export function takeReview(map: ExposureMap, cardId: string, today: string): { exposure: Exposure; map: ExposureMap } | null {
+export function takeReview(
+  map: ExposureMap,
+  cardId: string,
+  today: string
+): { exposure: Exposure; map: ExposureMap } | null {
   const exposure = map[cardId];
   if (!exposure || exposure.day >= today) return null;
   const { [cardId]: _taken, ...rest } = map;

@@ -6,8 +6,12 @@ import { HttpError, uuid, assertReadableSet } from './_access.js';
 import { courseSetsForStudent } from './_course.js';
 import { notifyCoursesChanged } from './_realtime.js';
 import {
-  getAdminStats, getAdminFeedback, markAdminFeedbackRead,
-  getAdminFeedbackThread, replyAdminFeedback, closeAdminFeedback,
+  getAdminStats,
+  getAdminFeedback,
+  markAdminFeedbackRead,
+  getAdminFeedbackThread,
+  replyAdminFeedback,
+  closeAdminFeedback,
 } from './_admin.js';
 import { isAppleUser, isAppleRevokeConfigured, revokeAppleAuthorization } from './_apple.js';
 import { getPublicNews } from './_whatsNew.js';
@@ -51,19 +55,22 @@ function isoOrNull(ms) {
 
 /** Набор принадлежит пользователю (менять можно только свои наборы). */
 async function assertOwnSet(sql, me, setId) {
-  const rows = await sql`SELECT 1 FROM card_sets WHERE id = ${setId}::uuid AND user_id = ${me}::uuid`;
+  const rows =
+    await sql`SELECT 1 FROM card_sets WHERE id = ${setId}::uuid AND user_id = ${me}::uuid`;
   if (rows.length === 0) throw new HttpError(403, 'Not your set');
 }
 
 /** Курс принадлежит пользователю (учитель). */
 async function assertOwnCourse(sql, me, courseId) {
-  const rows = await sql`SELECT 1 FROM courses WHERE id = ${courseId}::uuid AND user_id = ${me}::uuid`;
+  const rows =
+    await sql`SELECT 1 FROM courses WHERE id = ${courseId}::uuid AND user_id = ${me}::uuid`;
   if (rows.length === 0) throw new HttpError(403, 'Not your course');
 }
 
 /** Дата клиента YYYY-MM-DD, не дальше суток от UTC-сегодня (любой часовой пояс). */
 function localDay(value) {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new HttpError(400, 'Invalid date');
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value))
+    throw new HttpError(400, 'Invalid date');
   const today = Date.parse(new Date().toISOString().slice(0, 10) + 'T00:00:00Z');
   if (Math.abs(Date.parse(`${value}T00:00:00Z`) - today) > 2 * 24 * 60 * 60 * 1000) {
     throw new HttpError(400, 'Date out of range');
@@ -122,7 +129,8 @@ async function updateUserName(sql, me, p) {
 
 function optStringArray(value) {
   if (value === undefined || value === null) return null;
-  if (!Array.isArray(value) || value.some((v) => typeof v !== 'string')) throw new HttpError(400, 'string[] expected');
+  if (!Array.isArray(value) || value.some((v) => typeof v !== 'string'))
+    throw new HttpError(400, 'string[] expected');
   return value.slice(0, 20).map((v) => v.slice(0, 20));
 }
 
@@ -176,7 +184,10 @@ async function getAboutMe(sql, me) {
     classHour: row.class_hour,
     learningGoal: row.learning_goal,
     useHabits: row.use_habits,
-    habits: { usualTime: row.usual_time ? row.usual_time.slice(0, 5) : null, usualDays: row.usual_days || [] },
+    habits: {
+      usualTime: row.usual_time ? row.usual_time.slice(0, 5) : null,
+      usualDays: row.usual_days || [],
+    },
   };
 }
 
@@ -185,7 +196,8 @@ async function getAboutMe(sql, me) {
  * clearHabits — «Стереть, что знаешь о моих привычках»: профиль удаляется и больше не используется.
  */
 async function saveAboutMe(sql, me, p) {
-  if ('ageRange' in p) await sql`UPDATE users SET age_range = ${optAgeRange(p.ageRange)} WHERE id = ${me}::uuid`;
+  if ('ageRange' in p)
+    await sql`UPDATE users SET age_range = ${optAgeRange(p.ageRange)} WHERE id = ${me}::uuid`;
   if ('classDays' in p || 'classHour' in p) {
     const days = optClassDays(p.classDays);
     const hour = days ? optClassHour(p.classHour) : null;
@@ -333,7 +345,8 @@ async function insertCards(sql, me, cards) {
     status: optString(c.status, 20) || 'new',
   }));
   const setIds = [...new Set(rows.map((r) => r.set_id))];
-  const own = await sql`SELECT id FROM card_sets WHERE id = ANY(${setIds}::uuid[]) AND user_id = ${me}::uuid`;
+  const own =
+    await sql`SELECT id FROM card_sets WHERE id = ANY(${setIds}::uuid[]) AND user_id = ${me}::uuid`;
   if (own.length !== setIds.length) throw new HttpError(403, 'Not your set');
 
   const inserted = await sql`
@@ -512,8 +525,12 @@ async function dayCountsForStreak(sql, me, today, tz) {
   `;
   const { active, reviewed, waiting } = rows[0];
   return {
-    counted: reviewed >= DAILY_REVIEW_TARGET || (waiting === 0 && (reviewed >= 1 || active >= DAILY_REVIEW_TARGET)),
-    active, reviewed, waiting,
+    counted:
+      reviewed >= DAILY_REVIEW_TARGET ||
+      (waiting === 0 && (reviewed >= 1 || active >= DAILY_REVIEW_TARGET)),
+    active,
+    reviewed,
+    waiting,
   };
 }
 
@@ -544,7 +561,12 @@ async function updateUserStatsStreak(sql, me, p) {
           updated_at = NOW()
       `;
     }
-    return { counted: false, currentStreak: prevStreak, longestStreak: existing[0]?.longest_streak || 0, ...day };
+    return {
+      counted: false,
+      currentStreak: prevStreak,
+      longestStreak: existing[0]?.longest_streak || 0,
+      ...day,
+    };
   }
 
   let currentStreak = prevStreak;
@@ -555,7 +577,8 @@ async function updateUserStatsStreak(sql, me, p) {
     currentStreak += 1;
   } else {
     currentStreak = 1;
-    if (existing.length > 0 && prevStreak > 1) await sendPush(sql, me, 'streak_lost', { prevStreak });
+    if (existing.length > 0 && prevStreak > 1)
+      await sendPush(sql, me, 'streak_lost', { prevStreak });
   }
   if (currentStreak > longestStreak) longestStreak = currentStreak;
 
@@ -590,10 +613,18 @@ async function buyStreakFreeze(sql, me) {
     RETURNING diamond, streak_freezes
   `;
   if (rows.length === 0) {
-    const [u] = await sql`SELECT COALESCE(diamond, 0) AS diamond, streak_freezes FROM users WHERE id = ${me}::uuid`;
-    throw new HttpError(409, u && u.streak_freezes >= MAX_STREAK_FREEZES ? 'max_freezes' : 'not_enough_diamonds');
+    const [u] =
+      await sql`SELECT COALESCE(diamond, 0) AS diamond, streak_freezes FROM users WHERE id = ${me}::uuid`;
+    throw new HttpError(
+      409,
+      u && u.streak_freezes >= MAX_STREAK_FREEZES ? 'max_freezes' : 'not_enough_diamonds'
+    );
   }
-  return { diamonds: rows[0].diamond, streakFreezes: rows[0].streak_freezes, price: STREAK_FREEZE_PRICE };
+  return {
+    diamonds: rows[0].diamond,
+    streakFreezes: rows[0].streak_freezes,
+    price: STREAK_FREEZE_PRICE,
+  };
 }
 
 async function logStreakEvent(sql, me, p) {
@@ -632,17 +663,23 @@ async function getUserStats(sql, me) {
     let todayKey;
     try {
       todayKey = new Intl.DateTimeFormat('en-CA', {
-        timeZone: row.timezone || 'UTC', year: 'numeric', month: '2-digit', day: '2-digit',
+        timeZone: row.timezone || 'UTC',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
       }).format(new Date());
     } catch {
       todayKey = new Date().toISOString().slice(0, 10);
     }
     const diffDays = Math.round(
-      (Date.parse(`${todayKey}T12:00:00Z`) - Date.parse(`${row.last_active_date}T12:00:00Z`)) / 86_400_000,
+      (Date.parse(`${todayKey}T12:00:00Z`) - Date.parse(`${row.last_active_date}T12:00:00Z`)) /
+        86_400_000
     );
     if (diffDays === 2 && row.streak_freezes > 0) {
       // Вчера пропущен: заморозка «засчитывает» вчерашний день, серия не прерывается
-      const yesterday = new Date(Date.parse(`${todayKey}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+      const yesterday = new Date(Date.parse(`${todayKey}T12:00:00Z`) - 86_400_000)
+        .toISOString()
+        .slice(0, 10);
       const used = await sql`
         WITH f AS (
           UPDATE users SET streak_freezes = streak_freezes - 1
@@ -690,9 +727,11 @@ async function bootstrap(sql, me) {
     getUserStats(sql, me),
   ]);
   const courseSets = {};
-  await Promise.all(studentCourses.map(async (course) => {
-    courseSets[course.id] = await courseSetsForStudent(sql, course.id);
-  }));
+  await Promise.all(
+    studentCourses.map(async (course) => {
+      courseSets[course.id] = await courseSetsForStudent(sql, course.id);
+    })
+  );
   return { sets, cards, courses, studentCourses, courseSets, stats, serverTime: Date.now() };
 }
 
@@ -724,7 +763,8 @@ async function submitFeedback(sql, me, p) {
     if (!message || message.length < 3) throw new HttpError(400, 'Message required');
   } else {
     rating = Number(p.rating);
-    if (!Number.isInteger(rating) || rating < 1 || rating > 5) throw new HttpError(400, 'Invalid rating');
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5)
+      throw new HttpError(400, 'Invalid rating');
     hasProblem = typeof p.hasProblem === 'boolean' ? p.hasProblem : null;
     tags = Array.isArray(p.tags) ? [...new Set(p.tags.filter((t) => FEEDBACK_TAGS.has(t)))] : null;
     if (tags && tags.length === 0) tags = null;
@@ -756,7 +796,8 @@ async function assertFeedbackLimit(sql, me) {
         WHERE f.user_id = ${me}::uuid AND r.author = 'user' AND r.created_at > NOW() - INTERVAL '1 day')
       AS n
   `;
-  if (Number(recent[0].n) >= FEEDBACK_DAILY_LIMIT) throw new HttpError(429, 'Too many messages today');
+  if (Number(recent[0].n) >= FEEDBACK_DAILY_LIMIT)
+    throw new HttpError(429, 'Too many messages today');
 }
 
 // ==================== МОИ ОБРАЩЕНИЯ (plan/new/support_threads.md) ====================
@@ -774,7 +815,8 @@ const FEEDBACK_USER_STATUS = `
 
 /** Свои обращения, новые сверху. preview — последнее сообщение ветки (или само обращение). */
 async function myFeedback(sql, me) {
-  const rows = await sql.query(`
+  const rows = await sql.query(
+    `
     SELECT f.id, f.kind, f.category, f.rating, f.has_problem, f.tags, f.created_at, f.last_message_at,
            f.status = 'closed' AS closed,
            ${FEEDBACK_USER_STATUS} AS user_status,
@@ -788,7 +830,9 @@ async function myFeedback(sql, me) {
     WHERE f.user_id = $1::uuid
     ORDER BY f.last_message_at DESC
     LIMIT 100
-  `, [me]);
+  `,
+    [me]
+  );
   return rows.map((r) => ({
     id: r.id,
     kind: r.kind,
@@ -899,14 +943,19 @@ async function adminReplyFeedback(sql, me, p) {
   await assertAdmin(sql, me);
   const message = optString(p.message, 4000)?.trim();
   if (!message) throw new HttpError(400, 'Message required');
-  const reply = await replyAdminFeedback(sql, me, uuid(p.id, 'id'), message, { close: p.close === true });
+  const reply = await replyAdminFeedback(sql, me, uuid(p.id, 'id'), message, {
+    close: p.close === true,
+  });
   if (!reply) throw new HttpError(404, 'Not found');
   // Пуш — по галочке в админке; результат показываем рядом с ответом (ночью уйдёт утром, старой версии — нет)
   let push = null;
   if (p.push !== false && reply.user_id) {
     try {
       const { sendNotification } = await import('./push.js');
-      const r = await sendNotification(sql, reply.user_id, 'support_reply', { feedbackId: p.id, text: message });
+      const r = await sendNotification(sql, reply.user_id, 'support_reply', {
+        feedbackId: p.id,
+        text: message,
+      });
       push = { ok: r.ok === true, reason: r.reason || r.error || null };
     } catch (e) {
       log.error('data', 'support_reply push failed', e);
@@ -941,7 +990,8 @@ async function deleteAccount(sql, me, p, user) {
   if (!serviceKey) throw new HttpError(503, 'Account deletion is not configured');
 
   if (isAppleUser(user)) {
-    if (!isAppleRevokeConfigured()) throw new HttpError(503, 'Apple token revocation is not configured');
+    if (!isAppleRevokeConfigured())
+      throw new HttpError(503, 'Apple token revocation is not configured');
     const code = optString(p.appleAuthorizationCode, 2000);
     if (!code) throw new HttpError(400, 'Apple authorization required');
     try {
@@ -984,20 +1034,47 @@ async function deleteAccount(sql, me, p, user) {
 }
 
 const ACTIONS = {
-  ensureUserExists, getProfile, updateDisplayName, updateUserName, updateLanguagePreferences, saveOnboardingData,
-  getAboutMe, saveAboutMe,
-  loadSets, loadCardsBySet, loadAllCards, updateCard, createSet, createCard, createCardsBatch,
-  deleteSet, deleteCard, updateSetMeta, updateSetCourse,
-  loadCourses, createCourse, loadStudentCourses,
-  upsertDailyActivity, updateUserStatsStreak, buyStreakFreeze, logStreakEvent, getWeekActivity, getUserStats,
+  ensureUserExists,
+  getProfile,
+  updateDisplayName,
+  updateUserName,
+  updateLanguagePreferences,
+  saveOnboardingData,
+  getAboutMe,
+  saveAboutMe,
+  loadSets,
+  loadCardsBySet,
+  loadAllCards,
+  updateCard,
+  createSet,
+  createCard,
+  createCardsBatch,
+  deleteSet,
+  deleteCard,
+  updateSetMeta,
+  updateSetCourse,
+  loadCourses,
+  createCourse,
+  loadStudentCourses,
+  upsertDailyActivity,
+  updateUserStatsStreak,
+  buyStreakFreeze,
+  logStreakEvent,
+  getWeekActivity,
+  getUserStats,
   bootstrap,
   getDailyActivity,
   deleteAccount,
   submitFeedback,
-  myFeedback, feedbackThread, replyFeedback, feedbackUnreadCount,
+  myFeedback,
+  feedbackThread,
+  replyFeedback,
+  feedbackUnreadCount,
   adminDashboard,
   adminMarkFeedbackRead,
-  adminFeedbackThread, adminReplyFeedback, adminCloseFeedback,
+  adminFeedbackThread,
+  adminReplyFeedback,
+  adminCloseFeedback,
 };
 
 // ─── Сигнал ученикам об изменениях в курсе ─────────────────────────────────
@@ -1036,7 +1113,8 @@ async function coursesTouchedBy(sql, action, p) {
       case 'createCardsBatch': {
         const setIds = [...new Set((p.cards || []).map((c) => c?.setId).filter(Boolean))];
         if (setIds.length === 0) return [];
-        const rows = await sql`SELECT DISTINCT course_id FROM card_sets WHERE id = ANY(${setIds}::uuid[])`;
+        const rows =
+          await sql`SELECT DISTINCT course_id FROM card_sets WHERE id = ANY(${setIds}::uuid[])`;
         return rows.map((r) => r.course_id);
       }
       default:
@@ -1065,8 +1143,10 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
-  if (!Object.hasOwn(ACTIONS, action || '')) return res.status(400).json({ error: 'Unknown action' });
-  if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (!Object.hasOwn(ACTIONS, action || ''))
+    return res.status(400).json({ error: 'Unknown action' });
+  if (req.method !== 'GET' && req.method !== 'POST')
+    return res.status(405).json({ error: 'Method not allowed' });
 
   const user = await getAuthedUser(req);
   if (!user) return res.status(401).json({ error: 'Unauthorized' });

@@ -1,0 +1,34 @@
+# Сгенерированное, нативное и чужое — не наш исходный код (как в .eslintignore)
+node_modules/
+dist/
+build/
+coverage/
+ios/
+android/
+public/
+patches/
+plan/
+assets/
+templates/
+sets/
+books/
+sounds/
+keys/
+.vercel/
+.expo/
+tmp/
+temp/
+
+# Локальные файлы вне git (см. .gitignore)
+api/admin.js
+admin-server.mjs
+public/admin.html
+
+# Форматируем только JS/TS; данные и тексты не трогаем
+package-lock.json
+*.json
+*.md
+*.yml
+*.yaml
+*.html
+*.css

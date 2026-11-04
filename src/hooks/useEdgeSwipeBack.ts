@@ -6,9 +6,9 @@ import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
-const EDGE_WIDTH = 40;     // px от левого края
-const MIN_DELTA_X = 60;    // минимальный свайп вправо
-const MAX_DELTA_Y = 40;    // допустимый вертикальный люфт
+const EDGE_WIDTH = 40; // px от левого края
+const MIN_DELTA_X = 60; // минимальный свайп вправо
+const MAX_DELTA_Y = 40; // допустимый вертикальный люфт
 
 export function useEdgeSwipeBack(enabled = true) {
   const navigation = useNavigation();

@@ -13,7 +13,8 @@ export class HttpError extends Error {
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function uuid(value, name) {
-  if (typeof value !== 'string' || !UUID_RE.test(value)) throw new HttpError(400, `${name} must be a uuid`);
+  if (typeof value !== 'string' || !UUID_RE.test(value))
+    throw new HttpError(400, `${name} must be a uuid`);
   return value;
 }
 

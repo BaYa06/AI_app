@@ -42,7 +42,12 @@ const pageId = (pages: WhatsNewPage[], index: number): string => {
 
 /** События окна для одного показа: shown сразу, остальные — из onPage / onClose */
 export function trackWhatsNew(place: Place, pages: WhatsNewPage[]) {
-  Analytics.whatsNewShown({ place, count: pages.length, news: pageItemIds(pages).length, version: APP_VERSION });
+  Analytics.whatsNewShown({
+    place,
+    count: pages.length,
+    news: pageItemIds(pages).length,
+    version: APP_VERSION,
+  });
   return {
     page: (index: number) => Analytics.whatsNewPage({ place, id: pageId(pages, index), index }),
     close: (index: number, tryItem?: WhatsNewItem) => {

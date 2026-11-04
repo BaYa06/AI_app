@@ -15,7 +15,12 @@ import { pluralize } from '@/utils';
 import { Analytics } from '@/services/analytics';
 import { requestPushPermission } from '@/services/pushNotifications';
 import { supabase } from '@/services/supabaseClient';
-import { REMINDER_SLOTS, saveReminderHour, suggestedSlot, type ReminderSlot } from '@/services/pushPrompt';
+import {
+  REMINDER_SLOTS,
+  saveReminderHour,
+  suggestedSlot,
+  type ReminderSlot,
+} from '@/services/pushPrompt';
 
 /** Чем закончился лист: custom — человек хочет своё время, открыть настройки уведомлений */
 export type PushPrepromptResult = 'granted' | 'custom' | 'denied' | 'later';
@@ -29,12 +34,15 @@ interface Props {
 
 export function PushPreprompt({ visible, wordCount, onClose }: Props) {
   const colors = useThemeColors();
-  const [slot, setSlot] = useState<ReminderSlot | 'custom'>(() => suggestedSlot(new Date().getHours()));
+  const [slot, setSlot] = useState<ReminderSlot | 'custom'>(() =>
+    suggestedSlot(new Date().getHours())
+  );
   const [loading, setLoading] = useState(false);
 
-  const title = wordCount > 1
-    ? `Напомнить завтра повторить эти ${wordCount} ${pluralize(wordCount, 'слово', 'слова', 'слов')}?`
-    : 'Напомнить завтра про урок?';
+  const title =
+    wordCount > 1
+      ? `Напомнить завтра повторить эти ${wordCount} ${pluralize(wordCount, 'слово', 'слова', 'слов')}?`
+      : 'Напомнить завтра про урок?';
 
   const handleLater = useCallback(() => {
     if (loading) return;
@@ -75,14 +83,21 @@ export function PushPreprompt({ visible, wordCount, onClose }: Props) {
         <View style={[st.iconCircle, { backgroundColor: alpha(colors.primary, 10) }]}>
           <Bell size={iconSize.l} color={colors.primary} />
         </View>
-        <Text variant="h3" align="center" accessibilityRole="header" style={{ color: colors.textPrimary }}>
+        <Text
+          variant="h3"
+          align="center"
+          accessibilityRole="header"
+          style={{ color: colors.textPrimary }}
+        >
           {title}
         </Text>
         <Text variant="body" align="center" color="secondary" style={st.subtitle}>
           Повторение на следующий день помогает словам запомниться. Одно напоминание в день.
         </Text>
 
-        <Text variant="label" color="secondary" style={st.slotsLabel}>Когда напомнить</Text>
+        <Text variant="label" color="secondary" style={st.slotsLabel}>
+          Когда напомнить
+        </Text>
         <View style={st.slots}>
           {REMINDER_SLOTS.map((s) => (
             <Chip
@@ -96,8 +111,21 @@ export function PushPreprompt({ visible, wordCount, onClose }: Props) {
         </View>
 
         <View style={st.actions}>
-          <Button title={loading ? 'Включаем…' : 'Напомнить'} icon={Bell} onPress={handleAccept} disabled={loading} fullWidth />
-          <Button title="Не сейчас" variant="quiet" tone="secondary" onPress={handleLater} disabled={loading} fullWidth />
+          <Button
+            title={loading ? 'Включаем…' : 'Напомнить'}
+            icon={Bell}
+            onPress={handleAccept}
+            disabled={loading}
+            fullWidth
+          />
+          <Button
+            title="Не сейчас"
+            variant="quiet"
+            tone="secondary"
+            onPress={handleLater}
+            disabled={loading}
+            fullWidth
+          />
         </View>
       </View>
     </Sheet>

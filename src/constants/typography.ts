@@ -37,7 +37,7 @@ export const typography = {
     lineHeight: 40,
     letterSpacing: -0.5,
   } as TextStyle,
-  
+
   h2: {
     fontFamily,
     fontSize: 24,
@@ -45,7 +45,7 @@ export const typography = {
     lineHeight: 32,
     letterSpacing: -0.3,
   } as TextStyle,
-  
+
   h3: {
     fontFamily,
     fontSize: 20,
@@ -53,7 +53,7 @@ export const typography = {
     lineHeight: 28,
     letterSpacing: 0,
   } as TextStyle,
-  
+
   // Основной текст
   bodyLarge: {
     fontFamily,
@@ -61,21 +61,21 @@ export const typography = {
     fontWeight: '400',
     lineHeight: 26,
   } as TextStyle,
-  
+
   body: {
     fontFamily,
     fontSize: 16,
     fontWeight: '400',
     lineHeight: 24,
   } as TextStyle,
-  
+
   bodySmall: {
     fontFamily,
     fontSize: 14,
     fontWeight: '400',
     lineHeight: 20,
   } as TextStyle,
-  
+
   // Подписи
   caption: {
     fontFamily,
@@ -83,7 +83,7 @@ export const typography = {
     fontWeight: '400',
     lineHeight: 16,
   } as TextStyle,
-  
+
   // Кнопки
   button: {
     fontFamily,
@@ -92,7 +92,7 @@ export const typography = {
     lineHeight: 24,
     letterSpacing: 0.5,
   } as TextStyle,
-  
+
   buttonSmall: {
     fontFamily,
     fontSize: 14,
@@ -100,7 +100,7 @@ export const typography = {
     lineHeight: 20,
     letterSpacing: 0.5,
   } as TextStyle,
-  
+
   // Карточки - крупный текст для удобного чтения
   cardText: {
     fontFamily,
@@ -108,7 +108,7 @@ export const typography = {
     fontWeight: '600',
     lineHeight: 32,
   } as TextStyle,
-  
+
   // Лейблы
   label: {
     fontFamily,

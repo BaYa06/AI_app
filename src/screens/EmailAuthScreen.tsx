@@ -168,8 +168,7 @@ export function EmailAuthScreen({ onBack }: Props) {
         });
 
         // Analytics: определяем регистрация или вход
-        const isNewUser =
-          newSession.user.created_at === newSession.user.last_sign_in_at;
+        const isNewUser = newSession.user.created_at === newSession.user.last_sign_in_at;
         if (isNewUser) {
           Analytics.signUp('google');
         } else {
@@ -204,7 +203,7 @@ export function EmailAuthScreen({ onBack }: Props) {
         <ScrollView
           contentContainerStyle={[
             styles.scrollContent,
-            { paddingBottom: Math.max(insets.bottom, spacing.l) }
+            { paddingBottom: Math.max(insets.bottom, spacing.l) },
           ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"

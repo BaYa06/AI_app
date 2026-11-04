@@ -21,16 +21,35 @@ async function main(): Promise<void> {
 
   const sets = workbook.addWorksheet(SETS_SHEET);
   const setWidths: Record<(typeof SET_COLUMNS)[number], number> = {
-    title: 36, kind: 12, category: 14, language_from: 14, language_to: 14, description: 44, tags: 24, cover_emoji: 12,
+    title: 36,
+    kind: 12,
+    category: 14,
+    language_from: 14,
+    language_to: 14,
+    description: 44,
+    tags: 24,
+    cover_emoji: 12,
   };
   sets.columns = SET_COLUMNS.map((key) => ({ header: key, key, width: setWidths[key] }));
   sets.addRow({
-    title: 'Travel: at the airport', kind: 'language', category: 'travel', language_from: 'en', language_to: 'ru',
-    description: 'Слова, которые пригодятся в аэропорту', tags: 'путешествия, A2', cover_emoji: '✈️',
+    title: 'Travel: at the airport',
+    kind: 'language',
+    category: 'travel',
+    language_from: 'en',
+    language_to: 'ru',
+    description: 'Слова, которые пригодятся в аэропорту',
+    tags: 'путешествия, A2',
+    cover_emoji: '✈️',
   });
   sets.addRow({
-    title: 'Столицы Центральной Азии', kind: 'subject', category: 'geography', language_from: 'ru', language_to: 'ru',
-    description: 'Страна → столица', tags: 'ОРТ', cover_emoji: '🗺️',
+    title: 'Столицы Центральной Азии',
+    kind: 'subject',
+    category: 'geography',
+    language_from: 'ru',
+    language_to: 'ru',
+    description: 'Страна → столица',
+    tags: 'ОРТ',
+    cover_emoji: '🗺️',
   });
   styleHeader(sets);
 
@@ -47,22 +66,46 @@ async function main(): Promise<void> {
   const listRef = `'${CATEGORIES_SHEET}'!$A$2:$A$${LIBRARY_CATEGORIES.length + 1}`;
   for (let r = 2; r <= VALIDATED_ROWS; r++) {
     sets.getCell(r, categoryCol).dataValidation = {
-      type: 'list', allowBlank: true, formulae: [listRef],
-      showErrorMessage: true, errorTitle: 'Категория', error: `Выберите категорию с листа «${CATEGORIES_SHEET}»`,
+      type: 'list',
+      allowBlank: true,
+      formulae: [listRef],
+      showErrorMessage: true,
+      errorTitle: 'Категория',
+      error: `Выберите категорию с листа «${CATEGORIES_SHEET}»`,
     };
   }
 
   const cards = workbook.addWorksheet(CARDS_SHEET);
-  const cardWidths: Record<(typeof CARD_COLUMNS)[number], number> = { set: 30, term: 24, translation: 28, example: 44 };
+  const cardWidths: Record<(typeof CARD_COLUMNS)[number], number> = {
+    set: 30,
+    term: 24,
+    translation: 28,
+    example: 44,
+  };
   cards.columns = CARD_COLUMNS.map((key) => ({ header: key, key, width: cardWidths[key] }));
   const travel = 'Travel: at the airport';
   const capitals = 'Столицы Центральной Азии';
   const rows = [
-    { set: travel, term: 'boarding pass', translation: 'посадочный талон', example: 'Please show your boarding pass.' },
-    { set: travel, term: 'gate', translation: 'выход на посадку', example: 'Our flight leaves from gate 12.' },
+    {
+      set: travel,
+      term: 'boarding pass',
+      translation: 'посадочный талон',
+      example: 'Please show your boarding pass.',
+    },
+    {
+      set: travel,
+      term: 'gate',
+      translation: 'выход на посадку',
+      example: 'Our flight leaves from gate 12.',
+    },
     { set: travel, term: 'luggage', translation: 'багаж', example: '' },
     { set: travel, term: 'delay', translation: 'задержка', example: 'There is a two-hour delay.' },
-    { set: travel, term: 'check in', translation: 'зарегистрироваться', example: 'We need to check in online.' },
+    {
+      set: travel,
+      term: 'check in',
+      translation: 'зарегистрироваться',
+      example: 'We need to check in online.',
+    },
     { set: capitals, term: 'Кыргызстан', translation: 'Бишкек', example: '' },
     { set: capitals, term: 'Казахстан', translation: 'Астана', example: '' },
     { set: capitals, term: 'Узбекистан', translation: 'Ташкент', example: '' },

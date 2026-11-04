@@ -24,11 +24,14 @@ if (fs.existsSync(target)) {
   process.exit(1);
 }
 
-const template = fs.readFileSync(path.join(ROOT, 'src', 'screens', 'templates', 'ScreenTemplate.tsx'), 'utf8');
+const template = fs.readFileSync(
+  path.join(ROOT, 'src', 'screens', 'templates', 'ScreenTemplate.tsx'),
+  'utf8'
+);
 const source = template
   .replace(
     /^\/\*\*\n \* ScreenTemplate — [^\n]*\n(?: \*[^\n]*\n)*? \* Шаблон проверяют[^\n]*\n \*\n/m,
-    `/**\n * ${name}\n *\n`,
+    `/**\n * ${name}\n *\n`
   )
   .replace(/\bScreenTemplate\b/g, name);
 

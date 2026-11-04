@@ -42,14 +42,17 @@ export function AddByLinkSheet({ visible, onClose, onCode }: Props) {
     setError(null);
   }, [visible]);
 
-  const submit = useCallback((value: string) => {
-    const code = findShareCode(value);
-    if (!code) {
-      setError('Это не ссылка на набор Flashly');
-      return;
-    }
-    onCode(code);
-  }, [onCode]);
+  const submit = useCallback(
+    (value: string) => {
+      const code = findShareCode(value);
+      if (!code) {
+        setError('Это не ссылка на набор Flashly');
+        return;
+      }
+      onCode(code);
+    },
+    [onCode]
+  );
 
   const handlePaste = useCallback(async () => {
     const value = (await readClipboard()).trim();

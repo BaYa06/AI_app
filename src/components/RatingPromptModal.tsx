@@ -67,11 +67,14 @@ export function RatingPromptModal({ visible, onClose }: { visible: boolean; onCl
     };
   }, [visible]);
 
-  const showThanks = useCallback((withReplyHint: boolean) => {
-    setExpectsReply(withReplyHint);
-    setStep('thanks');
-    if (!withReplyHint) closeTimer.current = setTimeout(onClose, THANKS_CLOSE_MS);
-  }, [onClose]);
+  const showThanks = useCallback(
+    (withReplyHint: boolean) => {
+      setExpectsReply(withReplyHint);
+      setStep('thanks');
+      if (!withReplyHint) closeTimer.current = setTimeout(onClose, THANKS_CLOSE_MS);
+    },
+    [onClose]
+  );
 
   const submit = useCallback(
     async (payload: { hasProblem: boolean | null; tags?: FeedbackTag[]; message?: string }) => {
@@ -82,7 +85,7 @@ export function RatingPromptModal({ visible, onClose }: { visible: boolean; onCl
       setSending(false);
       showThanks(ok && (payload.hasProblem === true || !!payload.message?.trim()));
     },
-    [rating, showThanks],
+    [rating, showThanks]
   );
 
   const handleMood = (value: number) => {
@@ -126,10 +129,19 @@ export function RatingPromptModal({ visible, onClose }: { visible: boolean; onCl
       <View style={styles.content}>
         {step === 'mood' && (
           <>
-            <Text variant="h3" align="center" accessibilityRole="header" style={{ color: colors.textPrimary }}>
+            <Text
+              variant="h3"
+              align="center"
+              accessibilityRole="header"
+              style={{ color: colors.textPrimary }}
+            >
               Как тебе Flashly?
             </Text>
-            <Text variant="bodySmall" align="center" style={[styles.subtitle, { color: colors.textSecondary }]}>
+            <Text
+              variant="bodySmall"
+              align="center"
+              style={[styles.subtitle, { color: colors.textSecondary }]}
+            >
               Ответь в одно касание — так мы поймём, что улучшить
             </Text>
             <View style={styles.moodList}>
@@ -149,7 +161,12 @@ export function RatingPromptModal({ visible, onClose }: { visible: boolean; onCl
 
         {step === 'problem' && (
           <>
-            <Text variant="h3" align="center" accessibilityRole="header" style={{ color: colors.textPrimary }}>
+            <Text
+              variant="h3"
+              align="center"
+              accessibilityRole="header"
+              style={{ color: colors.textPrimary }}
+            >
               Были ли проблемы в приложении?
             </Text>
             <View style={styles.answerRow}>
@@ -173,7 +190,12 @@ export function RatingPromptModal({ visible, onClose }: { visible: boolean; onCl
 
         {step === 'details' && (
           <>
-            <Text variant="h3" align="center" accessibilityRole="header" style={{ color: colors.textPrimary }}>
+            <Text
+              variant="h3"
+              align="center"
+              accessibilityRole="header"
+              style={{ color: colors.textPrimary }}
+            >
               {hasProblem ? 'Что случилось?' : 'Что нам улучшить?'}
             </Text>
             {hasProblem && (
@@ -209,11 +231,14 @@ export function RatingPromptModal({ visible, onClose }: { visible: boolean; onCl
         {step === 'thanks' && (
           <View style={styles.thanks} accessibilityLiveRegion="polite">
             <Heart size={iconSize.xl} color={colors.primary} fill={colors.primary} />
-            <Text variant="h3" align="center" style={{ color: colors.textPrimary }}>Спасибо за отзыв!</Text>
+            <Text variant="h3" align="center" style={{ color: colors.textPrimary }}>
+              Спасибо за отзыв!
+            </Text>
             {expectsReply && (
               <>
                 <Text variant="bodySmall" align="center" style={{ color: colors.textSecondary }}>
-                  Мы прочитаем и ответим. Ответ придёт в «Профиль → Мои обращения» — пришлём уведомление.
+                  Мы прочитаем и ответим. Ответ придёт в «Профиль → Мои обращения» — пришлём
+                  уведомление.
                 </Text>
                 <Button title="Готово" onPress={onClose} fullWidth style={styles.done} />
               </>
@@ -222,7 +247,13 @@ export function RatingPromptModal({ visible, onClose }: { visible: boolean; onCl
         )}
 
         {step !== 'thanks' && (
-          <Button variant="quiet" tone="secondary" title="Пропустить" onPress={handleSkip} disabled={sending} />
+          <Button
+            variant="quiet"
+            tone="secondary"
+            title="Пропустить"
+            onPress={handleSkip}
+            disabled={sending}
+          />
         )}
       </View>
     </Sheet>

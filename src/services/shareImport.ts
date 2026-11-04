@@ -21,7 +21,7 @@ export interface ShareImportResult {
 async function importAsGuest(
   preview: SharePreview,
   courseId: string | null,
-  userId: string,
+  userId: string
 ): Promise<ShareImportResult> {
   const sharedCards = await ShareService.getAllCards(preview.code);
   const now = Date.now();
@@ -110,7 +110,11 @@ export async function importSharedSet(params: {
     const setId = await ShareService.importSet(preview.code, serverCourseId);
     result = { setId, alreadyImported: false };
   } catch (e) {
-    if (e instanceof ShareApiError && e.code === 'already_imported' && typeof e.payload.setId === 'string') {
+    if (
+      e instanceof ShareApiError &&
+      e.code === 'already_imported' &&
+      typeof e.payload.setId === 'string'
+    ) {
       result = { setId: e.payload.setId, alreadyImported: true };
     } else {
       throw e;

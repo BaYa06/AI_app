@@ -34,7 +34,13 @@ import type { SetSessionInfo } from './setSession';
 import { sessionSheetMeta, sessionSheetStages, sessionSheetText } from './sessionSheetText';
 import { isNativeStudyModeSheet, useNativeStudyModeSheet } from './nativeStudyModeSheet';
 
-export type StudyMode = 'classic' | 'match' | 'multipleChoice' | 'wordBuilder' | 'audio' | 'contextFill';
+export type StudyMode =
+  | 'classic'
+  | 'match'
+  | 'multipleChoice'
+  | 'wordBuilder'
+  | 'audio'
+  | 'contextFill';
 export type WordLimit = '10' | '20' | '30' | 'all';
 
 export interface StudyModeGame {
@@ -46,12 +52,42 @@ export interface StudyModeGame {
 }
 
 export const DEFAULT_STUDY_MODE_GAMES: StudyModeGame[] = [
-  { mode: 'match', icon: Puzzle, title: 'Пары', tag: 'Быстро', description: 'Сопоставление слов и переводов' },
-  { mode: 'multipleChoice', icon: ClipboardList, title: 'Тест', tag: 'Легко', description: 'Выбери правильный из 4 вариантов' },
-  { mode: 'wordBuilder', icon: Type, title: 'Собери слово', tag: 'Правописание', description: 'Собери слово из букв' },
+  {
+    mode: 'match',
+    icon: Puzzle,
+    title: 'Пары',
+    tag: 'Быстро',
+    description: 'Сопоставление слов и переводов',
+  },
+  {
+    mode: 'multipleChoice',
+    icon: ClipboardList,
+    title: 'Тест',
+    tag: 'Легко',
+    description: 'Выбери правильный из 4 вариантов',
+  },
+  {
+    mode: 'wordBuilder',
+    icon: Type,
+    title: 'Собери слово',
+    tag: 'Правописание',
+    description: 'Собери слово из букв',
+  },
   // Режим просит сказать перевод вслух (AudioLearningScreen), а не слушать — решение 20 плана
-  { mode: 'audio', icon: Headphones, title: 'Аудио', tag: 'Речь', description: 'Скажи перевод вслух за 5 секунд' },
-  { mode: 'contextFill', icon: BookOpenCheck, title: 'Слово в контексте', tag: 'Контекст', description: 'Угадай слово по примеру' },
+  {
+    mode: 'audio',
+    icon: Headphones,
+    title: 'Аудио',
+    tag: 'Речь',
+    description: 'Скажи перевод вслух за 5 секунд',
+  },
+  {
+    mode: 'contextFill',
+    icon: BookOpenCheck,
+    title: 'Слово в контексте',
+    tag: 'Контекст',
+    description: 'Угадай слово по примеру',
+  },
 ];
 
 /** Карточки в свободной практике — раньше были отдельной карточкой «Рекомендуем» */
@@ -121,7 +157,12 @@ function StudyModeSheetRN({
   const practice = useMemo(() => [CARDS_GAME, ...games], [games]);
   const isEmpty = plan?.mode === 'empty';
 
-  const title = view === 'settings' ? 'Настройки практики' : setSession ? setSession.title : 'Свободная практика';
+  const title =
+    view === 'settings'
+      ? 'Настройки практики'
+      : setSession
+        ? setSession.title
+        : 'Свободная практика';
   const meta = setSession && plan ? sessionSheetMeta(plan) : subtitle;
 
   const headerRight =
@@ -180,7 +221,8 @@ function StudyModeSheetRN({
             </View>
           </View>
           <Text variant="caption" color="secondary">
-            Действуют только на свободную практику. Сколько слов взять в сессию, приложение решает само.
+            Действуют только на свободную практику. Сколько слов взять в сессию, приложение решает
+            само.
           </Text>
         </View>
       ) : (
@@ -256,7 +298,10 @@ function StudyModeSheetRN({
 function SessionButton({ plan, session }: { plan: SetSessionPlan; session: SetSheetSession }) {
   const colors = useThemeColors();
   const cardsMap = useCardsStore((s) => s.cards);
-  const text = useMemo(() => sessionSheetText(plan, sessionSheetStages(plan, cardsMap)), [plan, cardsMap]);
+  const text = useMemo(
+    () => sessionSheetText(plan, sessionSheetStages(plan, cardsMap)),
+    [plan, cardsMap]
+  );
 
   if (text.kind === 'empty') {
     return (
@@ -267,7 +312,12 @@ function SessionButton({ plan, session }: { plan: SetSessionPlan; session: SetSh
         <Text variant="bodySmall" align="center" color="secondary">
           {text.text}
         </Text>
-        <Button title="Добавить слова" fullWidth onPress={session.onAddWords} style={styles.emptyButton} />
+        <Button
+          title="Добавить слова"
+          fullWidth
+          onPress={session.onAddWords}
+          style={styles.emptyButton}
+        />
       </View>
     );
   }
@@ -279,7 +329,11 @@ function SessionButton({ plan, session }: { plan: SetSessionPlan; session: SetSh
       onPress={session.onStart}
       accessibilityRole="button"
       accessibilityLabel={`${title}. ${caption}. Рекомендуем`}
-      style={({ pressed }) => [styles.sessionButton, { backgroundColor: colors.primaryFill }, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.sessionButton,
+        { backgroundColor: colors.primaryFill },
+        pressed && styles.pressed,
+      ]}
     >
       <View style={styles.sessionRow}>
         <View style={[styles.play, { backgroundColor: colors.onPrimary }]}>
@@ -304,11 +358,18 @@ function SessionButton({ plan, session }: { plan: SetSessionPlan; session: SetSh
           {Array.from({ length: stageCount }, (_, i) => (
             <View
               key={i}
-              style={[styles.miniSegment, { backgroundColor: i === 0 ? colors.onPrimary : alpha(colors.onPrimary, 40) }]}
+              style={[
+                styles.miniSegment,
+                { backgroundColor: i === 0 ? colors.onPrimary : alpha(colors.onPrimary, 40) },
+              ]}
             />
           ))}
         </View>
-        <Text variant="caption" numberOfLines={1} style={[styles.flex1, styles.onFillMuted, { color: colors.onPrimary }]}>
+        <Text
+          variant="caption"
+          numberOfLines={1}
+          style={[styles.flex1, styles.onFillMuted, { color: colors.onPrimary }]}
+        >
           {route}
         </Text>
       </View>

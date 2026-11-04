@@ -110,7 +110,6 @@ export function setPushGroupProperty(userId: string) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const Analytics = {
-
   // ═══════════════════════════════════════════════════════════════════════════
   // АУТЕНТИФИКАЦИЯ
   // Зачем: понять откуда приходят юзеры, какой метод регистрации популярнее,
@@ -121,29 +120,24 @@ export const Analytics = {
    * Юзер успешно зарегистрировался.
    * GA4 автоматически строит Retention отчёт от этой точки.
    */
-  signUp: (method: AuthMethod) =>
-    log('sign_up', { method }),
+  signUp: (method: AuthMethod) => log('sign_up', { method }),
 
   /**
    * Юзер вошёл в уже существующий аккаунт.
    */
-  login: (method: AuthMethod) =>
-    log('login', { method }),
+  login: (method: AuthMethod) => log('login', { method }),
 
   /**
    * Юзер завершил онбординг (дошёл до главного экрана).
    * Funnel: sign_up → onboarding_complete.
    * Если конверсия низкая — онбординг надо упрощать.
    */
-  onboardingComplete: () =>
-    log('onboarding_complete'),
+  onboardingComplete: () => log('onboarding_complete'),
 
   /**
    * Юзер вышел из аккаунта.
    */
-  logout: () =>
-    log('logout'),
-
+  logout: () => log('logout'),
 
   // ═══════════════════════════════════════════════════════════════════════════
   // НАБОРЫ КАРТОЧЕК
@@ -172,21 +166,18 @@ export const Analytics = {
    * Юзер удалил набор.
    * Зачем: если удалений много — юзеры создают случайные наборы. Нужны шаблоны.
    */
-  setDeleted: (cardCount: number) =>
-    log('set_deleted', { card_count: cardCount }),
+  setDeleted: (cardCount: number) => log('set_deleted', { card_count: cardCount }),
 
   /**
    * Юзер добавил набор из публичной библиотеки в свою коллекцию.
    */
-  setImportedFromLibrary: (setId: string) =>
-    log('set_imported_from_library', { set_id: setId }),
+  setImportedFromLibrary: (setId: string) => log('set_imported_from_library', { set_id: setId }),
 
   /**
    * Юзер импортировал CSV / Anki / Quizlet.
    */
   setImportedExternal: (source: 'csv' | 'anki' | 'quizlet', cardCount: number) =>
     log('set_imported_external', { source, card_count: cardCount }),
-
 
   // ═══════════════════════════════════════════════════════════════════════════
   // КАРТОЧКИ
@@ -196,15 +187,12 @@ export const Analytics = {
    * Юзер создал карточку вручную.
    * Зачем: baseline для сравнения с AI-генерацией.
    */
-  cardCreatedManual: () =>
-    log('card_created_manual'),
+  cardCreatedManual: () => log('card_created_manual'),
 
   /**
    * Карточка создана через AI-генерацию.
    */
-  cardCreatedAI: () =>
-    log('card_created_ai'),
-
+  cardCreatedAI: () => log('card_created_ai'),
 
   // ═══════════════════════════════════════════════════════════════════════════
   // СЕССИИ ОБУЧЕНИЯ
@@ -302,7 +290,6 @@ export const Analytics = {
       time_spent_sec: params.timeSpentSec,
     }),
 
-
   // ═══════════════════════════════════════════════════════════════════════════
   // STREAK (СЕРИИ)
   // Зачем: streak — главный retention-механизм. Видим где юзеры теряют серию
@@ -313,22 +300,18 @@ export const Analytics = {
    * Юзер достиг milestone по streak.
    * Зачем: можно строить cohort — юзеры с 7-дневным streak остаются на 30 день в X% случаев.
    */
-  streakMilestone: (days: number) =>
-    log('streak_milestone', { days }),
+  streakMilestone: (days: number) => log('streak_milestone', { days }),
 
   /**
    * Юзер потерял streak (пропустил день).
    * Зачем: если потери происходят в определённые дни недели — слабые напоминания.
    */
-  streakLost: (previousStreak: number) =>
-    log('streak_lost', { previous_streak: previousStreak }),
+  streakLost: (previousStreak: number) => log('streak_lost', { previous_streak: previousStreak }),
 
   /**
    * Юзер восстановил streak (вернулся после пропуска).
    */
-  streakRestored: (newStreak: number) =>
-    log('streak_restored', { new_streak: newStreak }),
-
+  streakRestored: (newStreak: number) => log('streak_restored', { new_streak: newStreak }),
 
   // ═══════════════════════════════════════════════════════════════════════════
   // AI-ГЕНЕРАЦИЯ
@@ -355,10 +338,7 @@ export const Analytics = {
   /**
    * AI-генерация завершена успешно.
    */
-  aiGenerationSuccess: (params: {
-    generatedCount: number;
-    durationMs: number;
-  }) =>
+  aiGenerationSuccess: (params: { generatedCount: number; durationMs: number }) =>
     log('ai_generation_success', {
       generated_count: params.generatedCount,
       duration_ms: params.durationMs,
@@ -368,16 +348,13 @@ export const Analytics = {
    * AI-генерация завершилась ошибкой.
    * Зачем: видим reliability AI-фичи. Если error_rate > 5% — проблема.
    */
-  aiGenerationError: (errorCode: string) =>
-    log('ai_generation_error', { error_code: errorCode }),
+  aiGenerationError: (errorCode: string) => log('ai_generation_error', { error_code: errorCode }),
 
   /**
    * Юзер достиг лимита бесплатных AI-генераций.
    * Зачем: это ключевая точка конверсии. Что делает юзер дальше — paywall или уходит?
    */
-  aiLimitReached: () =>
-    log('ai_limit_reached'),
-
+  aiLimitReached: () => log('ai_limit_reached'),
 
   // ═══════════════════════════════════════════════════════════════════════════
   // МОНЕТИЗАЦИЯ
@@ -389,24 +366,18 @@ export const Analytics = {
    * Paywall показан юзеру.
    * Зачем: если paywall_shown много, но premium_upgrade_click мало → оффер слабый.
    */
-  paywallShown: (source: PaywallSource) =>
-    log('paywall_shown', { source }),
+  paywallShown: (source: PaywallSource) => log('paywall_shown', { source }),
 
   /**
    * Юзер нажал кнопку апгрейда на premium.
    */
-  premiumUpgradeClick: (source: PaywallSource) =>
-    log('premium_upgrade_click', { source }),
+  premiumUpgradeClick: (source: PaywallSource) => log('premium_upgrade_click', { source }),
 
   /**
    * Покупка premium завершена.
    * Используем стандартное GA4 e-commerce событие — автоматически попадает в Revenue отчёт.
    */
-  premiumPurchase: (params: {
-    plan: 'monthly' | 'yearly';
-    priceUsd: number;
-    currency?: string;
-  }) =>
+  premiumPurchase: (params: { plan: 'monthly' | 'yearly'; priceUsd: number; currency?: string }) =>
     log('purchase', {
       currency: params.currency ?? 'USD',
       value: params.priceUsd,
@@ -421,7 +392,6 @@ export const Analytics = {
   premiumCancelled: (plan: 'monthly' | 'yearly', daysActive: number) =>
     log('premium_cancelled', { plan, days_active: daysActive }),
 
-
   // ═══════════════════════════════════════════════════════════════════════════
   // КОРПОРАТИВНЫЙ ТАРИФ
   // ═══════════════════════════════════════════════════════════════════════════
@@ -429,21 +399,18 @@ export const Analytics = {
   /**
    * Учитель создал курс.
    */
-  courseCreated: (studentCount: number) =>
-    log('course_created', { student_count: studentCount }),
+  courseCreated: (studentCount: number) => log('course_created', { student_count: studentCount }),
 
   /**
    * Ученик принял приглашение в курс.
    */
-  courseInviteAccepted: () =>
-    log('course_invite_accepted'),
+  courseInviteAccepted: () => log('course_invite_accepted'),
 
   /**
    * Учитель экспортировал статистику.
    */
   statsExported: (format: 'csv' | 'pdf', period: 'week' | 'month' | 'all') =>
     log('stats_exported', { format, period }),
-
 
   // ═══════════════════════════════════════════════════════════════════════════
   // УВЕДОМЛЕНИЯ
@@ -454,18 +421,15 @@ export const Analytics = {
   /**
    * Юзер дал разрешение на push-уведомления.
    */
-  pushPermissionGranted: () =>
-    log('push_permission_granted'),
+  pushPermissionGranted: () => log('push_permission_granted'),
 
   /**
    * Юзер отказал в push-уведомлениях.
    */
-  pushPermissionDenied: () =>
-    log('push_permission_denied'),
+  pushPermissionDenied: () => log('push_permission_denied'),
 
   /** Было разрешено, а при открытии приложения уже запрещено в настройках iOS (1.4) — отток канала */
-  pushPermissionRevoked: () =>
-    log('push_permission_revoked'),
+  pushPermissionRevoked: () => log('push_permission_revoked'),
 
   /**
    * Лист «Напомнить завтра?» на итогах урока (plan/new/push_notifications.md, 1.2) — воронка разрешения:
@@ -477,16 +441,13 @@ export const Analytics = {
   pushPrepromptAccepted: (hour: number | 'custom') =>
     log('push_preprompt_accepted', { hour: String(hour) }),
 
-  pushPrepromptLater: () =>
-    log('push_preprompt_later'),
+  pushPrepromptLater: () => log('push_preprompt_later'),
 
   /** Выключен переключатель «что присылать» (2.4) — сигнал оттока: какой тип пушей раздражает */
-  pushCategoryDisabled: (category: string) =>
-    log('push_category_disabled', { category }),
+  pushCategoryDisabled: (category: string) => log('push_category_disabled', { category }),
 
   /** Строка «Включи напоминания, чтобы не потерять серию» на главной (1.3): shown / tap / dismiss */
-  pushStreakNudge: (action: 'shown' | 'tap' | 'dismiss') =>
-    log('push_streak_nudge', { action }),
+  pushStreakNudge: (action: 'shown' | 'tap' | 'dismiss') => log('push_streak_nudge', { action }),
 
   /**
    * Юзер открыл приложение тапом по push-уведомлению (plan/new/push_notifications.md, 0.5).
@@ -498,7 +459,6 @@ export const Analytics = {
       ...(params.pushId ? { push_id: params.pushId } : null),
     }),
 
-
   // ═══════════════════════════════════════════════════════════════════════════
   // НАВИГАЦИЯ И ФИЧИ
   // Зачем: понять какие экраны используются, а какие — нет (можно убрать/упростить).
@@ -508,14 +468,12 @@ export const Analytics = {
    * Юзер открыл экран статистики.
    * Зачем: если stats_screen_viewed мало — юзеры не знают о фиче. Нужен промоушен.
    */
-  statsScreenViewed: () =>
-    log('stats_screen_viewed'),
+  statsScreenViewed: () => log('stats_screen_viewed'),
 
   /**
    * Юзер открыл публичную библиотеку наборов.
    */
-  libraryScreenViewed: () =>
-    log('library_screen_viewed'),
+  libraryScreenViewed: () => log('library_screen_viewed'),
 
   /**
    * Юзер использовал поиск.
@@ -526,64 +484,58 @@ export const Analytics = {
   /**
    * Юзер поделился набором.
    */
-  setShared: (method: 'link' | 'qr') =>
-    log('set_shared', { method }),
+  setShared: (method: 'link' | 'qr') => log('set_shared', { method }),
 
   /**
    * Наборы по ссылке (plan/new/share_set.md). Ссылка получена (новая или та же) перед меню «Поделиться».
    */
-  shareLinkCreated: (cardCount: number) =>
-    log('share_link_created', { card_count: cardCount }),
+  shareLinkCreated: (cardCount: number) => log('share_link_created', { card_count: cardCount }),
 
   /**
    * Ссылку отправили: app — приложение из меню iOS (WhatsApp, Telegram…), 'clipboard' — скопировали на вебе.
    * Зачем: какие мессенджеры главные — под них доводим превью и текст.
    */
-  shareLinkSent: (app: string | null) =>
-    log('share_link_sent', { app: app ?? 'unknown' }),
+  shareLinkSent: (app: string | null) => log('share_link_sent', { app: app ?? 'unknown' }),
 
   /**
    * Автор закрыл доступ по ссылке.
    */
-  shareLinkDisabled: () =>
-    log('share_link_disabled'),
+  shareLinkDisabled: () => log('share_link_disabled'),
 
   /**
    * Получатель открыл ссылку в приложении. Зачем: сколько ссылок доходит до приложения, а не до браузера.
    */
-  shareLinkOpened: (signedIn: boolean) =>
-    log('share_link_opened', { signed_in: signedIn }),
+  shareLinkOpened: (signedIn: boolean) => log('share_link_opened', { signed_in: signedIn }),
 
   /**
    * Набор по ссылке добавлен. target — куда (свой набор / курс), guest — копия на устройстве.
    */
   shareSetImported: (params: { target: 'own' | 'course'; guest: boolean; cardCount: number }) =>
-    log('share_set_imported', { target: params.target, guest: params.guest, card_count: params.cardCount }),
+    log('share_set_imported', {
+      target: params.target,
+      guest: params.guest,
+      card_count: params.cardCount,
+    }),
 
   /**
    * Жалоба на набор по ссылке (App Review 1.2).
    */
-  shareSetReported: (reason: string) =>
-    log('share_set_reported', { reason }),
+  shareSetReported: (reason: string) => log('share_set_reported', { reason }),
 
   /**
    * Автор набора по ссылке заблокирован.
    */
-  shareAuthorBlocked: () =>
-    log('share_author_blocked'),
+  shareAuthorBlocked: () => log('share_author_blocked'),
 
   /**
    * Юзер изменил тему оформления.
    */
-  themeChanged: (theme: 'light' | 'dark' | 'system') =>
-    log('theme_changed', { theme }),
+  themeChanged: (theme: 'light' | 'dark' | 'system') => log('theme_changed', { theme }),
 
   /**
    * Юзер изменил язык интерфейса.
    */
-  languageChanged: (language: 'ru' | 'en') =>
-    log('language_changed', { language }),
-
+  languageChanged: (language: 'ru' | 'en') => log('language_changed', { language }),
 
   // ═══════════════════════════════════════════════════════════════════════════
   // ГЛАВНЫЙ ЭКРАН
@@ -595,7 +547,12 @@ export const Analytics = {
    * Главная показана (один раз за каждый заход на экран).
    * reviewCount — слов ждут повторения, newCount — слов ещё ни разу не учили.
    */
-  homeViewed: (params: { state: HomeState; reviewCount: number; newCount: number; setsCount: number }) =>
+  homeViewed: (params: {
+    state: HomeState;
+    reviewCount: number;
+    newCount: number;
+    setsCount: number;
+  }) =>
     log('home_viewed', {
       state: params.state,
       review_count: params.reviewCount,
@@ -606,9 +563,7 @@ export const Analytics = {
   /**
    * Нажатие на главной. Доля 'daily_review' среди всех действий — главная метрика редизайна.
    */
-  homeAction: (action: HomeAction) =>
-    log('home_action', { action }),
-
+  homeAction: (action: HomeAction) => log('home_action', { action }),
 
   // ═══════════════════════════════════════════════════════════════════════════
   // УРОК ДНЯ
@@ -620,7 +575,12 @@ export const Analytics = {
    * Карточка урока показана (один раз за заход на главную).
    * state — lesson / first / overdue / mistakes / done / finished; streak_risk — вечерний вариант «Сохрани серию».
    */
-  lessonCardViewed: (params: { state: string; reviewCount: number; newCount: number; streakRisk: boolean }) =>
+  lessonCardViewed: (params: {
+    state: string;
+    reviewCount: number;
+    newCount: number;
+    streakRisk: boolean;
+  }) =>
     log('lesson_card_viewed', {
       state: params.state,
       review_count: params.reviewCount,
@@ -631,7 +591,13 @@ export const Analytics = {
   /**
    * Урок запущен с главной. Доля lesson_started среди lesson_card_viewed — конверсия карточки.
    */
-  lessonStarted: (params: { state: string; reviewCount: number; newCount: number; minutes: number; pushId?: string }) =>
+  lessonStarted: (params: {
+    state: string;
+    reviewCount: number;
+    newCount: number;
+    minutes: number;
+    pushId?: string;
+  }) =>
     log('lesson_started', {
       state: params.state,
       review_count: params.reviewCount,
@@ -644,7 +610,12 @@ export const Analytics = {
    * Пройдена последняя часть урока. lesson_completed / lesson_started — доля доведённых до конца;
    * duration_sec сравниваем с обещанным «~N мин».
    */
-  lessonCompleted: (params: { reviewCount: number; newCount: number; durationSec: number; pushId?: string }) =>
+  lessonCompleted: (params: {
+    reviewCount: number;
+    newCount: number;
+    durationSec: number;
+    pushId?: string;
+  }) =>
     log('lesson_completed', {
       review_count: params.reviewCount,
       new_count: params.newCount,
@@ -655,8 +626,7 @@ export const Analytics = {
   /**
    * «Сменить набор»: выбран набор вручную или снова «Выбирать автоматически».
    */
-  lessonFocusChanged: (auto: boolean) =>
-    log('lesson_focus_changed', { auto }),
+  lessonFocusChanged: (auto: boolean) => log('lesson_focus_changed', { auto }),
 
   // ═══════════════════════════════════════════════════════════════════════════
   // СЕССИЯ НАБОРА «ИЗУЧИТЬ» (plan/new/study_session.md, Session 13)
@@ -689,7 +659,12 @@ export const Analytics = {
     }),
 
   /** Этап пройден (done) или пропущен кнопкой «Не могу слушать» (skipped). index — с 1 */
-  setSessionStage: (params: { stage: string; index: number; total: number; result: 'done' | 'skipped' }) =>
+  setSessionStage: (params: {
+    stage: string;
+    index: number;
+    total: number;
+    result: 'done' | 'skipped';
+  }) =>
     log('set_session_stage', {
       stage: params.stage,
       index: params.index,
@@ -698,7 +673,12 @@ export const Analytics = {
     }),
 
   /** Вышли посреди сессии через окно «Выйти из сессии?». index — этап, на котором вышли, с 1 */
-  setSessionExited: (params: { stage: string; index: number; total: number; durationSec: number }) =>
+  setSessionExited: (params: {
+    stage: string;
+    index: number;
+    total: number;
+    durationSec: number;
+  }) =>
     log('set_session_exited', {
       stage: params.stage,
       index: params.index,
@@ -707,7 +687,13 @@ export const Analytics = {
     }),
 
   /** Сессия пройдена до итогов. duration_sec сравниваем с minutes из set_session_started */
-  setSessionCompleted: (params: { words: number; weak: number; stages: number; durationSec: number; xp: number }) =>
+  setSessionCompleted: (params: {
+    words: number;
+    weak: number;
+    stages: number;
+    durationSec: number;
+    xp: number;
+  }) =>
     log('set_session_completed', {
       words: params.words,
       weak: params.weak,
@@ -715,7 +701,6 @@ export const Analytics = {
       duration_sec: params.durationSec,
       xp: params.xp,
     }),
-
 
   // ═══════════════════════════════════════════════════════════════════════════
   // ВИДЖЕТ НА ЭКРАНЕ БЛОКИРОВКИ
@@ -726,8 +711,7 @@ export const Analytics = {
   /**
    * При открытии приложения нашли виджет, которого раньше не было.
    */
-  widgetInstalled: (family: string) =>
-    log('widget_installed', { family }),
+  widgetInstalled: (family: string) => log('widget_installed', { family }),
 
   /**
    * Виджет пропал. days_kept — сколько дней он простоял; много удалений в первые 7 дней — виджет раздражает.
@@ -744,16 +728,13 @@ export const Analytics = {
   /**
    * Нажатия «Показать» на виджете (iOS 17+), забранные при открытии приложения.
    */
-  widgetReveals: (count: number) =>
-    log('widget_reveals', { count }),
+  widgetReveals: (count: number) => log('widget_reveals', { count }),
 
   /**
    * Подсказка «Учи слова прямо с экрана блокировки» показана / нажата.
    */
-  widgetPromptShown: (place: string) =>
-    log('widget_prompt_shown', { place }),
-  widgetPromptClicked: (place: string) =>
-    log('widget_prompt_clicked', { place }),
+  widgetPromptShown: (place: string) => log('widget_prompt_shown', { place }),
+  widgetPromptClicked: (place: string) => log('widget_prompt_clicked', { place }),
 
   /**
    * Ответ в уроке на слово, подходившее в пул виджета. in_widget — слово было в виджете (иначе контрольная
@@ -761,7 +742,6 @@ export const Analytics = {
    */
   widgetWordReviewed: (params: { inWidget: boolean; correct: boolean }) =>
     log('widget_word_reviewed', { in_widget: params.inWidget, correct: params.correct }),
-
 
   // ═══════════════════════════════════════════════════════════════════════════
   // «ЧТО НОВОГО»
@@ -774,7 +754,12 @@ export const Analytics = {
    * Окно открылось. count — страниц, news — новостей в нём (на «И ещё» их несколько).
    */
   whatsNewShown: (params: { place: string; count: number; news: number; version: string }) =>
-    log('whats_new_shown', { place: params.place, count: params.count, news: params.news, version: params.version }),
+    log('whats_new_shown', {
+      place: params.place,
+      count: params.count,
+      news: params.news,
+      version: params.version,
+    }),
 
   /**
    * Открыта страница (и первая — при показе). Много закрытий после index 0 — первая новость неинтересна.
@@ -800,7 +785,6 @@ export const Analytics = {
       tried: params.tried,
     }),
 
-
   // ═══════════════════════════════════════════════════════════════════════════
   // ОШИБКИ И ТЕХНИЧЕСКИЕ СОБЫТИЯ
   // Зачем: видим user-facing ошибки до того как они попадут в отзывы.
@@ -809,15 +793,12 @@ export const Analytics = {
   /**
    * Произошла ошибка синхронизации с сервером.
    */
-  syncError: (errorCode: string) =>
-    log('sync_error', { error_code: errorCode }),
+  syncError: (errorCode: string) => log('sync_error', { error_code: errorCode }),
 
   /**
    * Юзер увидел экран ошибки (error boundary).
    */
-  errorBoundaryTriggered: (screen: string) =>
-    log('error_boundary_triggered', { screen }),
-
+  errorBoundaryTriggered: (screen: string) => log('error_boundary_triggered', { screen }),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -4,16 +4,27 @@ jest.mock('../localCache', () => ({ readCache: () => undefined, writeCache: () =
 jest.mock('../supabaseClient', () => ({ supabase: {} }));
 jest.mock('@/config/apiBase', () => ({ API_BASE: '' }));
 
-import { markPushPromptShown, shouldShowPushPrompt, shouldShowStreakNudge, suggestedSlot } from '../pushPrompt';
+import {
+  markPushPromptShown,
+  shouldShowPushPrompt,
+  shouldShowStreakNudge,
+  suggestedSlot,
+} from '../pushPrompt';
 
 const ask = { permission: 'default', supported: true };
 
 describe('pushPrompt', () => {
   it('первый урок — показываем, если разрешение ещё не спрашивали', () => {
     expect(shouldShowPushPrompt({ shownDays: [] }, '2026-10-14', ask)).toBe(true);
-    expect(shouldShowPushPrompt({ shownDays: [] }, '2026-10-14', { ...ask, permission: 'granted' })).toBe(false);
-    expect(shouldShowPushPrompt({ shownDays: [] }, '2026-10-14', { ...ask, permission: 'denied' })).toBe(false);
-    expect(shouldShowPushPrompt({ shownDays: [] }, '2026-10-14', { ...ask, supported: false })).toBe(false);
+    expect(
+      shouldShowPushPrompt({ shownDays: [] }, '2026-10-14', { ...ask, permission: 'granted' })
+    ).toBe(false);
+    expect(
+      shouldShowPushPrompt({ shownDays: [] }, '2026-10-14', { ...ask, permission: 'denied' })
+    ).toBe(false);
+    expect(
+      shouldShowPushPrompt({ shownDays: [] }, '2026-10-14', { ...ask, supported: false })
+    ).toBe(false);
   });
 
   it('«Не сейчас» — снова не раньше чем через 3 дня', () => {
@@ -38,7 +49,9 @@ describe('pushPrompt', () => {
     const denied = { streak: 5, permission: 'denied', supported: true };
     expect(shouldShowStreakNudge(undefined, '2026-10-14', denied)).toBe(true);
     expect(shouldShowStreakNudge(undefined, '2026-10-14', { ...denied, streak: 2 })).toBe(false);
-    expect(shouldShowStreakNudge(undefined, '2026-10-14', { ...denied, permission: 'granted' })).toBe(false);
+    expect(
+      shouldShowStreakNudge(undefined, '2026-10-14', { ...denied, permission: 'granted' })
+    ).toBe(false);
     expect(shouldShowStreakNudge('2026-10-01', '2026-10-14', denied)).toBe(false);
     expect(shouldShowStreakNudge('2026-10-01', '2026-10-15', denied)).toBe(true);
   });

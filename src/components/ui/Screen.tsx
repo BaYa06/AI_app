@@ -93,7 +93,11 @@ export function Screen({
       {children}
     </ScrollView>
   ) : (
-    <View style={[styles.flex, horizontal, !footer && { paddingBottom: bottomInset }, contentStyle]}>{children}</View>
+    <View
+      style={[styles.flex, horizontal, !footer && { paddingBottom: bottomInset }, contentStyle]}
+    >
+      {children}
+    </View>
   );
 
   const content = (
@@ -116,7 +120,10 @@ export function Screen({
     <View style={[styles.flex, { backgroundColor: colors.background }, style]}>
       {header}
       {keyboard ? (
-        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
           {content}
         </KeyboardAvoidingView>
       ) : (

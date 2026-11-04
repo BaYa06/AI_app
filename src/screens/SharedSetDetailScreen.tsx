@@ -3,12 +3,7 @@
  * @description Экран детальной информации о публичном наборе из библиотеки
  */
 import React, { useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-} from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { Text, Container } from '@/components/common';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha, iconSize } from '@/constants';
@@ -88,7 +83,9 @@ export function SharedSetDetailScreen({ navigation }: Props) {
   return (
     <Container padded={false} edges={['top', 'bottom']}>
       {/* Header */}
-      <View style={[s.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+      <View
+        style={[s.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}
+      >
         <Pressable onPress={() => navigation.goBack()} hitSlop={10} style={s.headerIcon}>
           <ArrowLeft size={22} color={colors.textPrimary} />
         </Pressable>
@@ -130,7 +127,12 @@ export function SharedSetDetailScreen({ navigation }: Props) {
 
           {/* Metrics Row */}
           <View style={s.metricsRow}>
-            <View style={[s.metricCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <View
+              style={[
+                s.metricCard,
+                { backgroundColor: colors.background, borderColor: colors.border },
+              ]}
+            >
               <View style={s.metricValue}>
                 <Star size={iconSize.xs} color={colors.star} fill={colors.star} />
                 <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
@@ -139,7 +141,12 @@ export function SharedSetDetailScreen({ navigation }: Props) {
               </View>
               <Text style={[s.metricLabel, { color: colors.textTertiary }]}>Rating</Text>
             </View>
-            <View style={[s.metricCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <View
+              style={[
+                s.metricCard,
+                { backgroundColor: colors.background, borderColor: colors.border },
+              ]}
+            >
               <View style={s.metricValue}>
                 <Download size={16} color={colors.primary} />
                 <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
@@ -148,7 +155,12 @@ export function SharedSetDetailScreen({ navigation }: Props) {
               </View>
               <Text style={[s.metricLabel, { color: colors.textTertiary }]}>Downloads</Text>
             </View>
-            <View style={[s.metricCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <View
+              style={[
+                s.metricCard,
+                { backgroundColor: colors.background, borderColor: colors.border },
+              ]}
+            >
               <View style={s.metricValue}>
                 <Heart size={16} color="#EC4899" />
                 <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
@@ -161,20 +173,25 @@ export function SharedSetDetailScreen({ navigation }: Props) {
         </View>
 
         {/* Description */}
-        <View style={[s.descSection, { backgroundColor: surfaceBg, borderTopColor: sectionBorder }]}>
+        <View
+          style={[s.descSection, { backgroundColor: surfaceBg, borderTopColor: sectionBorder }]}
+        >
           <Text variant="bodySmall" style={{ color: colors.textSecondary, lineHeight: 22 }}>
             {descExpanded ? MOCK_SET.description : MOCK_SET.description}
             <Text
               onPress={() => setDescExpanded(!descExpanded)}
               style={{ color: colors.primary, fontWeight: '700' }}
             >
-              {' '}Читать ещё
+              {' '}
+              Читать ещё
             </Text>
           </Text>
         </View>
 
         {/* Details */}
-        <View style={[s.detailsSection, { backgroundColor: surfaceBg, borderTopColor: sectionBorder }]}>
+        <View
+          style={[s.detailsSection, { backgroundColor: surfaceBg, borderTopColor: sectionBorder }]}
+        >
           <Text variant="h3" style={{ color: colors.textPrimary, marginBottom: spacing.m }}>
             Подробнее
           </Text>
@@ -328,7 +345,10 @@ export function SharedSetDetailScreen({ navigation }: Props) {
                 ]}
               >
                 <View style={s.commentHeader}>
-                  <Text variant="bodySmall" style={{ color: colors.textPrimary, fontWeight: '700' }}>
+                  <Text
+                    variant="bodySmall"
+                    style={{ color: colors.textPrimary, fontWeight: '700' }}
+                  >
                     {review.name}
                   </Text>
                   <Text style={[s.commentTime, { color: colors.textTertiary }]}>{review.time}</Text>
@@ -350,9 +370,7 @@ export function SharedSetDetailScreen({ navigation }: Props) {
             ))}
           </View>
 
-          <Pressable
-            style={[s.viewAllReviewsBtn, { borderColor: colors.primary + '33' }]}
-          >
+          <Pressable style={[s.viewAllReviewsBtn, { borderColor: colors.primary + '33' }]}>
             <Text variant="bodySmall" style={{ color: colors.primary, fontWeight: '700' }}>
               Все отзывы
             </Text>

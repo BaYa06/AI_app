@@ -47,10 +47,14 @@ function languageLabel(code) {
   return lang ? `${lang[0]} ${lang[1]}` : String(code || '').toUpperCase();
 }
 
-const ICON_ZAP = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>';
-const ICON_BOOK = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>';
-const ICON_LAYERS = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg>';
-const ICON_LINK_OFF = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 17H7A5 5 0 0 1 7 7"/><path d="M15 7h2a5 5 0 0 1 4 8"/><line x1="8" x2="12" y1="12" y2="12"/><line x1="2" x2="22" y1="2" y2="22"/></svg>';
+const ICON_ZAP =
+  '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>';
+const ICON_BOOK =
+  '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>';
+const ICON_LAYERS =
+  '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg>';
+const ICON_LINK_OFF =
+  '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 17H7A5 5 0 0 1 7 7"/><path d="M15 7h2a5 5 0 0 1 4 8"/><line x1="8" x2="12" y1="12" y2="12"/><line x1="2" x2="22" y1="2" y2="22"/></svg>';
 
 // Токены брендбука (plan/done/brandbook.md, раздел 2): светлая и тёмная тема.
 const STYLES = `
@@ -149,16 +153,24 @@ export function renderSharePage({ code, url, set, author, cards }) {
   const authorName = author.name || 'Пользователь Flashly';
   const count = pluralCards(set.cardsCount);
   const title = `${set.title} — ${count} · Flashly`;
-  const sample = cards.slice(0, 5).map((c) => c.front).join(', ');
+  const sample = cards
+    .slice(0, 5)
+    .map((c) => c.front)
+    .join(', ');
   const description = `Набор от ${authorName}. Давай учить вместе во Flashly!${sample ? ` ${sample}…` : ''}`;
 
-  const rows = cards.slice(0, PREVIEW_ROWS)
-    .map((c) => `<li><span class="front">${esc(c.front)}</span><span class="back">${esc(c.back)}</span></li>`)
+  const rows = cards
+    .slice(0, PREVIEW_ROWS)
+    .map(
+      (c) =>
+        `<li><span class="front">${esc(c.front)}</span><span class="back">${esc(c.back)}</span></li>`
+    )
     .join('');
   const rest = set.cardsCount - Math.min(cards.length, PREVIEW_ROWS);
-  const languages = set.languageFrom && set.languageTo
-    ? `<span class="chip">${esc(languageLabel(set.languageFrom))} → ${esc(languageLabel(set.languageTo))}</span>`
-    : '';
+  const languages =
+    set.languageFrom && set.languageTo
+      ? `<span class="chip">${esc(languageLabel(set.languageFrom))} → ${esc(languageLabel(set.languageTo))}</span>`
+      : '';
   const deepLink = `flashly://share/${code}`;
 
   const body = `
@@ -196,9 +208,10 @@ document.getElementById('copy').addEventListener('click', function () {
 /** @param {'not_found'|'disabled'} reason */
 export function renderShareErrorPage(reason, url) {
   const heading = reason === 'disabled' ? 'Ссылка больше не действует' : 'Набор не найден';
-  const text = reason === 'disabled'
-    ? 'Автор закрыл доступ к этому набору. Попроси автора прислать новую ссылку.'
-    : 'Возможно, автор удалил набор или в ссылке ошибка.';
+  const text =
+    reason === 'disabled'
+      ? 'Автор закрыл доступ к этому набору. Попроси автора прислать новую ссылку.'
+      : 'Возможно, автор удалил набор или в ссылке ошибка.';
   const body = `
 <section class="error">
   <div class="deck">${ICON_LINK_OFF}</div>
@@ -209,5 +222,10 @@ export function renderShareErrorPage(reason, url) {
   <a class="btn btn-primary only-ios" href="${APP_STORE_URL}">Скачать Flashly в App Store</a>
   <a class="btn btn-primary only-other" href="/">Открыть Flashly</a>
 </section>`;
-  return layout({ title: `${heading} · Flashly`, description: 'Flashly — карточки для изучения слов', url, body });
+  return layout({
+    title: `${heading} · Flashly`,
+    description: 'Flashly — карточки для изучения слов',
+    url,
+    body,
+  });
 }

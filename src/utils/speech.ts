@@ -224,14 +224,20 @@ export const toSpeechLang = (code?: string | null): string | undefined => {
 };
 
 /** Язык озвучки: язык набора, если он известен, иначе — угадываем по тексту */
-export const resolveSpeechLang = (text: string, langHint?: string | null, counterpart?: string): string =>
-  toSpeechLang(langHint) || detectLanguage(text, counterpart);
+export const resolveSpeechLang = (
+  text: string,
+  langHint?: string | null,
+  counterpart?: string
+): string => toSpeechLang(langHint) || detectLanguage(text, counterpart);
 
 /**
  * Языки сторон карточки — из её набора (card.setId). Берём набор самой карточки, а не экрана:
  * в тренировке с главной карточки из разных наборов идут вперемешку.
  */
-export function cardSpeechLangs(card?: { setId?: string } | null): { front?: string; back?: string } {
+export function cardSpeechLangs(card?: { setId?: string } | null): {
+  front?: string;
+  back?: string;
+} {
   if (!card?.setId) return {};
   // Ленивый require — как в других сервисах, чтобы не было циклических импортов со store
   const { useSetsStore } = require('@/store/setsStore');
@@ -266,8 +272,14 @@ const base64UrlEncode = (data: ArrayBuffer | string) => {
 };
 
 const importPrivateKey = async (pem: string) => {
-  const cleaned = pem.replace('-----BEGIN PRIVATE KEY-----', '').replace('-----END PRIVATE KEY-----', '').replace(/\s+/g, '');
-  const binaryStr = typeof atob !== 'undefined' ? atob(cleaned) : getGlobal().Buffer.from(cleaned, 'base64').toString('binary');
+  const cleaned = pem
+    .replace('-----BEGIN PRIVATE KEY-----', '')
+    .replace('-----END PRIVATE KEY-----', '')
+    .replace(/\s+/g, '');
+  const binaryStr =
+    typeof atob !== 'undefined'
+      ? atob(cleaned)
+      : getGlobal().Buffer.from(cleaned, 'base64').toString('binary');
   const binary = Uint8Array.from(binaryStr, (c) => c.charCodeAt(0));
   const subtle = getGlobal().crypto?.subtle;
   if (!subtle) throw new Error('WebCrypto not available');
@@ -287,7 +299,11 @@ const signJwt = async (payload: Record<string, unknown>, pem: string) => {
 
   const data = `${base64UrlEncode(JSON.stringify(header))}.${base64UrlEncode(JSON.stringify(payload))}`;
   const key = await importPrivateKey(pem);
-  const signature = await subtle.sign({ name: 'RSASSA-PKCS1-v1_5' }, key, new TextEncoder().encode(data));
+  const signature = await subtle.sign(
+    { name: 'RSASSA-PKCS1-v1_5' },
+    key,
+    new TextEncoder().encode(data)
+  );
   return `${data}.${base64UrlEncode(signature)}`;
 };
 
@@ -304,14 +320,21 @@ const getApiKey = () => {
 const getServiceAccount = (): ServiceAccount | null => {
   const envJson = ENV_GCLOUD_TTS_SA || undefined;
 
-  log.debug('Speech', 'Service Account JSON available', !!envJson, envJson ? `(length: ${envJson.length})` : '');
+  log.debug(
+    'Speech',
+    'Service Account JSON available',
+    !!envJson,
+    envJson ? `(length: ${envJson.length})` : ''
+  );
 
   if (envJson) {
     try {
       // Remove surrounding quotes if present
       let cleaned = envJson.trim();
-      if ((cleaned.startsWith("'") && cleaned.endsWith("'")) ||
-          (cleaned.startsWith('"') && cleaned.endsWith('"'))) {
+      if (
+        (cleaned.startsWith("'") && cleaned.endsWith("'")) ||
+        (cleaned.startsWith('"') && cleaned.endsWith('"'))
+      ) {
         cleaned = cleaned.slice(1, -1);
       }
 
@@ -481,7 +504,7 @@ const synthesizeToCache = async (
   key: string,
   text: string,
   lang: string,
-  options?: { rate?: number; pitch?: number },
+  options?: { rate?: number; pitch?: number }
 ): Promise<boolean> => {
   const fetchFn = getGlobal().fetch as FetchLike | undefined;
   if (!fetchFn) return false;
@@ -496,7 +519,11 @@ const synthesizeToCache = async (
   }
   if (!token && !apiKey) return false;
 
-  const languageCode = (lang || 'en-US').split('-').slice(0, 2).join('-').replace(/^zh-CN$/i, 'cmn-CN');
+  const languageCode = (lang || 'en-US')
+    .split('-')
+    .slice(0, 2)
+    .join('-')
+    .replace(/^zh-CN$/i, 'cmn-CN');
   const url = token ? GOOGLE_TTS_ENDPOINT : `${GOOGLE_TTS_ENDPOINT}?key=${apiKey}`;
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -537,7 +564,7 @@ const ensureCached = (
   key: string,
   text: string,
   lang: string,
-  options?: { rate?: number; pitch?: number },
+  options?: { rate?: number; pitch?: number }
 ): Promise<boolean> => {
   const pending = inflight.get(key);
   if (pending) return pending;
@@ -570,7 +597,9 @@ const speakWithGoogle = async (
  * Заранее озвучить слова, которые вероятно нажмут (текущая и следующая карточка) — тогда кнопка
  * динамика играет мгновенно. Тихо: ошибки (нет сети, нет ключа) игнорируются.
  */
-export function prefetchSpeech(items: Array<{ text: string; counterpart?: string; lang?: string }>): void {
+export function prefetchSpeech(
+  items: Array<{ text: string; counterpart?: string; lang?: string }>
+): void {
   for (const item of items) {
     const normalized = (item.text || '').trim().split(/\r?\n/)[0].trim();
     if (!normalized) continue;
@@ -587,7 +616,9 @@ const speakWithWebSpeech = async (
   options?: { rate?: number; pitch?: number; volume?: number }
 ) => {
   const synth = getEngine();
-  const UtteranceCtor = getGlobal().SpeechSynthesisUtterance as (new (utteranceText?: string) => SpeechUtterance) | undefined;
+  const UtteranceCtor = getGlobal().SpeechSynthesisUtterance as
+    | (new (utteranceText?: string) => SpeechUtterance)
+    | undefined;
   if (!synth || !UtteranceCtor) return;
 
   const voices = await loadVoices();
@@ -616,7 +647,8 @@ const speakWithNativeTTS = async (
     if (typeof Tts.stop === 'function') await Tts.stop();
     if (typeof Tts.setDefaultLanguage === 'function') await Tts.setDefaultLanguage(lang);
     // rate везде: 1 — обычная скорость; у голоса устройства обычная — 0.5
-    if (typeof Tts.setDefaultRate === 'function') await Tts.setDefaultRate(0.5 * (options?.rate ?? 1));
+    if (typeof Tts.setDefaultRate === 'function')
+      await Tts.setDefaultRate(0.5 * (options?.rate ?? 1));
     if (typeof Tts.setDefaultPitch === 'function') await Tts.setDefaultPitch(options?.pitch ?? 1);
     if (typeof Tts.speak === 'function') {
       Tts.speak(text);

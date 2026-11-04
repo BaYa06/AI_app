@@ -21,10 +21,7 @@ const ALLOWED_MIME_TYPES = new Set([
   'text/tab-separated-values',
 ]);
 
-const TEXT_MIME_TYPES = new Set([
-  'text/csv',
-  'text/tab-separated-values',
-]);
+const TEXT_MIME_TYPES = new Set(['text/csv', 'text/tab-separated-values']);
 
 // ~20 MB in base64 ≈ 28 000 000 chars
 const MAX_TOTAL_BASE64 = 28_000_000;
@@ -71,7 +68,7 @@ export async function importFilesHandler(req, res) {
   }
 
   const totalBase64 = files
-    .filter(f => f.type === 'binary')
+    .filter((f) => f.type === 'binary')
     .reduce((sum, f) => sum + f.base64.length, 0);
 
   if (totalBase64 > MAX_TOTAL_BASE64) {
@@ -105,12 +102,13 @@ Rules:
 - For CSV/TSV: treat column headers as context for deciding which column is front and which is back
 - If no clear word pairs exist, create question-answer cards from the content`;
 
-    const userInstruction = (typeof prompt === 'string' && prompt.trim())
-      ? prompt.trim()
-      : 'Extract all terms and create flashcards from these files.';
+    const userInstruction =
+      typeof prompt === 'string' && prompt.trim()
+        ? prompt.trim()
+        : 'Extract all terms and create flashcards from these files.';
 
     // Binary files (images, PDF) → inlineData; text files (CSV, TSV) → plain text block
-    const fileParts = files.map(f => {
+    const fileParts = files.map((f) => {
       if (f.type === 'binary') {
         return { inlineData: { mimeType: f.mimeType, data: f.base64 } };
       }
@@ -134,13 +132,11 @@ Rules:
     }
 
     const cards = Array.isArray(parsed.cards)
-      ? parsed.cards.filter(
-          c =>
-            c &&
-            typeof c.front === 'string' &&
-            typeof c.back === 'string' &&
-            c.front.trim()
-        ).map(c => ({ front: c.front.trim(), back: c.back.trim() }))
+      ? parsed.cards
+          .filter(
+            (c) => c && typeof c.front === 'string' && typeof c.back === 'string' && c.front.trim()
+          )
+          .map((c) => ({ front: c.front.trim(), back: c.back.trim() }))
       : [];
 
     const suggestedTitle = typeof parsed.title === 'string' ? parsed.title.trim() : '';
@@ -150,6 +146,8 @@ Rules:
     return res.status(200).json({ cards, suggestedTitle, count: cards.length });
   } catch (error) {
     console.error('[import-files] error:', error?.message || error);
-    return res.status(500).json({ error: 'Failed to generate cards: ' + (error?.message || 'Unknown error') });
+    return res
+      .status(500)
+      .json({ error: 'Failed to generate cards: ' + (error?.message || 'Unknown error') });
   }
 }

@@ -122,7 +122,11 @@ export interface LessonInput {
 type SetCards = { set: CardSet; cards: Card[] };
 
 /** Карточки наборов без повторов (одна карточка может встречаться в двух наборах курса) */
-function collectCards(sets: CardSet[], cardsBySet: LessonInput['cardsBySet'], cards: LessonInput['cards']): SetCards[] {
+function collectCards(
+  sets: CardSet[],
+  cardsBySet: LessonInput['cardsBySet'],
+  cards: LessonInput['cards']
+): SetCards[] {
   const seen = new Set<string>();
   return sets.map((set) => {
     const list: Card[] = [];
@@ -144,7 +148,7 @@ export function countWaitingReview(
   sets: CardSet[],
   cardsBySet: LessonInput['cardsBySet'],
   cards: LessonInput['cards'],
-  now: number,
+  now: number
 ): number {
   let n = 0;
   for (const { cards: list } of collectCards(sets, cardsBySet, cards)) {
@@ -157,7 +161,11 @@ export function countWaitingReview(
  * Состояние дня: вчерашнее — сбрасывается (выбранный набор остаётся), сегодняшнее — как есть.
  * waitingNow — countWaitingReview на момент первого открытия главной.
  */
-export function ensureLessonDay(prev: LessonDay | null, date: string, waitingNow: number): LessonDay {
+export function ensureLessonDay(
+  prev: LessonDay | null,
+  date: string,
+  waitingNow: number
+): LessonDay {
   if (prev && prev.date === date) return prev;
   return {
     date,
@@ -202,18 +210,32 @@ export function estimateMinutes(reviewCount: number, newCount: number): number {
   return Math.max(1, Math.round((reviewCount * REVIEW_SEC + newCount * NEW_SEC) / 60));
 }
 
-export function buildLessonPlan({ sets, newFrom, cardsBySet, cards, newPerDay, day, now }: LessonInput): LessonPlan {
+export function buildLessonPlan({
+  sets,
+  newFrom,
+  cardsBySet,
+  cards,
+  newPerDay,
+  day,
+  now,
+}: LessonInput): LessonPlan {
   const all = collectCards(sets, cardsBySet, cards).flatMap((s) => s.cards);
-  const bySet = newFrom ? collectCards(newFrom, cardsBySet, cards) : collectCards(sets, cardsBySet, cards);
+  const bySet = newFrom
+    ? collectCards(newFrom, cardsBySet, cards)
+    : collectCards(sets, cardsBySet, cards);
   const answeredToday = new Set([...day.reviewedIds, ...day.introducedIds]);
   const introduced = new Set(day.introducedIds);
 
   // --- Повторение ---
-  const waiting = all.filter((c) => isCardWaitingReview(c, now)).sort((a, b) => a.nextReviewDate - b.nextReviewDate);
+  const waiting = all
+    .filter((c) => isCardWaitingReview(c, now))
+    .sort((a, b) => a.nextReviewDate - b.nextReviewDate);
   const freshWaiting = waiting.filter((c) => !answeredToday.has(c.id));
   // Ошибки сегодняшнего урока: повторённое слово снова ждёт, новое осталось на шаге 0 («Не знаю»)
   const mistakes = all.filter(
-    (c) => answeredToday.has(c.id) && (isCardWaitingReview(c, now) || (introduced.has(c.id) && stepOf(c) === 0)),
+    (c) =>
+      answeredToday.has(c.id) &&
+      (isCardWaitingReview(c, now) || (introduced.has(c.id) && stepOf(c) === 0))
   );
   const reviewBudget = Math.max(0, LESSON_MAX_CARDS - day.reviewedIds.length);
   const review = freshWaiting.slice(0, reviewBudget);
@@ -223,7 +245,8 @@ export function buildLessonPlan({ sets, newFrom, cardsBySet, cards, newPerDay, d
   const newRemaining = Math.max(0, newQuota - day.introducedIds.length);
   const newRoom = Math.max(0, LESSON_MAX_CARDS - review.length);
 
-  const unseenOf = (list: Card[]) => list.filter((c) => stepOf(c) === 0 && !introduced.has(c.id)).sort(byCreated);
+  const unseenOf = (list: Card[]) =>
+    list.filter((c) => stepOf(c) === 0 && !introduced.has(c.id)).sort(byCreated);
   const withNew = bySet.filter((s) => unseenOf(s.cards).length > 0);
 
   const chosen = withNew.find((s) => s.set.id === day.focusSetId);
@@ -249,7 +272,8 @@ export function buildLessonPlan({ sets, newFrom, cardsBySet, cards, newPerDay, d
   // --- Сводка ---
   let tomorrowCount = 0;
   for (const c of all) {
-    if (stepOf(c) >= 1 && !isCardWaitingReview(c, now) && c.nextReviewDate <= now + DAY_MS) tomorrowCount++;
+    if (stepOf(c) >= 1 && !isCardWaitingReview(c, now) && c.nextReviewDate <= now + DAY_MS)
+      tomorrowCount++;
   }
   // Новые слова берутся только из newFrom — и считаем их там же
   const newLeftTotal = bySet.reduce((n, s) => n + s.cards.filter((c) => stepOf(c) === 0).length, 0);
@@ -282,7 +306,9 @@ export function buildLessonPlan({ sets, newFrom, cardsBySet, cards, newPerDay, d
 
   const fadingCount = review.filter((c) => isCardFading(c, now)).length;
   const minutes =
-    state === 'mistakes' ? estimateMinutes(mistakeIds.length, 0) : estimateMinutes(reviewIds.length, newIds.length);
+    state === 'mistakes'
+      ? estimateMinutes(mistakeIds.length, 0)
+      : estimateMinutes(reviewIds.length, newIds.length);
 
   return {
     state,
@@ -300,9 +326,14 @@ export function buildLessonPlan({ sets, newFrom, cardsBySet, cards, newPerDay, d
     newLeftTotal,
     newQuota,
     doneToday: day.reviewedIds.length + day.introducedIds.length,
-    newSets: withNew.map((s) => ({ setId: s.set.id, title: s.set.title, newLeft: unseenOf(s.cards).length })),
+    newSets: withNew.map((s) => ({
+      setId: s.set.id,
+      title: s.set.title,
+      newLeft: unseenOf(s.cards).length,
+    })),
     focusManual: !!chosen,
-    newDaysLeft: newPerDay > 0 ? Math.ceil(Math.max(0, newLeftTotal - newCards.length) / newPerDay) : 0,
+    newDaysLeft:
+      newPerDay > 0 ? Math.ceil(Math.max(0, newLeftTotal - newCards.length) / newPerDay) : 0,
   };
 }
 
@@ -380,32 +411,64 @@ function wasAnswered(card: Card, introduced: Set<string>): boolean {
 }
 
 /** Снизу вверх по уровню, внутри уровня — срок раньше, затем порядок добавления */
-const byLevel = (a: Card, b: Card) => stepOf(a) - stepOf(b) || a.nextReviewDate - b.nextReviewDate || byCreated(a, b);
+const byLevel = (a: Card, b: Card) =>
+  stepOf(a) - stepOf(b) || a.nextReviewDate - b.nextReviewDate || byCreated(a, b);
 
-export function buildSetSessionPlan({ set, cards, newPerDay, day, now }: SetSessionInput): SetSessionPlan {
+export function buildSetSessionPlan({
+  set,
+  cards,
+  newPerDay,
+  day,
+  now,
+}: SetSessionInput): SetSessionPlan {
   const introduced = new Set(day.introducedIds);
   const answered = cards.filter((c) => wasAnswered(c, introduced));
   const stages = isSubjectSet(set) ? SUBJECT_STAGES : LANGUAGE_STAGES;
   const base = { totalCount: cards.length, studiedCount: answered.length, missingCards: 0 };
-  const plan = (mode: SetSessionMode, list: Card[], newCount: number, kind: 'learn' | 'review'): SetSessionPlan => {
+  const plan = (
+    mode: SetSessionMode,
+    list: Card[],
+    newCount: number,
+    kind: 'learn' | 'review'
+  ): SetSessionPlan => {
     const sec = kind === 'learn' ? SESSION_LEARN_SEC : SESSION_REVIEW_SEC;
-    const minutes = list.length > 0 ? Math.max(1, Math.round((list.length * stages[kind].length * sec) / 60)) : 0;
-    return { ...base, mode, cardIds: list.map((c) => c.id), newCount, stages: stages[kind], minutes };
+    const minutes =
+      list.length > 0 ? Math.max(1, Math.round((list.length * stages[kind].length * sec) / 60)) : 0;
+    return {
+      ...base,
+      mode,
+      cardIds: list.map((c) => c.id),
+      newCount,
+      stages: stages[kind],
+      minutes,
+    };
   };
 
   if (cards.length === 0) return { ...plan('empty', [], 0, 'learn'), stages: [] };
   if (cards.length < SESSION_MIN_CARDS) {
-    return { ...plan('tooFew', [], 0, 'learn'), stages: [], missingCards: SESSION_MIN_CARDS - cards.length };
+    return {
+      ...plan('tooFew', [], 0, 'learn'),
+      stages: [],
+      missingCards: SESSION_MIN_CARDS - cards.length,
+    };
   }
 
   // Слабые (ошибка вернула на шаг 0) и те, кому пришло время повторения
-  const review = answered.filter((c) => stepOf(c) === 0 || isCardWaitingReview(c, now)).sort(byLevel);
+  const review = answered
+    .filter((c) => stepOf(c) === 0 || isCardWaitingReview(c, now))
+    .sort(byLevel);
   if (review.length > 0) return plan('review', review.slice(0, SESSION_REVIEW_MAX), 0, 'review');
 
-  const fresh = cards.filter((c) => !wasAnswered(c, introduced)).sort(byCreated).slice(0, SESSION_NEW_WORDS);
+  const fresh = cards
+    .filter((c) => !wasAnswered(c, introduced))
+    .sort(byCreated)
+    .slice(0, SESSION_NEW_WORDS);
   if (fresh.length > 0) {
     // Новых меньше 5 — добираем learning (шаг 1–2) с самым низким уровнем
-    const fill = answered.filter((c) => stepOf(c) <= 2).sort(byLevel).slice(0, SESSION_NEW_WORDS - fresh.length);
+    const fill = answered
+      .filter((c) => stepOf(c) <= 2)
+      .sort(byLevel)
+      .slice(0, SESSION_NEW_WORDS - fresh.length);
     // Квота общая с уроком дня; последняя сессия дня может её чуть превысить — сессия не дробится
     const quotaLeft = newQuotaOf(day, newPerDay) - day.introducedIds.length;
     return plan(quotaLeft > 0 ? 'learn' : 'more', [...fresh, ...fill], fresh.length, 'learn');

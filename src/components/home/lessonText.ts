@@ -56,8 +56,13 @@ const STREAK_RISK_MIN_DAYS = 3;
  * Серия под угрозой: вечер, цель дня ещё не выполнена, серия ≥ 3 дней.
  * Возвращает, сколько целых часов осталось до полуночи (0 — меньше часа); null — не под угрозой.
  */
-export function streakRiskHoursLeft(now: Date, streakDays: number, goalReached: boolean): number | null {
-  if (goalReached || streakDays < STREAK_RISK_MIN_DAYS || now.getHours() < STREAK_RISK_FROM_HOUR) return null;
+export function streakRiskHoursLeft(
+  now: Date,
+  streakDays: number,
+  goalReached: boolean
+): number | null {
+  if (goalReached || streakDays < STREAK_RISK_MIN_DAYS || now.getHours() < STREAK_RISK_FROM_HOUR)
+    return null;
   const midnight = new Date(now);
   midnight.setHours(24, 0, 0, 0);
   return Math.floor((midnight.getTime() - now.getTime()) / (60 * 60 * 1000));
@@ -76,7 +81,7 @@ export function lessonCardContent(
     streakRiskHours?: number | null;
     /** Сейчас — для даты «все слова к…» (по умолчанию текущее время) */
     now?: Date;
-  },
+  }
 ): LessonCardContent | null {
   const queued = plan.reviewIds.length + plan.newIds.length + plan.mistakeIds.length;
   const progress = queued > 0 ? { done: plan.doneToday, total: plan.doneToday + queued } : null;
@@ -108,7 +113,10 @@ export function lessonCardContent(
         calm: true,
         overline: 'Урок дня пройден',
         title: 'Готово на сегодня',
-        meta: opts.streakDays > 0 ? `Серия ${opts.streakDays} ${pluralize(opts.streakDays, 'день', 'дня', 'дней')}` : null,
+        meta:
+          opts.streakDays > 0
+            ? `Серия ${opts.streakDays} ${pluralize(opts.streakDays, 'день', 'дня', 'дней')}`
+            : null,
         hint: tomorrow,
         action: `Ещё ${opts.extraNewStep} новых`,
         kind: 'extraNew',
@@ -147,7 +155,12 @@ export function lessonCardContent(
       }
       return {
         calm: false,
-        overline: plan.state === 'first' ? 'День 1' : plan.state === 'overdue' ? 'Накопилось повторение' : 'Сегодня',
+        overline:
+          plan.state === 'first'
+            ? 'День 1'
+            : plan.state === 'overdue'
+              ? 'Накопилось повторение'
+              : 'Сегодня',
         title: 'Урок дня',
         meta: `${lessonComposition(plan)} · ${time}`,
         hint: lessonHint(plan, opts.now),
@@ -161,8 +174,18 @@ export function lessonCardContent(
 }
 
 const MONTHS_GENITIVE = [
-  'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
-  'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря',
+  'января',
+  'февраля',
+  'марта',
+  'апреля',
+  'мая',
+  'июня',
+  'июля',
+  'августа',
+  'сентября',
+  'октября',
+  'ноября',
+  'декабря',
 ];
 /** Дату «всё выучишь к…» показываем, только если впереди много слов: «к послезавтра» не мотивирует */
 const FINISH_DATE_MIN_NEW = 20;
@@ -185,11 +208,12 @@ export function lessonHint(plan: LessonPlan, now: Date = new Date()): string | n
     parts.push(
       plan.state === 'first'
         ? `Начинаем с «${plan.focusSetTitle}»`
-        : `${plan.focusSetTitle} · ${plan.focusSetSeen} из ${plan.focusSetTotal}`,
+        : `${plan.focusSetTitle} · ${plan.focusSetSeen} из ${plan.focusSetTotal}`
     );
   }
   const left = plan.waitingTotal - plan.reviewIds.length;
-  if (plan.state !== 'mistakes' && left > 0 && plan.reviewIds.length > 0) parts.push(`ещё ждут ${left}`);
+  if (plan.state !== 'mistakes' && left > 0 && plan.reviewIds.length > 0)
+    parts.push(`ещё ждут ${left}`);
   // Последняя по важности — дата, к которой пройдём все слова (только когда новые слова в уроке есть)
   if ((plan.state === 'lesson' || plan.state === 'first') && plan.newIds.length > 0) {
     const finish = finishDateText(plan, now);
