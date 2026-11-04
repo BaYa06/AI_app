@@ -143,6 +143,13 @@ getCurrentUser (id, email, isAnonymous), onAuthChange (setTimeout(0), отпис
 эквивалентна (то же поле, та же ветка без токена, вызов внутри/вне try там же). Удалён мёртвый
 AuthService.ts (MMKV-заглушка, только реэкспорт). settingsStore больше не тянет баррел
 `@/services` (баррел всё равно грузится из App.tsx до первого рендера). Моки 3 тестов → session.
+**5c ✅ 04.11.2026** — `src/services/api/client.ts`: `apiFetch(endpoint, {method, query, body,
+headers, auth: required|optional|none, timeoutMs (false = голый fetch), signal, baseUrl, retry,
+parse: json|none})` → `{ok, status, json, response, error: ApiError}`. Не бросает на HTTP/сети/
+таймауте/нет токена (code: no_token|network|timeout|aborted|http, исходное исключение в
+`error.original`) — так каждый сервис в 5d повторит свои ветки. Бросает только исключение
+getAccessToken и JSON.stringify. Логов нет (сервисы логируют сами), новых заголовков нет,
+retry по умолчанию 0 (только GET + network). Тест — 26 случаев.
 Подшаги: 5a session.ts + тест · 5b сервисы и сторы на session.ts (+ удалить мёртвый AuthService)
 · 5c api/client.ts + тест · 5d call*Api сервисов на клиент (контракты null/ApiResult/reason те же)
 · 5e экраны: getSession → getUserId/getCurrentUser · 5f ExamService + useExamExitGuard
