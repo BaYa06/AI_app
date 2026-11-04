@@ -1,25 +1,33 @@
 #!/bin/sh
-# Брендбук: коммит не проходит, если нарушений стало больше, чем в снимке
-# scripts/brand-baseline.json (plan/done/brandbook_migration.md, шаг 8.1).
-# Ставится командой `npm run hooks:install` (и автоматически при npm install).
+# Проверки перед коммитом. Ставится командой `npm run hooks:install` (и автоматически при npm install).
 # Обойти в крайнем случае: git commit --no-verify
-
-# Проверяем только когда в коммите есть файлы интерфейса
-if ! git diff --cached --name-only --diff-filter=ACMR | grep -qE '^src/.*\.(ts|tsx)$'; then
-  exit 0
-fi
+#  1. Миграции: _db-init.js и database/migrations/ сходятся (plan/new/code_cleanup.md, Clean 2).
+#  2. Брендбук: нарушений не больше, чем в снимке scripts/brand-baseline.json
+#     (plan/done/brandbook_migration.md, шаг 8.1).
 
 command -v node >/dev/null 2>&1 || exit 0
 
 repo_root=$(git rev-parse --show-toplevel) || exit 0
 cd "$repo_root" || exit 0
 
-if ! node scripts/brand-check.mjs --fail-on-new >/tmp/brand-check-precommit.log 2>&1; then
-  # таблицу не показываем — только новые нарушения и подсказку
-  sed -n '/✗ Новые нарушения/,$p' /tmp/brand-check-precommit.log
-  echo ""
-  echo "Подробно по строкам: npm run brand:check -- --details <путь к файлу>"
-  exit 1
+staged=$(git diff --cached --name-only --diff-filter=ACMRD)
+
+# 1. Миграции — только когда в коммите схема БД
+if printf '%s\n' "$staged" | grep -qE '^(api/_db-init\.js|database/migrations/)'; then
+  if ! node scripts/check-migrations.mjs; then
+    exit 1
+  fi
+fi
+
+# 2. Брендбук — только когда в коммите файлы интерфейса
+if printf '%s\n' "$staged" | grep -qE '^src/.*\.(ts|tsx)$'; then
+  if ! node scripts/brand-check.mjs --fail-on-new >/tmp/brand-check-precommit.log 2>&1; then
+    # таблицу не показываем — только новые нарушения и подсказку
+    sed -n '/✗ Новые нарушения/,$p' /tmp/brand-check-precommit.log
+    echo ""
+    echo "Подробно по строкам: npm run brand:check -- --details <путь к файлу>"
+    exit 1
+  fi
 fi
 
 exit 0

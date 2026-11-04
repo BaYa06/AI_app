@@ -3,6 +3,7 @@ import { neon } from '@neondatabase/serverless';
 /**
  * Версия схемы: при добавлении миграции в applyMigrations увеличить (и дописать файл в
  * database/migrations). Пока в app_migrations есть отметка этой версии, миграции не выполняются.
+ * Правила — database/migrations/MIGRATION_GUIDE.md; проверка — `npm run db:check-migrations`.
  */
 // schema_039: в 038 (official_sets_guard) и 039 (set_kind) версию не подняли — миграции не выполнились,
 // и запросы с card_sets.kind падали на тестовом сервере (plan/new/set_kind.md, слабые места)
