@@ -87,13 +87,13 @@ export function WordBuilderScreen({ navigation, route }: Props) {
   } | null>(null);
 
   const cardMap = useMemo(() => {
-    const map: Record<string, Card> = {};
+    const byId: Record<string, Card> = {};
     cards.forEach((card) => {
       if (card) {
-        map[card.id] = card;
+        byId[card.id] = card;
       }
     });
-    return map;
+    return byId;
   }, [cards]);
 
   const phaseFailedList = useMemo(

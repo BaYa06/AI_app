@@ -38,8 +38,8 @@ export function OralTestSessionScreen({ navigation, route }: Props) {
     .filter(Boolean);
 
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [knownIds, setKnownIds] = useState<string[]>([]);
-  const [unknownIds, setUnknownIds] = useState<string[]>([]);
+  const [, setKnownIds] = useState<string[]>([]);
+  const [, setUnknownIds] = useState<string[]>([]);
 
   // Refs to avoid stale closures inside PanResponder
   const currentIndexRef = useRef(0);

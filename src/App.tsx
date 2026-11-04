@@ -304,7 +304,7 @@ function AppRoot({
             accessibilityLabel="Разрешить уведомления"
             onPress={async () => {
               setPushBannerLoading(true);
-              const status = await requestPushPermission(currentUserId);
+              await requestPushPermission(currentUserId);
               setPushBannerLoading(false);
               setShowPushBanner(false);
               localStorage.setItem('flashly_push_banner_dismissed', '1');

@@ -2,7 +2,7 @@
  * Study Screen
  * @description Экран изучения карточек с CSS-анимациями для web
  */
-import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { View, StyleSheet, Pressable, Dimensions, Animated, Modal, AppState, Platform, type LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useCardsStore, useSetsStore, useStudyStore, useThemeColors, useSettingsStore, selectSetStats } from '@/store';

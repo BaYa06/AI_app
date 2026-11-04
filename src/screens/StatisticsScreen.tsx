@@ -3,13 +3,12 @@
  * @description Full statistics page with hero card, goals, heatmap, charts
  */
 import { isCardLearned } from '@/services/SRSService';
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   StyleSheet,
   ScrollView,
   Pressable,
-  ActivityIndicator,
 } from 'react-native';
 import { Text } from '@/components/common';
 import { useThemeColors, useSettingsStore, useCardsStore, useSetsStore, useContextFillStore } from '@/store';
@@ -25,7 +24,6 @@ import {
   Library,
   Settings,
   Sparkles,
-  Sun,
   Timer,
   Trophy,
   User,
@@ -81,7 +79,7 @@ export function StatisticsScreen({ navigation }: any) {
   const [weekActivity, setWeekActivity] = useState<DailyActivity[]>(() => StreakService.cachedWeekActivity(7) ?? []);
   const [monthActivity, setMonthActivity] = useState<DailyActivity[] | null>(() => StreakService.cachedWeekActivity(30));
   const [yearActivity, setYearActivity] = useState<DailyActivity[] | null>(() => StreakService.cachedWeekActivity(365));
-  const [loading, setLoading] = useState(() => userStats === null);
+  const [, setLoading] = useState(() => userStats === null);
   const [userName, setUserName] = useState('');
 
 

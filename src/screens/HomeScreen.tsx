@@ -1053,9 +1053,6 @@ export function HomeScreen({ navigation, route }: any) {
   
   const updateSetStats = useSetsStore((s) => s.updateSetStats);
   const updateSet = useSetsStore((s) => s.updateSet);
-  const deleteSet = useSetsStore((s) => s.deleteSet);
-  const addSet = useSetsStore((s) => s.addSet);
-  const deleteCardsBySet = useCardsStore((s) => s.deleteCardsBySet);
 
   // Свои курсы — куда можно переложить свой набор (в курс учителя нельзя)
   const moveTargetCourses = useMemo(() => courses.filter((c) => !c.isStudentCourse), [courses]);
@@ -2234,10 +2231,10 @@ export function HomeScreen({ navigation, route }: any) {
         onAccepted={(courseId, courseTitle) => {
           setJoinByCodeVisible(false);
           // Курс сразу в список, наборы курса — тихой синхронизацией (без мигания экрана)
-          const { courses } = useCoursesStore.getState();
-          if (!courses.some((c) => c.id === courseId)) {
+          const { courses: storeCourses } = useCoursesStore.getState();
+          if (!storeCourses.some((c) => c.id === courseId)) {
             useCoursesStore.setState({
-              courses: [...courses, { id: courseId, title: courseTitle, createdAt: Date.now(), isStudentCourse: true }],
+              courses: [...storeCourses, { id: courseId, title: courseTitle, createdAt: Date.now(), isStudentCourse: true }],
             });
           }
           DatabaseService.syncStudentCourses();

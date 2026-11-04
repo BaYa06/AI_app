@@ -229,10 +229,6 @@ export function SetEditorScreen({ navigation, route }: Props) {
     }
   }, [showPublishForm, publishFormInitialized, description, category]);
 
-  const categoryOption = useMemo(
-    () => CATEGORY_OPTIONS.find((c) => c.value === category),
-    [category]
-  );
 
   const selectedCourseTitle = useMemo(() => {
     if (!courseId) return 'Без курса';

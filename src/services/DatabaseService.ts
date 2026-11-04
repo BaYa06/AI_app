@@ -468,7 +468,7 @@ export const DatabaseService = {
    * Перегрузить удалённые данные для указанного пользователя:
    * очищает карточки/наборы в store и грузит только его данные.
    */
-  async reloadRemoteDataForUser(userId: string | undefined): Promise<void> {
+  async reloadRemoteDataForUser(_userId: string | undefined): Promise<void> {
     const stores = getStores();
     stores.useCardsStore.getState().clearCards();
     stores.useSetsStore.getState().clearSets();

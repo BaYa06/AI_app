@@ -587,7 +587,7 @@ const speakWithWebSpeech = async (
   options?: { rate?: number; pitch?: number; volume?: number }
 ) => {
   const synth = getEngine();
-  const UtteranceCtor = getGlobal().SpeechSynthesisUtterance as (new (text?: string) => SpeechUtterance) | undefined;
+  const UtteranceCtor = getGlobal().SpeechSynthesisUtterance as (new (utteranceText?: string) => SpeechUtterance) | undefined;
   if (!synth || !UtteranceCtor) return;
 
   const voices = await loadVoices();

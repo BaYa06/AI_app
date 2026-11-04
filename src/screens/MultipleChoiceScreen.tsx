@@ -595,6 +595,13 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
     };
   }, []);
 
+  // До раннего return: хуки вызываются в одном порядке на каждом рендере
+  const handleClose = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    finishStudySession();
+    navigation.navigate('Main', { screen: 'Home' });
+  }, [challengeMode, finishStudySession, navigation]);
+
   if (!set) {
     return <Loading fullScreen message="Загрузка..." />;
   }
@@ -606,12 +613,6 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
       : challengeMode
         ? 'Быстрый раунд'
         : 'Тест';
-
-  const handleClose = useCallback(() => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    finishStudySession();
-    navigation.navigate('Main', { screen: 'Home' });
-  }, [challengeMode, finishStudySession, navigation]);
 
   if (!totalQuestions) {
     return (

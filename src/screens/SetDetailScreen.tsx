@@ -80,8 +80,8 @@ export function SetDetailScreen({ navigation, route }: Props) {
 
 
   // Publish states
-  const [isPublished, setIsPublished] = useState(false);
-  const [librarySetId, setLibrarySetId] = useState<string | null>(null);
+  const [, setIsPublished] = useState(false);
+  const [, setLibrarySetId] = useState<string | null>(null);
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [publishDescription, setPublishDescription] = useState('');
   const [publishCategory, setPublishCategory] = useState('');

@@ -9,8 +9,7 @@ import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha } from '@/constants';
 import Svg, { Circle, Path, Rect, Defs, LinearGradient, Stop } from 'react-native-svg';
 
-function StudyIllustration({ color, tint, surface }: { color: string; tint: string; surface: string }) {
-  const bgTint = tint;
+function StudyIllustration({ color, tint: _tint, surface }: { color: string; tint: string; surface: string }) {
   return (
     <View style={s.illustrationWrap}>
       <Svg width={200} height={160} viewBox="0 0 200 160">

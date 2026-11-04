@@ -87,7 +87,18 @@ check-migrations по-прежнему находит `Migration NNN_name failed
 4. ESLint: `no-console: error` для `src/**` и `api/**` (кроме самих логгеров).
 Можно разбить на 3a (логгер + services/store), 3b (screens/components), 3c (api).
 
-## Clean 4 — линт и форматирование зелёные ⬜
+## Clean 4 — линт и форматирование зелёные ⬜ (4a ✅, 4b ⬜, 4c ⬜)
+
+**4a сделано 04.11.2026** — `.eslintrc.js` → `.eslintrc.cjs` (ESM-пакет), `.eslintignore`
+(сборки, нативные папки, ассеты), Node-окружение для api/scripts/database, `no-console: error`
+для src/api (кроме логгеров). Линт: 0 ошибок, 2080 предупреждений (curly 1659, пробелы —
+уйдут в 4b; exhaustive-deps 89 остаётся warn — зависимости не добавляем, это меняет поведение).
+Исправлено 29 ошибок без изменения поведения: неиспользуемые импорты/переменные, no-shadow.
+MultipleChoiceScreen: `useCallback` стоял после раннего `return` (rules-of-hooks, риск
+«Rendered more hooks») — перенесён выше без изменений. tsc в src 85 → 63 (ушли TS6133).
+`prettier/prettier` выключен: eslint-plugin-prettier из @react-native/eslint-config 0.73
+падает с prettier 3 → в 4b форматирование проверяем `prettier --check`, а не через ESLint.
+На 4b: добавить `.mjs,.cjs` в `--ext` скрипта lint.
 1. Запустить `npm run lint`, посчитать ошибки, исправить автофиксом (`--fix`) то, что можно.
 2. Остальное — исправить или (если правило не подходит проекту) отключить в `.eslintrc.js`
    осознанно, с комментарием почему. Цель: `npm run lint` → 0 ошибок.

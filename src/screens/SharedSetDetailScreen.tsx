@@ -8,7 +8,6 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
-  Image,
 } from 'react-native';
 import { Text, Container } from '@/components/common';
 import { useThemeColors } from '@/store';
@@ -26,7 +25,6 @@ import {
   Layers,
   Calendar,
   ArrowRight,
-  ChevronRight,
   Plus,
 } from 'lucide-react-native';
 import type { RootStackScreenProps } from '@/types/navigation';

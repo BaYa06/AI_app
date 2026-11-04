@@ -212,7 +212,6 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
   const reportWithReason = async (reason: string) => {
     if (!userId || !currentSet) return;
     try {
-      const { LibraryService } = await import('@/services/LibraryService');
       await LibraryService.reportSet(userId, currentSet.id, reason);
       toast.success('Спасибо, жалоба отправлена');
     } catch {

@@ -6,7 +6,6 @@ import Animated, {
   withDelay,
   withSequence,
   Easing,
-  runOnJS,
   useAnimatedStyle,
 } from 'react-native-reanimated';
 import { Gem } from 'lucide-react-native';

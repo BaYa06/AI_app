@@ -100,11 +100,6 @@ function easeInOutCubic(x: number) {
   return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
 }
 
-function clamp01(x: number) {
-  'worklet';
-  return Math.min(1, Math.max(0, x));
-}
-
 /** withSequence(withTiming(peak), withSpring(1)) — короткий «поп» 1 → peak → 1. */
 function bump(peak: number, upMs: number, spring: { damping: number; stiffness: number; mass: number }) {
   return withSequence(withTiming(peak, { duration: upMs, easing: easeOut }), withSpring(1, spring));

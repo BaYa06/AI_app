@@ -76,7 +76,7 @@ export function AudioLearningScreen({ navigation, route }: Props) {
   // State
   const [sessionState, setSessionState] = useState<SessionState>('idle');
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [errorCardIds, setErrorCardIds] = useState<string[]>([]);
+  const [, setErrorCardIds] = useState<string[]>([]);
   const [partialText, setPartialText] = useState('');
   const [recognizedText, setRecognizedText] = useState('');
   const [isRunning, setIsRunning] = useState(false);

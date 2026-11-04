@@ -30,7 +30,7 @@ type Props = {
   onCreateAccount?: () => void;
 };
 
-export function SignInScreen({ onBack, onSendCode, onCreateAccount }: Props) {
+export function SignInScreen({ onBack, onCreateAccount }: Props) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const [isLoading, setIsLoading] = useState(false);
