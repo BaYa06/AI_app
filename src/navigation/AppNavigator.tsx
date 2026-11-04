@@ -53,7 +53,7 @@ function BounceIcon({ name, color, focused }: { name: string; color: string; foc
 }
 
 // Экраны
-import { HomeScreen } from '@/screens/HomeScreen.new';
+import { HomeScreen } from '@/screens/HomeScreen';
 import { LibraryScreen } from '@/screens/LibraryScreen';
 import { StatisticsScreen } from '@/screens/StatisticsScreen';
 import { ProfileScreen } from '@/screens/ProfileScreen';
