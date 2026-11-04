@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import { getAuthedUserId } from './_auth.js';
 import { notifyCoursesChanged } from './_realtime.js';
+import { log } from './_log.js';
 
 /**
  * API каталога книг (Книга → Юнит → официальный набор) и планов юнитов курса.
@@ -67,7 +68,7 @@ export default async function handler(req, res) {
 
     return res.status(400).json({ error: 'Unknown action' });
   } catch (error) {
-    console.error('Books API error:', error);
+    log.error('books', 'Books API error', error);
     return res.status(500).json({ error: error.message });
   }
 }

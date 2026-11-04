@@ -25,6 +25,7 @@ import { sendNotification, groupsOff, logChannelEvents } from './push/_send.js';
 import { runArbiter } from './push/_arbiter.js';
 import { recomputeHabits } from './push/_habits.js';
 import { SETTING_GROUPS, isHoldout } from './push/_decide.js';
+import { log } from './_log.js';
 
 // teacher.js и data.js импортируют отправку отсюда
 export { sendNotification };
@@ -55,7 +56,7 @@ const LEGACY_DEFAULT_DAYS = 'mon,tue,wed,thu,fri';
 async function settingsUserId(req, legacyUserId) {
   if (req.headers.authorization) return getAuthedUserId(req); // невалидный JWT → null → 401
   if (typeof legacyUserId !== 'string' || !legacyUserId) return null;
-  console.warn('[push] settings без JWT (старая сборка)');
+  log.warn('push', 'settings без JWT (старая сборка)');
   return legacyUserId;
 }
 
@@ -83,7 +84,7 @@ export default async function handler(req, res) {
       if (req.headers.authorization && !userId) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
-      if (!userId && bodyUserId) console.warn('[push] subscribe: userId без JWT проигнорирован');
+      if (!userId && bodyUserId) log.warn('push', 'subscribe: userId без JWT проигнорирован');
       // Разрешение отозвали в настройках iOS (5.1, отток канала): было granted/provisional, стало denied
       if (permission === 'denied' && userId) {
         const [prev] = await sql`SELECT permission FROM push_tokens WHERE token = ${token}`;
@@ -310,7 +311,7 @@ export default async function handler(req, res) {
 
     return res.status(400).json({ error: 'Unknown action' });
   } catch (error) {
-    console.error('[push] Error:', error);
+    log.error('push', 'Error', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }

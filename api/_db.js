@@ -1,5 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { ensureDatabaseInitialized, initDatabase } from './_db-init.js';
+import { log } from './_log.js';
 
 /**
  * Vercel Serverless Function для работы с Neon PostgreSQL
@@ -52,7 +53,7 @@ export default async function handler(req, res) {
 
     res.status(404).json({ error: 'Endpoint not found' });
   } catch (error) {
-    console.error('Database error:', error);
+    log.error('db', 'Database error', error);
     res.status(500).json({ error: error.message });
   }
 }

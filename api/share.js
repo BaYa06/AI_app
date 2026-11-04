@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { ensureDatabaseInitialized } from './_db-init.js';
 import { getAuthedUserId } from './_auth.js';
 import { renderSharePage, renderShareErrorPage } from './_share-page.js';
+import { log } from './_log.js';
 
 /**
  * Наборы по ссылке (plan/new/share_set.md, Share 1).
@@ -108,7 +109,7 @@ export default async function handler(req, res) {
     if (action === 'unblock') return await unblockAuthor(res, sql, userId, body.userId);
     return res.status(400).json({ error: 'Unknown action' });
   } catch (error) {
-    console.error('Share API error:', error);
+    log.error('share', 'Share API error', error);
     return res.status(500).json({ error: error.message });
   }
 }

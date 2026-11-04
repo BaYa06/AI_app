@@ -4,6 +4,7 @@ import { courseSetIdsSql, courseSetsForStudent } from './_course.js';
 import { sendNotification } from './push.js';
 import { notifyCoursesChanged } from './_realtime.js';
 import crypto from 'crypto';
+import { log } from './_log.js';
 
 /**
  * API для учительских мутаций (курсы, приглашения, ростер, видимость наборов)
@@ -79,7 +80,7 @@ export default async function handler(req, res) {
 
     return res.status(400).json({ error: 'Unknown action' });
   } catch (error) {
-    console.error('Teacher API error:', error);
+    log.error('teacher', 'Teacher API error', error);
     return res.status(500).json({ error: error.message });
   }
 }

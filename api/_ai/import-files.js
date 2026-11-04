@@ -2,6 +2,7 @@ import { MODELS, generateJson, parseJsonObject, sendAiError } from './gemini.js'
 import { WORD_FORMAT_RULES, languageName, vocabExtractionRules } from './prompts.js';
 import { consumeRecognition } from './usage.js';
 import { getAuthedUserId } from '../_auth.js';
+import { log } from '../_log.js';
 
 /**
  * Единый ИИ-импорт: фото, PDF, CSV/TSV и вставленный текст → карточки.
@@ -174,7 +175,7 @@ export default async function handler(req, res) {
   const invalid = validateFiles(files);
   if (invalid) {
     // Отказы проверки тоже в лог — иначе в приложении «не получилось», а на сервере тишина
-    console.warn(`[import-files] rejected: ${invalid}`);
+    log.warn('import-files', `rejected: ${invalid}`);
     if (invalid === 'too_large') return res.status(413).json({ error: 'too_large' });
     return res.status(400).json({ error: invalid });
   }
@@ -186,7 +187,7 @@ export default async function handler(req, res) {
   try {
     quota = await consumeRecognition(userId);
   } catch (error) {
-    console.error('[import-files] usage check failed:', error?.message || error);
+    log.error('import-files', 'usage check failed', error?.message || error);
     return res.status(500).json({ error: 'Failed to check usage' });
   }
   if (!quota.ok) {
@@ -241,7 +242,7 @@ export default async function handler(req, res) {
     // следующим запросом пользователь выберет, что делать с текстом
     if (cards.length === 0) await quota.refund();
 
-    console.log(`[import-files] files=${files.length} goal=${goal} subject=${subject} kind=${kind} lang=${lang} cards=${cards.length}`);
+    log.info('import-files', `files=${files.length} goal=${goal} subject=${subject} kind=${kind} lang=${lang} cards=${cards.length}`);
 
     return res.status(200).json({
       cards,

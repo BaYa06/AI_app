@@ -20,6 +20,7 @@ import {
   DEFAULT_TZ, QUIET_TO_HOUR, QUIET_FROM_HOUR, MINOR_QUIET_FROM_HOUR, groupsOff, initFirebase, isDeadTokenError, isPushPaused,
   isAllowedRecipient, logChannelEvents, sendNotification,
 } from './_send.js';
+import { log } from '../_log.js';
 
 const FCM_BATCH = 500;
 const DAILY_SLOT = 'daily';
@@ -44,7 +45,7 @@ async function sendDeferred(sql) {
       const result = await sendNotification(sql, r.user_id, r.type, r.payload || {});
       if (result.ok) sent++;
     } catch (e) {
-      console.error(`[arbiter] deferred ${r.type} for ${r.user_id} failed:`, e);
+      log.error('arbiter', `deferred ${r.type} for ${r.user_id} failed`, e);
     }
   }
   return { deferred: rows.length, deferredSent: sent };
@@ -117,7 +118,7 @@ async function sendClassPrep(sql, { dryRun }) {
       if (result.ok) sent++;
       if (dryRun) report.push({ user_id: r.user_id, type: 'class_prep', status: result.reason || 'send', data, message: result.message || null });
     } catch (e) {
-      console.error(`[arbiter] class_prep for ${r.user_id} failed:`, e);
+      log.error('arbiter', `class_prep for ${r.user_id} failed`, e);
     }
   }
   return { classCandidates: rows.length, classSent: sent, ...(dryRun ? { classReport: report } : null) };
@@ -149,7 +150,7 @@ async function sendEach(sql, items, { dryRun, markDay = true }) {
       }
       if (dryRun) report.push({ user_id: userId, type, status: result.reason || 'send', data, message: result.message || null });
     } catch (e) {
-      console.error(`[arbiter] ${type} for ${userId} failed:`, e);
+      log.error('arbiter', `${type} for ${userId} failed`, e);
     }
   }
   if (!dryRun && markDay) await markRemindedToday(sql, reminded);
@@ -676,7 +677,7 @@ export async function runArbiter(sql, { dryRun = false } = {}) {
             else if (isDeadTokenError(r.error?.code)) dead.push(chunk[j]);
           });
         } catch (e) {
-          console.error('[arbiter] FCM batch failed:', e);
+          log.error('arbiter', 'FCM batch failed', e);
           for (const m of chunk) stats.get(m.pushId).tokens++;
         }
       }

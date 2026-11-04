@@ -12,13 +12,13 @@
    try {
      await sql`ALTER TABLE ... ADD COLUMN IF NOT EXISTS ...`;
    } catch (e) {
-     console.error('Migration 040_short_name failed:', e);
+     log.error('db-init', 'Migration 040_short_name failed', e);
    }
    ```
 2. `SCHEMA_VERSION = 'schema_040'` — **без этого миграция не выполнится** на базе, где уже есть
    отметка прошлой версии (так было с 038/039).
 3. Файл `database/migrations/040_short_name.sql` — то же самое на SQL, с комментарием сверху.
-   Имя файла = имя в `console.error('Migration … failed')`.
+   Имя файла = имя в `log.error('db-init', 'Migration … failed', e)`.
 
 Только добавляющие изменения: `IF NOT EXISTS`, новые колонки nullable или с `DEFAULT`
 (совместимость со старыми версиями приложения — `plan/new/release_safety.md`, Release 2).

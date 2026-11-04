@@ -3,7 +3,7 @@
  * Сверяет миграции в api/_db-init.js с файлами database/migrations/*.sql (plan/new/code_cleanup.md, Clean 2).
  *
  * Исполняется _db-init.js, а .sql — история и ручное применение. Скрипт проверяет:
- *  1. у каждой миграции в коде (`console.error('Migration NNN_name failed:'…)`) есть файл NNN_name.sql;
+ *  1. у каждой миграции в коде (`log.error('db-init', 'Migration NNN_name failed', e)`) есть файл NNN_name.sql;
  *  2. у каждого комментария `// Migration NNN:` есть такой catch с именем — иначе не понять, какой файл;
  *  3. каждый .sql либо есть в коде, либо в списке старых ручных миграций (MANUAL ниже);
  *  4. SCHEMA_VERSION = schema_<наибольший номер> — иначе миграции не выполнятся на сервере
@@ -49,7 +49,7 @@ for (const name of [...named].sort()) {
 for (const num of [...commented].sort()) {
   if (!namedNumbers.has(num)) {
     errors.push(
-      `миграция ${num} в _db-init.js без catch с именем — допиши console.error('Migration ${num}_<имя> failed:', e)`,
+      `миграция ${num} в _db-init.js без catch с именем — допиши log.error('db-init', 'Migration ${num}_<имя> failed', e)`,
     );
   }
 }
@@ -57,7 +57,7 @@ for (const num of [...commented].sort()) {
 for (const name of files.sort()) {
   if (!named.has(name) && !MANUAL.has(name)) {
     errors.push(
-      `файл ${name}.sql не применяется: добавь миграцию в api/_db-init.js (catch 'Migration ${name} failed')`,
+      `файл ${name}.sql не применяется: добавь миграцию в api/_db-init.js (catch с 'Migration ${name} failed')`,
     );
   }
 }

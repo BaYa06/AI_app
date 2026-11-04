@@ -10,6 +10,7 @@ import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
 import { PUSH_TYPES, pushType, buildPush, versionAtLeast } from './_registry.js';
 import { disabledCategories, isHoldout } from './_decide.js';
+import { log as logger } from '../_log.js';
 
 export const DEFAULT_TZ = 'Asia/Bishkek';
 /** Тихие часы (принцип 2): с 22:00 до 8:00 по поясу пользователя ничего не шлём, даже от учителя */
@@ -72,7 +73,7 @@ export async function logChannelEvents(sql, events) {
         AS x(user_id uuid, event text, detail text)
     `;
   } catch (e) {
-    console.error('[push] push_channel_events insert failed:', e);
+    logger.error('push', 'push_channel_events insert failed', e);
   }
 }
 
@@ -91,7 +92,7 @@ export async function logPush(sql, { id, userId, type, status, tokens = 0, deliv
       )
     `;
   } catch (e) {
-    console.error('[push] push_log insert failed:', e);
+    logger.error('push', 'push_log insert failed', e);
   }
 }
 

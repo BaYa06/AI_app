@@ -3,6 +3,7 @@ import { getAuthedUserId, hasBearerSecret } from './_auth.js';
 import { ensureDatabaseInitialized } from './_db-init.js';
 import { HttpError, UUID_RE, uuid, assertReadableSet } from './_access.js';
 import { courseSetIdsSql } from './_course.js';
+import { log } from './_log.js';
 
 /**
  * Прогресс по карточкам — единственное место, где меняется уровень карточки.
@@ -566,7 +567,7 @@ export default async function handler(req, res) {
     try {
       return res.status(200).json(await closeWeeks(sql));
     } catch (error) {
-      console.error('[progress] close-week failed:', error);
+      log.error('progress', 'close-week failed', error);
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
@@ -589,7 +590,7 @@ export default async function handler(req, res) {
     return res.status(200).json(await route.run(me));
   } catch (error) {
     if (error instanceof HttpError) return res.status(error.status).json({ error: error.message });
-    console.error(`[progress] ${action} failed:`, error);
+    log.error('progress', `${action} failed`, error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }

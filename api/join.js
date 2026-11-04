@@ -1,4 +1,5 @@
 import { neon } from '@neondatabase/serverless';
+import { log } from './_log.js';
 
 /**
  * Landing page для /join/TOKEN
@@ -37,7 +38,7 @@ export default async function handler(req, res) {
       renderPage({ courseTitle: course_title, teacherName: teacher_name, token })
     );
   } catch (error) {
-    console.error('Join page error:', error);
+    log.error('join', 'Join page error', error);
     return res.status(500).send(renderPage({ error: 'Ошибка сервера' }));
   }
 }

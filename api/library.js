@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import { ensureDatabaseInitialized } from './_db-init.js';
 import { getAuthedUserId } from './_auth.js';
+import { log } from './_log.js';
 
 /**
  * Consolidated Library API
@@ -115,7 +116,7 @@ export default async function handler(req, res) {
     }
     return await getLibrarySets(req, res, sql);
   } catch (error) {
-    console.error('Library API error:', error);
+    log.error('library', 'Library API error', error);
     return res.status(500).json({ error: error.message });
   }
 }

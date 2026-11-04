@@ -53,7 +53,15 @@ SCHEMA_VERSION = schema_<последний номер> — ровно та ош
    файлами в `migrations/`, падает при расхождении. Подключить в pre-commit.
 Перевод на настоящий раннер миграций — не в этом плане (рискованно для боевой базы).
 
-## Clean 3 — логгер вместо console.* ⬜ (3a ✅, 3b ✅, 3c ⬜)
+## Clean 3 — логгер вместо console.* ✅ (3a ✅, 3b ✅, 3c ✅)
+
+**3c сделано 04.11.2026** — `api/_log.js` + 78 вызовов в api/. Vercel и так собирает консоль,
+поэтому смысл — единый формат `[tag] message`, стек у Error и `debug`, который молчит в
+продакшне (VERCEL_ENV=production); info/warn/error пишутся как раньше. В `api/push/_send.js`
+логгер импортирован как `logger` — там своя функция `log` (журнал пушей в БД).
+check-migrations по-прежнему находит `Migration NNN_name failed` — пример в MIGRATION_GUIDE
+обновлён на log.error. Локальная админка (api/admin.js, не в git) не тронута.
+
 252 вызова `console.*` в `src`, 78 в `api`.
 
 **3a сделано 04.11.2026** — `src/utils/logger.ts` + services/store (140 вызовов), тест logger.test.ts.

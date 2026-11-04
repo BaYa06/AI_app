@@ -11,6 +11,7 @@ import {
 } from './_admin.js';
 import { isAppleUser, isAppleRevokeConfigured, revokeAppleAuthorization } from './_apple.js';
 import { getPublicNews } from './_whatsNew.js';
+import { log } from './_log.js';
 
 /**
  * API данных пользователя: профиль, наборы, карточки, курсы, прогресс, серия.
@@ -481,7 +482,7 @@ async function sendPush(sql, userId, type, data = {}) {
     const { sendNotification } = await import('./push.js');
     await sendNotification(sql, userId, type, data);
   } catch (e) {
-    console.error(`[data] push ${type} failed:`, e);
+    log.error('data', `push ${type} failed`, e);
   }
 }
 
@@ -908,7 +909,7 @@ async function adminReplyFeedback(sql, me, p) {
       const r = await sendNotification(sql, reply.user_id, 'support_reply', { feedbackId: p.id, text: message });
       push = { ok: r.ok === true, reason: r.reason || r.error || null };
     } catch (e) {
-      console.error('[data] support_reply push failed:', e);
+      log.error('data', 'support_reply push failed', e);
       push = { ok: false, reason: 'error' };
     }
   }
@@ -946,7 +947,7 @@ async function deleteAccount(sql, me, p, user) {
     try {
       await revokeAppleAuthorization(code);
     } catch (e) {
-      console.error('[data] deleteAccount: Apple revoke failed:', e);
+      log.error('data', 'deleteAccount: Apple revoke failed', e);
       throw new HttpError(502, 'Failed to revoke Apple authorization');
     }
   }
@@ -976,7 +977,7 @@ async function deleteAccount(sql, me, p, user) {
   const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
   const { error } = await admin.auth.admin.deleteUser(me);
   if (error && error.status !== 404) {
-    console.error('[data] deleteAccount: Supabase deleteUser failed:', error);
+    log.error('data', 'deleteAccount: Supabase deleteUser failed', error);
     throw new HttpError(502, 'Failed to delete auth user');
   }
   return true;
@@ -1060,7 +1061,7 @@ export default async function handler(req, res) {
       res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
       return res.status(200).json({ data: await getPublicNews(sql) });
     } catch (error) {
-      console.error('[data] news failed:', error);
+      log.error('data', 'news failed', error);
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
@@ -1082,7 +1083,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ data });
   } catch (error) {
     if (error instanceof HttpError) return res.status(error.status).json({ error: error.message });
-    console.error(`[data] ${action} failed:`, error);
+    log.error('data', `${action} failed`, error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }

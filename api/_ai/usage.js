@@ -1,5 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { getAuthedUserId } from '../_auth.js';
+import { log } from '../_log.js';
 
 /**
  * Дневной лимит ИИ-распознаваний на пользователя (plan/done/ai_import.md, AI 3).
@@ -92,7 +93,7 @@ export async function consumeRecognition(userId) {
       `;
       result.usage.used = Math.max(used - 1, 0);
     } catch (error) {
-      console.error('[usage] refund failed:', error?.message || error);
+      log.error('usage', 'refund failed', error?.message || error);
     }
   };
   return result;
@@ -116,7 +117,7 @@ export default async function handler(req, res) {
     const used = await readUsed(sql, userId, windowStart);
     return res.status(200).json({ used, limit: DAILY_LIMIT, resetAt });
   } catch (error) {
-    console.error('[usage] error:', error?.message || error);
+    log.error('usage', 'error', error?.message || error);
     return res.status(500).json({ error: 'Failed to read usage' });
   }
 }

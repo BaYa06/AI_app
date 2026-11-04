@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import { createClient } from '@supabase/supabase-js';
 import { ensureDatabaseInitialized } from './_db-init.js';
+import { log } from './_log.js';
 
 /**
  * API для Live-тестов
@@ -85,7 +86,7 @@ export default async function handler(req, res) {
 
     return res.status(400).json({ error: 'Unknown action. Use: create, join, start, answer, monitor, finish, results, get-question, history, away, back, leave, reinstate' });
   } catch (error) {
-    console.error('Test API error:', error);
+    log.error('test', 'Test API error', error);
     return res.status(500).json({ error: error.message });
   }
 }
@@ -144,7 +145,7 @@ async function broadcast(sessionId, event, payload, topicSuffix = '') {
       const channel = supabase.channel(`test:${sessionId}${topicSuffix}`);
 
       const timeout = setTimeout(() => {
-        console.error(`Broadcast ${event} timed out`);
+        log.error('test', `Broadcast ${event} timed out`);
         supabase.removeChannel(channel).catch(() => {});
         resolve();
       }, 5000);
@@ -155,19 +156,19 @@ async function broadcast(sessionId, event, payload, topicSuffix = '') {
           try {
             await channel.send({ type: 'broadcast', event, payload });
           } catch (e) {
-            console.error(`Broadcast send ${event} failed:`, e);
+            log.error('test', `Broadcast send ${event} failed`, e);
           }
           await supabase.removeChannel(channel).catch(() => {});
           resolve();
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           clearTimeout(timeout);
-          console.error(`Broadcast channel error for ${event}: ${status}`);
+          log.error('test', `Broadcast channel error for ${event}: ${status}`);
           await supabase.removeChannel(channel).catch(() => {});
           resolve();
         }
       });
     } catch (e) {
-      console.error(`Broadcast ${event} failed:`, e);
+      log.error('test', `Broadcast ${event} failed`, e);
       resolve();
     }
   });

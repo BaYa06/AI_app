@@ -1,5 +1,6 @@
 import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 import { GROQ_MODELS, groqGenerate, isGroqEnabled } from './groq.js';
+import { log } from '../_log.js';
 
 /**
  * Общий клиент Gemini для AI-эндпоинтов (Google AI Studio, ключ GEMINI_API_KEY).
@@ -100,7 +101,7 @@ export async function generateJson({ models, prompt, files = [], temperature, ma
     } catch (error) {
       lastError = error;
       if (!isRetryable(error) && !isTimeout(error)) throw error;
-      console.warn(`[gemini] ${model} → ${isTimeout(error) ? 'timeout' : errorStatus(error)}, пробуем следующую модель`);
+      log.warn('gemini', `${model} → ${isTimeout(error) ? 'timeout' : errorStatus(error)}, пробуем следующую модель`);
     }
   }
 
@@ -112,12 +113,12 @@ export async function generateJson({ models, prompt, files = [], temperature, ma
         const text = await groqGenerate({
           model, prompt, temperature, maxOutputTokens, timeoutMs: Math.min(remaining, GROQ_ATTEMPT_MS),
         });
-        console.warn(`[gemini] все модели заняты — ответил резерв Groq ${model}`);
+        log.warn('gemini', `все модели заняты — ответил резерв Groq ${model}`);
         return text;
       } catch (error) {
         // Последний резерв: любая ошибка (квота, 413 «больше поминутного лимита токенов»,
         // снятая с поддержки модель) — пробуем следующую; в ответ уйдёт ошибка Gemini
-        console.warn(`[groq] ${model} → ${isTimeout(error) ? 'timeout' : errorStatus(error)}, пробуем следующую модель`);
+        log.warn('groq', `${model} → ${isTimeout(error) ? 'timeout' : errorStatus(error)}, пробуем следующую модель`);
       }
     }
   }
@@ -137,7 +138,7 @@ export function parseJsonArray(text) {
     const match = text.match(/\[[\s\S]*\]/);
     return match ? JSON.parse(match[0]) : [];
   } catch {
-    console.error('Failed to parse Gemini response:', text);
+    log.error('gemini', 'Failed to parse Gemini response', text);
     return [];
   }
 }
@@ -154,7 +155,7 @@ export function parseJsonObject(text) {
     const match = text.match(/\{[\s\S]*\}/);
     return match ? JSON.parse(match[0]) : {};
   } catch {
-    console.error('Failed to parse Gemini response:', text);
+    log.error('gemini', 'Failed to parse Gemini response', text);
     return {};
   }
 }
@@ -170,6 +171,6 @@ export function sendAiError(res, error, fallbackMessage) {
   if (isTimeout(error)) {
     return res.status(504).json({ error: 'ai_timeout' });
   }
-  console.error(`${fallbackMessage}:`, error?.message || error);
+  log.error('gemini', `${fallbackMessage}`, error?.message || error);
   return res.status(500).json({ error: `${fallbackMessage}: ${error?.message || 'Unknown error'}` });
 }

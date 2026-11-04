@@ -1,4 +1,5 @@
 import { neon } from '@neondatabase/serverless';
+import { log } from './_log.js';
 
 /**
  * Версия схемы: при добавлении миграции в applyMigrations увеличить (и дописать файл в
@@ -23,7 +24,7 @@ async function ensureDatabaseInitialized(sql) {
   if (!initPromise) {
     initPromise = runDatabaseInit(sql).catch((error) => {
       initPromise = null; // следующий запрос попробует снова
-      console.error('Database init failed:', error);
+      log.error('db-init', 'Database init failed', error);
     });
   }
   return initPromise;
@@ -49,16 +50,16 @@ async function runDatabaseInit(sql) {
     const exists = result[0]?.exists;
     
     if (!exists) {
-      console.log('Database not initialized. Creating tables...');
+      log.info('db-init', 'Database not initialized. Creating tables...');
       await initDatabase(sql);
-      console.log('Database initialized successfully!');
+      log.info('db-init', 'Database initialized successfully!');
     }
 
     // Миграции для существующих БД
     await applyMigrations(sql);
     await sql`INSERT INTO app_migrations (name) VALUES (${SCHEMA_VERSION}) ON CONFLICT (name) DO NOTHING`;
   } catch (error) {
-    console.error('Error checking database:', error);
+    log.error('db-init', 'Error checking database', error);
     // Если произошла ошибка, пытаемся инициализировать
     await initDatabase(sql);
   }
@@ -74,7 +75,7 @@ async function applyMigrations(sql) {
       ADD COLUMN IF NOT EXISTS is_hidden_from_students BOOLEAN NOT NULL DEFAULT false
     `;
   } catch (e) {
-    console.error('Migration is_hidden_from_students failed:', e);
+    log.error('db-init', 'Migration is_hidden_from_students failed', e);
   }
 
   // Migration: word_type for context fill mode distractors
@@ -84,7 +85,7 @@ async function applyMigrations(sql) {
       ADD COLUMN IF NOT EXISTS word_type VARCHAR(20)
     `;
   } catch (e) {
-    console.error('Migration word_type failed:', e);
+    log.error('db-init', 'Migration word_type failed', e);
   }
 
   // Migration: push_tokens table
@@ -99,14 +100,14 @@ async function applyMigrations(sql) {
       )
     `;
   } catch (e) {
-    console.error('Migration push_tokens failed:', e);
+    log.error('db-init', 'Migration push_tokens failed', e);
   }
 
   // word_form для карточек (раньше клиент делал ALTER TABLE сам при каждой загрузке карточек)
   try {
     await sql`ALTER TABLE cards ADD COLUMN IF NOT EXISTS word_form VARCHAR(100)`;
   } catch (e) {
-    console.error('Migration word_form failed:', e);
+    log.error('db-init', 'Migration word_form failed', e);
   }
 
   // Таблицы библиотеки (раньше их создавал клиент — src/services/LibraryService.ts)
@@ -177,7 +178,7 @@ async function applyMigrations(sql) {
     await sql`CREATE INDEX IF NOT EXISTS idx_library_imports_user ON library_imports(user_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_library_likes_user ON library_likes(user_id)`;
   } catch (e) {
-    console.error('Migration library tables failed:', e);
+    log.error('db-init', 'Migration library tables failed', e);
   }
 
   // Migration 020: серверный SRS — журнал ответов, поля первого выучивания, одноразовое понижение уровней
@@ -232,7 +233,7 @@ async function applyMigrations(sql) {
       `;
     }
   } catch (e) {
-    console.error('Migration 020_server_srs failed:', e);
+    log.error('db-init', 'Migration 020_server_srs failed', e);
   }
 
   // Migration 021: очки и рейтинг курса (план, этап 2)
@@ -281,7 +282,7 @@ async function applyMigrations(sql) {
       )
     `;
   } catch (e) {
-    console.error('Migration 021_course_rating failed:', e);
+    log.error('db-init', 'Migration 021_course_rating failed', e);
   }
 
   // Migration 022: триггеры повторения (план, этап 3)
@@ -300,7 +301,7 @@ async function applyMigrations(sql) {
         FROM answers WHERE rejected_reason IS NULL
     `;
   } catch (e) {
-    console.error('Migration 022_review_triggers failed:', e);
+    log.error('db-init', 'Migration 022_review_triggers failed', e);
   }
 
   // Migration 023: обратная связь — «Написать нам» и окно оценки приложения (смотрится в админке)
@@ -326,14 +327,14 @@ async function applyMigrations(sql) {
     await sql`CREATE INDEX IF NOT EXISTS idx_app_feedback_created ON app_feedback(created_at DESC)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_app_feedback_user_created ON app_feedback(user_id, created_at DESC)`;
   } catch (e) {
-    console.error('Migration 023_app_feedback failed:', e);
+    log.error('db-init', 'Migration 023_app_feedback failed', e);
   }
 
   // Migration 024: книга видна ученикам — переключатель на каждую книгу (api/books.js)
   try {
     await sql`ALTER TABLE books ADD COLUMN IF NOT EXISTS student_visible BOOLEAN NOT NULL DEFAULT false`;
   } catch (e) {
-    console.error('Migration 024_book_student_visible failed:', e);
+    log.error('db-init', 'Migration 024_book_student_visible failed', e);
   }
 
   // Migration 025: контроль выхода из приложения во время живого теста (plan/done/exam_lockdown.md).
@@ -346,7 +347,7 @@ async function applyMigrations(sql) {
     await sql`ALTER TABLE test_participants ADD COLUMN IF NOT EXISTS client_exit_control BOOLEAN NOT NULL DEFAULT false`;
     await sql`ALTER TABLE test_participants ADD COLUMN IF NOT EXISTS rejoin_allowed BOOLEAN NOT NULL DEFAULT false`;
   } catch (e) {
-    console.error('Migration 025_exam_exit_control failed:', e);
+    log.error('db-init', 'Migration 025_exam_exit_control failed', e);
   }
 
   // Migration 026: журнал push-уведомлений (plan/new/push_notifications.md, шаг 0.3). Только новая таблица.
@@ -379,7 +380,7 @@ async function applyMigrations(sql) {
       WHERE slot IS NOT NULL AND status IN ('sending', 'sent')
     `;
   } catch (e) {
-    console.error('Migration 026_push_log failed:', e);
+    log.error('db-init', 'Migration 026_push_log failed', e);
   }
 
   // Migration 027: дни недели — фильтр только для выбранных самим (план пушей, шаг 0.6)
@@ -388,14 +389,14 @@ async function applyMigrations(sql) {
     await sql`ALTER TABLE user_stats ALTER COLUMN notif_days SET DEFAULT 'mon,tue,wed,thu,fri,sat,sun'`;
     await sql`ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS notif_categories_off TEXT[] NOT NULL DEFAULT '{}'`;
   } catch (e) {
-    console.error('Migration 027_notif_days_custom failed:', e);
+    log.error('db-init', 'Migration 027_notif_days_custom failed', e);
   }
 
   // Migration 028: разрешение на уведомления на устройстве (план пушей, шаг 1.4). NULL — неизвестно.
   try {
     await sql`ALTER TABLE push_tokens ADD COLUMN IF NOT EXISTS permission TEXT`;
   } catch (e) {
-    console.error('Migration 028_push_token_permission failed:', e);
+    log.error('db-init', 'Migration 028_push_token_permission failed', e);
   }
 
   // Migration 029: профиль привычек для пушей (план пушей, шаг 2.6). Только новая таблица.
@@ -416,7 +417,7 @@ async function applyMigrations(sql) {
       )
     `;
   } catch (e) {
-    console.error('Migration 029_user_habits failed:', e);
+    log.error('db-init', 'Migration 029_user_habits failed', e);
   }
 
   // Migration 030: ответы «о себе» и согласие подстраивать напоминания (план пушей, 2.7). Nullable/DEFAULT.
@@ -435,14 +436,14 @@ async function applyMigrations(sql) {
       await sql`UPDATE user_stats SET notif_time_custom = true WHERE notif_hour <> 19 OR COALESCE(notif_minute, 0) <> 0`;
     }
   } catch (e) {
-    console.error('Migration 030_about_me failed:', e);
+    log.error('db-init', 'Migration 030_about_me failed', e);
   }
 
   // Migration 031: расписание занятий курса (план пушей, шаг 2.8). Nullable.
   try {
     await sql`ALTER TABLE courses ADD COLUMN IF NOT EXISTS schedule JSONB`;
   } catch (e) {
-    console.error('Migration 031_course_schedule failed:', e);
+    log.error('db-init', 'Migration 031_course_schedule failed', e);
   }
 
   // Migration 032: о каком наборе курса ученикам уже сообщили (план пушей, 3.5). Разово — все старые наборы.
@@ -456,7 +457,7 @@ async function applyMigrations(sql) {
       await sql`UPDATE card_sets SET announced_at = COALESCE(created_at, NOW()) WHERE announced_at IS NULL`;
     }
   } catch (e) {
-    console.error('Migration 032_set_announced failed:', e);
+    log.error('db-init', 'Migration 032_set_announced failed', e);
   }
 
   // Migration 033: дашборд пушей (план пушей, 5.1) — журнал оттока и три представления.
@@ -524,7 +525,7 @@ async function applyMigrations(sql) {
       GROUP BY cohort_week, push_group
     `;
   } catch (e) {
-    console.error('Migration 033_push_views failed:', e);
+    log.error('db-init', 'Migration 033_push_views failed', e);
   }
 
   // Migration 034: наборы по ссылке (plan/new/share_set.md, Share 1). Только новые таблицы.
@@ -569,7 +570,7 @@ async function applyMigrations(sql) {
       PRIMARY KEY (user_id, blocked_user_id)
     )`;
   } catch (e) {
-    console.error('Migration 034_set_shares failed:', e);
+    log.error('db-init', 'Migration 034_set_shares failed', e);
   }
 
   // Migration 035: «Мои обращения» (plan/new/support_threads.md, Support 1) — переписка по обращению.
@@ -596,7 +597,7 @@ async function applyMigrations(sql) {
     await sql`UPDATE app_feedback SET read_at = created_at WHERE status = 'read' AND read_at IS NULL`;
     await sql`CREATE INDEX IF NOT EXISTS idx_app_feedback_user_last ON app_feedback(user_id, last_message_at DESC)`;
   } catch (e) {
-    console.error('Migration 035_feedback_replies failed:', e);
+    log.error('db-init', 'Migration 035_feedback_replies failed', e);
   }
 
   // Migration 036: версия приложения у push-токена — пуш с новым экраном не шлём старым версиям
@@ -604,7 +605,7 @@ async function applyMigrations(sql) {
   try {
     await sql`ALTER TABLE push_tokens ADD COLUMN IF NOT EXISTS app_version VARCHAR(20)`;
   } catch (e) {
-    console.error('Migration 036_push_token_version failed:', e);
+    log.error('db-init', 'Migration 036_push_token_version failed', e);
   }
 
   // Migration 037: «Что нового» (plan/new/whats_new.md, News 5) — новости окна после обновления.
@@ -629,7 +630,7 @@ async function applyMigrations(sql) {
       updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`;
   } catch (e) {
-    console.error('Migration 037_whats_new failed:', e);
+    log.error('db-init', 'Migration 037_whats_new failed', e);
   }
 
   // Migration 038: защита наборов книг (database/migrations/038_official_sets_guard.sql).
@@ -707,7 +708,7 @@ async function applyMigrations(sql) {
       ]);
     }
   } catch (e) {
-    console.error('Migration 038_official_sets_guard failed:', e);
+    log.error('db-init', 'Migration 038_official_sets_guard failed', e);
   }
 
   // Migration 039: тип набора (plan/new/set_kind.md, Kind 1) — 'language' | 'subject' | NULL (= язык).
@@ -715,7 +716,7 @@ async function applyMigrations(sql) {
     await sql`ALTER TABLE card_sets ADD COLUMN IF NOT EXISTS kind TEXT CHECK (kind IN ('language', 'subject'))`;
     await sql`ALTER TABLE library_sets ADD COLUMN IF NOT EXISTS kind TEXT CHECK (kind IN ('language', 'subject'))`;
   } catch (e) {
-    console.error('Migration 039_set_kind failed:', e);
+    log.error('db-init', 'Migration 039_set_kind failed', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)
@@ -732,7 +733,7 @@ async function applyMigrations(sql) {
       )
     `;
   } catch (e) {
-    console.error('Migration 019_daily_rewards failed:', e);
+    log.error('db-init', 'Migration 019_daily_rewards failed', e);
   }
 
   // Migration: notif columns for user_stats
@@ -743,7 +744,7 @@ async function applyMigrations(sql) {
     await sql`ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS notif_days TEXT DEFAULT 'mon,tue,wed,thu,fri'`;
     await sql`ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS notif_streak BOOLEAN DEFAULT true`;
   } catch (e) {
-    console.error('Migration notif columns failed:', e);
+    log.error('db-init', 'Migration notif columns failed', e);
   }
 
   // Migration 012: Streak events log
@@ -759,7 +760,7 @@ async function applyMigrations(sql) {
     await sql`CREATE INDEX IF NOT EXISTS idx_streak_events_user ON streak_events(user_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_streak_events_created ON streak_events(created_at DESC)`;
   } catch (e) {
-    console.error('Migration 012_streak_events failed:', e);
+    log.error('db-init', 'Migration 012_streak_events failed', e);
   }
 
   // Migration 011: Live test system
@@ -815,7 +816,7 @@ async function applyMigrations(sql) {
     await sql`CREATE INDEX IF NOT EXISTS idx_test_participants_user ON test_participants(user_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_test_answers_participant ON test_answers(participant_id)`;
   } catch (e) {
-    console.error('Migration 011_live_test failed:', e);
+    log.error('db-init', 'Migration 011_live_test failed', e);
   }
 
   // Migration 014: UNIQUE(participant_id, card_id) на test_answers — без него можно было
@@ -825,7 +826,7 @@ async function applyMigrations(sql) {
   try {
     await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_test_answers_unique_participant_card ON test_answers(participant_id, card_id)`;
   } catch (e) {
-    console.error('Migration 014_test_answers_unique failed:', e);
+    log.error('db-init', 'Migration 014_test_answers_unique failed', e);
   }
 }
 
