@@ -4,7 +4,7 @@
  * строки подключения к БД в приложении нет. См. plan/course_rating_and_review_plan.md, этап 0.
  */
 
-import { supabase } from './supabaseClient';
+import { getAccessToken } from './auth/session';
 import { API_BASE } from '@/config/apiBase';
 import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
 import { readCache, writeCache } from './localCache';
@@ -59,10 +59,7 @@ async function callTeacherApi<T = any>(
 ): Promise<
   { ok: true; data: T } | { ok: false; error: string; status: number; reason: TeacherApiReason }
 > {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const token = session?.access_token;
+  const token = await getAccessToken();
   if (!token) return { ok: false, error: 'Not authenticated', status: 401, reason: 'unauthorized' };
 
   const query = new URLSearchParams({ action, ...(params || {}) }).toString();
@@ -136,10 +133,7 @@ async function callDataApi<T = any>(
   method: 'GET' | 'POST' = 'POST',
   strict = false
 ): Promise<T | null> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const token = session?.access_token;
+  const token = await getAccessToken();
   if (!token) return null;
   try {
     const query = new URLSearchParams({ action });
@@ -213,10 +207,7 @@ async function callProgressApi<T = any>(
     body,
   }: { method: 'GET' | 'POST'; params?: Record<string, string>; body?: object }
 ): Promise<T | null> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const token = session?.access_token;
+  const token = await getAccessToken();
   if (!token) return null;
   try {
     const query = new URLSearchParams({ action, ...(params || {}) });
@@ -878,10 +869,7 @@ export const NeonService = {
     | { error: 'not_enough_diamonds' | 'max_freezes' | 'unknown' }
     | null
   > {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const token = session?.access_token;
+    const token = await getAccessToken();
     if (!token) return null;
     try {
       const resp = await fetchWithTimeout(`${DATA_API_BASE}?action=buyStreakFreeze`, {
@@ -1032,10 +1020,7 @@ export const NeonService = {
     /** Очки рейтинга за этот ответ */
     points: number;
   }> | null> {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const token = session?.access_token;
+    const token = await getAccessToken();
     if (!token) return null;
     try {
       const resp = await fetchWithTimeout(`${API_BASE}/progress?action=answer`, {

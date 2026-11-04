@@ -7,7 +7,7 @@
 import { API_BASE } from '@/config/apiBase';
 import { Analytics } from './analytics';
 import { markLaunchInterrupted } from './modalGate';
-import { supabase } from './supabaseClient';
+import { getAccessToken } from './auth/session';
 import { log } from '@/utils/logger';
 
 /** Урок засчитывается пушу, если начат в течение 6 часов после тапа (главная метрика плана) */
@@ -26,8 +26,7 @@ const handledPushIds = new Set<string>();
 
 async function reportToServer(pushId: string, stage: PushLessonStage): Promise<void> {
   try {
-    const { data } = await supabase.auth.getSession();
-    const accessToken = data.session?.access_token;
+    const accessToken = await getAccessToken();
     if (!accessToken) return;
     await fetch(`${API_BASE}/push?action=opened`, {
       method: 'POST',

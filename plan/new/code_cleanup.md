@@ -139,6 +139,10 @@ getCurrentUser (id, email, isAnonymous), onAuthChange (setTimeout(0), отпис
 Ошибка Supabase (`error`) → null + warn; ИСКЛЮЧЕНИЕ пробрасывается, как у прямого вызова
 (иначе в 5b «нет сети» превратилось бы в «не авторизован», а strict-загрузка — в пустые данные).
 Тест — 12 случаев. Существующий код не тронут.
+**5b ✅ 04.11.2026** — 24 вызова в 16 файлах services/store → session.ts; каждая замена
+эквивалентна (то же поле, та же ветка без токена, вызов внутри/вне try там же). Удалён мёртвый
+AuthService.ts (MMKV-заглушка, только реэкспорт). settingsStore больше не тянет баррел
+`@/services` (баррел всё равно грузится из App.tsx до первого рендера). Моки 3 тестов → session.
 Подшаги: 5a session.ts + тест · 5b сервисы и сторы на session.ts (+ удалить мёртвый AuthService)
 · 5c api/client.ts + тест · 5d call*Api сервисов на клиент (контракты null/ApiResult/reason те же)
 · 5e экраны: getSession → getUserId/getCurrentUser · 5f ExamService + useExamExitGuard

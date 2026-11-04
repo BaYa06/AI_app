@@ -7,7 +7,7 @@
  */
 import { API_BASE } from '@/config/apiBase';
 import { readCache, writeCache } from './localCache';
-import { supabase } from './supabaseClient';
+import { getAccessToken } from './auth/session';
 import { log } from '@/utils/logger';
 
 const CACHE_NAME = 'push_prompt';
@@ -74,8 +74,7 @@ export function suggestedSlot(hourNow: number): ReminderSlot {
  */
 export async function saveReminderHour(hour: number): Promise<boolean> {
   try {
-    const { data } = await supabase.auth.getSession();
-    const accessToken = data.session?.access_token;
+    const accessToken = await getAccessToken();
     if (!accessToken) return false;
     const headers = { Authorization: `Bearer ${accessToken}` };
     const current = await fetch(`${API_BASE}/push?action=settings`, { headers }).then((r) =>

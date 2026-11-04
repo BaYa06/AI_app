@@ -10,7 +10,7 @@ import type { UserSettings, ThemeMode } from '@/types';
 import { colors, ColorScheme } from '@/constants';
 import { StreakService } from '@/services/StreakService';
 import { NeonService } from '@/services/NeonService';
-import { supabase } from '@/services';
+import { getUserId } from '@/services/auth/session';
 import { DEFAULT_NEW_PER_DAY } from '@/services/LessonService';
 
 interface SettingsState {
@@ -252,8 +252,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
           // Пуш о рекорде серии шлёт сервер (api/data.js, updateUserStatsStreak)
 
           // Логируем событие стрика для админ-панели
-          supabase.auth.getSession().then(({ data }) => {
-            const userId = data.session?.user?.id;
+          getUserId().then((userId) => {
             if (userId) NeonService.logStreakEvent(userId, newCount).catch(() => {});
           });
 

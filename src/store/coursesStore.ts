@@ -10,7 +10,7 @@ import type { Course } from '@/types';
 import { StorageService, STORAGE_KEYS } from '@/services/StorageService';
 import { NeonService } from '@/services/NeonService';
 import { SyncQueueService } from '@/services/SyncQueueService';
-import { supabase } from '@/services/supabaseClient';
+import { getUserId } from '@/services/auth/session';
 import { log } from '@/utils/logger';
 
 // Lazy import для useSetsStore чтобы избежать циклических зависимостей
@@ -88,8 +88,7 @@ export const useCoursesStore = create<CoursesState & CoursesActions>()(
         log.debug('Courses', 'Отправка курса в Neon PostgreSQL...');
         (async () => {
           // Получаем текущего пользователя
-          const { data: sessionData } = await supabase.auth.getSession();
-          const currentUserId = sessionData.session?.user?.id;
+          const currentUserId = await getUserId();
 
           if (!currentUserId) {
             log.debug('Courses', 'Пользователь не авторизован, курс сохранен только локально');

@@ -5,7 +5,7 @@
 import { StorageService, STORAGE_KEYS } from './StorageService';
 import { NeonService, NetworkLoadError, type BootstrapData } from './NeonService';
 import { BookService } from './BookService';
-import { supabase } from './supabaseClient';
+import { getUserId } from './auth/session';
 import { setActivitySegmentProperty } from './analytics';
 import type { Card, CardSet, Course, UserSettings } from '@/types';
 
@@ -41,8 +41,7 @@ const isTeacherCourseSet = (set: CardSet, me: string) =>
   set.isReadOnly === true && set.isOfficial !== true && set.userId !== me;
 
 async function runStudentCoursesSync(): Promise<void> {
-  const { data } = await supabase.auth.getSession();
-  const me = data.session?.user?.id;
+  const me = await getUserId();
   if (!me) return;
 
   const stores = getStores();
@@ -233,15 +232,10 @@ export const DatabaseService = {
       // Определяем текущего авторизованного пользователя (если есть)
       let currentUserId: string | undefined;
 
-      if (supabase?.auth?.getSession) {
-        try {
-          const { data: sessionData } = await supabase.auth.getSession();
-          currentUserId = sessionData.session?.user?.id;
-        } catch (error) {
-          log.warn('Database', 'Не удалось получить сессию Supabase', error);
-        }
-      } else {
-        log.warn('Database', 'Supabase не инициализирован, используем локальные данные');
+      try {
+        currentUserId = (await getUserId()) ?? undefined;
+      } catch (error) {
+        log.warn('Database', 'Не удалось получить сессию Supabase', error);
       }
 
       devLog('🔄 Загрузка данных из Neon PostgreSQL...');

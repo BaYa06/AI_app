@@ -1,7 +1,7 @@
 import { describe, expect, it, jest } from '@jest/globals';
 
 jest.mock('../localCache', () => ({ readCache: () => undefined, writeCache: () => {} }));
-jest.mock('../supabaseClient', () => ({ supabase: {} }));
+jest.mock('../auth/session', () => ({ getAccessToken: async () => null }));
 jest.mock('@/config/apiBase', () => ({ API_BASE: '' }));
 
 import {

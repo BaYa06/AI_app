@@ -4,7 +4,7 @@
  */
 
 import { Platform, Share, Clipboard } from 'react-native';
-import { supabase } from './supabaseClient';
+import { getAccessToken } from './auth/session';
 import { API_BASE } from '@/config/apiBase';
 import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
 import { pluralize } from '@/utils';
@@ -80,10 +80,7 @@ async function callShareApi<T>(
     body,
   }: { method?: 'GET' | 'POST'; params?: Record<string, string>; body?: object } = {}
 ): Promise<T> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const token = session?.access_token;
+  const token = await getAccessToken();
   const query = new URLSearchParams({ action, ...params });
   const resp = await fetchWithTimeout(`${SHARE_API}?${query}`, {
     method,

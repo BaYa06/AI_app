@@ -5,7 +5,7 @@
 
 import { NeonService, NetworkLoadError } from './NeonService';
 import { readCache, writeCache } from './localCache';
-import { supabase } from './supabaseClient';
+import { getUserId } from './auth/session';
 import { log } from '@/utils/logger';
 
 // ==================== ТИПЫ ====================
@@ -116,8 +116,7 @@ export async function recordActivity(
 
   try {
     // Проверяем авторизацию
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id;
+    const userId = await getUserId();
 
     if (!userId) {
       log.debug('Streak', 'пользователь не авторизован, активность сохранена локально');
@@ -236,8 +235,7 @@ async function updateUserStats(
  */
 export async function fetchWeekActivity(days: number = 7): Promise<DailyActivity[]> {
   try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id;
+    const userId = await getUserId();
 
     if (!userId || !NeonService.isEnabled()) {
       return [];
@@ -260,8 +258,7 @@ export async function fetchWeekActivity(days: number = 7): Promise<DailyActivity
  */
 export async function fetchUserStats(): Promise<UserStats | null> {
   try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id;
+    const userId = await getUserId();
 
     if (!userId || !NeonService.isEnabled()) {
       return null;
@@ -344,8 +341,7 @@ export function buildWeekStatus(
  */
 export async function fetchTodayActivity(): Promise<DailyActivity | null> {
   try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id;
+    const userId = await getUserId();
 
     if (!userId || !NeonService.isEnabled()) {
       return null;

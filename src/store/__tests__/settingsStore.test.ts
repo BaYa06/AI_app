@@ -24,7 +24,7 @@ jest.mock('@/services/StorageService', () => ({
   STORAGE_KEYS: {},
 }));
 jest.mock('@/services/NeonService', () => ({ NeonService: {} }));
-jest.mock('@/services', () => ({ supabase: {} }));
+jest.mock('@/services/auth/session', () => ({ getUserId: async () => null }));
 jest.mock('@/services/LessonService', () => ({ DEFAULT_NEW_PER_DAY: 10 }));
 
 import { useSettingsStore } from '../settingsStore';

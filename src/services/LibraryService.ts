@@ -4,7 +4,7 @@
  * Строки подключения к БД в приложении нет — см. plan/course_rating_and_review_plan.md, этап 0.
  */
 
-import { supabase } from './supabaseClient';
+import { getAccessToken } from './auth/session';
 import { API_BASE } from '@/config/apiBase';
 import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
 import type {
@@ -35,10 +35,7 @@ async function callLibraryApi<T>(
     requireAuth = false,
   }: { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: object; requireAuth?: boolean } = {}
 ): Promise<T> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const token = session?.access_token;
+  const token = await getAccessToken();
   if (requireAuth && !token) throw new Error('Необходимо войти в аккаунт');
 
   const query = new URLSearchParams();

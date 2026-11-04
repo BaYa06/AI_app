@@ -4,7 +4,7 @@
  * План: plan/book_catalog_plan.md, части 3–4.
  */
 
-import { supabase } from './supabaseClient';
+import { getAccessToken } from './auth/session';
 import { API_BASE } from '@/config/apiBase';
 import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
 import type { Card, CardSet, CardStatus } from '@/types';
@@ -36,10 +36,7 @@ async function callBooksApi<T>(
     params?: Record<string, string>;
   } = {}
 ): Promise<ApiResult<T>> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const token = session?.access_token;
+  const token = await getAccessToken();
   if (!token) return { ok: false, error: 'Not authenticated', status: 401 };
 
   const query = new URLSearchParams({ action, ...(params || {}) }).toString();

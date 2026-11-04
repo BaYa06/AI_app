@@ -23,7 +23,7 @@ import {
 } from '@react-native-firebase/messaging';
 import { API_BASE as APP_API_BASE } from '@/config/apiBase';
 import { version as APP_VERSION } from '../../package.json';
-import { supabase } from './supabaseClient';
+import { getAccessToken } from './auth/session';
 import { StorageService } from './StorageService';
 import { Analytics } from './analytics';
 import { log } from '@/utils/logger';
@@ -282,8 +282,7 @@ export async function getPushStatus(): Promise<PushStatus> {
 
 /** Заголовок с JWT: backend берёт userId из токена входа, а не из тела запроса. */
 async function authHeaders(): Promise<Record<string, string>> {
-  const { data } = await supabase.auth.getSession();
-  const accessToken = data.session?.access_token;
+  const accessToken = await getAccessToken();
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
 }
 

@@ -9,7 +9,7 @@ import type { CardSet, CreateSetInput, SetKind, UpdateSetInput } from '@/types';
 import { NeonService } from '@/services/NeonService';
 import { DatabaseService } from '@/services/DatabaseService';
 import { SyncQueueService } from '@/services/SyncQueueService';
-import { supabase } from '@/services/supabaseClient';
+import { getUserId } from '@/services/auth/session';
 import { useCardsStore } from '@/store/cardsStore';
 import { log } from '@/utils/logger';
 
@@ -133,7 +133,7 @@ export const useSetsStore = create<SetsState & SetsActions>()(
     addSet: async (input) => {
       const now = Date.now();
       const currentUserId = NeonService.isEnabled()
-        ? (await supabase.auth.getSession()).data.session?.user?.id || REMOTE_USER_ID
+        ? (await getUserId()) || REMOTE_USER_ID
         : LOCAL_USER_ID;
 
       const newSet: CardSet = {

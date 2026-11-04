@@ -5,7 +5,7 @@
  * Ошибки сервера превращаются в AiImportError с кодом — экран показывает понятный текст.
  */
 import { API_BASE } from '@/config/apiBase';
-import { supabase } from './supabaseClient';
+import { getAccessToken } from './auth/session';
 import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
 
 /** Файл, подготовленный к отправке (фото уже сжато, PDF/таблица прочитаны) */
@@ -108,10 +108,7 @@ export function payloadSize(file: ImportFile): number {
 }
 
 async function authHeaders(): Promise<Record<string, string>> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const token = session?.access_token;
+  const token = await getAccessToken();
   if (!token)
     throw new AiImportError('unauthorized', 'Войди в аккаунт, чтобы создавать карточки с ИИ');
   return { Authorization: `Bearer ${token}` };

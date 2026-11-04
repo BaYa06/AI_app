@@ -8,7 +8,7 @@
 import { Platform } from 'react-native';
 import { getMessaging, getToken, onMessage, isSupported, type Messaging } from 'firebase/messaging';
 import { app as firebaseApp } from './firebase';
-import { supabase } from './supabaseClient';
+import { getAccessToken } from './auth/session';
 import { version as APP_VERSION } from '../../package.json';
 import { log } from '@/utils/logger';
 
@@ -391,8 +391,7 @@ const API_BASE = '/api/push';
 
 /** JWT входа: сервер привязывает токен к пользователю только по нему (userId из тела игнорирует). */
 async function authHeaders(): Promise<Record<string, string>> {
-  const { data } = await supabase.auth.getSession();
-  const accessToken = data.session?.access_token;
+  const accessToken = await getAccessToken();
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
 }
 

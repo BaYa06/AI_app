@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { supabase } from '@/services/supabaseClient';
+import { getAccessToken } from '@/services/auth/session';
 import { API_BASE } from '@/config/apiBase';
 import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
 import { useChallengeStore, localDay, type ChallengeId } from './challengeStore';
@@ -15,10 +15,7 @@ async function callRewardsApi(
   init: { method: 'GET' | 'POST'; body?: object },
   day: string
 ) {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const token = session?.access_token;
+  const token = await getAccessToken();
   if (!token) return null;
   try {
     const resp = await fetchWithTimeout(`${REWARDS_API}?action=${action}&day=${day}`, {

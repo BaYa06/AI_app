@@ -6,7 +6,7 @@ jest.mock('@/services/DatabaseService', () => ({ DatabaseService: { saveSets: ()
 jest.mock('@/services/SyncQueueService', () => ({
   SyncQueueService: { registerExecutor: () => {} },
 }));
-jest.mock('@/services/supabaseClient', () => ({ supabase: {} }));
+jest.mock('@/services/auth/session', () => ({ getUserId: async () => null }));
 const mockDeletedCardSets: string[] = [];
 jest.mock('@/store/cardsStore', () => ({
   useCardsStore: {
