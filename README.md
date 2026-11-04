@@ -111,6 +111,19 @@ npm run new:screen -- Achievements   # → src/screens/AchievementsScreen.tsx и
 1. Создайте файл в `src/store/`
 2. Экспортируйте из `src/store/index.ts`
 
+### Линтер, форматирование и pre-commit
+
+- `npm run lint` — ESLint по всему проекту (`.eslintrc.cjs`): ошибки должны быть 0, предупреждения пока допустимы.
+- `npm run format` — отформатировать код prettier (`.prettierrc`); `npm run format:check` — только проверить.
+
+Хук pre-commit (`scripts/git-hooks/pre-commit`, ставится `npm run hooks:install` и на `npm install`) проверяет только то, что в коммите:
+
+1. миграции (`npm run db:check-migrations`) — если в коммите `api/_db-init.js` или `database/migrations/`;
+2. брендбук (`brand:check --fail-on-new`) — если в коммите `src/**/*.ts(x)`;
+3. ESLint только по ошибкам (`--quiet`, предупреждения не блокируют) и `prettier --check` — по проиндексированным `.js/.jsx/.ts/.tsx/.mjs/.cjs` (файлы из `.eslintignore` / `.prettierignore` пропускаются).
+
+Обойти в крайнем случае: `git commit --no-verify`.
+
 ## 📱 Основные функции
 
 - ✅ Создание и редактирование карточек

@@ -87,7 +87,13 @@ check-migrations по-прежнему находит `Migration NNN_name failed
 4. ESLint: `no-console: error` для `src/**` и `api/**` (кроме самих логгеров).
 Можно разбить на 3a (логгер + services/store), 3b (screens/components), 3c (api).
 
-## Clean 4 — линт и форматирование зелёные ⬜ (4a ✅, 4b ✅, 4c ⬜)
+## Clean 4 — линт и форматирование зелёные ✅ (4a ✅, 4b ✅, 4c ✅)
+
+**4c сделано 04.11.2026** — правила: `comma-dangle: off` (запятые расставляет prettier),
+`curly: ['warn', 'multi-line']` (стиль проекта — однострочные `if (x) return;`). Предупреждений
+1973 → 145, ошибок 0. pre-commit: ESLint `--quiet` (только ошибки) и `prettier --check` по
+проиндексированным JS/TS (имена с пробелами и кириллицей — через `-z`/`xargs -0`), прежние
+проверки миграций и брендбука сохранены. README — раздел «Линтер, форматирование и pre-commit».
 
 **4b сделано 04.11.2026** — prettier 3.7.4 по 271 файлу (src, api, scripts, database, server,
 конфиги), `.prettierignore`, скрипты `format` / `format:check`, в lint добавлены `.mjs,.cjs`.

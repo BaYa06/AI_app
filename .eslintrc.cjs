@@ -10,6 +10,12 @@ module.exports = {
     // eslint-plugin-prettier из @react-native/eslint-config 0.73 несовместим с prettier 3
     // (падает на prettier.resolveConfig.sync).
     'prettier/prettier': 'off',
+    // Висячие запятые расставляет prettier (trailingComma: es5); правило из @react-native
+    // требует запятые и там, где es5 их не ставит, — два инструмента спорили бы.
+    'comma-dangle': 'off',
+    // Стиль проекта: однострочное `if (x) return;` допустимо, а когда тело на другой
+    // строке — скобки обязательны (иначе легко дописать вторую строку «мимо» if).
+    curly: ['warn', 'multi-line'],
   },
   overrides: [
     {
