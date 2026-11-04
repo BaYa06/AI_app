@@ -36,6 +36,7 @@ import ReAnimated, {
   Extrapolation,
   Easing as REasing,
 } from 'react-native-reanimated';
+import { log } from '@/utils/logger';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = Math.min(340, SCREEN_WIDTH - 32);
@@ -137,7 +138,7 @@ export function StudyScreen({ navigation, route }: Props) {
       if (!normalized) return;
       const lang = resolveSpeechLang(normalized, langHint, counterpart);
       speak(normalized, lang).catch((error) => {
-        console.warn('[StudyScreen] TTS error:', error);
+        log.warn('Study', 'TTS error', error);
       });
     },
     []
@@ -167,7 +168,7 @@ export function StudyScreen({ navigation, route }: Props) {
       
       // Если не смогли найти карточки по ID, пробуем найти их в текущем наборе
       if (pendingIds.length > 0 && pendingCards.length === 0) {
-        console.warn('[StudyScreen] Не удалось найти ошибочные карточки по ID, пробуем найти в наборе');
+        log.warn('Study', 'Не удалось найти ошибочные карточки по ID, пробуем найти в наборе');
         const pendingSet = new Set(pendingIds);
         const foundInSet = cards.filter(c => pendingSet.has(c.id));
         pendingCards.push(...foundInSet);
@@ -189,7 +190,7 @@ export function StudyScreen({ navigation, route }: Props) {
       });
       cards = Array.from(map.values());
       
-      console.log('[StudyScreen] Фаза:', {
+      log.debug('Study', 'Фаза', {
         phaseId,
         phaseOffset,
         pendingIds: pendingIds.length,
@@ -257,7 +258,7 @@ export function StudyScreen({ navigation, route }: Props) {
             settings.dailyReviewLimit
           );
 
-    console.log('[StudyScreen] Очередь сформирована:', {
+    log.debug('Study', 'Очередь сформирована', {
       queueLength: queue.length,
       cardsLength: cards.length,
       isErrorReview,
@@ -269,11 +270,11 @@ export function StudyScreen({ navigation, route }: Props) {
     });
 
     if (queue.length === 0) {
-      console.warn('[StudyScreen] Пустая очередь');
+      log.warn('Study', 'Пустая очередь');
       
       // Если есть ошибочные карточки, но очередь пустая - это баг, логируем детали
       if (phaseFailedList && phaseFailedList.length > 0) {
-        console.error('[StudyScreen] Есть ошибочные карточки, но очередь пустая!', {
+        log.error('Study', 'Есть ошибочные карточки, но очередь пустая!', {
           phaseFailedList,
           allCards: getCardsBySet(setId).map(c => c.id)
         });
@@ -488,7 +489,7 @@ export function StudyScreen({ navigation, route }: Props) {
         });
         const newPhaseFailedIds = Array.from(prevFailed);
         
-        console.log('[StudyScreen] Завершение порции:', {
+        log.debug('Study', 'Завершение порции', {
           totalCards,
           newCardsInBatch,
           pendingCardsInQueue: pendingCardsInQueueRef.current,

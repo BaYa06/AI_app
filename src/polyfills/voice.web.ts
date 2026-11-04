@@ -3,6 +3,8 @@
  * Uses the Web Speech API (SpeechRecognition / webkitSpeechRecognition)
  */
 
+import { log } from '@/utils/logger';
+
 type Callback = (event: any) => void;
 
 const getSpeechRecognition = (): any => {
@@ -21,7 +23,7 @@ const Voice = {
   start: async (locale: string) => {
     const SpeechRecognition = getSpeechRecognition();
     if (!SpeechRecognition) {
-      console.warn('[voice.web] SpeechRecognition not supported');
+      log.warn('VoiceWeb', 'SpeechRecognition not supported');
       if (_onSpeechError) _onSpeechError({ error: { message: 'Not supported' } });
       return;
     }

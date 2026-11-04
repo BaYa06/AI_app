@@ -19,6 +19,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 import { API_BASE } from '@/config/apiBase';
 import { pluralize } from '@/utils';
+import { log } from '@/utils/logger';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TestWaiting'>;
 
@@ -91,7 +92,7 @@ export function TestWaitingScreen({ navigation, route }: Props) {
         }));
         setParticipants(list);
       } catch (e) {
-        console.error('Failed to load participants:', e);
+        log.error('TestWaiting', 'Failed to load participants', e);
       }
     })();
     return () => { mounted = false; };

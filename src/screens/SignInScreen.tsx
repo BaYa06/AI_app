@@ -19,6 +19,7 @@ import { spacing, screenPadding } from '@/constants';
 import { useThemeColors } from '@/store';
 import { SUPABASE_OAUTH_REDIRECT, supabase } from '@/services/supabaseClient';
 import { describeError } from '@/utils/userErrors';
+import { log } from '@/utils/logger';
 
 // Кнопка Google берёт иконку по тем же пропсам size/color, что и lucide
 const GoogleIcon = GoogleLogo as unknown as IconComponent;
@@ -91,7 +92,7 @@ export function SignInScreen({ onBack, onSendCode, onCreateAccount }: Props) {
     }
 
     // Native mobile: use InAppBrowser with PKCE
-    console.log('[auth] Redirect URI:', SUPABASE_OAUTH_REDIRECT);
+    log.debug('Auth', 'Redirect URI', SUPABASE_OAUTH_REDIRECT);
     const { data, error: authError } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -99,7 +100,7 @@ export function SignInScreen({ onBack, onSendCode, onCreateAccount }: Props) {
         skipBrowserRedirect: true,
       },
     });
-    console.log('[auth] OAuth URL:', data?.url);
+    log.debug('Auth', 'OAuth URL', data?.url);
     if (authError) {
       setError(describeError(authError, 'Не удалось войти. Попробуй ещё раз.'));
       setIsLoading(false);
@@ -121,7 +122,7 @@ export function SignInScreen({ onBack, onSendCode, onCreateAccount }: Props) {
             if (code) {
               const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
               if (exchangeError) {
-                console.error('[auth] Code exchange failed:', exchangeError.message);
+                log.error('Auth', 'Code exchange failed', exchangeError.message);
                 setError(describeError(exchangeError, 'Не удалось войти. Попробуй ещё раз.'));
               }
             } else {
@@ -135,7 +136,7 @@ export function SignInScreen({ onBack, onSendCode, onCreateAccount }: Props) {
           await Linking.openURL(data.url);
         }
       } catch (e) {
-        console.error('[auth] Failed to open browser:', e);
+        log.error('Auth', 'Failed to open browser', e);
         setError('Не удалось открыть браузер для входа через Google');
       } finally {
         setIsLoading(false);

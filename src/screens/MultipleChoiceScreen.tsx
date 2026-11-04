@@ -24,6 +24,7 @@ import { isSubjectSet } from '@/utils/setKind';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card, Rating } from '@/types';
 import { pluralize } from '@/utils';
+import { log } from '@/utils/logger';
 
 type Props = RootStackScreenProps<'MultipleChoice'>;
 
@@ -177,7 +178,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
       const pendingInQueue = limited.filter(c => pendingIdsSet.has(c.id)).length;
       pendingCardsInQueueRef.current = pendingInQueue;
       
-      console.log('[MultipleChoice] Фаза:', {
+      log.debug('MultipleChoice', 'Фаза', {
         phaseId,
         phaseOffset,
         pendingIds: pendingIds.length,
@@ -220,7 +221,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
       if (!normalized) return;
       const lang = resolveSpeechLang(normalized, langHint, counterpartText);
       speak(normalized, lang, rate ? { rate } : undefined).catch((error) => {
-        console.warn('[MultipleChoice] Speech error:', error);
+        log.warn('MultipleChoice', 'Speech error', error);
       });
     },
     [],
@@ -368,7 +369,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
       });
       const newPhaseFailedIds = Array.from(prevFailed);
       
-      console.log('[MultipleChoice] Завершение порции:', {
+      log.debug('MultipleChoice', 'Завершение порции', {
         totalQuestions,
         newCardsInBatch,
         pendingCardsInQueue: pendingCardsInQueueRef.current,

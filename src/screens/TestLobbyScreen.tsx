@@ -32,6 +32,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { API_BASE } from '@/config/apiBase';
 import { describeTestError } from '@/utils/testApiErrors';
 import { BottomBar } from '@/components/ui';
+import { log } from '@/utils/logger';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TestLobby'>;
 
@@ -147,7 +148,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
         sessionId,
       });
     } catch (e: any) {
-      console.error('Start test error:', e);
+      log.error('TestLobby', 'Start test error', e);
       alert(describeTestError(e, 'Не удалось запустить тест. Попробуй ещё раз.'));
       setStarting(false);
     }

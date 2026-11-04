@@ -22,6 +22,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 
 import { API_BASE } from '@/config/apiBase';
+import { log } from '@/utils/logger';
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D'];
 
@@ -122,7 +123,7 @@ export function TestExamScreen({ navigation, route }: Props) {
         // Android: «Назад» → «Завершить» закрывает приложение, как и просили; итог уже у учителя.
         if (source === 'back' && Platform.OS === 'android') BackHandler.exitApp();
       } catch (e) {
-        console.error('leave error:', e);
+        log.error('TestExam', 'leave error', e);
         toast.error('Не удалось завершить тест. Проверь интернет и попробуй ещё раз.');
       }
     } finally {
@@ -174,7 +175,7 @@ export function TestExamScreen({ navigation, route }: Props) {
       if (!res.ok) throw new Error(json.error || 'Failed to load question');
       setQuestion(json);
     } catch (e: any) {
-      console.error('get-question error:', e);
+      log.error('TestExam', 'get-question error', e);
     } finally {
       setLoadingQuestion(false);
     }
@@ -293,7 +294,7 @@ export function TestExamScreen({ navigation, route }: Props) {
         if (timePerQuestion > 0) setTimeLeft(timePerQuestion);
       }
     } catch (e: any) {
-      console.error('answer error:', e);
+      log.error('TestExam', 'answer error', e);
       setSubmitting(false);
     }
   }, [submitting, question, participantId, questionIndex, questionCount, timePerQuestion, finishExam, finishLeft]);

@@ -35,6 +35,7 @@ import {
 import { installedWidgets } from '@/services/widgetBridge';
 import { localDay } from '@/store/challengeStore';
 import { Settings, CheckCircle2, List, ArrowRight, RotateCcw, BookOpen, X } from 'lucide-react-native';
+import { log } from '@/utils/logger';
 
 type Props = RootStackScreenProps<'StudyResults'>;
 
@@ -203,7 +204,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   }, []);
 
   // Debug info
-  console.log('[StudyResults] Параметры фазы:', {
+  log.debug('StudyResults', 'Параметры фазы', {
     phaseId,
     totalPhaseCards,
     phaseOffset,
@@ -246,7 +247,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   };
 
   const handleNextCards = () => {
-    console.log('[StudyResults] handleNextCards вызван:', {
+    log.debug('StudyResults', 'handleNextCards вызван', {
       isPhaseComplete,
       phaseId,
       totalPhaseCards,

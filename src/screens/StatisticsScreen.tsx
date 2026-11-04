@@ -36,6 +36,7 @@ import { StreakService } from '@/services';
 import type { DailyActivity, UserStats } from '@/services';
 import { supabase } from '@/services/supabaseClient';
 import { getLevelProgress, XP_PER_LEVEL } from '@/utils/level';
+import { log } from '@/utils/logger';
 
 // ---- Helpers ----
 
@@ -111,7 +112,7 @@ export function StatisticsScreen({ navigation }: any) {
         setHeatmapActivity(heatmap);
         setWeekActivity(week);
       } catch (e) {
-        console.error('StatisticsScreen: failed to load data', e);
+        log.error('Statistics', 'failed to load data', e);
       } finally {
         if (mounted) setLoading(false);
       }

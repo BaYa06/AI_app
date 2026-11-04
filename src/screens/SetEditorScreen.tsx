@@ -29,6 +29,7 @@ import { confirmAction } from '@/utils/dialogs';
 import { canShareSet, useShareSet } from '@/components/share/useShareSet';
 import { pluralize } from '@/utils';
 import { COMMUNITY_LIBRARY_ENABLED } from '@/config/features';
+import { log } from '@/utils/logger';
 
 type Props = RootStackScreenProps<'SetEditor'>;
 
@@ -412,7 +413,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
     if (!setId) return;
 
     const performDelete = () => {
-      console.log('Удаление набора:', setId);
+      log.debug('SetEditor', 'Удаление набора', setId);
       deleteCardsBySet(setId);
       deleteSet(setId);
       navigation.navigate('Main', { screen: 'Home' });

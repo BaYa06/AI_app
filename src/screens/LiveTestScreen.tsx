@@ -22,6 +22,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 
 import { API_BASE } from '@/config/apiBase';
+import { log } from '@/utils/logger';
 
 // Цвета аватаров участников — имена токенов, значения берутся из темы
 const AVATAR_TOKENS: ColorToken[] = ['primaryFill', 'warning', 'like', 'success', 'streak'];
@@ -106,7 +107,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
         setTimeLeft(Math.max(0, totalSec - elapsed));
       }
     } catch (e) {
-      console.error('Monitor fetch error:', e);
+      log.warn('LiveTest', 'Monitor fetch error', e);
     }
   }, [sessionId, goToResults]);
 
@@ -223,7 +224,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
       });
       goToResults();
     } catch (e: any) {
-      console.error('End test error:', e);
+      log.error('LiveTest', 'End test error', e);
       setEnding(false);
     }
   }, [ending, sessionId, goToResults]);
@@ -255,7 +256,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
       ));
       toast.success(`${st.name} может продолжить`);
     } catch (e) {
-      console.error('Reinstate error:', e);
+      log.error('LiveTest', 'Reinstate error', e);
       toast.error('Не удалось разрешить. Попробуйте ещё раз.');
     } finally {
       setReinstating(null);

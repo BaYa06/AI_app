@@ -45,6 +45,7 @@ import { TeacherGroupSizeScreen } from '@/screens/TeacherGroupSizeScreen';
 
 import { SafeAreaProvider, initialWindowMetrics, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TouchableOpacity } from 'react-native';
+import { log } from '@/utils/logger';
 
 // Стили для веб-платформы (iOS PWA scroll fix)
 const webStyles = Platform.OS === 'web' ? StyleSheet.create({
@@ -445,7 +446,7 @@ export default function App() {
     const splashTimer = setTimeout(() => {
       if (isMounted && !splashReleased) {
         splashReleased = true;
-        console.warn('⚠️ Startup: загрузка данных дольше 15 с — показываем приложение, данные догрузятся');
+        log.warn('App', 'Startup: загрузка данных дольше 15 с — показываем приложение, данные догрузятся');
         setIsReady(true);
         setAuthChecked(true);
       }
@@ -469,7 +470,7 @@ export default function App() {
           unsubscribe = setupAutoSave();
         }
       } catch (error) {
-        console.error('Failed to initialize app:', error);
+        log.error('App', 'Failed to initialize app', error);
       } finally {
         clearTimeout(splashTimer);
         splashReleased = true;
@@ -573,7 +574,7 @@ export default function App() {
     let isMounted = true;
 
     if (!supabase?.auth) {
-      console.warn('⚠️ Supabase не инициализирован');
+      log.warn('App', 'Supabase не инициализирован');
       return;
     }
 
@@ -582,7 +583,7 @@ export default function App() {
       .then(async ({ data, error }) => {
         if (!isMounted) return;
         if (error) {
-          console.error('Supabase session error:', error.message);
+          log.error('App', 'Supabase session error', error.message);
         }
         const user = data.session?.user;
         if (user) {
@@ -603,7 +604,7 @@ export default function App() {
         }
       })
       .catch((error) => {
-        console.error('⚠️ Ошибка получения сессии:', error);
+        log.error('App', 'Ошибка получения сессии', error);
       });
 
     // Supabase вызывает этот обработчик ВНУТРИ своей блокировки сессии (например, SIGNED_IN при
@@ -618,7 +619,7 @@ export default function App() {
       if (session?.user) {
         const user = session.user;
         setTimeout(() => {
-          if (isMounted) handleSession(user).catch((e) => console.error('handleSession failed:', e));
+          if (isMounted) handleSession(user).catch((e) => log.error('App', 'handleSession failed', e));
         }, 0);
       } else {
         Analytics.logout();
@@ -664,7 +665,7 @@ export default function App() {
     const path = window.location.pathname;
     const joinMatch = path.match(/\/join\/([a-f0-9]{64})/);
     if (joinMatch) {
-      console.log('[invite] Web URL detected, token:', joinMatch[1].slice(0, 8) + '...');
+      log.debug('Invite', 'Web URL detected, token', joinMatch[1].slice(0, 8) + '...');
       setPendingInviteToken(joinMatch[1]);
       return;
     }
@@ -681,7 +682,7 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     const joinParam = params.get('join');
     if (joinParam && /^[a-f0-9]{64}$/.test(joinParam)) {
-      console.log('[invite] Query param detected, token:', joinParam.slice(0, 8) + '...');
+      log.debug('Invite', 'Query param detected, token', joinParam.slice(0, 8) + '...');
       setPendingInviteToken(joinParam);
       // Очистить query из URL
       window.history.replaceState({}, '', '/');
@@ -731,14 +732,14 @@ export default function App() {
         // Обработка приглашения: /join/TOKEN
         const joinMatch = url.match(/\/join\/([a-f0-9]{64})/);
         if (joinMatch) {
-          console.log('[invite] Deep link detected, token:', joinMatch[1].slice(0, 8) + '...');
+          log.debug('Invite', 'Deep link detected, token', joinMatch[1].slice(0, 8) + '...');
           setPendingInviteToken(joinMatch[1]);
           return;
         }
 
         const existingSession = await supabase.auth.getSession();
         if (existingSession.data.session) {
-          console.log('[auth] Session already established, skipping deep-link exchange');
+          log.debug('Auth', 'Session already established, skipping deep-link exchange');
           return;
         }
 
@@ -746,23 +747,23 @@ export default function App() {
         const code = getParamFromUrl(url, 'code');
 
         if (!code) {
-          console.warn('[auth] No code found in deep link URL:', url);
+          log.warn('Auth', 'No code found in deep link URL', url);
           return;
         }
 
         if (processedOAuthCodeRef.current === code) {
-          console.log('[auth] Skipping duplicate OAuth code exchange');
+          log.debug('Auth', 'Skipping duplicate OAuth code exchange');
           return;
         }
         processedOAuthCodeRef.current = code;
 
         const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (error) {
-          console.error('Supabase code exchange failed:', error.message);
+          log.error('Auth', 'Supabase code exchange failed', error.message);
           processedOAuthCodeRef.current = null;
         }
       } catch (e) {
-        console.error('[auth] Failed to handle deep link:', e);
+        log.error('Auth', 'Failed to handle deep link', e);
         processedOAuthCodeRef.current = null;
       }
     };

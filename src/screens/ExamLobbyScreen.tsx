@@ -35,6 +35,7 @@ import type { RootStackParamList } from '@/types/navigation';
 
 import { API_BASE } from '@/config/apiBase';
 import { describeTestError } from '@/utils/testApiErrors';
+import { log } from '@/utils/logger';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ExamLobby'>;
 
@@ -73,7 +74,7 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
         setSets(stats);
         if (stats.length > 0) setSelectedSetId(stats[0].setId);
       } catch (e) {
-        console.error('Failed to load sets:', e);
+        log.error('ExamLobby', 'Failed to load sets', e);
       } finally {
         if (mounted) setLoadingSets(false);
       }
@@ -432,7 +433,7 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
                 timePerQuestion,
               });
             } catch (e: any) {
-              console.error('Create test error:', e);
+              log.error('ExamLobby', 'Create test error', e);
               alert(describeTestError(e, 'Не удалось создать тест. Попробуй ещё раз.'));
             } finally {
               setCreating(false);

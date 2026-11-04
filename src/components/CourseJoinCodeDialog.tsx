@@ -12,6 +12,7 @@ import { useThemeColors } from '@/store';
 import { alpha, borderRadius, iconSize, spacing } from '@/constants';
 import { NeonService } from '@/services/NeonService';
 import { supabase } from '@/services/supabaseClient';
+import { log } from '@/utils/logger';
 
 interface CourseJoinCodeDialogProps {
   visible: boolean;
@@ -48,7 +49,7 @@ export function CourseJoinCodeDialog({ visible, courseId, courseTitle, onClose }
         const result = userId ? await NeonService.createCourseInvite(courseId, userId) : null;
         if (mounted) setJoinCode(result?.joinCode ?? null);
       } catch (e) {
-        console.error('Failed to create invite:', e);
+        log.error('CourseJoinCodeDialog', 'Failed to create invite', e);
       } finally {
         if (mounted) setLoading(false);
       }

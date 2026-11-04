@@ -17,6 +17,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Dimensions, Platform, useWindowDimensions, type AppStateStatus } from 'react-native';
 import { supabase } from '@/services/supabaseClient';
 import { API_BASE } from '@/config/apiBase';
+import { log } from '@/utils/logger';
 
 export type ExamLeftReason = 'manual' | 'background' | 'relaunch';
 
@@ -106,7 +107,7 @@ export function useExamExitGuard({ participantId, enabled, onLeft }: Options) {
       if (splitRef.current) goAway('split');
     } catch (e) {
       // Нет сети — сервер не даст ответить после льготы (409 в get-question/answer).
-      console.warn('exam back failed:', e);
+      log.warn('ExamExitGuard', 'exam back failed', e);
     } finally {
       setChecking(false);
     }

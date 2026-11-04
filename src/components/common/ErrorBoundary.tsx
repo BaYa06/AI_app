@@ -29,6 +29,8 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     this.setState({ errorInfo });
+    // Не log.error: отчёт уже отправляет reportError ниже — иначе в Crashlytics было бы два
+    // eslint-disable-next-line no-console
     console.error('ErrorBoundary caught:', error, errorInfo);
     reportError(error, 'ErrorBoundary');
   }

@@ -53,7 +53,7 @@ SCHEMA_VERSION = schema_<последний номер> — ровно та ош
    файлами в `migrations/`, падает при расхождении. Подключить в pre-commit.
 Перевод на настоящий раннер миграций — не в этом плане (рискованно для боевой базы).
 
-## Clean 3 — логгер вместо console.* ⬜ (3a ✅, 3b ⬜, 3c ⬜)
+## Clean 3 — логгер вместо console.* ⬜ (3a ✅, 3b ✅, 3c ⬜)
 252 вызова `console.*` в `src`, 78 в `api`.
 
 **3a сделано 04.11.2026** — `src/utils/logger.ts` + services/store (140 вызовов), тест logger.test.ts.
@@ -65,6 +65,10 @@ SCHEMA_VERSION = schema_<последний номер> — ровно та ош
   в отчёт идут только тег, текст и текст ошибки — объекты из details (токены, наборы) нет.
 Правило выбора: обрыв сети, ответ 4xx, неверный код/ссылка пользователя — `warn`;
 ответ 5xx и необъяснимое — `error` (NeonService: `resp.status >= 500 ? log.error : log.warn`).
+**3b сделано 04.11.2026** — screens, components, App.tsx, utils, hooks, polyfills (122 вызова).
+В `src` не осталось `console.*`, кроме логгера и ErrorBoundary (там `reportError` уже шлёт
+отчёт — log.error задвоил бы его). Ошибки входа — `error` (отмену Apple код отсекает раньше);
+опрос монитора живого теста, озвучка, звуки, распознавание речи — `warn`.
 Найдено: ESLint не запускается — `.eslintrc.js` с `module.exports` при `"type": "module"`
 (нужно `.eslintrc.cjs`) → Clean 4.
 1. `src/utils/logger.ts`: `log.debug/info/warn/error(tag, ...args)`. В релизе debug/info —

@@ -26,6 +26,7 @@ import {
 import { supabase } from '@/services';
 import { API_BASE } from '@/config/apiBase';
 import { Analytics } from '@/services/analytics';
+import { log } from '@/utils/logger';
 
 /** «Что присылать» (plan/new/push_notifications.md, 2.4) — ключи как SETTING_GROUPS в api/push/_decide.js */
 type PushGroup = 'lesson' | 'streak' | 'course' | 'rating';
@@ -136,7 +137,7 @@ export function NotificationSettingsScreen({ navigation }: any) {
         setPushStatus(status);
       }
     } catch (error) {
-      console.error('[NotificationSettings] Push toggle error:', error);
+      log.error('NotificationSettings', 'Push toggle error', error);
     } finally {
       setPushLoading(false);
     }
@@ -180,7 +181,7 @@ export function NotificationSettingsScreen({ navigation }: any) {
       for (const group of groupsOff) if (!loadedOff.includes(group)) Analytics.pushCategoryDisabled(group);
       navigation.goBack();
     } catch (e) {
-      console.error('[NotificationSettings] Save error:', e);
+      log.error('NotificationSettings', 'Save error', e);
       toast.error('Не удалось сохранить настройки. Проверь интернет и попробуй ещё раз');
     } finally {
       setSaving(false);

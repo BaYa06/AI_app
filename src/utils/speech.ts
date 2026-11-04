@@ -5,6 +5,7 @@
  */
 
 import { Platform } from 'react-native';
+import { log } from '@/utils/logger';
 
 let Tts: any | null = null;
 let RNFS: any | null = null;
@@ -14,19 +15,19 @@ if (Platform.OS !== 'web') {
     const ttsModule = require('react-native-tts');
     Tts = ttsModule?.default ?? ttsModule;
   } catch (error) {
-    console.warn('[speech] Failed to load react-native-tts:', error);
+    log.warn('Speech', 'Failed to load react-native-tts', error);
   }
   try {
     const fsModule = require('react-native-fs');
     RNFS = fsModule?.default ?? fsModule;
   } catch (error) {
-    console.warn('[speech] Failed to load react-native-fs:', error);
+    log.warn('Speech', 'Failed to load react-native-fs', error);
   }
   try {
     const soundModule = require('react-native-sound');
     Sound = soundModule?.default ?? soundModule;
   } catch (error) {
-    console.warn('[speech] Failed to load react-native-sound:', error);
+    log.warn('Speech', 'Failed to load react-native-sound', error);
   }
 }
 
@@ -38,23 +39,23 @@ if (isNative && Tts && typeof Tts.getInitStatus === 'function') {
   Tts.getInitStatus()
     .then(() => {
       nativeTtsReady = true;
-      console.log('[speech] Native TTS initialized');
+      log.debug('Speech', 'Native TTS initialized');
     })
     .catch((err: any) => {
       // On some Android devices, TTS engine needs to be installed
       if (err?.code === 'no_engine') {
-        console.warn('[speech] No TTS engine installed on device');
+        log.warn('Speech', 'No TTS engine installed on device');
         if (typeof Tts.requestInstallEngine === 'function') {
           Tts.requestInstallEngine();
         }
       } else {
-        console.warn('[speech] Native TTS init error:', err);
+        log.warn('Speech', 'Native TTS init error', err);
         // Still mark as ready — speak() may work anyway
         nativeTtsReady = true;
       }
     });
 } else if (isNative) {
-  console.warn('[speech] Native TTS module unavailable');
+  log.warn('Speech', 'Native TTS module unavailable');
 }
 
 type SpeechVoice = {
@@ -296,14 +297,14 @@ const getApiKey = () => {
   const key = ENV_GCLOUD_TTS_KEY || undefined;
   // Раньше логировались первые 10 символов ключа — не нужно писать фрагмент секрета в логи,
   // даже частично. См. план, пункт 52.
-  console.log('[speech] API Key available:', !!key);
+  log.debug('Speech', 'API Key available', !!key);
   return key;
 };
 
 const getServiceAccount = (): ServiceAccount | null => {
   const envJson = ENV_GCLOUD_TTS_SA || undefined;
 
-  console.log('[speech] Service Account JSON available:', !!envJson, envJson ? `(length: ${envJson.length})` : '');
+  log.debug('Speech', 'Service Account JSON available', !!envJson, envJson ? `(length: ${envJson.length})` : '');
 
   if (envJson) {
     try {
@@ -316,11 +317,11 @@ const getServiceAccount = (): ServiceAccount | null => {
 
       const decoded = decodeMaybeBase64(cleaned);
       const parsed = JSON.parse(decoded);
-      console.log('[speech] Service Account parsed:', !!parsed?.client_email, !!parsed?.private_key);
+      log.debug('Speech', 'Service Account parsed', !!parsed?.client_email, !!parsed?.private_key);
 
       if (parsed?.client_email && parsed?.private_key) return parsed;
     } catch (e) {
-      console.warn('[speech] Failed to parse GCLOUD_TTS_SA:', e);
+      log.warn('Speech', 'Failed to parse GCLOUD_TTS_SA', e);
     }
   }
 
@@ -451,7 +452,7 @@ const playAudioFile = (filePath: string, volume = 1): Promise<void> => {
   return new Promise<void>((resolve, reject) => {
     const sound = new Sound(filePath, '', (err: any) => {
       if (err) {
-        console.error('[speech] Sound load error:', err);
+        log.warn('Speech', 'Sound load error', err);
         reject(err);
         return;
       }
@@ -491,7 +492,7 @@ const synthesizeToCache = async (
   try {
     token = await getAccessToken();
   } catch (e) {
-    console.warn('[speech] getAccessToken failed:', e);
+    log.warn('Speech', 'getAccessToken failed', e);
   }
   if (!token && !apiKey) return false;
 
@@ -622,10 +623,10 @@ const speakWithNativeTTS = async (
     } else {
       throw new Error('TTS speak is unavailable');
     }
-    console.log('[speech] Native TTS speaking:', lang);
+    log.debug('Speech', 'Native TTS speaking', lang);
     return true;
   } catch (e) {
-    console.warn('[speech] Native TTS failed:', e);
+    log.warn('Speech', 'Native TTS failed', e);
     return false;
   }
 };
@@ -642,32 +643,32 @@ export async function speak(
   if (isNative) {
     // On native: try Google Cloud TTS first (high quality), fall back to device TTS
     try {
-      console.log('[speech] [native] Attempting Google Cloud TTS...');
+      log.debug('Speech', '[native] Attempting Google Cloud TTS...');
       const done = await speakWithGoogle(text, lang, options);
       if (done) {
-        console.log('[speech] [native] Google Cloud TTS succeeded');
+        log.debug('Speech', '[native] Google Cloud TTS succeeded');
         return;
       }
     } catch (e) {
-      console.warn('[speech] [native] Google TTS failed:', e);
+      log.warn('Speech', '[native] Google TTS failed', e);
     }
-    console.log('[speech] [native] Falling back to native TTS');
+    log.debug('Speech', '[native] Falling back to native TTS');
     await speakWithNativeTTS(text, lang, options);
     return;
   }
 
   // On web: try Google Cloud TTS first, fall back to Web Speech API
   try {
-    console.log('[speech] Attempting Google Cloud TTS...');
+    log.debug('Speech', 'Attempting Google Cloud TTS...');
     const done = await speakWithGoogle(text, lang, options);
     if (done) {
-      console.log('[speech] Google Cloud TTS succeeded');
+      log.debug('Speech', 'Google Cloud TTS succeeded');
       return;
     }
-    console.log('[speech] Google TTS returned false, falling back to Web Speech');
+    log.debug('Speech', 'Google TTS returned false, falling back to Web Speech');
   } catch (e) {
-    console.warn('[speech] Google TTS failed, fallback to Web Speech:', e);
+    log.warn('Speech', 'Google TTS failed, fallback to Web Speech', e);
   }
-  console.log('[speech] Using Web Speech fallback');
+  log.debug('Speech', 'Using Web Speech fallback');
   await speakWithWebSpeech(text, lang, options);
 }

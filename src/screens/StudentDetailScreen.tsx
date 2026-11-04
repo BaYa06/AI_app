@@ -23,6 +23,7 @@ import { supabase } from '@/services/supabaseClient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 import { pluralize } from '@/utils';
+import { log } from '@/utils/logger';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'StudentDetail'>;
 
@@ -118,7 +119,7 @@ export function StudentDetailScreen({ navigation, route }: Props) {
       NeonService.loadStudentCourseStats(courseId, studentId)
         .then((data) => { if (mounted) setStats(data); })
         .catch((e) => {
-          console.error('Failed to load student stats:', e);
+          log.error('StudentDetail', 'Failed to load student stats', e);
           if (mounted) setError(true);
         })
         .finally(() => { if (mounted) setLoading(false); });
@@ -224,7 +225,7 @@ export function StudentDetailScreen({ navigation, route }: Props) {
               setError(false);
               NeonService.loadStudentCourseStats(courseId, studentId)
                 .then(setStats)
-                .catch((e) => { console.error('Failed to load student stats:', e); setError(true); })
+                .catch((e) => { log.error('StudentDetail', 'Failed to load student stats', e); setError(true); })
                 .finally(() => setLoading(false));
             }}
           >

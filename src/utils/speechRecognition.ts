@@ -7,6 +7,7 @@
 import { Platform, PermissionsAndroid } from 'react-native';
 import Voice from '@react-native-voice/voice';
 import type { SpeechResultsEvent, SpeechErrorEvent } from '@react-native-voice/voice';
+import { log } from '@/utils/logger';
 
 // ---- Language normalization ----
 
@@ -109,7 +110,7 @@ export async function requestMicrophonePermission(): Promise<boolean> {
     );
     return granted === PermissionsAndroid.RESULTS.GRANTED;
   } catch (err) {
-    console.warn('[speechRecognition] Permission error:', err);
+    log.warn('SpeechRecognition', 'Permission error', err);
     return false;
   }
 }
@@ -168,7 +169,7 @@ export async function listenForAnswer(options: ListenOptions): Promise<Recogniti
       const code = typeof err === 'object' ? err?.code ?? err?.message : String(err);
       // Error code 5 = "Client side error" — retry after a pause
       if (String(code) === '5' && attempt < MAX_RETRIES) {
-        console.warn(`[speechRecognition] Error 5, retry ${attempt + 1}/${MAX_RETRIES}`);
+        log.warn('SpeechRecognition', `Error 5, retry ${attempt + 1}/${MAX_RETRIES}`);
         await ensureVoiceStopped();
         continue;
       }
@@ -176,7 +177,7 @@ export async function listenForAnswer(options: ListenOptions): Promise<Recogniti
     }
   }
 
-  console.warn('[speechRecognition] All retries exhausted:', lastError);
+  log.warn('SpeechRecognition', 'All retries exhausted', lastError);
   return { recognized: false, alternatives: [], isCorrect: false, timedOut: false };
 }
 
@@ -246,7 +247,7 @@ function _listenOnce(
         reject(e.error);
         return;
       }
-      console.warn('[speechRecognition] Error:', e.error);
+      log.warn('SpeechRecognition', 'Error', e.error);
       settle({
         recognized: false,
         alternatives: allAlternatives,
@@ -270,7 +271,7 @@ function _listenOnce(
 
     // Start
     Voice.start(lang).catch((err) => {
-      console.error('[speechRecognition] Voice.start failed:', err);
+      log.error('SpeechRecognition', 'Voice.start failed', err);
       if (!settled) { settled = true; clearTimeout(timeoutId); Voice.removeAllListeners(); }
       reject(err);
     });
@@ -353,7 +354,7 @@ function _restartContinuous(): void {
     if (!_continuousActive) return;
     _attachContinuousListeners();
     Voice.start(_continuousLang).catch((err) => {
-      console.warn('[speechRecognition] Continuous restart failed:', err);
+      log.warn('SpeechRecognition', 'Continuous restart failed', err);
       if (_continuousActive) {
         setTimeout(() => {
           if (!_continuousActive) return;
@@ -393,7 +394,7 @@ function _attachContinuousListeners(): void {
     const msg = String(e.error?.message ?? e.error?.code ?? '');
     // "aborted" is expected when restarting recognition — ignore to avoid restart loop
     if (msg === 'aborted' || msg === 'no-speech') return;
-    console.warn('[speechRecognition] Continuous error:', e.error);
+    log.warn('SpeechRecognition', 'Continuous error', e.error);
     if (_errorCallback) _errorCallback();
     _restartContinuous();
   };

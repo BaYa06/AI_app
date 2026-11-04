@@ -24,6 +24,7 @@ import { SUPABASE_OAUTH_REDIRECT, supabase } from '@/services/supabaseClient';
 import { describeError } from '@/utils/userErrors';
 import { setAppleSignInName } from '@/services/appleSignInName';
 import { PRIVACY_POLICY_URL, TERMS_URL } from '@/config/legal';
+import { log } from '@/utils/logger';
 
 type Props = {
   isLoading?: boolean;
@@ -85,7 +86,7 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
         },
       });
       if (error) {
-        console.error('[auth] Google sign-in error', error);
+        log.error('Auth', 'Google sign-in error', error);
         setAuthError(describeError(error, 'Не удалось войти. Попробуй ещё раз.'));
         setIsLoading(false);
       }
@@ -102,7 +103,7 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
     });
 
     if (error) {
-      console.error('[auth] Google sign-in error', error);
+      log.error('Auth', 'Google sign-in error', error);
       setAuthError(describeError(error, 'Не удалось войти. Попробуй ещё раз.'));
       setIsLoading(false);
       return;
@@ -122,7 +123,7 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
             if (code) {
               const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
               if (exchangeError) {
-                console.error('[auth] Code exchange failed:', exchangeError.message);
+                log.error('Auth', 'Code exchange failed', exchangeError.message);
                 setAuthError(describeError(exchangeError, 'Не удалось войти. Попробуй ещё раз.'));
               }
             } else {
@@ -136,7 +137,7 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
           await Linking.openURL(data.url);
         }
       } catch (e) {
-        console.error('[auth] Failed to open browser:', e);
+        log.error('Auth', 'Failed to open browser', e);
         setAuthError('Не удалось открыть браузер для входа через Google');
       } finally {
         setIsLoading(false);
@@ -172,12 +173,12 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
 
       if (error) {
         setAppleSignInName(null);
-        console.error('[auth] Apple sign-in error', error);
+        log.error('Auth', 'Apple sign-in error', error);
         setAuthError(describeError(error, 'Не удалось войти. Попробуй ещё раз.'));
       }
     } catch (e: any) {
       if (e?.code !== appleAuth.Error.CANCELED) {
-        console.error('[auth] Apple sign-in failed:', e);
+        log.error('Auth', 'Apple sign-in failed', e);
         setAuthError('Не удалось войти через Apple');
       }
     } finally {

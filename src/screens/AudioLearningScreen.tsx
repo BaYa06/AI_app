@@ -34,6 +34,7 @@ import type { RecognitionResult } from '@/utils/speechRecognition';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card } from '@/types';
 import { estimateLines, fitText } from '@/utils/fitText';
+import { log } from '@/utils/logger';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = Math.min(280, SCREEN_WIDTH - 64);
@@ -154,7 +155,7 @@ export function AudioLearningScreen({ navigation, route }: Props) {
   // If no cards, go back
   useEffect(() => {
     if (cards.length === 0) {
-      console.warn('[AudioLearningScreen] Нет карточек');
+      log.warn('AudioLearning', 'Нет карточек');
       navigation.goBack();
     }
   }, [cards.length, navigation]);
@@ -384,7 +385,7 @@ export function AudioLearningScreen({ navigation, route }: Props) {
       // Раньше при отказе Voice.start() (например, разрешение реально не было выдано, несмотря
       // на то что requestMicrophonePermission на iOS сейчас безусловно возвращает true — см.
       // план, пункт 49) UI тихо зависал в состоянии "идёт сессия". См. план, пункт 50.
-      console.error('[AudioLearning] Failed to start listening:', e);
+      log.error('AudioLearning', 'Failed to start listening', e);
       isRunningRef.current = false;
       setIsRunning(false);
       toast.error('Не удалось запустить микрофон. Разреши доступ в настройках устройства и попробуй снова');

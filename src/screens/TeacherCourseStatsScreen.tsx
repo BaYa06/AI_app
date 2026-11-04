@@ -23,6 +23,7 @@ import { NeonService } from '@/services/NeonService';
 import { supabase } from '@/services/supabaseClient';
 import type { RootStackParamList } from '@/types/navigation';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { log } from '@/utils/logger';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TeacherCourseStats'>;
 
@@ -213,7 +214,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
     setSetsError(false);
     NeonService.loadCourseSetStats(route.params.courseId)
       .then(setSetsStats)
-      .catch((e) => { console.error('Failed to load set stats:', e); setSetsError(true); })
+      .catch((e) => { log.error('TeacherCourseStats', 'Failed to load set stats', e); setSetsError(true); })
       .finally(() => setSetsLoading(false));
   }, [isOwner, route.params.courseId, retryTick]);
 
@@ -237,7 +238,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
         );
       })
       .catch((e) => {
-        console.error('Failed to load members:', e);
+        log.error('TeacherCourseStats', 'Failed to load members', e);
         if (mounted) setMembersError(true);
       })
       .finally(() => { if (mounted) setMembersLoading(false); });
@@ -259,7 +260,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
         setChartData(buildChartDays(raw, days, members.length));
       })
       .catch((e) => {
-        console.error('Failed to load activity chart:', e);
+        log.error('TeacherCourseStats', 'Failed to load activity chart', e);
         setChartError(true);
       })
       .finally(() => setChartLoading(false));

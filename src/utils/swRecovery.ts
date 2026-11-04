@@ -11,6 +11,8 @@
  * 3. Защита от бесконечного цикла: localStorage флаг с TTL 5 минут.
  */
 
+import { log } from '@/utils/logger';
+
 const RECOVERY_KEY = 'flashly_recovered_once';
 const RECOVERY_TTL_MS = 5 * 60 * 1000; // 5 минут
 
@@ -44,16 +46,16 @@ function markRecovery(): void {
 
 /** Полная очистка: unregister SW + удалить все кэши */
 async function nukeAndReload(): Promise<void> {
-  console.warn('[Recovery] Starting nuke: unregister SWs + clear caches + reload');
+  log.warn('Recovery', 'Starting nuke: unregister SWs + clear caches + reload');
 
   // 1) Unregister ALL service workers
   if ('serviceWorker' in navigator) {
     try {
       const registrations = await navigator.serviceWorker.getRegistrations();
       await Promise.all(registrations.map((r: ServiceWorkerRegistration) => r.unregister()));
-      console.warn('[Recovery] All SWs unregistered');
+      log.warn('Recovery', 'All SWs unregistered');
     } catch (e) {
-      console.warn('[Recovery] SW unregister failed:', e);
+      log.warn('Recovery', 'SW unregister failed', e);
     }
   }
 
@@ -62,9 +64,9 @@ async function nukeAndReload(): Promise<void> {
     try {
       const keys = await caches.keys();
       await Promise.all(keys.map((k: string) => caches.delete(k)));
-      console.warn('[Recovery] All caches deleted');
+      log.warn('Recovery', 'All caches deleted');
     } catch (e) {
-      console.warn('[Recovery] Cache delete failed:', e);
+      log.warn('Recovery', 'Cache delete failed', e);
     }
   }
 
@@ -105,7 +107,7 @@ export function initSwRecovery(): void {
       // Reload один раз, чтобы подхватить свежий HTML/чанки.
       if (refreshing) return;
       refreshing = true;
-      console.log('[SW] Controller changed, reloading page...');
+      log.debug('SW', 'Controller changed, reloading page...');
       window.location.reload();
     });
   }
@@ -143,10 +145,11 @@ export function initSwRecovery(): void {
 
 /** Обработка ChunkLoadError с защитой от бесконечного цикла */
 function handleChunkLoadError(error: unknown): void {
-  console.error('[Recovery] ChunkLoadError detected:', error);
+  log.error('Recovery', 'ChunkLoadError detected', error);
   if (hasRecentRecovery()) {
-    console.error(
-      '[Recovery] Already attempted recovery recently. Skipping to avoid loop. ' +
+    log.error(
+      'Recovery',
+      'Already attempted recovery recently. Skipping to avoid loop. ' +
       'User needs to manually clear browser data.',
     );
     return;

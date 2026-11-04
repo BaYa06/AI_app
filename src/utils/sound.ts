@@ -6,6 +6,7 @@
 
 import { Platform } from 'react-native';
 import { useSettingsStore } from '@/store/settingsStore';
+import { log } from '@/utils/logger';
 
 let Sound: any | null = null;
 if (Platform.OS !== 'web') {
@@ -13,7 +14,7 @@ if (Platform.OS !== 'web') {
     const soundModule = require('react-native-sound');
     Sound = soundModule?.default ?? soundModule;
   } catch (error) {
-    console.warn('[sound] Failed to load react-native-sound:', error);
+    log.warn('Sound', 'Failed to load react-native-sound', error);
   }
 }
 
@@ -27,7 +28,7 @@ if (isNative && canUseNativeSound) {
   try {
     Sound.setCategory('Playback');
   } catch (error) {
-    console.warn('[sound] Failed to set audio category:', error);
+    log.warn('Sound', 'Failed to set audio category', error);
   }
 }
 
@@ -87,7 +88,7 @@ function playSynthesizedSound(): void {
     osc.stop(ctx.currentTime + duration);
     osc.onended = () => ctx.close();
   } catch (error) {
-    console.warn('[sound] Synthesized sound failed:', error);
+    log.warn('Sound', 'Synthesized sound failed', error);
   }
 }
 
@@ -96,7 +97,7 @@ function playSynthesizedSound(): void {
 function playNativeSound(assetName: string, volume: number): Promise<void> {
   return new Promise((resolve) => {
     if (!canUseNativeSound) {
-      console.warn('[sound] react-native-sound is unavailable, skipping playback:', assetName);
+      log.warn('Sound', 'react-native-sound is unavailable, skipping playback', assetName);
       resolve();
       return;
     }
@@ -107,7 +108,7 @@ function playNativeSound(assetName: string, volume: number): Promise<void> {
       cached.setVolume(volume);
       cached.stop(() => {
         cached.play((success: boolean) => {
-          if (!success) console.warn('[sound] Native playback failed:', assetName);
+          if (!success) log.warn('Sound', 'Native playback failed', assetName);
           resolve();
         });
       });
@@ -117,14 +118,14 @@ function playNativeSound(assetName: string, volume: number): Promise<void> {
     // Load from assets directory
     const sound = new Sound(assetName, Sound.MAIN_BUNDLE, (err: any) => {
       if (err) {
-        console.warn('[sound] Failed to load native sound:', assetName, err);
+        log.warn('Sound', 'Failed to load native sound', assetName, err);
         resolve();
         return;
       }
       sound.setVolume(volume);
       nativeSoundCache.set(assetName, sound);
       sound.play((success: boolean) => {
-        if (!success) console.warn('[sound] Native playback failed:', assetName);
+        if (!success) log.warn('Sound', 'Native playback failed', assetName);
         resolve();
       });
     });
@@ -136,18 +137,18 @@ function playNativeSound(assetName: string, volume: number): Promise<void> {
 export function preloadSound(url: string): void {
   if (isNative) {
     if (!canUseNativeSound) {
-      console.warn('[sound] react-native-sound is unavailable, skip preload:', url);
+      log.warn('Sound', 'react-native-sound is unavailable, skip preload', url);
       return;
     }
     const assetName = urlToAssetName(url);
     if (nativeSoundCache.has(assetName)) return;
     const sound = new Sound(assetName, Sound.MAIN_BUNDLE, (err: any) => {
       if (err) {
-        console.warn('[sound] Failed to preload native sound:', assetName, err);
+        log.warn('Sound', 'Failed to preload native sound', assetName, err);
         return;
       }
       nativeSoundCache.set(assetName, sound);
-      console.log('[sound] Preloaded native:', assetName);
+      log.debug('Sound', 'Preloaded native', assetName);
     });
     return;
   }
@@ -161,7 +162,7 @@ export function preloadSound(url: string): void {
     audio.load();
     audioCache.set(url, audio);
   } catch (error) {
-    console.warn('[sound] Failed to preload:', url, error);
+    log.warn('Sound', 'Failed to preload', url, error);
   }
 }
 

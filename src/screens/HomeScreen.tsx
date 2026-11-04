@@ -78,6 +78,7 @@ import { AddByLinkSheet } from '@/components/share/AddByLinkSheet';
 import { requestOpenShare } from '@/services/shareLinks';
 import { useWhatsNewOnHome } from '@/components/whatsNew/useWhatsNewOnHome';
 import { WhatsNewSheet } from '@/components/whatsNew/WhatsNewSheet';
+import { log } from '@/utils/logger';
 
 const StaggerCard = React.memo(function StaggerCard({
   index,
@@ -1273,7 +1274,7 @@ export function HomeScreen({ navigation, route }: any) {
         setInviteJoinCode(result?.joinCode ?? null);
       }
     } catch (error) {
-      console.error('Failed to create invite:', error);
+      log.error('Home', 'Failed to create invite', error);
     } finally {
       setInviteLoading(false);
     }

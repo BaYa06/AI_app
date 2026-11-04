@@ -30,6 +30,7 @@ import { supabase } from '@/services/supabaseClient';
 import type { RootStackParamList } from '@/types/navigation';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { pluralize } from '@/utils';
+import { log } from '@/utils/logger';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TeacherStudents'>;
 
@@ -238,7 +239,7 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
         : null;
       setInviteJoinCode(result?.joinCode ?? null);
     } catch (e) {
-      console.error('Failed to create invite:', e);
+      log.error('TeacherStudents', 'Failed to create invite', e);
     } finally {
       setInviteLoading(false);
     }
@@ -251,7 +252,7 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
       const result = await NeonService.regenerateCourseInvite(route.params.courseId);
       setInviteJoinCode(result?.joinCode ?? null);
     } catch (e) {
-      console.error('Failed to regenerate invite:', e);
+      log.error('TeacherStudents', 'Failed to regenerate invite', e);
     } finally {
       setInviteLoading(false);
     }
@@ -303,7 +304,7 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
           );
         })
         .catch((e) => {
-          console.error('Failed to load members:', e);
+          log.error('TeacherStudents', 'Failed to load members', e);
           if (mounted) setLoadError(true);
         })
         .finally(() => { if (mounted) setLoading(false); });

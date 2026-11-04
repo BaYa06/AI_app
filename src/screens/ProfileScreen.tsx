@@ -45,6 +45,7 @@ import { COMMUNITY_LIBRARY_ENABLED } from '@/config/features';
 import { isAppleUser, requestAppleAuthorizationCode } from '@/services/appleSignInName';
 import { ensureAiConsent, hasAiConsent, setAiConsent } from '@/services/aiConsent';
 import { loadSupportUnreadCount } from '@/services/feedback';
+import { log } from '@/utils/logger';
 
 const THEME_OPTIONS: Array<{ value: ThemeMode; label: string }> = [
   { value: 'light', label: 'Светлая' },
@@ -161,7 +162,7 @@ export function ProfileScreen({ navigation }: any) {
       Analytics.logout();
       await supabase.auth.signOut({ scope });
     } catch (e) {
-      console.error('Logout error:', e);
+      log.error('Profile', 'Logout error', e);
     }
   }, []);
 

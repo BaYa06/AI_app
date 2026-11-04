@@ -20,6 +20,7 @@ import { spacing, borderRadius, iconSize, alpha } from '@/constants';
 import { ProgressService } from '@/services/ProgressService';
 import { speak, resolveSpeechLang, prefetchSpeech, cardSpeechLangs } from '@/utils/speech';
 import { playCorrectSound2 as playCorrectSound, playSessionSfx, preloadSessionSfx, preloadSound } from '@/utils/sound';
+import { log } from '@/utils/logger';
 
 type Props = RootStackScreenProps<'WordBuilder'>;
 
@@ -400,7 +401,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
       if (!normalized) return;
       const lang = resolveSpeechLang(normalized, langHint, counterpartText);
       speak(normalized, lang).catch((error) => {
-        console.warn('[WordBuilder] Speech error:', error);
+        log.warn('WordBuilder', 'Speech error', error);
       });
     },
     [],
