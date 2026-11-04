@@ -150,6 +150,11 @@ parse: json|none})` → `{ok, status, json, response, error: ApiError}`. Не б
 `error.original`) — так каждый сервис в 5d повторит свои ветки. Бросает только исключение
 getAccessToken и JSON.stringify. Логов нет (сервисы логируют сами), новых заголовков нет,
 retry по умолчанию 0 (только GET + network). Тест — 26 случаев.
+**5d.1 ✅ 04.11.2026** — NeonService (callTeacherApi, callDataApi, callProgressApi,
+buyStreakFreeze, submitAnswers) и diamondStore.callRewardsApi на apiFetch. Токен читается вне
+try, как раньше (`auth: 'none'` + явный Authorization) — исключение сессии летит наружу.
+Тест neonApiCalls.test.ts (27 случаев: точный URL, заголовки с порядком, тело, ветки, логи)
+проходит и на старом коде, и на новом — запросы побайтно те же.
 Подшаги: 5a session.ts + тест · 5b сервисы и сторы на session.ts (+ удалить мёртвый AuthService)
 · 5c api/client.ts + тест · 5d call*Api сервисов на клиент (контракты null/ApiResult/reason те же)
 · 5e экраны: getSession → getUserId/getCurrentUser · 5f ExamService + useExamExitGuard

@@ -1,14 +1,12 @@
 import { create } from 'zustand';
 import { getAccessToken } from '@/services/auth/session';
-import { API_BASE } from '@/config/apiBase';
-import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
+import { apiFetch } from '@/services/api/client';
 import { useChallengeStore, localDay, type ChallengeId } from './challengeStore';
 import { readCache, writeCache } from '@/services/localCache';
 import { log } from '@/utils/logger';
 
 // Баланс и ежедневные награды живут в БД (users.diamond, daily_rewards). Начисляет только
 // сервер (api/push.js?action=claim-reward), он же не даёт забрать награду дважды за день.
-const REWARDS_API = `${API_BASE}/push`;
 
 async function callRewardsApi(
   action: string,
@@ -18,12 +16,19 @@ async function callRewardsApi(
   const token = await getAccessToken();
   if (!token) return null;
   try {
-    const resp = await fetchWithTimeout(`${REWARDS_API}?action=${action}&day=${day}`, {
+    // Query собран вручную, как раньше (без URLSearchParams); токен прочитан до try — auth: 'none'
+    const res = await apiFetch(`push?action=${action}&day=${day}`, {
       method: init.method,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: init.body ? JSON.stringify({ ...init.body, day }) : undefined,
+      auth: 'none',
+      body: init.body ? { ...init.body, day } : undefined,
+      parse: 'none', // невалидный JSON при 2xx бросает → catch, как `await resp.json()` раньше
     });
-    return resp.ok ? await resp.json() : null;
+    if (!res.response) {
+      log.error('Rewards', `Rewards API ${action} failed`, res.error.original);
+      return null;
+    }
+    return res.ok ? await res.response.json() : null;
   } catch (error) {
     log.error('Rewards', `Rewards API ${action} failed`, error);
     return null;

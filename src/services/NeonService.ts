@@ -5,8 +5,7 @@
  */
 
 import { getAccessToken } from './auth/session';
-import { API_BASE } from '@/config/apiBase';
-import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
+import { apiFetch } from './api/client';
 import { readCache, writeCache } from './localCache';
 import type { Card, CardSet, CardStatus, UpdateCardInput, Course, SetKind } from '@/types';
 import { parseSetKind } from '@/utils/setKind';
@@ -15,7 +14,15 @@ import { log } from '@/utils/logger';
 // Учительские мутации (курсы/инвайты/ростер/видимость наборов) идут через настоящий backend
 // (api/teacher.js), а не напрямую в Neon — он проверяет Supabase JWT вызывающего вместо того,
 // чтобы доверять userId, переданному с клиента. См. plan/teacher_access_fix_plan.md, пункт 1.
-const TEACHER_API_BASE = `${API_BASE}/teacher`;
+
+/**
+ * Заголовки запросов к нашему API — как до перевода на apiFetch (Clean 5d.1): Content-Type и на
+ * GET. Токен сервисы читают сами ДО своего try (`auth: 'none'` в apiFetch): исключение
+ * getAccessToken летит наружу, а не превращается в «нет сети» / null.
+ */
+function authHeaders(token: string): Record<string, string> {
+  return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+}
 
 // Причина отказа — чтобы UI мог показать разный текст под "истёк"/"не найден"/"нет сети" и
 // т.д., вместо одного и того же сообщения на всё подряд (план, пункт 13).
@@ -62,23 +69,31 @@ async function callTeacherApi<T = any>(
   const token = await getAccessToken();
   if (!token) return { ok: false, error: 'Not authenticated', status: 401, reason: 'unauthorized' };
 
-  const query = new URLSearchParams({ action, ...(params || {}) }).toString();
+  const query = new URLSearchParams({ action, ...(params || {}) });
   try {
-    const resp = await fetchWithTimeout(`${TEACHER_API_BASE}?${query}`, {
+    const res = await apiFetch('teacher', {
       method,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: method === 'POST' ? JSON.stringify(body || {}) : undefined,
+      query,
+      headers: authHeaders(token),
+      auth: 'none',
+      body: method === 'POST' ? body || {} : undefined,
     });
-    const json = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      const reason: TeacherApiReason = json?.reason || reasonFromStatus(resp.status);
+    if (!res.response) {
+      const original = res.error.original as { message?: string } | null | undefined;
       return {
         ok: false,
-        error: json?.error || `HTTP ${resp.status}`,
-        status: resp.status,
+        error: original?.message || 'Network error',
+        status: 0,
+        reason: 'network',
+      };
+    }
+    const json = res.json;
+    if (!res.ok) {
+      const reason: TeacherApiReason = json?.reason || reasonFromStatus(res.status);
+      return {
+        ok: false,
+        error: json?.error || `HTTP ${res.status}`,
+        status: res.status,
         reason,
       };
     }
@@ -120,8 +135,6 @@ function getStatusFromStep(learningStep: number): CardStatus {
   return 'mature';
 }
 
-const DATA_API_BASE = `${API_BASE}/data`;
-
 /**
  * Вызов api/data.js. userId сервер берёт из Supabase JWT — параметры userId у методов ниже
  * оставлены только ради совместимости сигнатур вызывающего кода.
@@ -142,20 +155,27 @@ async function callDataApi<T = any>(
         if (value !== undefined && value !== null) query.set(key, String(value));
       }
     }
-    const resp = await fetchWithTimeout(`${DATA_API_BASE}?${query.toString()}`, {
+    const res = await apiFetch('data', {
       method,
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: method === 'POST' ? JSON.stringify(params) : undefined,
+      query,
+      headers: authHeaders(token),
+      auth: 'none',
+      body: method === 'POST' ? params : undefined,
     });
-    const json = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      (resp.status >= 500 ? log.error : log.warn)(
+    if (!res.response) {
+      log.warn('Neon', `Data API ${action} network error`, res.error.original);
+      if (strict) throw new NetworkLoadError(action);
+      return null;
+    }
+    const json = res.json;
+    if (!res.ok) {
+      (res.status >= 500 ? log.error : log.warn)(
         'Neon',
         `Data API ${action} failed`,
-        resp.status,
+        res.status,
         json?.error
       );
-      if (strict) throw new NetworkLoadError(action, resp.status);
+      if (strict) throw new NetworkLoadError(action, res.status);
       return null;
     }
     return json.data as T;
@@ -211,17 +231,23 @@ async function callProgressApi<T = any>(
   if (!token) return null;
   try {
     const query = new URLSearchParams({ action, ...(params || {}) });
-    const resp = await fetchWithTimeout(`${API_BASE}/progress?${query.toString()}`, {
+    const res = await apiFetch('progress', {
       method,
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: body ? JSON.stringify(body) : undefined,
+      query,
+      headers: authHeaders(token),
+      auth: 'none',
+      body: body || undefined,
     });
-    const json = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      (resp.status >= 500 ? log.error : log.warn)(
+    if (!res.response) {
+      log.warn('Neon', `Progress API ${action} network error`, res.error.original);
+      return null;
+    }
+    const json = res.json;
+    if (!res.ok) {
+      (res.status >= 500 ? log.error : log.warn)(
         'Neon',
         `Progress API ${action} failed`,
-        resp.status,
+        res.status,
         json?.error
       );
       return null;
@@ -872,15 +898,18 @@ export const NeonService = {
     const token = await getAccessToken();
     if (!token) return null;
     try {
-      const resp = await fetchWithTimeout(`${DATA_API_BASE}?action=buyStreakFreeze`, {
+      const res = await apiFetch('data', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: '{}',
+        query: { action: 'buyStreakFreeze' },
+        headers: authHeaders(token),
+        auth: 'none',
+        body: {}, // → '{}'
       });
-      const json = await resp.json().catch(() => ({}));
-      if (resp.status === 409)
+      if (!res.response) return null;
+      const json = res.json;
+      if (res.status === 409)
         return { error: json?.error === 'max_freezes' ? 'max_freezes' : 'not_enough_diamonds' };
-      if (!resp.ok) return { error: 'unknown' };
+      if (!res.ok) return { error: 'unknown' };
       return json.data;
     } catch {
       return null;
@@ -1023,21 +1052,27 @@ export const NeonService = {
     const token = await getAccessToken();
     if (!token) return null;
     try {
-      const resp = await fetchWithTimeout(`${API_BASE}/progress?action=answer`, {
+      const res = await apiFetch('progress', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ answers }),
+        query: { action: 'answer' },
+        headers: authHeaders(token),
+        auth: 'none',
+        body: { answers },
       });
-      const json = await resp.json().catch(() => ({}));
-      if (!resp.ok) {
-        (resp.status >= 500 ? log.error : log.warn)(
+      if (!res.response) {
+        log.warn('Neon', 'Progress API network error', res.error.original);
+        return null;
+      }
+      const json = res.json;
+      if (!res.ok) {
+        (res.status >= 500 ? log.error : log.warn)(
           'Neon',
           'Progress API failed',
-          resp.status,
+          res.status,
           json?.error
         );
         // Некорректный ответ не исправится повтором — не держим его в очереди
-        return resp.status === 400 ? [] : null;
+        return res.status === 400 ? [] : null;
       }
       return json.results;
     } catch (error) {
