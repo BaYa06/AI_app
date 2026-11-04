@@ -3,6 +3,7 @@
  * @description Быстрое локальное хранилище с использованием MMKV
  */
 import { MMKV } from 'react-native-mmkv';
+import { log } from '@/utils/logger';
 
 // Инициализация MMKV
 // Webpack автоматически заменит react-native-mmkv на веб-полифилл при сборке для веба
@@ -54,7 +55,7 @@ export const StorageService = {
     try {
       return JSON.parse(json) as T;
     } catch {
-      console.error(`Failed to parse JSON for key: ${key}`);
+      log.error('Storage', `Failed to parse JSON for key: ${key}`);
       return undefined;
     }
   },
@@ -64,7 +65,7 @@ export const StorageService = {
       const json = JSON.stringify(value);
       storage.set(key, json);
     } catch (error) {
-      console.error(`Failed to stringify object for key: ${key}`, error);
+      log.error('Storage', `Failed to stringify object for key: ${key}`, error);
     }
   },
 

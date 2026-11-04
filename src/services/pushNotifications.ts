@@ -10,6 +10,7 @@ import { getMessaging, getToken, onMessage, isSupported, type Messaging } from '
 import { app as firebaseApp } from './firebase';
 import { supabase } from './supabaseClient';
 import { version as APP_VERSION } from '../../package.json';
+import { log } from '@/utils/logger';
 
 // ==================== TYPES ====================
 
@@ -43,11 +44,11 @@ const TOKEN_STORAGE_KEY = 'flashly_fcm_token';
 
 // Debug: проверка VAPID ключа при загрузке модуля
 if (Platform.OS === 'web') {
-  console.log('[Push] Module loaded. VAPID_KEY present:', !!VAPID_KEY);
+  log.debug('Push', 'Module loaded. VAPID_KEY present', !!VAPID_KEY);
   if (VAPID_KEY) {
-    console.log('[Push] VAPID key (first 15 chars):', VAPID_KEY.substring(0, 15) + '...');
+    log.debug('Push', 'VAPID key (first 15 chars)', VAPID_KEY.substring(0, 15) + '...');
   } else {
-    console.error('[Push] ❌ VAPID_KEY is empty! Check webpack.config.cjs and .env.local');
+    log.error('Push', 'VAPID_KEY is empty! Check webpack.config.cjs and .env.local');
   }
 }
 
@@ -123,7 +124,7 @@ async function getMainSWRegistration(): Promise<ServiceWorkerRegistration> {
   for (const reg of registrations) {
     const sw = reg.installing || reg.waiting || reg.active;
     if (sw?.scriptURL.includes('firebase-messaging-sw.js')) {
-      console.log('[Push] Removing legacy firebase-messaging-sw.js registration');
+      log.debug('Push', 'Removing legacy firebase-messaging-sw.js registration');
       await reg.unregister();
     }
   }
@@ -132,13 +133,13 @@ async function getMainSWRegistration(): Promise<ServiceWorkerRegistration> {
   const allRegs = await navigator.serviceWorker.getRegistrations();
   for (const reg of allRegs) {
     if (reg.active?.scriptURL.includes('sw.js') && !reg.active.scriptURL.includes('firebase-messaging-sw.js')) {
-      console.log('[Push] Found active main SW:', reg.scope);
+      log.debug('Push', 'Found active main SW', reg.scope);
       return reg;
     }
   }
 
   // Если sw.js ещё не зарегистрирован (маловероятно), регистрируем
-  console.log('[Push] Main SW not found, registering sw.js...');
+  log.debug('Push', 'Main SW not found, registering sw.js...');
   const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
 
   // Ждём активации
@@ -152,7 +153,7 @@ async function getMainSWRegistration(): Promise<ServiceWorkerRegistration> {
     });
   });
 
-  console.log('[Push] Main SW registered and active');
+  log.debug('Push', 'Main SW registered and active');
   return registration;
 }
 
@@ -183,13 +184,13 @@ export async function requestPushPermission(userId?: string | null): Promise<Pus
     const messaging = await getMessagingInstance();
 
     if (!VAPID_KEY) {
-      console.error('[Push] FIREBASE_VAPID_KEY not set! Add it to .env.local');
-      console.error('[Push] Current VAPID_KEY value:', VAPID_KEY, 'Type:', typeof VAPID_KEY);
-      console.error('[Push] process.env.FIREBASE_VAPID_KEY:', process.env.FIREBASE_VAPID_KEY);
+      log.error('Push', 'FIREBASE_VAPID_KEY not set! Add it to .env.local');
+      log.debug('Push', 'Current VAPID_KEY value', VAPID_KEY, 'Type:', typeof VAPID_KEY);
+      log.debug('Push', 'process.env.FIREBASE_VAPID_KEY', process.env.FIREBASE_VAPID_KEY);
       return { permission, token: null, isSupported: true, error: 'VAPID key not configured' };
     }
 
-    console.log('[Push] Using VAPID key:', VAPID_KEY.substring(0, 10) + '...');
+    log.debug('Push', 'Using VAPID key', VAPID_KEY.substring(0, 10) + '...');
 
     const token = await getToken(messaging, {
       vapidKey: VAPID_KEY,
@@ -201,7 +202,7 @@ export async function requestPushPermission(userId?: string | null): Promise<Pus
     }
 
     currentToken = token;
-    console.log('[Push] FCM token:', token);
+    log.debug('Push', 'FCM token', token);
 
     // 5. Сохраняем локально + отправляем на backend (не блокируя)
     const storedToken = getStoredToken();
@@ -212,7 +213,7 @@ export async function requestPushPermission(userId?: string | null): Promise<Pus
 
     return { permission, token, isSupported: true };
   } catch (error: any) {
-    console.error('[Push] Error requesting permission:', error);
+    log.error('Push', 'Error requesting permission', error);
     return {
       permission: Notification.permission || 'default',
       token: null,
@@ -233,7 +234,7 @@ export async function refreshPushToken(userId?: string | null): Promise<string |
 
   try {
     if (!VAPID_KEY) {
-      console.warn('[Push] VAPID key not set, skipping token refresh');
+      log.warn('Push', 'VAPID key not set, skipping token refresh');
       return null;
     }
 
@@ -258,7 +259,7 @@ export async function refreshPushToken(userId?: string | null): Promise<string |
 
     return token;
   } catch (error) {
-    console.error('[Push] Error refreshing token:', error);
+    log.error('Push', 'Error refreshing token', error);
     return null;
   }
 }
@@ -279,7 +280,7 @@ export async function subscribeForegroundMessages(handler: ForegroundMessageHand
     }
 
     foregroundUnsubscribe = onMessage(messaging, (payload) => {
-      console.log('[Push] Foreground message:', payload);
+      log.debug('Push', 'Foreground message', payload);
       handler({
         title: payload.notification?.title || payload.data?.title,
         body: payload.notification?.body || payload.data?.body,
@@ -287,7 +288,7 @@ export async function subscribeForegroundMessages(handler: ForegroundMessageHand
       });
     });
   } catch (error) {
-    console.error('[Push] Error subscribing to foreground messages:', error);
+    log.error('Push', 'Error subscribing to foreground messages', error);
   }
 }
 
@@ -334,7 +335,7 @@ export async function unsubscribePush(): Promise<boolean> {
     currentToken = null;
     return true;
   } catch (error) {
-    console.error('[Push] Error unsubscribing:', error);
+    log.error('Push', 'Error unsubscribing', error);
     return false;
   }
 }
@@ -382,7 +383,7 @@ async function sendTokenToBackend(token: string, userId?: string | null): Promis
       body: JSON.stringify({ token, platform: 'web', userId: userId || null, appVersion: APP_VERSION }),
     });
     if (!res.ok) {
-      console.warn('[Push] Backend subscribe failed:', res.status);
+      log.warn('Push', 'Backend subscribe failed', res.status);
     } else {
       try {
         localStorage.setItem(TOKEN_VERSION_STORAGE_KEY, APP_VERSION);
@@ -391,7 +392,7 @@ async function sendTokenToBackend(token: string, userId?: string | null): Promis
       }
     }
   } catch (error) {
-    console.error('[Push] Failed to send token to backend:', error);
+    log.warn('Push', 'Failed to send token to backend', error);
   }
 }
 
@@ -406,9 +407,9 @@ async function removeTokenFromBackend(token: string): Promise<void> {
       body: JSON.stringify({ token }),
     });
     if (!res.ok) {
-      console.warn('[Push] Backend unsubscribe failed:', res.status);
+      log.warn('Push', 'Backend unsubscribe failed', res.status);
     }
   } catch (error) {
-    console.error('[Push] Failed to remove token from backend:', error);
+    log.warn('Push', 'Failed to remove token from backend', error);
   }
 }

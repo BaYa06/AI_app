@@ -10,6 +10,7 @@ import type { Card, CreateCardInput, UpdateCardInput } from '@/types';
 import { NeonService } from '@/services/NeonService';
 import { DatabaseService } from '@/services/DatabaseService';
 import { SyncQueueService } from '@/services/SyncQueueService';
+import { log } from '@/utils/logger';
 
 // ==================== SYNC QUEUE EXECUTORS ====================
 
@@ -185,7 +186,7 @@ export const useCardsStore = create<CardsState & CardsActions>()(
       if (deletedCard) {
         // Сохраняем локально
         DatabaseService.saveCards();
-        console.log('✅ Карточка удалена локально:', cardId);
+        log.debug('Cards', 'Карточка удалена локально', cardId);
 
         // Удаляем из Neon (через очередь с retry)
         if (NeonService.isEnabled()) {
@@ -238,7 +239,7 @@ export const useCardsStore = create<CardsState & CardsActions>()(
 
       // Сохраняем локально
       DatabaseService.saveCards();
-      console.log('✅ Карточки набора удалены локально:', setId);
+      log.debug('Cards', 'Карточки набора удалены локально', setId);
     },
 
     // ==================== SRS ====================

@@ -5,18 +5,19 @@
  */
 import { logEvent, setUserId, setUserProperties } from 'firebase/analytics';
 import { analytics } from './firebase';
+import { log } from '@/utils/logger';
 
 type Params = Record<string, string | number | boolean>;
 
 export function sendEvent(event: string, params?: Params) {
   if (!analytics) {
-    if (__DEV__) console.log(`[Analytics] ${event}`, params);
+    log.debug('Analytics', `${event}`, params);
     return;
   }
   try {
     logEvent(analytics, event, params);
   } catch (e) {
-    if (__DEV__) console.warn('[Analytics] logEvent error:', e);
+    log.debug('Analytics', 'logEvent error', e);
   }
 }
 
@@ -25,7 +26,7 @@ export function sendUserProperties(props: Record<string, string>) {
   try {
     setUserProperties(analytics, props);
   } catch (e) {
-    if (__DEV__) console.warn('[Analytics] setUserProperties error:', e);
+    log.debug('Analytics', 'setUserProperties error', e);
   }
 }
 
@@ -37,6 +38,6 @@ export function setAnalyticsUserId(userId: string | null) {
   try {
     setUserId(analytics, userId);
   } catch (e) {
-    if (__DEV__) console.warn('[Analytics] setUserId error:', e);
+    log.debug('Analytics', 'setUserId error', e);
   }
 }

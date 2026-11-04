@@ -4,6 +4,7 @@ import { API_BASE } from '@/config/apiBase';
 import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
 import { useChallengeStore, localDay, type ChallengeId } from './challengeStore';
 import { readCache, writeCache } from '@/services/localCache';
+import { log } from '@/utils/logger';
 
 // Баланс и ежедневные награды живут в БД (users.diamond, daily_rewards). Начисляет только
 // сервер (api/push.js?action=claim-reward), он же не даёт забрать награду дважды за день.
@@ -21,7 +22,7 @@ async function callRewardsApi(action: string, init: { method: 'GET' | 'POST'; bo
     });
     return resp.ok ? await resp.json() : null;
   } catch (error) {
-    console.error(`Rewards API ${action} failed:`, error);
+    log.error('Rewards', `Rewards API ${action} failed`, error);
     return null;
   }
 }

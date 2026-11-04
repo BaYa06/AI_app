@@ -53,8 +53,20 @@ SCHEMA_VERSION = schema_<последний номер> — ровно та ош
    файлами в `migrations/`, падает при расхождении. Подключить в pre-commit.
 Перевод на настоящий раннер миграций — не в этом плане (рискованно для боевой базы).
 
-## Clean 3 — логгер вместо console.* ⬜
+## Clean 3 — логгер вместо console.* ⬜ (3a ✅, 3b ⬜, 3c ⬜)
 252 вызова `console.*` в `src`, 78 в `api`.
+
+**3a сделано 04.11.2026** — `src/utils/logger.ts` + services/store (140 вызовов), тест logger.test.ts.
+Важно: в релизе babel уже вырезал console.log/warn (`transform-remove-console`), а console.error
+никуда не уходил — до логгера ошибки в продакшне не видел никто. Уровни:
+- `debug`/`info` — только `__DEV__`;
+- `warn` — разработка: консоль; релиз: строка в журнал Crashlytics (видна в следующем отчёте);
+- `error` — console.error + некритичная ошибка в Crashlytics, раз за запуск на тег+текст;
+  в отчёт идут только тег, текст и текст ошибки — объекты из details (токены, наборы) нет.
+Правило выбора: обрыв сети, ответ 4xx, неверный код/ссылка пользователя — `warn`;
+ответ 5xx и необъяснимое — `error` (NeonService: `resp.status >= 500 ? log.error : log.warn`).
+Найдено: ESLint не запускается — `.eslintrc.js` с `module.exports` при `"type": "module"`
+(нужно `.eslintrc.cjs`) → Clean 4.
 1. `src/utils/logger.ts`: `log.debug/info/warn/error(tag, ...args)`. В релизе debug/info —
    ничего, warn — в Crashlytics как лог, error — `recordError` в Crashlytics.
 2. `api/_log.js`: то же для сервера, с префиксом `[tag]` — читается в логах Vercel.

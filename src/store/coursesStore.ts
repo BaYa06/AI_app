@@ -11,6 +11,7 @@ import { StorageService, STORAGE_KEYS } from '@/services/StorageService';
 import { NeonService } from '@/services/NeonService';
 import { SyncQueueService } from '@/services/SyncQueueService';
 import { supabase } from '@/services/supabaseClient';
+import { log } from '@/utils/logger';
 
 // Lazy import для useSetsStore чтобы избежать циклических зависимостей
 const getSetsStore = () => require('./setsStore').useSetsStore;
@@ -79,18 +80,18 @@ export const useCoursesStore = create<CoursesState & CoursesActions>()(
 
       // Сохраняем в хранилище
       get().saveCourses();
-      console.log('✅ Курс создан:', newCourse.title);
+      log.debug('Courses', 'Курс создан', newCourse.title);
 
       // Синхронизируем с Neon (async, только для авторизованных пользователей)
       if (NeonService.isEnabled()) {
-        console.log('🔄 Отправка курса в Neon PostgreSQL...');
+        log.debug('Courses', 'Отправка курса в Neon PostgreSQL...');
         (async () => {
           // Получаем текущего пользователя
           const { data: sessionData } = await supabase.auth.getSession();
           const currentUserId = sessionData.session?.user?.id;
 
           if (!currentUserId) {
-            console.log('ℹ️  Пользователь не авторизован, курс сохранен только локально');
+            log.debug('Courses', 'Пользователь не авторизован, курс сохранен только локально');
             return;
           }
 
@@ -101,9 +102,9 @@ export const useCoursesStore = create<CoursesState & CoursesActions>()(
             createdAt: newCourse.createdAt,
           });
           if (ok) {
-            console.log('✅ Курс сохранен в Neon PostgreSQL:', newCourse.title);
+            log.debug('Courses', 'Курс сохранен в Neon PostgreSQL', newCourse.title);
           } else {
-            console.warn('⚠️  Не удалось синхронизировать курс с Neon:', newCourse.title);
+            log.warn('Courses', 'Не удалось синхронизировать курс с Neon', newCourse.title);
             Alert.alert(
               'Не удалось сохранить курс на сервере',
               `Курс "${newCourse.title}" сохранён только на этом устройстве. Проверь соединение с интернетом и попробуй создать его ещё раз.`
@@ -126,17 +127,17 @@ export const useCoursesStore = create<CoursesState & CoursesActions>()(
 
       // Сохраняем в хранилище
       get().saveCourses();
-      console.log('✅ Курс переименован:', title);
+      log.debug('Courses', 'Курс переименован', title);
 
       // Синхронизируем с Neon (async)
       if (NeonService.isEnabled()) {
-        console.log('🔄 Обновление курса в Neon PostgreSQL...');
+        log.debug('Courses', 'Обновление курса в Neon PostgreSQL...');
         (async () => {
           const ok = await NeonService.renameCourse(id, title.trim());
           if (ok) {
-            console.log('✅ Курс обновлен в Neon PostgreSQL:', title);
+            log.debug('Courses', 'Курс обновлен в Neon PostgreSQL', title);
           } else {
-            console.warn('⚠️  Не удалось обновить курс в Neon:', title);
+            log.warn('Courses', 'Не удалось обновить курс в Neon', title);
             Alert.alert(
               'Не удалось переименовать курс на сервере',
               'Новое название сохранено только на этом устройстве. Проверь соединение с интернетом и попробуй ещё раз.'
@@ -169,7 +170,7 @@ export const useCoursesStore = create<CoursesState & CoursesActions>()(
 
       // Сохраняем в хранилище
       get().saveCourses();
-      console.log('✅ Курс удален:', id);
+      log.debug('Courses', 'Курс удален', id);
 
       // Сервер удаляет курс, его наборы и карточки (withSets) — через очередь с повтором
       if (NeonService.isEnabled()) {
@@ -200,7 +201,7 @@ export const useCoursesStore = create<CoursesState & CoursesActions>()(
 
       // Сохраняем в хранилище
       get().saveCourses();
-      console.log('✅ Активный курс:', id || 'Мои наборы');
+      log.debug('Courses', 'Активный курс', id || 'Мои наборы');
     },
 
     // ==================== СЕЛЕКТОРЫ ====================
@@ -243,10 +244,10 @@ export const useCoursesStore = create<CoursesState & CoursesActions>()(
             state.courses = data.courses || [];
             state.activeCourseId = data.activeCourseId ?? null;
           });
-          console.log('✅ Курсы загружены:', data.courses?.length || 0);
+          log.debug('Courses', 'Курсы загружены', data.courses?.length || 0);
         }
       } catch (error) {
-        console.error('❌ Ошибка загрузки курсов:', error);
+        log.error('Courses', 'Ошибка загрузки курсов', error);
       }
     },
 
@@ -258,7 +259,7 @@ export const useCoursesStore = create<CoursesState & CoursesActions>()(
           activeCourseId,
         });
       } catch (error) {
-        console.error('❌ Ошибка сохранения курсов:', error);
+        log.error('Courses', 'Ошибка сохранения курсов', error);
       }
     },
 

@@ -10,6 +10,7 @@ import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
 import type { Card, CardSet, CardStatus } from '@/types';
 import { getCardStatus, isCardLearned } from './SRSService';
 import type { BookDetail, BookFilters, BookListItem, CoursePlan } from '@/types/books';
+import { log } from '@/utils/logger';
 
 const BOOKS_API_BASE = `${API_BASE}/books`;
 
@@ -80,7 +81,7 @@ export const BookService = {
     if (filters.q) params.q = filters.q;
     const result = await callBooksApi<{ books: BookListItem[] }>('list-books', { params });
     if (!result.ok) {
-      console.warn('[BookService] listBooks failed:', result.error);
+      log.warn('BookService', 'listBooks failed', result.error);
       return [];
     }
     return result.data.books;
@@ -89,7 +90,7 @@ export const BookService = {
   async getBookDetail(bookId: string): Promise<BookDetail | null> {
     const result = await callBooksApi<BookDetail>('book-detail', { params: { bookId } });
     if (!result.ok) {
-      console.warn('[BookService] getBookDetail failed:', result.error);
+      log.warn('BookService', 'getBookDetail failed', result.error);
       return null;
     }
     return result.data;
@@ -105,7 +106,7 @@ export const BookService = {
     if (setIds.length > 0) params.setIds = [...new Set(setIds)].slice(0, 100).join(',');
     const result = await callBooksApi<OfficialSetsResponse>('official-sets', { params });
     if (!result.ok) {
-      console.warn('[BookService] loadOfficialSets failed:', result.error);
+      log.warn('BookService', 'loadOfficialSets failed', result.error);
       return null;
     }
 
@@ -231,7 +232,7 @@ export const BookService = {
   async getCoursePlan(courseId: string): Promise<CoursePlan | null> {
     const result = await callBooksApi<CoursePlan>('course-plan', { params: { courseId } });
     if (!result.ok) {
-      console.warn('[BookService] getCoursePlan failed:', result.error);
+      log.warn('BookService', 'getCoursePlan failed', result.error);
       return null;
     }
     return result.data;

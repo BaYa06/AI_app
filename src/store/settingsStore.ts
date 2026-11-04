@@ -87,6 +87,7 @@ const defaultSettings: UserSettings = {
 };
 
 import { getLocalDateKey } from '@/services/StreakService';
+import { log } from '@/utils/logger';
 
 const getTodayDate = () => getLocalDateKey();
 
@@ -255,7 +256,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
           });
         }
       } catch (e) {
-        console.warn('Streak sync error:', e);
+        log.warn('Settings', 'Streak sync error', e);
       }
       return { streakIncreased: false, newStreakCount: 0 };
     },
@@ -291,7 +292,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
         state.todayStats.streak = data.currentStreak;
         state.todayStats.longestStreak = data.longestStreak;
       });
-      console.log('✅ Streak: синхронизировано с сервером', data);
+      log.debug('Settings', 'Streak: синхронизировано с сервером', data);
     },
 
     // ==================== РОЛЬ УЧИТЕЛЯ ====================

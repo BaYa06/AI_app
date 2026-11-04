@@ -8,6 +8,7 @@
 import { API_BASE } from '@/config/apiBase';
 import { readCache, writeCache } from './localCache';
 import { supabase } from './supabaseClient';
+import { log } from '@/utils/logger';
 
 const CACHE_NAME = 'push_prompt';
 export const PUSH_PROMPT_MAX_ATTEMPTS = 3;
@@ -93,7 +94,7 @@ export async function saveReminderHour(hour: number): Promise<boolean> {
     });
     return res.ok;
   } catch (error) {
-    console.warn('[PushPrompt] save hour failed:', error);
+    log.warn('PushPrompt', 'save hour failed', error);
     return false;
   }
 }

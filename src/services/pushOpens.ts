@@ -8,6 +8,7 @@ import { API_BASE } from '@/config/apiBase';
 import { Analytics } from './analytics';
 import { markLaunchInterrupted } from './modalGate';
 import { supabase } from './supabaseClient';
+import { log } from '@/utils/logger';
 
 /** Урок засчитывается пушу, если начат в течение 6 часов после тапа (главная метрика плана) */
 const PUSH_LESSON_WINDOW_MS = 6 * 60 * 60 * 1000;
@@ -34,7 +35,7 @@ async function reportToServer(pushId: string, stage: PushLessonStage): Promise<v
       body: JSON.stringify({ push_id: pushId, stage }),
     });
   } catch (error) {
-    console.warn('[Push] opened report failed:', error);
+    log.warn('Push', 'opened report failed', error);
   }
 }
 

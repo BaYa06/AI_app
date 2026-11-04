@@ -10,6 +10,7 @@ import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
 import { readCache, writeCache } from './localCache';
 import type { Card, CardSet, CardStatus, UpdateCardInput, Course, SetKind } from '@/types';
 import { parseSetKind } from '@/utils/setKind';
+import { log } from '@/utils/logger';
 
 // Учительские мутации (курсы/инвайты/ростер/видимость наборов) идут через настоящий backend
 // (api/teacher.js), а не напрямую в Neon — он проверяет Supabase JWT вызывающего вместо того,
@@ -125,14 +126,14 @@ async function callDataApi<T = any>(
     });
     const json = await resp.json().catch(() => ({}));
     if (!resp.ok) {
-      console.error(`Data API ${action} failed:`, json?.error || resp.status);
+      (resp.status >= 500 ? log.error : log.warn)('Neon', `Data API ${action} failed`, resp.status, json?.error);
       if (strict) throw new NetworkLoadError(action, resp.status);
       return null;
     }
     return json.data as T;
   } catch (error) {
     if (error instanceof NetworkLoadError) throw error;
-    console.error(`Data API ${action} network error:`, error);
+    log.warn('Neon', `Data API ${action} network error`, error);
     if (strict) throw new NetworkLoadError(action);
     return null;
   }
@@ -172,12 +173,12 @@ async function callProgressApi<T = any>(
     });
     const json = await resp.json().catch(() => ({}));
     if (!resp.ok) {
-      console.error(`Progress API ${action} failed:`, json?.error || resp.status);
+      (resp.status >= 500 ? log.error : log.warn)('Neon', `Progress API ${action} failed`, resp.status, json?.error);
       return null;
     }
     return json as T;
   } catch (error) {
-    console.error(`Progress API ${action} network error:`, error);
+    log.warn('Neon', `Progress API ${action} network error`, error);
     return null;
   }
 }
@@ -583,7 +584,7 @@ export const NeonService = {
    */
   async loadSets(userId?: string, options?: LoadOptions): Promise<CardSet[]> {
     if (!userId) {
-      console.warn('userId не передан, пропускаем загрузку наборов');
+      log.warn('Neon', 'userId не передан, пропускаем загрузку наборов');
       return [];
     }
     const sets = await callDataApi<any[]>('loadSets', {}, 'GET');
@@ -604,7 +605,7 @@ export const NeonService = {
    */
   async loadAllCards(userId?: string, options?: LoadOptions): Promise<Card[]> {
     if (!userId) {
-      console.warn('userId не передан, пропускаем загрузку карточек');
+      log.warn('Neon', 'userId не передан, пропускаем загрузку карточек');
       return [];
     }
     const cards = await callDataApi<any[]>('loadAllCards', {}, 'GET');
@@ -895,13 +896,13 @@ export const NeonService = {
       });
       const json = await resp.json().catch(() => ({}));
       if (!resp.ok) {
-        console.error('Progress API failed:', json?.error || resp.status);
+        (resp.status >= 500 ? log.error : log.warn)('Neon', 'Progress API failed', resp.status, json?.error);
         // Некорректный ответ не исправится повтором — не держим его в очереди
         return resp.status === 400 ? [] : null;
       }
       return json.results;
     } catch (error) {
-      console.error('Progress API network error:', error);
+      log.warn('Neon', 'Progress API network error', error);
       return null;
     }
   },
@@ -924,7 +925,7 @@ export const NeonService = {
   async renameCourse(courseId: string, title: string): Promise<boolean> {
     const result = await callTeacherApi('rename-course', { method: 'POST', body: { courseId, title } });
     if (!result.ok) {
-      console.error('Failed to rename course:', result.error);
+      log.error('Neon', 'Failed to rename course', result.error);
       return false;
     }
     return true;
@@ -940,7 +941,7 @@ export const NeonService = {
       body: { courseId, withSets: options?.withSets === true },
     });
     if (!result.ok) {
-      console.error('Failed to delete course:', result.error);
+      log.error('Neon', 'Failed to delete course', result.error);
       return false;
     }
     return true;
@@ -959,7 +960,7 @@ export const NeonService = {
       body: { courseId },
     });
     if (!result.ok) {
-      console.error('Failed to create course invite:', result.error);
+      log.error('Neon', 'Failed to create course invite', result.error);
       return null;
     }
     return { token: result.data.token, joinCode: result.data.joinCode };
@@ -975,7 +976,7 @@ export const NeonService = {
       body: { courseId },
     });
     if (!result.ok) {
-      console.error('Failed to regenerate course invite:', result.error);
+      log.error('Neon', 'Failed to regenerate course invite', result.error);
       return null;
     }
     return { token: result.data.token, joinCode: result.data.joinCode };
@@ -994,7 +995,7 @@ export const NeonService = {
     );
     if (!result.ok) {
       if (result.reason !== 'not_found' && result.reason !== 'expired') {
-        console.error('Failed to get course invite info by code:', result.error);
+        log.warn('Neon', 'Failed to get course invite info by code', result.error);
       }
       return { ok: false, reason: result.reason };
     }
@@ -1015,7 +1016,7 @@ export const NeonService = {
     });
     if (!result.ok) {
       if (result.reason !== 'not_found' && result.reason !== 'expired' && result.reason !== 'own_course') {
-        console.warn('Failed to join course by code:', result.error);
+        log.warn('Neon', 'Failed to join course by code', result.error);
       }
       return { ok: false, reason: result.reason };
     }
@@ -1035,7 +1036,7 @@ export const NeonService = {
     );
     if (!result.ok) {
       if (result.reason !== 'not_found' && result.reason !== 'expired') {
-        console.error('Failed to get course invite info:', result.error);
+        log.warn('Neon', 'Failed to get course invite info', result.error);
       }
       return { ok: false, reason: result.reason };
     }
@@ -1056,7 +1057,7 @@ export const NeonService = {
     });
     if (!result.ok) {
       if (result.reason !== 'not_found' && result.reason !== 'expired' && result.reason !== 'own_course') {
-        console.warn('Failed to join course by token:', result.error);
+        log.warn('Neon', 'Failed to join course by token', result.error);
       }
       return { ok: false, reason: result.reason };
     }
@@ -1067,7 +1068,7 @@ export const NeonService = {
     // _teacherUserId сохранён для обратной совместимости — backend берёт userId из JWT.
     const result = await callTeacherApi('remove-student', { method: 'POST', body: { courseId, studentUserId } });
     if (!result.ok) {
-      console.error('Failed to remove student from course:', result.error);
+      log.error('Neon', 'Failed to remove student from course', result.error);
       return false;
     }
     return true;
@@ -1093,7 +1094,7 @@ export const NeonService = {
       if (options?.throwOnError && (result.reason === 'network' || result.status === 0 || result.status >= 500)) {
         throw new NetworkLoadError('loadCourseSetsByMembership');
       }
-      console.error('Failed to load course sets by membership:', result.error);
+      log.error('Neon', 'Failed to load course sets by membership', result.error);
       return [];
     }
     return result.data.sets.map((row) => mapMembershipSetRow(row, courseId));
@@ -1123,7 +1124,7 @@ export const NeonService = {
       params: { courseId },
     });
     if (!result.ok) {
-      console.error('Failed to load course members:', result.error);
+      log.error('Neon', 'Failed to load course members', result.error);
       throw new Error(result.error);
     }
     return result.data.members.map((row) => ({
@@ -1162,7 +1163,7 @@ export const NeonService = {
       { method: 'GET', params: { courseId, days: String(days) } },
     );
     if (!result.ok) {
-      console.error('Failed to load course activity chart:', result.error);
+      log.error('Neon', 'Failed to load course activity chart', result.error);
       throw new Error(result.error);
     }
     return result.data.rows;
@@ -1191,7 +1192,7 @@ export const NeonService = {
       }>;
     }>('course-set-stats', { method: 'GET', params: { courseId } });
     if (!result.ok) {
-      console.error('Failed to load course set stats:', result.error);
+      log.error('Neon', 'Failed to load course set stats', result.error);
       throw new Error(result.error);
     }
     return result.data.sets;
@@ -1209,7 +1210,7 @@ export const NeonService = {
       cards: Array<{ cardId: string; front: string; back: string; attempts: number }>;
     }>('set-hard-cards', { method: 'GET', params: { setId, courseId } });
     if (!result.ok) {
-      console.error('Failed to load set hard cards:', result.error);
+      log.error('Neon', 'Failed to load set hard cards', result.error);
       return [];
     }
     return result.data.cards;
@@ -1222,7 +1223,7 @@ export const NeonService = {
       params: { courseId },
     });
     if (!result.ok) {
-      console.error('Failed to check course ownership:', result.error);
+      log.error('Neon', 'Failed to check course ownership', result.error);
       return false;
     }
     return result.data.isOwner;
@@ -1232,7 +1233,7 @@ export const NeonService = {
     // _userId сохранён для обратной совместимости — backend берёт userId из JWT.
     const result = await callTeacherApi('leave-course', { method: 'POST', body: { courseId } });
     if (!result.ok) {
-      console.warn('Failed to leave student course:', result.error);
+      log.warn('Neon', 'Failed to leave student course', result.error);
       return false;
     }
     return true;
@@ -1263,7 +1264,7 @@ export const NeonService = {
       streak: number; lastActiveDate: string | null;
     }>('student-stats', { method: 'GET', params: { courseId, studentId } });
     if (!result.ok) {
-      console.error('Failed to load student course stats:', result.error);
+      log.error('Neon', 'Failed to load student course stats', result.error);
       throw new Error(result.error);
     }
     return result.data;
@@ -1272,7 +1273,7 @@ export const NeonService = {
   async toggleSetHiddenFromStudents(setId: string, hidden: boolean): Promise<boolean> {
     const result = await callTeacherApi('toggle-set-hidden', { method: 'POST', body: { setId, hidden } });
     if (!result.ok) {
-      console.error('Failed to toggle set hidden from students:', result.error);
+      log.error('Neon', 'Failed to toggle set hidden from students', result.error);
       return false;
     }
     return true;

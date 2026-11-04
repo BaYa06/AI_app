@@ -11,6 +11,7 @@ import { DatabaseService } from '@/services/DatabaseService';
 import { SyncQueueService } from '@/services/SyncQueueService';
 import { supabase } from '@/services/supabaseClient';
 import { useCardsStore } from '@/store/cardsStore';
+import { log } from '@/utils/logger';
 
 // ==================== SYNC QUEUE EXECUTORS ====================
 
@@ -147,7 +148,7 @@ export const useSetsStore = create<SetsState & SetsActions>()(
 
       // Сохраняем локально сразу, чтобы не потерять набор при выходе
       DatabaseService.saveSets();
-      console.log('✅ Набор сохранен локально:', newSet.title);
+      log.debug('Sets', 'Набор сохранен локально', newSet.title);
 
       // Синхронизируем с Neon (через очередь с retry)
       if (NeonService.isEnabled()) {
@@ -212,7 +213,7 @@ export const useSetsStore = create<SetsState & SetsActions>()(
 
       // Сохраняем локально
       DatabaseService.saveSets();
-      console.log('✅ Набор удален локально:', setId);
+      log.debug('Sets', 'Набор удален локально', setId);
 
       // Удаляем из Neon (через очередь с retry)
       if (NeonService.isEnabled() && !isReadOnly) {
@@ -364,7 +365,7 @@ export const useSetsStore = create<SetsState & SetsActions>()(
 
       // Сохраняем изменения
       DatabaseService.saveSets();
-      console.log('✅ Наборы перемещены из курса в «Мои наборы»:', courseId, '· удалено read-only:', readOnlySetIds.length);
+      log.debug('Sets', 'Наборы перемещены из курса в «Мои наборы»', courseId, '· удалено read-only:', readOnlySetIds.length);
     },
 
     deleteSetsOfCourse: (courseId) => {
@@ -397,7 +398,7 @@ export const useSetsStore = create<SetsState & SetsActions>()(
       // На сервере наборы удаляет сам delete-course (withSets) — отдельные deleteSet не нужны
       removedIds.forEach((id) => useCardsStore.getState().deleteCardsBySet(id));
       DatabaseService.saveSets();
-      console.log('✅ Наборы курса удалены локально:', courseId, removedIds.length);
+      log.debug('Sets', 'Наборы курса удалены локально', courseId, removedIds.length);
     },
 
     getSetsByCourse: (courseId) => {

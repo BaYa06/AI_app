@@ -18,6 +18,7 @@ import {
 } from './widgetBridge';
 import { readCache, writeCache } from './localCache';
 import { Analytics } from './analytics';
+import { log } from '@/utils/logger';
 
 const SYNC_DELAY_MS = 5000;
 /** Локальная дата YYYY-MM-DD (как localDay в challengeStore — без зависимости от store) */
@@ -59,7 +60,7 @@ async function flush(): Promise<void> {
     await setWidgetSnapshot(JSON.stringify(snapshot));
     lastKey = key;
   } catch (e) {
-    console.warn('[widget] Не удалось записать расписание:', e);
+    log.warn('Widget', 'Не удалось записать расписание', e);
   }
 }
 
@@ -103,7 +104,7 @@ export async function resetWidget(): Promise<void> {
   try {
     await clearWidget();
   } catch (e) {
-    console.warn('[widget] Не удалось очистить виджет:', e);
+    log.warn('Widget', 'Не удалось очистить виджет', e);
   }
 }
 
@@ -152,6 +153,6 @@ export async function checkWidgetUsage(): Promise<void> {
     const reveals = await readWidgetReveals();
     if (reveals > 0) Analytics.widgetReveals(reveals);
   } catch (e) {
-    console.warn('[widget] Не удалось проверить виджеты:', e);
+    log.warn('Widget', 'Не удалось проверить виджеты', e);
   }
 }

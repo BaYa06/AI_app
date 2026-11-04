@@ -26,6 +26,7 @@ import { version as APP_VERSION } from '../../package.json';
 import { supabase } from './supabaseClient';
 import { StorageService } from './StorageService';
 import { Analytics } from './analytics';
+import { log } from '@/utils/logger';
 
 export interface PushStatus {
   /** Текущее разрешение: granted / denied / default */
@@ -117,7 +118,7 @@ export async function requestPushPermission(userId?: string | null): Promise<Pus
     const token = await registerToken(userId);
     return { permission, token, isSupported: true };
   } catch (error: any) {
-    console.error('[Push] requestPushPermission failed:', error);
+    log.error('Push', 'requestPushPermission failed', error);
     return { permission: 'default', token: null, isSupported: true, error: error?.message || 'Unknown error' };
   }
 }
@@ -137,7 +138,7 @@ export async function requestProvisionalPermission(userId?: string | null): Prom
     const token = await registerToken(userId);
     return { permission, token, isSupported: true, provisional: status === AuthorizationStatus.PROVISIONAL };
   } catch (error: any) {
-    console.error('[Push] requestProvisionalPermission failed:', error);
+    log.error('Push', 'requestProvisionalPermission failed', error);
     return { permission: 'default', token: null, isSupported: true, error: error?.message || 'Unknown error' };
   }
 }
@@ -154,7 +155,7 @@ export async function refreshPushToken(userId?: string | null): Promise<string |
     }
     return await registerToken(userId);
   } catch (error) {
-    console.error('[Push] refreshPushToken failed:', error);
+    log.error('Push', 'refreshPushToken failed', error);
     return null;
   }
 }
@@ -198,7 +199,7 @@ export async function syncPushPermission(): Promise<void> {
     await sendTokenToBackend(token, permission);
     reportedPermission = permission;
   } catch (error) {
-    console.warn('[Push] syncPushPermission failed:', error);
+    log.warn('Push', 'syncPushPermission failed', error);
   }
 }
 
@@ -209,7 +210,7 @@ export async function getInitialPushData(): Promise<Record<string, string> | nul
     const message = await getInitialNotification(messaging());
     return (message?.data as Record<string, string> | undefined) ?? null;
   } catch (error) {
-    console.warn('[Push] getInitialNotification failed:', error);
+    log.warn('Push', 'getInitialNotification failed', error);
     return null;
   }
 }
@@ -231,7 +232,7 @@ export async function unsubscribePush(): Promise<boolean> {
     currentToken = null;
     return true;
   } catch (error) {
-    console.error('[Push] unsubscribePush failed:', error);
+    log.error('Push', 'unsubscribePush failed', error);
     return false;
   }
 }
@@ -269,9 +270,9 @@ async function sendTokenToBackend(token: string, permission?: ServerPermission |
         token, platform: Platform.OS, userId: currentUserId, permission: permission ?? undefined, appVersion: APP_VERSION,
       }),
     });
-    if (!res.ok) console.warn('[Push] Backend subscribe failed:', res.status);
+    if (!res.ok) log.warn('Push', 'Backend subscribe failed', res.status);
   } catch (error) {
-    console.error('[Push] Failed to send token to backend:', error);
+    log.warn('Push', 'Failed to send token to backend', error);
   }
 }
 
@@ -282,8 +283,8 @@ async function removeTokenFromBackend(token: string): Promise<void> {
       headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify({ token }),
     });
-    if (!res.ok) console.warn('[Push] Backend unsubscribe failed:', res.status);
+    if (!res.ok) log.warn('Push', 'Backend unsubscribe failed', res.status);
   } catch (error) {
-    console.error('[Push] Failed to remove token from backend:', error);
+    log.warn('Push', 'Failed to remove token from backend', error);
   }
 }

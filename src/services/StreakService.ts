@@ -6,6 +6,7 @@
 import { NeonService, NetworkLoadError } from './NeonService';
 import { readCache, writeCache } from './localCache';
 import { supabase } from './supabaseClient';
+import { log } from '@/utils/logger';
 
 // ==================== ТИПЫ ====================
 
@@ -117,12 +118,12 @@ export async function recordActivity(params: RecordActivityParams): Promise<{ sa
     const userId = sessionData.session?.user?.id;
 
     if (!userId) {
-      console.log('ℹ️ Streak: пользователь не авторизован, активность сохранена локально');
+      log.debug('Streak', 'пользователь не авторизован, активность сохранена локально');
       return { saved: false, counted: false };
     }
 
     if (!NeonService.isEnabled()) {
-      console.log('ℹ️ Streak: Neon не настроен');
+      log.debug('Streak', 'Neon не настроен');
       return { saved: false, counted: false };
     }
 
@@ -138,7 +139,7 @@ export async function recordActivity(params: RecordActivityParams): Promise<{ sa
     const localDate = getLocalDateKey(timezone);
     const yesterdayDate = getYesterdayKey(timezone);
 
-    console.log('🔄 Streak: записываем активность', { userId, localDate, wordsDelta, minutesDelta, cardsDelta });
+    log.debug('Streak', 'записываем активность', { userId, localDate, wordsDelta, minutesDelta, cardsDelta });
 
     // 1. Upsert в daily_activity
     const activityResult = await upsertDailyActivity(userId, localDate, {
@@ -148,7 +149,7 @@ export async function recordActivity(params: RecordActivityParams): Promise<{ sa
     });
 
     if (!activityResult) {
-      console.warn('⚠️ Streak: не удалось записать daily_activity');
+      log.warn('Streak', 'не удалось записать daily_activity');
       return { saved: false, counted: false };
     }
 
@@ -160,11 +161,11 @@ export async function recordActivity(params: RecordActivityParams): Promise<{ sa
       cardsDelta,
     });
 
-    console.log(counted ? '✅ Streak: день засчитан' : 'ℹ️ Streak: активность записана, день в серию пока не засчитан');
+    log.debug('Streak', counted ? 'день засчитан' : 'активность записана, день в серию пока не засчитан');
     // daily_activity уже записан — повторная отправка задвоила бы его, поэтому saved даже без итогов
     return { saved: true, counted };
   } catch (error) {
-    console.error('❌ Streak: ошибка при записи активности:', error);
+    log.error('Streak', 'ошибка при записи активности', error);
     return { saved: false, counted: false };
   }
 }
@@ -178,7 +179,7 @@ async function upsertDailyActivity(
   deltas: { wordsDelta: number; minutesDelta: number; cardsDelta: number }
 ): Promise<boolean> {
   if (!NeonService.isEnabled()) {
-    console.log('ℹ️ Streak: Neon не настроен');
+    log.debug('Streak', 'Neon не настроен');
     return false;
   }
 
@@ -187,7 +188,7 @@ async function upsertDailyActivity(
     const result = await NeonService.upsertDailyActivity(userId, localDate, deltas);
     return result;
   } catch (error) {
-    console.error('❌ Streak: ошибка upsert daily_activity:', error);
+    log.error('Streak', 'ошибка upsert daily_activity', error);
     return false;
   }
 }
@@ -209,7 +210,7 @@ async function updateUserStats(
     const result = await NeonService.updateUserStatsStreak(userId, localDate, yesterdayDate, deltas);
     return result;
   } catch (error) {
-    console.error('❌ Streak: ошибка обновления user_stats:', error);
+    log.error('Streak', 'ошибка обновления user_stats', error);
     return false;
   }
 }
@@ -232,7 +233,7 @@ export async function fetchWeekActivity(days: number = 7): Promise<DailyActivity
   } catch (error) {
     // Нет сети — последнее сохранённое
     if (error instanceof NetworkLoadError) return readCache<DailyActivity[]>(`activity_${days}`) ?? [];
-    console.error('❌ Streak: ошибка получения активности за неделю:', error);
+    log.error('Streak', 'ошибка получения активности за неделю', error);
     return [];
   }
 }
@@ -254,7 +255,7 @@ export async function fetchUserStats(): Promise<UserStats | null> {
     return stats;
   } catch (error) {
     if (error instanceof NetworkLoadError) return readCache<UserStats>('user_stats') ?? null;
-    console.error('❌ Streak: ошибка получения user_stats:', error);
+    log.error('Streak', 'ошибка получения user_stats', error);
     return null;
   }
 }
@@ -339,7 +340,7 @@ export async function fetchTodayActivity(): Promise<DailyActivity | null> {
     return activity;
   } catch (error) {
     if (error instanceof NetworkLoadError) return cachedTodayActivity() ?? null;
-    console.error('❌ Streak: ошибка получения активности за сегодня:', error);
+    log.error('Streak', 'ошибка получения активности за сегодня', error);
     return null;
   }
 }

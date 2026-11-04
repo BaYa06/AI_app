@@ -18,7 +18,7 @@ const getStores = () => ({
 });
 
 /** Лог только в деве — эти сообщения не секретные, но не нужны в продовых логах. */
-const devLog = (...args: unknown[]) => { if (__DEV__) console.log(...args); };
+const devLog = (message: string, ...details: unknown[]) => log.debug('Database', message, ...details);
 
 /**
  * Интерфейс сохраненных данных
@@ -146,6 +146,7 @@ const LOCAL_DATA_TTL_MS = 30 * 60 * 1000; // 30 минут — после это
 // Чьи данные сохранены на устройстве: по нему при запуске сразу показываем сохранённое,
 // не дожидаясь сервера; при выходе — стираем (ключ объявлен в localCache)
 import { CACHE_OWNER_KEY, writeCache } from './localCache';
+import { log } from '@/utils/logger';
 export { CACHE_OWNER_KEY };
 
 /**
@@ -183,7 +184,7 @@ export const DatabaseService = {
       }
       return owner;
     } catch (error) {
-      console.warn('⚠️ Не удалось показать сохранённые данные:', error);
+      log.warn('Database', 'Не удалось показать сохранённые данные', error);
       return null;
     }
   },
@@ -212,10 +213,10 @@ export const DatabaseService = {
           const { data: sessionData } = await supabase.auth.getSession();
           currentUserId = sessionData.session?.user?.id;
         } catch (error) {
-          console.warn('⚠️ Не удалось получить сессию Supabase:', error);
+          log.warn('Database', 'Не удалось получить сессию Supabase', error);
         }
       } else {
-        console.warn('⚠️ Supabase не инициализирован, используем локальные данные');
+        log.warn('Database', 'Supabase не инициализирован, используем локальные данные');
       }
 
       devLog('🔄 Загрузка данных из Neon PostgreSQL...');
@@ -337,7 +338,7 @@ export const DatabaseService = {
         } catch (e) {
           // Без курсов ученика картина неполная — не заменяем сохранённые данные урезанными
           if (e instanceof NetworkLoadError) return this.keepCachedData(currentUserId);
-          console.warn('⚠️ Не удалось загрузить курсы ученика:', e);
+          log.warn('Database', 'Не удалось загрузить курсы ученика', e);
         }
       }
 
@@ -425,7 +426,7 @@ export const DatabaseService = {
             devLog(`📖 Загружено официальных наборов: ${bundle.sets.length}`);
           }
         } catch (e) {
-          console.warn('⚠️ Не удалось загрузить официальные наборы:', e);
+          log.warn('Database', 'Не удалось загрузить официальные наборы', e);
         }
       }
 
@@ -451,14 +452,14 @@ export const DatabaseService = {
             if (userStats.activity_segment) setActivitySegmentProperty(userStats.activity_segment);
           }
         } catch (e) {
-          console.warn('⚠️ Не удалось загрузить streak:', e);
+          log.warn('Database', 'Не удалось загрузить streak', e);
         }
       }
 
       if (currentUserId) StorageService.setString(CACHE_OWNER_KEY, currentUserId);
       return true;
     } catch (error) {
-      console.error('❌ Failed to load data:', error);
+      log.error('Database', 'Failed to load data', error);
       return false;
     }
   },
@@ -491,7 +492,7 @@ export const DatabaseService = {
     studentSyncRunning = (async () => {
       do {
         studentSyncAgain = false;
-        await runStudentCoursesSync().catch((e) => console.warn('⚠️ Синхронизация курсов:', e));
+        await runStudentCoursesSync().catch((e) => log.warn('Database', 'Синхронизация курсов', e));
       } while (studentSyncAgain);
     })().finally(() => {
       studentSyncRunning = null;
@@ -525,7 +526,7 @@ export const DatabaseService = {
 
       return true;
     } catch (error) {
-      console.error('Failed to save data:', error);
+      log.error('Database', 'Failed to save data', error);
       return false;
     }
   },
@@ -641,7 +642,7 @@ export const DatabaseService = {
 
       return true;
     } catch (error) {
-      console.error('Failed to import data:', error);
+      log.error('Database', 'Failed to import data', error);
       return false;
     }
   },

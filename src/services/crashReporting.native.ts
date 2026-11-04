@@ -11,6 +11,7 @@
 import { Platform } from 'react-native';
 import {
   getCrashlytics,
+  log,
   recordError,
   setAttribute,
   setUserId,
@@ -35,4 +36,10 @@ export function setCrashUserId(userId: string | null) {
 export function reportError(error: Error, context?: string) {
   if (!enabled) return;
   recordError(getCrashlytics(), error, context);
+}
+
+/** Строка в журнал Crashlytics: сама отчётом не становится, прикладывается к следующему отчёту. */
+export function crashLog(message: string) {
+  if (!enabled) return;
+  log(getCrashlytics(), message);
 }
