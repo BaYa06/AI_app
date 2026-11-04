@@ -120,6 +120,31 @@ MultipleChoiceScreen: `useCallback` стоял после раннего `return
 4. `lint` и `prettier --check` добавить в pre-commit хук на изменённые файлы.
 
 ## Clean 5 — единый API-клиент и авторизация в одном месте ⬜
+
+**Карта 04.11.2026 (Explore):** 69 вызовов getSession (один разбит на 2 строки в App.tsx),
+17 прямых `fetch` в экранах/хуках (почти все — `/api/test`, без таймаута), общего хелпера
+токена нет, 401 нигде не обновляет сессию (только autoRefresh), 5 разных форм ошибок в
+сервисах. `supabase.channel` (Realtime) — в 4 экранах тестов и useCourseRealtime.
+Уточнения к пунктам ниже (безопаснее плана, поведение не меняется):
+- повтор запроса: опция `retry` в клиенте есть, по умолчанию выкл. и никем не используется —
+  сейчас повторов нет нигде, а повтор POST (answer, join, buyStreakFreeze) опасен;
+- заголовок версии приложения — НЕ добавляем: на web это CORS preflight, изменение контракта;
+- `onAuthChange` сохраняет отсрочку `setTimeout(0)` (deadlock getSession внутри колбэка, App.tsx);
+- session.ts без кэша токена; импортирует только supabaseClient; сторы импортируют его напрямую,
+  не через баррел `@/services` (циклы);
+- для ESLint-запрета нужна обёртка `services/realtime.ts`; экраны входа и App.tsx — исключения;
+- тексты ошибок экзаменов сохранить: их переводит `describeTestError`.
+**5a ✅ 04.11.2026** — `src/services/auth/session.ts`: getSession, getAccessToken, getUserId,
+getCurrentUser (id, email, isAnonymous), onAuthChange (setTimeout(0), отписка). Без кэша.
+Ошибка Supabase (`error`) → null + warn; ИСКЛЮЧЕНИЕ пробрасывается, как у прямого вызова
+(иначе в 5b «нет сети» превратилось бы в «не авторизован», а strict-загрузка — в пустые данные).
+Тест — 12 случаев. Существующий код не тронут.
+Подшаги: 5a session.ts + тест · 5b сервисы и сторы на session.ts (+ удалить мёртвый AuthService)
+· 5c api/client.ts + тест · 5d call*Api сервисов на клиент (контракты null/ApiResult/reason те же)
+· 5e экраны: getSession → getUserId/getCurrentUser · 5f ExamService + useExamExitGuard
+· 5g экраны учителя (ExamLobby, TestLobby, LiveTest) · 5h экраны ученика (TestJoin, TestWaiting,
+TestExam, TestDone) · 5i TestResultsTeacher, TestHistory, настройки push · 5j realtime.ts,
+distractors/whatsNew/ApiService на клиент · 5k ESLint-запреты.
 `supabase.auth.getSession` вызывается 68 раз в 52 файлах; 10 экранов сами делают `fetch`.
 Это главный архитектурный долг: токен, базовый URL, обработка 401 и ошибок — в каждом месте
 по-своему.
