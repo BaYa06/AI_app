@@ -5,11 +5,8 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
   View,
-  StyleSheet,
   Pressable,
-  Dimensions,
   Animated,
-  Modal,
   AppState,
   Platform,
   type LayoutChangeEvent,
@@ -24,14 +21,14 @@ import {
   selectSetStats,
 } from '@/store';
 import { Text, Loading } from '@/components/common';
-import { Button, Switch } from '@/components/ui';
+import { Button } from '@/components/ui';
 import { StageLayout, sessionStageProgress } from '@/components/study/StageLayout';
 import { buildStudyQueue, getCardStatus } from '@/services/SRSService';
 import { StatusBadge } from '@/components/cards';
 import { ProgressService } from '@/services/ProgressService';
 import { lessonPhaseForAnswer, sessionPhaseForAnswer } from '@/services/lessonFlow';
 import { useLessonStore } from '@/store/lessonStore';
-import { spacing, borderRadius, heights, iconSize, screenPadding, alpha } from '@/constants';
+import { spacing, iconSize, alpha } from '@/constants';
 import { DatabaseService, Analytics } from '@/services';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Rating, Card } from '@/types';
@@ -61,31 +58,22 @@ import ReAnimated, {
 } from 'react-native-reanimated';
 import { log } from '@/utils/logger';
 import { cardFront, cardBack } from '@/utils/cardText';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = Math.min(340, SCREEN_WIDTH - 32);
-const CARD_HEIGHT = CARD_WIDTH * 1.25;
-const CARD_BOX_HEIGHT = Math.min(CARD_HEIGHT, 420);
-
-// Рамка текста на карточке до первого onLayout: без отступов 24×2 и рамки, верхней строки (32),
-// низа (24 + подпись 20 на лице, 24 на обороте) и запаса над словом (4)
-const DEFAULT_TEXT_BOX = {
-  width: CARD_WIDTH - spacing.l * 2 - 2,
-  front: CARD_BOX_HEIGHT - spacing.l * 2 - 2 - 32 - 44 - spacing.xxs,
-  back: CARD_BOX_HEIGHT - spacing.l * 2 - 2 - 32 - spacing.l - spacing.xxs,
-};
-// Слово: h2 (24) → не мельче 18; пример: bodyLarge (18) → не мельче 15 (utils/fitText.ts)
-const WORD_FIT = { sizes: [24, 22, 20, 18], lineHeightRatio: 1.5 };
-const EXAMPLE_FIT = { sizes: [18, 16, 15], lineHeightRatio: 1.45 };
-// Между словом и примером: два отступа cardContent + разделитель
-const EXAMPLE_GAP = spacing.m * 2 + 2;
-// Свайп карточки засчитывается после 30% её ширины или быстрым смахом; затем она улетает за край
-const SWIPE_DISTANCE = CARD_WIDTH * 0.3;
-const SWIPE_VELOCITY = 800;
-const SWIPE_OUT_MS = 220;
-// Следующая карточка проявляется на месте отвеченной
-const CARD_IN_MS = 160;
-const CARD_IN_DELAY_MS = 32;
+import {
+  CARD_WIDTH,
+  DEFAULT_TEXT_BOX,
+  WORD_FIT,
+  EXAMPLE_FIT,
+  EXAMPLE_GAP,
+  SWIPE_DISTANCE,
+  SWIPE_VELOCITY,
+  SWIPE_OUT_MS,
+  CARD_IN_MS,
+  CARD_IN_DELAY_MS,
+  SCREEN_WIDTH,
+} from './study/layout';
+import { styles } from './study/styles';
+import { StudySettingsModal } from './study/StudySettingsModal';
+import { FlashcardFace } from './study/FlashcardFace';
 
 type Props = RootStackScreenProps<'Study'>;
 
@@ -969,364 +957,41 @@ export function StudyScreen({ navigation, route }: Props) {
         {/* Флеш-карточка */}
         <GestureDetector gesture={cardSwipeGesture}>
           <ReAnimated.View style={swipeStyle}>
-            <Pressable
-              onPress={handleToggleCard}
-              accessibilityRole="button"
-              accessibilityLabel={
-                isFlipped
-                  ? `Ответ: ${answerText}. Нажми, чтобы перевернуть`
-                  : `${questionText}. Нажми, чтобы перевернуть`
-              }
-              style={styles.cardWrapper}
-            >
-              {/* Передняя сторона (вопрос) */}
-              <ReAnimated.View
-                style={[styles.cardAnim, frontAnimStyle]}
-                pointerEvents={isFlipped ? 'none' : 'auto'}
-              >
-                <View
-                  style={[
-                    styles.cardInner,
-                    { backgroundColor: colors.surface, borderColor: colors.border },
-                  ]}
-                >
-                  {renderCardTop(() => handleSpeak(questionText, questionLang, answerText))}
-
-                  <View style={styles.cardContent} onLayout={measureTextBox('front')}>
-                    <Text
-                      variant="h2"
-                      numberOfLines={questionFit.numberOfLines}
-                      style={[
-                        styles.cardWord,
-                        {
-                          color: colors.textPrimary,
-                          fontSize: questionFit.fontSize,
-                          lineHeight: questionFit.lineHeight,
-                        },
-                      ]}
-                    >
-                      {questionText}
-                    </Text>
-                  </View>
-
-                  <View style={styles.cardBottom}>
-                    <Text
-                      variant="bodySmall"
-                      align="center"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      {showSwipeHint && session?.currentIndex === 0
-                        ? '← Не знаю · Уверенно →'
-                        : 'Нажми, чтобы перевернуть'}
-                    </Text>
-                  </View>
-                </View>
-              </ReAnimated.View>
-
-              {/* Задняя сторона (ответ) */}
-              <ReAnimated.View
-                style={[styles.cardAnim, backAnimStyle]}
-                pointerEvents={isFlipped ? 'auto' : 'none'}
-              >
-                <View
-                  style={[
-                    styles.cardInner,
-                    { backgroundColor: colors.surface, borderColor: colors.border },
-                  ]}
-                >
-                  {renderCardTop(() => handleSpeak(answerText, answerLang, questionText))}
-
-                  <View style={styles.cardContent} onLayout={measureTextBox('back')}>
-                    <Text
-                      variant="h2"
-                      numberOfLines={answerFit.word.numberOfLines}
-                      style={[
-                        styles.cardWord,
-                        {
-                          color: colors.textPrimary,
-                          fontSize: answerFit.word.fontSize,
-                          lineHeight: answerFit.word.lineHeight,
-                        },
-                      ]}
-                    >
-                      {answerText}
-                    </Text>
-                    <View style={[styles.divider, { backgroundColor: colors.border }]} />
-                    {example ? (
-                      <Text
-                        variant="bodyLarge"
-                        align="center"
-                        numberOfLines={answerFit.example.numberOfLines}
-                        style={{
-                          color: colors.textSecondary,
-                          fontSize: answerFit.example.fontSize,
-                          lineHeight: answerFit.example.lineHeight,
-                        }}
-                      >
-                        {example}
-                      </Text>
-                    ) : null}
-                  </View>
-
-                  <View style={styles.cardBottom} />
-                </View>
-              </ReAnimated.View>
-
-              {/* Подписи свайпа: влево — «Не знаю», вправо — «Уверенно» */}
-              <ReAnimated.View
-                pointerEvents="none"
-                style={[
-                  styles.swipeOverlay,
-                  {
-                    borderColor: colors.ratingAgain,
-                    backgroundColor: alpha(colors.ratingAgain, 10),
-                  },
-                  swipeLeftStyle,
-                ]}
-              >
-                <View
-                  style={[
-                    styles.swipeLabel,
-                    { borderColor: colors.ratingAgain, backgroundColor: colors.surface },
-                  ]}
-                >
-                  <Text variant="label" style={{ color: colors.errorText }}>
-                    Не знаю
-                  </Text>
-                </View>
-              </ReAnimated.View>
-              <ReAnimated.View
-                pointerEvents="none"
-                style={[
-                  styles.swipeOverlay,
-                  { borderColor: colors.ratingGood, backgroundColor: alpha(colors.ratingGood, 10) },
-                  swipeRightStyle,
-                ]}
-              >
-                <View
-                  style={[
-                    styles.swipeLabel,
-                    { borderColor: colors.ratingGood, backgroundColor: colors.surface },
-                  ]}
-                >
-                  <Text variant="label" style={{ color: colors.successText }}>
-                    Уверенно
-                  </Text>
-                </View>
-              </ReAnimated.View>
-            </Pressable>
+            <FlashcardFace
+              colors={colors}
+              session={session}
+              isFlipped={isFlipped}
+              handleToggleCard={handleToggleCard}
+              handleSpeak={handleSpeak}
+              renderCardTop={renderCardTop}
+              measureTextBox={measureTextBox}
+              questionText={questionText}
+              answerText={answerText}
+              example={example}
+              questionLang={questionLang}
+              answerLang={answerLang}
+              questionFit={questionFit}
+              answerFit={answerFit}
+              frontAnimStyle={frontAnimStyle}
+              backAnimStyle={backAnimStyle}
+              swipeLeftStyle={swipeLeftStyle}
+              swipeRightStyle={swipeRightStyle}
+              showSwipeHint={showSwipeHint}
+            />
           </ReAnimated.View>
         </GestureDetector>
       </View>
 
-      <Modal
-        visible={isSettingsOpen}
-        transparent
-        animationType="none"
-        statusBarTranslucent
-        onRequestClose={closeSettings}
-      >
-        <View style={styles.modalRoot}>
-          <Pressable
-            accessibilityRole="button"
-            style={styles.backdrop}
-            onPress={closeSettings}
-            accessibilityLabel="Закрыть настройки"
-          >
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.backdropTint,
-                { opacity: backdropOpacity, backgroundColor: colors.overlay },
-              ]}
-            />
-          </Pressable>
-
-          {/* Панель настроек выезжает сверху (формат прежний) */}
-          <Animated.View
-            style={[
-              styles.settingsSheet,
-              {
-                top: insets.top + spacing.m,
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                transform: [{ translateY: sheetTranslate }],
-              },
-            ]}
-          >
-            <View style={styles.settingsRow}>
-              <View
-                style={[styles.settingsIconWrap, { backgroundColor: alpha(colors.primary, 10) }]}
-              >
-                <Settings size={iconSize.s} color={colors.primary} />
-              </View>
-              <View style={styles.settingsTexts}>
-                <Text variant="body" style={[styles.semibold, { color: colors.textPrimary }]}>
-                  Реверс карточек
-                </Text>
-                <Text variant="caption" style={{ color: colors.textSecondary }}>
-                  Сначала показывать обратную сторону
-                </Text>
-              </View>
-              <Switch
-                value={reverseEnabled}
-                onValueChange={handleToggleReverse}
-                accessibilityLabel="Реверс карточек"
-              />
-            </View>
-          </Animated.View>
-        </View>
-      </Modal>
+      <StudySettingsModal
+        colors={colors}
+        isSettingsOpen={isSettingsOpen}
+        closeSettings={closeSettings}
+        backdropOpacity={backdropOpacity}
+        sheetTranslate={sheetTranslate}
+        insets={insets}
+        reverseEnabled={reverseEnabled}
+        handleToggleReverse={handleToggleReverse}
+      />
     </StageLayout>
   );
 }
-
-// ==================== СТИЛИ ====================
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  semibold: {
-    fontWeight: '600',
-  },
-  pressed: {
-    opacity: 0.85,
-  },
-
-  // Main content
-  // Боковой отступ даёт StageLayout
-  mainContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // Card
-  cardWrapper: {
-    width: CARD_WIDTH,
-    height: Math.min(CARD_HEIGHT, 420),
-    position: 'relative',
-  },
-  cardAnim: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-  },
-  cardInner: {
-    flex: 1,
-    borderRadius: borderRadius.xl,
-    borderWidth: 1,
-    padding: spacing.l,
-    // Без overflow:'hidden': фон и рамка сами скругляются через borderRadius,
-    // а маска слоя (masksToBounds) в связке с 3D-трансформом на iOS
-    // рендерится offscreen и может срезать верх глифов.
-  },
-  // Подпись свайпа поверх карточки: рамка и лёгкая заливка цветом оценки, плашка сверху
-  swipeOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: borderRadius.xl,
-    borderWidth: 2,
-    alignItems: 'center',
-    paddingTop: spacing.l,
-  },
-  swipeLabel: {
-    borderWidth: 2,
-    borderRadius: borderRadius.full,
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.xxs,
-  },
-  cardTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  statusPlaceholder: {
-    width: 40,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-  },
-
-  audioButton: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cardContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: spacing.m,
-  },
-  cardWord: {
-    textAlign: 'center',
-    // Высота строки ×1.5 и отступ сверху: запас под умлауты и диакритику
-    // над заглавными (Ä, Ö, Ü, É), иначе iOS срезает их по рамке Text
-    lineHeight: 36,
-    paddingTop: spacing.xxs,
-  },
-  divider: {
-    width: 48,
-    height: 2,
-    borderRadius: borderRadius.full,
-  },
-  cardBottom: {
-    paddingTop: spacing.l,
-  },
-
-  // Bottom panel
-  rateHint: {
-    marginBottom: spacing.s,
-  },
-  ratingGrid: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-    maxWidth: 448,
-    alignSelf: 'center',
-    width: '100%',
-  },
-  ratingButton: {
-    flex: 1,
-    height: heights.button,
-    borderRadius: borderRadius.m,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xxs,
-  },
-  modalRoot: {
-    flex: 1,
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  backdropTint: {
-    flex: 1,
-  },
-  // Без тени — панель отделяет затемнение
-  settingsSheet: {
-    position: 'absolute',
-    left: screenPadding,
-    right: screenPadding,
-    padding: spacing.m,
-    borderRadius: borderRadius.l,
-    borderWidth: 1,
-  },
-  settingsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.s,
-  },
-  settingsIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: borderRadius.m,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  settingsTexts: {
-    flex: 1,
-  },
-});
