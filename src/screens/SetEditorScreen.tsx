@@ -6,19 +6,17 @@ import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { View, ScrollView, TextInput, Pressable, Alert, Animated, Platform } from 'react-native';
 import { useSetsStore, useCardsStore, useThemeColors, useCoursesStore } from '@/store';
 import { Text } from '@/components/common';
-import { spacing, iconSize, alpha } from '@/constants';
-import { Button, CategoryIcon, toast, useScreenBottomInset } from '@/components/ui';
+import { iconSize } from '@/constants';
+import { Button, toast, useScreenBottomInset } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { SetCategory, SetKind } from '@/types';
 import { SetKindPicker } from '@/components/cards/SetKindPicker';
-import { ArrowLeftRight, Globe, Link2, Share2 } from 'lucide-react-native';
+import { ArrowLeftRight } from 'lucide-react-native';
 import { LibraryService, ShareService, Analytics } from '@/services';
 import { getSession } from '@/services/auth/session';
-import { LIBRARY_CATEGORIES } from '@/constants/library';
 import { describeError } from '@/utils/userErrors';
 import { confirmAction } from '@/utils/dialogs';
 import { canShareSet, useShareSet } from '@/components/share/useShareSet';
-import { pluralize } from '@/utils';
 import { COMMUNITY_LIBRARY_ENABLED } from '@/config/features';
 import { log } from '@/utils/logger';
 import { styles } from './setEditor/styles';
@@ -33,6 +31,8 @@ import {
 import { SelectPill } from './setEditor/SelectPill';
 import { LanguageDropdown } from './setEditor/LanguageDropdown';
 import { CourseDropdown } from './setEditor/CourseDropdown';
+import { ShareSection } from './setEditor/ShareSection';
+import { PublishSection } from './setEditor/PublishSection';
 
 type Props = RootStackScreenProps<'SetEditor'>;
 
@@ -675,247 +675,33 @@ export function SetEditorScreen({ navigation, route }: Props) {
 
           {/* Публикация в библиотеку */}
           {COMMUNITY_LIBRARY_ENABLED && canPublish && isEditing && !isReadOnly && (
-            <View style={styles.field}>
-              <Text variant="label" color="primary" style={styles.fieldLabel}>
-                Библиотека
-              </Text>
-
-              {isPublished && !showPublishForm ? (
-                <View style={{ gap: spacing.s }}>
-                  <View
-                    style={[
-                      styles.publishedBadge,
-                      {
-                        backgroundColor: alpha(colors.success, 10),
-                        borderColor: alpha(colors.success, 20),
-                      },
-                    ]}
-                  >
-                    <Globe size={16} color={colors.success} />
-                    <Text variant="bodySmall" style={{ color: colors.success, fontWeight: '600' }}>
-                      Опубликовано в библиотеке
-                    </Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', gap: spacing.s }}>
-                    <Pressable
-                      onPress={() => setShowPublishForm(true)}
-                      accessibilityRole="button"
-                      style={[styles.publishActionBtn, { borderColor: colors.primary }]}
-                    >
-                      <Text
-                        variant="bodySmall"
-                        style={{ color: colors.primary, fontWeight: '600' }}
-                      >
-                        Обновить
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={handleUnpublish}
-                      accessibilityRole="button"
-                      style={[styles.publishActionBtn, { borderColor: alpha(colors.error, 40) }]}
-                    >
-                      <Text
-                        variant="bodySmall"
-                        style={{ color: colors.errorText, fontWeight: '600' }}
-                      >
-                        Снять
-                      </Text>
-                    </Pressable>
-                  </View>
-                </View>
-              ) : !showPublishForm ? (
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => setShowPublishForm(true)}
-                  style={[
-                    styles.publishButton,
-                    {
-                      backgroundColor: alpha(colors.primary, 10),
-                      borderColor: alpha(colors.primary, 20),
-                    },
-                  ]}
-                >
-                  <Globe size={18} color={colors.primary} />
-                  <Text variant="body" style={{ color: colors.primary, fontWeight: '600' }}>
-                    Опубликовать в библиотеке
-                  </Text>
-                </Pressable>
-              ) : null}
-
-              {showPublishForm && (
-                <View
-                  style={[
-                    styles.publishForm,
-                    { backgroundColor: colors.surface, borderColor: colors.border },
-                  ]}
-                >
-                  <TextInput
-                    value={publishDescription}
-                    onChangeText={setPublishDescription}
-                    placeholder="Описание для библиотеки (необязательно)"
-                    placeholderTextColor={colors.textTertiary}
-                    style={[
-                      styles.publishInput,
-                      {
-                        color: colors.textPrimary,
-                        borderColor: colors.border,
-                        backgroundColor: colors.background,
-                      },
-                    ]}
-                    multiline
-                    maxLength={500}
-                  />
-
-                  <Text variant="caption" color="secondary" style={{ marginTop: spacing.xs }}>
-                    Категория
-                  </Text>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={{ marginTop: spacing.xs }}
-                  >
-                    <View style={{ flexDirection: 'row', gap: spacing.xs }}>
-                      {LIBRARY_CATEGORIES.map((cat) => (
-                        <Pressable
-                          key={cat.key}
-                          onPress={() =>
-                            setPublishCategory(publishCategory === cat.key ? '' : cat.key)
-                          }
-                          accessibilityRole="button"
-                          accessibilityState={{ selected: publishCategory === cat.key }}
-                          style={[
-                            styles.publishChip,
-                            {
-                              backgroundColor:
-                                publishCategory === cat.key
-                                  ? colors.primaryFill
-                                  : colors.surfaceMuted,
-                              borderColor:
-                                publishCategory === cat.key
-                                  ? colors.primaryFill
-                                  : colors.surfaceMuted,
-                            },
-                          ]}
-                        >
-                          {/* Раньше здесь выводилось имя иконки Ionicons текстом («text-outline») */}
-                          <CategoryIcon
-                            category={cat.key}
-                            size="xs"
-                            color={
-                              publishCategory === cat.key ? colors.onPrimary : colors.textSecondary
-                            }
-                          />
-                          <Text
-                            variant="label"
-                            style={{
-                              color:
-                                publishCategory === cat.key ? colors.onPrimary : colors.textPrimary,
-                            }}
-                          >
-                            {cat.label}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  </ScrollView>
-
-                  <TextInput
-                    value={publishTags}
-                    onChangeText={setPublishTags}
-                    placeholder="Теги через запятую (необязательно)"
-                    placeholderTextColor={colors.textTertiary}
-                    style={[
-                      styles.publishInput,
-                      {
-                        color: colors.textPrimary,
-                        borderColor: colors.border,
-                        backgroundColor: colors.background,
-                        marginTop: spacing.s,
-                      },
-                    ]}
-                    maxLength={200}
-                  />
-
-                  <View style={styles.publishActions}>
-                    <Button
-                      variant="quiet"
-                      tone="secondary"
-                      size="s"
-                      title="Отмена"
-                      onPress={() => setShowPublishForm(false)}
-                      style={styles.flex1}
-                    />
-                    <Button
-                      size="s"
-                      title={
-                        isPublishing ? 'Публикация...' : isPublished ? 'Обновить' : 'Опубликовать'
-                      }
-                      onPress={handlePublish}
-                      disabled={isPublishing}
-                      style={styles.flex1}
-                    />
-                  </View>
-                </View>
-              )}
-
-              <Text variant="caption" color="tertiary" style={styles.helperText}>
-                Опубликованные наборы доступны всем пользователям
-              </Text>
-            </View>
+            <PublishSection
+              colors={colors}
+              isPublished={isPublished}
+              showPublishForm={showPublishForm}
+              setShowPublishForm={setShowPublishForm}
+              publishCategory={publishCategory}
+              setPublishCategory={setPublishCategory}
+              publishDescription={publishDescription}
+              setPublishDescription={setPublishDescription}
+              publishTags={publishTags}
+              setPublishTags={setPublishTags}
+              isPublishing={isPublishing}
+              handlePublish={handlePublish}
+              handleUnpublish={handleUnpublish}
+            />
           )}
 
           {canShare && existingSet && (
-            <View style={styles.field}>
-              <Text variant="label" color="primary" style={styles.fieldLabel}>
-                Поделиться набором
-              </Text>
-              <Button
-                variant="secondary"
-                title="Поделиться"
-                icon={Share2}
-                loading={isSharing}
-                onPress={() => share(existingSet)}
-                fullWidth
-              />
-              {shareLink && (
-                <View
-                  style={[
-                    styles.shareRow,
-                    { backgroundColor: colors.surface, borderColor: colors.border },
-                  ]}
-                >
-                  <View style={[styles.shareIcon, { backgroundColor: alpha(colors.primary, 10) }]}>
-                    <Link2 size={iconSize.s} color={colors.primary} />
-                  </View>
-                  <View style={styles.flex1}>
-                    <Text variant="body" color="primary">
-                      Ссылка действует
-                    </Text>
-                    <Text variant="caption" color="secondary">
-                      {`Открыли ${shareLink.views} · добавили ${shareLink.imports} ${pluralize(shareLink.imports, 'раз', 'раза', 'раз')}`}
-                    </Text>
-                  </View>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={handleDisableShare}
-                    disabled={isDisablingShare}
-                    hitSlop={10}
-                    style={({ pressed }) => [
-                      styles.shareDisable,
-                      (pressed || isDisablingShare) && { opacity: 0.5 },
-                    ]}
-                  >
-                    <Text variant="label" style={{ color: colors.errorText }}>
-                      Закрыть доступ
-                    </Text>
-                  </Pressable>
-                </View>
-              )}
-              <Text variant="caption" color="tertiary" style={styles.helperText}>
-                Отправь ссылку — друг сможет добавить все карточки себе. Набор видят только те, у
-                кого есть ссылка
-              </Text>
-            </View>
+            <ShareSection
+              existingSet={existingSet}
+              colors={colors}
+              share={share}
+              isSharing={isSharing}
+              shareLink={shareLink}
+              handleDisableShare={handleDisableShare}
+              isDisablingShare={isDisablingShare}
+            />
           )}
 
           {isEditing && !isReadOnly && (
