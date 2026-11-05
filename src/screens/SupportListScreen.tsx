@@ -38,6 +38,7 @@ import {
   type SupportStatus,
   type SupportTicket,
 } from '@/services/feedback';
+import type { RootStackScreenProps } from '@/types/navigation';
 
 const STATUS: Record<SupportStatus, { label: string; tone: BadgeTone }> = {
   sent: { label: 'Отправлено', tone: 'neutral' },
@@ -86,7 +87,7 @@ function ratingPreview(t: SupportTicket): string {
   return 'Ответ в окне «Как тебе Flashly?»';
 }
 
-export function SupportListScreen({ navigation }: any) {
+export function SupportListScreen({ navigation }: RootStackScreenProps<'Support'>) {
   const colors = useThemeColors();
   const [tickets, setTickets] = useState<SupportTicket[] | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);

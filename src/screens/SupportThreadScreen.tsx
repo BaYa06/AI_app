@@ -22,6 +22,7 @@ import {
   type SupportThread,
 } from '@/services/feedback';
 import { formatSupportDate, ticketTitle } from './SupportListScreen';
+import type { RootStackScreenProps } from '@/types/navigation';
 
 const MAX_LENGTH = 4000;
 
@@ -48,7 +49,7 @@ function buildItems(thread: SupportThread): Item[] {
   return items;
 }
 
-export function SupportThreadScreen({ navigation, route }: any) {
+export function SupportThreadScreen({ navigation, route }: RootStackScreenProps<'SupportThread'>) {
   const colors = useThemeColors();
   const id: string = route?.params?.id;
   const scrollRef = useRef<ScrollView>(null);

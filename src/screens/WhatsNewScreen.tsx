@@ -25,8 +25,9 @@ import {
   trackWhatsNew,
 } from '@/components/whatsNew/newsContext';
 import type { WhatsNewItem, WhatsNewPage } from '@/types/whatsNew';
+import type { RootStackScreenProps } from '@/types/navigation';
 
-export function WhatsNewScreen({ navigation }: any) {
+export function WhatsNewScreen({ navigation }: RootStackScreenProps<'WhatsNew'>) {
   const isTeacher = useSettingsStore((s) => s.isTeacher) === true;
   const groups = useMemo(() => newsHistory(currentNews(), newsContext(isTeacher)), [isTeacher]);
   const [seen, setSeen] = useState<string[]>(() => loadWhatsNewState()?.seen ?? []);

@@ -10,8 +10,9 @@ import { ListGroup, ListRow, Screen, ScreenHeader, Switch } from '@/components/u
 import { spacing } from '@/constants';
 import { playCorrectSound } from '@/utils/sound';
 import { triggerHaptic } from '@/utils/haptic';
+import type { RootStackScreenProps } from '@/types/navigation';
 
-export function SoundSettingsScreen({ navigation }: any) {
+export function SoundSettingsScreen({ navigation }: RootStackScreenProps<'SoundSettings'>) {
   const soundEnabled = useSettingsStore((s) => s.settings.soundEnabled);
   const hapticEnabled = useSettingsStore((s) => s.settings.hapticEnabled);
   const updateSettings = useSettingsStore((s) => s.updateSettings);

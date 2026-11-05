@@ -45,6 +45,7 @@ import { Analytics } from '@/services/analytics';
 import { log } from '@/utils/logger';
 import { getAccessToken, getSession } from '@/services/auth/session';
 import { rawApiFetch } from '@/services/api/client';
+import type { RootStackScreenProps } from '@/types/navigation';
 
 /** «Что присылать» (plan/new/push_notifications.md, 2.4) — ключи как SETTING_GROUPS в api/push/_decide.js */
 type PushGroup = 'lesson' | 'streak' | 'course' | 'rating';
@@ -79,7 +80,9 @@ const DAYS = [
   { key: 'sun', label: 'Вс' },
 ] as const;
 
-export function NotificationSettingsScreen({ navigation }: any) {
+export function NotificationSettingsScreen({
+  navigation,
+}: RootStackScreenProps<'NotificationSettings'>) {
   const colors = useThemeColors();
 
   // ---- State ----

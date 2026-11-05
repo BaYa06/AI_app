@@ -18,6 +18,7 @@ import { isLockScreenWidgetAvailable } from '@/services/widgetPrompt';
 import { Analytics } from '@/services/analytics';
 import { NEW_PER_DAY_OPTIONS } from '@/services/LessonService';
 import { pluralize } from '@/utils';
+import type { RootStackScreenProps } from '@/types/navigation';
 
 const CARD_LIMIT_OPTIONS: Array<{ value: number | null; label: string }> = [
   { value: 10, label: '10' },
@@ -38,7 +39,7 @@ const WIDGET_DIRECTION_HINTS: Record<UserSettings['widgetDirection'], string> = 
   reverse: 'Всегда показывать перевод, а вспоминать слово.',
 };
 
-export function LearningSettingsScreen({ navigation }: any) {
+export function LearningSettingsScreen({ navigation }: RootStackScreenProps<'LearningSettings'>) {
   const colors = useThemeColors();
   const lessonNewPerDay = useSettingsStore((s) => s.settings.lessonNewPerDay);
   const studyCardLimit = useSettingsStore((s) => s.settings.studyCardLimit);

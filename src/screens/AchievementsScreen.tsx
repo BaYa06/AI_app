@@ -9,6 +9,7 @@ import { Badge, Card, ProgressBar, ScreenHeader, type IconComponent } from '@/co
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, iconSize, screenPadding, alpha } from '@/constants';
 import { Award, BookOpen, Flame, GraduationCap, Lock, Timer, Users } from 'lucide-react-native';
+import type { RootStackScreenProps } from '@/types/navigation';
 
 // ---- Data ----
 
@@ -177,7 +178,7 @@ function LockedCard({
 
 // ---- Main Screen ----
 
-export function AchievementsScreen({ navigation }: any) {
+export function AchievementsScreen({ navigation }: RootStackScreenProps<'Achievements'>) {
   const colors = useThemeColors();
   const [activeTab, setActiveTab] = useState(0);
 

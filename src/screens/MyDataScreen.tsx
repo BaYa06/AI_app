@@ -27,6 +27,7 @@ import {
   WEEK_DAYS,
   type AboutMeValue,
 } from '@/components/push/AboutMeForm';
+import type { RootStackScreenProps } from '@/types/navigation';
 
 const GOAL_LABELS: Record<string, string> = {
   studies: 'Для учёбы',
@@ -50,7 +51,7 @@ function toFormValue(data: AboutMe): AboutMeValue {
   };
 }
 
-export function MyDataScreen({ navigation }: any) {
+export function MyDataScreen({ navigation }: RootStackScreenProps<'MyData'>) {
   const colors = useThemeColors();
   const [data, setData] = useState<AboutMe | null>(null);
   const [form, setForm] = useState<AboutMeValue | null>(null);

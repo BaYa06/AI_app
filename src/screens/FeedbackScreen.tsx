@@ -20,6 +20,7 @@ import {
 import { spacing, borderRadius, heights, iconSize } from '@/constants';
 import { triggerHaptic } from '@/utils/haptic';
 import { sendFeedbackMessage, type FeedbackCategory } from '@/services/feedback';
+import type { RootStackScreenProps } from '@/types/navigation';
 
 const CATEGORIES: Array<{
   value: FeedbackCategory;
@@ -45,7 +46,7 @@ const CATEGORIES: Array<{
 const MIN_LENGTH = 10;
 const MAX_LENGTH = 4000;
 
-export function FeedbackScreen({ navigation }: any) {
+export function FeedbackScreen({ navigation }: RootStackScreenProps<'Feedback'>) {
   const colors = useThemeColors();
 
   const [category, setCategory] = useState<FeedbackCategory>('problem');

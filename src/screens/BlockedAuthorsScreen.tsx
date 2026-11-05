@@ -21,8 +21,9 @@ import {
 import { spacing } from '@/constants';
 import { ShareService, type BlockedAuthor } from '@/services';
 import { describeError } from '@/utils/userErrors';
+import type { RootStackScreenProps } from '@/types/navigation';
 
-export function BlockedAuthorsScreen({ navigation }: any) {
+export function BlockedAuthorsScreen({ navigation }: RootStackScreenProps<'BlockedAuthors'>) {
   const [blocks, setBlocks] = useState<BlockedAuthor[] | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [unblocking, setUnblocking] = useState<string | null>(null);
