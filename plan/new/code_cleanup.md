@@ -119,7 +119,7 @@ MultipleChoiceScreen: `useCallback` стоял после раннего `return
    чтобы не смешивать с другими изменениями в истории.
 4. `lint` и `prettier --check` добавить в pre-commit хук на изменённые файлы.
 
-## Clean 5 — единый API-клиент и авторизация в одном месте ⬜
+## Clean 5 — единый API-клиент и авторизация в одном месте ✅ (код; ⬜ проверка на устройстве)
 
 **Карта 04.11.2026 (Explore):** 69 вызовов getSession (один разбит на 2 строки в App.tsx),
 17 прямых `fetch` в экранах/хуках (почти все — `/api/test`, без таймаута), общего хелпера
@@ -178,6 +178,11 @@ supabase) для 4 экранов экзаменов и useCourseRealtime; utils
 ApiService удалены мёртвые checkDatabase/initDatabase. whatsNew и ApiService.generateExamples
 остаются на fetch — они в src/services, правилу «fetch только в сервисах» это не противоречит.
 `supabase` в интерфейсе теперь импортируют только SignIn, Welcome, EmailAuth, Profile.
+**5k ✅ 05.11.2026** — ESLint для src/screens, src/components, src/hooks: запрещён импорт
+supabaseClient (и `supabase` из баррела `@/services`, и относительный путь) и глобальный `fetch`;
+исключения — SignIn, Welcome, EmailAuth, Profile. Проверено пробным файлом: 5 нарушений из 5.
+**Итог Clean 5:** `supabase.auth.getSession` вне session.ts — только App.tsx и экраны входа;
+прямого fetch в интерфейсе нет; 290 тестов (+109 за шаг), tsc 63, lint 0 ошибок, веб собирается.
 Подшаги: 5a session.ts + тест · 5b сервисы и сторы на session.ts (+ удалить мёртвый AuthService)
 · 5c api/client.ts + тест · 5d call*Api сервисов на клиент (контракты null/ApiResult/reason те же)
 · 5e экраны: getSession → getUserId/getCurrentUser · 5f ExamService + useExamExitGuard

@@ -65,5 +65,60 @@ module.exports = {
       files: ['src/utils/logger.ts', 'api/_log.js'],
       rules: { 'no-console': 'off' },
     },
+    // Экраны, компоненты и хуки не ходят в сеть и в сессию сами (Clean 5): сессия —
+    // services/auth/session.ts, запросы — сервисы или services/api/client.ts, Realtime —
+    // services/realtime.ts.
+    {
+      files: [
+        'src/screens/**/*.{ts,tsx}',
+        'src/components/**/*.{ts,tsx}',
+        'src/hooks/**/*.{ts,tsx}',
+      ],
+      rules: {
+        'no-restricted-imports': [
+          'error',
+          {
+            paths: [
+              {
+                name: '@/services/supabaseClient',
+                message:
+                  'Сессия — @/services/auth/session, Realtime — @/services/realtime (Clean 5).',
+              },
+              {
+                name: '@/services',
+                importNames: ['supabase'],
+                message:
+                  'Сессия — @/services/auth/session, Realtime — @/services/realtime (Clean 5).',
+              },
+            ],
+            patterns: [
+              {
+                group: ['**/supabaseClient'],
+                message:
+                  'Сессия — @/services/auth/session, Realtime — @/services/realtime (Clean 5).',
+              },
+            ],
+          },
+        ],
+        'no-restricted-globals': [
+          'error',
+          {
+            name: 'fetch',
+            message: 'Запросы к API — через сервисы или @/services/api/client (Clean 5).',
+          },
+        ],
+      },
+    },
+    // Вход и выход — единственные экраны, которым нужен supabase.auth напрямую
+    // (signIn*, exchangeCodeForSession, signOut, onAuthStateChange).
+    {
+      files: [
+        'src/screens/SignInScreen.tsx',
+        'src/screens/WelcomeScreen.tsx',
+        'src/screens/EmailAuthScreen.tsx',
+        'src/screens/ProfileScreen.tsx',
+      ],
+      rules: { 'no-restricted-imports': 'off' },
+    },
   ],
 };
