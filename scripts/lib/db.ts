@@ -70,6 +70,23 @@ export async function connect(): Promise<Db> {
   } as Db;
 }
 
+/**
+ * Endpoint рабочей базы (Neon, ветка main). Писать туда — только с явного разрешения: скрипты,
+ * которые этим пользуются, без флага --prod отказываются работать. Staging — ep-wild-king-ah80ir3s.
+ */
+const PROD_ENDPOINTS = ['ep-misty-scene-ahkv29p5'];
+
+/** Хост базы без логина и пароля — чтобы показать, куда пишет скрипт. */
+export function describeDatabaseTarget(): { host: string; isProd: boolean } {
+  let host = 'неизвестно';
+  try {
+    host = new URL(getDatabaseUrl()).hostname;
+  } catch {
+    // getDatabaseUrl бросит понятную ошибку позже, в connect()
+  }
+  return { host, isProd: PROD_ENDPOINTS.some((ep) => host.startsWith(ep)) };
+}
+
 /** Текст ошибки для вывода: у сетевых ошибок (AggregateError) message пустой — берём вложенные. */
 export function describeError(error: unknown): string {
   if (error instanceof AggregateError && error.errors.length > 0) {

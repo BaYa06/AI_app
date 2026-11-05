@@ -247,9 +247,19 @@
   - Индексы: `(collection_id, position)` уникальный, `(subject_id, status)` у подборок, ключ подборки
     `(subject_id, track, level, title)`. `book_unit_imports(user_id)` покрыт `UNIQUE (user_id, unit_id)`.
   - Начальные строки предметов: Языки, История, География, ОРТ и НЦТ, Наука; разделы истории и ОРТ.
-- [ ] **Catalog 2. Excel.**
-  - `scripts/create-library-template.ts`: листы «Предметы», «Разделы», новые колонки «Наборов», выпадающие списки.
-  - `scripts/import-library.ts`: подборки, порядок, проверки, `kind` и `category` из предмета, отчёт `--dry-run`.
+- [x] **Catalog 2. Excel.** ✅ (проверка на staging-базе — за пользователем, см. ниже)
+  - `scripts/create-library-template.ts`: листы «Предметы», «Разделы», новые колонки «Наборов», выпадающие списки
+    (предмет, уровень, набор у карточки). Примеры проходят проверку.
+  - `scripts/lib/libraryExcel.ts`: разбор файла + `validateCatalog` (шкала уровней, разделы, track = language_from
+    у языков, номера 1..N). `a2` → `A2`, «Основы» → `basic`. Колонки старого формата пропускаются с предупреждением.
+  - `scripts/import-library.ts`: предметы и разделы из файла поверх базы, подборки (порядок — первое появление в файле),
+    наборы с подборкой и номером. Номера затронутых подборок сначала снимаются, потом ставятся заново;
+    набор, которого в подборке больше нет, отвязывается. `kind` и `category` из предмета, `tags` / `cover_emoji` не трогаются.
+  - **Защита прода** (найдено 05.11.2026: `.env.local` смотрит в прод, endpoint `ep-misty-scene`). Скрипт печатает базу
+    и без `--prod` отказывается работать с продом, даже с `--dry-run` (`scripts/lib/db.ts`, `PROD_ENDPOINTS`).
+    Staging: `DATABASE_URL_UNPOOLED='<строка staging>' npx tsx scripts/import-library.ts файл.xlsx --dry-run`.
+  - Проверено без базы: шаблон, `plan/ideas/library_catalog_languages_example.xlsx`, файл с 7 видами ошибок.
+    Осталось: `--dry-run` и `--publish` на staging.
 - [ ] **Catalog 3. Сервер: чтение каталога.** Новые `action` в `api/library.js`, старые не меняются.
   - `catalog`: видимые предметы, «Продолжить» или «С чего начать», полка учебников.
   - `subject&id`: разделы, непустые уровни, подборки с «N наборов / добавлено k».
