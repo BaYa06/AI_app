@@ -61,7 +61,6 @@ import {
   Skeleton,
   SkeletonCard,
   TextField,
-  confirmDialog,
   toast,
   useTabBarOverlayInset,
 } from '@/components/ui';
@@ -129,7 +128,6 @@ import { AddByLinkSheet } from '@/components/share/AddByLinkSheet';
 import { requestOpenShare } from '@/services/shareLinks';
 import { useWhatsNewOnHome } from '@/components/whatsNew/useWhatsNewOnHome';
 import { WhatsNewSheet } from '@/components/whatsNew/WhatsNewSheet';
-import { log } from '@/utils/logger';
 
 import {
   DEFAULT_SETS_SORT,
@@ -140,6 +138,7 @@ import {
 } from './home/setsSort';
 import { pickCardsForGame } from './home/pickCardsForGame';
 import { styles } from './home/styles';
+import { useCourseInvite } from './home/useCourseInvite';
 import { SetListItem } from './home/components/SetListItem';
 import { SetActionSheet } from './home/components/SetActionSheet';
 import { SetsSortSheet } from './home/components/SetsSortSheet';
@@ -228,12 +227,6 @@ export function HomeScreen({ navigation, route }: any) {
   const [onlyHard, setOnlyHard] = useState(false);
   const isTeacher = useSettingsStore((s) => s.isTeacher);
   const fetchIsTeacher = useSettingsStore((s) => s.fetchIsTeacher);
-  const [inviteModalCourseId, setInviteModalCourseId] = useState<string | null>(null);
-  const [inviteCopied, setInviteCopied] = useState(false);
-  const [inviteToken, setInviteToken] = useState<string | null>(null);
-  const [inviteJoinCode, setInviteJoinCode] = useState<string | null>(null);
-  const [inviteLoading, setInviteLoading] = useState(false);
-  const [inviteRegenerating, setInviteRegenerating] = useState(false);
   const [joinByCodeVisible, setJoinByCodeVisible] = useState(false);
   const [addByLinkVisible, setAddByLinkVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -486,6 +479,19 @@ export function HomeScreen({ navigation, route }: any) {
     },
     [drawerMounted]
   );
+
+  const {
+    inviteModalCourseId,
+    inviteCopied,
+    setInviteCopied,
+    inviteToken,
+    inviteJoinCode,
+    inviteLoading,
+    inviteRegenerating,
+    openInviteModal,
+    closeInviteModal,
+    handleRegenerateInvite,
+  } = useCourseInvite({ runAfterDrawerClosed, setCourseMenuOpen });
 
   useEffect(() => {
     if (drawerMounted || !afterDrawerClosedRef.current) return;
@@ -1430,64 +1436,6 @@ export function HomeScreen({ navigation, route }: any) {
     }
     return `Удалить курс «${deleteModalCourse.title}»?`;
   }, [deleteModalCourse, deleteModalHasSets, deleteModalStats, formatSetWord]);
-
-  const openInviteModal = useCallback(
-    async (courseId: string) => {
-      setCourseMenuOpen(null);
-      setInviteCopied(false);
-      setInviteToken(null);
-      setInviteJoinCode(null);
-      setInviteLoading(true);
-      // Окно — только после закрытия боковой панели (иначе iOS покажет его под панелью и оно пропадёт)
-      runAfterDrawerClosed(() => setInviteModalCourseId(courseId));
-      try {
-        const authSession = await getSession();
-        const userId = authSession?.user?.id;
-        if (userId) {
-          const result = await NeonService.createCourseInvite(courseId, userId);
-          setInviteToken(result?.token ?? null);
-          setInviteJoinCode(result?.joinCode ?? null);
-        }
-      } catch (error) {
-        log.error('Home', 'Failed to create invite', error);
-      } finally {
-        setInviteLoading(false);
-      }
-    },
-    [runAfterDrawerClosed]
-  );
-
-  const closeInviteModal = useCallback(() => {
-    setInviteModalCourseId(null);
-    setInviteCopied(false);
-    setInviteToken(null);
-    setInviteJoinCode(null);
-  }, []);
-
-  const handleRegenerateInvite = useCallback(async () => {
-    if (!inviteModalCourseId) return;
-    const confirmed = await confirmDialog({
-      title: 'Обновить код приглашения?',
-      message:
-        'Старые ссылка и код перестанут работать — ученики, у которых они есть, больше не смогут по ним присоединиться.',
-      confirmText: 'Обновить',
-      destructive: true,
-    });
-    if (!confirmed) return;
-    setInviteRegenerating(true);
-    setInviteCopied(false);
-    try {
-      const result = await NeonService.regenerateCourseInvite(inviteModalCourseId);
-      if (result) {
-        setInviteToken(result.token);
-        setInviteJoinCode(result.joinCode);
-      } else {
-        toast.error('Не удалось обновить код приглашения');
-      }
-    } finally {
-      setInviteRegenerating(false);
-    }
-  }, [inviteModalCourseId]);
 
   // Обработка удаления курса через модальное окно
   const openDeleteModal = useCallback(
