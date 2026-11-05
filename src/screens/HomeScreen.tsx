@@ -11,8 +11,6 @@ import {
   TextInput as RNTextInput,
   Platform,
   Clipboard,
-  Share,
-  ActivityIndicator,
   RefreshControl,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -60,12 +58,8 @@ import {
   Button,
   Card as SurfaceCard,
   Badge,
-  Dialog,
   EmptyState,
-  ListRow,
-  ProgressBar,
   SegmentedProgressBar,
-  Sheet,
   Skeleton,
   SkeletonCard,
   TextField,
@@ -81,13 +75,10 @@ import {
   MoreVertical,
   MoreHorizontal,
   X,
-  Eye,
   EyeOff,
   BookOpen,
   Folder,
-  Edit2,
   ArrowUpDown,
-  Check,
   RotateCcw,
   Users,
   Flame,
@@ -97,9 +88,8 @@ import {
   Clock,
   GraduationCap,
   Trophy,
-  FolderInput,
 } from 'lucide-react-native';
-import { StreakService, getLocalDateKey } from '@/services/StreakService';
+import { StreakService } from '@/services/StreakService';
 import { getSession } from '@/services/auth/session';
 import { NeonService, type CourseLeaderboard } from '@/services/NeonService';
 import { leaderboardSeenKey, type LeaderboardSeen } from '@/screens/CourseLeaderboardScreen';
@@ -158,6 +148,13 @@ import {
 } from './home/setsSort';
 import { pickCardsForGame } from './home/pickCardsForGame';
 import { styles } from './home/styles';
+import { SetActionSheet } from './home/components/SetActionSheet';
+import { SetsSortSheet } from './home/components/SetsSortSheet';
+import { InviteStudentsDialog } from './home/components/InviteStudentsDialog';
+import { LeaveCourseDialog } from './home/components/LeaveCourseDialog';
+import { DeleteCourseDialog } from './home/components/DeleteCourseDialog';
+import { EditCourseDialog } from './home/components/EditCourseDialog';
+import { StreakDialog } from './home/components/StreakDialog';
 
 export function HomeScreen({ navigation, route }: any) {
   const colors = useThemeColors();
@@ -2354,284 +2351,67 @@ export function HomeScreen({ navigation, route }: any) {
         />
 
         {/* Edit Course Modal */}
-        <Dialog
-          visible={isEditModalVisible}
-          onClose={cancelCourseEdit}
-          title="Переименовать курс"
-          headerRight={closeButton(cancelCourseEdit)}
-          footer={
-            <View style={styles.dialogButtons}>
-              <Button
-                variant="quiet"
-                tone="secondary"
-                title="Отмена"
-                onPress={cancelCourseEdit}
-                style={styles.flex1}
-              />
-              <Button
-                title="Сохранить"
-                onPress={() => editingCourseId && saveCourseTitle(editingCourseId)}
-                style={styles.flex1}
-              />
-            </View>
-          }
-        >
-          <TextField
-            ref={editModalInputRef}
-            icon={Folder}
-            placeholder="Название курса..."
-            value={editingTitle}
-            onChangeText={setEditingTitle}
-            onSubmitEditing={() => editingCourseId && saveCourseTitle(editingCourseId)}
-            inputStyle={Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : undefined}
-          />
-        </Dialog>
+        <EditCourseDialog
+          isEditModalVisible={isEditModalVisible}
+          cancelCourseEdit={cancelCourseEdit}
+          closeButton={closeButton}
+          editModalInputRef={editModalInputRef}
+          editingCourseId={editingCourseId}
+          editingTitle={editingTitle}
+          setEditingTitle={setEditingTitle}
+          saveCourseTitle={saveCourseTitle}
+        />
 
         {/* Delete Course Modal */}
-        <Dialog
-          visible={deleteModalCourseId !== null}
-          onClose={closeDeleteModal}
-          title="Удаление курса"
-          headerRight={closeButton(closeDeleteModal)}
-          footer={
-            <View style={styles.dialogButtons}>
-              <Button
-                variant="quiet"
-                tone="secondary"
-                title="Отмена"
-                onPress={closeDeleteModal}
-                style={styles.flex1}
-              />
-              <Button
-                variant="danger"
-                filled
-                title="Удалить"
-                onPress={confirmDeleteCourse}
-                disabled={deleteModalHasSets && !deleteConfirmed}
-                style={styles.flex1}
-              />
-            </View>
-          }
-        >
-          <Text variant="body" style={{ color: colors.textPrimary }}>
-            {deleteModalMessage}
-          </Text>
-          {deleteModalHasSets && (
-            <>
-              {!!deleteModalStudents && (
-                <Text
-                  variant="body"
-                  style={[styles.semibold, styles.dialogNote, { color: colors.warningText }]}
-                >
-                  {`У ${deleteModalStudents} ${pluralize(deleteModalStudents, 'ученика', 'учеников', 'учеников')} пропадут наборы этого курса.`}
-                </Text>
-              )}
-              <Pressable
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: deleteConfirmed }}
-                onPress={() => {
-                  triggerHaptic('selection');
-                  setDeleteConfirmed((v) => !v);
-                }}
-                style={styles.deleteConfirmRow}
-              >
-                <View
-                  style={[
-                    styles.deleteConfirmBox,
-                    deleteConfirmed
-                      ? { backgroundColor: colors.error, borderColor: colors.error }
-                      : { borderColor: colors.border, backgroundColor: colors.surface },
-                  ]}
-                >
-                  {deleteConfirmed && <Check size={iconSize.xs} color={colors.onPrimary} />}
-                </View>
-                <Text variant="body" style={[styles.flex1, { color: colors.textPrimary }]}>
-                  Я понимаю, что наборы и прогресс удалятся навсегда
-                </Text>
-              </Pressable>
-              <Text
-                variant="bodySmall"
-                style={[styles.dialogNote, { color: colors.textSecondary }]}
-              >
-                Хочешь сохранить набор? Сначала перенеси его в «Мои наборы».
-              </Text>
-            </>
-          )}
-        </Dialog>
+        <DeleteCourseDialog
+          deleteModalCourseId={deleteModalCourseId}
+          closeDeleteModal={closeDeleteModal}
+          closeButton={closeButton}
+          colors={colors}
+          confirmDeleteCourse={confirmDeleteCourse}
+          deleteConfirmed={deleteConfirmed}
+          setDeleteConfirmed={setDeleteConfirmed}
+          deleteModalHasSets={deleteModalHasSets}
+          deleteModalMessage={deleteModalMessage}
+          deleteModalStudents={deleteModalStudents}
+        />
 
         {/* Leave Course Modal */}
-        <Dialog
-          visible={leaveModalCourseId !== null}
-          onClose={() => !leaveLoading && setLeaveModalCourseId(null)}
-          title="Выйти из курса?"
-          headerRight={closeButton(() => setLeaveModalCourseId(null), leaveLoading)}
-          footer={
-            <View style={styles.dialogButtons}>
-              <Button
-                variant="quiet"
-                tone="secondary"
-                title="Отмена"
-                onPress={() => setLeaveModalCourseId(null)}
-                disabled={leaveLoading}
-                style={styles.flex1}
-              />
-              <Button
-                variant="danger"
-                filled
-                title="Выйти"
-                onPress={handleLeaveCourse}
-                loading={leaveLoading}
-                style={styles.flex1}
-              />
-            </View>
-          }
-        >
-          <Text variant="body" style={{ color: colors.textPrimary }}>
-            {`Ты покинешь курс "${leaveModalCourseTitle}" и потеряешь доступ ко всем его материалам.`}
-          </Text>
-        </Dialog>
+        <LeaveCourseDialog
+          leaveModalCourseId={leaveModalCourseId}
+          setLeaveModalCourseId={setLeaveModalCourseId}
+          closeButton={closeButton}
+          colors={colors}
+          handleLeaveCourse={handleLeaveCourse}
+          leaveLoading={leaveLoading}
+          leaveModalCourseTitle={leaveModalCourseTitle}
+        />
 
         {/* Invite Students Modal */}
-        <Dialog
-          visible={inviteModalCourseId !== null}
-          onClose={closeInviteModal}
-          title="Пригласить учеников"
-          headerRight={closeButton(closeInviteModal)}
-        >
-          <Text
-            variant="bodySmall"
-            style={[styles.inviteDescription, { color: colors.textSecondary }]}
-          >
-            Поделись ссылкой или кодом — ученики смогут присоединиться к курсу.
-          </Text>
-
-          {inviteLoading ? (
-            <ActivityIndicator size="small" color={colors.primary} style={styles.inviteSpinner} />
-          ) : inviteToken ? (
-            <>
-              {/* Код курса */}
-              {inviteJoinCode && (
-                <View style={styles.inviteCodeBlock}>
-                  <Text
-                    variant="label"
-                    style={[styles.inviteCodeLabel, { color: colors.textSecondary }]}
-                  >
-                    Код курса
-                  </Text>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`Код курса ${inviteJoinCode.split('').join(' ')}. Нажми, чтобы скопировать`}
-                    style={[
-                      styles.inviteBox,
-                      styles.inviteCodeBox,
-                      {
-                        backgroundColor: colors.surfaceMuted,
-                        borderColor: alpha(colors.primary, 40),
-                      },
-                    ]}
-                    onPress={() => copyToClipboard(inviteJoinCode)}
-                  >
-                    <Text variant="h1" style={[styles.inviteCode, { color: colors.primary }]}>
-                      {inviteJoinCode}
-                    </Text>
-                  </Pressable>
-                </View>
-              )}
-
-              <Pressable
-                accessibilityRole="button"
-                accessibilityHint="Удерживай, чтобы скопировать ссылку"
-                style={[
-                  styles.inviteBox,
-                  { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
-                ]}
-                onLongPress={() => {
-                  copyToClipboard(`${inviteBaseUrl}/join/${inviteToken}`);
-                  setInviteCopied(true);
-                }}
-              >
-                <Text
-                  variant="label"
-                  style={{ color: colors.primary }}
-                  numberOfLines={1}
-                  selectable
-                >
-                  {`${inviteBaseUrl}/join/${inviteToken}`}
-                </Text>
-              </Pressable>
-
-              <View style={styles.dialogButtons}>
-                <Button
-                  title={inviteCopied ? 'Скопировано' : 'Копировать'}
-                  icon={inviteCopied ? Check : undefined}
-                  onPress={() => {
-                    copyToClipboard(`${inviteBaseUrl}/join/${inviteToken}`);
-                    setInviteCopied(true);
-                  }}
-                  style={styles.flex1}
-                />
-                <Button
-                  variant="secondary"
-                  title="Поделиться"
-                  onPress={async () => {
-                    try {
-                      await Share.share({ message: `${inviteBaseUrl}/join/${inviteToken}` });
-                    } catch {}
-                  }}
-                  style={styles.flex1}
-                />
-              </View>
-
-              <Button
-                variant="quiet"
-                tone="secondary"
-                title="Обновить код приглашения"
-                onPress={handleRegenerateInvite}
-                loading={inviteRegenerating}
-                fullWidth
-                style={styles.inviteRegenerate}
-              />
-            </>
-          ) : (
-            <Text variant="bodySmall" style={{ color: colors.errorText }}>
-              Не удалось создать ссылку
-            </Text>
-          )}
-        </Dialog>
+        <InviteStudentsDialog
+          inviteModalCourseId={inviteModalCourseId}
+          closeInviteModal={closeInviteModal}
+          closeButton={closeButton}
+          colors={colors}
+          copyToClipboard={copyToClipboard}
+          handleRegenerateInvite={handleRegenerateInvite}
+          inviteBaseUrl={inviteBaseUrl}
+          inviteCopied={inviteCopied}
+          setInviteCopied={setInviteCopied}
+          inviteJoinCode={inviteJoinCode}
+          inviteLoading={inviteLoading}
+          inviteRegenerating={inviteRegenerating}
+          inviteToken={inviteToken}
+        />
 
         {/* Sort Sheet */}
-        <Sheet
-          visible={sortSheetVisible}
-          onClose={() => setSortSheetVisible(false)}
-          title="Сортировка"
-        >
-          {SETS_SORT_OPTIONS.map((option) => {
-            const selected = option.key === setsSort;
-            return (
-              <Pressable
-                key={option.key}
-                onPress={() => selectSetsSort(option.key)}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-                style={({ pressed }) => [
-                  styles.sortOption,
-                  pressed && { backgroundColor: colors.surfaceMuted },
-                ]}
-              >
-                <Text
-                  variant="body"
-                  style={[
-                    { color: selected ? colors.primary : colors.textPrimary },
-                    selected && styles.semibold,
-                  ]}
-                >
-                  {option.label}
-                </Text>
-                {selected && <Check size={iconSize.s} color={colors.primary} />}
-              </Pressable>
-            );
-          })}
-        </Sheet>
+        <SetsSortSheet
+          sortSheetVisible={sortSheetVisible}
+          setSortSheetVisible={setSortSheetVisible}
+          colors={colors}
+          setsSort={setsSort}
+          selectSetsSort={selectSetsSort}
+        />
 
         <SetsSectionMenu
           visible={setsMenuVisible}
@@ -2727,159 +2507,24 @@ export function HomeScreen({ navigation, route }: any) {
         />
 
         {/* Streak Modal */}
-        <Dialog
-          visible={streakModalVisible}
-          onClose={closeStreakModal}
-          placement="top"
-          style={styles.streakCard}
-        >
-          {/* Section 1: Header */}
-          <View style={styles.streakTop}>
-            <View
-              style={[
-                styles.streakTopIcon,
-                todayGoalReached
-                  ? {
-                      backgroundColor: alpha(colors.streak, 10),
-                      borderColor: alpha(colors.streak, 40),
-                    }
-                  : { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
-              ]}
-            >
-              <Flame
-                size={iconSize.l}
-                color={todayGoalReached ? colors.streak : colors.textTertiary}
-              />
-            </View>
-            <View style={styles.streakTopText}>
-              <Text variant="overline" style={{ color: colors.textSecondary }}>
-                Ударный режим
-              </Text>
-              <Text variant="h2" style={{ color: colors.textPrimary }}>
-                {formatDays(streakValue)}
-              </Text>
-            </View>
-          </View>
-
-          {/* Week grid */}
-          <View style={styles.weekGrid}>
-            {(() => {
-              const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-              const today = new Date();
-              const todayKey = getLocalDateKey();
-
-              // Форматтер для получения YYYY-MM-DD в правильном timezone
-              const dateFmt = new Intl.DateTimeFormat('en-CA', {
-                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-              });
-              // Определяем день недели из todayKey (надёжнее чем getDay())
-              const todayParsed = new Date(todayKey + 'T12:00:00');
-              const todayIndex = (todayParsed.getDay() + 6) % 7; // Пн = 0
-
-              // Создаём Set дат, когда была активность (из реальных данных БД)
-              const activeDates = new Set(
-                weekActivity.filter((a) => a.cards_studied >= 10).map((a) => a.local_date)
-              );
-
-              return weekDays.map((day, idx) => {
-                const isToday = idx === todayIndex;
-                // Вычисляем дату для каждой ячейки
-                const dateForCell = new Date(today);
-                const diff = idx - todayIndex;
-                dateForCell.setDate(today.getDate() + diff);
-                const dayNumber = parseInt(dateFmt.format(dateForCell).split('-')[2], 10);
-                const dateKey = dateFmt.format(dateForCell); // YYYY-MM-DD в local tz
-                const isFuture = dateKey > todayKey;
-                const done = !isFuture && activeDates.has(dateKey);
-                return (
-                  <View key={day} style={styles.weekItem}>
-                    <Text
-                      variant="overline"
-                      style={{ color: isToday ? colors.primary : colors.textSecondary }}
-                    >
-                      {day}
-                    </Text>
-                    <View
-                      accessible
-                      accessibilityLabel={`${day}, ${dayNumber}: ${done ? 'цель выполнена' : isToday ? 'сегодня' : 'нет занятий'}`}
-                      style={[
-                        styles.weekCircle,
-                        done
-                          ? { backgroundColor: colors.success, borderColor: colors.success }
-                          : { borderColor: isToday ? colors.primary : colors.border },
-                      ]}
-                    >
-                      {done ? (
-                        <Check size={iconSize.xs} color={colors.onPrimary} strokeWidth={3} />
-                      ) : (
-                        <Text
-                          variant="caption"
-                          style={[
-                            styles.bold,
-                            { color: isToday ? colors.primary : colors.textSecondary },
-                          ]}
-                        >
-                          {dayNumber}
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-                );
-              });
-            })()}
-          </View>
-
-          {/* Section 3: Progress / goal */}
-          <View style={styles.goalCard}>
-            <View style={styles.goalHeader}>
-              <View>
-                <Text variant="overline" style={{ color: colors.textSecondary }}>
-                  Карточки
-                </Text>
-                <Text variant="h3" style={[styles.bold, { color: colors.textPrimary }]}>
-                  {cardsLearned}
-                  <Text variant="h3" style={{ color: colors.textSecondary }}>
-                    /{dailyGoal}
-                  </Text>
-                </Text>
-              </View>
-              <Text variant="overline" style={{ color: colors.primary }}>
-                Дневная цель
-              </Text>
-            </View>
-            <ProgressBar progress={goalProgress} accessibilityLabel="Дневная цель" />
-          </View>
-
-          <Text variant="bodySmall" align="center" style={{ color: colors.textSecondary }}>
-            {streakSupportText}
-          </Text>
-
-          {streakFreezes !== null && (
-            <View style={[styles.freezeRow, { borderColor: colors.border }]}>
-              <View style={styles.flex1}>
-                <Text variant="body" style={[styles.semibold, { color: colors.textPrimary }]}>
-                  Заморозка серии: {streakFreezes} из {MAX_STREAK_FREEZES}
-                </Text>
-                <Text variant="caption" style={{ color: colors.textSecondary }}>
-                  Спасёт серию, если пропустишь один день
-                </Text>
-              </View>
-              {streakFreezes < MAX_STREAK_FREEZES && (
-                <Button
-                  size="s"
-                  icon={Gem}
-                  title={String(STREAK_FREEZE_PRICE)}
-                  accessibilityLabel={`Купить заморозку за ${STREAK_FREEZE_PRICE} алмазов`}
-                  onPress={handleBuyStreakFreeze}
-                  loading={buyingFreeze}
-                />
-              )}
-            </View>
-          )}
-        </Dialog>
+        <StreakDialog
+          streakModalVisible={streakModalVisible}
+          closeStreakModal={closeStreakModal}
+          colors={colors}
+          todayGoalReached={todayGoalReached}
+          formatDays={formatDays}
+          streakValue={streakValue}
+          weekActivity={weekActivity}
+          cardsLearned={cardsLearned}
+          dailyGoal={dailyGoal}
+          goalProgress={goalProgress}
+          streakSupportText={streakSupportText}
+          streakFreezes={streakFreezes}
+          MAX_STREAK_FREEZES={MAX_STREAK_FREEZES}
+          STREAK_FREEZE_PRICE={STREAK_FREEZE_PRICE}
+          handleBuyStreakFreeze={handleBuyStreakFreeze}
+          buyingFreeze={buyingFreeze}
+        />
 
         <WhatsNewSheet {...whatsNew} />
 
@@ -2897,74 +2542,19 @@ export function HomeScreen({ navigation, route }: any) {
           }}
         />
         {/* Set Action Sheet */}
-        <Sheet visible={!!setMenuTarget} onClose={closeSetMenu}>
-          {setMenuMoving && setMenuTarget ? (
-            <>
-              {[{ id: null as string | null, title: 'Мои наборы' }, ...moveTargetCourses].map(
-                (c) => {
-                  const current = (setMenuTarget.courseId ?? null) === c.id;
-                  return (
-                    <ListRow
-                      key={c.id ?? 'my-sets'}
-                      icon={c.id ? Folder : Library}
-                      iconColor={current ? colors.primary : colors.textPrimary}
-                      title={c.title}
-                      right={
-                        current ? <Check size={iconSize.s} color={colors.primary} /> : undefined
-                      }
-                      chevron={false}
-                      onPress={() => handleMoveSet(setMenuTarget, c.id)}
-                      style={styles.sheetRow}
-                    />
-                  );
-                }
-              )}
-            </>
-          ) : (
-            <>
-              <ListRow
-                icon={Edit2}
-                iconColor={colors.textPrimary}
-                title="Редактировать"
-                chevron={false}
-                onPress={() => {
-                  if (setMenuTarget) {
-                    navigation?.navigate('SetEditor', {
-                      setId: setMenuTarget.id,
-                      autoFocusTitle: true,
-                    });
-                    setSetMenuTarget(null);
-                  }
-                }}
-                style={styles.sheetRow}
-              />
-              {setMenuTarget?.courseId && isTeacher && (
-                <ListRow
-                  icon={setMenuTarget.isHiddenFromStudents ? Eye : EyeOff}
-                  iconColor={
-                    setMenuTarget.isHiddenFromStudents ? colors.primary : colors.textSecondary
-                  }
-                  title={
-                    setMenuTarget.isHiddenFromStudents ? 'Показать ученикам' : 'Скрыть от учеников'
-                  }
-                  chevron={false}
-                  onPress={() => setMenuTarget && handleToggleSetHidden(setMenuTarget)}
-                  style={styles.sheetRow}
-                />
-              )}
-              {setMenuTarget && !setMenuTarget.isReadOnly && !setMenuTarget.isOfficial && (
-                <ListRow
-                  icon={FolderInput}
-                  iconColor={colors.textPrimary}
-                  title="Переместить в курс…"
-                  chevron={false}
-                  onPress={() => setSetMenuMoving(true)}
-                  style={styles.sheetRow}
-                />
-              )}
-            </>
-          )}
-        </Sheet>
+        <SetActionSheet
+          setMenuTarget={setMenuTarget}
+          setSetMenuTarget={setSetMenuTarget}
+          setMenuMoving={setMenuMoving}
+          setSetMenuMoving={setSetMenuMoving}
+          closeSetMenu={closeSetMenu}
+          colors={colors}
+          handleMoveSet={handleMoveSet}
+          handleToggleSetHidden={handleToggleSetHidden}
+          isTeacher={isTeacher}
+          moveTargetCourses={moveTargetCourses}
+          navigation={navigation}
+        />
         <DiamondReward
           ref={diamondRewardRef}
           targetPosition={diamondTargetPos}
