@@ -173,6 +173,11 @@ LiveTest, TestWaiting, TestExam, TestDone, TestResultsTeacher, TestHistory), Not
 типизированного ExamService (переписал бы ветки 409/left, describeTestError) выбрана замена
 1:1. Таймаут для экзаменов — сознательно не добавлен (изменение поведения), можно отдельным
 решением. 17 запросов, тест rawApiFetch (4 случая).
+**5j ✅ 05.11.2026** — `src/services/realtime.ts` (createChannel / removeChannel — те же вызовы
+supabase) для 4 экранов экзаменов и useCourseRealtime; utils/distractors на rawApiFetch; из
+ApiService удалены мёртвые checkDatabase/initDatabase. whatsNew и ApiService.generateExamples
+остаются на fetch — они в src/services, правилу «fetch только в сервисах» это не противоречит.
+`supabase` в интерфейсе теперь импортируют только SignIn, Welcome, EmailAuth, Profile.
 Подшаги: 5a session.ts + тест · 5b сервисы и сторы на session.ts (+ удалить мёртвый AuthService)
 · 5c api/client.ts + тест · 5d call*Api сервисов на клиент (контракты null/ApiResult/reason те же)
 · 5e экраны: getSession → getUserId/getCurrentUser · 5f ExamService + useExamExitGuard

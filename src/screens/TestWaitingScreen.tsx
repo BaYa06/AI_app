@@ -9,7 +9,7 @@ import { Text } from '@/components/common';
 import { Badge, Button, Card, Screen, ScreenHeader } from '@/components/ui';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha, iconSize, type ColorToken } from '@/constants';
-import { supabase } from '@/services/supabaseClient';
+import { createChannel, removeChannel } from '@/services/realtime';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 import { pluralize } from '@/utils';
@@ -154,7 +154,7 @@ export function TestWaitingScreen({ navigation, route }: Props) {
 
   // Realtime: мгновенный старт (без ожидания следующего polling)
   useEffect(() => {
-    const channel = supabase.channel(`test:${sessionId}`);
+    const channel = createChannel(`test:${sessionId}`);
 
     channel
       .on('broadcast', { event: 'test_started' }, onTestStarted)
@@ -171,7 +171,7 @@ export function TestWaitingScreen({ navigation, route }: Props) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      removeChannel(channel);
     };
   }, [sessionId, onTestStarted]);
 

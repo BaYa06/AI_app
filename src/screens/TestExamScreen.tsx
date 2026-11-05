@@ -20,7 +20,7 @@ import {
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha, heights, screenPadding, iconSize } from '@/constants';
 import { useExamExitGuard, leaveExam, type ExamAttemptSummary } from '@/hooks/useExamExitGuard';
-import { supabase } from '@/services/supabaseClient';
+import { createChannel, removeChannel } from '@/services/realtime';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 
@@ -209,14 +209,14 @@ export function TestExamScreen({ navigation, route }: Props) {
 
   // Realtime: учитель принудительно завершил тест
   useEffect(() => {
-    const channel = supabase.channel(`test:${sessionId}:exam`);
+    const channel = createChannel(`test:${sessionId}:exam`);
     channel
       .on('broadcast', { event: 'test_finished' }, () => {
         finishExam();
       })
       .subscribe();
     return () => {
-      supabase.removeChannel(channel);
+      removeChannel(channel);
     };
   }, [sessionId, finishExam]);
 

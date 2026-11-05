@@ -18,10 +18,9 @@ import { GraduationCap, Copy, UserPlus, CheckCircle2, ArrowRight } from 'lucide-
 import { Text } from '@/components/common';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha, type ColorToken } from '@/constants';
-import { supabase } from '@/services/supabaseClient';
+import { createChannel, removeChannel, type RealtimeChannel } from '@/services/realtime';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
-import type { RealtimeChannel } from '@supabase/supabase-js';
 
 import { describeTestError } from '@/utils/testApiErrors';
 import { BottomBar } from '@/components/ui';
@@ -86,7 +85,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
 
   // Realtime — мгновенное добавление студента (без ожидания следующего polling)
   useEffect(() => {
-    const channel = supabase.channel(`test:${sessionId}`);
+    const channel = createChannel(`test:${sessionId}`);
     channelRef.current = channel;
 
     channel
@@ -107,7 +106,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      removeChannel(channel);
     };
   }, [sessionId]);
 

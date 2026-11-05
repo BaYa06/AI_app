@@ -10,7 +10,7 @@
  */
 
 import type { Card } from '@/types';
-import { API_BASE } from '@/config/apiBase';
+import { rawApiFetch } from '@/services/api/client';
 import { hasAiConsent } from '@/services/aiConsent';
 
 function shuffle<T>(arr: T[]): T[] {
@@ -61,10 +61,10 @@ async function generateAIDistractors(card: Card, count: number): Promise<string[
   // Фоновый запрос в ИИ — только с уже данным согласием, окно здесь не показываем
   if (!hasAiConsent()) return [];
   try {
-    const res = await fetch(`${API_BASE}/context?action=distractors`, {
+    const res = await rawApiFetch('context?action=distractors', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      body: {
         word: card.frontText,
         translation: card.backText,
         wordType: card.wordType || 'other',
@@ -72,7 +72,7 @@ async function generateAIDistractors(card: Card, count: number): Promise<string[
         // Предложение с пропуском — чтобы ИИ не предложил слово, которое тоже подходит
         example: card.example || undefined,
         wordForm: card.wordForm || undefined,
-      }),
+      },
     });
     if (!res.ok) return [];
     const json = await res.json();

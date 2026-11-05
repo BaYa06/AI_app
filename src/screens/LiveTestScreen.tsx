@@ -10,7 +10,7 @@ import { Text } from '@/components/common';
 import { Badge, Button, confirmDialog, toast, BottomBar } from '@/components/ui';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha, type ColorToken, iconSize } from '@/constants';
-import { supabase } from '@/services/supabaseClient';
+import { createChannel, removeChannel } from '@/services/realtime';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 
@@ -163,7 +163,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
   // Realtime: progress_update — сопоставление по userId, а не по displayName (два "Гостя" в
   // одной сессии раньше перезаписывали друг друга, т.к. имена не уникальны). См. план, пункт 43.
   useEffect(() => {
-    const channel = supabase.channel(`test:${sessionId}`);
+    const channel = createChannel(`test:${sessionId}`);
     channel
       .on('broadcast', { event: 'progress_update' }, ({ payload }) => {
         if (!payload) return;
@@ -228,7 +228,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      removeChannel(channel);
     };
   }, [sessionId, questionCount]);
 
