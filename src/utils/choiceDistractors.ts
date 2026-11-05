@@ -13,12 +13,13 @@
  * Сравниваются ответы (оборот карточки), потому что их и показывает тест.
  */
 import type { Card } from '@/types';
+import { cardBack } from '@/utils/cardText';
 
 const MAX_POOL = 600; // для больших наборов считаем баллы по случайной выборке — быстро
 const MIN_SAME_SET_POOL = 8; // меньше кандидатов в наборе — добираем из наборов с той же парой языков
 const RANDOM_JITTER = 0.15; // доля случайности в выборе среди похожих
 
-const answerOf = (card: Card) => card.backText ?? (card as any).back ?? '';
+const answerOf = (card: Card) => cardBack(card);
 
 /** Для сравнения: первая строка, нижний регистр, без скобок, знаков и лишних пробелов */
 export function normalizeAnswer(text: string): string {

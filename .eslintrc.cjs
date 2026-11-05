@@ -32,6 +32,8 @@ module.exports = {
             ignoreRestSiblings: true,
           },
         ],
+        // any виден в линте, но не блокирует: оставшиеся — ответы API и web-полифилы (Clean 6)
+        '@typescript-eslint/no-explicit-any': 'warn',
         'no-shadow': 'off',
         'no-undef': 'off',
         'react-hooks/exhaustive-deps': 'warn',

@@ -15,6 +15,7 @@ import { useThemeColors } from '@/store';
 import { Text } from '../common/Text';
 import { spacing, borderRadius, animation } from '@/constants';
 import type { Card } from '@/types';
+import { cardFront, cardBack } from '@/utils/cardText';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - spacing.l * 2;
@@ -28,8 +29,8 @@ interface FlashCardProps {
 
 export const FlashCard = memo<FlashCardProps>(function FlashCard({ card, isFlipped, onFlip }) {
   const colors = useThemeColors();
-  const front = card.frontText ?? (card as any).front ?? '';
-  const back = card.backText ?? (card as any).back ?? '';
+  const front = cardFront(card);
+  const back = cardBack(card);
   const flipProgress = useSharedValue(0);
 
   // Анимация переворота

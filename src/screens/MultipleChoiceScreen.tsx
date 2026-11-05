@@ -44,6 +44,7 @@ import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card, Rating } from '@/types';
 import { pluralize } from '@/utils';
 import { log } from '@/utils/logger';
+import { cardFront, cardBack } from '@/utils/cardText';
 
 type Props = RootStackScreenProps<'MultipleChoice'>;
 
@@ -140,8 +141,8 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
   const [sniperStreak, setSniperStreak] = useState(0);
   const TARGET_STREAK = 5;
 
-  const getFront = (card: Card) => card.frontText ?? (card as any).front ?? '';
-  const getBack = (card: Card) => card.backText ?? (card as any).back ?? '';
+  const getFront = (card: Card) => cardFront(card);
+  const getBack = (card: Card) => cardBack(card);
 
   // Ответ в тесте: уровень карточки считает сервер (сверяет выбранный вариант), экран обновляется сразу
   const applySrsUpdate = React.useCallback(

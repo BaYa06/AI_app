@@ -26,6 +26,7 @@ import {
   preloadSound,
 } from '@/utils/sound';
 import { log } from '@/utils/logger';
+import { cardFront, cardBack } from '@/utils/cardText';
 
 type Props = RootStackScreenProps<'WordBuilder'>;
 
@@ -174,8 +175,8 @@ export function WordBuilderScreen({ navigation, route }: Props) {
 
   const currentCard = cardsQueue[currentIndex];
 
-  const getFront = (card: Card) => card.frontText ?? (card as any).front ?? '';
-  const getBack = (card: Card) => card.backText ?? (card as any).back ?? '';
+  const getFront = (card: Card) => cardFront(card);
+  const getBack = (card: Card) => cardBack(card);
 
   // Заранее озвучиваем слово текущей и следующей карточки — кнопка динамика играет сразу
   useEffect(() => {

@@ -60,6 +60,7 @@ import ReAnimated, {
   Easing as REasing,
 } from 'react-native-reanimated';
 import { log } from '@/utils/logger';
+import { cardFront, cardBack } from '@/utils/cardText';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = Math.min(340, SCREEN_WIDTH - 32);
@@ -247,7 +248,7 @@ export function StudyScreen({ navigation, route }: Props) {
     // Если переданы ошибочные карточки, фильтруем только их
     if (isErrorReview && errorCardsFronts) {
       cards = cards.filter((card) => {
-        const front = card.frontText ?? (card as any).front ?? '';
+        const front = cardFront(card);
         return errorCardsFronts.includes(front);
       });
       // В фазах повторяем ошибки сразу, без проверки расписания SRS (nextReviewDate)
@@ -447,8 +448,8 @@ export function StudyScreen({ navigation, route }: Props) {
           ...prev,
           {
             id: currentCard.id,
-            front: currentCard.frontText ?? (currentCard as any).front ?? '',
-            back: currentCard.backText ?? (currentCard as any).back ?? '',
+            front: cardFront(currentCard),
+            back: cardBack(currentCard),
             rating,
           },
         ]);
@@ -494,8 +495,8 @@ export function StudyScreen({ navigation, route }: Props) {
               ...errorCards,
               {
                 id: currentCard.id,
-                front: currentCard.frontText ?? (currentCard as any).front ?? '',
-                back: currentCard.backText ?? (currentCard as any).back ?? '',
+                front: cardFront(currentCard),
+                back: cardBack(currentCard),
                 rating,
               },
             ];
@@ -509,8 +510,8 @@ export function StudyScreen({ navigation, route }: Props) {
         const resolveErrorId = (card: { id?: string; front: string; back: string }) => {
           if (card.id) return card.id;
           const match = queueCards.find((c) => {
-            const front = c.frontText ?? (c as any).front ?? '';
-            const back = c.backText ?? (c as any).back ?? '';
+            const front = cardFront(c);
+            const back = cardBack(c);
             return front === card.front && back === card.back;
           });
           return match?.id;
@@ -824,8 +825,8 @@ export function StudyScreen({ navigation, route }: Props) {
       const card = useCardsStore.getState().cards[id];
       if (!card || !isCardSpeakable(card)) continue;
       const langs = cardSpeechLangs(card);
-      const front = (card.frontText ?? (card as any).front ?? '').trim();
-      const back = (card.backText ?? (card as any).back ?? '').trim();
+      const front = cardFront(card).trim();
+      const back = cardBack(card).trim();
       if (front) items.push({ text: front, lang: resolveSpeechLang(front, langs.front, back) });
       if (back) items.push({ text: back, lang: resolveSpeechLang(back, langs.back, front) });
     }
@@ -837,8 +838,8 @@ export function StudyScreen({ navigation, route }: Props) {
     return <Loading fullScreen message="Подготовка карточек..." />;
   }
 
-  const baseFront = currentCard.frontText ?? (currentCard as any).front ?? '';
-  const baseBack = currentCard.backText ?? (currentCard as any).back ?? '';
+  const baseFront = cardFront(currentCard);
+  const baseBack = cardBack(currentCard);
   const example = (currentCard as any).example ?? '';
 
   const questionText = reverseEnabled ? baseBack : baseFront;

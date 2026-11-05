@@ -15,6 +15,7 @@ const counterHint = (text: string, max: number) =>
   text.length >= max * 0.8 ? `${text.length}/${max}` : undefined;
 import { Button, ScreenHeader, TextField, confirmDialog, toast } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
+import { cardFront, cardBack } from '@/utils/cardText';
 
 type Props = RootStackScreenProps<'CardEditor'>;
 
@@ -51,8 +52,8 @@ export function CardEditorScreen({ navigation, route }: Props) {
     if (cardId) {
       const card = getCard(cardId);
       if (card) {
-        setFrontText(card.frontText ?? (card as any).front ?? '');
-        setBackText(card.backText ?? (card as any).back ?? '');
+        setFrontText(cardFront(card));
+        setBackText(cardBack(card));
       }
     }
   }, [cardId, getCard]);

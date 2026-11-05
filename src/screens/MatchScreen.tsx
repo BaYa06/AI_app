@@ -22,6 +22,7 @@ import {
 } from '@/utils/sound';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card } from '@/types';
+import { cardFront, cardBack } from '@/utils/cardText';
 
 type Props = RootStackScreenProps<'Match'>;
 
@@ -79,8 +80,8 @@ export function MatchScreen({ navigation, route }: Props) {
   const sheetTranslate = useRef(new Animated.Value(-220)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
 
-  const getFront = (card: Card) => card.frontText ?? (card as any).front ?? '';
-  const getBack = (card: Card) => card.backText ?? (card as any).back ?? '';
+  const getFront = (card: Card) => cardFront(card);
+  const getBack = (card: Card) => cardBack(card);
   const getFadeValue = useCallback((cardId: string) => {
     if (!fadeValues.current[cardId]) {
       fadeValues.current[cardId] = new Animated.Value(1);

@@ -60,6 +60,7 @@ import {
 } from 'lucide-react-native';
 import { describeError } from '@/utils/userErrors';
 import { pluralize } from '@/utils';
+import { cardFront, cardBack, type LegacyCard } from '@/utils/cardText';
 
 type Props = RootStackScreenProps<'SetDetail'>;
 type Filter = 'all' | 'mastered' | 'unmastered';
@@ -129,8 +130,8 @@ export function SetDetailScreen({ navigation, route }: Props) {
   const modalInputBg = colors.surface;
 
   const filteredCards = useMemo(() => {
-    const getFront = (card: Card) => card.frontText ?? (card as any).front ?? '';
-    const getBack = (card: Card) => card.backText ?? (card as any).back ?? '';
+    const getFront = (card: Card) => cardFront(card);
+    const getBack = (card: Card) => cardBack(card);
     const query = search.trim().toLowerCase();
 
     return cards
@@ -575,7 +576,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
         accessibilityRole="button"
         // Вложенные кнопки (изменить, меню) VoiceOver внутри доступного родителя не видит —
         // отдаём их действиями карточки (жест вверх/вниз)
-        accessibilityLabel={`${item.frontText ?? (item as any).front}. ${item.backText ?? (item as any).back}. ${STATUS_LABEL[getCardStatus(item)]}`}
+        accessibilityLabel={`${item.frontText ?? (item as LegacyCard).front}. ${item.backText ?? (item as LegacyCard).back}. ${STATUS_LABEL[getCardStatus(item)]}`}
         accessibilityActions={[
           { name: 'longpress', label: 'Посмотреть' },
           ...(isReadOnly
@@ -625,10 +626,10 @@ export function SetDetailScreen({ navigation, route }: Props) {
           style={[styles.cardFront, { color: colors.textPrimary }]}
           numberOfLines={2}
         >
-          {item.frontText ?? (item as any).front}
+          {item.frontText ?? (item as LegacyCard).front}
         </Text>
         <Text variant="bodySmall" color="secondary" numberOfLines={2} style={styles.cardBack}>
-          {item.backText ?? (item as any).back}
+          {item.backText ?? (item as LegacyCard).back}
         </Text>
 
         {!isReadOnly && (
