@@ -27,35 +27,27 @@ npm run android
 
 ## 📁 Структура проекта
 
+Подробно — [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): схема (приложение → Vercel `api/` → Neon;
+Supabase — только вход; Firebase — push, аналитика, Crashlytics), раскладка папок и правила,
+которые проверяют линт и CI.
+
 ```
 src/
-├── components/          # UI компоненты
-│   ├── common/         # Переиспользуемые компоненты (Button, Input, Text)
-│   └── cards/          # Компоненты карточек (FlashCard, SetCard)
-│
-├── screens/            # Экраны приложения
-│   ├── HomeScreen      # Главный экран со списком наборов
-│   ├── StudyScreen     # Экран изучения карточек
-│   ├── SetDetailScreen # Детали набора
-│   └── ...
-│
-├── navigation/         # Навигация (React Navigation)
-│
-├── store/              # Состояние приложения (Zustand)
-│   ├── cardsStore     # Управление карточками
-│   ├── setsStore      # Управление наборами
-│   ├── studyStore     # Сессия изучения
-│   └── settingsStore  # Настройки и тема
-│
-├── services/           # Бизнес-логика
-│   ├── SRSService     # Алгоритм интервальных повторений
-│   ├── StorageService # Локальное хранилище (MMKV)
-│   └── DatabaseService # Персистентность данных
-│
-├── types/              # TypeScript типы
-├── constants/          # Константы (цвета, отступы, конфиг)
-├── hooks/              # Кастомные хуки
-└── utils/              # Утилиты
+├── screens/            # XScreen.tsx — экран; x/ — его части (styles.ts, компоненты, хуки)
+├── components/         # ui/ — UI-кит брендбука; остальное — общие компоненты по разделам
+├── navigation/         # React Navigation
+├── store/              # Zustand
+├── services/           # сеть, хранилище, нативные модули
+│   ├── auth/session.ts # единственное чтение сессии Supabase
+│   ├── api/client.ts   # HTTP-клиент к api/
+│   ├── neon/           # методы данных по доменам (фасад NeonService.ts)
+│   └── analyticsEvents/# каталог событий (фасад analytics.ts)
+├── utils/              # в т.ч. logger.ts
+├── types/ · constants/ · hooks/
+api/                    # Vercel Functions: x.js — роутер, _handlers/x/ — действия
+database/migrations/    # SQL миграций (исполняет api/_db-init.js)
+scripts/                # импорт книг/библиотеки, проверки (миграции, брендбук), git-хуки
+plan/                   # планы: new/ — в работе, done/ — готовые
 ```
 
 ## ⚡ Оптимизации производительности
