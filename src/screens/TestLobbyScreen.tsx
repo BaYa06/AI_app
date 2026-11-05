@@ -23,10 +23,11 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
-import { API_BASE } from '@/config/apiBase';
 import { describeTestError } from '@/utils/testApiErrors';
 import { BottomBar } from '@/components/ui';
 import { log } from '@/utils/logger';
+import { getAccessToken } from '@/services/auth/session';
+import { rawApiFetch } from '@/services/api/client';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TestLobby'>;
 
@@ -56,10 +57,9 @@ export function TestLobbyScreen({ navigation, route }: Props) {
     const fetchParticipants = async () => {
       if (cancelled) return;
       try {
-        const { data: authData } = await supabase.auth.getSession();
-        const token = authData.session?.access_token;
+        const token = await getAccessToken();
         if (!token) return;
-        const resp = await fetch(`${API_BASE}/test?action=monitor&sessionId=${sessionId}`, {
+        const resp = await rawApiFetch(`test?action=monitor&sessionId=${sessionId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!resp.ok || cancelled) return;
@@ -127,14 +127,13 @@ export function TestLobbyScreen({ navigation, route }: Props) {
     if (starting || students.length === 0) return;
     setStarting(true);
     try {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
+      const token = await getAccessToken();
       if (!token) throw new Error('Not authenticated');
 
-      const resp = await fetch(`${API_BASE}/test?action=start`, {
+      const resp = await rawApiFetch('test?action=start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ sessionId }),
+        body: { sessionId },
       });
       const result = await resp.json();
       if (!resp.ok) throw new Error(result.error || 'Failed to start test');

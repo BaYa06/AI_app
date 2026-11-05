@@ -12,9 +12,10 @@ import { spacing, borderRadius, alpha, iconSize, type ColorToken } from '@/const
 import { supabase } from '@/services/supabaseClient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
-import { API_BASE } from '@/config/apiBase';
 import { pluralize } from '@/utils';
 import { log } from '@/utils/logger';
+import { getAccessToken } from '@/services/auth/session';
+import { rawApiFetch } from '@/services/api/client';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TestWaiting'>;
 
@@ -81,10 +82,9 @@ export function TestWaitingScreen({ navigation, route }: Props) {
     let mounted = true;
     (async () => {
       try {
-        const { data: authData } = await supabase.auth.getSession();
-        const token = authData.session?.access_token;
+        const token = await getAccessToken();
         if (!token) return;
-        const resp = await fetch(`${API_BASE}/test?action=monitor&sessionId=${sessionId}`, {
+        const resp = await rawApiFetch(`test?action=monitor&sessionId=${sessionId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await resp.json();
@@ -128,10 +128,9 @@ export function TestWaitingScreen({ navigation, route }: Props) {
     const checkStatus = async () => {
       if (cancelled) return;
       try {
-        const { data: authData } = await supabase.auth.getSession();
-        const token = authData.session?.access_token;
+        const token = await getAccessToken();
         if (!token) return;
-        const resp = await fetch(`${API_BASE}/test?action=monitor&sessionId=${sessionId}`, {
+        const resp = await rawApiFetch(`test?action=monitor&sessionId=${sessionId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!resp.ok || cancelled) return;

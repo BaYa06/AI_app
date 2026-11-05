@@ -258,3 +258,27 @@ export async function apiFetch<T = any>(
     error: new ApiError('http', response.status, json),
   };
 }
+
+/**
+ * Прямая замена `fetch(`${API_BASE}/${path}`, init)` для мест, где вызывающий сам разбирает
+ * Response (экраны экзаменов, настройки push, useExamExitGuard) — Clean 5f–5i.
+ *
+ * Тот же Response, то же исключение при обрыве сети, без таймаута и без чтения тела — как у
+ * прежнего голого fetch. Токен вызывающий передаёт сам в `headers` (как раньше). Тело — объект,
+ * клиент сериализует его JSON.stringify (раньше это делал вызывающий).
+ */
+export async function rawApiFetch(
+  path: string,
+  init: { method?: 'GET' | 'POST'; headers?: Record<string, string>; body?: unknown } = {}
+): Promise<Response> {
+  const res = await apiFetch(path, {
+    method: init.method,
+    headers: init.headers,
+    body: init.body,
+    auth: 'none',
+    timeoutMs: false,
+    parse: 'none',
+  });
+  if (!res.response) throw res.error.original;
+  return res.response;
+}

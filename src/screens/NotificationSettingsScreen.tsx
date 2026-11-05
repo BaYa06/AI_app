@@ -41,10 +41,10 @@ import {
   getPushStatus,
   type PushStatus,
 } from '@/services/pushNotifications';
-import { supabase } from '@/services';
-import { API_BASE } from '@/config/apiBase';
 import { Analytics } from '@/services/analytics';
 import { log } from '@/utils/logger';
+import { getAccessToken, getSession } from '@/services/auth/session';
+import { rawApiFetch } from '@/services/api/client';
 
 /** «Что присылать» (plan/new/push_notifications.md, 2.4) — ключи как SETTING_GROUPS в api/push/_decide.js */
 type PushGroup = 'lesson' | 'streak' | 'course' | 'rating';
@@ -118,12 +118,12 @@ export function NotificationSettingsScreen({ navigation }: any) {
 
   useEffect(() => {
     getPushStatus().then(setPushStatus);
-    supabase.auth.getSession().then(({ data }) => {
-      const uid = data.session?.user?.id;
-      const token = data.session?.access_token;
+    getSession().then((authSession) => {
+      const uid = authSession?.user?.id;
+      const token = authSession?.access_token;
       setUserId(uid);
       if (uid && token) {
-        fetch(`${API_BASE}/push?action=settings`, { headers: { Authorization: `Bearer ${token}` } })
+        rawApiFetch('push?action=settings', { headers: { Authorization: `Bearer ${token}` } })
           .then((r) => r.json())
           .then((d) => {
             setReminderEnabled(d.notifEnabled ?? true);
@@ -190,13 +190,12 @@ export function NotificationSettingsScreen({ navigation }: any) {
     if (!userId || saving) return;
     setSaving(true);
     try {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
+      const token = await getAccessToken();
       if (!token) throw new Error('No session');
-      const res = await fetch(`${API_BASE}/push?action=settings`, {
+      const res = await rawApiFetch('push?action=settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
+        body: {
           notifEnabled: reminderEnabled,
           notifHour: hours,
           notifMinute: minutes,
@@ -207,7 +206,7 @@ export function NotificationSettingsScreen({ navigation }: any) {
           notifDaysExplicit: true,
           notifStreak: !groupsOff.includes('streak'),
           notifCategoriesOff: groupsOff,
-        }),
+        },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       for (const group of groupsOff)

@@ -16,12 +16,12 @@ import {
 import { Text } from '@/components/common';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha } from '@/constants';
-import { supabase } from '@/services/supabaseClient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 
-import { API_BASE } from '@/config/apiBase';
 import { describeError } from '@/utils/userErrors';
+import { getAccessToken } from '@/services/auth/session';
+import { rawApiFetch } from '@/services/api/client';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TestHistory'>;
 
@@ -65,13 +65,12 @@ export function TestHistoryScreen({ navigation, route }: Props) {
     setError(null);
     setLoading(true);
     try {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
+      const token = await getAccessToken();
       if (!token) {
         setError('Не авторизован');
         return;
       }
-      const res = await fetch(`${API_BASE}/test?action=history&courseId=${courseId}`, {
+      const res = await rawApiFetch(`test?action=history&courseId=${courseId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) {

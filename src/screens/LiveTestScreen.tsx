@@ -14,8 +14,9 @@ import { supabase } from '@/services/supabaseClient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 
-import { API_BASE } from '@/config/apiBase';
 import { log } from '@/utils/logger';
+import { getAccessToken } from '@/services/auth/session';
+import { rawApiFetch } from '@/services/api/client';
 
 // Цвета аватаров участников — имена токенов, значения берутся из темы
 const AVATAR_TOKENS: ColorToken[] = ['primaryFill', 'warning', 'like', 'success', 'streak'];
@@ -75,10 +76,9 @@ export function LiveTestScreen({ navigation, route }: Props) {
   const fetchMonitor = useCallback(
     async (mountedRef: { current: boolean }) => {
       try {
-        const { data: authData } = await supabase.auth.getSession();
-        const token = authData.session?.access_token;
+        const token = await getAccessToken();
         if (!token) return;
-        const resp = await fetch(`${API_BASE}/test?action=monitor&sessionId=${sessionId}`, {
+        const resp = await rawApiFetch(`test?action=monitor&sessionId=${sessionId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await resp.json();
@@ -236,14 +236,13 @@ export function LiveTestScreen({ navigation, route }: Props) {
     if (ending || hasNavigated.current) return;
     setEnding(true);
     try {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
+      const token = await getAccessToken();
       if (!token) throw new Error('Not authenticated');
 
-      await fetch(`${API_BASE}/test?action=finish`, {
+      await rawApiFetch('test?action=finish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ sessionId }),
+        body: { sessionId },
       });
       goToResults();
     } catch (e: any) {
@@ -265,13 +264,12 @@ export function LiveTestScreen({ navigation, route }: Props) {
       if (!ok) return;
       setReinstating(st.userId);
       try {
-        const { data } = await supabase.auth.getSession();
-        const token = data.session?.access_token;
+        const token = await getAccessToken();
         if (!token) throw new Error('Not authenticated');
-        const resp = await fetch(`${API_BASE}/test?action=reinstate`, {
+        const resp = await rawApiFetch('test?action=reinstate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ sessionId, userId: st.userId }),
+          body: { sessionId, userId: st.userId },
         });
         const result = await resp.json();
         if (!resp.ok) throw new Error(result.error || `Error ${resp.status}`);

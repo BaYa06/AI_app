@@ -21,14 +21,14 @@ import { Text } from '@/components/common';
 import { Switch, BottomBar } from '@/components/ui';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha } from '@/constants';
-import { supabase } from '@/services/supabaseClient';
 import { NeonService } from '@/services/NeonService';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 
-import { API_BASE } from '@/config/apiBase';
 import { describeTestError } from '@/utils/testApiErrors';
 import { log } from '@/utils/logger';
+import { getAccessToken } from '@/services/auth/session';
+import { rawApiFetch } from '@/services/api/client';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ExamLobby'>;
 
@@ -433,21 +433,20 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
             triggerHaptic('selection');
             setCreating(true);
             try {
-              const { data } = await supabase.auth.getSession();
-              const token = data.session?.access_token;
+              const token = await getAccessToken();
               if (!token) throw new Error('Not authenticated');
 
-              const resp = await fetch(`${API_BASE}/test?action=create`, {
+              const resp = await rawApiFetch('test?action=create', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({
+                body: {
                   setId: selectedSetId,
                   courseId: route.params.courseId,
                   testMode,
                   questionCount: totalQuestions,
                   timePerQuestion,
                   exitControl,
-                }),
+                },
               });
               const result = await resp.json();
               if (!resp.ok) throw new Error(result.error || 'Failed to create test');

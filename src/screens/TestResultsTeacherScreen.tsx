@@ -18,13 +18,13 @@ import { Text } from '@/components/common';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha, type ColorToken } from '@/constants';
 import { Badge, toast, BottomBar } from '@/components/ui';
-import { supabase } from '@/services/supabaseClient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 
-import { API_BASE } from '@/config/apiBase';
 import { describeTestError } from '@/utils/testApiErrors';
 import { pluralize } from '@/utils';
+import { getAccessToken } from '@/services/auth/session';
+import { rawApiFetch } from '@/services/api/client';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TestResultsTeacher'>;
 
@@ -84,10 +84,9 @@ export function TestResultsTeacherScreen({ navigation, route }: Props) {
     try {
       setLoading(true);
       setError(null);
-      const { data: authData } = await supabase.auth.getSession();
-      const token = authData.session?.access_token;
+      const token = await getAccessToken();
       if (!token) throw new Error('Not authenticated');
-      const res = await fetch(`${API_BASE}/test?action=results&sessionId=${sessionId}`, {
+      const res = await rawApiFetch(`test?action=results&sessionId=${sessionId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) {

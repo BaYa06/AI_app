@@ -165,6 +165,14 @@ Teacher*, StudentDetail, Library*, MyPublications, PersonalInfo, Statistics, Cou
 Push*, SharedSetPreview): `supabase.auth.getSession()` → `getSession()` из session.ts — тот же
 объект Session | null, код после вызова не менялся (`session?.user?.id` и т.п.). ProfileScreen —
 исключение (signOut + onAuthStateChange без отсрочки), как экраны входа и App.tsx.
+**5f–5i ✅ 05.11.2026 (один коммит)** — экраны экзаменов (TestJoin, ExamLobby, TestLobby,
+LiveTest, TestWaiting, TestExam, TestDone, TestResultsTeacher, TestHistory), NotificationSettings
+и useExamExitGuard: токен — `getAccessToken()` / `getSession()`, запрос — `rawApiFetch(path, init)`
+из api/client.ts (прямая замена голого fetch: тот же Response, то же исключение сети, без
+таймаута, тело не читается). Обработка ответов на экранах НЕ менялась — поэтому вместо
+типизированного ExamService (переписал бы ветки 409/left, describeTestError) выбрана замена
+1:1. Таймаут для экзаменов — сознательно не добавлен (изменение поведения), можно отдельным
+решением. 17 запросов, тест rawApiFetch (4 случая).
 Подшаги: 5a session.ts + тест · 5b сервисы и сторы на session.ts (+ удалить мёртвый AuthService)
 · 5c api/client.ts + тест · 5d call*Api сервисов на клиент (контракты null/ApiResult/reason те же)
 · 5e экраны: getSession → getUserId/getCurrentUser · 5f ExamService + useExamExitGuard

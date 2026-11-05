@@ -20,8 +20,8 @@ import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha, iconSize, typography } from '@/constants';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
-import { supabase } from '@/services/supabaseClient';
-import { API_BASE } from '@/config/apiBase';
+import { getSession } from '@/services/auth/session';
+import { rawApiFetch } from '@/services/api/client';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TestDone'>;
 
@@ -40,10 +40,9 @@ export function TestDoneScreen({ navigation, route }: Props) {
 
     const check = async () => {
       try {
-        const { data: authData } = await supabase.auth.getSession();
-        const session = authData.session;
+        const session = await getSession();
         if (!session || cancelled) return;
-        const resp = await fetch(`${API_BASE}/test?action=monitor&sessionId=${resume.sessionId}`, {
+        const resp = await rawApiFetch(`test?action=monitor&sessionId=${resume.sessionId}`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
         if (!resp.ok || cancelled) return;

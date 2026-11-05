@@ -9,14 +9,14 @@ import { Text } from '@/components/common';
 import { Button, Screen, ScreenHeader } from '@/components/ui';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha, iconSize, heights, typography } from '@/constants';
-import { supabase } from '@/services/supabaseClient';
 import { NeonService } from '@/services/NeonService';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 
-import { API_BASE } from '@/config/apiBase';
 import { describeTestError } from '@/utils/testApiErrors';
+import { getAccessToken, getSession } from '@/services/auth/session';
+import { rawApiFetch } from '@/services/api/client';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TestJoin'>;
 
@@ -61,8 +61,8 @@ export function TestJoinScreen({ navigation, route }: Props) {
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      supabase.auth.getSession().then(async ({ data }) => {
-        const user = data.session?.user;
+      getSession().then(async (authSession) => {
+        const user = authSession?.user;
         if (!user) return;
         const fromProfile = await NeonService.getDisplayName(user.id);
         if (active) setDisplayName(fromProfile?.trim() || user.email || null);
@@ -87,16 +87,15 @@ export function TestJoinScreen({ navigation, route }: Props) {
     setError(null);
 
     try {
-      const { data: authData } = await supabase.auth.getSession();
-      const token = authData.session?.access_token;
+      const token = await getAccessToken();
       if (!token) throw new Error('Not authenticated');
 
-      const resp = await fetch(`${API_BASE}/test?action=join`, {
+      const resp = await rawApiFetch('test?action=join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         // exitControl: приложение умеет контроль выхода (plan/done/exam_lockdown.md) — сервер
         // применяет к нему правило «повторный вход в идущий тест = выход».
-        body: JSON.stringify({ code, exitControl: true }),
+        body: { code, exitControl: true },
       });
       const result = await resp.json();
 

@@ -24,8 +24,9 @@ import { supabase } from '@/services/supabaseClient';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 
-import { API_BASE } from '@/config/apiBase';
 import { log } from '@/utils/logger';
+import { getAccessToken } from '@/services/auth/session';
+import { rawApiFetch } from '@/services/api/client';
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D'];
 
@@ -175,14 +176,13 @@ export function TestExamScreen({ navigation, route }: Props) {
       if (timePerQuestion > 0) setTimeLeft(timePerQuestion);
 
       try {
-        const { data: authData } = await supabase.auth.getSession();
-        const token = authData.session?.access_token;
+        const token = await getAccessToken();
         if (!token) throw new Error('Not authenticated');
 
-        const res = await fetch(`${API_BASE}/test?action=get-question`, {
+        const res = await rawApiFetch('test?action=get-question', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ participantId, questionIndex: idx }),
+          body: { participantId, questionIndex: idx },
         });
         const json = await res.json();
         // 409 — попытка уже завершена из-за выхода (сервер не выдаёт вопросы после выхода)
@@ -256,8 +256,7 @@ export function TestExamScreen({ navigation, route }: Props) {
       const isLastQuestion = nextIdx >= questionCount;
 
       try {
-        const { data: authData } = await supabase.auth.getSession();
-        const token = authData.session?.access_token;
+        const token = await getAccessToken();
         if (!token) throw new Error('Not authenticated');
         const authHeaders = {
           'Content-Type': 'application/json',
@@ -266,22 +265,22 @@ export function TestExamScreen({ navigation, route }: Props) {
 
         const withStatus = async (r: Response) => ({ status: r.status, body: await r.json() });
 
-        const answerPromise = fetch(`${API_BASE}/test?action=answer`, {
+        const answerPromise = rawApiFetch('test?action=answer', {
           method: 'POST',
           headers: authHeaders,
-          body: JSON.stringify({
+          body: {
             participantId,
             cardId: question.cardId,
             chosenAnswer: option,
             timeSpentSec,
-          }),
+          },
         }).then(withStatus);
 
         const nextQuestionPromise = !isLastQuestion
-          ? fetch(`${API_BASE}/test?action=get-question`, {
+          ? rawApiFetch('test?action=get-question', {
               method: 'POST',
               headers: authHeaders,
-              body: JSON.stringify({ participantId, questionIndex: nextIdx }),
+              body: { participantId, questionIndex: nextIdx },
             }).then(withStatus)
           : Promise.resolve(null);
 

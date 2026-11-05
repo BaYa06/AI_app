@@ -6,7 +6,7 @@ jest.mock('@/services/auth/session', () => ({
 }));
 jest.mock('@/config/apiBase', () => ({ API_BASE: 'https://api.test/api' }));
 
-import { ApiError, apiFetch, buildApiUrl } from '../api/client';
+import { ApiError, apiFetch, buildApiUrl, rawApiFetch } from '../api/client';
 
 type FetchArgs = [string, RequestInit];
 const mockFetch = jest.fn<(...args: FetchArgs) => Promise<Response>>();
@@ -288,5 +288,45 @@ describe('повторы', () => {
     mockFetch.mockImplementation(hangingFetch);
     await apiFetch('data', { retry: 3, timeoutMs: 5 });
     expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('rawApiFetch — замена голого fetch', () => {
+  it('GET: тот же URL как есть, только переданные заголовки, без signal и тела', async () => {
+    await rawApiFetch('test?action=monitor&sessionId=s 1', {
+      headers: { Authorization: 'Bearer t' },
+    });
+    const [url, init] = mockFetch.mock.calls[0];
+    expect(url).toBe('https://api.test/api/test?action=monitor&sessionId=s 1');
+    expect(init.headers).toEqual({ Authorization: 'Bearer t' });
+    expect(init.body).toBeUndefined();
+    expect(init.signal).toBeUndefined();
+    expect(mockGetAccessToken).not.toHaveBeenCalled();
+  });
+
+  it('POST: тело сериализуется, заголовки в порядке вызывающего', async () => {
+    await rawApiFetch('test?action=join', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer t' },
+      body: { code: '123', exitControl: true },
+    });
+    const [, init] = mockFetch.mock.calls[0];
+    expect(init.method).toBe('POST');
+    expect(Object.keys(init.headers as object)).toEqual(['Content-Type', 'Authorization']);
+    expect(init.body).toBe('{"code":"123","exitControl":true}');
+  });
+
+  it('HTTP-ошибка — тот же Response, тело не прочитано', async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse(409, { left: true }));
+    const resp = await rawApiFetch('test?action=answer', { method: 'POST', body: {} });
+    expect(resp.status).toBe(409);
+    expect(resp.bodyUsed).toBe(false);
+    expect(await resp.json()).toEqual({ left: true });
+  });
+
+  it('обрыв сети — исходное исключение fetch', async () => {
+    const err = new TypeError('Network request failed');
+    mockFetch.mockRejectedValueOnce(err);
+    await expect(rawApiFetch('test?action=start', { method: 'POST', body: {} })).rejects.toBe(err);
   });
 });

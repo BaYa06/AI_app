@@ -21,9 +21,9 @@ import {
   useWindowDimensions,
   type AppStateStatus,
 } from 'react-native';
-import { supabase } from '@/services/supabaseClient';
-import { API_BASE } from '@/config/apiBase';
 import { log } from '@/utils/logger';
+import { getAccessToken } from '@/services/auth/session';
+import { rawApiFetch } from '@/services/api/client';
 
 export type ExamLeftReason = 'manual' | 'background' | 'relaunch';
 
@@ -44,13 +44,12 @@ const SPLIT_WIDTH_RATIO = 0.8;
 const AWAY_WAIT_MS = 3000;
 
 async function postExam(action: string, body: Record<string, unknown>) {
-  const { data: authData } = await supabase.auth.getSession();
-  const token = authData.session?.access_token;
+  const token = await getAccessToken();
   if (!token) throw new Error('Not authenticated');
-  const res = await fetch(`${API_BASE}/test?action=${action}`, {
+  const res = await rawApiFetch(`test?action=${action}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(body),
+    body,
   });
   const json = await res.json();
   if (!res.ok) throw new Error(json.error || `Error ${res.status}`);
