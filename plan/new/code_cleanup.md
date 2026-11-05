@@ -248,7 +248,22 @@ distractors/whatsNew/ApiService на клиент · 5k ESLint-запреты.
 3. iOS-сборку в Actions оставить ручной (`workflow_dispatch`) — её делает Codemagic.
 4. Бейдж статуса в README.
 
-## Clean 8 — разрезать огромные экраны ⬜
+## Clean 8 — разрезать огромные экраны ⬜ (8a частично ✅ — ждёт проверки на устройстве)
+
+**8a (HomeScreen) 05.11.2026 — 3456 → 2285 строк**, всё — перенос без изменения логики, каждый
+кусок сверен с HEAD (совпадает с точностью до пробелов/переносов):
+- 8a.1 `7187f5b` — `src/screens/home/`: styles.ts, setsSort.ts, StaggerCard.tsx, pickCardsForGame.ts.
+- 8a.2 `de1194e` — `home/components/`: StreakDialog, EditCourseDialog, DeleteCourseDialog,
+  LeaveCourseDialog, InviteStudentsDialog, SetsSortSheet, SetActionSheet (разметка как была,
+  значения — пропсами с теми же именами).
+- 8a.3 `1fe7ff8` — SetListItem (тело visibleSets.map; key на компоненте — те же ключи).
+- 8a.4 `b9c9de2` — хук useCourseInvite (состояние + обработчики приглашения).
+- 8a.5 `0b53bc9` — хук useCourseRemoval (удаление курса и выход из курса; флаги окон остались в
+  HomeScreen — их читает useWhatsNewOnHome).
+Структура: экран остался `src/screens/HomeScreen.tsx` (импорт в навигации не менялся), куски —
+в `src/screens/home/`. Цель ≤ 400 строк не достигнута: остаток — переплетённые группы (серия и
+алмазы, мини-игры, боковая панель с жестами, запуск режимов изучения, урок дня, виджет) и
+разметка тела. Продолжать — после проверки 8a на устройстве.
 14 файлов больше 900 строк. Норма: экран ≤ 400 строк, логика — в хуках, куски UI —
 в компонентах рядом с экраном.
 Структура для экрана-гиганта:
