@@ -594,7 +594,7 @@ export function validateCatalog(
     }
     if (col.sets.length < MIN_SETS_TO_PUBLISH) {
       warnings.push(
-        `${name}: наборов ${col.sets.length}, для показа в библиотеке нужно не меньше ${MIN_SETS_TO_PUBLISH} — подборка останется черновиком`
+        `${name}: наборов ${col.sets.length}, нужно не меньше ${MIN_SETS_TO_PUBLISH}: новая подборка останется черновиком, уже опубликованная останется видна — проверьте`
       );
     }
   }

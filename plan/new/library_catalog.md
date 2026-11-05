@@ -247,7 +247,7 @@
   - Индексы: `(collection_id, position)` уникальный, `(subject_id, status)` у подборок, ключ подборки
     `(subject_id, track, level, title)`. `book_unit_imports(user_id)` покрыт `UNIQUE (user_id, unit_id)`.
   - Начальные строки предметов: Языки, История, География, ОРТ и НЦТ, Наука; разделы истории и ОРТ.
-- [x] **Catalog 2. Excel.** ✅ (проверка на staging-базе — за пользователем, см. ниже)
+- [x] **Catalog 2. Excel.** ✅
   - `scripts/create-library-template.ts`: листы «Предметы», «Разделы», новые колонки «Наборов», выпадающие списки
     (предмет, уровень, набор у карточки). Примеры проходят проверку.
   - `scripts/lib/libraryExcel.ts`: разбор файла + `validateCatalog` (шкала уровней, разделы, track = language_from
@@ -260,7 +260,8 @@
     Staging — флаг `--staging`: база только из `.env.staging` (в git не попадает), без запасных из `.env.local`,
     хост обязан быть staging-endpoint'ом: `npx tsx scripts/import-library.ts файл.xlsx --staging --dry-run`.
   - Проверено без базы: шаблон, `plan/ideas/library_catalog_languages_example.xlsx`, файл с 7 видами ошибок.
-    Осталось: `--dry-run` и `--publish` на staging.
+    На staging (05.11.2026): пример импортирован с `--publish` (3 подборки, 9 наборов, 47 карточек), повтор —
+    «без изменений», перестановка номеров и удаление набора из подборки (`--dry-run`) — без ошибок уникальности.
 - [ ] **Catalog 3. Сервер: чтение каталога.** Новые `action` в `api/library.js`, старые не меняются.
   - `catalog`: видимые предметы, «Продолжить» или «С чего начать», полка учебников.
   - `subject&id`: разделы, непустые уровни, подборки с «N наборов / добавлено k».
