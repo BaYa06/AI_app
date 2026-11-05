@@ -33,7 +33,7 @@ import { Text } from '@/components/common';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha, iconSize } from '@/constants';
 import { NeonService } from '@/services/NeonService';
-import { supabase } from '@/services/supabaseClient';
+import { getSession } from '@/services/auth/session';
 import type { RootStackParamList } from '@/types/navigation';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { log } from '@/utils/logger';
@@ -324,8 +324,8 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
     let mounted = true;
     const checkOwnership = async () => {
       try {
-        const { data } = await supabase.auth.getSession();
-        const userId = data.session?.user?.id;
+        const authSession = await getSession();
+        const userId = authSession?.user?.id;
         if (!userId || !NeonService.isEnabled()) {
           // Проверить нечем (не авторизован / Neon не сконфигурирован) — не блокируем, как и раньше.
           if (mounted) setIsOwner(true);

@@ -6,7 +6,8 @@ import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, Pressable, TextInput, Platform } from 'react-native';
 import { Text, Container } from '@/components/common';
 import { useThemeColors } from '@/store';
-import { supabase, NeonService } from '@/services';
+import { NeonService } from '@/services';
+import { getSession } from '@/services/auth/session';
 import {
   spacing,
   borderRadius,
@@ -36,8 +37,8 @@ export function PersonalInfoScreen({ navigation }: Props) {
 
   // Загрузить user_name, display_name и языковые предпочтения из БД
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      const userId = data.session?.user?.id;
+    getSession().then((authSession) => {
+      const userId = authSession?.user?.id;
       if (!userId) return;
       NeonService.getUserName(userId).then((name) => {
         if (name) setUserName(name);
@@ -310,8 +311,8 @@ export function PersonalInfoScreen({ navigation }: Props) {
           loading={saving}
           fullWidth
           onPress={async () => {
-            const { data } = await supabase.auth.getSession();
-            const userId = data.session?.user?.id;
+            const authSession = await getSession();
+            const userId = authSession?.user?.id;
             if (!userId) {
               toast.error('Нужно войти в аккаунт');
               return;

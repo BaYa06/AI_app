@@ -14,7 +14,7 @@ import { spacing, borderRadius, alpha, iconSize } from '@/constants';
 import { pluralize } from '@/utils';
 import { Analytics } from '@/services/analytics';
 import { requestPushPermission } from '@/services/pushNotifications';
-import { supabase } from '@/services/supabaseClient';
+import { getSession } from '@/services/auth/session';
 import {
   REMINDER_SLOTS,
   saveReminderHour,
@@ -56,8 +56,8 @@ export function PushPreprompt({ visible, wordCount, onClose }: Props) {
     Analytics.pushPrepromptAccepted(hour ?? 'custom');
     setLoading(true);
     try {
-      const { data } = await supabase.auth.getSession();
-      const status = await requestPushPermission(data.session?.user?.id ?? null);
+      const authSession = await getSession();
+      const status = await requestPushPermission(authSession?.user?.id ?? null);
       if (status.permission !== 'granted') {
         Analytics.pushPermissionDenied();
         onClose('denied');

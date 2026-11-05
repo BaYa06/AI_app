@@ -112,7 +112,7 @@ import {
   FolderInput,
 } from 'lucide-react-native';
 import { StreakService, getLocalDateKey } from '@/services/StreakService';
-import { supabase } from '@/services/supabaseClient';
+import { getSession } from '@/services/auth/session';
 import { NeonService, type CourseLeaderboard } from '@/services/NeonService';
 import { leaderboardSeenKey, type LeaderboardSeen } from '@/screens/CourseLeaderboardScreen';
 import { DatabaseService } from '@/services/DatabaseService';
@@ -607,8 +607,8 @@ export function HomeScreen({ navigation, route }: any) {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setCurrentUserId(data.session?.user?.id ?? null);
+    getSession().then((authSession) => {
+      setCurrentUserId(authSession?.user?.id ?? null);
     });
   }, []);
 
@@ -1548,8 +1548,8 @@ export function HomeScreen({ navigation, route }: any) {
       // Окно — только после закрытия боковой панели (иначе iOS покажет его под панелью и оно пропадёт)
       runAfterDrawerClosed(() => setInviteModalCourseId(courseId));
       try {
-        const { data } = await supabase.auth.getSession();
-        const userId = data.session?.user?.id;
+        const authSession = await getSession();
+        const userId = authSession?.user?.id;
         if (userId) {
           const result = await NeonService.createCourseInvite(courseId, userId);
           setInviteToken(result?.token ?? null);
@@ -1633,8 +1633,8 @@ export function HomeScreen({ navigation, route }: any) {
     if (!leaveModalCourseId) return;
     setLeaveLoading(true);
     try {
-      const { data } = await supabase.auth.getSession();
-      const userId = data.session?.user?.id;
+      const authSession = await getSession();
+      const userId = authSession?.user?.id;
       if (!userId) {
         toast.info('Войди в аккаунт, чтобы выйти из курса');
         return;

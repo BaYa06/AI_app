@@ -47,10 +47,10 @@ import {
   Analytics,
   ShareApiError,
   ShareService,
-  supabase,
   type SharePreview,
   type ShareReportReason,
 } from '@/services';
+import { getSession } from '@/services/auth/session';
 import { importSharedSet } from '@/services/shareImport';
 import { confirmAction } from '@/utils/dialogs';
 import {
@@ -156,8 +156,8 @@ export function SharedSetPreviewModal({
     let cancelled = false;
     setLoadError(null);
     (async () => {
-      const { data } = await supabase.auth.getSession();
-      const user = data.session?.user;
+      const authSession = await getSession();
+      const user = authSession?.user;
       if (!cancelled)
         setSession(user ? { userId: user.id, isGuest: (user as any).is_anonymous === true } : null);
       try {

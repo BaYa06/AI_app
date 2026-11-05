@@ -41,7 +41,7 @@ import {
   ArrowRight,
   ExternalLink,
 } from 'lucide-react-native';
-import { supabase } from '@/services/supabaseClient';
+import { getSession } from '@/services/auth/session';
 import { DatabaseService } from '@/services/DatabaseService';
 import type { RootStackScreenProps } from '@/types/navigation';
 import { describeError } from '@/utils/userErrors';
@@ -76,10 +76,10 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
   const bottomInset = useScreenBottomInset();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      const uid = data.session?.user?.id;
+    getSession().then((authSession) => {
+      const uid = authSession?.user?.id;
       setUserId(uid);
-      setIsAnonymous((data.session?.user as any)?.is_anonymous === true);
+      setIsAnonymous((authSession?.user as any)?.is_anonymous === true);
       fetchSetDetail(setId, uid);
     });
   }, [setId]);

@@ -26,7 +26,7 @@ import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha, iconSize } from '@/constants';
 import { toast } from '@/components/ui';
 import { NeonService } from '@/services/NeonService';
-import { supabase } from '@/services/supabaseClient';
+import { getSession } from '@/services/auth/session';
 import type { RootStackParamList } from '@/types/navigation';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { pluralize } from '@/utils';
@@ -230,8 +230,8 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
     setInviteJoinCode(null);
     setInviteLoading(true);
     try {
-      const { data } = await supabase.auth.getSession();
-      const userId = data.session?.user?.id;
+      const authSession = await getSession();
+      const userId = authSession?.user?.id;
       const result = userId
         ? await NeonService.createCourseInvite(route.params.courseId, userId)
         : null;
@@ -318,8 +318,8 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
     let mounted = true;
     const checkOwnership = async () => {
       try {
-        const { data } = await supabase.auth.getSession();
-        const userId = data.session?.user?.id;
+        const authSession = await getSession();
+        const userId = authSession?.user?.id;
         if (!userId || !NeonService.isEnabled()) {
           // Проверить нечем (не авторизован / Neon не сконфигурирован) — не блокируем, как и раньше.
           if (mounted) setIsOwner(true);
@@ -403,9 +403,7 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
       if (!confirmed) return;
 
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+        const session = await getSession();
         if (!session?.user) return;
 
         const success = await NeonService.removeStudentFromCourse(

@@ -44,7 +44,7 @@ import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card } from '@/types';
 import { DatabaseService, LibraryService, Analytics, NeonService, BookService } from '@/services';
 import { confirmAction } from '@/utils/dialogs';
-import { supabase } from '@/services/supabaseClient';
+import { getSession } from '@/services/auth/session';
 import { LIBRARY_CATEGORIES } from '@/constants/library';
 import {
   ArrowLeft,
@@ -166,9 +166,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
   useEffect(() => {
     (async () => {
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+        const session = await getSession();
         if (!session?.user?.id) return;
         const result = await LibraryService.checkPublished(setId, session.user.id);
         setIsPublished(result.isPublished);
@@ -467,9 +465,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
       return;
     }
     const { newSetId } = result.data;
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    const session = await getSession();
     const [ownSets, newCards] = await Promise.all([
       NeonService.loadSets(session?.user?.id),
       NeonService.loadCardsBySet(newSetId),
@@ -546,9 +542,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
     }
     setIsPublishing(true);
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const session = await getSession();
       if (!session?.user?.id) {
         toast.error('Нужно войти в аккаунт');
         return;

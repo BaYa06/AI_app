@@ -19,7 +19,7 @@ import { Button, Dialog, confirmDialog, toast } from '@/components/ui';
 import { useThemeColors } from '@/store';
 import { alpha, borderRadius, iconSize, spacing } from '@/constants';
 import { NeonService } from '@/services/NeonService';
-import { supabase } from '@/services/supabaseClient';
+import { getSession } from '@/services/auth/session';
 import { log } from '@/utils/logger';
 
 interface CourseJoinCodeDialogProps {
@@ -57,8 +57,8 @@ export function CourseJoinCodeDialog({
     setLoading(true);
     (async () => {
       try {
-        const { data } = await supabase.auth.getSession();
-        const userId = data.session?.user?.id;
+        const authSession = await getSession();
+        const userId = authSession?.user?.id;
         const result = userId ? await NeonService.createCourseInvite(courseId, userId) : null;
         if (mounted) setJoinCode(result?.joinCode ?? null);
       } catch (e) {

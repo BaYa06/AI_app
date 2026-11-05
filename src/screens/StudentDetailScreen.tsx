@@ -12,7 +12,7 @@ import { Text } from '@/components/common';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha } from '@/constants';
 import { NeonService } from '@/services/NeonService';
-import { supabase } from '@/services/supabaseClient';
+import { getSession } from '@/services/auth/session';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 import { pluralize } from '@/utils';
@@ -128,8 +128,8 @@ export function StudentDetailScreen({ navigation, route }: Props) {
     let mounted = true;
     const checkOwnership = async () => {
       try {
-        const { data } = await supabase.auth.getSession();
-        const userId = data.session?.user?.id;
+        const authSession = await getSession();
+        const userId = authSession?.user?.id;
         if (!userId) {
           if (mounted) goBack();
           return;

@@ -160,6 +160,11 @@ try, как раньше (`auth: 'none'` + явный Authorization) — иск�
 `timeoutMs: false`), исходное исключение fetch пробрасывается, как раньше. В клиенте: свой
 Content-Type в headers сохраняет порядок ключей вызывающего (pushPrompt: Authorization первым).
 Тест serviceApiCalls.test.ts (39 случаев) проходит и на старом коде, и на новом.
+**5e ✅ 05.11.2026** — 25 вызовов в 15 экранах/компонентах (Home, SetDetail, SetEditor,
+Teacher*, StudentDetail, Library*, MyPublications, PersonalInfo, Statistics, CourseJoinCodeDialog,
+Push*, SharedSetPreview): `supabase.auth.getSession()` → `getSession()` из session.ts — тот же
+объект Session | null, код после вызова не менялся (`session?.user?.id` и т.п.). ProfileScreen —
+исключение (signOut + onAuthStateChange без отсрочки), как экраны входа и App.tsx.
 Подшаги: 5a session.ts + тест · 5b сервисы и сторы на session.ts (+ удалить мёртвый AuthService)
 · 5c api/client.ts + тест · 5d call*Api сервисов на клиент (контракты null/ApiResult/reason те же)
 · 5e экраны: getSession → getUserId/getCurrentUser · 5f ExamService + useExamExitGuard

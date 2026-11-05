@@ -57,7 +57,7 @@ import {
 } from '@/components/ui';
 import { pluralize } from '@/utils';
 import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'react-native-svg';
-import { supabase } from '@/services/supabaseClient';
+import { getSession } from '@/services/auth/session';
 import { BookService } from '@/services/BookService';
 import { getBookCover, formatBookMeta } from '@/utils/bookCover';
 import type { LibrarySet } from '@/types/library';
@@ -351,8 +351,8 @@ export function LibraryScreen() {
 
   // Get user ID
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setUserId(data.session?.user?.id);
+    getSession().then((authSession) => {
+      setUserId(authSession?.user?.id);
     });
   }, []);
 

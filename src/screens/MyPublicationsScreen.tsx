@@ -25,7 +25,7 @@ import {
   toast,
 } from '@/components/ui';
 import { RefreshCw, EyeOff, BookOpen, Star, Download, Heart, Layers } from 'lucide-react-native';
-import { supabase } from '@/services/supabaseClient';
+import { getSession } from '@/services/auth/session';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { LibrarySet } from '@/types/library';
 import { describeError } from '@/utils/userErrors';
@@ -43,8 +43,8 @@ export function MyPublicationsScreen({ navigation }: Props) {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      const uid = data.session?.user?.id;
+    getSession().then((authSession) => {
+      const uid = authSession?.user?.id;
       setUserId(uid);
       if (uid) {
         fetchMyPublications(uid).finally(() => setLoading(false));

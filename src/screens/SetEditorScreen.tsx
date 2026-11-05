@@ -22,7 +22,7 @@ import type { SetCategory, SetKind } from '@/types';
 import { SetKindPicker } from '@/components/cards/SetKindPicker';
 import { ArrowLeftRight, Check, ChevronDown, Globe, Link2, Share2 } from 'lucide-react-native';
 import { LibraryService, ShareService, Analytics } from '@/services';
-import { supabase } from '@/services/supabaseClient';
+import { getSession } from '@/services/auth/session';
 import { LIBRARY_CATEGORIES } from '@/constants/library';
 import { describeError } from '@/utils/userErrors';
 import { confirmAction } from '@/utils/dialogs';
@@ -159,9 +159,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
     if (!isEditing || !setId) return;
     (async () => {
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+        const session = await getSession();
         if (!session?.user?.id) return;
         const result = await LibraryService.checkPublished(setId, session.user.id);
         setCanPublish(result.canPublish === true);
@@ -305,9 +303,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
 
     setIsPublishing(true);
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const session = await getSession();
       if (!session?.user?.id) {
         toast.error('Нужно войти в аккаунт');
         return;
@@ -359,9 +355,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
   const handleUnpublish = useCallback(async () => {
     if (!librarySetId) return;
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const session = await getSession();
       if (!session?.user?.id) return;
       await LibraryService.unpublishSet(session.user.id, librarySetId);
       setIsPublished(false);

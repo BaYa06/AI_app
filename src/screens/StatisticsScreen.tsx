@@ -46,7 +46,7 @@ import {
 import Svg, { Circle } from 'react-native-svg';
 import { StreakService } from '@/services';
 import type { DailyActivity, UserStats } from '@/services';
-import { supabase } from '@/services/supabaseClient';
+import { getSession } from '@/services/auth/session';
 import { getLevelProgress, XP_PER_LEVEL } from '@/utils/level';
 import { log } from '@/utils/logger';
 
@@ -127,9 +127,7 @@ export function StatisticsScreen({ navigation }: any) {
     (async () => {
       try {
         // Get user name from session
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+        const session = await getSession();
         if (session?.user?.email && mounted) {
           setUserName(session.user.email.split('@')[0]);
         }
