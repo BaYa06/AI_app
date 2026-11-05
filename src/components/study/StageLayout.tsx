@@ -30,10 +30,24 @@ export const SESSION_STAGE_INFO: Record<SessionStage, { title: string; subtitle:
 /** Сколько показывается экран «Этап N из M», если не нажать «Начать» */
 const INTRO_MS = 1500;
 
+/**
+ * Прогресс этапа сессии целиком, а не текущей порции: ошибки повторяются следующими порциями
+ * того же этапа, и полоска не должна начинаться заново. Растёт только за верные ответы.
+ */
+export function sessionStageProgress(
+  studiedInPhase: number,
+  answered: number,
+  errors: number,
+  total: number
+): { done: number; total: number } {
+  const done = Math.max(studiedInPhase, studiedInPhase + answered - errors);
+  return { done: Math.min(done, total), total };
+}
+
 interface Props {
   /** Есть — экран открыт из сессии набора */
   session?: SessionRouteParams;
-  /** Сколько заданий текущего этапа (порции) сделано и сколько всего */
+  /** Сколько заданий сделано и сколько всего: в сессии — по этапу (sessionStageProgress), иначе по порции */
   progress: { done: number; total: number };
   /** Подпись задания над содержимым: «Как переводится?» */
   task?: string;

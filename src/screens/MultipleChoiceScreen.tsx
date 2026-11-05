@@ -38,7 +38,7 @@ import { playCorrectSound, playSessionSfx, preloadSessionSfx, preloadSound } fro
 import { buildDistractorPool, pickSimilarDistractors } from '@/utils/choiceDistractors';
 import { Analytics } from '@/services/analytics';
 import { useChallengeStore } from '@/store';
-import { StageLayout, AnswerPanel } from '@/components/study/StageLayout';
+import { StageLayout, AnswerPanel, sessionStageProgress } from '@/components/study/StageLayout';
 import { isSubjectSet } from '@/utils/setKind';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card, Rating } from '@/types';
@@ -965,7 +965,16 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
     return (
       <StageLayout
         session={session}
-        progress={{ done: currentIndex + (showResult ? 1 : 0), total: totalQuestions }}
+        progress={
+          session
+            ? sessionStageProgress(
+                studiedInPhase,
+                currentIndex + (showResult ? 1 : 0),
+                errors,
+                currentTotalPhaseCards.current || totalQuestions
+              )
+            : { done: currentIndex + (showResult ? 1 : 0), total: totalQuestions }
+        }
         task={
           isListen ? 'Что вы слышите?' : isSubjectSet(set) ? 'Выберите ответ' : 'Как переводится?'
         }

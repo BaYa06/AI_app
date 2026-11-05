@@ -13,7 +13,7 @@ import {
   selectSetStats,
 } from '@/store';
 import { Text, Loading } from '@/components/common';
-import { StageLayout, AnswerPanel } from '@/components/study/StageLayout';
+import { StageLayout, AnswerPanel, sessionStageProgress } from '@/components/study/StageLayout';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card, Rating } from '@/types';
 import { spacing, borderRadius, iconSize, alpha } from '@/constants';
@@ -524,7 +524,16 @@ export function WordBuilderScreen({ navigation, route }: Props) {
   return (
     <StageLayout
       session={session}
-      progress={{ done: currentIndex + (wordResult ? 1 : 0), total: totalWords }}
+      progress={
+        session
+          ? sessionStageProgress(
+              studiedInPhase,
+              currentIndex + (wordResult ? 1 : 0),
+              errors,
+              currentTotalPhaseCards.current || totalWords
+            )
+          : { done: currentIndex + (wordResult ? 1 : 0), total: totalWords }
+      }
       task="Собери слово из букв"
       onExit={handleExit}
       showIntro={phaseOffset === 0 && !phaseFailedList.length}

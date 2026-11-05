@@ -25,7 +25,7 @@ import {
 } from '@/store';
 import { Text, Loading } from '@/components/common';
 import { Button, Switch } from '@/components/ui';
-import { StageLayout } from '@/components/study/StageLayout';
+import { StageLayout, sessionStageProgress } from '@/components/study/StageLayout';
 import { buildStudyQueue, getCardStatus } from '@/services/SRSService';
 import { StatusBadge } from '@/components/cards';
 import { ProgressService } from '@/services/ProgressService';
@@ -908,7 +908,17 @@ export function StudyScreen({ navigation, route }: Props) {
   return (
     <StageLayout
       session={sessionRoute}
-      progress={{ done: Math.max(0, progress.current - 1), total: progress.total }}
+      progress={
+        sessionRoute
+          ? // Повтор «Почти» в конце очереди не двигает полоску этапа: считаем только основную очередь
+            sessionStageProgress(
+              studiedInPhase,
+              Math.min(Math.max(0, progress.current - 1), baseQueueLengthRef.current),
+              errorCards.length,
+              currentTotalPhaseCards.current || baseQueueLengthRef.current
+            )
+          : { done: Math.max(0, progress.current - 1), total: progress.total }
+      }
       task="Вспомни перевод"
       taskAction={
         <Button

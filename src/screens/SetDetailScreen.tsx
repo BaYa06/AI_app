@@ -6,19 +6,8 @@ import { getCardStatus, isCardLearned, isCardWaitingReview } from '@/services/SR
 import { StatusBadge, STATUS_LABEL } from '@/components/cards';
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { shallow } from 'zustand/shallow';
-import {
-  View,
-  FlatList,
-  Pressable,
-  TextInput,
-  ScrollView,
-  ActivityIndicator,
-  Platform,
-  KeyboardAvoidingView,
-  Modal,
-} from 'react-native';
+import { View, FlatList, Pressable, TextInput, Platform } from 'react-native';
 import { triggerHaptic } from '@/utils/haptic';
-import { BlurView } from '@/utils/BlurView';
 import {
   useSetsStore,
   useCardsStore,
@@ -36,14 +25,13 @@ import {
 } from '@/components/study/StudyModeSheet';
 import { currentSetSessionPlan, startSetSession } from '@/components/study/setSession';
 import { isModeAllowedForSets } from '@/utils/setKind';
-import { spacing, iconSize, alpha, config } from '@/constants';
+import { spacing, iconSize, alpha } from '@/constants';
 import { BottomBar, EmptyState, ProgressBar, toast } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card } from '@/types';
 import { DatabaseService, LibraryService, Analytics, NeonService, BookService } from '@/services';
 import { confirmAction } from '@/utils/dialogs';
 import { getSession } from '@/services/auth/session';
-import { LIBRARY_CATEGORIES } from '@/constants/library';
 import {
   ArrowLeft,
   MoreHorizontal,
@@ -51,8 +39,6 @@ import {
   SlidersHorizontal,
   Edit3,
   Camera,
-  Globe,
-  X,
   BookOpen,
   Layers,
 } from 'lucide-react-native';
@@ -62,6 +48,10 @@ import { cardFront, cardBack, type LegacyCard } from '@/utils/cardText';
 import { styles } from './setDetail/styles';
 import { FilterPill } from './setDetail/FilterPill';
 import { MissingSet } from './setDetail/MissingSet';
+import { CardPreviewModal } from './setDetail/CardPreviewModal';
+import { PublishSetModal } from './setDetail/PublishSetModal';
+import { AddCardSheet } from './setDetail/AddCardSheet';
+import { CardActionSheet } from './setDetail/CardActionSheet';
 
 type Props = RootStackScreenProps<'SetDetail'>;
 type Filter = 'all' | 'mastered' | 'unmastered';
@@ -901,173 +891,39 @@ export function SetDetailScreen({ navigation, route }: Props) {
       </BottomBar>
 
       {actionCardId && (
-        <View style={[styles.sheetWrapper, { zIndex: 25 }]} pointerEvents="box-none">
-          <Pressable
-            style={[styles.sheetBackdrop, { backgroundColor: backdropColor }]}
-            onPress={() => setActionCardId(null)}
-          />
-          <View style={[styles.sheet, { backgroundColor: modalSurface, borderColor: modalBorder }]}>
-            <Pressable
-              accessibilityRole="button"
-              style={styles.sheetAction}
-              onPress={handleDeleteCard}
-            >
-              <Text variant="body" style={{ color: colors.error, fontWeight: '700' }}>
-                Удалить
-              </Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              style={styles.sheetAction}
-              onPress={() => setActionCardId(null)}
-            >
-              <Text variant="body" style={{ color: modalTextPrimary, fontWeight: '700' }}>
-                Отмена
-              </Text>
-            </Pressable>
-          </View>
-        </View>
+        <CardActionSheet
+          colors={colors}
+          backdropColor={backdropColor}
+          modalSurface={modalSurface}
+          modalBorder={modalBorder}
+          modalTextPrimary={modalTextPrimary}
+          setActionCardId={setActionCardId}
+          handleDeleteCard={handleDeleteCard}
+        />
       )}
 
       {showAddCard && (
-        <KeyboardAvoidingView
-          style={[styles.sheetWrapper, { zIndex: 30 }]}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          pointerEvents="box-none"
-        >
-          <Pressable
-            style={[styles.sheetBackdrop, { backgroundColor: backdropColor }]}
-            onPress={() => setShowAddCard(false)}
-          />
-          <View
-            style={[
-              styles.addSheet,
-              { backgroundColor: modalSurface, borderColor: modalBorder, maxHeight: '85%' },
-            ]}
-          >
-            <View style={styles.addSheetHeader}>
-              <Text variant="h3" style={{ color: modalTextPrimary }}>
-                Новая карточка
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => {
-                  setShowAddCard(false);
-                  navigation.navigate('ImportFiles', { setId });
-                }}
-                style={[styles.exportButton, { backgroundColor: colors.primaryFill }]}
-              >
-                <Camera size={iconSize.xs} color={colors.onPrimary} />
-                <Text variant="bodySmall" style={{ color: colors.onPrimary, fontWeight: '700' }}>
-                  Из фото или файла
-                </Text>
-              </Pressable>
-            </View>
-
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ gap: spacing.m, paddingBottom: spacing.s }}
-            >
-              <View style={styles.addField}>
-                <Text variant="label" color="primary" style={styles.fieldLabel}>
-                  Иностранное слово
-                </Text>
-                <TextInput
-                  value={newFront}
-                  onChangeText={setNewFront}
-                  maxLength={config.limits.maxCardFrontLength}
-                  placeholder="Например: scharf"
-                  placeholderTextColor={modalPlaceholder}
-                  style={[
-                    styles.addInput,
-                    {
-                      color: modalTextPrimary,
-                      borderColor: modalBorder,
-                      backgroundColor: modalInputBg,
-                      ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
-                    },
-                  ]}
-                />
-              </View>
-
-              <View style={styles.addField}>
-                <Text variant="label" color="primary" style={styles.fieldLabel}>
-                  Перевод
-                </Text>
-                <TextInput
-                  value={newBack}
-                  onChangeText={setNewBack}
-                  maxLength={config.limits.maxCardBackLength}
-                  placeholder="Например: острый"
-                  placeholderTextColor={modalPlaceholder}
-                  style={[
-                    styles.addInput,
-                    {
-                      color: modalTextPrimary,
-                      borderColor: modalBorder,
-                      backgroundColor: modalInputBg,
-                      ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
-                    },
-                  ]}
-                />
-              </View>
-
-              <View style={styles.addField}>
-                <Text variant="label" color="primary" style={styles.fieldLabel}>
-                  Пример
-                </Text>
-                <TextInput
-                  value={newExample}
-                  onChangeText={setNewExample}
-                  maxLength={config.limits.maxCardExampleLength}
-                  placeholder="Например: Der scharfe Pfeffer..."
-                  placeholderTextColor={modalPlaceholder}
-                  style={[
-                    styles.addInput,
-                    {
-                      color: modalTextPrimary,
-                      borderColor: modalBorder,
-                      backgroundColor: modalInputBg,
-                      ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
-                    },
-                  ]}
-                  multiline
-                />
-              </View>
-            </ScrollView>
-
-            <View style={styles.addActions}>
-              <Pressable
-                accessibilityRole="button"
-                style={[styles.secondaryAction, { borderColor: modalBorder }]}
-                onPress={() => setShowAddCard(false)}
-              >
-                <Text variant="body" style={{ color: modalTextSecondary, fontWeight: '700' }}>
-                  Отмена
-                </Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                style={[
-                  styles.primaryAction,
-                  {
-                    backgroundColor:
-                      newFront.trim() && newBack.trim() && !isAdding
-                        ? colors.primaryFill
-                        : modalBorder,
-                  },
-                ]}
-                disabled={!newFront.trim() || !newBack.trim() || isAdding}
-                onPress={handleCreateCard}
-              >
-                <Text variant="body" style={{ color: colors.onPrimary, fontWeight: '700' }}>
-                  Сохранить
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
+        <AddCardSheet
+          colors={colors}
+          backdropColor={backdropColor}
+          modalSurface={modalSurface}
+          modalBorder={modalBorder}
+          modalTextPrimary={modalTextPrimary}
+          modalTextSecondary={modalTextSecondary}
+          modalInputBg={modalInputBg}
+          modalPlaceholder={modalPlaceholder}
+          setShowAddCard={setShowAddCard}
+          handleCreateCard={handleCreateCard}
+          isAdding={isAdding}
+          newFront={newFront}
+          setNewFront={setNewFront}
+          newBack={newBack}
+          setNewBack={setNewBack}
+          newExample={newExample}
+          setNewExample={setNewExample}
+          navigation={navigation}
+          setId={setId}
+        />
       )}
 
       <StudyModeSheet
@@ -1101,262 +957,34 @@ export function SetDetailScreen({ navigation, route }: Props) {
       />
 
       {showPublishModal && (
-        <View
-          style={[styles.importOverlay, { backgroundColor: backdropColor }]}
-          pointerEvents="box-none"
-        >
-          <Pressable
-            style={[styles.sheetBackdrop, { backgroundColor: backdropColor }]}
-            onPress={() => !isPublishing && setShowPublishModal(false)}
-          />
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{ width: '100%', maxWidth: 480, alignItems: 'center' }}
-          >
-            <View
-              style={[
-                styles.importCard,
-                { backgroundColor: modalSurface, borderColor: modalBorder },
-              ]}
-            >
-              <View style={styles.importTopBar}>
-                <Pressable
-                  onPress={() => !isPublishing && setShowPublishModal(false)}
-                  hitSlop={10}
-                  style={styles.topIcon}
-                  accessibilityRole="button"
-                  accessibilityLabel="Закрыть"
-                >
-                  <X size={iconSize.m} color={modalTextPrimary} />
-                </Pressable>
-                <Text variant="body" style={[styles.importTitle, { color: modalTextPrimary }]}>
-                  Опубликовать в библиотеке
-                </Text>
-                <View style={styles.topIcon} />
-              </View>
-
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                contentContainerStyle={{ gap: spacing.m, paddingBottom: spacing.s }}
-              >
-                <View style={styles.addField}>
-                  <Text variant="label" color="primary" style={styles.fieldLabel}>
-                    Описание (необязательно)
-                  </Text>
-                  <TextInput
-                    value={publishDescription}
-                    onChangeText={setPublishDescription}
-                    placeholder="Расскажи о наборе..."
-                    placeholderTextColor={modalPlaceholder}
-                    maxLength={500}
-                    multiline
-                    style={[
-                      styles.addInput,
-                      {
-                        color: modalTextPrimary,
-                        borderColor: modalBorder,
-                        backgroundColor: modalInputBg,
-                        minHeight: 80,
-                        textAlignVertical: 'top',
-                        ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
-                      },
-                    ]}
-                  />
-                  <Text variant="caption" color="secondary" style={{ alignSelf: 'flex-end' }}>
-                    {publishDescription.length}/500
-                  </Text>
-                </View>
-
-                <View style={styles.addField}>
-                  <Text variant="label" color="primary" style={styles.fieldLabel}>
-                    Категория *
-                  </Text>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
-                    {LIBRARY_CATEGORIES.map((cat) => (
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: publishCategory === cat.key }}
-                        key={cat.key}
-                        onPress={() => setPublishCategory(cat.key)}
-                        style={[
-                          styles.wordChip,
-                          {
-                            backgroundColor:
-                              publishCategory === cat.key ? colors.primaryFill : 'transparent',
-                            borderColor:
-                              publishCategory === cat.key ? colors.primaryFill : modalBorder,
-                          },
-                        ]}
-                      >
-                        <Text
-                          variant="caption"
-                          style={{
-                            color:
-                              publishCategory === cat.key ? colors.onPrimary : modalTextSecondary,
-                            fontWeight: '700',
-                          }}
-                        >
-                          {cat.label}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
-
-                <View style={styles.addField}>
-                  <Text variant="label" color="primary" style={styles.fieldLabel}>
-                    Теги (через запятую)
-                  </Text>
-                  <TextInput
-                    value={publishTags}
-                    onChangeText={setPublishTags}
-                    placeholder="например: A1, начинающим, еда"
-                    placeholderTextColor={modalPlaceholder}
-                    style={[
-                      styles.addInput,
-                      {
-                        color: modalTextPrimary,
-                        borderColor: modalBorder,
-                        backgroundColor: modalInputBg,
-                        ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
-                      },
-                    ]}
-                  />
-                </View>
-              </ScrollView>
-
-              <View style={styles.addActions}>
-                <Pressable
-                  accessibilityRole="button"
-                  style={[styles.secondaryAction, { borderColor: modalBorder }]}
-                  onPress={() => !isPublishing && setShowPublishModal(false)}
-                >
-                  <Text variant="body" style={{ color: modalTextSecondary, fontWeight: '700' }}>
-                    Отмена
-                  </Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  style={[
-                    styles.primaryAction,
-                    {
-                      backgroundColor:
-                        publishCategory && !isPublishing ? colors.primaryFill : modalBorder,
-                      flexDirection: 'row',
-                      gap: spacing.xs,
-                    },
-                  ]}
-                  disabled={!publishCategory || isPublishing}
-                  onPress={handlePublish}
-                >
-                  {isPublishing ? (
-                    <ActivityIndicator size="small" color={colors.onPrimary} />
-                  ) : (
-                    <>
-                      <Globe size={18} color={colors.onPrimary} />
-                      <Text variant="body" style={{ color: colors.onPrimary, fontWeight: '700' }}>
-                        Опубликовать
-                      </Text>
-                    </>
-                  )}
-                </Pressable>
-              </View>
-            </View>
-          </KeyboardAvoidingView>
-        </View>
+        <PublishSetModal
+          colors={colors}
+          backdropColor={backdropColor}
+          modalSurface={modalSurface}
+          modalBorder={modalBorder}
+          modalTextPrimary={modalTextPrimary}
+          modalTextSecondary={modalTextSecondary}
+          modalInputBg={modalInputBg}
+          modalPlaceholder={modalPlaceholder}
+          setShowPublishModal={setShowPublishModal}
+          handlePublish={handlePublish}
+          isPublishing={isPublishing}
+          publishCategory={publishCategory}
+          setPublishCategory={setPublishCategory}
+          publishDescription={publishDescription}
+          setPublishDescription={setPublishDescription}
+          publishTags={publishTags}
+          setPublishTags={setPublishTags}
+        />
       )}
 
       {/* Card Preview Modal */}
-      <Modal
-        visible={previewCard !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPreviewCard(null)}
-      >
-        <Pressable
-          accessibilityRole="button"
-          style={[styles.previewOverlay, { backgroundColor: colors.overlay }]}
-          onPress={() => setPreviewCard(null)}
-          accessibilityLabel="Закрыть"
-        >
-          {Platform.OS === 'web' ? (
-            <View
-              style={[
-                styles.previewCard,
-                {
-                  backgroundColor: alpha(colors.surface, 40),
-                  borderColor: colors.border,
-                },
-              ]}
-            >
-              <View style={styles.previewFrontSection}>
-                <Text
-                  style={[styles.previewFrontText, { color: colors.textPrimary }]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.6}
-                  allowFontScaling={false}
-                >
-                  {previewCard?.frontText ?? (previewCard as any)?.front}
-                </Text>
-              </View>
-              <View style={[styles.previewDivider, { backgroundColor: colors.border }]} />
-              <View style={styles.previewBackSection}>
-                <Text
-                  style={[styles.previewBackText, { color: colors.textSecondary }]}
-                  numberOfLines={2}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.7}
-                  allowFontScaling={false}
-                >
-                  {previewCard?.backText ?? (previewCard as any)?.back}
-                </Text>
-                {previewCard?.example ? (
-                  <Text style={[styles.previewExample, { color: colors.textTertiary }]}>
-                    {previewCard.example}
-                  </Text>
-                ) : null}
-              </View>
-            </View>
-          ) : (
-            <BlurView
-              blurType={theme === 'dark' ? 'dark' : 'xlight'}
-              blurAmount={24}
-              style={[styles.previewCard, { borderColor: colors.border }]}
-            >
-              <View style={styles.previewFrontSection}>
-                <Text
-                  style={[styles.previewFrontText, { color: colors.textPrimary }]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.6}
-                  allowFontScaling={false}
-                >
-                  {previewCard?.frontText ?? (previewCard as any)?.front}
-                </Text>
-              </View>
-              <View style={[styles.previewDivider, { backgroundColor: colors.border }]} />
-              <View style={styles.previewBackSection}>
-                <Text
-                  style={[styles.previewBackText, { color: colors.textSecondary }]}
-                  numberOfLines={2}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.7}
-                  allowFontScaling={false}
-                >
-                  {previewCard?.backText ?? (previewCard as any)?.back}
-                </Text>
-                {previewCard?.example ? (
-                  <Text style={[styles.previewExample, { color: colors.textTertiary }]}>
-                    {previewCard.example}
-                  </Text>
-                ) : null}
-              </View>
-            </BlurView>
-          )}
-        </Pressable>
-      </Modal>
+      <CardPreviewModal
+        previewCard={previewCard}
+        setPreviewCard={setPreviewCard}
+        colors={colors}
+        theme={theme}
+      />
     </Container>
   );
 }
