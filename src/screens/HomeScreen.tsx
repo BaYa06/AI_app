@@ -42,7 +42,7 @@ import {
   clampTranslateX,
   resolveDrawerOpen,
 } from '@/components/home/drawerAnimation';
-import ReanimatedAnimated, {
+import {
   useSharedValue,
   withTiming,
   withSequence,
@@ -50,38 +50,19 @@ import ReanimatedAnimated, {
   Easing,
   runOnJS,
 } from 'react-native-reanimated';
-import { spacing, iconSize, alpha, animation } from '@/constants';
+import { spacing, iconSize, animation } from '@/constants';
 import { triggerHaptic } from '@/utils/haptic';
 import { pluralize } from '@/utils';
 import { isModeAllowedForSets } from '@/utils/setKind';
 import {
   Button,
-  Card as SurfaceCard,
-  EmptyState,
   Skeleton,
   SkeletonCard,
   TextField,
   toast,
   useTabBarOverlayInset,
 } from '@/components/ui';
-import {
-  Menu,
-  Plus,
-  Library,
-  Lightbulb,
-  MoreHorizontal,
-  X,
-  Folder,
-  ArrowUpDown,
-  Users,
-  Flame,
-  Gem,
-  Zap,
-  Crosshair,
-  Clock,
-  GraduationCap,
-  Trophy,
-} from 'lucide-react-native';
+import { Plus, X, Zap, Crosshair, Clock } from 'lucide-react-native';
 import { StreakService } from '@/services/StreakService';
 import { getSession } from '@/services/auth/session';
 import { NeonService, type CourseLeaderboard } from '@/services/NeonService';
@@ -129,7 +110,6 @@ import { useWhatsNewOnHome } from '@/components/whatsNew/useWhatsNewOnHome';
 import { WhatsNewSheet } from '@/components/whatsNew/WhatsNewSheet';
 
 import {
-  DEFAULT_SETS_SORT,
   SETS_COMPARATORS,
   SETS_SORT_OPTIONS,
   loadSetsSort,
@@ -147,6 +127,10 @@ import { LeaveCourseDialog } from './home/components/LeaveCourseDialog';
 import { DeleteCourseDialog } from './home/components/DeleteCourseDialog';
 import { EditCourseDialog } from './home/components/EditCourseDialog';
 import { StreakDialog } from './home/components/StreakDialog';
+import { HomeEmptyState } from './home/components/HomeEmptyState';
+import { SetsSectionHeader } from './home/components/SetsSectionHeader';
+import { HomeHeader } from './home/components/HomeHeader';
+import { TeacherBanner } from './home/components/TeacherBanner';
 
 export function HomeScreen({ navigation, route }: any) {
   const colors = useThemeColors();
@@ -1574,51 +1558,12 @@ export function HomeScreen({ navigation, route }: any) {
   // Баннер учителя — вход в курс (ученики, приглашения, тесты, «Учебники курса»). Показывается и
   // когда в курсе ещё нет наборов: иначе в новом пустом курсе до него было не добраться.
   const teacherBanner = (
-    <View style={styles.teacherBannerWrap}>
-      <Pressable
-        accessibilityRole="button"
-        style={({ pressed }) => [
-          styles.teacherBanner,
-          { backgroundColor: pressed ? colors.primaryPressed : colors.primaryFill },
-        ]}
-        onPress={() => {
-          const ownCourses = courses.filter((c) => !c.isStudentCourse);
-          const targetCourse = ownCourses.find((c) => c.id === activeCourseId) ?? ownCourses[0];
-
-          if (!targetCourse) {
-            toast.info('Нет курсов — сначала создай курс, чтобы открыть статистику учителя');
-            return;
-          }
-
-          const rootNav = navigation?.getParent?.() ?? navigation;
-          rootNav?.navigate('TeacherCourseStats', {
-            courseId: targetCourse.id,
-            courseTitle: targetCourse.title || 'Курс',
-          });
-        }}
-      >
-        <View style={styles.teacherBannerLeft}>
-          <View
-            style={[styles.teacherBannerIcon, { backgroundColor: alpha(colors.onPrimary, 20) }]}
-          >
-            <GraduationCap size={iconSize.s} color={colors.onPrimary} />
-          </View>
-          <View style={styles.flexShrink}>
-            <Text variant="label" style={{ color: colors.onPrimary }}>
-              Режим учителя
-            </Text>
-            <Text variant="caption" style={[styles.onFillMuted, { color: colors.onPrimary }]}>
-              Ученики, наборы и тесты
-            </Text>
-          </View>
-        </View>
-        <View style={[styles.teacherBannerButton, { backgroundColor: colors.onPrimary }]}>
-          <Text variant="caption" style={[styles.semibold, { color: colors.primaryFill }]}>
-            Мои курсы →
-          </Text>
-        </View>
-      </Pressable>
-    </View>
+    <TeacherBanner
+      colors={colors}
+      activeCourseId={activeCourseId}
+      courses={courses}
+      navigation={navigation}
+    />
   );
 
   // Карточка ежедневного челленджа: играть → "Забрать" 10 алмазов → "Получено" до завтра
@@ -1687,87 +1632,20 @@ export function HomeScreen({ navigation, route }: any) {
     <GestureDetector gesture={rootGesture}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         {/* Header */}
-        <View
-          style={[
-            styles.header,
-            { backgroundColor: colors.background, borderBottomColor: colors.border },
-          ]}
-        >
-          <Button
-            variant="icon"
-            icon={Menu}
-            background="none"
-            accessibilityLabel="Курсы"
-            onPress={() => setDrawerOpen(true)}
-          />
-
-          <View style={styles.headerCenter}>
-            <Pressable
-              style={styles.headerStat}
-              onPress={() => setStreakModalVisible(true)}
-              accessibilityRole="button"
-              accessibilityLabel={`Серия: ${formatDays(streakValue)}`}
-            >
-              <Flame
-                size={iconSize.m}
-                color={todayGoalReached ? colors.streak : colors.textTertiary}
-              />
-              <Text
-                style={[
-                  styles.headerStatText,
-                  { color: todayGoalReached ? colors.textPrimary : colors.textSecondary },
-                ]}
-              >
-                {formatDays(streakValue)}
-              </Text>
-            </Pressable>
-
-            <View
-              ref={diamondIconRef}
-              style={styles.headerStat}
-              accessible
-              accessibilityLabel={`Алмазы: ${diamonds}`}
-              onLayout={() => {
-                diamondIconRef.current?.measureInWindow((x, y, w, h) => {
-                  setDiamondTargetPos({ x: x + w / 2, y: y + h / 2 });
-                });
-              }}
-            >
-              <Gem size={iconSize.m} color={colors.diamond} />
-              <ReanimatedAnimated.View style={diamondCountAnimStyle}>
-                <Text style={[styles.headerStatText, { color: colors.textPrimary }]}>
-                  {diamonds}
-                </Text>
-              </ReanimatedAnimated.View>
-            </View>
-          </View>
-
-          <View style={styles.headerRight}>
-            {/* Рейтинг курса (plan/done/home_redesign.md, 3.2): значок в шапке, точка — есть новости */}
-            {ratingTeaser && (
-              <View>
-                <Button
-                  variant="icon"
-                  icon={Trophy}
-                  background="none"
-                  iconSize={iconSize.s}
-                  iconColor={colors.warningText}
-                  accessibilityLabel={`${ratingTeaser.title}. ${ratingTeaser.hint}`}
-                  onPress={() => openLeaderboard(ratingTeaser.week)}
-                />
-                {ratingTeaser.dot && (
-                  <View
-                    pointerEvents="none"
-                    style={[
-                      styles.ratingDot,
-                      { backgroundColor: colors.error, borderColor: colors.background },
-                    ]}
-                  />
-                )}
-              </View>
-            )}
-          </View>
-        </View>
+        <HomeHeader
+          colors={colors}
+          setDrawerOpen={setDrawerOpen}
+          setStreakModalVisible={setStreakModalVisible}
+          todayGoalReached={todayGoalReached}
+          formatDays={formatDays}
+          streakValue={streakValue}
+          diamondIconRef={diamondIconRef}
+          setDiamondTargetPos={setDiamondTargetPos}
+          diamonds={diamonds}
+          diamondCountAnimStyle={diamondCountAnimStyle}
+          ratingTeaser={ratingTeaser}
+          openLeaderboard={openLeaderboard}
+        />
 
         <View style={styles.body}>
           <ScrollView
@@ -1788,93 +1666,19 @@ export function HomeScreen({ navigation, route }: any) {
             }
           >
             {filteredSets.length === 0 ? (
-              <>
-                {isTeacher === true && teacherBanner}
-                {/* Курс пуст, но в других курсах есть слова — урок дня всё равно на месте (повторение из всех) */}
-                {isTeacher === false && hasLessonCards && lessonContent && (
-                  <LessonCard
-                    content={lessonContent}
-                    onPress={handleLessonPress}
-                    onSecondaryPress={openFocusSheet}
-                    style={styles.lessonCard}
-                  />
-                )}
-                {mySetsEmptyButCourses ? (
-                  <EmptyState
-                    icon={Library}
-                    title="Здесь наборы без курса"
-                    description="Наборы курсов лежат внутри своих курсов. Выбери курс в списке — или создай набор здесь."
-                    action={{
-                      label: 'Открыть курсы',
-                      icon: Folder,
-                      onPress: () => {
-                        Analytics.homeAction('open_courses');
-                        setDrawerOpen(true);
-                      },
-                    }}
-                    secondaryAction={{
-                      label: 'Создать набор',
-                      icon: Plus,
-                      onPress: () => {
-                        Analytics.homeAction('create_set');
-                        navigation?.navigate('SetEditor', {});
-                      },
-                    }}
-                  />
-                ) : (
-                  <>
-                    <EmptyState
-                      icon={Library}
-                      title="Пока нет наборов"
-                      description={
-                        isTeacher
-                          ? 'Создай первый набор, чтобы начать учиться и упорядочить материалы по курсам.'
-                          : 'Создай свой набор слов или подключись к курсу учителя — его наборы появятся здесь.'
-                      }
-                      action={{
-                        label: 'Создать набор',
-                        icon: Plus,
-                        onPress: () => {
-                          Analytics.homeAction('create_set');
-                          navigation?.navigate('SetEditor', {});
-                        },
-                      }}
-                      // Новичку — второй путь: не создавать, а подключиться к курсу учителя по коду
-                      secondaryAction={
-                        isTeacher !== true
-                          ? {
-                              label: 'Подключиться к курсу',
-                              icon: Users,
-                              onPress: () => {
-                                triggerHaptic('selection');
-                                Analytics.homeAction('join_course');
-                                setJoinByCodeVisible(true);
-                              },
-                            }
-                          : undefined
-                      }
-                    />
-                    <SurfaceCard
-                      style={[styles.tipCard, { backgroundColor: alpha(colors.primary, 10) }]}
-                    >
-                      <Lightbulb size={iconSize.s} color={colors.primary} />
-                      <View style={styles.flex1}>
-                        <Text
-                          variant="label"
-                          style={[styles.tipTitle, { color: colors.textPrimary }]}
-                        >
-                          Подсказка
-                        </Text>
-                        <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
-                          {isTeacher
-                            ? 'Курс пустой? Через «Режим учителя» выше можно пригласить учеников и подключить учебник — наборы для этого не нужны.'
-                            : 'Объединяй несколько наборов в курс — так проще учиться по теме или семестру.'}
-                        </Text>
-                      </View>
-                    </SurfaceCard>
-                  </>
-                )}
-              </>
+              <HomeEmptyState
+                colors={colors}
+                teacherBanner={teacherBanner}
+                isTeacher={isTeacher}
+                hasLessonCards={hasLessonCards}
+                lessonContent={lessonContent}
+                handleLessonPress={handleLessonPress}
+                openFocusSheet={openFocusSheet}
+                mySetsEmptyButCourses={mySetsEmptyButCourses}
+                setDrawerOpen={setDrawerOpen}
+                setJoinByCodeVisible={setJoinByCodeVisible}
+                navigation={navigation}
+              />
             ) : (
               <>
                 {isTeacher === null ? (
@@ -1925,44 +1729,15 @@ export function HomeScreen({ navigation, route }: any) {
                 )}
 
                 {/* Section Header */}
-                <View style={styles.sectionHeader}>
-                  <Text
-                    variant="h3"
-                    style={[styles.flexShrink, { color: colors.textPrimary }]}
-                    numberOfLines={1}
-                  >
-                    {activeCourseId === null ? 'Мои наборы' : activeCourseTitle}
-                  </Text>
-                  <View style={styles.sectionActions}>
-                    {/* Порядок показываем, только если он не по умолчанию — иначе список кажется перемешанным */}
-                    {setsSort !== DEFAULT_SETS_SORT && (
-                      <Pressable
-                        onPress={() => {
-                          Analytics.homeAction('sort');
-                          setSortSheetVisible(true);
-                        }}
-                        hitSlop={spacing.s}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Сортировка: ${setsSortShortLabel}`}
-                        style={({ pressed }) => [styles.sortButton, pressed && styles.pressed]}
-                      >
-                        <ArrowUpDown size={iconSize.xs} color={colors.primary} />
-                        <Text variant="label" style={{ color: colors.primary }}>
-                          {setsSortShortLabel}
-                        </Text>
-                      </Pressable>
-                    )}
-                    <Button
-                      variant="icon"
-                      icon={MoreHorizontal}
-                      background="none"
-                      iconSize={iconSize.s}
-                      iconColor={colors.textSecondary}
-                      accessibilityLabel="Действия с наборами"
-                      onPress={openSetsMenu}
-                    />
-                  </View>
-                </View>
+                <SetsSectionHeader
+                  colors={colors}
+                  activeCourseId={activeCourseId}
+                  activeCourseTitle={activeCourseTitle}
+                  openSetsMenu={openSetsMenu}
+                  setSortSheetVisible={setSortSheetVisible}
+                  setsSort={setsSort}
+                  setsSortShortLabel={setsSortShortLabel}
+                />
 
                 {/* Поиск по наборам — у самих наборов (plan/done/home_redesign.md, 4.1) */}
                 {searchVisible && (
