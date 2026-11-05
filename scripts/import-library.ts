@@ -1,7 +1,7 @@
 /**
  * Импорт каталога библиотеки из Excel (Neon): предметы → разделы → подборки → наборы → карточки.
  *
- *   npx tsx scripts/import-library.ts path/to/catalog.xlsx [--dry-run] [--publish]
+ *   npx tsx scripts/import-library.ts path/to/catalog.xlsx [--staging] [--dry-run] [--publish]
  *
  * --dry-run  всё выполняется в транзакции и откатывается: отчёт точный, в базе ничего не меняется
  * --publish  черновики из файла сделать видимыми (draft → published) — и подборки, и наборы.
@@ -10,8 +10,8 @@
  * --prod     разрешить рабочую базу. Без него скрипт отказывается работать с продом (scripts/lib/db.ts,
  *            PROD_ENDPOINTS) — даже с --dry-run. Прод — только с разрешения.
  *
- * База берётся из .env.local; переменная окружения важнее файла, поэтому staging так:
- *   DATABASE_URL_UNPOOLED='<строка staging>' npx tsx scripts/import-library.ts файл.xlsx --dry-run
+ * --staging  база из .env.staging (только она, без запасных из .env.local; хост обязан быть staging).
+ *            Без флага база из .env.local — а он смотрит в прод.
  *
  * Наборы пишутся в library_sets / library_cards от служебного автора LIBRARY_AUTHOR_ID
  * (scripts/create-library-author.ts), original_set_id = NULL. Повторный запуск:
@@ -92,12 +92,16 @@ const STATUS_LABEL: Record<Status, string> = {
 function parseArgs(argv: string[]): Args {
   const flags = new Set(argv.filter((a) => a.startsWith('--')));
   const positional = argv.filter((a) => !a.startsWith('--'));
-  const known = new Set(['--dry-run', '--publish', '--prod']);
+  const known = new Set(['--dry-run', '--publish', '--prod', '--staging']);
+  if (flags.has('--prod') && flags.has('--staging')) {
+    console.error('--prod и --staging вместе нельзя');
+    process.exit(2);
+  }
   const unknown = [...flags].filter((f) => !known.has(f));
   if (unknown.length > 0 || positional.length !== 1) {
     if (unknown.length > 0) console.error(`Неизвестные флаги: ${unknown.join(', ')}`);
     console.error(
-      'Использование: npx tsx scripts/import-library.ts path/to/catalog.xlsx [--dry-run] [--publish] [--prod]'
+      'Использование: npx tsx scripts/import-library.ts path/to/catalog.xlsx [--staging] [--dry-run] [--publish] [--prod]'
     );
     process.exit(2);
   }
@@ -433,11 +437,13 @@ async function main(): Promise<void> {
 
   // 2. Куда пишем. Прод — только с --prod.
   const target = describeDatabaseTarget();
-  console.log(`База: ${target.host}${target.isProd ? ' — РАБОЧАЯ (прод)' : ''}`);
+  console.log(
+    `База: ${target.host}${target.isProd ? ' — РАБОЧАЯ (прод)' : target.isStaging ? ' — staging' : ''}`
+  );
   if (target.isProd && !args.prod) {
     console.error(
       '\n❌ Это рабочая база. Импорт в прод — только с разрешения и флагом --prod.\n' +
-        "   Для staging: DATABASE_URL_UNPOOLED='<строка staging>' npx tsx scripts/import-library.ts файл.xlsx --dry-run"
+        '   Для staging: npx tsx scripts/import-library.ts файл.xlsx --staging --dry-run'
     );
     process.exit(2);
   }

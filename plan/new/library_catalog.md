@@ -257,7 +257,8 @@
     набор, которого в подборке больше нет, отвязывается. `kind` и `category` из предмета, `tags` / `cover_emoji` не трогаются.
   - **Защита прода** (найдено 05.11.2026: `.env.local` смотрит в прод, endpoint `ep-misty-scene`). Скрипт печатает базу
     и без `--prod` отказывается работать с продом, даже с `--dry-run` (`scripts/lib/db.ts`, `PROD_ENDPOINTS`).
-    Staging: `DATABASE_URL_UNPOOLED='<строка staging>' npx tsx scripts/import-library.ts файл.xlsx --dry-run`.
+    Staging — флаг `--staging`: база только из `.env.staging` (в git не попадает), без запасных из `.env.local`,
+    хост обязан быть staging-endpoint'ом: `npx tsx scripts/import-library.ts файл.xlsx --staging --dry-run`.
   - Проверено без базы: шаблон, `plan/ideas/library_catalog_languages_example.xlsx`, файл с 7 видами ошибок.
     Осталось: `--dry-run` и `--publish` на staging.
 - [ ] **Catalog 3. Сервер: чтение каталога.** Новые `action` в `api/library.js`, старые не меняются.
