@@ -1,5 +1,14 @@
 // .cjs, а не .js: в package.json "type": "module", и ESLint 8 не читает
 // конфиг через module.exports из .js-файла ESM-пакета.
+// Серверные пакеты (api/, scripts/) — в коде приложения запрещены: Metro/webpack утащили бы их
+// в сборку (Clean 12).
+const SERVER_ONLY_IMPORTS = [
+  'firebase-admin',
+  '@google/genai',
+  '@neondatabase/serverless',
+  'dotenv',
+].map((name) => ({ name, message: 'Серверный пакет — только в api/ и scripts/ (Clean 12).' }));
+
 module.exports = {
   root: true,
   extends: '@react-native',
@@ -67,6 +76,10 @@ module.exports = {
       files: ['src/utils/logger.ts', 'api/_log.js'],
       rules: { 'no-console': 'off' },
     },
+    {
+      files: ['src/**/*.{js,jsx,ts,tsx}'],
+      rules: { 'no-restricted-imports': ['error', { paths: SERVER_ONLY_IMPORTS }] },
+    },
     // Экраны, компоненты и хуки не ходят в сеть и в сессию сами (Clean 5): сессия —
     // services/auth/session.ts, запросы — сервисы или services/api/client.ts, Realtime —
     // services/realtime.ts.
@@ -81,6 +94,7 @@ module.exports = {
           'error',
           {
             paths: [
+              ...SERVER_ONLY_IMPORTS,
               {
                 name: '@/services/supabaseClient',
                 message:
@@ -120,7 +134,7 @@ module.exports = {
         'src/screens/EmailAuthScreen.tsx',
         'src/screens/ProfileScreen.tsx',
       ],
-      rules: { 'no-restricted-imports': 'off' },
+      rules: { 'no-restricted-imports': ['error', { paths: SERVER_ONLY_IMPORTS }] },
     },
   ],
 };
