@@ -517,7 +517,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
                 style={[
                   styles.input,
                   { color: colors.textPrimary },
-                  Platform.OS === 'web' && { outlineStyle: 'none' },
+                  Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
                 ]}
                 onFocus={() => setTitleFocused(true)}
                 onBlur={() => setTitleFocused(false)}
@@ -566,7 +566,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
                 style={[
                   styles.textarea,
                   { color: colors.textPrimary },
-                  Platform.OS === 'web' && { outlineStyle: 'none' },
+                  Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
                 ]}
                 multiline
                 maxLength={DESCRIPTION_LIMIT}
@@ -1033,7 +1033,8 @@ function SelectPill({
         size={18}
         color={isOpen ? colors.primary : colors.textSecondary}
         style={[
-          { transition: 'transform 0.2s ease' },
+          // transition — только web, в типах RN его нет
+          { transition: 'transform 0.2s ease' } as any,
           isOpen ? { transform: [{ rotate: '180deg' }] } : undefined,
         ]}
       />

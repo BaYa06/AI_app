@@ -280,7 +280,7 @@ const importPrivateKey = async (pem: string) => {
     typeof atob !== 'undefined'
       ? atob(cleaned)
       : getGlobal().Buffer.from(cleaned, 'base64').toString('binary');
-  const binary = Uint8Array.from(binaryStr, (c) => c.charCodeAt(0));
+  const binary = Uint8Array.from(binaryStr, (c: string) => c.charCodeAt(0));
   const subtle = getGlobal().crypto?.subtle;
   if (!subtle) throw new Error('WebCrypto not available');
   return await subtle.importKey(

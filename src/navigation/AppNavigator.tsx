@@ -187,7 +187,7 @@ function MainTabs() {
         }}
         listeners={{ tabPress: () => triggerHaptic('selection') }}
       >
-        {(props) => <LibraryScreen {...props} />}
+        {() => <LibraryScreen />}
       </Tab.Screen>
       <Tab.Screen
         name="TestTab"
@@ -216,7 +216,7 @@ function MainTabs() {
         }}
         listeners={{ tabPress: () => triggerHaptic('selection') }}
       >
-        {(props) => <StudyPlaceholderScreen {...props} />}
+        {() => <StudyPlaceholderScreen />}
       </Tab.Screen>
       <Tab.Screen
         name="Statistics"

@@ -811,7 +811,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
           ? 'Время вышло!'
           : 'Не получилось...',
       subtitle: isSuccess
-        ? `Все ${challengeResult.total} ${pluralize(challengeResult.total, 'слово', 'слова', 'слов')} угаданы без ошибок за ${formatTime(challengeResult.timeSpent ?? 0)}! Алмазы ждут тебя на главной.`
+        ? `Все ${challengeResult.total} ${pluralize(challengeResult.total ?? 0, 'слово', 'слова', 'слов')} угаданы без ошибок за ${formatTime(challengeResult.timeSpent ?? 0)}! Алмазы ждут тебя на главной.`
         : challengeResult.timesUp
           ? `Ты успел ответить на ${currentIndex} из ${totalQuestions}`
           : 'Чтобы забрать алмазы, угадай все слова за 2 минуты без единой ошибки. Ты справишься!',

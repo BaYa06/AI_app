@@ -443,9 +443,9 @@ export function AudioLearningScreen({ navigation, route }: Props) {
       );
       animation.start();
       return () => animation.stop();
-    } else {
-      pulseAnim.setValue(1);
     }
+    pulseAnim.setValue(1);
+    return undefined;
   }, [sessionState, pulseAnim]);
 
   // Settings callbacks

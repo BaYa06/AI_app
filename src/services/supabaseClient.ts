@@ -7,7 +7,8 @@ import { log } from '@/utils/logger';
 /**
  * Safe AsyncStorage adapter — prevents crashes if the native module is not linked.
  */
-const safeStorage = AsyncStorage?.getItem
+// Модуль может быть не слинкован — в рантайме getItem бывает undefined, хотя по типам он есть
+const safeStorage = (AsyncStorage as Partial<typeof AsyncStorage> | undefined)?.getItem
   ? AsyncStorage
   : {
       getItem: async () => null,

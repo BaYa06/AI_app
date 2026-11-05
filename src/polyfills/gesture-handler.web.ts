@@ -1,6 +1,7 @@
 // Web polyfill for react-native-gesture-handler
 import React, { useEffect, useRef } from 'react';
-import { View, ViewProps } from 'react-native-web';
+import { View } from 'react-native-web';
+import type { ViewProps } from 'react-native';
 
 // GestureHandlerRootView - just a passthrough View on web
 export const GestureHandlerRootView: React.FC<ViewProps & { children?: React.ReactNode }> = ({

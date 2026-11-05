@@ -1,3 +1,4 @@
+import { describe, expect, it } from '@jest/globals';
 import { estimateLines, fitText, fitWordWithExample } from '../fitText';
 import { config } from '../../constants/config';
 

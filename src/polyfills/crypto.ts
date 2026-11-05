@@ -19,7 +19,7 @@ if (typeof globalThis.crypto === 'undefined') {
 
 if (!globalThis.crypto.subtle) {
   (globalThis.crypto as any).subtle = {
-    async digest(algorithm: string, data: ArrayBuffer): Promise<ArrayBuffer> {
+    async digest(algorithm: string | { name: string }, data: ArrayBuffer): Promise<ArrayBuffer> {
       const algo = typeof algorithm === 'string' ? algorithm : algorithm.name;
       if (algo !== 'SHA-256') {
         throw new Error(`crypto.subtle.digest: unsupported algorithm ${algo}`);

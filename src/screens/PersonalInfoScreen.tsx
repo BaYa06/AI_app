@@ -120,7 +120,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
                     backgroundColor: inputBg,
                     borderColor: inputBorder,
                   },
-                  Platform.OS === 'web' && { outlineStyle: 'none' },
+                  Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
                 ]}
               />
             </View>
@@ -138,7 +138,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
                     backgroundColor: inputBg,
                     borderColor: inputBorder,
                   },
-                  Platform.OS === 'web' && { outlineStyle: 'none' },
+                  Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
                 ]}
               />
             </View>
@@ -163,7 +163,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
                 style={[
                   s.inputInner,
                   { color: colors.textPrimary },
-                  Platform.OS === 'web' && { outlineStyle: 'none' },
+                  Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
                 ]}
               />
             </View>

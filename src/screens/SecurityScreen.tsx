@@ -70,7 +70,7 @@ export function SecurityScreen({ navigation }: Props) {
   const sessionIconBg = colors.surfaceMuted;
 
   return (
-    <Container padded={false} edges={['top', 'bottom']}>
+    <Container padded={false}>
       {/* Header */}
       <View
         style={[s.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}

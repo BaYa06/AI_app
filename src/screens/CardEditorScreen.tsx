@@ -160,7 +160,7 @@ export function CardEditorScreen({ navigation, route }: Props) {
   }, [frontText, backText, setId, addCard, incrementCardCount, handleSave]);
 
   return (
-    <Container edges={['top', 'bottom']}>
+    <Container>
       <ScreenHeader
         onBack={() => navigation.goBack()}
         style={styles.header}

@@ -758,7 +758,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
               style={[
                 styles.searchInput,
                 { color: colors.textPrimary },
-                Platform.OS === 'web' && { outlineStyle: 'none' },
+                Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
               ]}
             />
           </View>
@@ -848,7 +848,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
   }
 
   return (
-    <Container padded={false} edges={['top', 'bottom']}>
+    <Container padded={false}>
       <FlatList
         data={filteredCards}
         renderItem={renderCard}

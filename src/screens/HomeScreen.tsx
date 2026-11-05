@@ -1316,6 +1316,7 @@ export function HomeScreen({ navigation, route }: any) {
       }, 50);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [isCreatingCourse]);
 
   // Стиль панели вкладок задаёт только AppNavigator (шаг брендбука 1.6). Боковая панель —
