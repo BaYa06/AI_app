@@ -118,7 +118,8 @@
   "jest": {
     "testEnvironment": "node",
     "testMatch": [
-      "<rootDir>/src/**/__tests__/**/*.test.ts"
+      "<rootDir>/src/**/__tests__/**/*.test.ts",
+      "<rootDir>/api/**/__tests__/**/*.test.js"
     ],
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/src/$1"
