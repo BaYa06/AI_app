@@ -202,7 +202,28 @@ distractors/whatsNew/ApiService на клиент · 5k ESLint-запреты.
 4. ESLint `no-restricted-imports`: `supabaseClient` нельзя импортировать из `src/screens` и
    `src/components`; `no-restricted-globals` для `fetch` в тех же папках.
 
-## Clean 6 — TypeScript без ошибок ⬜
+## Clean 6 — TypeScript без ошибок ✅
+
+**Сделано 05.11.2026** — `npm run type-check`: **0 ошибок** (было 63, и сам tsc падал RangeError).
+- 6a `2a5dc37` — `include: ["src"]` в tsconfig: tsc больше не обходит dist/ios/Pods.
+- 6b `3403cc9` — 62 ошибки, только типы: импорт @jest/globals в fitText.test (29), полифилы web,
+  `src/types/modules.d.ts`, web-стили `as any` (как уже в проекте), явный return в эффектах.
+  Container не принимает `edges` — проп игнорировался на 3 экранах, убран (возможно, там
+  задумывались safe-area-отступы — отдельный вопрос дизайна). Удалён мёртвый
+  SharedSetDetailScreen (моки, в навигации не было).
+- 6c `94a96e5` — **ИСПРАВЛЕНИЕ БАГА**: гостевой импорт набора из библиотеки писал карточки с
+  front/back вместо frontText/backText — на экранах без подстраховки (AudioLearning, ContextFill,
+  OralTest, итоги, урок дня, виджет) текст был пустым. Отдельный коммит.
+- 6d `3389aa2` — `src/utils/cardText.ts` (cardFront/cardBack, LegacyCard) вместо 28 `as any`;
+  ESLint `no-explicit-any: warn`.
+- 6e `53ccdb6` — типы навигации у 10 экранов стека. Вкладки (Home, Profile, Statistics) — на
+  any: `MainTabScreenProps` (CompositeScreenProps RN6) сужает navigate до never — чинить тип
+  отдельно (вместе с rn_upgrade.md).
+**any: 201 → 164.** Остаток: ответы API и строки БД (`r: any`, `row: any`, NeonService),
+`catch (e: any)` (19 — замена на unknown требует правки обработчиков), web-полифилы. Комментарий
+к каждому не ставим (164 строки шума) — линт показывает их как warn; типы ответов API —
+естественно делать вместе с Clean 9 (разнос NeonService по доменам).
+
 Около 89 старых ошибок tsc в `src`, 190 `any`.
 1. Починить tsc в корне (RangeError) — скорее всего, `allowJs` тянет `dist/`, `public/`,
    `android/`, `ios/`. Добавить в `exclude` или завести `include: ["src", "index*.js*"]`.
