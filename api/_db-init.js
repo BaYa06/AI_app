@@ -8,7 +8,7 @@ import { log } from './_log.js';
  */
 // schema_039: в 038 (official_sets_guard) и 039 (set_kind) версию не подняли — миграции не выполнились,
 // и запросы с card_sets.kind падали на тестовом сервере (plan/new/set_kind.md, слабые места)
-const SCHEMA_VERSION = 'schema_039';
+const SCHEMA_VERSION = 'schema_040';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -718,6 +718,93 @@ async function applyMigrations(sql) {
     await sql`ALTER TABLE library_sets ADD COLUMN IF NOT EXISTS kind TEXT CHECK (kind IN ('language', 'subject'))`;
   } catch (e) {
     log.error('db-init', 'Migration 039_set_kind failed', e);
+  }
+
+  // Migration 040: библиотека-каталог (plan/new/library_catalog.md, Catalog 1) — предметы, разделы,
+  // подборки, порядок наборов, курс и копия в library_imports, юниты учебника у ученика.
+  // Подробные комментарии — database/migrations/040_library_catalog.sql.
+  try {
+    await sql`CREATE TABLE IF NOT EXISTS library_subjects (
+      id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      slug         TEXT NOT NULL UNIQUE,
+      title        TEXT NOT NULL,
+      subtitle     TEXT,
+      icon         TEXT,
+      track_label  TEXT,
+      level_scale  TEXT CHECK (level_scale IN ('cefr', 'stages')),
+      set_kind     TEXT NOT NULL DEFAULT 'subject' CHECK (set_kind IN ('language', 'subject')),
+      position     INTEGER NOT NULL DEFAULT 0,
+      is_published BOOLEAN NOT NULL DEFAULT true,
+      created_at   TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at   TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )`;
+    await sql`CREATE TABLE IF NOT EXISTS library_tracks (
+      id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      subject_id UUID NOT NULL REFERENCES library_subjects(id) ON DELETE CASCADE,
+      key        TEXT NOT NULL,
+      title      TEXT NOT NULL,
+      position   INTEGER NOT NULL DEFAULT 0,
+      UNIQUE (subject_id, key)
+    )`;
+    await sql`CREATE TABLE IF NOT EXISTS library_collections (
+      id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      subject_id  UUID NOT NULL REFERENCES library_subjects(id) ON DELETE CASCADE,
+      track       TEXT,
+      level       TEXT,
+      title       VARCHAR(100) NOT NULL,
+      description TEXT,
+      icon        TEXT,
+      position    INTEGER NOT NULL DEFAULT 0,
+      status      VARCHAR(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
+      created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )`;
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_library_collections_key
+      ON library_collections (subject_id, COALESCE(track, ''), COALESCE(level, ''), title)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_library_collections_subject_status ON library_collections (subject_id, status)`;
+
+    await sql`ALTER TABLE library_sets ADD COLUMN IF NOT EXISTS collection_id UUID REFERENCES library_collections(id) ON DELETE SET NULL`;
+    await sql`ALTER TABLE library_sets ADD COLUMN IF NOT EXISTS position INTEGER`;
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_library_sets_collection_position
+      ON library_sets (collection_id, position) WHERE collection_id IS NOT NULL`;
+
+    await sql`ALTER TABLE library_imports ADD COLUMN IF NOT EXISTS course_id UUID REFERENCES courses(id) ON DELETE CASCADE`;
+    await sql`ALTER TABLE library_imports ADD COLUMN IF NOT EXISTS card_set_id UUID REFERENCES card_sets(id) ON DELETE CASCADE`;
+    // Сначала новая уникальность, потом снимаем старую — защита от двойного импорта не пропадает.
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_library_imports_user_set_course
+      ON library_imports (user_id, library_set_id, COALESCE(course_id, '00000000-0000-0000-0000-000000000000'::uuid))`;
+    await sql`ALTER TABLE library_imports DROP CONSTRAINT IF EXISTS library_imports_user_id_library_set_id_key`;
+
+    await sql`CREATE TABLE IF NOT EXISTS book_unit_imports (
+      id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id     UUID NOT NULL,
+      unit_id     UUID NOT NULL REFERENCES book_units(id) ON DELETE CASCADE,
+      card_set_id UUID REFERENCES card_sets(id) ON DELETE CASCADE,
+      imported_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      UNIQUE (user_id, unit_id)
+    )`;
+
+    await sql`INSERT INTO library_subjects (slug, title, subtitle, icon, track_label, level_scale, set_kind, position) VALUES
+      ('languages', 'Языки',     'Английский, немецкий, турецкий', 'globe',    'Язык',   'cefr',   'language', 1),
+      ('history',   'История',   'Кыргызстан и мир',               'landmark', 'Раздел', 'stages', 'subject',  2),
+      ('geography', 'География', 'Столицы, флаги, природа',        'map-pin',  NULL,     NULL,     'subject',  3),
+      ('ort',       'ОРТ и НЦТ', 'Подготовка к тестам',            'clipboard-check', 'Раздел', NULL, 'subject', 4),
+      ('science',   'Наука',     'Физика и химия',                 'flask-conical', NULL, NULL,   'subject',  5)
+      ON CONFLICT (slug) DO NOTHING`;
+    await sql`INSERT INTO library_tracks (subject_id, key, title, position)
+      SELECT s.id, t.key, t.title, t.position
+      FROM library_subjects s
+      JOIN (VALUES
+        ('history', 'kg',        'Кыргызстан', 1),
+        ('history', 'world',     'Всемирная',  2),
+        ('ort',     'math',      'Математика', 1),
+        ('ort',     'analogies', 'Аналогии',   2),
+        ('ort',     'reading',   'Чтение',     3),
+        ('ort',     'grammar',   'Грамматика', 4)
+      ) AS t(subject, key, title, position) ON t.subject = s.slug
+      ON CONFLICT (subject_id, key) DO NOTHING`;
+  } catch (e) {
+    log.error('db-init', 'Migration 040_library_catalog failed', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)
