@@ -1,5 +1,7 @@
 # Flashcards App
 
+[![Checks](https://github.com/BaYa06/AI_app/actions/workflows/checks.yml/badge.svg?branch=dev)](https://github.com/BaYa06/AI_app/actions/workflows/checks.yml)
+
 Приложение для изучения с помощью флеш-карточек с системой интервальных повторений (SRS).
 
 ## 🚀 Быстрый старт

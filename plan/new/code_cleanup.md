@@ -233,7 +233,14 @@ distractors/whatsNew/ApiService на клиент · 5k ESLint-запреты.
    только с комментарием почему. ESLint `@typescript-eslint/no-explicit-any: warn`.
 4. Цель шага: `npm run type-check` → 0 ошибок, включается в CI (Clean 7).
 
-## Clean 7 — CI проверяет каждый PR ⬜
+## Clean 7 — CI проверяет каждый PR ✅ (код) / ⬜ п.2 защита main — пользователь
+
+**Сделано 05.11.2026** — `.github/workflows/checks.yml`: push в dev/main и PR → Node 24 (engines),
+`npm ci` → lint → format:check → type-check → jest → brand:check → db:check-migrations; все шаги
+выполняются, даже если предыдущий упал. Локально вся последовательность — 0. iOS-сборка в Actions
+— только вручную (TestFlight собирает Codemagic). Бейдж Checks в README.
+**Первый прогон в Actions будет после push в dev** — проверить, что `npm ci` на Ubuntu проходит
+(patch-package, prepare-хук).
 Сейчас `.github/workflows/ios-build.yml` только собирает iOS и проверяет бренд.
 1. Новый `.github/workflows/checks.yml` на push в `dev` и PR в `main`, Ubuntu (дешёво):
    `npm ci` → `lint` → `type-check` → `jest` → `brand:check` → `check-migrations`.
