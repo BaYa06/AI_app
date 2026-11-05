@@ -341,7 +341,18 @@ src/screens/home/
 реэкспортом на время перехода, потом удаляется. `analytics.ts` (894) — события в
 `analytics/events.ts`, транспорт отдельно.
 
-## Clean 10 — серверный API по модулям ⬜
+## Clean 10 — серверный API по модулям ✅ (код) / ⬜ п.4 деплой на тестовый сервер и холодный старт
+
+**Сделано 05.11.2026** — только перенос, поведение сервера не менялось:
+- 10a `d9516c5` — `api/_handlers/data/` (profile, sets, courses, streak, feedback, admin, account,
+  _shared). data.js — роутер + ACTIONS: ключи `__actions` и исходный текст всех 41 функции
+  совпадают с прежними (проверено через Function.prototype.toString). 1172 → 211 строк.
+- 10b `262aa33` — `api/_handlers/test/` (teacher, student, exitControl, _shared) и
+  `api/_handlers/teacher/` (courses, invites, roster, stats). Цепочки `action → функция` не
+  менялись, исходный текст handler совпадает. test.js 1197 → 101, teacher.js 880 → 112.
+- vercel.json задаёт maxDuration только для api/ai.js и api/push.js — новые файлы не затронуты.
+**П.3 (валидатор, 400 вместо 500) не делался:** это изменение ответов сервера (контракт) —
+отдельным решением. **П.4 — после деплоя dev на тестовый сервер** (см. отчёт).
 `api/data.js` (1091), `api/test.js` (1167), `api/teacher.js` (849) — один файл, много
 `action`. URL и `action` **не меняются** (совместимость).
 1. Внутри: `api/data.js` становится роутером `action → обработчик`, обработчики —
