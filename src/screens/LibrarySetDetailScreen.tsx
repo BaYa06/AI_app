@@ -150,8 +150,10 @@ export function LibrarySetDetailScreen({ navigation, route }: Props) {
         const newCards = libCards.map((c) => ({
           id: uuid(),
           setId: newSetId,
-          front: c.front,
-          back: c.back,
+          // Поля карточки в приложении — frontText/backText (раньше здесь были front/back,
+          // и у гостя сохранённый набор открывался с пустыми карточками)
+          frontText: c.front,
+          backText: c.back,
           example: c.hint ?? undefined,
           createdAt: now,
           updatedAt: now,
