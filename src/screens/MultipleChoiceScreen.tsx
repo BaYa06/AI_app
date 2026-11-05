@@ -3,9 +3,9 @@
  * @description Экран выбора перевода
  */
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { View, StyleSheet, Pressable, ScrollView, AppState } from 'react-native';
+import { View, ScrollView, AppState } from 'react-native';
 import { triggerHaptic } from '@/utils/haptic';
-import { Check, Layers, Volume2, X } from 'lucide-react-native';
+import { Layers } from 'lucide-react-native';
 import { Container, Text, Loading } from '@/components/common';
 import {
   Button,
@@ -22,7 +22,6 @@ import {
   useSettingsStore,
   selectSetStats,
 } from '@/store';
-import { spacing, borderRadius, heights, iconSize, screenPadding, alpha } from '@/constants';
 import { ProgressService } from '@/services/ProgressService';
 import { lessonPhaseForAnswer, sessionPhaseForAnswer } from '@/services/lessonFlow';
 import { useLessonStore } from '@/store/lessonStore';
@@ -45,19 +44,11 @@ import type { Card, Rating } from '@/types';
 import { pluralize } from '@/utils';
 import { log } from '@/utils/logger';
 import { cardFront, cardBack } from '@/utils/cardText';
+import { styles } from './multipleChoice/styles';
+import { type ChallengeResult, type OptionState, type Option } from './multipleChoice/types';
+import { QuestionView } from './multipleChoice/QuestionView';
 
 type Props = RootStackScreenProps<'MultipleChoice'>;
-
-type ChallengeResult = {
-  finished: boolean;
-  timesUp: boolean;
-  correct?: number;
-  total?: number;
-  timeSpent?: number;
-} | null;
-
-type OptionState = 'neutral' | 'correct' | 'wrong';
-type Option = { id: string; label: string; text: string; isCorrect: boolean };
 
 export function MultipleChoiceScreen({ navigation, route }: Props) {
   const {
@@ -821,124 +812,20 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
   }
 
   const questionView = (
-    <>
-      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        {isPlainTest ? null : (
-          <View style={styles.cardChip}>
-            <Text variant="overline" style={{ color: colors.primary }}>
-              Выбери правильный ответ
-            </Text>
-          </View>
-        )}
-        {isListen ? (
-          <View style={styles.listenRow}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Прослушать ещё раз"
-              onPress={() => playWord()}
-              style={({ pressed }) => [
-                styles.listenButton,
-                {
-                  backgroundColor: pressed ? alpha(colors.primary, 20) : alpha(colors.primary, 10),
-                },
-              ]}
-            >
-              <Volume2 size={iconSize.l} color={colors.primary} />
-            </Pressable>
-            <Button variant="secondary" size="s" title="Медленнее" onPress={() => playWord(true)} />
-          </View>
-        ) : null}
-        {/* «На слух»: слово видно только после ответа */}
-        {!isListen || showResult ? (
-          <Text variant="h1" style={[styles.word, { color: colors.textPrimary }]}>
-            {getFront(currentCard)}
-          </Text>
-        ) : null}
-        {!isListen && isCardSpeakable(currentCard) ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Прослушать слово"
-            style={({ pressed }) => [
-              styles.audioButton,
-              {
-                backgroundColor: pressed ? alpha(colors.primary, 20) : colors.surfaceMuted,
-                borderColor: colors.border,
-              },
-            ]}
-            onPress={() =>
-              handleSpeak(
-                getFront(currentCard),
-                getBack(currentCard),
-                cardSpeechLangs(currentCard).front
-              )
-            }
-          >
-            <Volume2 size={iconSize.m} color={colors.primary} />
-          </Pressable>
-        ) : null}
-      </View>
-
-      <View style={styles.optionsBlock}>
-        {options.map((option) => {
-          const state = optionState(option);
-          const isCorrect = state === 'correct';
-          const isWrong = state === 'wrong';
-
-          const baseBorder = isCorrect ? colors.success : isWrong ? colors.error : colors.border;
-          const baseBg = isCorrect
-            ? alpha(colors.success, 10)
-            : isWrong
-              ? alpha(colors.error, 10)
-              : colors.surface;
-          // Текст ответа — «текстовые» токены: заливки как текст нечитаемы
-          const textColor = isCorrect
-            ? colors.successText
-            : isWrong
-              ? colors.errorText
-              : colors.textPrimary;
-
-          return (
-            <Pressable
-              key={option.id}
-              onPress={() => handleSelectOption(option)}
-              disabled={showResult}
-              accessibilityRole="button"
-              accessibilityLabel={`${option.label}. ${option.text}${isCorrect ? ', верно' : isWrong ? ', неверно' : ''}`}
-              style={({ pressed }) => [
-                styles.option,
-                {
-                  borderColor: baseBorder,
-                  backgroundColor:
-                    pressed && !isCorrect && !isWrong ? alpha(colors.primary, 10) : baseBg,
-                },
-              ]}
-            >
-              <View
-                style={[
-                  styles.optionBadge,
-                  { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
-                ]}
-              >
-                <Text variant="label" style={{ color: colors.textSecondary }}>
-                  {option.label}
-                </Text>
-              </View>
-              <Text variant="bodyLarge" style={[styles.optionText, { color: textColor }]}>
-                {option.text}
-              </Text>
-              {/* Верно/неверно — цвет и иконка, не только цвет (брендбук, 11) */}
-              {isCorrect ? (
-                <Check size={iconSize.s} color={colors.successText} strokeWidth={3} />
-              ) : isWrong ? (
-                <X size={iconSize.s} color={colors.errorText} strokeWidth={3} />
-              ) : (
-                <View style={styles.optionMarkPlaceholder} />
-              )}
-            </Pressable>
-          );
-        })}
-      </View>
-    </>
+    <QuestionView
+      colors={colors}
+      currentCard={currentCard}
+      getFront={getFront}
+      getBack={getBack}
+      options={options}
+      optionState={optionState}
+      handleSelectOption={handleSelectOption}
+      handleSpeak={handleSpeak}
+      playWord={playWord}
+      isListen={isListen}
+      isPlainTest={isPlainTest}
+      showResult={showResult}
+    />
   );
 
   if (isPlainTest) {
@@ -1051,111 +938,3 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
     </Container>
   );
 }
-
-const styles = StyleSheet.create({
-  semibold: {
-    fontWeight: '600',
-  },
-  progressSection: {
-    paddingHorizontal: screenPadding,
-    paddingVertical: spacing.s,
-    gap: spacing.xs,
-  },
-  progressInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  content: {
-    gap: spacing.m,
-    paddingHorizontal: screenPadding,
-    paddingBottom: spacing.xxl,
-  },
-  // Рамка без тени (брендбук, 7.3)
-  card: {
-    borderRadius: borderRadius.l,
-    borderWidth: 1,
-    padding: spacing.l,
-    gap: spacing.s,
-  },
-  cardChip: {
-    alignSelf: 'center',
-    paddingHorizontal: spacing.s,
-    paddingVertical: spacing.xxs,
-  },
-  word: {
-    textAlign: 'center',
-  },
-  listenRow: {
-    alignItems: 'center',
-    gap: spacing.s,
-  },
-  listenButton: {
-    width: 88,
-    height: 88,
-    borderRadius: borderRadius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  audioButton: {
-    marginTop: spacing.m,
-    alignSelf: 'center',
-    width: 56,
-    height: 56,
-    borderRadius: borderRadius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  optionsBlock: {
-    gap: spacing.s,
-  },
-  option: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.s,
-    borderRadius: borderRadius.l,
-    borderWidth: 2,
-    paddingVertical: spacing.s,
-    paddingHorizontal: spacing.m,
-  },
-  optionBadge: {
-    width: heights.touch,
-    height: heights.touch,
-    borderRadius: borderRadius.m,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  optionText: {
-    flex: 1,
-    fontWeight: '600',
-  },
-  optionMarkPlaceholder: {
-    width: iconSize.s,
-  },
-  timerText: {
-    fontVariant: ['tabular-nums'],
-    letterSpacing: 0,
-  },
-  // Challenge result
-  challengeResultContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.l,
-  },
-  challengeResultIcon: {
-    marginBottom: spacing.m,
-  },
-  challengeResultTitle: {
-    marginBottom: spacing.xs,
-  },
-  challengeResultSubtitle: {
-    marginBottom: spacing.xl,
-  },
-  challengeResultButtons: {
-    width: '100%',
-    gap: spacing.s,
-  },
-});
