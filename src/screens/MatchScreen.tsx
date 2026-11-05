@@ -26,6 +26,9 @@ import { cardFront, cardBack } from '@/utils/cardText';
 
 type Props = RootStackScreenProps<'Match'>;
 
+/** Найденная пара в сессии: остаётся на месте, но «цвет выключен» */
+const MATCHED_DIM_OPACITY = 0.45;
+
 export function MatchScreen({ navigation, route }: Props) {
   const {
     setId,
@@ -200,12 +203,17 @@ export function MatchScreen({ navigation, route }: Props) {
     if (isCorrect) {
       const leftFade = getFadeValue(selectedLeft);
       const rightFade = getFadeValue(selectedRight);
+      // В сессии найденная пара остаётся на месте тусклой — сетка не сдвигается.
+      // В свободной практике пара исчезает, как раньше
+      const toValue = session ? MATCHED_DIM_OPACITY : 0;
       Animated.parallel([
-        Animated.timing(leftFade, { toValue: 0, duration: 180, useNativeDriver: true }),
-        Animated.timing(rightFade, { toValue: 0, duration: 180, useNativeDriver: true }),
+        Animated.timing(leftFade, { toValue, duration: 180, useNativeDriver: true }),
+        Animated.timing(rightFade, { toValue, duration: 180, useNativeDriver: true }),
       ]).start(() => {
-        setLeftCards((prev) => prev.filter((card) => card.id !== selectedLeft));
-        setRightCards((prev) => prev.filter((card) => card.id !== selectedRight));
+        if (!session) {
+          setLeftCards((prev) => prev.filter((card) => card.id !== selectedLeft));
+          setRightCards((prev) => prev.filter((card) => card.id !== selectedRight));
+        }
         resetSelection();
       });
 
@@ -224,7 +232,7 @@ export function MatchScreen({ navigation, route }: Props) {
       if (mismatchRef.current) clearTimeout(mismatchRef.current);
       mismatchRef.current = setTimeout(() => resetSelection(), 450);
     }
-  }, [selectedLeft, selectedRight, resetSelection, triggerSuccessHaptic, getFadeValue]);
+  }, [selectedLeft, selectedRight, resetSelection, triggerSuccessHaptic, getFadeValue, session]);
 
   // Завершение игры
   const finishGame = useCallback(() => {
@@ -368,12 +376,16 @@ export function MatchScreen({ navigation, route }: Props) {
                         styles.card,
                         {
                           backgroundColor: isMatched
-                            ? alpha(colors.success, 10)
+                            ? session
+                              ? colors.surfaceMuted
+                              : alpha(colors.success, 10)
                             : isSelected
                               ? alpha(colors.primary, 10)
                               : colors.surface,
                           borderColor: isMatched
-                            ? colors.success
+                            ? session
+                              ? colors.borderLight
+                              : colors.success
                             : isSelected
                               ? colors.primary
                               : colors.border,
@@ -387,7 +399,9 @@ export function MatchScreen({ navigation, route }: Props) {
                           styles.cardText,
                           {
                             color: isMatched
-                              ? colors.successText
+                              ? session
+                                ? colors.textTertiary
+                                : colors.successText
                               : isSelected
                                 ? colors.primary
                                 : colors.textPrimary,
@@ -430,12 +444,16 @@ export function MatchScreen({ navigation, route }: Props) {
                         styles.card,
                         {
                           backgroundColor: isMatched
-                            ? alpha(colors.success, 10)
+                            ? session
+                              ? colors.surfaceMuted
+                              : alpha(colors.success, 10)
                             : isSelected
                               ? alpha(colors.primary, 10)
                               : colors.surface,
                           borderColor: isMatched
-                            ? colors.success
+                            ? session
+                              ? colors.borderLight
+                              : colors.success
                             : isSelected
                               ? colors.primary
                               : colors.border,
@@ -449,7 +467,9 @@ export function MatchScreen({ navigation, route }: Props) {
                           styles.cardText,
                           {
                             color: isMatched
-                              ? colors.successText
+                              ? session
+                                ? colors.textTertiary
+                                : colors.successText
                               : isSelected
                                 ? colors.primary
                                 : colors.textPrimary,
