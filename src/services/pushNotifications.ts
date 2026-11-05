@@ -9,6 +9,7 @@ import { Platform } from 'react-native';
 import { getMessaging, getToken, onMessage, isSupported, type Messaging } from 'firebase/messaging';
 import { app as firebaseApp } from './firebase';
 import { getAccessToken } from './auth/session';
+import { apiFetch } from './api/client';
 import { version as APP_VERSION } from '../../package.json';
 import { log } from '@/utils/logger';
 
@@ -387,7 +388,7 @@ export async function getPushStatus(): Promise<PushStatus> {
 // корректно резолвит относительные URL сам, в отличие от нативного React Native. Абсолютный
 // URL здесь был бы наоборот регрессией — привязал бы веб-версию к одному конкретному домену
 // вместо текущего origin (сломался бы на превью-деплоях/другом домене). См. план, пункт 55.
-const API_BASE = '/api/push';
+const API_BASE = '/api';
 
 /** JWT входа: сервер привязывает токен к пользователю только по нему (userId из тела игнорирует). */
 async function authHeaders(): Promise<Record<string, string>> {
@@ -401,16 +402,23 @@ async function authHeaders(): Promise<Record<string, string>> {
  */
 async function sendTokenToBackend(token: string, userId?: string | null): Promise<void> {
   try {
-    const res = await fetch(`${API_BASE}?action=subscribe`, {
+    const res = await apiFetch('push', {
       method: 'POST',
+      baseUrl: API_BASE,
+      query: { action: 'subscribe' },
       headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-      body: JSON.stringify({
+      auth: 'none',
+      body: {
         token,
         platform: 'web',
         userId: userId || null,
         appVersion: APP_VERSION,
-      }),
+      },
+      timeoutMs: false,
+      parse: 'none',
     });
+    // Сеть — в catch ниже, как раньше
+    if (!res.response) throw res.error.original;
     if (!res.ok) {
       log.warn('Push', 'Backend subscribe failed', res.status);
     } else {
@@ -430,11 +438,17 @@ async function sendTokenToBackend(token: string, userId?: string | null): Promis
  */
 async function removeTokenFromBackend(token: string): Promise<void> {
   try {
-    const res = await fetch(`${API_BASE}?action=unsubscribe`, {
+    const res = await apiFetch('push', {
       method: 'POST',
+      baseUrl: API_BASE,
+      query: { action: 'unsubscribe' },
       headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-      body: JSON.stringify({ token }),
+      auth: 'none',
+      body: { token },
+      timeoutMs: false,
+      parse: 'none',
     });
+    if (!res.response) throw res.error.original;
     if (!res.ok) {
       log.warn('Push', 'Backend unsubscribe failed', res.status);
     }

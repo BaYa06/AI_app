@@ -101,8 +101,8 @@ export interface ApiRequestOptions {
    */
   body?: unknown;
   /**
-   * Свои заголовки. Итоговый набор: `Content-Type` (если есть тело) → `headers` →
-   * `Authorization` (если есть токен). Чтобы повторить старый код, славший `Content-Type` и на
+   * Свои заголовки. Итоговый набор: `Content-Type` (если есть тело и его нет в `headers`) →
+   * `headers` → `Authorization` (если есть токен). Чтобы повторить старый код, славший `Content-Type` и на
    * GET, передайте его здесь.
    */
   headers?: Record<string, string>;
@@ -212,8 +212,11 @@ export async function apiFetch<T = any>(
   }
 
   const hasBody = body !== undefined && body !== null;
+  // Свой `Content-Type` в `headers` встаёт на своё место в порядке ключей (pushPrompt шлёт
+  // Authorization перед Content-Type) — порядок у вызывающих, ставящих его первым, тот же
+  const ownContentType = !!extraHeaders && 'Content-Type' in extraHeaders;
   const headers: Record<string, string> = {
-    ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
+    ...(hasBody && !ownContentType ? { 'Content-Type': 'application/json' } : {}),
     ...(extraHeaders || {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };

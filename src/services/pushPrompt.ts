@@ -5,9 +5,9 @@
  * не раньше чем через 3 дня, снова после пройденного урока; всего не больше 3 попыток.
  * Только нативное приложение: в вебе свой баннер (App.tsx).
  */
-import { API_BASE } from '@/config/apiBase';
 import { readCache, writeCache } from './localCache';
 import { getAccessToken } from './auth/session';
+import { apiFetch } from './api/client';
 import { log } from '@/utils/logger';
 
 const CACHE_NAME = 'push_prompt';
@@ -77,14 +77,26 @@ export async function saveReminderHour(hour: number): Promise<boolean> {
     const accessToken = await getAccessToken();
     if (!accessToken) return false;
     const headers = { Authorization: `Bearer ${accessToken}` };
-    const current = await fetch(`${API_BASE}/push?action=settings`, { headers }).then((r) =>
-      r.json()
-    );
+    // Голый fetch без таймаута; статус GET не проверяется, невалидный JSON — в catch (как раньше)
+    const got = await apiFetch('push', {
+      query: { action: 'settings' },
+      headers,
+      auth: 'none',
+      timeoutMs: false,
+      parse: 'none',
+    });
+    if (!got.response) throw got.error.original;
+    const current = await got.response.json();
     const days = typeof current?.notifDays === 'string' ? current.notifDays : undefined;
-    const res = await fetch(`${API_BASE}/push?action=settings`, {
+    const res = await apiFetch('push', {
       method: 'POST',
+      query: { action: 'settings' },
+      // Authorization перед Content-Type — как раньше
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      auth: 'none',
+      timeoutMs: false,
+      parse: 'none',
+      body: {
         notifEnabled: true,
         notifHour: hour,
         notifMinute: 0,
@@ -94,8 +106,9 @@ export async function saveReminderHour(hour: number): Promise<boolean> {
         notifStreak: current?.notifStreak ?? true,
         // Время выбрано в листе — оно важнее привычек (plan/new/push_notifications.md, 2.9)
         notifTimeExplicit: true,
-      }),
+      },
     });
+    if (!res.response) throw res.error.original;
     return res.ok;
   } catch (error) {
     log.warn('PushPrompt', 'save hour failed', error);

@@ -21,9 +21,9 @@ import {
   onNotificationOpenedApp,
   AuthorizationStatus,
 } from '@react-native-firebase/messaging';
-import { API_BASE as APP_API_BASE } from '@/config/apiBase';
 import { version as APP_VERSION } from '../../package.json';
 import { getAccessToken } from './auth/session';
+import { apiFetch } from './api/client';
 import { StorageService } from './StorageService';
 import { Analytics } from './analytics';
 import { log } from '@/utils/logger';
@@ -48,7 +48,6 @@ export type ForegroundMessageHandler = (payload: {
 }) => void;
 
 const IS_SUPPORTED = Platform.OS === 'ios';
-const API_BASE = `${APP_API_BASE}/push`;
 
 let currentToken: string | null = null;
 let currentUserId: string | null = null;
@@ -291,18 +290,24 @@ async function sendTokenToBackend(
   permission?: ServerPermission | null
 ): Promise<void> {
   try {
-    const res = await fetch(`${API_BASE}?action=subscribe`, {
+    const res = await apiFetch('push', {
       method: 'POST',
+      query: { action: 'subscribe' },
       headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+      auth: 'none',
       // appVersion — сервер шлёт пуши с новыми экранами только версиям, которые их знают (support_reply)
-      body: JSON.stringify({
+      body: {
         token,
         platform: Platform.OS,
         userId: currentUserId,
         permission: permission ?? undefined,
         appVersion: APP_VERSION,
-      }),
+      },
+      timeoutMs: false,
+      parse: 'none',
     });
+    // Сеть — в catch ниже, как раньше
+    if (!res.response) throw res.error.original;
     if (!res.ok) log.warn('Push', 'Backend subscribe failed', res.status);
   } catch (error) {
     log.warn('Push', 'Failed to send token to backend', error);
@@ -311,11 +316,16 @@ async function sendTokenToBackend(
 
 async function removeTokenFromBackend(token: string): Promise<void> {
   try {
-    const res = await fetch(`${API_BASE}?action=unsubscribe`, {
+    const res = await apiFetch('push', {
       method: 'POST',
+      query: { action: 'unsubscribe' },
       headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-      body: JSON.stringify({ token }),
+      auth: 'none',
+      body: { token },
+      timeoutMs: false,
+      parse: 'none',
     });
+    if (!res.response) throw res.error.original;
     if (!res.ok) log.warn('Push', 'Backend unsubscribe failed', res.status);
   } catch (error) {
     log.warn('Push', 'Failed to remove token from backend', error);

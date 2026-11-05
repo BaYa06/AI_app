@@ -5,14 +5,11 @@
  */
 
 import { getAccessToken } from './auth/session';
-import { API_BASE } from '@/config/apiBase';
-import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
+import { apiFetch } from './api/client';
 import type { Card, CardSet, CardStatus } from '@/types';
 import { getCardStatus, isCardLearned } from './SRSService';
 import type { BookDetail, BookFilters, BookListItem, CoursePlan } from '@/types/books';
 import { log } from '@/utils/logger';
-
-const BOOKS_API_BASE = `${API_BASE}/books`;
 
 // Ленивый доступ к сторам — как в DatabaseService: сторы импортируют сервисы, прямой импорт дал бы цикл.
 const getStores = () => ({
@@ -39,16 +36,20 @@ async function callBooksApi<T>(
   const token = await getAccessToken();
   if (!token) return { ok: false, error: 'Not authenticated', status: 401 };
 
-  const query = new URLSearchParams({ action, ...(params || {}) }).toString();
+  const query = new URLSearchParams({ action, ...(params || {}) });
   try {
-    const resp = await fetchWithTimeout(`${BOOKS_API_BASE}?${query}`, {
+    const res = await apiFetch('books', {
       method,
+      query,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: method === 'POST' ? JSON.stringify(body || {}) : undefined,
+      auth: 'none',
+      body: method === 'POST' ? body || {} : undefined,
     });
-    const json = await resp.json().catch(() => ({}));
-    if (!resp.ok)
-      return { ok: false, error: json?.error || `HTTP ${resp.status}`, status: resp.status };
+    // Сеть/таймаут — в catch ниже с исходным исключением fetch, как раньше
+    if (!res.response) throw res.error.original;
+    const json = res.json;
+    if (!res.ok)
+      return { ok: false, error: json?.error || `HTTP ${res.status}`, status: res.status };
     return { ok: true, data: json as T };
   } catch (error) {
     return {

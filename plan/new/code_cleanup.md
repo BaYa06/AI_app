@@ -155,6 +155,11 @@ buyStreakFreeze, submitAnswers) и diamondStore.callRewardsApi на apiFetch. Т
 try, как раньше (`auth: 'none'` + явный Authorization) — исключение сессии летит наружу.
 Тест neonApiCalls.test.ts (27 случаев: точный URL, заголовки с порядком, тело, ветки, логи)
 проходит и на старом коде, и на новом — запросы побайтно те же.
+**5d.2 ✅ 05.11.2026** — Library, Book, Share, AiImport (importFiles, getAiUsage), push (web —
+`baseUrl: '/api'`, native), pushPrompt на apiFetch; таймауты прежние (120/15/20 с, голый fetch →
+`timeoutMs: false`), исходное исключение fetch пробрасывается, как раньше. В клиенте: свой
+Content-Type в headers сохраняет порядок ключей вызывающего (pushPrompt: Authorization первым).
+Тест serviceApiCalls.test.ts (39 случаев) проходит и на старом коде, и на новом.
 Подшаги: 5a session.ts + тест · 5b сервисы и сторы на session.ts (+ удалить мёртвый AuthService)
 · 5c api/client.ts + тест · 5d call*Api сервисов на клиент (контракты null/ApiResult/reason те же)
 · 5e экраны: getSession → getUserId/getCurrentUser · 5f ExamService + useExamExitGuard

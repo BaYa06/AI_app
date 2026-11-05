@@ -5,11 +5,8 @@
 
 import { Platform, Share, Clipboard } from 'react-native';
 import { getAccessToken } from './auth/session';
-import { API_BASE } from '@/config/apiBase';
-import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
+import { apiFetch } from './api/client';
 import { pluralize } from '@/utils';
-
-const SHARE_API = `${API_BASE}/share`;
 
 export interface ShareLink {
   code: string;
@@ -82,16 +79,20 @@ async function callShareApi<T>(
 ): Promise<T> {
   const token = await getAccessToken();
   const query = new URLSearchParams({ action, ...params });
-  const resp = await fetchWithTimeout(`${SHARE_API}?${query}`, {
+  const res = await apiFetch('share', {
     method,
+    query,
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: body ? JSON.stringify(body) : undefined,
+    auth: 'none',
+    body: body || undefined,
   });
-  const json = await resp.json().catch(() => ({}));
-  if (!resp.ok) throw new ShareApiError(json?.error || `http_${resp.status}`, resp.status, json);
+  // Сеть/таймаут — исходное исключение fetch, как раньше
+  if (!res.response) throw res.error.original;
+  const json = res.json;
+  if (!res.ok) throw new ShareApiError(json?.error || `http_${res.status}`, res.status, json);
   return json as T;
 }
 

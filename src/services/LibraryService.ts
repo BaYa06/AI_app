@@ -5,8 +5,7 @@
  */
 
 import { getAccessToken } from './auth/session';
-import { API_BASE } from '@/config/apiBase';
-import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
+import { apiFetch } from './api/client';
 import type {
   LibraryFilters,
   LibraryListResponse,
@@ -19,8 +18,6 @@ import type {
   RateResponse,
   LibrarySet,
 } from '@/types/library';
-
-const LIBRARY_API = `${API_BASE}/library`;
 
 /**
  * Запрос к api/library.js. Токен добавляется, если есть сессия (для списка/деталей он
@@ -38,23 +35,27 @@ async function callLibraryApi<T>(
   const token = await getAccessToken();
   if (requireAuth && !token) throw new Error('Необходимо войти в аккаунт');
 
+  // '' тоже пропускаем — поэтому готовый URLSearchParams, а не объект
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== null && value !== '') query.set(key, String(value));
   }
-  const qs = query.toString();
-  const resp = await fetchWithTimeout(qs ? `${LIBRARY_API}?${qs}` : LIBRARY_API, {
+  const res = await apiFetch('library', {
     method,
+    query,
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: body ? JSON.stringify(body) : undefined,
+    auth: 'none',
+    body: body || undefined,
   });
-  const json = await resp.json().catch(() => ({}));
-  if (!resp.ok) {
-    if (resp.status === 403) throw new Error('Можно добавлять только в свои курсы');
-    throw new Error(json?.error || `HTTP ${resp.status}`);
+  // Сеть/таймаут — исходное исключение fetch, как раньше
+  if (!res.response) throw res.error.original;
+  const json = res.json;
+  if (!res.ok) {
+    if (res.status === 403) throw new Error('Можно добавлять только в свои курсы');
+    throw new Error(json?.error || `HTTP ${res.status}`);
   }
   return json as T;
 }

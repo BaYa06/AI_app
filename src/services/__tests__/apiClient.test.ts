@@ -95,6 +95,30 @@ describe('тело и заголовки', () => {
     });
   });
 
+  it('свой Content-Type в headers — порядок ключей как у вызывающего (pushPrompt)', async () => {
+    await apiFetch('push', {
+      method: 'POST',
+      body: { a: 1 },
+      auth: 'none',
+      headers: { Authorization: 'Bearer x', 'Content-Type': 'application/json' },
+    });
+    expect(Object.keys(mockFetch.mock.calls[0][1].headers as object)).toEqual([
+      'Authorization',
+      'Content-Type',
+    ]);
+
+    await apiFetch('data', {
+      method: 'POST',
+      body: { a: 1 },
+      auth: 'none',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer x' },
+    });
+    expect(Object.keys(mockFetch.mock.calls[1][1].headers as object)).toEqual([
+      'Content-Type',
+      'Authorization',
+    ]);
+  });
+
   it('никаких лишних заголовков', async () => {
     await apiFetch('data', { method: 'POST', body: { a: 1 }, auth: 'none' });
     expect(Object.keys(mockFetch.mock.calls[0][1].headers as object)).toEqual(['Content-Type']);

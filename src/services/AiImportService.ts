@@ -4,9 +4,8 @@
  * карточки через api/ai?fn=import-files, и дневной лимит распознаваний (fn=usage).
  * Ошибки сервера превращаются в AiImportError с кодом — экран показывает понятный текст.
  */
-import { API_BASE } from '@/config/apiBase';
 import { getAccessToken } from './auth/session';
-import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
+import { apiFetch } from './api/client';
 
 /** Файл, подготовленный к отправке (фото уже сжато, PDF/таблица прочитаны) */
 export type ImportFileKind = 'image' | 'pdf' | 'table' | 'text';
@@ -155,24 +154,27 @@ export async function importFiles(
 
   let response: Response;
   try {
-    response = await fetchWithTimeout(
-      `${API_BASE}/ai?fn=import-files`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...headers },
-        body: JSON.stringify({
-          files,
-          goal: request.goal,
-          level: request.level,
-          prompt: request.prompt?.trim() || undefined,
-          languageFrom: request.languageFrom,
-          languageTo: request.languageTo,
-          setKind: request.setKind,
-        }),
-        signal,
+    const res = await apiFetch('ai', {
+      method: 'POST',
+      query: { fn: 'import-files' },
+      headers: { 'Content-Type': 'application/json', ...headers },
+      auth: 'none',
+      body: {
+        files,
+        goal: request.goal,
+        level: request.level,
+        prompt: request.prompt?.trim() || undefined,
+        languageFrom: request.languageFrom,
+        languageTo: request.languageTo,
+        setKind: request.setKind,
       },
-      120_000
-    );
+      signal,
+      timeoutMs: 120_000,
+      // toAiError и разбор успеха читают тело сами (невалидный JSON успеха — исключение, как раньше)
+      parse: 'none',
+    });
+    if (!res.response) throw res.error.original;
+    response = res.response;
   } catch {
     if (signal?.aborted) throw new AiImportError('cancelled', 'Отменено');
     throw new AiImportError('network', 'Нет связи с сервером. Проверь интернет');
@@ -194,9 +196,15 @@ export async function importFiles(
 export async function getAiUsage(): Promise<AiUsage | null> {
   try {
     const headers = await authHeaders();
-    const response = await fetchWithTimeout(`${API_BASE}/ai?fn=usage`, { headers }, 15_000);
-    if (!response.ok) return null;
-    return (await response.json()) as AiUsage;
+    const res = await apiFetch('ai', {
+      query: { fn: 'usage' },
+      headers,
+      auth: 'none',
+      timeoutMs: 15_000,
+      parse: 'none',
+    });
+    if (!res.ok) return null;
+    return (await res.response.json()) as AiUsage;
   } catch {
     return null;
   }
