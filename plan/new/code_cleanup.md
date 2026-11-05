@@ -322,7 +322,20 @@ src/screens/home/
 Перед резкой каждого экрана — проверить на устройстве основные сценарии, после — те же.
 `npm run new:screen` обновить, чтобы генерировал папку по этой структуре.
 
-## Clean 9 — разнести NeonService и большие сервисы ⬜
+## Clean 9 — разнести NeonService и большие сервисы ✅
+
+**Сделано 05.11.2026** — только перенос, код методов и событий не менялся (сверено с HEAD):
+- 9a `1e4f935` — `src/services/neon/`: core.ts (запросы к api/data|teacher|progress, мапперы
+  строк БД, типы), profile (21 метод), sets (11), courses (27), streak (7), progress (1).
+  NeonService.ts (32 строки) собирает объект `{ ...profileApi, … }` и реэкспортирует публичные
+  типы и NetworkLoadError — ни один импорт в приложении не менялся.
+- 9b `3740afc` — `src/services/analyticsEvents/`: core.ts (типы, log) + 7 разделов событий;
+  analytics.ts (~160 строк) собирает `Analytics`, набор экспортов прежний. Транспорт уже был
+  отдельно (analyticsTransport / .native). Папка названа analyticsEvents, а не analytics —
+  чтобы не путаться с файлом analytics.ts.
+Отличие от плана: NeonService не удалён — оставлен фасадом (переводить ~90 мест вызова на
+доменные модули смысла нет: API тот же). Типы ответов API (Clean 6, `any` в мапперах) — не
+делались: требуют знания форм ответов сервера, естественнее вместе с Clean 10/11.
 `NeonService.ts` (1280) — по доменам: `SetsService`, `CardsService`, `CoursesService`,
 `ProfileService`, общий `api/client.ts` из Clean 5. `NeonService` остаётся тонким
 реэкспортом на время перехода, потом удаляется. `analytics.ts` (894) — события в
