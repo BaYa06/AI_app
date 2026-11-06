@@ -98,6 +98,11 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
   const currentTotalPhaseCards = useRef(totalPhaseCards || 0);
   // Количество ошибочных карточек из прошлых порций в текущей очереди
   const pendingCardsInQueueRef = useRef(0);
+  // Сессия «Изучить»: вопросов в порции без повторов и слова с ошибкой, ещё не исправленные.
+  // Ошибка уходит в конец той же очереди — экран не закрывается ради новой порции
+  const baseQuestionsRef = useRef(0);
+  const sessionRetryIdsRef = useRef<Set<string>>(new Set());
+  const [sessionRetryCount, setSessionRetryCount] = useState(0);
 
   const [questions, setQuestions] = useState<Card[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -242,6 +247,9 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
     questionCards = questionCards.filter((c) => !seen.has(c.id) && seen.add(c.id));
 
     setQuestions(questionCards);
+    baseQuestionsRef.current = questionCards.length;
+    sessionRetryIdsRef.current = new Set();
+    setSessionRetryCount(0);
     setCurrentIndex(0);
     setSelectedOption(null);
     setShowResult(false);
@@ -301,7 +309,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
     if (!isListen || !introDone || !currentCard) return;
     const timer = setTimeout(() => playWord(), 250);
     return () => clearTimeout(timer);
-  }, [isListen, introDone, currentCard?.id]);
+  }, [isListen, introDone, currentCard?.id, currentIndex]);
 
   const progressPercent = totalQuestions
     ? Math.round(((currentIndex + 1) / totalQuestions) * 100)
@@ -402,16 +410,18 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
       errorList: Array<{ id: string; front: string; back: string; rating: number }>
     ) => {
       const timeSpent = Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000));
-      const learnedCards = Math.max(0, totalQuestions - errorsCount);
+      // В сессии очередь растёт за счёт повторов ошибок — итоги по исходной порции
+      const portionTotal = session ? baseQuestionsRef.current : totalQuestions;
+      const learnedCards = Math.max(0, portionTotal - errorsCount);
 
       // Считаем сколько НОВЫХ карточек было в этой порции
-      const newCardsInBatch = totalQuestions - pendingCardsInQueueRef.current;
+      const newCardsInBatch = portionTotal - pendingCardsInQueueRef.current;
 
       // Обновляем прогресс фазы
       const newStudiedInPhase = studiedInPhase + learnedCards;
       // phaseOffset увеличивается только на количество НОВЫХ карточек
       const newPhaseOffset = phaseOffset + newCardsInBatch;
-      const phaseTotal = currentTotalPhaseCards.current || totalQuestions;
+      const phaseTotal = currentTotalPhaseCards.current || portionTotal;
 
       // Собираем ID ошибочных карточек
       const errorIds = new Set(errorList.map((c) => c.id).filter(Boolean));
@@ -430,7 +440,8 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
           prevFailed.add(id);
         }
       });
-      const newPhaseFailedIds = Array.from(prevFailed);
+      // Сессия: все ошибки исправлены в этой же очереди — этап пройден
+      const newPhaseFailedIds = session ? [] : Array.from(prevFailed);
 
       log.debug('MultipleChoice', 'Завершение порции', {
         totalQuestions,
@@ -450,7 +461,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
 
       navigation.replace('StudyResults', {
         setId,
-        totalCards: totalQuestions,
+        totalCards: portionTotal,
         learnedCards,
         timeSpent,
         errors: errorsCount,
@@ -617,6 +628,12 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
 
     // Обычный тест: дальше — по кнопке в нижней панели (handleNextQuestion)
     if (isPlainTest) {
+      if (session) {
+        const retryIds = sessionRetryIdsRef.current;
+        if (isCorrect) retryIds.delete(currentCard.id);
+        else retryIds.add(currentCard.id);
+        setSessionRetryCount(retryIds.size);
+      }
       setFeedback({ correct: isCorrect, nextErrors, updatedErrorCards });
       return;
     }
@@ -648,10 +665,23 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
 
   const handleNextQuestion = () => {
     if (!feedback) return;
-    if (currentIndex >= totalQuestions - 1) {
+    // Сессия: ошибка — тот же вопрос ещё раз в конце очереди, пока не ответят верно.
+    // Добавляем здесь, а не при ответе: иначе варианты текущего вопроса перемешались бы на глазах
+    const retry = !!session && !feedback.correct && !!currentCard;
+    if (!retry && currentIndex >= totalQuestions - 1) {
+      if (session) {
+        // Слово могли ошибиться несколько раз — в итогах считаем его один раз
+        const seen = new Set<string>();
+        const unique = feedback.updatedErrorCards.filter((c) =>
+          seen.has(c.id) ? false : (seen.add(c.id), true)
+        );
+        finishQuiz(unique.length, unique);
+        return;
+      }
       finishQuiz(feedback.nextErrors, feedback.updatedErrorCards);
       return;
     }
+    if (retry) setQuestions((prev) => [...prev, currentCard]);
     setFeedback(null);
     setCurrentIndex((idx) => idx + 1);
     setSelectedOption(null);
@@ -856,9 +886,9 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
           session
             ? sessionStageProgress(
                 studiedInPhase,
-                currentIndex + (showResult ? 1 : 0),
-                errors,
-                currentTotalPhaseCards.current || totalQuestions
+                Math.min(currentIndex + (showResult ? 1 : 0), baseQuestionsRef.current),
+                sessionRetryCount,
+                currentTotalPhaseCards.current || baseQuestionsRef.current
               )
             : { done: currentIndex + (showResult ? 1 : 0), total: totalQuestions }
         }
