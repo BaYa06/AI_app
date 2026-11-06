@@ -2,6 +2,13 @@ import { neon } from '@neondatabase/serverless';
 import { ensureDatabaseInitialized } from './_db-init.js';
 import { getAuthedUserId } from './_auth.js';
 import { log } from './_log.js';
+import { HttpError } from './_access.js';
+import {
+  getCatalog,
+  getCollection,
+  getSubject,
+  searchCatalog,
+} from './_handlers/library/catalog.js';
 
 /**
  * Consolidated Library API
@@ -21,6 +28,12 @@ import { log } from './_log.js';
  * POST /api/library?action=import           – import a set { librarySetId, courseId? } (JWT; курс — только свой)
  * GET  /api/library?action=cards&id=xxx      – все карточки опубликованного набора
  *
+ * Каталог (plan/new/library_catalog.md, Catalog 3; api/_handlers/library/catalog.js), токен необязателен:
+ * GET  /api/library?action=catalog[&lang=en]  – предметы, «Продолжить» / «С чего начать», полка учебников
+ * GET  /api/library?action=subject&subject=slug – разделы, уровни, подборки предмета
+ * GET  /api/library?action=collection&id=xxx – наборы подборки по порядку
+ * GET  /api/library?action=search&q=текст    – подборки, наборы, учебники
+ *
  * userId — только из Supabase JWT: мутации и «мои» запросы требуют токен, в списке/деталях
  * токен необязателен (без него флаги is_imported/is_liked = false).
  *
@@ -35,6 +48,13 @@ const isUuid = (v) => typeof v === 'string' && UUID_RE.test(v);
 const MUTATION_ACTIONS = new Set(['like', 'rate', 'report', 'import', 'publish']);
 
 const OWN_READ_ACTIONS = new Set(['my-publications', 'check-published', 'can-publish']);
+
+const CATALOG_ROUTES = {
+  catalog: getCatalog,
+  subject: getSubject,
+  collection: getCollection,
+  search: searchCatalog,
+};
 
 // Набор виден другим, только если его опубликовал админ.
 const ADMIN_AUTHOR = `EXISTS (SELECT 1 FROM users au WHERE au.id = ls.user_id AND au.is_admin = true)`;
@@ -97,6 +117,11 @@ export default async function handler(req, res) {
     if (action === 'report') return await reportSet(req, res, sql);
     if (action === 'import') return await importSet(req, res, sql);
     if (action === 'cards') return await getLibraryCards(req, res, sql, id);
+    const catalogRoute = CATALOG_ROUTES[action];
+    if (catalogRoute) {
+      if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+      return await catalogRoute(req, res, sql, userId);
+    }
     if (action === 'publish') {
       switch (req.method) {
         case 'POST':
@@ -120,6 +145,7 @@ export default async function handler(req, res) {
     }
     return await getLibrarySets(req, res, sql);
   } catch (error) {
+    if (error instanceof HttpError) return res.status(error.status).json({ error: error.message });
     log.error('library', 'Library API error', error);
     return res.status(500).json({ error: error.message });
   }

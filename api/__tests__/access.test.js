@@ -198,6 +198,45 @@ describe('api/library (публикация)', () => {
     expect(destructive()).toEqual([]);
   });
 
+  it('каталог без входа открывается (токен необязателен), «добавлено» считается для пустого пользователя', async () => {
+    mockUser = null;
+    const res = mockRes();
+    await library()({ method: 'GET', headers: {}, query: { action: 'catalog' } }, res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({ ok: true, subjects: [], continue: null, books: [] });
+    expect(destructive()).toEqual([]);
+    // Запросы с «моими» отметками получают null, а не чужой id.
+    const withMe = mockQueries.filter((q) => /\b(li|bi)\.user_id = \?::uuid/.test(q.text));
+    expect(withMe.length).toBeGreaterThan(0);
+    for (const q of withMe) expect(q.values).toContain(null);
+  });
+
+  it('каталог только на чтение: POST — 405 и ни одного запроса к каталогу', async () => {
+    const res = mockRes();
+    await library()({ method: 'POST', headers: {}, query: { action: 'subject' }, body: {} }, res);
+    expect(res.statusCode).toBe(405);
+    expect(mockQueries.filter((q) => /library_subjects|library_collections/.test(q.text))).toEqual(
+      []
+    );
+  });
+
+  it('кривой предмет — 400 до запроса к базе, неизвестный — 404', async () => {
+    let res = mockRes();
+    await library()(
+      { method: 'GET', headers: {}, query: { action: 'subject', subject: "x'; DROP" } },
+      res
+    );
+    expect(res.statusCode).toBe(400);
+    expect(mockQueries).toEqual([]);
+
+    res = mockRes();
+    await library()(
+      { method: 'GET', headers: {}, query: { action: 'subject', subject: 'nope' } },
+      res
+    );
+    expect(res.statusCode).toBe(404);
+  });
+
   it('лайк без входа — 401 и ни одного запроса', async () => {
     mockUser = null;
     const res = mockRes();
