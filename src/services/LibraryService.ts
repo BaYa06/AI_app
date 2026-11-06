@@ -17,6 +17,11 @@ import type {
   ToggleLikeResponse,
   RateResponse,
   LibrarySet,
+  CatalogResponse,
+  CatalogSubjectResponse,
+  CatalogCollectionResponse,
+  CatalogSearchResponse,
+  ImportCollectionResponse,
 } from '@/types/library';
 
 /**
@@ -177,6 +182,39 @@ class LibraryServiceClass {
       { requireAuth: true }
     );
     return json.canPublish === true;
+  }
+
+  // ── Каталог (plan/new/library_catalog.md, Catalog 3–5). Токен необязателен ──
+
+  /** Предметы, «Продолжить» / «С чего начать», полка учебников. lang — язык для «С чего начать». */
+  async getCatalog(lang?: string | null): Promise<CatalogResponse> {
+    return callLibraryApi<CatalogResponse>({ action: 'catalog', lang });
+  }
+
+  /** Разделы, непустые уровни и подборки предмета. */
+  async getCatalogSubject(slug: string): Promise<CatalogSubjectResponse> {
+    return callLibraryApi<CatalogSubjectResponse>({ action: 'subject', subject: slug });
+  }
+
+  /** Подборка и её наборы по порядку. */
+  async getCatalogCollection(id: string): Promise<CatalogCollectionResponse> {
+    return callLibraryApi<CatalogCollectionResponse>({ action: 'collection', id });
+  }
+
+  /** Поиск по подборкам, наборам и учебникам (от 2 символов, иначе пустой ответ). */
+  async searchCatalog(q: string): Promise<CatalogSearchResponse> {
+    return callLibraryApi<CatalogSearchResponse>({ action: 'search', q });
+  }
+
+  /** Вся подборка в свой курс (учитель). Уже лежащие в курсе наборы сервер пропускает. */
+  async importCollection(
+    collectionId: string,
+    courseId: string
+  ): Promise<ImportCollectionResponse> {
+    return callLibraryApi<ImportCollectionResponse>(
+      { action: 'import-collection' },
+      { method: 'POST', body: { collectionId, courseId }, requireAuth: true }
+    );
   }
 
   /** Check if a personal set is published */

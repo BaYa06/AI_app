@@ -36,7 +36,7 @@ import {
   syncPushPermission,
   requestProvisionalPermission,
 } from '@/services/pushNotifications';
-import { useCoursesStore, useSettingsStore } from '@/store';
+import { useCatalogStore, useCoursesStore, useSettingsStore } from '@/store';
 import { NEW_PER_DAY_OPTIONS } from '@/services/LessonService';
 import type { AboutMeAnswers } from '@/screens/AboutMeOnboardingScreen';
 
@@ -317,6 +317,8 @@ export default function App() {
         Analytics.logout();
         // Виджет на экране блокировки не должен показывать слова прошлого аккаунта (plan/new/widgets.md, 1.2)
         resetWidget();
+        // Отметки «добавлено» в каталоге библиотеки — этого пользователя
+        useCatalogStore.getState().clear();
         // Сохранённые данные больше не показываем мгновенно — следующий вошедший может быть другим
         StorageService.delete(CACHE_OWNER_KEY);
         cachedOwnerRef.current = null;
