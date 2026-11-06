@@ -1,6 +1,7 @@
 /**
  * Speech helper
- * Google Cloud TTS (API key or service account) with Web Speech fallback.
+ * Облачный голос: Azure через наш сервер (api/ai.js?fn=tts), затем Google TTS (уходит в TTS 4),
+ * затем голос браузера (Web Speech) или устройства (react-native-tts).
  * On native (Android/iOS) uses react-native-tts as fallback instead of Web Speech API.
  */
 
@@ -419,7 +420,8 @@ let ttsCachePruned = false;
 
 /** Стабильный короткий ключ: голос + язык + скорость + высота + текст (djb2 → hex) */
 const ttsKey = (text: string, lang: string, options?: { rate?: number; pitch?: number }) => {
-  const raw = `${pickGoogleVoice(lang) || ''}|${lang}|${toGoogleRate(options?.rate)}|${toGooglePitch(options?.pitch)}|${text}`;
+  // 'azure' — чтобы на телефоне не играли старые mp3 голоса Google из кэша
+  const raw = `azure|${pickGoogleVoice(lang) || ''}|${lang}|${toGoogleRate(options?.rate)}|${toGooglePitch(options?.pitch)}|${text}`;
   let h1 = 5381;
   let h2 = 52711;
   for (let i = 0; i < raw.length; i++) {
@@ -499,13 +501,46 @@ const playCachedAudio = async (key: string, volume = 1) => {
   await audio.play();
 };
 
-/** Синтез у Google и сохранение в кэш (без проигрывания). false — нет ключа/токена. */
+/**
+ * Облачный голос Azure через наш сервер (api/_ai/tts.js) — ключ только на сервере.
+ * false — сервер не смог (не вошёл, нет ключа, лимит F0, нет сети): дальше запасные голоса.
+ */
+const synthesizeWithServer = async (
+  key: string,
+  text: string,
+  lang: string,
+  options?: { rate?: number }
+): Promise<boolean> => {
+  // Ленивый require — клиент API тянет auth/session, не создаём циклических импортов
+  const { apiFetch } = require('@/services/api/client');
+  const res = await apiFetch('ai', {
+    method: 'POST',
+    query: { fn: 'tts' },
+    auth: 'required',
+    timeoutMs: TTS_TIMEOUT_MS,
+    body: { text, lang, rate: options?.rate ?? 1 },
+  });
+  if (!res.ok || !res.json?.audioContent) {
+    log.debug('Speech', 'Server TTS unavailable', res.status, res.json?.error);
+    return false;
+  }
+  await storeCachedAudio(key, res.json.audioContent);
+  return true;
+};
+
+/** Синтез и сохранение в кэш (без проигрывания): Azure через сервер, затем Google. false — не вышло. */
 const synthesizeToCache = async (
   key: string,
   text: string,
   lang: string,
   options?: { rate?: number; pitch?: number }
 ): Promise<boolean> => {
+  try {
+    if (await synthesizeWithServer(key, text, lang, options)) return true;
+  } catch (e) {
+    log.warn('Speech', 'Server TTS failed', e);
+  }
+
   const fetchFn = getGlobal().fetch as FetchLike | undefined;
   if (!fetchFn) return false;
 
@@ -576,7 +611,7 @@ const ensureCached = (
   return job;
 };
 
-const speakWithGoogle = async (
+const speakWithCloud = async (
   text: string,
   lang: string,
   options?: { rate?: number; pitch?: number; volume?: number }
@@ -673,33 +708,33 @@ export async function speak(
   if (!text) return;
 
   if (isNative) {
-    // On native: try Google Cloud TTS first (high quality), fall back to device TTS
+    // On native: cloud voice first (Azure via server), fall back to device TTS
     try {
-      log.debug('Speech', '[native] Attempting Google Cloud TTS...');
-      const done = await speakWithGoogle(text, lang, options);
+      log.debug('Speech', '[native] Attempting cloud TTS...');
+      const done = await speakWithCloud(text, lang, options);
       if (done) {
-        log.debug('Speech', '[native] Google Cloud TTS succeeded');
+        log.debug('Speech', '[native] Cloud TTS succeeded');
         return;
       }
     } catch (e) {
-      log.warn('Speech', '[native] Google TTS failed', e);
+      log.warn('Speech', '[native] Cloud TTS failed', e);
     }
     log.debug('Speech', '[native] Falling back to native TTS');
     await speakWithNativeTTS(text, lang, options);
     return;
   }
 
-  // On web: try Google Cloud TTS first, fall back to Web Speech API
+  // On web: cloud voice first (Azure via server), fall back to Web Speech API
   try {
-    log.debug('Speech', 'Attempting Google Cloud TTS...');
-    const done = await speakWithGoogle(text, lang, options);
+    log.debug('Speech', 'Attempting cloud TTS...');
+    const done = await speakWithCloud(text, lang, options);
     if (done) {
-      log.debug('Speech', 'Google Cloud TTS succeeded');
+      log.debug('Speech', 'Cloud TTS succeeded');
       return;
     }
-    log.debug('Speech', 'Google TTS returned false, falling back to Web Speech');
+    log.debug('Speech', 'Cloud TTS unavailable, falling back to Web Speech');
   } catch (e) {
-    log.warn('Speech', 'Google TTS failed, fallback to Web Speech', e);
+    log.warn('Speech', 'Cloud TTS failed, fallback to Web Speech', e);
   }
   log.debug('Speech', 'Using Web Speech fallback');
   await speakWithWebSpeech(text, lang, options);

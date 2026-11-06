@@ -300,6 +300,17 @@ module.exports = (env, argv) => {
               }
             });
 
+            // AI-эндпоинты (api/ai.js, ?fn=…) — в т.ч. облачная озвучка fn=tts без vercel dev
+            apiMiddleware.all('/api/ai', async (req, res) => {
+              try {
+                const mod = await import('./api/ai.js');
+                return mod.default(req, res);
+              } catch (e) {
+                console.error('[devServer] ai error', e);
+                return res.status(500).json({ error: 'dev-server error', message: e.message });
+              }
+            });
+
             // Live test API (all methods — GET and POST)
             apiMiddleware.all('/api/test', async (req, res) => {
               console.log('[devServer] /api/test called, action:', req.query?.action || req.url);

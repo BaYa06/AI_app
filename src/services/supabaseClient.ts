@@ -36,8 +36,10 @@ const defaultWebRedirect =
     ? `${window.location.origin}/auth-callback`
     : '';
 const SUPABASE_REDIRECT_URI = isWeb
-  ? (process.env.SUPABASE_WEB_REDIRECT_URI ?? defaultWebRedirect)
-  : (process.env.SUPABASE_REDIRECT_URI ?? 'flashly://auth-callback');
+  ? // `||`, а не `??`: webpack подставляет '' для незаданной переменной — с `??` вход на
+    // localhost уходил на боевой сайт (Site URL в Supabase)
+    process.env.SUPABASE_WEB_REDIRECT_URI || defaultWebRedirect
+  : process.env.SUPABASE_REDIRECT_URI || 'flashly://auth-callback';
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   log.warn(

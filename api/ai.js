@@ -5,6 +5,7 @@ import extractPdf from './_ai/extract-pdf.js';
 import extractImage from './_ai/extract-image.js';
 import importFiles from './_ai/import-files.js';
 import usage from './_ai/usage.js';
+import tts from './_ai/tts.js';
 
 /**
  * Единая Vercel-функция для AI-эндпоинтов (лимит Hobby — 12 функций).
@@ -19,6 +20,7 @@ const HANDLERS = {
   'extract-image': extractImage,
   'import-files': importFiles,
   usage,
+  tts,
 };
 
 export default async function handler(req, res) {
