@@ -9,3 +9,10 @@
  * false — во вкладке только учебники.
  */
 export const COMMUNITY_LIBRARY_ENABLED = true;
+
+/**
+ * Новая библиотека-каталог: предмет → подборка → набор (plan/new/library_catalog.md, Catalog 6–8).
+ * Пока false — во вкладке прежний экран: экраны «Предмет» и «Подборка» появляются в Catalog 7 и 8,
+ * без них плитки вели бы в никуда. Включается, когда готовы все три экрана.
+ */
+export const LIBRARY_CATALOG_ENABLED = false;

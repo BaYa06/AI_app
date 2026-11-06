@@ -153,6 +153,9 @@ export type RootStackParamList = {
     phaseFailedIds?: string[];
   };
   LibrarySetDetail: { setId: string };
+  /** Каталог библиотеки (plan/new/library_catalog.md): экран предмета и экран подборки */
+  LibrarySubject: { slug: string; title?: string };
+  LibraryCollection: { collectionId: string; title?: string };
   BookDetail: { bookId: string };
   CourseBooks: { courseId: string; courseTitle: string };
   MyPublications: undefined;

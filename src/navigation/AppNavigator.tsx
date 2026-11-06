@@ -55,6 +55,7 @@ function BounceIcon({ name, color, focused }: { name: string; color: string; foc
 // Экраны
 import { HomeScreen } from '@/screens/HomeScreen';
 import { LibraryScreen } from '@/screens/LibraryScreen';
+import { LibraryCatalogScreen } from '@/screens/LibraryCatalogScreen';
 import { StatisticsScreen } from '@/screens/StatisticsScreen';
 import { ProfileScreen } from '@/screens/ProfileScreen';
 import { SetDetailScreen } from '@/screens/SetDetailScreen';
@@ -80,7 +81,7 @@ import { LibrarySetDetailScreen } from '@/screens/LibrarySetDetailScreen';
 import { BookDetailScreen } from '@/screens/BookDetailScreen';
 import { CourseBooksScreen } from '@/screens/CourseBooksScreen';
 import { MyPublicationsScreen } from '@/screens/MyPublicationsScreen';
-import { COMMUNITY_LIBRARY_ENABLED } from '@/config/features';
+import { COMMUNITY_LIBRARY_ENABLED, LIBRARY_CATALOG_ENABLED } from '@/config/features';
 import { PersonalInfoScreen } from '@/screens/PersonalInfoScreen';
 import { SecurityScreen } from '@/screens/SecurityScreen';
 import { TeacherCourseStatsScreen } from '@/screens/TeacherCourseStatsScreen';
@@ -187,7 +188,7 @@ function MainTabs() {
         }}
         listeners={{ tabPress: () => triggerHaptic('selection') }}
       >
-        {() => <LibraryScreen />}
+        {() => (LIBRARY_CATALOG_ENABLED ? <LibraryCatalogScreen /> : <LibraryScreen />)}
       </Tab.Screen>
       <Tab.Screen
         name="TestTab"
