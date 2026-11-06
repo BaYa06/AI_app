@@ -81,6 +81,11 @@ export function WordBuilderScreen({ navigation, route }: Props) {
   const [wordResult, setWordResult] = useState<'correct' | 'wrong' | null>(null);
 
   const pendingCardsInQueueRef = useRef(0);
+  // Сессия «Изучить»: слов в порции без повторов и слова с ошибкой, ещё не исправленные.
+  // Ошибка уходит в конец той же очереди — экран не закрывается ради новой порции
+  const baseWordsRef = useRef(0);
+  const sessionRetryIdsRef = useRef<Set<string>>(new Set());
+  const [sessionRetryCount, setSessionRetryCount] = useState(0);
   const currentPhaseId = useRef(
     phaseId || `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   );
@@ -148,6 +153,9 @@ export function WordBuilderScreen({ navigation, route }: Props) {
 
     currentTotalPhaseCards.current = totalPhaseCards || queue.length;
     setCardsQueue(queue);
+    baseWordsRef.current = queue.length;
+    sessionRetryIdsRef.current = new Set();
+    setSessionRetryCount(0);
     setCurrentIndex(0);
     setErrors(0);
     setErrorCards([]);
@@ -235,7 +243,8 @@ export function WordBuilderScreen({ navigation, route }: Props) {
     setTiles(shuffleArray(initialTiles));
     setIsLocked(false);
     setWordResult(null);
-  }, [currentCard?.id, targetWord]);
+    // currentIndex — слово с ошибкой может повториться сразу следом (сессия): плитки заново
+  }, [currentCard?.id, targetWord, currentIndex]);
 
   const totalWords = cardsQueue.length;
 
@@ -285,12 +294,14 @@ export function WordBuilderScreen({ navigation, route }: Props) {
       errorList: Array<{ id?: string; front: string; back: string; rating: number }>
     ) => {
       const timeSpent = Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000));
-      const learnedCards = Math.max(0, totalWords - errorsCount);
+      // В сессии очередь растёт за счёт повторов ошибок — итоги по исходной порции
+      const portionTotal = session ? baseWordsRef.current : totalWords;
+      const learnedCards = Math.max(0, portionTotal - errorsCount);
 
-      const newCardsInBatch = totalWords - pendingCardsInQueueRef.current;
+      const newCardsInBatch = portionTotal - pendingCardsInQueueRef.current;
       const newStudiedInPhase = studiedInPhase + learnedCards;
       const newPhaseOffset = phaseOffset + newCardsInBatch;
-      const phaseTotal = currentTotalPhaseCards.current || totalWords;
+      const phaseTotal = currentTotalPhaseCards.current || portionTotal;
 
       const errorIds = new Set(errorList.map((c) => c.id).filter(Boolean));
       const prevFailed = new Set(phaseFailedList || []);
@@ -304,14 +315,15 @@ export function WordBuilderScreen({ navigation, route }: Props) {
           prevFailed.add(id);
         }
       });
-      const newPhaseFailedIds = Array.from(prevFailed);
+      // Сессия: все ошибки исправлены в этой же очереди — этап пройден
+      const newPhaseFailedIds = session ? [] : Array.from(prevFailed);
 
       // Серия: результат нужен экрану итогов — там праздник, если день засчитан впервые
       const streakResult = await finishStudySession();
 
       navigation.replace('StudyResults', {
         setId,
-        totalCards: totalWords,
+        totalCards: portionTotal,
         learnedCards,
         timeSpent,
         errors: errorsCount,
@@ -420,20 +432,33 @@ export function WordBuilderScreen({ navigation, route }: Props) {
       errorsCount: number,
       errorList: Array<{ id?: string; front: string; back: string; rating: number }>
     ) => {
+      // Сессия: ошибка — то же слово ещё раз в конце очереди, пока не соберут верно
+      const retry = !!session && wordResult === 'wrong' && !!currentCard;
       const isLast = currentIndex >= totalWords - 1;
-      if (isLast) {
+      if (isLast && !retry) {
+        if (session) {
+          // Слово могли ошибиться несколько раз — в итогах считаем его один раз
+          const seen = new Set<string>();
+          const unique = errorList.filter((c) => {
+            const key = c.id ?? c.front;
+            return seen.has(key) ? false : (seen.add(key), true);
+          });
+          finishSession(unique.length, unique);
+          return;
+        }
         finishSession(errorsCount, errorList);
         return;
       }
+      if (retry) setCardsQueue((prev) => [...prev, currentCard]);
 
       pendingAdvanceRef.current = null;
       setSlots([]);
       setTiles([]);
       setWordResult(null);
       setIsLocked(false);
-      setCurrentIndex((idx) => Math.min(totalWords - 1, idx + 1));
+      setCurrentIndex((idx) => (retry ? idx + 1 : Math.min(totalWords - 1, idx + 1)));
     },
-    [currentIndex, totalWords, finishSession]
+    [currentIndex, totalWords, finishSession, session, wordResult, currentCard]
   );
 
   const handleCompleteWord = useCallback(() => {
@@ -458,6 +483,12 @@ export function WordBuilderScreen({ navigation, route }: Props) {
 
     setErrors(nextErrors);
     setErrorCards(updatedErrorCards);
+    if (session) {
+      const retryIds = sessionRetryIdsRef.current;
+      if (isCorrect) retryIds.delete(currentCard.id);
+      else retryIds.add(currentCard.id);
+      setSessionRetryCount(retryIds.size);
+    }
     setWordResult(isCorrect ? 'correct' : 'wrong');
     setIsLocked(true);
 
@@ -528,9 +559,9 @@ export function WordBuilderScreen({ navigation, route }: Props) {
         session
           ? sessionStageProgress(
               studiedInPhase,
-              currentIndex + (wordResult ? 1 : 0),
-              errors,
-              currentTotalPhaseCards.current || totalWords
+              Math.min(currentIndex + (wordResult ? 1 : 0), baseWordsRef.current),
+              sessionRetryCount,
+              currentTotalPhaseCards.current || baseWordsRef.current
             )
           : { done: currentIndex + (wordResult ? 1 : 0), total: totalWords }
       }
