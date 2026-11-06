@@ -12,7 +12,7 @@ export const COMMUNITY_LIBRARY_ENABLED = true;
 
 /**
  * Новая библиотека-каталог: предмет → подборка → набор (plan/new/library_catalog.md, Catalog 6–8).
- * Пока false — во вкладке прежний экран: экраны «Предмет» и «Подборка» появляются в Catalog 7 и 8,
- * без них плитки вели бы в никуда. Включается, когда готовы все три экрана.
+ * true — во вкладке каталог (LibraryCatalogScreen), экраны «Предмет» и «Подборка» зарегистрированы.
+ * false — прежний экран с полками (LibraryScreen), откат одной строкой. Прежний экран удаляется в Catalog 10.
  */
-export const LIBRARY_CATALOG_ENABLED = false;
+export const LIBRARY_CATALOG_ENABLED = true;
