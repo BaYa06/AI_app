@@ -114,6 +114,10 @@ export function StudyScreen({ navigation, route }: Props) {
   const pendingCardsInQueueRef = useRef(0);
   // Длина очереди без повторов «Почти» — по ней итоги сессии; повторы идут после неё
   const baseQueueLengthRef = useRef(0);
+  // Сессия «Изучить»: слова с ошибкой, ещё не исправленные. Ошибка уходит в конец той же очереди —
+  // экран не закрывается ради новой порции, полоска стоит, пока слово не отвечено верно
+  const sessionRetryIdsRef = useRef<Set<string>>(new Set());
+  const [sessionRetryCount, setSessionRetryCount] = useState(0);
   // Analytics: момент показа текущей карточки
   const cardShownAtRef = useRef(Date.now());
   // Один ответ на карточку: повторное нажатие или свайп до показа следующей игнорируются
@@ -309,6 +313,8 @@ export function StudyScreen({ navigation, route }: Props) {
     }
 
     baseQueueLengthRef.current = queue.length;
+    sessionRetryIdsRef.current = new Set();
+    setSessionRetryCount(0);
     startSession(
       {
         setId,
@@ -412,6 +418,14 @@ export function StudyScreen({ navigation, route }: Props) {
         !isRepeat &&
         Boolean(session) &&
         session!.currentIndex + 1 < session!.queue.length;
+      // Сессия: ошибка — то же слово ещё раз в конце очереди, пока не ответят верно (и на повторе тоже)
+      const sessionRetry = Boolean(sessionRoute) && Boolean(session) && !isCorrect;
+      if (sessionRoute) {
+        const retryIds = sessionRetryIdsRef.current;
+        if (isCorrect) retryIds.delete(currentCard.id);
+        else retryIds.add(currentCard.id);
+        setSessionRetryCount(retryIds.size);
+      }
 
       // Analytics: card_answered
       const ratingMap: Record<number, 'again' | 'hard' | 'good' | 'easy'> = {
@@ -474,10 +488,10 @@ export function StudyScreen({ navigation, route }: Props) {
       }
 
       // Переход к следующей карточке
-      if (session && session.currentIndex + 1 >= session.queue.length) {
+      if (session && session.currentIndex + 1 >= session.queue.length && !sessionRetry) {
         // Переходим на экран результатов
         const totalCards = baseQueueLengthRef.current;
-        const finalErrorCards = isCorrect
+        let finalErrorCards = isCorrect
           ? errorCards
           : [
               ...errorCards,
@@ -488,6 +502,13 @@ export function StudyScreen({ navigation, route }: Props) {
                 rating,
               },
             ];
+        // В сессии слово могли ошибиться несколько раз — в итогах считаем его один раз
+        if (sessionRoute) {
+          const seen = new Set<string>();
+          finalErrorCards = finalErrorCards.filter((c) =>
+            seen.has(c.id) ? false : (seen.add(c.id), true)
+          );
+        }
         const learnedCards = totalCards - finalErrorCards.length;
         const timeSpent = Math.floor((Date.now() - session.startedAt) / 1000);
         const errors = finalErrorCards.length;
@@ -539,7 +560,8 @@ export function StudyScreen({ navigation, route }: Props) {
             prevFailed.add(id);
           }
         });
-        const newPhaseFailedIds = Array.from(prevFailed);
+        // Сессия: все ошибки исправлены в этой же очереди — этап пройден
+        const newPhaseFailedIds = sessionRoute ? [] : Array.from(prevFailed);
 
         log.debug('Study', 'Завершение порции', {
           totalCards,
@@ -592,8 +614,8 @@ export function StudyScreen({ navigation, route }: Props) {
             ? {
                 ...s.session,
                 currentIndex: s.session.currentIndex + 1,
-                // Повтор «Почти» — в конец очереди; знаменатель прогресса растёт, чтобы полоса не ушла за 100%
-                ...(repeatLater
+                // Повтор «Почти» и ошибка в сессии — в конец очереди; знаменатель прогресса растёт, чтобы полоса не ушла за 100%
+                ...(repeatLater || sessionRetry
                   ? {
                       queue: [...s.session.queue, currentCard.id],
                       totalCards: s.session.totalCards + 1,
@@ -902,7 +924,7 @@ export function StudyScreen({ navigation, route }: Props) {
             sessionStageProgress(
               studiedInPhase,
               Math.min(Math.max(0, progress.current - 1), baseQueueLengthRef.current),
-              errorCards.length,
+              sessionRetryCount,
               currentTotalPhaseCards.current || baseQueueLengthRef.current
             )
           : { done: Math.max(0, progress.current - 1), total: progress.total }
