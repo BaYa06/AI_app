@@ -156,6 +156,7 @@ export type RootStackParamList = {
   /** Каталог библиотеки (plan/new/library_catalog.md): экран предмета и экран подборки */
   LibrarySubject: { slug: string; title?: string };
   LibraryCollection: { collectionId: string; title?: string };
+  LibraryBooks: undefined;
   BookDetail: { bookId: string };
   CourseBooks: { courseId: string; courseTitle: string };
   MyPublications: undefined;

@@ -30,6 +30,7 @@ import { alpha, borderRadius, iconSize, spacing } from '@/constants';
 import { getCatalogIcon } from '@/constants/catalogIcons';
 import { StorageService, STORAGE_KEYS } from '@/services/StorageService';
 import { getBookCover, formatBookMeta } from '@/utils/bookCover';
+import { BookService } from '@/services/BookService';
 import { pluralize } from '@/utils';
 import {
   addedLabel,
@@ -40,6 +41,7 @@ import {
 } from '@/utils/catalog';
 import type { RootStackParamList } from '@/types/navigation';
 import type { CatalogCollection, CatalogTrack } from '@/types/library';
+import type { BookListItem } from '@/types/books';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, 'LibrarySubject'>;
@@ -128,7 +130,6 @@ export function LibrarySubjectScreen() {
   const entry = useCatalogStore((st) => st.subjects[slug]?.data ?? null);
   const error = useCatalogStore((st) => st.subjectError[slug] ?? null);
   const fetchSubject = useCatalogStore((st) => st.fetchSubject);
-  const books = useCatalogStore((st) => st.catalog?.data.books ?? null);
   const currentId = useCatalogStore((st) => st.catalog?.data.continue?.collection.id ?? null);
 
   const [track, setTrack] = useState<string | null | undefined>(undefined);
@@ -140,6 +141,16 @@ export function LibrarySubjectScreen() {
       fetchSubject(slug);
     }, [fetchSubject, slug])
   );
+
+  // Все видимые учебники (а не 6 с полки) — для «Учебники этого уровня». Только у языков.
+  const [books, setBooks] = useState<BookListItem[] | null>(null);
+  const isLanguage = entry?.subject.setKind === 'language';
+  useEffect(() => {
+    if (!isLanguage || books) return;
+    BookService.listBooks()
+      .then(setBooks)
+      .catch(() => setBooks([]));
+  }, [isLanguage, books]);
 
   const tracks = useMemo<CatalogTrack[]>(() => entry?.tracks ?? [], [entry]);
   const subject = entry?.subject ?? null;

@@ -205,10 +205,8 @@ describe('api/library (публикация)', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body).toMatchObject({ ok: true, subjects: [], continue: null, books: [] });
     expect(destructive()).toEqual([]);
-    // Запросы с «моими» отметками получают null, а не чужой id.
-    const withMe = mockQueries.filter((q) => /\b(li|bi)\.user_id = \?::uuid/.test(q.text));
-    expect(withMe.length).toBeGreaterThan(0);
-    for (const q of withMe) expect(q.values).toContain(null);
+    // Без входа ни один запрос не получает id пользователя — «добавлено» считается для пустого.
+    for (const q of mockQueries) expect(q.values).not.toContain(ME);
   });
 
   it('каталог только на чтение: POST — 405 и ни одного запроса к каталогу', async () => {

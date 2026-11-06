@@ -159,7 +159,6 @@ export interface CatalogBook {
   languageTo: string;
   publisher: string | null;
   unitsCount: number;
-  addedCount: number;
 }
 
 export interface CatalogResponse {

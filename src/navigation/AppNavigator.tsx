@@ -58,6 +58,7 @@ import { LibraryScreen } from '@/screens/LibraryScreen';
 import { LibraryCatalogScreen } from '@/screens/LibraryCatalogScreen';
 import { LibrarySubjectScreen } from '@/screens/LibrarySubjectScreen';
 import { LibraryCollectionScreen } from '@/screens/LibraryCollectionScreen';
+import { LibraryBooksScreen } from '@/screens/LibraryBooksScreen';
 import { StatisticsScreen } from '@/screens/StatisticsScreen';
 import { ProfileScreen } from '@/screens/ProfileScreen';
 import { SetDetailScreen } from '@/screens/SetDetailScreen';
@@ -535,6 +536,13 @@ export function AppNavigator() {
           <Stack.Screen
             name="LibraryCollection"
             component={LibraryCollectionScreen}
+            options={{ headerShown: false }}
+          />
+        )}
+        {LIBRARY_CATALOG_ENABLED && (
+          <Stack.Screen
+            name="LibraryBooks"
+            component={LibraryBooksScreen}
             options={{ headerShown: false }}
           />
         )}

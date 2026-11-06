@@ -57,7 +57,6 @@ function mapBook(row) {
     languageTo: row.language_to,
     publisher: row.publisher || null,
     unitsCount: int(row.units_count),
-    addedCount: int(row.added_count),
   };
 }
 
@@ -177,12 +176,10 @@ async function continueOrStart(sql, me, lang) {
   return { continue: null, start: col ? mapCollection(col) : null };
 }
 
-async function loadShelf(sql, me, allBooks, { q = null, limit = SHELF_LIMIT } = {}) {
+async function loadShelf(sql, allBooks, { q = null, limit = SHELF_LIMIT } = {}) {
   return sql`
     SELECT b.id, b.title, b.edition, b.level, b.subject, b.language_from, b.language_to, b.publisher,
-           (SELECT COUNT(*) FROM book_units u WHERE u.book_id = b.id) AS units_count,
-           (SELECT COUNT(*) FROM book_unit_imports bi JOIN book_units u ON u.id = bi.unit_id
-             WHERE u.book_id = b.id AND bi.user_id = ${me}::uuid) AS added_count
+           (SELECT COUNT(*) FROM book_units u WHERE u.book_id = b.id) AS units_count
       FROM books b
      WHERE b.is_published = true
        AND (${allBooks}::boolean OR b.student_visible = true)
@@ -210,7 +207,7 @@ export async function getCatalog(req, res, sql, me) {
     continueOrStart(sql, me, lang),
     seesAllBooks(sql, me),
   ]);
-  const books = await loadShelf(sql, me, allBooks);
+  const books = await loadShelf(sql, allBooks);
   return res.status(200).json({
     ok: true,
     subjects: subjects.map((s) => ({
@@ -336,7 +333,7 @@ export async function searchCatalog(req, res, sql, me) {
   const cols = ids.length > 0 ? (await loadCollections(sql, me, { ids })).map(mapCollection) : [];
   const colById = new Map(cols.map((c) => [c.id, c]));
   const matched = new Set(colRows.map((r) => r.id));
-  const books = await loadShelf(sql, me, allBooks, { q, limit: SEARCH_LIMIT });
+  const books = await loadShelf(sql, allBooks, { q, limit: SEARCH_LIMIT });
 
   return res.status(200).json({
     ok: true,

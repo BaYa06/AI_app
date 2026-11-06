@@ -21,7 +21,7 @@ import {
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { BookOpen, ChevronRight, Library, Search } from 'lucide-react-native';
+import { ChevronRight, Library, Search } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import {
   Badge,
@@ -182,9 +182,7 @@ const ShelfBook = memo(function ShelfBook({
         {book.title}
       </Text>
       <Text variant="caption" color="secondary" numberOfLines={1}>
-        {book.addedCount > 0
-          ? `добавлено ${book.addedCount} из ${book.unitsCount}`
-          : meta || `${book.unitsCount} ${pluralize(book.unitsCount, 'юнит', 'юнита', 'юнитов')}`}
+        {meta || `${book.unitsCount} ${pluralize(book.unitsCount, 'юнит', 'юнита', 'юнитов')}`}
       </Text>
     </Pressable>
   );
@@ -538,7 +536,15 @@ export function LibraryCatalogScreen() {
               <Text variant="h3" style={{ color: colors.textPrimary }}>
                 Учебники
               </Text>
-              <BookOpen size={iconSize.s} color={colors.textTertiary} />
+              <Pressable
+                accessibilityRole="button"
+                hitSlop={spacing.xs}
+                onPress={() => navigation.navigate('LibraryBooks')}
+              >
+                <Text variant="label" style={{ color: colors.primary }}>
+                  Все
+                </Text>
+              </Pressable>
             </View>
             <ScrollView
               horizontal
