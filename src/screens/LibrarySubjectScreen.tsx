@@ -28,6 +28,7 @@ import {
 import { useCatalogStore, useThemeColors } from '@/store';
 import { alpha, borderRadius, iconSize, spacing } from '@/constants';
 import { getCatalogIcon } from '@/constants/catalogIcons';
+import { TOP_LANGUAGES } from '@/constants/languages';
 import { StorageService, STORAGE_KEYS } from '@/services/StorageService';
 import { getBookCover, formatBookMeta } from '@/utils/bookCover';
 import { BookService } from '@/services/BookService';
@@ -152,7 +153,16 @@ export function LibrarySubjectScreen() {
       .catch(() => setBooks([]));
   }, [isLanguage, books]);
 
-  const tracks = useMemo<CatalogTrack[]>(() => entry?.tracks ?? [], [entry]);
+  // Языки — в привычном порядке приложения (английский, немецкий…): сервер сортирует их по коду.
+  const tracks = useMemo<CatalogTrack[]>(() => {
+    const list = entry?.tracks ?? [];
+    if (entry?.subject.setKind !== 'language') return list;
+    const rank = (code: string | null) => {
+      const i = TOP_LANGUAGES.findIndex((l) => l.code === code);
+      return i < 0 ? TOP_LANGUAGES.length : i;
+    };
+    return [...list].sort((a, b) => rank(a.key) - rank(b.key));
+  }, [entry]);
   const subject = entry?.subject ?? null;
 
   // Раздел: выбранный → сохранённый → первый. Если сохранённого больше нет (подборки убрали) — первый.
