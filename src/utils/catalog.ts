@@ -44,3 +44,17 @@ export function cardsCountLabel(n: number): string {
 export function addedLabel(added: number, total: number): string {
   return `добавлено ${added} из ${total}`;
 }
+
+const CEFR = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+
+/** Учебник подходит уровню: «A2», «A1–A2», «a2 - b1» — уровень входит в диапазон книги. */
+export function bookMatchesLevel(book: { level: string | null }, level: string): boolean {
+  if (!book.level) return false;
+  const parts = book.level
+    .toUpperCase()
+    .split(/\s*[–—-]\s*/)
+    .filter((p) => CEFR.includes(p));
+  if (parts.length === 0) return false;
+  const i = CEFR.indexOf(level.toUpperCase());
+  return i >= CEFR.indexOf(parts[0]) && i <= CEFR.indexOf(parts[parts.length - 1]);
+}

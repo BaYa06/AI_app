@@ -128,6 +128,8 @@ export const STORAGE_KEYS = {
   SETTINGS: 'settings',
   THEME: 'theme',
   HOME_SETS_SORT: 'home_sets_sort',
+  /** Каталог библиотеки: последний выбранный язык / раздел и уровень в каждом предмете */
+  LIBRARY_SELECTION: 'library_selection',
 
   // Пользователь
   USER: 'user',
