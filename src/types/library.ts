@@ -22,6 +22,9 @@ export interface LibrarySet {
   status: 'published' | 'archived' | 'blocked';
   is_featured: boolean;
   cover_emoji: string | null;
+  /** Подборка каталога и номер в ней (plan/new/library_catalog.md); null — набор вне каталога */
+  collection_id?: string | null;
+  position?: number | null;
   published_at: string;
   updated_at: string;
 
