@@ -237,6 +237,46 @@ describe('api/library (публикация)', () => {
     expect(res.statusCode).toBe(404);
   });
 
+  it('подборка в курс: без входа 401, кривые id 400, чужой курс 403 — и ничего не пишется', async () => {
+    const COL = '66666666-6666-4666-8666-666666666666';
+    const COURSE = '77777777-7777-4777-8777-777777777777';
+    const call = async (body) => {
+      const res = mockRes();
+      await library()(
+        { method: 'POST', headers: {}, query: { action: 'import-collection' }, body },
+        res
+      );
+      return res;
+    };
+
+    mockUser = null;
+    expect((await call({ collectionId: COL, courseId: COURSE })).statusCode).toBe(401);
+    expect(mockQueries).toEqual([]);
+
+    mockUser = { id: ME };
+    expect((await call({ collectionId: COL })).statusCode).toBe(400);
+    expect((await call({ collectionId: 'x', courseId: COURSE })).statusCode).toBe(400);
+    expect(mockQueries).toEqual([]);
+
+    const res = await call({ collectionId: COL, courseId: COURSE });
+    expect(res.statusCode).toBe(403);
+    const ownerCheck = mockQueries.find((q) => /FROM courses WHERE id = \?/.test(q.text));
+    expect(ownerCheck.values).toEqual([COURSE, ME]);
+    expect(destructive()).toEqual([]);
+  });
+
+  it('лайк и оценка больше ничего не пишут (старые версии получают текущее состояние)', async () => {
+    for (const [action, body] of [
+      ['like', { librarySetId: SET }],
+      ['rate', { librarySetId: SET, rating: 5 }],
+    ]) {
+      const res = mockRes();
+      await library()({ method: 'POST', headers: {}, query: { action }, body }, res);
+      expect(res.statusCode).toBe(200);
+    }
+    expect(destructive()).toEqual([]);
+  });
+
   it('лайк без входа — 401 и ни одного запроса', async () => {
     mockUser = null;
     const res = mockRes();
