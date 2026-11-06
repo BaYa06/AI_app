@@ -205,3 +205,15 @@ export function getDeckAccentColor(idOrIndex: string | number): string {
   }
   return DECK_ACCENT_COLORS[hash % DECK_ACCENT_COLORS.length];
 }
+
+/**
+ * Цвета заставки (LoadingSplash) — не зависят от темы и совпадают с LaunchScreen.storyboard
+ * и windowBackground на Android (макет plan/ideas/Splash-html)
+ */
+export const SPLASH_COLORS = {
+  background: '#6467F2',
+  cardBack: '#A5A8F7', // задняя карточка логотипа
+  cardFront: '#FFFFFF', // передняя карточка и надпись «flashly»
+  letter: '#5B4FD6', // буква F
+  accent: '#F59E0B', // полоска на букве F
+} as const;

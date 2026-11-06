@@ -3,18 +3,18 @@
  * (Clean 8 — перенесено из App.tsx без изменений.)
  */
 import { useEffect, useState } from 'react';
-import { Platform, View, StyleSheet } from 'react-native';
+import { Platform, View, StyleSheet, StatusBar } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AppNavigator } from '@/navigation';
-import { LoadingSplash } from '@/components/common';
+import { LoadingSplash, SPLASH_BACKGROUND } from '@/components/common';
 import { ToastHost } from '@/components/ui/Toast';
 import { currentNews, initWhatsNew } from '@/services/whatsNew';
 import { markLaunchInterrupted, setGateOpen } from '@/services/modalGate';
 import { requestPushPermission, isPushSupported } from '@/services/pushNotifications';
-import { useThemeColors } from '@/store';
+import { useSettingsStore, useThemeColors } from '@/store';
 import { X } from 'lucide-react-native';
 import { Text as ThemedText } from '@/components/common/Text';
-import { borderRadius, colors as palette, iconSize, screenPadding, spacing } from '@/constants';
+import { borderRadius, iconSize, screenPadding, spacing } from '@/constants';
 import { CourseInviteModal } from '@/components/CourseInviteModal';
 import { SharedSetPreviewModal } from '@/components/share/SharedSetPreviewModal';
 import { WelcomeScreen } from '@/screens/WelcomeScreen';
@@ -134,6 +134,7 @@ export function AppRoot({
   nativeLanguage,
 }: AppRootProps) {
   const colors = useThemeColors();
+  const resolvedTheme = useSettingsStore((s) => s.resolvedTheme);
   const insets = useSafeAreaInsets();
   const signedIn = isReady && isAuthenticated && !needsOnboarding;
   const inviteOpen = isAuthenticated && !!pendingInviteToken;
@@ -236,14 +237,17 @@ export function AppRoot({
   );
 
   return (
-    <View
-      style={{ flex: 1, backgroundColor: isReady ? colors.background : palette.light.background }}
-    >
-      {/* Safe-area зона сверху под цвет темы (светлая на загрузке — как заставка LoadingSplash) */}
+    <View style={{ flex: 1, backgroundColor: isReady ? colors.background : SPLASH_BACKGROUND }}>
+      {/* Базовая строка состояния: на заставке светлая, дальше по теме (экраны с Container задают свою) */}
+      <StatusBar
+        barStyle={!isReady || resolvedTheme === 'dark' ? 'light-content' : 'dark-content'}
+        backgroundColor={isReady ? colors.background : SPLASH_BACKGROUND}
+      />
+      {/* Safe-area зона сверху под цвет темы (на загрузке — фон заставки LoadingSplash) */}
       <View
         style={{
           height: top,
-          backgroundColor: isReady ? colors.background : palette.light.background,
+          backgroundColor: isReady ? colors.background : SPLASH_BACKGROUND,
         }}
       />
 

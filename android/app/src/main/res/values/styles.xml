@@ -4,6 +4,8 @@
     <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
         <!-- Customize your theme here. -->
         <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
+        <!-- Фон до появления JS-заставки (и системной заставки Android 12+) — как LoadingSplash -->
+        <item name="android:windowBackground">@color/splash_background</item>
     </style>
 
 </resources>

@@ -1,0 +1,4 @@
+<resources>
+    <!-- Фон заставки = LoadingSplash.tsx (SPLASH_BACKGROUND) -->
+    <color name="splash_background">#6467F2</color>
+</resources>

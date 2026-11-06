@@ -1,40 +1,55 @@
 /**
  * LoadingSplash Component
- * @description Экран загрузки приложения при старте.
- * Всегда в светлой палитре: тема ещё не определена, а системный экран запуска — белый,
- * поэтому тёмная заставка мигнула бы между ними.
+ * @description Экран загрузки при старте — 1в1 с макетом plan/ideas/Splash-html и системным
+ * экраном запуска iOS (LaunchScreen.storyboard): фиолетовый фон, логотип 168×168 по центру экрана,
+ * надпись «flashly» в 64 pt от низа. Поэтому переход от системного экрана к этому незаметен.
+ * Не зависит от темы. Надпись — контур шрифта Nunito Black 44 px (letter-spacing −1), чтобы не
+ * встраивать шрифт; PNG для storyboard сделаны из тех же векторов.
  */
 import React from 'react';
-import { View, StyleSheet, ActivityIndicator } from 'react-native';
-import { Zap } from 'lucide-react-native';
-import { borderRadius, colors, iconSize, spacing } from '@/constants';
-import { Text } from './Text';
+import { View, StyleSheet } from 'react-native';
+import Svg, { G, Path, Rect } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SPLASH_COLORS } from '@/constants';
 
-const palette = colors.light;
+/** Фон заставки (= LaunchScreen.storyboard и windowBackground на Android) */
+export const SPLASH_BACKGROUND = SPLASH_COLORS.background;
+
+const LOGO_SIZE = 168;
+const WORDMARK_WIDTH = 139;
+const WORDMARK_HEIGHT = 60.02;
+const WORDMARK_BOTTOM = 64;
+
+const WORDMARK_PATH =
+  'M8.04 44.89Q6.16 44.89 5.14 43.87Q4.12 42.85 4.12 40.92V28.59H2.99Q1.57 28.59 0.8 27.85Q0.03 27.1 0.03 25.71Q0.03 24.3 0.8 23.57Q1.57 22.83 2.99 22.83H6.4L4.12 24.9V23.65Q4.12 18.79 6.56 16.35Q9 13.92 13.85 13.41L15.15 13.28Q16.53 13.13 17.37 13.63Q18.21 14.13 18.51 14.95Q18.81 15.77 18.66 16.64Q18.52 17.51 17.99 18.12Q17.46 18.74 16.6 18.81L15.98 18.86Q13.73 19.03 12.84 19.82Q11.95 20.61 11.95 22.18V23.62L11.02 22.83H14.48Q15.93 22.83 16.68 23.57Q17.44 24.3 17.44 25.71Q17.44 27.1 16.68 27.85Q15.93 28.59 14.48 28.59H11.95V40.92Q11.95 44.89 8.04 44.89Z M27.21 44.98Q22.96 44.98 20.96 42.71Q18.96 40.43 18.96 35.85V17.01Q18.96 15.08 19.97 14.07Q20.98 13.06 22.87 13.06Q24.75 13.06 25.77 14.07Q26.79 15.08 26.79 17.01V35.62Q26.79 37.22 27.44 37.96Q28.08 38.71 29.08 38.71Q29.4 38.71 29.74 38.64Q30.07 38.58 30.44 38.56Q31.22 38.53 31.58 39.1Q31.94 39.68 31.94 41.46Q31.94 42.98 31.34 43.75Q30.73 44.52 29.46 44.76Q29.11 44.81 28.44 44.89Q27.77 44.98 27.21 44.98Z M40.8 44.98Q38.3 44.98 36.38 44.05Q34.45 43.12 33.38 41.51Q32.3 39.9 32.3 37.85Q32.3 35.48 33.53 34.1Q34.77 32.73 37.51 32.13Q40.25 31.53 44.78 31.53H47.2V35.23H44.77Q43.05 35.23 41.94 35.48Q40.83 35.73 40.3 36.23Q39.78 36.72 39.78 37.53Q39.78 38.56 40.49 39.22Q41.21 39.88 42.59 39.88Q43.68 39.88 44.54 39.39Q45.39 38.91 45.91 38.04Q46.43 37.18 46.43 36.03V30.94Q46.43 29.33 45.63 28.69Q44.83 28.04 42.85 28.04Q41.77 28.04 40.47 28.28Q39.16 28.52 37.51 29.12Q36.33 29.55 35.48 29.25Q34.64 28.94 34.18 28.21Q33.73 27.48 33.75 26.59Q33.76 25.71 34.31 24.9Q34.86 24.1 36.03 23.67Q38.11 22.89 39.91 22.61Q41.71 22.33 43.2 22.33Q46.81 22.33 49.16 23.37Q51.5 24.41 52.66 26.55Q53.83 28.69 53.83 32.02V40.92Q53.83 42.85 52.9 43.87Q51.98 44.89 50.21 44.89Q48.44 44.89 47.49 43.87Q46.55 42.85 46.55 40.92V39.8L46.81 40.39Q46.59 41.79 45.79 42.81Q44.98 43.83 43.72 44.41Q42.45 44.98 40.8 44.98Z M65.92 44.98Q63.95 44.98 61.96 44.68Q59.98 44.38 58.33 43.67Q57.24 43.23 56.77 42.47Q56.3 41.7 56.32 40.87Q56.35 40.04 56.8 39.36Q57.26 38.68 58.04 38.39Q58.82 38.11 59.8 38.46Q61.62 39.13 63.1 39.42Q64.59 39.7 65.94 39.7Q67.57 39.7 68.29 39.23Q69 38.76 69 38.02Q69 37.34 68.53 37Q68.05 36.67 67.22 36.54L62.35 35.73Q59.62 35.26 58.12 33.73Q56.62 32.2 56.62 29.73Q56.62 27.45 57.91 25.8Q59.2 24.14 61.48 23.24Q63.76 22.33 66.7 22.33Q68.69 22.33 70.31 22.64Q71.94 22.94 73.49 23.65Q74.43 24.06 74.83 24.8Q75.23 25.54 75.14 26.38Q75.05 27.21 74.58 27.88Q74.11 28.55 73.32 28.8Q72.53 29.06 71.5 28.68Q70.06 28.11 68.93 27.86Q67.8 27.61 66.83 27.61Q65.01 27.61 64.27 28.09Q63.53 28.57 63.53 29.32Q63.53 29.86 63.93 30.25Q64.34 30.64 65.17 30.77L70.04 31.58Q72.88 32.05 74.39 33.52Q75.91 34.98 75.91 37.5Q75.91 41.05 73.17 43.01Q70.44 44.98 65.92 44.98Z M81.99 44.89Q80.11 44.89 79.1 43.87Q78.09 42.85 78.09 40.92V17.01Q78.09 15.08 79.1 14.07Q80.11 13.06 81.99 13.06Q83.88 13.06 84.9 14.07Q85.92 15.08 85.92 17.01V26.61H85.25Q86.3 24.55 88.26 23.44Q90.22 22.33 92.71 22.33Q95.3 22.33 96.97 23.34Q98.65 24.35 99.48 26.42Q100.32 28.49 100.32 31.68V40.92Q100.32 42.85 99.3 43.87Q98.29 44.89 96.41 44.89Q94.53 44.89 93.51 43.87Q92.49 42.85 92.49 40.92V32Q92.49 30.03 91.81 29.18Q91.13 28.33 89.79 28.33Q88.05 28.33 86.98 29.45Q85.92 30.58 85.92 32.47V40.92Q85.92 44.89 81.99 44.89Z M112 44.98Q107.76 44.98 105.75 42.71Q103.75 40.43 103.75 35.85V17.01Q103.75 15.08 104.76 14.07Q105.78 13.06 107.66 13.06Q109.54 13.06 110.56 14.07Q111.58 15.08 111.58 17.01V35.62Q111.58 37.22 112.23 37.96Q112.88 38.71 113.87 38.71Q114.19 38.71 114.53 38.64Q114.87 38.58 115.23 38.56Q116.02 38.53 116.38 39.1Q116.74 39.68 116.74 41.46Q116.74 42.98 116.13 43.75Q115.52 44.52 114.25 44.76Q113.9 44.81 113.23 44.89Q112.57 44.98 112 44.98Z M123.74 52.81Q122.41 52.81 121.56 52.11Q120.7 51.41 120.51 50.26Q120.31 49.12 120.91 47.83L123.84 41.46V44.6L116.31 27.42Q115.75 26.09 115.95 24.96Q116.15 23.82 117.11 23.12Q118.08 22.42 119.74 22.42Q121.15 22.42 122 23.06Q122.86 23.71 123.57 25.57L127.99 37H126.5L131.14 25.5Q131.85 23.74 132.76 23.08Q133.67 22.42 135.2 22.42Q136.5 22.42 137.3 23.12Q138.09 23.82 138.28 24.95Q138.47 26.07 137.86 27.4L127.87 49.86Q127.1 51.6 126.15 52.2Q125.19 52.81 123.74 52.81Z';
 
 export function LoadingSplash() {
+  // Родитель начинается под safe-area сверху — растягиваемся на весь экран,
+  // чтобы центр логотипа совпал с экраном запуска
+  const { top } = useSafeAreaInsets();
+
   return (
-    <View style={[styles.container, { backgroundColor: palette.background }]}>
-      <View style={styles.content}>
-        <View style={[styles.logoCircle, { backgroundColor: palette.surfaceMuted }]}>
-          <Zap size={iconSize.xl} color={palette.primary} fill={palette.primary} />
-        </View>
-        <Text variant="h1" align="center" style={[styles.title, { color: palette.textPrimary }]}>
-          Flashly
-        </Text>
-        <Text
-          variant="bodyLarge"
-          align="center"
-          style={[styles.subtitle, { color: palette.textSecondary }]}
+    <View style={[styles.container, { top: -top }]} accessibilityLabel="Загрузка Flashly">
+      <Svg width={LOGO_SIZE} height={LOGO_SIZE} viewBox="0 0 168 168">
+        <G transform="rotate(-10 84 84)">
+          <Rect x={40} y={22} width={92} height={124} rx={20} fill={SPLASH_COLORS.cardBack} />
+        </G>
+        <G transform="rotate(6 84 84)">
+          <Rect x={34} y={22} width={92} height={124} rx={20} fill={SPLASH_COLORS.cardFront} />
+          <Rect x={56} y={46} width={19} height={76} rx={9.5} fill={SPLASH_COLORS.letter} />
+          <Rect x={56} y={46} width={52} height={19} rx={9.5} fill={SPLASH_COLORS.letter} />
+          <Rect x={50} y={80} width={38} height={15} rx={7.5} fill={SPLASH_COLORS.accent} />
+        </G>
+      </Svg>
+
+      <View style={styles.wordmark}>
+        <Svg
+          width={WORDMARK_WIDTH}
+          height={WORDMARK_HEIGHT}
+          viewBox={`0 0 ${WORDMARK_WIDTH} ${WORDMARK_HEIGHT}`}
         >
-          Учись умнее. Запоминай надолго.
-        </Text>
-        <ActivityIndicator
-          size="large"
-          color={palette.primary}
-          accessibilityLabel="Загрузка"
-          style={styles.spinner}
-        />
+          <Path d={WORDMARK_PATH} fill={SPLASH_COLORS.cardFront} />
+        </Svg>
       </View>
     </View>
   );
@@ -42,26 +57,19 @@ export function LoadingSplash() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: SPLASH_BACKGROUND,
   },
-  content: {
+  wordmark: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: WORDMARK_BOTTOM,
     alignItems: 'center',
-    paddingHorizontal: spacing.l,
-  },
-  logoCircle: {
-    padding: spacing.l,
-    borderRadius: borderRadius.xl,
-    marginBottom: spacing.m,
-  },
-  title: {
-    marginBottom: spacing.xs,
-  },
-  subtitle: {
-    marginBottom: spacing.xl,
-  },
-  spinner: {
-    marginTop: spacing.m,
   },
 });
