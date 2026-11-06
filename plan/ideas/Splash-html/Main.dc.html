@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Flashly — Splash</title>
+<script src="./vendor/react.js"></script>
+<script src="./vendor/react-dom.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@900&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'Nunito',system-ui,sans-serif}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; background: {{bg}}; font-family: 'Nunito', system-ui, sans-serif">
+
+<svg width="168" height="168" viewBox="0 0 168 168" role="img" aria-label="Логотип Flashly">
+<g transform="rotate(-10 84 84)">
+<rect x="40" y="22" width="92" height="124" rx="20" fill="#A5A8F7"></rect>
+</g>
+<g transform="rotate(6 84 84)">
+<rect x="34" y="22" width="92" height="124" rx="20" fill="#FFFFFF"></rect>
+<rect x="56" y="46" width="19" height="76" rx="9.5" fill="#5B4FD6"></rect>
+<rect x="56" y="46" width="52" height="19" rx="9.5" fill="#5B4FD6"></rect>
+<rect x="50" y="80" width="38" height="15" rx="7.5" fill="#F59E0B"></rect>
+</g>
+</svg>
+
+<div style="position: absolute; left: 0; right: 0; bottom: 64px; text-align: center; color: #FFFFFF; font-size: 44px; font-weight: 900; letter-spacing: -1px">flashly</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"bg":{"editor":"color","default":"#6467F2","options":["#6467F2","#8B5CF6","#101122"]},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { bg: this.props.bg ?? '#6467F2' };
+  }
+}
+</script>
+</body>
+</html>
