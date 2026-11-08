@@ -106,13 +106,24 @@ plan/new/release_safety.md.
 - Android и веб → все поля `null`, Apple не спрашиваем. Другая платформа → 400.
 - ⬜ После push в `dev`: `curl "https://ai-app-git-dev-baya06s-projects.vercel.app/api/data?action=app-version&platform=ios"`.
 
-## Update 2 — правила в JS ⬜
-- `src/services/appUpdate.ts`: `compareVersions`, `decideUpdatePrompt(state) → 'none' | 'soft' | 'force'`.
+## Update 2 — правила в JS ✅
+- `src/services/appUpdate.ts`: `decideUpdatePrompt(ctx) → 'none' | 'soft' | 'force'`.
   Учитывает пункты 3–8 решений: заход, 3 дня тишины, тест/сессия, прерванный запуск, 6 часов
-  после «Обновить», офлайн.
-- MMKV: `appUpdate.config` (последний ответ сервера), `appUpdate.lastShownAt`,
-  `appUpdate.storeOpenedAt`.
-- Тесты jest на каждое правило.
+  после «Обновить», офлайн. `compareVersions` — общий с «Что нового».
+- MMKV, ключ `app_update`: `config` (последний ответ сервера), `fetchedAt`, `lastShownAt`,
+  `storeOpenedAt`.
+- Тесты jest на каждое правило: src/services/__tests__/appUpdate.test.ts (27).
+
+Сделано (08.11.2026). Что уточнилось по ходу:
+- **Заход ждёт показа.** `markColdStart()` / `onAppStateChange()` ставят «заход», `consumeEntry()`
+  снимает его после показа мягкого окна. Если человек пришёл по ссылке или сразу ушёл в урок,
+  окно появится, когда он вернётся на главную, а не потеряется. `inactive` (шторка уведомлений,
+  звонок) время ухода в фон не сбивает.
+- **«Свежие данные»** = ответ сервера не старше суток. Старее — мягкое не показываем.
+- **Сервер вернул `latest: null`** (Apple ему не ответил) — берём только новый `minVersion`,
+  прежние версию и дату оставляем, свежими данные не считаем.
+- **Кривые версии** (в ответе или у самого приложения) — окна нет: лучше не показать, чем запереть
+  приложение. Ссылка на магазин принимается только `https://apps.apple.com/…`.
 
 ## Update 3 — Swift-шторка ⬜
 - `ios/FlashcardsApp/AppUpdateSheet.swift` + `.m` по образцу `WhatsNewSheet`. Вход:
