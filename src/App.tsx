@@ -7,6 +7,7 @@ import { AppState, Linking, Platform, Alert } from 'react-native';
 
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { StagingBadge } from '@/components/common/StagingBadge';
+import { InstallFromLink } from '@/components/pwa/InstallFromLink';
 import {
   DatabaseService,
   setupAutoSave,
@@ -726,6 +727,7 @@ export default function App() {
           nativeLanguage={onboardingData.nativeLanguage}
         />
         <StagingBadge />
+        {Platform.OS === 'web' && <InstallFromLink />}
       </SafeAreaProvider>
     </ErrorBoundary>
   );

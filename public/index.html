@@ -11,7 +11,7 @@
   <!-- Дополнительные meta-теги для iOS PWA -->
   <meta name="apple-touch-fullscreen" content="yes">
   <meta name="format-detection" content="telephone=no">
-  <meta name="description" content="Учи слова эффективно с интервальным повторением">
+  <meta name="description" content="Flashly — карточки для изучения слов с интервальным повторением.">
   
   <!-- PWA Manifest -->
   <link rel="manifest" href="/manifest.webmanifest">
@@ -27,7 +27,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
 
-  <title>Flashly - Flashcards App</title>
+  <title>Flashly — карточки для изучения слов</title>
   <style>
     /* Ionicons font for react-native-vector-icons */
     @font-face {
@@ -194,6 +194,17 @@
   <div id="root"></div>
 
 
+  <script>
+    // Событие установки PWA может прийти раньше, чем смонтируется React: сохраняем его
+    // для usePwaInstall (окно «Установить» по ссылке ?install=1 — plan/new/seo_launch.md, SEO 3)
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      window.__flashlyInstallPrompt = e;
+    });
+    window.addEventListener('appinstalled', function () {
+      window.__flashlyInstallPrompt = null;
+    });
+  </script>
   <script>
     // ===== Service Worker Registration with auto-update =====
     if ('serviceWorker' in navigator) {
