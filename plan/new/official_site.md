@@ -106,6 +106,36 @@ ai-app-seven-zeta.vercel.app → старый адрес, НЕ отключае�
 - JSON-LD: ссылка на Google Play; Android App Links (`/.well-known/assetlinks.json`) для `/s/` и `/join/`.
 - Google Play Console: политика `flashlycards.app/privacy`, удаление аккаунта `flashlycards.app/delete-account`, сайт.
 
+## Перенос в прод (main отстаёт на 1.7.1, 152 коммита)
+Цель — пользователи 1.7.1 и веба ничего не замечают. Сервер выходит раньше новой сборки (Release 2).
+
+Что меняется на сервере: API разбит по `_handlers` (все action из main сохранены); миграции 012, 036, 038, 039, 040 только добавляют (038 обнуляет владельца у официальных наборов + триггер защиты); новая логика push (cron-job.org сразу применит её ко всем); озвучка Azure (`AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION`); веб получит новую версию сразу.
+
+### A. Подготовка
+- ✅ A1 (я): сверка API main ↔ dev. 277 функций сервера: 184 без изменений, все action и маршруты на месте, проверки входа те же. Изменения по существу — новое поле `kind` (необязательное, с умолчанием), «уже добавлен» в библиотеке без учёта курсов, импорт из библиотеки ещё и в каждый свой курс — формат ответов прежний.
+  - ⚠️ Заметно для 1.7.1: лайк и оценка в библиотеке отвечают текущим состоянием и ничего не пишут (library_catalog, решение 8) — нажатый лайк пропадёт после обновления экрана.
+  - Триггер 038 (наборы книг только для чтения): все записи в card_sets/cards ограничены владельцем, кроме `announced_at` в push «новый набор» — он берёт только наборы с `course_id`, а наборы книг создаются без него (scripts/import-book.ts). Подтвердить на A2.
+- ⬜ A2 (с разрешения): репетиция миграций на временной ветке Neon из рабочей базы.
+- ⬜ A3 (владелец): Vercel → Environment Variables — `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION` для Production.
+- ⬜ A4 (владелец): Supabase → Redirect URLs — `https://app.flashlycards.app/auth-callback`.
+- ⬜ A5 (владелец): Neon — ветка `before-1.8` из рабочей базы перед слиянием.
+- ⬜ A6 (я): Site 5 в dev.
+- A7: заморозка dev на время переноса. A8: утро буднего дня, не вечер и не около 20:30 UTC (cron close-week).
+
+### B. Перенос (~30 мин)
+1. merge dev → main, push (Production-деплой).
+2. Сразу домены `flashlycards.app`, `app.flashlycards.app`: Preview → Production.
+3. Первый запрос к API — миграции; проверить ошибки.
+4. curl-проверка: старый адрес, API, `/privacy` `/terms` + редиректы, лендинг, `app.`, `/s/`, `/join/`.
+5. iPhone с 1.7.1 из App Store: вход, главная, занятие, библиотека, набор по ссылке, курс и тест, push.
+6. 1–2 часа: Vercel Runtime Errors, Crashlytics, панель push.
+
+### C. Откат
+Vercel → предыдущий Production-деплой → Instant Rollback (миграции аддитивные — старый код с ними работает); домены → Preview; данные — ветка Neon `before-1.8`.
+
+### D. После
+Импорт каталога библиотеки `--prod`; сборка 1.8.x из main → TestFlight → ревью (данные о сбоях, поэтапный выпуск); Site 8; Site 6–7 в новой сборке.
+
 ## Отложено
 Проблема: при входе через Google (окно браузера в `SignInScreen` / `EmailAuthScreen`) Google пишет «перейти на yiwsmjbeirgomkrckoju.supabase.co» — выглядит подозрительно. Вход через Apple нативный, его не касается. Supabase сейчас на тарифе **Free**.
 - **A. Свой домен Supabase `auth.flashlycards.app`:** тариф Pro (~$25/мес) + Custom Domain (~$10/мес), цены перепроверить. CNAME `auth` + TXT в name.com, новый callback `https://auth.flashlycards.app/auth/v1/callback` в Google Cloud, `SUPABASE_URL` в `supabaseClient.ts` (новая сборка). Старый `…supabase.co` продолжит работать.
