@@ -149,6 +149,8 @@ module.exports = (env, argv) => {
           // Политика конфиденциальности и условия (/privacy, /terms): ссылки в приложении и в App Store Connect
           { from: 'public/privacy.html', to: 'privacy.html' },
           { from: 'public/terms.html', to: 'terms.html' },
+          // Официальный сайт flashlycards.app (plan/new/official_site.md): лендинг, маршрут по адресу — Site 3
+          { from: 'public/site', to: 'site' },
           // Universal Links: iOS открывает /join/* сразу в приложении
           {
             from: 'public/.well-known/apple-app-site-association',
