@@ -3,7 +3,8 @@
  * @description Проверки по порядку:
  * 1. главная на экране и загрузилась (роль известна), на ней не открыто своё окно;
  * 2. приложение открыли обычным способом, а не по ссылке, пушу или виджету (modalGate);
- * 3. не открыто окно важнее — приглашение в курс или набор по ссылке;
+ * 3. не открыто окно важнее — приглашение в курс, набор по ссылке, «Вышла новая версия» — и
+ *    его не показывали в этом запуске (plan/new/app_update_prompt.md, Update 4);
  * 4. спустя секунду (человек успел увидеть свою главную) есть подходящие новости — с сервера
  *    (ждём не дольше 3 с), иначе из кэша или сборки.
  * Хук решает, когда показать; само окно главная рисует через <WhatsNewSheet {...whatsNew} />.
@@ -31,6 +32,7 @@ import {
   subscribeGate,
 } from '@/services/modalGate';
 import { toast } from '@/components/ui';
+import { wasSoftShownThisRun } from '@/services/appUpdate';
 import type { WhatsNewItem, WhatsNewPage } from '@/types/whatsNew';
 import type { WhatsNewSheetProps } from './nativeWhatsNewSheet';
 import { APP_VERSION, newsContext, openNewsAction, trackWhatsNew } from './newsContext';
@@ -72,14 +74,17 @@ export function useWhatsNewOnHome({
 
   useEffect(() => {
     if (visible || !isFocused || isTeacher === null || blocked) return;
-    if (isLaunchInterrupted() || isBlockedFor('whatsNew')) return;
+    // Не больше одного окна за запуск: было «Вышла новая версия» — новости в следующий раз
+    if (isLaunchInterrupted() || isBlockedFor('whatsNew') || wasSoftShownThisRun()) return;
     // Новости с сервера грузятся, пока идёт пауза; один запрос на заход на главную
     newsRequest.current ??= refreshNews();
     const news = newsRequest.current;
     let cancelled = false;
     const timer = setTimeout(async () => {
       const all = await news;
-      if (cancelled || isLaunchInterrupted() || isBlockedFor('whatsNew')) return;
+      if (cancelled || isLaunchInterrupted() || isBlockedFor('whatsNew') || wasSoftShownThisRun()) {
+        return;
+      }
       const state = loadWhatsNewState();
       if (!state || !canShowNews(state)) return;
       const items = selectNews(all, { ...newsContext(isTeacher), seen: state.seen });

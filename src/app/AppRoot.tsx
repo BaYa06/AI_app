@@ -8,6 +8,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AppNavigator } from '@/navigation';
 import { LoadingSplash, SPLASH_BACKGROUND } from '@/components/common';
 import { ToastHost } from '@/components/ui/Toast';
+import { AppUpdateGuard } from '@/components/appUpdate/AppUpdateGuard';
 import { currentNews, initWhatsNew } from '@/services/whatsNew';
 import { markLaunchInterrupted, setGateOpen } from '@/services/modalGate';
 import { requestPushPermission, isPushSupported } from '@/services/pushNotifications';
@@ -354,6 +355,8 @@ export function AppRoot({
       )}
 
       {/* Тосты (toast.success(...)) — поверх экранов */}
+      {/* «Вышла новая версия»: заходы и обязательное окно на любом экране (app_update_prompt.md, Update 4) */}
+      <AppUpdateGuard />
       <ToastHost />
     </View>
   );

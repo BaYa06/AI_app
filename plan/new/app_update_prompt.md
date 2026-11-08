@@ -144,13 +144,30 @@ JS-обёртка src/components/appUpdate/nativeAppUpdateSheet.ts (`useNativeAp
 - Проверено без сборки: `swiftc -parse` и `-typecheck` против iOS SDK 15.1 и 16.0 с заглушками
   React Native; `xcodebuild -list` читает проект. Как выглядит на устройстве — только TestFlight.
 
-## Update 4 — подключение ⬜
+## Update 4 — подключение ✅ (код) / ⬜ (проверка в TestFlight Staging)
 - Проверка при запуске и при возврате из фона (`AppState`), владелец `appUpdate` в `modalGate`
   с приоритетами из пункта 6.
 - «Что нового» не открывается в запуске, где показано мягкое окно.
 - **Готово, когда:** в staging-сборке с `APP_LATEST_VERSION_IOS=9.9.9` на Preview окно появляется
   на запуске и после 30 минут в фоне. С `APP_MIN_VERSION_IOS=9.9.9` его не закрыть. Во время
   теста окна нет.
+
+Сделано (08.11.2026):
+- `src/components/appUpdate/AppUpdateGuard.tsx` в корне (AppRoot): отмечает заходы, на каждом
+  спрашивает сервер (`refreshOnEntry`), показывает обязательное окно на любом экране и до входа.
+  Тест — по текущему экрану: TestLobby, LiveTest, TestWaiting, TestExam, ExamLobby,
+  OralTestLobby, OralTestSession.
+- `useAppUpdateOnHome` на главной — мягкое окно. Вызывается до `useWhatsNewOnHome`: занимает
+  очередь (`appUpdate`), пока ждёт ответ сервера, поэтому «Что нового» не открывается раньше.
+  Заход снимается после решения; если человек тем временем ушёл с главной или запуск оказался
+  по ссылке — заход остаётся до следующего прихода на главную.
+- `modalGate`: обязательное (-1) → приглашение → набор → мягкое → «Что нового».
+  «Что нового» не открывается в запуске, где уже было мягкое окно (`wasSoftShownThisRun`).
+- «Обновить» → `markStoreOpened` + ссылка из ответа сервера (запасная — apps.apple.com/app/id6808731151).
+- Как проверить: в Vercel → Preview (dev) поставить `APP_LATEST_VERSION_IOS=9.9.9` и передеплоить
+  (env применяются только к новому деплою), собрать TestFlight Staging. Дата выхода у поправки
+  неизвестна, поэтому 3 дня тишины не действуют — окно сразу. Для обязательного —
+  `APP_MIN_VERSION_IOS=9.9.9`. После проверки обе переменные убрать.
 
 ## Update 5 — замеры и Release 5 ⬜
 - События: `update_prompt_shown { variant }`, `update_prompt_update`, `update_prompt_later`.

@@ -114,14 +114,20 @@ export function markColdStart(): void {
   backgroundAt = null;
 }
 
-/** Смена AppState: 'background' запоминает время, 'active' после долгого фона — новый заход */
-export function onAppStateChange(state: string, now: number = Date.now()): void {
+/**
+ * Смена AppState: 'background' запоминает время, 'active' после долгого фона — новый заход.
+ * @returns true, если с этим 'active' начался новый заход (пора спросить сервер)
+ */
+export function onAppStateChange(state: string, now: number = Date.now()): boolean {
   if (state === 'background') {
     backgroundAt ??= now;
   } else if (state === 'active') {
-    if (backgroundAt != null && now - backgroundAt >= ENTRY_BACKGROUND_MS) entryPending = true;
+    const entry = backgroundAt != null && now - backgroundAt >= ENTRY_BACKGROUND_MS;
+    if (entry) entryPending = true;
     backgroundAt = null;
+    return entry;
   }
+  return false;
 }
 
 export function isEntryPending(): boolean {
@@ -133,10 +139,26 @@ export function consumeEntry(): void {
   entryPending = false;
 }
 
+/**
+ * Мягкое окно уже показывали в этом запуске — «Что нового» тогда не открываем: не больше одного
+ * окна обновления/новостей за запуск (решение 6)
+ */
+let softShownThisRun = false;
+
+export function markSoftShownThisRun(): void {
+  softShownThisRun = true;
+}
+
+export function wasSoftShownThisRun(): boolean {
+  return softShownThisRun;
+}
+
 /** Для тестов */
 export function resetEntries(): void {
   entryPending = false;
   backgroundAt = null;
+  softShownThisRun = false;
+  refreshing = null;
 }
 
 // ==================== Состояние на устройстве ====================
@@ -166,6 +188,20 @@ export function markStoreOpened(now: number = Date.now()): void {
 }
 
 // ==================== Ответ сервера ====================
+
+/** Запрос этого захода: главная ждёт его же, а не шлёт свой */
+let refreshing: Promise<AppUpdateState | undefined> | null = null;
+
+/** Спросить сервер на заходе (холодный запуск, возврат после долгого фона) */
+export function refreshOnEntry(platform: string): Promise<AppUpdateState | undefined> {
+  refreshing = refreshAppVersion({ platform });
+  return refreshing;
+}
+
+/** Ответ этого захода; запроса не было — то, что уже на устройстве */
+export function entryRefresh(): Promise<AppUpdateState | undefined> {
+  return refreshing ?? Promise.resolve(loadAppUpdateState());
+}
 
 const isVersionOrNull = (v: unknown) => v === null || isVersion(v);
 

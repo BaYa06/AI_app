@@ -107,6 +107,7 @@ import { SetsSectionMenu } from '@/components/home/SetsSectionMenu';
 import { AddByLinkSheet } from '@/components/share/AddByLinkSheet';
 import { requestOpenShare } from '@/services/shareLinks';
 import { useWhatsNewOnHome } from '@/components/whatsNew/useWhatsNewOnHome';
+import { useAppUpdateOnHome } from '@/components/appUpdate/useAppUpdateOnHome';
 import { WhatsNewSheet } from '@/components/whatsNew/WhatsNewSheet';
 
 import {
@@ -885,27 +886,34 @@ export function HomeScreen({ navigation, route }: any) {
     startLesson(lessonPlan);
   }, [lessonContent, lessonPlan, startLesson, computeLessonPlan, navigation]);
 
+  // На главной открыто своё окно — окна, которые открываются сами, ждут
+  const homeOverlayOpen =
+    searchVisible ||
+    setsMenuVisible ||
+    sortSheetVisible ||
+    drawerOpen ||
+    streakModalVisible ||
+    courseMenuOpen !== null ||
+    isEditModalVisible ||
+    joinByCodeVisible ||
+    addByLinkVisible ||
+    setMenuTarget !== null ||
+    focusSheetVisible ||
+    showStudyModeModal ||
+    deleteModalCourseId !== null ||
+    leaveModalCourseId !== null ||
+    inviteModalCourseId !== null;
+
+  // «Вышла новая версия» (plan/new/app_update_prompt.md, Update 4) — до «Что нового»: его эффект
+  // занимает очередь первым, и «Что нового» не откроется раньше
+  useAppUpdateOnHome({ ready: isTeacher !== null, blocked: homeOverlayOpen });
+
   // «Что нового» после обновления (plan/new/whats_new.md, News 3) — ждёт, пока на главной закрыты свои окна
   const whatsNew = useWhatsNewOnHome({
     navigation,
     isTeacher,
     openedFrom: route?.params?.from,
-    blocked:
-      searchVisible ||
-      setsMenuVisible ||
-      sortSheetVisible ||
-      drawerOpen ||
-      streakModalVisible ||
-      courseMenuOpen !== null ||
-      isEditModalVisible ||
-      joinByCodeVisible ||
-      addByLinkVisible ||
-      setMenuTarget !== null ||
-      focusSheetVisible ||
-      showStudyModeModal ||
-      deleteModalCourseId !== null ||
-      leaveModalCourseId !== null ||
-      inviteModalCourseId !== null,
+    blocked: homeOverlayOpen,
   });
 
   // Ссылка из виджета на экране блокировки (plan/new/widgets.md, 0.3): flashly://lesson?from=widget.

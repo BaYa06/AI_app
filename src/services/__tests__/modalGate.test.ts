@@ -38,6 +38,25 @@ describe('modalGate', () => {
     expect(isLaunchInterrupted()).toBe(false);
   });
 
+  it('обязательное обновление важнее всех', () => {
+    setGateOpen('appUpdateForce', true);
+    expect(isBlockedFor('courseInvite')).toBe(true);
+    expect(isBlockedFor('shareLink')).toBe(true);
+    expect(isBlockedFor('appUpdate')).toBe(true);
+    expect(isBlockedFor('whatsNew')).toBe(true);
+    expect(isBlockedFor('appUpdateForce')).toBe(false);
+  });
+
+  it('мягкое обновление — после приглашения и набора, но раньше «Что нового»', () => {
+    setGateOpen('appUpdate', true);
+    expect(isBlockedFor('whatsNew')).toBe(true);
+    expect(isBlockedFor('courseInvite')).toBe(false);
+    expect(isBlockedFor('shareLink')).toBe(false);
+    setGateOpen('appUpdate', false);
+    setGateOpen('shareLink', true);
+    expect(isBlockedFor('appUpdate')).toBe(true);
+  });
+
   it('подписчики узнают только об изменениях', () => {
     const listener = jest.fn();
     const unsubscribe = subscribeGate(listener);

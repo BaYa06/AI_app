@@ -30,6 +30,10 @@ import {
   parseAppVersion,
   refreshAppVersion,
   resetEntries,
+  refreshOnEntry,
+  entryRefresh,
+  markSoftShownThisRun,
+  wasSoftShownThisRun,
   type AppUpdateState,
   type AppVersionInfo,
   type UpdateContext,
@@ -213,6 +217,19 @@ describe('заходы', () => {
     expect(isEntryPending()).toBe(true);
   });
 
+  it('onAppStateChange сообщает, что начался новый заход', () => {
+    expect(onAppStateChange('background', NOW)).toBe(false);
+    expect(onAppStateChange('active', NOW + 60 * 1000)).toBe(false);
+    onAppStateChange('background', NOW);
+    expect(onAppStateChange('active', NOW + ENTRY_BACKGROUND_MS)).toBe(true);
+  });
+
+  it('мягкое окно в этом запуске — отметка до перезапуска', () => {
+    expect(wasSoftShownThisRun()).toBe(false);
+    markSoftShownThisRun();
+    expect(wasSoftShownThisRun()).toBe(true);
+  });
+
   it('active без ухода в фон — не заход', () => {
     onAppStateChange('inactive', NOW);
     onAppStateChange('active', NOW + ENTRY_BACKGROUND_MS * 2);
@@ -286,6 +303,15 @@ describe('refreshAppVersion', () => {
     expect(s?.config?.latest).toBe('1.9.0');
     expect(s?.config?.minVersion).toBe('1.8.5');
     expect(s?.fetchedAt).toBe(NOW);
+  });
+
+  it('главная ждёт запрос захода, а без него берёт сохранённое', async () => {
+    mockStore.set('app_update', { config: config({ latest: '1.8.9' }), fetchedAt: NOW });
+    expect((await entryRefresh())?.config?.latest).toBe('1.8.9');
+    g.fetch = reply(config());
+    const request = refreshOnEntry('ios');
+    expect(entryRefresh()).toBe(request);
+    expect((await entryRefresh())?.config?.latest).toBe('1.9.0');
   });
 
   it('Android и веб — без запроса', async () => {
