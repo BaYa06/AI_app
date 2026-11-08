@@ -1,5 +1,29 @@
-# flashlycards.app — официальный сайт Flashly (plan/new/official_site.md, Site 5)
+# flashlycards.app — официальный сайт Flashly (plan/new/seo_launch.md)
+# Отдаётся только на flashlycards.app. Веб-приложение живёт на app.flashlycards.app
+# и закрыто от индекса заголовком X-Robots-Tag: noindex.
+
 User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin
+Disallow: /join/
+Disallow: /s/
+
+# Поисковики и ИИ-ассистенты: сайт открыт, чтобы они могли находить и цитировать Flashly
+User-agent: Googlebot
+User-agent: Bingbot
+User-agent: YandexBot
+User-agent: Google-Extended
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: ClaudeBot
+User-agent: Claude-SearchBot
+User-agent: Claude-User
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+User-agent: Applebot
+User-agent: Applebot-Extended
 Allow: /
 Disallow: /api/
 Disallow: /admin

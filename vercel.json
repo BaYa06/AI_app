@@ -122,7 +122,7 @@
   ],
   "redirects": [
     {
-      "source": "/:path((?!(?:api|ai|s|join|privacy|terms|support|delete-account|admin|site|icons|fonts|\\.well-known)(?:/|$))[^.]+)",
+      "source": "/:path((?!(?:api|ai|s|join|privacy|terms|support|delete-account|admin|site|icons|fonts|\\.well-known|en|learn|how-to-learn-words|spaced-repetition|teachers)(?:/|$))[^.]+)",
       "has": [{ "type": "host", "value": "flashlycards.app" }],
       "destination": "https://app.flashlycards.app/:path",
       "permanent": false
@@ -152,6 +152,14 @@
     { "source": "/terms", "destination": "/terms.html" },
     { "source": "/robots.txt", "has": [{ "type": "host", "value": "flashlycards.app" }], "destination": "/site/robots.txt" },
     { "source": "/sitemap.xml", "has": [{ "type": "host", "value": "flashlycards.app" }], "destination": "/site/sitemap.xml" },
+    { "source": "/llms.txt", "has": [{ "type": "host", "value": "flashlycards.app" }], "destination": "/site/llms.txt" },
+    { "source": "/en", "destination": "/site/p/en.html" },
+    { "source": "/learn/english", "destination": "/site/p/learn-english.html" },
+    { "source": "/learn/german", "destination": "/site/p/learn-german.html" },
+    { "source": "/learn/turkish", "destination": "/site/p/learn-turkish.html" },
+    { "source": "/how-to-learn-words", "destination": "/site/p/how-to-learn-words.html" },
+    { "source": "/spaced-repetition", "destination": "/site/p/spaced-repetition.html" },
+    { "source": "/teachers", "destination": "/site/p/teachers.html" },
     { "source": "/support", "destination": "/site/support.html" },
     { "source": "/delete-account", "destination": "/site/delete-account.html" },
     { "source": "/api/translate-words",           "destination": "/api/ai?fn=translate-words" },
@@ -161,6 +169,7 @@
     { "source": "/api/extract-image",             "destination": "/api/ai?fn=extract-image" },
     { "source": "/api/import-files",              "destination": "/api/ai?fn=import-files" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/((?!.*\\.).*)", "has": [{ "type": "host", "value": "flashlycards.app" }], "destination": "/site/404.html" },
     { "source": "/((?!.*\\.).*)", "destination": "/index.html" }
   ]
 }
