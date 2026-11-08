@@ -73,11 +73,13 @@ ai-app-seven-zeta.vercel.app → старый адрес, НЕ отключае�
 - vercel.json: rewrites `/support`, `/delete-account`; исключения редиректа на `app.`; на старом адресе `/privacy`, `/terms` → 308 на `flashlycards.app`.
 - ⚠️ Редирект со старого адреса начнёт работать только после слияния в `main`. Слияние `dev` → `main` и перевод `flashlycards.app` / `app.flashlycards.app` с Preview на Production — **одновременно** (иначе старые ссылки на политику уведут на сборку `dev`).
 
-### Site 5 — поиск и превью ссылок
-- Убрать `noindex` из `public/site/index.html` (поставлен в Site 1).
-- title/description, canonical на `flashlycards.app`, Open Graph, favicon, JSON-LD `SoftwareApplication`, Smart App Banner.
-- `sitemap.xml`, `robots.txt`; PWA, `/admin` и старый адрес — `noindex`.
-- Отправить сайт в Google Search Console.
+### Site 5 — поиск и превью ссылок ✅ (код) / ⬜ Search Console после переноса
+- `noindex` убран с лендинга, `/support`, `/delete-account`.
+- На всех страницах: canonical на `flashlycards.app`, Open Graph + Twitter-карточка с картинкой `public/site/og.png` (1200×630, рендер HTML), Smart App Banner `app-id=6808731151`.
+- Лендинг: JSON-LD `SoftwareApplication` (бесплатно, iOS, ссылка App Store, без рейтингов) и `FAQPage` — вопросы взяты из текста страницы.
+- `public/site/robots.txt` и `sitemap.xml` (5 страниц), отдаются только на `flashlycards.app` (rewrite по адресу).
+- vercel.json: `X-Robots-Tag: noindex` на всех адресах, кроме `flashlycards.app` (`app.`, старый адрес, Preview), и на `/join/*`. Страницы `/s/` уже с `noindex`.
+- ⬜ После переноса: Google Search Console — подтвердить домен (TXT в name.com), отправить sitemap.
 
 ### Site 6 — приложение на новом домене (новая сборка, TestFlight)
 - `src/config/legal.ts` → новый домен.
@@ -117,9 +119,9 @@ ai-app-seven-zeta.vercel.app → старый адрес, НЕ отключае�
   - Триггер 038 (наборы книг только для чтения): все записи в card_sets/cards ограничены владельцем, кроме `announced_at` в push «новый набор» — он берёт только наборы с `course_id`, а наборы книг создаются без него (scripts/import-book.ts). Подтвердить на A2.
 - ✅ A2 (08.11.2026): репетиция на копии рабочей базы. schema_037 → schema_040 без ошибок, данные не тронуты (448 пользователей, 972 набора, 52 182 карточки). Наборы книг на проде уже без владельца и с триггерами (038 ничего не меняет), риск push «новый набор» = 0. **Миграции идут ~35 с** — поэтому шаг B0. Ветку `rehearsal-1-8` и `.env.rehearsal` удалить.
 - ✅ A3 (владелец, 08.11.2026): `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION` заданы для Production и Preview (коннектор Vercel список переменных не читает — проверка озвучки в B5).
-- ⬜ A4 (владелец): Supabase → Redirect URLs — `https://app.flashlycards.app/auth-callback`. **Site URL не менять** до переноса: `app.` пока смотрит на dev и тестовую базу.
+- ✅ A4 (владелец, 08.11.2026): Supabase → Redirect URLs — `https://app.flashlycards.app/auth-callback`. **Site URL не менять** до переноса: `app.` пока смотрит на dev и тестовую базу.
 - ⬜ A5 (владелец): Neon — ветка `before-1.8` из рабочей базы перед слиянием.
-- ⬜ A6 (я): Site 5 в dev.
+- ✅ A6 (я): Site 5 в dev.
 - A7: заморозка dev на время переноса. A8: утро буднего дня, не вечер и не около 20:30 UTC (cron close-week).
 
 ### B. Перенос (~30 мин)

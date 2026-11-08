@@ -1,0 +1,9 @@
+# flashlycards.app — официальный сайт Flashly (plan/new/official_site.md, Site 5)
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin
+Disallow: /join/
+Disallow: /s/
+
+Sitemap: https://flashlycards.app/sitemap.xml

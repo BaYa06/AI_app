@@ -17,6 +17,15 @@
   },
   "headers": [
     {
+      "source": "/(.*)",
+      "missing": [{ "type": "host", "value": "flashlycards.app" }],
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+    },
+    {
+      "source": "/join/(.*)",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+    },
+    {
       "source": "/.well-known/apple-app-site-association",
       "headers": [
         { "key": "Content-Type", "value": "application/json" }
@@ -141,6 +150,8 @@
     { "source": "/admin", "destination": "/admin.html" },
     { "source": "/privacy", "destination": "/privacy.html" },
     { "source": "/terms", "destination": "/terms.html" },
+    { "source": "/robots.txt", "has": [{ "type": "host", "value": "flashlycards.app" }], "destination": "/site/robots.txt" },
+    { "source": "/sitemap.xml", "has": [{ "type": "host", "value": "flashlycards.app" }], "destination": "/site/sitemap.xml" },
     { "source": "/support", "destination": "/site/support.html" },
     { "source": "/delete-account", "destination": "/site/delete-account.html" },
     { "source": "/api/translate-words",           "destination": "/api/ai?fn=translate-words" },
