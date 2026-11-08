@@ -111,6 +111,14 @@
       ]
     }
   ],
+  "redirects": [
+    {
+      "source": "/:path((?!(?:api|ai|s|join|privacy|terms|admin|site|icons|fonts|\\.well-known)(?:/|$))[^.]+)",
+      "has": [{ "type": "host", "value": "flashlycards.app" }],
+      "destination": "https://app.flashlycards.app/:path",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     { "source": "/api/push/subscribe",            "destination": "/api/push?action=subscribe" },
     { "source": "/api/push/unsubscribe",           "destination": "/api/push?action=unsubscribe" },

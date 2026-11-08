@@ -60,7 +60,10 @@ ai-app-seven-zeta.vercel.app → старый адрес, НЕ отключае�
 - Сначала проверить на Preview ветки dev.
 
 ### Site 3 — маршруты по адресу
-- vercel.json: `flashlycards.app/` → лендинг, `app.flashlycards.app` → PWA, старый адрес без изменений.
+- `flashlycards.app/` → лендинг через `middleware.js` (Routing Middleware, `matcher: '/'`). Правило в vercel.json не работает: на «/» лежит `index.html` приложения, а файл важнее rewrites.
+- vercel.json `redirects`: адреса приложения на `flashlycards.app` (`/auth-callback`, `/home` …) → `app.flashlycards.app` (временный редирект). Остаются на корне: `/api`, `/ai`, `/s`, `/join`, `/privacy`, `/terms`, `/admin`, `/site`, `/icons`, `/fonts`, `/.well-known`, файлы с точкой. В Site 4 добавить в исключения `/support` и `/delete-account`.
+- Лендинг снимает Service Worker приложения на `flashlycards.app` (остался у тех, кто открывал домен до Site 3).
+- `app.flashlycards.app` и старый адрес — без изменений.
 - Проверить API, `/s/`, `/join/`, `/admin` на всех адресах.
 
 ### Site 4 — официальные страницы
