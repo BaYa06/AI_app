@@ -6,8 +6,21 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
+/**
+ * Событие установки может прийти раньше, чем React смонтирует экран: его ловит скрипт
+ * в public/index.html и кладёт сюда (plan/new/seo_launch.md, SEO 3).
+ */
+type WindowWithPrompt = Window & { __flashlyInstallPrompt?: BeforeInstallPromptEvent | null };
+
+function earlyPrompt(): BeforeInstallPromptEvent | null {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return null;
+  return (window as WindowWithPrompt).__flashlyInstallPrompt ?? null;
+}
+
 export function usePwaInstall() {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(
+    earlyPrompt
+  );
   const [isIosSafari, setIsIosSafari] = useState(false);
 
   useEffect(() => {
@@ -40,6 +53,8 @@ export function usePwaInstall() {
     await deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
     if (outcome === 'accepted') {
+      // Событие одноразовое: второй prompt() у того же события браузер не покажет
+      (window as WindowWithPrompt).__flashlyInstallPrompt = null;
       setDeferredPrompt(null);
     }
   }, [deferredPrompt]);
