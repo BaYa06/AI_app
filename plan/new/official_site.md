@@ -66,9 +66,12 @@ ai-app-seven-zeta.vercel.app → старый адрес, НЕ отключае�
 - `app.flashlycards.app` и старый адрес — без изменений.
 - Проверить API, `/s/`, `/join/`, `/admin` на всех адресах.
 
-### Site 4 — официальные страницы
-- `/privacy`, `/terms` в оформлении сайта; новые `/support` (связь + вопросы) и `/delete-account` (обязательна для Google Play).
-- Старый адрес: `/privacy`, `/terms` → 301 на новый домен.
+### Site 4 — официальные страницы ✅
+- Общий стиль `public/site/site.css` (токены брендбука), шапка и подвал как на лендинге.
+- `/privacy`, `/terms` — новое оформление, текст без изменений; почта для связи `onlinechina06@gmail.com` → `support@flashlycards.app`, дата «обновлено 8 ноября 2026».
+- Новые `/support` (`public/site/support.html`) и `/delete-account` (`public/site/delete-account.html`) — содержание только из политики и условий; пока `noindex` до Site 5.
+- vercel.json: rewrites `/support`, `/delete-account`; исключения редиректа на `app.`; на старом адресе `/privacy`, `/terms` → 308 на `flashlycards.app`.
+- ⚠️ Редирект со старого адреса начнёт работать только после слияния в `main`. Слияние `dev` → `main` и перевод `flashlycards.app` / `app.flashlycards.app` с Preview на Production — **одновременно** (иначе старые ссылки на политику уведут на сборку `dev`).
 
 ### Site 5 — поиск и превью ссылок
 - Убрать `noindex` из `public/site/index.html` (поставлен в Site 1).

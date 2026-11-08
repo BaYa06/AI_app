@@ -1,0 +1,102 @@
+/* Официальные страницы flashlycards.app: /privacy, /terms, /support, /delete-account.
+   Токены — из брендбука (plan/done/brandbook.md), те же, что на лендинге public/site/index.html. */
+:root {
+  --bg: #FFFFFF;
+  --surface: #FFFFFF;
+  --surface-muted: #F1F5F9;
+  --border: #DBDBE6;
+  --text: #111827;
+  --text-2: #6B7280;
+  --text-3: #8A8F99;
+  --primary: #6467F2;
+  --primary-fill: #6467F2;
+  --primary-pressed: #4F46E5;
+  --on-primary: #FFFFFF;
+  --tint: rgba(100,103,242,0.10);
+  --warning-text: #B45309;
+  --warning-tint: rgba(245,158,11,0.10);
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", Roboto, "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #101122; --surface: #1A1B30; --surface-muted: #232540; --border: rgba(255,255,255,0.10);
+    --text: #F9FAFB; --text-2: #9CA3AF; --text-3: #8A8F99;
+    --primary: #818CF8; --primary-fill: #6366F1; --primary-pressed: #4F46E5; --on-primary: #FFFFFF;
+    --tint: rgba(129,140,248,0.10); --warning-text: #FBBF24; --warning-tint: rgba(251,191,36,0.10);
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 16px; line-height: 26px; -webkit-font-smoothing: antialiased; }
+a { color: var(--primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; border-radius: 8px; }
+
+.wrap { max-width: 1120px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* Шапка */
+header.top { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--border); }
+.top .wrap { display: flex; align-items: center; gap: 24px; height: 64px; }
+.logo { display: flex; align-items: center; gap: 10px; color: var(--text); font-weight: 700; font-size: 20px; line-height: 28px; }
+.logo:hover { text-decoration: none; }
+.logo img { width: 32px; height: 32px; border-radius: 8px; }
+.top nav { display: flex; gap: 24px; margin-left: auto; align-items: center; font-size: 14px; line-height: 20px; font-weight: 600; }
+.top nav a:not(.btn) { color: var(--text-2); }
+.top nav a:not(.btn):hover { color: var(--text); text-decoration: none; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 20px; border-radius: 12px; font: 600 16px/24px var(--font); background: var(--primary-fill); color: var(--on-primary); }
+.btn:hover { background: var(--primary-pressed); text-decoration: none; }
+
+/* Документ */
+.doc { max-width: 720px; margin: 0 auto; padding-block: 48px 72px; }
+.overline { font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: var(--primary); }
+.doc h1 { margin: 8px 0 8px; font-size: 32px; line-height: 40px; font-weight: 700; letter-spacing: -0.4px; text-wrap: balance; }
+.doc h2 { margin: 40px 0 12px; font-size: 20px; line-height: 28px; font-weight: 600; text-wrap: balance; }
+.doc p { margin: 0 0 16px; }
+.doc ul, .doc ol { margin: 0 0 16px; padding-left: 22px; }
+.doc li { margin: 6px 0; }
+.meta { color: var(--text-2); font-size: 14px; line-height: 20px; margin: 0 0 32px; }
+.lead { font-size: 18px; line-height: 28px; color: var(--text-2); }
+.table-wrap { overflow-x: auto; margin: 0 0 16px; border: 1px solid var(--border); border-radius: 16px; }
+.doc table { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 20px; min-width: 520px; }
+.doc th, .doc td { text-align: left; vertical-align: top; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.doc tr:last-child td { border-bottom: 0; }
+.doc th { color: var(--text-2); font-weight: 600; background: var(--surface-muted); }
+
+/* Блоки на страницах поддержки и удаления */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; margin: 0 0 16px; }
+.card h2 { margin-top: 0; }
+.contact { display: grid; gap: 4px; }
+.contact b { font-size: 20px; line-height: 28px; font-weight: 600; }
+.steps { counter-reset: s; list-style: none; padding: 0 !important; display: grid; gap: 12px; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 32px 1fr; gap: 12px; margin: 0 !important; align-items: start; }
+.steps li::before { content: counter(s); width: 32px; height: 32px; border-radius: 999px; background: var(--tint); color: var(--primary); font-weight: 700; font-size: 14px; display: grid; place-items: center; }
+.note { background: var(--warning-tint); color: var(--text); border-radius: 12px; padding: 12px 16px; margin: 0 0 16px; }
+.note b { color: var(--warning-text); }
+details { border-bottom: 1px solid var(--border); }
+details:first-of-type { border-top: 1px solid var(--border); }
+summary { cursor: pointer; padding: 16px 0; font-weight: 600; list-style: none; }
+summary::-webkit-details-marker { display: none; }
+summary::after { content: "+"; float: right; color: var(--text-3); font-weight: 400; }
+details[open] summary::after { content: "−"; color: var(--primary); }
+details p { color: var(--text-2); }
+
+/* Подвал */
+footer { border-top: 1px solid var(--border); padding-block: 40px; font-size: 14px; line-height: 20px; color: var(--text-2); }
+footer .wrap { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 32px; }
+footer h4 { margin: 0 0 12px; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text-3); }
+footer ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+footer a { color: var(--text-2); }
+footer a:hover { color: var(--text); }
+footer p { margin: 12px 0 0; max-width: 30em; }
+.legal { grid-column: 1 / -1; padding-top: 24px; border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; color: var(--text-3); font-size: 12px; line-height: 16px; }
+
+@media (max-width: 600px) {
+  .doc { padding-block: 32px 56px; }
+  .doc h1 { font-size: 24px; line-height: 32px; }
+  .top nav a:not(.btn) { display: none; }
+  .btn { height: 40px; padding: 0 14px; font-size: 14px; }
+  footer .wrap { grid-template-columns: 1fr 1fr; }
+  footer .wrap > div:first-child { grid-column: 1 / -1; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
