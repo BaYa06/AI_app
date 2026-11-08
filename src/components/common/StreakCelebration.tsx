@@ -8,9 +8,10 @@
  * Хореография из прототипа «Серия Flashly»: искра → разжигание (волна, искры, haptic) →
  * смена числа → огонёк перелетает в сегодняшний день → текст и кнопка → спокойное мерцание.
  * Варианты: обычный день, рубеж (7, 30, 50, 100, 365), первый день, уменьшение анимации.
+ * Показывается слоем поверх экрана, не системным окном — почему, см. StreakCelebration ниже.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, View, useWindowDimensions } from 'react-native';
+import { BackHandler, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useReducedMotion,
@@ -288,6 +289,13 @@ interface Props {
   onClose: () => void;
 }
 
+/**
+ * Слой поверх экрана, а не <Modal>. Системное окно iOS падало, когда его закрытие совпадало
+ * с переходом на другой экран («Продолжить» → следующая сессия через replace): React Native
+ * показывал ещё открытый контроллер второй раз — NSInvalidArgumentException «already being
+ * presented» (Crashlytics, 1.8.1). Слой живёт и умирает вместе с экраном, переход ему не мешает.
+ * Поэтому рисовать его нужно последним ребёнком корневого View экрана на весь экран.
+ */
 export function StreakCelebration({ visible, streakCount, onClose }: Props) {
   const [enabled, setEnabled] = useState(false);
   useEffect(() => {
@@ -298,17 +306,27 @@ export function StreakCelebration({ visible, streakCount, onClose }: Props) {
       setEnabled(false);
     };
   }, [visible]);
+
+  // Android «назад» закрывает праздник, но не раньше, чем пользователь увидел момент,
+  // и не уводит с экрана под ним
+  useEffect(() => {
+    if (!visible) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (enabled) onClose();
+      return true;
+    });
+    return () => sub.remove();
+  }, [visible, enabled, onClose]);
+
   if (!visible) return null;
   return (
-    <Modal
-      visible
-      transparent
-      animationType="none"
-      statusBarTranslucent
-      // Android «назад» закрывает экран, но не раньше, чем пользователь увидел момент
-      onRequestClose={() => enabled && onClose()}
-    >
+    <View style={overlayStyles.overlay}>
       <StreakCelebrationContent streakCount={streakCount} onClose={onClose} />
-    </Modal>
+    </View>
   );
 }
+
+const overlayStyles = StyleSheet.create({
+  // Поверх всего на экране; касания под слой не проходят
+  overlay: { ...StyleSheet.absoluteFillObject, zIndex: 1000, elevation: 1000 },
+});
