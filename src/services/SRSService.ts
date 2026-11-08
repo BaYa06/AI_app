@@ -39,6 +39,11 @@ export function getStatusForStep(step: number): CardStatus {
   return 'mature';
 }
 
+/** Статус слова по его шагу; поле card.status может отставать — цвет и счётчики берём отсюда */
+export function getCardStatus(card: Pick<Card, 'learningStep'>): CardStatus {
+  return getStatusForStep(card.learningStep || 0);
+}
+
 /** Выученная карточка — «знаю» и выше (шаг ≥ 3). Одно определение для наборов, статистики и рейтинга. */
 export const LEARNED_STEP = 3;
 
@@ -50,7 +55,10 @@ export function isCardLearned(card: Pick<Card, 'learningStep'>): boolean {
 export type AnswerMode = 'test' | 'builder' | 'flashcard';
 
 /** Пришло ли время повторения карточки */
-export function isCardDue(card: Pick<Card, 'learningStep' | 'nextReviewDate'>, now: number = Date.now()): boolean {
+export function isCardDue(
+  card: Pick<Card, 'learningStep' | 'nextReviewDate'>,
+  now: number = Date.now()
+): boolean {
   return (card.learningStep || 0) === 0 || card.nextReviewDate <= now + DUE_GRACE_MS;
 }
 
@@ -61,20 +69,26 @@ export function isCardDue(card: Pick<Card, 'learningStep' | 'nextReviewDate'>, n
  * Слово «угасает»: не повторяли дольше интервала его шага (зеркало isFading в api/progress.js).
  * При следующем ответе такое слово сначала теряет шаг.
  */
-export function isCardFading(card: Pick<Card, 'learningStep' | 'nextReviewDate'>, now: number = Date.now()): boolean {
+export function isCardFading(
+  card: Pick<Card, 'learningStep' | 'nextReviewDate'>,
+  now: number = Date.now()
+): boolean {
   const step = card.learningStep || 0;
   return step >= 1 && now - card.nextReviewDate > getIntervalForStep(step) * DAY_IN_MS;
 }
 
 /** Слово ждёт повторения: уже изучалось (шаг ≥ 1) и время повторения пришло */
-export function isCardWaitingReview(card: Pick<Card, 'learningStep' | 'nextReviewDate'>, now: number = Date.now()): boolean {
+export function isCardWaitingReview(
+  card: Pick<Card, 'learningStep' | 'nextReviewDate'>,
+  now: number = Date.now()
+): boolean {
   return (card.learningStep || 0) >= 1 && card.nextReviewDate <= now + DUE_GRACE_MS;
 }
 
 export function applyAnswer(
   card: Pick<Card, 'learningStep' | 'nextReviewDate'>,
   answer: { mode: AnswerMode; correct: boolean; selfRating?: Rating },
-  answeredAt: number = Date.now(),
+  answeredAt: number = Date.now()
 ): Pick<Card, 'learningStep' | 'nextReviewDate' | 'lastReviewDate' | 'status'> {
   const fading = isCardFading(card, answeredAt);
   let step = fading ? (card.learningStep || 0) - 1 : card.learningStep || 0;
@@ -93,18 +107,19 @@ export function applyAnswer(
     nextReviewDate = answeredAt + getIntervalForStep(step) * DAY_IN_MS;
   }
 
-  return { learningStep: step, nextReviewDate, lastReviewDate: answeredAt, status: getStatusForStep(step) };
+  return {
+    learningStep: step,
+    nextReviewDate,
+    lastReviewDate: answeredAt,
+    status: getStatusForStep(step),
+  };
 }
 
 /**
  * Создает очередь карточек для изучения
  * Приоритет: просроченные → запланированные на сегодня → новые
  */
-export function buildStudyQueue(
-  cards: Card[],
-  newLimit: number,
-  reviewLimit: number
-): Card[] {
+export function buildStudyQueue(cards: Card[], newLimit: number, reviewLimit: number): Card[] {
   const now = Date.now();
   const queue: Card[] = [];
 
@@ -128,16 +143,16 @@ export function buildStudyQueue(
 
   // Сортируем просроченные по давности (самые старые первыми)
   overdueCards.sort((a, b) => a.nextReviewDate - b.nextReviewDate);
-  
+
   // Добавляем просроченные
   queue.push(...overdueCards.slice(0, reviewLimit));
-  
+
   // Добавляем запланированные на сегодня
   const remainingReviewSlots = reviewLimit - queue.length;
   if (remainingReviewSlots > 0) {
     queue.push(...dueCards.slice(0, remainingReviewSlots));
   }
-  
+
   // Добавляем новые карточки
   queue.push(...newCards.slice(0, newLimit));
 

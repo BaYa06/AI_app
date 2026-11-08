@@ -2,22 +2,44 @@
  * Study Screen
  * @description Экран изучения карточек с CSS-анимациями для web
  */
-import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
-import { View, StyleSheet, Pressable, Dimensions, Animated, Modal, AppState, Platform, type LayoutChangeEvent } from 'react-native';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
+import {
+  View,
+  Pressable,
+  Animated,
+  AppState,
+  Platform,
+  type LayoutChangeEvent,
+} from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { useCardsStore, useSetsStore, useStudyStore, useThemeColors, useSettingsStore, selectSetStats } from '@/store';
+import {
+  useCardsStore,
+  useSetsStore,
+  useStudyStore,
+  useThemeColors,
+  useSettingsStore,
+  selectSetStats,
+} from '@/store';
 import { Text, Loading } from '@/components/common';
-import { Button, ProgressBar, ScreenHeader, Switch } from '@/components/ui';
-import { buildStudyQueue, isCardLearned } from '@/services/SRSService';
+import { Button } from '@/components/ui';
+import { StageLayout, sessionStageProgress } from '@/components/study/StageLayout';
+import { buildStudyQueue, getCardStatus } from '@/services/SRSService';
+import { StatusBadge } from '@/components/cards';
 import { ProgressService } from '@/services/ProgressService';
-import { lessonPhaseForAnswer } from '@/services/lessonFlow';
+import { lessonPhaseForAnswer, sessionPhaseForAnswer } from '@/services/lessonFlow';
 import { useLessonStore } from '@/store/lessonStore';
-import { spacing, borderRadius, heights, iconSize, screenPadding, alpha } from '@/constants';
+import { spacing, iconSize, alpha } from '@/constants';
 import { DatabaseService, Analytics } from '@/services';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Rating, Card } from '@/types';
-import { Settings, Volume2, Check } from 'lucide-react-native';
-import { speak, resolveSpeechLang, prefetchSpeech, cardSpeechLangs } from '@/utils/speech';
+import { Settings, Volume2 } from 'lucide-react-native';
+import {
+  speak,
+  resolveSpeechLang,
+  prefetchSpeech,
+  cardSpeechLangs,
+  isCardSpeakable,
+} from '@/utils/speech';
 import { triggerHaptic } from '@/utils/haptic';
 import { fitText, fitWordWithExample } from '@/utils/fitText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -34,33 +56,44 @@ import ReAnimated, {
   Extrapolation,
   Easing as REasing,
 } from 'react-native-reanimated';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = Math.min(340, SCREEN_WIDTH - 32);
-const CARD_HEIGHT = CARD_WIDTH * 1.25;
-const CARD_BOX_HEIGHT = Math.min(CARD_HEIGHT, 420);
-
-// Рамка текста на карточке до первого onLayout: без отступов 24×2 и рамки, верхней строки (32),
-// низа (24 + подпись 20 на лице, 24 на обороте) и запаса над словом (4)
-const DEFAULT_TEXT_BOX = {
-  width: CARD_WIDTH - spacing.l * 2 - 2,
-  front: CARD_BOX_HEIGHT - spacing.l * 2 - 2 - 32 - 44 - spacing.xxs,
-  back: CARD_BOX_HEIGHT - spacing.l * 2 - 2 - 32 - spacing.l - spacing.xxs,
-};
-// Слово: h2 (24) → не мельче 18; пример: bodyLarge (18) → не мельче 15 (utils/fitText.ts)
-const WORD_FIT = { sizes: [24, 22, 20, 18], lineHeightRatio: 1.5 };
-const EXAMPLE_FIT = { sizes: [18, 16, 15], lineHeightRatio: 1.45 };
-// Между словом и примером: два отступа cardContent + разделитель
-const EXAMPLE_GAP = spacing.m * 2 + 2;
-// Свайп карточки засчитывается после 30% её ширины или быстрым смахом; затем она улетает за край
-const SWIPE_DISTANCE = CARD_WIDTH * 0.3;
-const SWIPE_VELOCITY = 800;
-const SWIPE_OUT_MS = 220;
+import { log } from '@/utils/logger';
+import { cardFront, cardBack } from '@/utils/cardText';
+import {
+  CARD_WIDTH,
+  DEFAULT_TEXT_BOX,
+  WORD_FIT,
+  EXAMPLE_FIT,
+  EXAMPLE_GAP,
+  SWIPE_DISTANCE,
+  SWIPE_VELOCITY,
+  SWIPE_OUT_MS,
+  CARD_IN_MS,
+  CARD_IN_DELAY_MS,
+  SCREEN_WIDTH,
+} from './study/layout';
+import { styles } from './study/styles';
+import { StudySettingsModal } from './study/StudySettingsModal';
+import { FlashcardFace } from './study/FlashcardFace';
 
 type Props = RootStackScreenProps<'Study'>;
 
 export function StudyScreen({ navigation, route }: Props) {
-  const { setId, mode, errorCardsFronts, studyAll, cardLimit, onlyHard, dueCardIds, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0, phaseFailedIds, lesson } = route.params;
+  const {
+    setId,
+    mode,
+    errorCardsFronts,
+    studyAll,
+    cardLimit,
+    onlyHard,
+    dueCardIds,
+    phaseId,
+    totalPhaseCards,
+    studiedInPhase = 0,
+    phaseOffset = 0,
+    phaseFailedIds,
+    lesson,
+    session: sessionRoute,
+  } = route.params;
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const settings = useSettingsStore((s) => s.settings);
@@ -71,14 +104,20 @@ export function StudyScreen({ navigation, route }: Props) {
     () => phaseFailedIds || [],
     [phaseFailedIds ? phaseFailedIds.join('|') : '']
   );
-  
+
   // Генерируем phaseId при первом запуске (если не передан)
-  const currentPhaseId = useRef(phaseId || `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+  const currentPhaseId = useRef(
+    phaseId || `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  );
   const currentTotalPhaseCards = useRef(totalPhaseCards || 0);
   // Количество ошибочных карточек из прошлых порций в текущей очереди
   const pendingCardsInQueueRef = useRef(0);
   // Длина очереди без повторов «Почти» — по ней итоги сессии; повторы идут после неё
   const baseQueueLengthRef = useRef(0);
+  // Сессия «Изучить»: слова с ошибкой, ещё не исправленные. Ошибка уходит в конец той же очереди —
+  // экран не закрывается ради новой порции, полоска стоит, пока слово не отвечено верно
+  const sessionRetryIdsRef = useRef<Set<string>>(new Set());
+  const [sessionRetryCount, setSessionRetryCount] = useState(0);
   // Analytics: момент показа текущей карточки
   const cardShownAtRef = useRef(Date.now());
   // Один ответ на карточку: повторное нажатие или свайп до показа следующей игнорируются
@@ -90,17 +129,21 @@ export function StudyScreen({ navigation, route }: Props) {
   const swipeFlying = useSharedValue(false);
   // Палец за порогом свайпа — вибрация при каждом пересечении порога
   const swipePastThreshold = useSharedValue(false);
+  // Видимость карточки — на UI-потоке вместе со сдвигом: отвеченная прячется в том же кадре,
+  // в котором возвращается в центр, и следующая проявляется уже со своим текстом (одна анимация)
+  const cardOpacity = useSharedValue(1);
+  const cardScale = useSharedValue(1);
   // Подсказка свайпа новичку: первые сессии, пока не сделал свайп — карточка покачивается
   // и внизу «← Не знаю · Уверенно →» (только на первой карточке)
   const [showSwipeHint, setShowSwipeHint] = useState(false);
   const swipeHintCheckedRef = useRef(false);
   const reduceMotion = useReducedMotion();
-  
+
   // Store
   const updateLastStudied = useSetsStore((s) => s.updateLastStudied);
   const updateSetStats = useSetsStore((s) => s.updateSetStats);
   const getCardsBySet = useCardsStore((s) => s.getCardsBySet);
-  
+
   // Study store
   const session = useStudyStore((s) => s.session);
   const isFlipped = useStudyStore((s) => s.isFlipped);
@@ -113,25 +156,25 @@ export function StudyScreen({ navigation, route }: Props) {
   // Локальное состояние
   const [currentCard, setCurrentCard] = useState<Card | null>(null);
   const [textBox, setTextBox] = useState(DEFAULT_TEXT_BOX);
-  const [errorCards, setErrorCards] = useState<Array<{ id: string; front: string; back: string; rating: number }>>([]);
+  const [errorCards, setErrorCards] = useState<
+    Array<{ id: string; front: string; back: string; rating: number }>
+  >([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [cardVisible, setCardVisible] = useState(true);
+  // Индекс карточки, которая уже показана, — по нему проявляем следующую (повтор «Почти» — та же карточка)
+  const [shownIndex, setShownIndex] = useState(-1);
   const reverseEnabled = useSettingsStore((s) => s.settings.reverseCards);
   const updateSettings = useSettingsStore((s) => s.updateSettings);
   const sheetTranslate = useRef(new Animated.Value(-220)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
-  const isCurrentMastered = currentCard ? isCardLearned(currentCard) : false;
-  const handleSpeak = useCallback(
-    (text: string, langHint?: string, counterpart?: string) => {
-      const normalized = (text || '').trim();
-      if (!normalized) return;
-      const lang = resolveSpeechLang(normalized, langHint, counterpart);
-      speak(normalized, lang).catch((error) => {
-        console.warn('[StudyScreen] TTS error:', error);
-      });
-    },
-    []
-  );
+  const currentStatus = currentCard ? getCardStatus(currentCard) : 'new';
+  const handleSpeak = useCallback((text: string, langHint?: string, counterpart?: string) => {
+    const normalized = (text || '').trim();
+    if (!normalized) return;
+    const lang = resolveSpeechLang(normalized, langHint, counterpart);
+    speak(normalized, lang).catch((error) => {
+      log.warn('Study', 'TTS error', error);
+    });
+  }, []);
 
   // Инициализация сессии
   useEffect(() => {
@@ -144,31 +187,31 @@ export function StudyScreen({ navigation, route }: Props) {
       cards = getCardsBySet(setId);
     }
     const onlyUnmastered = Boolean(onlyHard);
-    
+
     if (phaseId) {
       // Собираем карточки для фазы: сначала невыполненные ошибки прошлых порций, потом оставшиеся по offset
       const pendingIds = phaseFailedList || [];
       const state = useCardsStore.getState();
-      
+
       // Получаем ошибочные карточки по ID
       const pendingCards: Card[] = pendingIds
         .map((id) => state.getCard(id))
         .filter((c): c is Card => Boolean(c));
-      
+
       // Если не смогли найти карточки по ID, пробуем найти их в текущем наборе
       if (pendingIds.length > 0 && pendingCards.length === 0) {
-        console.warn('[StudyScreen] Не удалось найти ошибочные карточки по ID, пробуем найти в наборе');
+        log.warn('Study', 'Не удалось найти ошибочные карточки по ID, пробуем найти в наборе');
         const pendingSet = new Set(pendingIds);
-        const foundInSet = cards.filter(c => pendingSet.has(c.id));
+        const foundInSet = cards.filter((c) => pendingSet.has(c.id));
         pendingCards.push(...foundInSet);
       }
 
       // Получаем оставшиеся карточки по offset
       const remaining = phaseOffset > 0 ? cards.slice(phaseOffset) : cards;
-      
+
       // Исключаем из remaining те, что уже есть в pendingCards (ошибочные)
-      const pendingIdsSet = new Set(pendingCards.map(c => c.id));
-      const filteredRemaining = remaining.filter(c => !pendingIdsSet.has(c.id));
+      const pendingIdsSet = new Set(pendingCards.map((c) => c.id));
+      const filteredRemaining = remaining.filter((c) => !pendingIdsSet.has(c.id));
 
       // Собираем уникальные карточки: сначала ошибочные, потом новые
       const map = new Map<string, Card>();
@@ -178,32 +221,32 @@ export function StudyScreen({ navigation, route }: Props) {
         }
       });
       cards = Array.from(map.values());
-      
-      console.log('[StudyScreen] Фаза:', {
+
+      log.debug('Study', 'Фаза', {
         phaseId,
         phaseOffset,
         pendingIds: pendingIds.length,
         pendingCards: pendingCards.length,
         remaining: filteredRemaining.length,
-        total: cards.length
+        total: cards.length,
       });
-      
+
       // Сохраняем количество ошибочных карточек для правильного расчёта phaseOffset
       pendingCardsInQueueRef.current = pendingCards.length;
     } else {
       pendingCardsInQueueRef.current = 0;
     }
-    
+
     // Если переданы ошибочные карточки, фильтруем только их
     if (isErrorReview && errorCardsFronts) {
-      cards = cards.filter(card => {
-        const front = card.frontText ?? (card as any).front ?? '';
+      cards = cards.filter((card) => {
+        const front = cardFront(card);
         return errorCardsFronts.includes(front);
       });
       // В фазах повторяем ошибки сразу, без проверки расписания SRS (nextReviewDate)
       if (!phaseId) {
         const now = Date.now();
-        cards = cards.filter(card => card.nextReviewDate <= now);
+        cards = cards.filter((card) => card.nextReviewDate <= now);
       }
       // Очищаем список ошибок для новой сессии повторения
       setErrorCards([]);
@@ -214,7 +257,7 @@ export function StudyScreen({ navigation, route }: Props) {
     if (studyAll && onlyUnmastered) {
       const now = Date.now();
       const failedIdsSet = new Set(phaseFailedList || []);
-      cards = cards.filter(card => {
+      cards = cards.filter((card) => {
         // Ошибочные карточки фазы всегда включаем
         if (failedIdsSet.has(card.id)) {
           return true;
@@ -236,18 +279,14 @@ export function StudyScreen({ navigation, route }: Props) {
     };
 
     const queue = isErrorReview
-      // Для повторения ошибок берем только ошибочные карточки, игнорируя расписание SRS
-      ? cards
+      ? // Для повторения ошибок берем только ошибочные карточки, игнорируя расписание SRS
+        cards
       : studyAll
-        // "Учить всё" — включаем все карточки набора (или выбранное число) вне зависимости от статуса
-        ? limitCards(cards)
-        : buildStudyQueue(
-            cards,
-            settings.dailyNewCardsLimit,
-            settings.dailyReviewLimit
-          );
+        ? // "Учить всё" — включаем все карточки набора (или выбранное число) вне зависимости от статуса
+          limitCards(cards)
+        : buildStudyQueue(cards, settings.dailyNewCardsLimit, settings.dailyReviewLimit);
 
-    console.log('[StudyScreen] Очередь сформирована:', {
+    log.debug('Study', 'Очередь сформирована', {
       queueLength: queue.length,
       cardsLength: cards.length,
       isErrorReview,
@@ -255,25 +294,27 @@ export function StudyScreen({ navigation, route }: Props) {
       cardLimit,
       phaseId,
       phaseOffset,
-      phaseFailedList: phaseFailedList?.length || 0
+      phaseFailedList: phaseFailedList?.length || 0,
     });
 
     if (queue.length === 0) {
-      console.warn('[StudyScreen] Пустая очередь');
-      
+      log.warn('Study', 'Пустая очередь');
+
       // Если есть ошибочные карточки, но очередь пустая - это баг, логируем детали
       if (phaseFailedList && phaseFailedList.length > 0) {
-        console.error('[StudyScreen] Есть ошибочные карточки, но очередь пустая!', {
+        log.error('Study', 'Есть ошибочные карточки, но очередь пустая!', {
           phaseFailedList,
-          allCards: getCardsBySet(setId).map(c => c.id)
+          allCards: getCardsBySet(setId).map((c) => c.id),
         });
       }
-      
+
       navigation.goBack();
       return;
     }
 
     baseQueueLengthRef.current = queue.length;
+    sessionRetryIdsRef.current = new Set();
+    setSessionRetryCount(0);
     startSession(
       {
         setId,
@@ -300,7 +341,17 @@ export function StudyScreen({ navigation, route }: Props) {
         setShowSwipeHint(true);
       }
     }
-  }, [setId, errorCardsFronts, studyAll, cardLimit, onlyHard, dueCardIds, phaseId, phaseOffset, phaseFailedList]);
+  }, [
+    setId,
+    errorCardsFronts,
+    studyAll,
+    cardLimit,
+    onlyHard,
+    dueCardIds,
+    phaseId,
+    phaseOffset,
+    phaseFailedList,
+  ]);
 
   // Получить текущую карточку из очереди
   useEffect(() => {
@@ -308,6 +359,7 @@ export function StudyScreen({ navigation, route }: Props) {
       const cardId = session.queue[session.currentIndex];
       const card = useCardsStore.getState().getCard(cardId);
       setCurrentCard(card || null);
+      setShownIndex(session.currentIndex);
       cardShownAtRef.current = Date.now();
       // Новая карточка — на месте и лицевой стороной, без анимации переворота
       answeringRef.current = false;
@@ -318,6 +370,14 @@ export function StudyScreen({ navigation, route }: Props) {
     }
   }, [session?.currentIndex]);
 
+  // Новая карточка уже отрисована — проявляем её (после ответа она спрятана). Пауза в пару кадров:
+  // на старой архитектуре текст до экрана доходит позже, чем анимация стартует на UI-потоке
+  useEffect(() => {
+    const duration = reduceMotion ? 0 : CARD_IN_MS;
+    cardScale.value = withDelay(CARD_IN_DELAY_MS, withTiming(1, { duration }));
+    cardOpacity.value = withDelay(CARD_IN_DELAY_MS, withTiming(1, { duration }));
+  }, [shownIndex]);
+
   // Покачивание карточки — после сброса позиции в эффекте выше, поэтому объявлено ниже него
   useEffect(() => {
     if (!showSwipeHint || reduceMotion) return;
@@ -326,15 +386,23 @@ export function StudyScreen({ navigation, route }: Props) {
       withSequence(
         withTiming(-28, { duration: 220 }),
         withTiming(28, { duration: 320 }),
-        withTiming(0, { duration: 220 }),
-      ),
+        withTiming(0, { duration: 220 })
+      )
     );
   }, [showSwipeHint]);
 
   // Обработка оценки
   const handleRate = useCallback(
     async (rating: Rating, input: 'button' | 'swipe' = 'button') => {
-      if (!currentCard || answeringRef.current) return;
+      if (!currentCard || answeringRef.current) {
+        // Свайп не засчитан — карточку, спрятанную после вылета, возвращаем
+        if (input === 'swipe') {
+          swipeFlying.value = false;
+          cardScale.value = 1;
+          cardOpacity.value = withTiming(1, { duration: CARD_IN_MS });
+        }
+        return;
+      }
       if (input === 'button' && swipeFlying.value) return;
       answeringRef.current = true;
       triggerHaptic('selection');
@@ -346,10 +414,26 @@ export function StudyScreen({ navigation, route }: Props) {
       const isRepeat = Boolean(session) && session!.currentIndex >= baseQueueLengthRef.current;
       // «Почти» — слово ещё раз в конце сессии: один раз и только если после него есть другие слова
       const repeatLater =
-        rating === 3 && !isRepeat && Boolean(session) && session!.currentIndex + 1 < session!.queue.length;
+        rating === 3 &&
+        !isRepeat &&
+        Boolean(session) &&
+        session!.currentIndex + 1 < session!.queue.length;
+      // Сессия: ошибка — то же слово ещё раз в конце очереди, пока не ответят верно (и на повторе тоже)
+      const sessionRetry = Boolean(sessionRoute) && Boolean(session) && !isCorrect;
+      if (sessionRoute) {
+        const retryIds = sessionRetryIdsRef.current;
+        if (isCorrect) retryIds.delete(currentCard.id);
+        else retryIds.add(currentCard.id);
+        setSessionRetryCount(retryIds.size);
+      }
 
       // Analytics: card_answered
-      const ratingMap: Record<number, 'again' | 'hard' | 'good' | 'easy'> = { 1: 'again', 2: 'hard', 3: 'good', 4: 'easy' };
+      const ratingMap: Record<number, 'again' | 'hard' | 'good' | 'easy'> = {
+        1: 'again',
+        2: 'hard',
+        3: 'good',
+        4: 'easy',
+      };
       if (!isRepeat) {
         Analytics.cardAnswered({
           correct: isCorrect,
@@ -359,20 +443,26 @@ export function StudyScreen({ navigation, route }: Props) {
           input,
         });
       }
-      
+
       // Если ошибка, добавляем в список ошибочных карточек (с id для фаз)
       if (!isCorrect) {
-        setErrorCards(prev => [...prev, {
-          id: currentCard.id,
-          front: currentCard.frontText ?? (currentCard as any).front ?? '',
-          back: currentCard.backText ?? (currentCard as any).back ?? '',
-          rating,
-        }]);
+        setErrorCards((prev) => [
+          ...prev,
+          {
+            id: currentCard.id,
+            front: cardFront(currentCard),
+            back: cardBack(currentCard),
+            rating,
+          },
+        ]);
       }
 
       // Урок дня: считаем по состоянию карточки до ответа
-      const lessonPhase = lessonPhaseForAnswer(lesson?.part, currentCard);
-      if (lessonPhase && !isRepeat) useLessonStore.getState().recordAnswer(lessonPhase, currentCard.id);
+      const lessonPhase =
+        lessonPhaseForAnswer(lesson?.part, currentCard) ??
+        (sessionRoute ? sessionPhaseForAnswer(currentCard) : null);
+      if (lessonPhase && !isRepeat)
+        useLessonStore.getState().recordAnswer(lessonPhase, currentCard.id);
       // Самооценка: уровень считает сервер (очков рейтинга она не даёт — план §1.3), экран обновляется сразу
       ProgressService.recordAnswer(currentCard, {
         mode: 'flashcard',
@@ -386,6 +476,8 @@ export function StudyScreen({ navigation, route }: Props) {
         cardCount: statsSnapshot.total,
         newCount: statsSnapshot.newCount,
         learningCount: statsSnapshot.learningCount,
+        youngCount: statsSnapshot.youngCount,
+        matureCount: statsSnapshot.matureCount,
         reviewCount: statsSnapshot.reviewCount,
         masteredCount: statsSnapshot.masteredCount,
       });
@@ -396,15 +488,27 @@ export function StudyScreen({ navigation, route }: Props) {
       }
 
       // Переход к следующей карточке
-      if (session && session.currentIndex + 1 >= session.queue.length) {
+      if (session && session.currentIndex + 1 >= session.queue.length && !sessionRetry) {
         // Переходим на экран результатов
         const totalCards = baseQueueLengthRef.current;
-        const finalErrorCards = isCorrect ? errorCards : [...errorCards, {
-          id: currentCard.id,
-          front: currentCard.frontText ?? (currentCard as any).front ?? '',
-          back: currentCard.backText ?? (currentCard as any).back ?? '',
-          rating,
-        }];
+        let finalErrorCards = isCorrect
+          ? errorCards
+          : [
+              ...errorCards,
+              {
+                id: currentCard.id,
+                front: cardFront(currentCard),
+                back: cardBack(currentCard),
+                rating,
+              },
+            ];
+        // В сессии слово могли ошибиться несколько раз — в итогах считаем его один раз
+        if (sessionRoute) {
+          const seen = new Set<string>();
+          finalErrorCards = finalErrorCards.filter((c) =>
+            seen.has(c.id) ? false : (seen.add(c.id), true)
+          );
+        }
         const learnedCards = totalCards - finalErrorCards.length;
         const timeSpent = Math.floor((Date.now() - session.startedAt) / 1000);
         const errors = finalErrorCards.length;
@@ -415,8 +519,8 @@ export function StudyScreen({ navigation, route }: Props) {
         const resolveErrorId = (card: { id?: string; front: string; back: string }) => {
           if (card.id) return card.id;
           const match = queueCards.find((c) => {
-            const front = c.frontText ?? (c as any).front ?? '';
-            const back = c.backText ?? (c as any).back ?? '';
+            const front = cardFront(c);
+            const back = cardBack(c);
             return front === card.front && back === card.back;
           });
           return match?.id;
@@ -425,7 +529,7 @@ export function StudyScreen({ navigation, route }: Props) {
           ...card,
           id: resolveErrorId(card) ?? card.id,
         }));
-        
+
         // Обновляем прогресс фазы
         // Считаем сколько НОВЫХ карточек было в этой порции (не включая повторные ошибки)
         const newCardsInBatch = totalCards - pendingCardsInQueueRef.current;
@@ -456,20 +560,21 @@ export function StudyScreen({ navigation, route }: Props) {
             prevFailed.add(id);
           }
         });
-        const newPhaseFailedIds = Array.from(prevFailed);
-        
-        console.log('[StudyScreen] Завершение порции:', {
+        // Сессия: все ошибки исправлены в этой же очереди — этап пройден
+        const newPhaseFailedIds = sessionRoute ? [] : Array.from(prevFailed);
+
+        log.debug('Study', 'Завершение порции', {
           totalCards,
           newCardsInBatch,
           pendingCardsInQueue: pendingCardsInQueueRef.current,
           learnedCards,
           errors,
-          errorCardsWithIds: errorCardsWithIds.map(c => ({ id: c.id, front: c.front })),
+          errorCardsWithIds: errorCardsWithIds.map((c) => ({ id: c.id, front: c.front })),
           effectiveErrorIds,
           newPhaseFailedIds,
           newStudiedInPhase,
           newPhaseOffset,
-          phaseTotal
+          phaseTotal,
         });
 
         // Завершаем сессию и проверяем стрик
@@ -497,29 +602,45 @@ export function StudyScreen({ navigation, route }: Props) {
           streakIncreased: streakResult.streakIncreased,
           newStreakCount: streakResult.newStreakCount,
           lesson,
+          session: sessionRoute,
         });
       } else {
+        // Отвеченную карточку прячем до смены текста — следующую проявит эффект на shownIndex
+        cardOpacity.value = 0;
+        cardScale.value = 0.96;
         useStudyStore.setState((s) => ({
           ...s,
           session: s.session
             ? {
                 ...s.session,
                 currentIndex: s.session.currentIndex + 1,
-                // Повтор «Почти» — в конец очереди; знаменатель прогресса растёт, чтобы полоса не ушла за 100%
-                ...(repeatLater
-                  ? { queue: [...s.session.queue, currentCard.id], totalCards: s.session.totalCards + 1 }
+                // Повтор «Почти» и ошибка в сессии — в конец очереди; знаменатель прогресса растёт, чтобы полоса не ушла за 100%
+                ...(repeatLater || sessionRetry
+                  ? {
+                      queue: [...s.session.queue, currentCard.id],
+                      totalCards: s.session.totalCards + 1,
+                    }
                   : {}),
               }
             : null,
           isFlipped: false,
         }));
-        setCardVisible(false);
-        requestAnimationFrame(() => {
-          setTimeout(() => setCardVisible(true), 60);
-        });
       }
     },
-    [currentCard, incrementTodayCards, session, setId, updateSetStats, navigation, errorCards, studiedInPhase, phaseOffset, isErrorReview, lesson]
+    [
+      currentCard,
+      incrementTodayCards,
+      session,
+      setId,
+      updateSetStats,
+      navigation,
+      errorCards,
+      studiedInPhase,
+      phaseOffset,
+      isErrorReview,
+      lesson,
+      sessionRoute,
+    ]
   );
 
   const openSettings = useCallback(() => {
@@ -573,8 +694,9 @@ export function StudyScreen({ navigation, route }: Props) {
     }
     finishStudySession();
     endSession();
-    navigation.goBack();
-  }, [finishStudySession, endSession, navigation, session, setId]);
+    if (sessionRoute) navigation.navigate('SetDetail', { setId: sessionRoute.setId });
+    else navigation.goBack();
+  }, [finishStudySession, endSession, navigation, session, setId, sessionRoute]);
 
   // Сохраняем активность при уходе в background
   useEffect(() => {
@@ -620,14 +742,17 @@ export function StudyScreen({ navigation, route }: Props) {
 
   // Свайп влево — «Не знаю», вправо — «Уверенно»; работает на обеих сторонах (plan/done/card_rating.md).
   // Касание ловит Pressable карточки — протягивание его отменяет. На вебе только кнопки
-  const handleSwipe = useCallback((direction: number) => {
-    // Свайп освоен — подсказка больше не нужна
-    if (useSettingsStore.getState().settings.swipeHintsLeft > 0) {
-      updateSettings({ swipeHintsLeft: 0 });
-      DatabaseService.saveSettings();
-    }
-    handleRate(direction > 0 ? 4 : 1, 'swipe');
-  }, [handleRate, updateSettings]);
+  const handleSwipe = useCallback(
+    (direction: number) => {
+      // Свайп освоен — подсказка больше не нужна
+      if (useSettingsStore.getState().settings.swipeHintsLeft > 0) {
+        updateSettings({ swipeHintsLeft: 0 });
+        DatabaseService.saveSettings();
+      }
+      handleRate(direction > 0 ? 4 : 1, 'swipe');
+    },
+    [handleRate, updateSettings]
+  );
 
   const cardSwipeGesture = Gesture.Pan()
     .enabled(Platform.OS !== 'web' && !isSettingsOpen)
@@ -644,7 +769,9 @@ export function StudyScreen({ navigation, route }: Props) {
     })
     .onEnd((e) => {
       if (swipeFlying.value) return;
-      const flick = Math.abs(e.velocityX) > SWIPE_VELOCITY && Math.sign(e.velocityX) === Math.sign(e.translationX);
+      const flick =
+        Math.abs(e.velocityX) > SWIPE_VELOCITY &&
+        Math.sign(e.velocityX) === Math.sign(e.translationX);
       if (Math.abs(e.translationX) < SWIPE_DISTANCE && !flick) {
         swipeX.value = withSpring(0, { damping: 18, stiffness: 220 });
         swipePastThreshold.value = false;
@@ -652,20 +779,44 @@ export function StudyScreen({ navigation, route }: Props) {
       }
       const direction = e.translationX > 0 ? 1 : -1;
       swipeFlying.value = true;
-      swipeX.value = withTiming(direction * SCREEN_WIDTH * 1.2, { duration: SWIPE_OUT_MS }, (finished) => {
-        if (finished) runOnJS(handleSwipe)(direction);
-      });
+      swipeX.value = withTiming(
+        direction * SCREEN_WIDTH * 1.2,
+        { duration: SWIPE_OUT_MS },
+        (finished) => {
+          if (!finished) return;
+          // Улетела — прячем и возвращаем в центр лицом в одном кадре, пока на экране ещё её текст
+          cardOpacity.value = 0;
+          cardScale.value = 0.96;
+          swipeX.value = 0;
+          flipProgress.value = 0;
+          runOnJS(handleSwipe)(direction);
+        }
+      );
     });
 
   const swipeStyle = useAnimatedStyle(() => {
     'worklet';
-    const rotate = interpolate(swipeX.value, [-CARD_WIDTH, 0, CARD_WIDTH], [-12, 0, 12], Extrapolation.CLAMP);
-    return { transform: [{ translateX: swipeX.value }, { rotate: `${rotate}deg` }] };
+    const rotate = interpolate(
+      swipeX.value,
+      [-CARD_WIDTH, 0, CARD_WIDTH],
+      [-12, 0, 12],
+      Extrapolation.CLAMP
+    );
+    return {
+      opacity: cardOpacity.value,
+      transform: [
+        { translateX: swipeX.value },
+        { rotate: `${rotate}deg` },
+        { scale: cardScale.value },
+      ],
+    };
   });
   // Подписи свайпа проступают вместе со сдвигом и на пороге видны полностью
   const swipeLeftStyle = useAnimatedStyle(() => {
     'worklet';
-    return { opacity: interpolate(-swipeX.value, [0, SWIPE_DISTANCE], [0, 1], Extrapolation.CLAMP) };
+    return {
+      opacity: interpolate(-swipeX.value, [0, SWIPE_DISTANCE], [0, 1], Extrapolation.CLAMP),
+    };
   });
   const swipeRightStyle = useAnimatedStyle(() => {
     'worklet';
@@ -675,14 +826,17 @@ export function StudyScreen({ navigation, route }: Props) {
   // Заранее озвучиваем вопрос и ответ текущей и следующей карточки — кнопка динамика играет сразу
   useEffect(() => {
     if (!session) return;
-    const ids = [session.queue[session.currentIndex], session.queue[session.currentIndex + 1]].filter(Boolean);
+    const ids = [
+      session.queue[session.currentIndex],
+      session.queue[session.currentIndex + 1],
+    ].filter(Boolean);
     const items: Array<{ text: string; lang: string }> = [];
     for (const id of ids) {
       const card = useCardsStore.getState().cards[id];
-      if (!card) continue;
+      if (!card || !isCardSpeakable(card)) continue;
       const langs = cardSpeechLangs(card);
-      const front = (card.frontText ?? (card as any).front ?? '').trim();
-      const back = (card.backText ?? (card as any).back ?? '').trim();
+      const front = cardFront(card).trim();
+      const back = cardBack(card).trim();
       if (front) items.push({ text: front, lang: resolveSpeechLang(front, langs.front, back) });
       if (back) items.push({ text: back, lang: resolveSpeechLang(back, langs.back, front) });
     }
@@ -694,14 +848,19 @@ export function StudyScreen({ navigation, route }: Props) {
     return <Loading fullScreen message="Подготовка карточек..." />;
   }
 
-  const baseFront = currentCard.frontText ?? (currentCard as any).front ?? '';
-  const baseBack = currentCard.backText ?? (currentCard as any).back ?? '';
+  const baseFront = cardFront(currentCard);
+  const baseBack = cardBack(currentCard);
   const example = (currentCard as any).example ?? '';
 
   const questionText = reverseEnabled ? baseBack : baseFront;
   const answerText = reverseEnabled ? baseFront : baseBack;
   // Длинный текст — шрифт мельче, чтобы не выходил за карточку
-  const questionFit = fitText(questionText, { width: textBox.width, height: textBox.front, weight: 'bold', ...WORD_FIT });
+  const questionFit = fitText(questionText, {
+    width: textBox.width,
+    height: textBox.front,
+    weight: 'bold',
+    ...WORD_FIT,
+  });
   const answerFit = fitWordWithExample(answerText, example, {
     width: textBox.width,
     height: textBox.back,
@@ -712,11 +871,14 @@ export function StudyScreen({ navigation, route }: Props) {
   const measureTextBox = (side: 'front' | 'back') => (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     const sideHeight = height - spacing.xxs;
-    setTextBox((box) => (box.width === width && box[side] === sideHeight ? box : { ...box, width, [side]: sideHeight }));
+    setTextBox((box) =>
+      box.width === width && box[side] === sideHeight ? box : { ...box, width, [side]: sideHeight }
+    );
   };
   const { front: frontLang, back: backLang } = cardSpeechLangs(currentCard);
   const questionLang = reverseEnabled ? backLang : frontLang;
   const answerLang = reverseEnabled ? frontLang : backLang;
+  const canSpeak = isCardSpeakable(currentCard);
 
   // Кнопки оценки: цвета оценок SRS, текст — «текстовые» токены; «Уверенно» — главная кнопка.
   // Оценки 2 («Сомневаюсь») больше нет, сервер её по-прежнему принимает от старых версий (plan/done/card_rating.md)
@@ -729,362 +891,129 @@ export function StudyScreen({ navigation, route }: Props) {
   const renderCardTop = (onSpeak: () => void) => (
     <View style={styles.cardTopRow}>
       <View style={styles.statusPlaceholder}>
-        {isCurrentMastered ? (
-          <View
-            accessible
-            accessibilityLabel="Выучено"
-            style={[styles.masteredBadge, { backgroundColor: alpha(colors.success, 10), borderColor: alpha(colors.success, 40) }]}
-          >
-            <Check size={iconSize.xs} color={colors.successText} />
-          </View>
-        ) : null}
+        {/* Статус слова — тот же кружок, что в наборе; у нового слова пусто */}
+        {currentStatus !== 'new' ? <StatusBadge status={currentStatus} /> : null}
       </View>
-      <Pressable
-        style={({ pressed }) => [styles.audioButton, { backgroundColor: pressed ? alpha(colors.primary, 20) : colors.surfaceMuted }]}
-        hitSlop={spacing.xxs}
-        accessibilityRole="button"
-        accessibilityLabel="Прослушать"
-        onPress={(e) => { e.stopPropagation(); triggerHaptic('selection'); onSpeak(); }}
-      >
-        <Volume2 size={iconSize.s} color={colors.primary} />
-      </Pressable>
+      {canSpeak ? (
+        <Pressable
+          style={({ pressed }) => [
+            styles.audioButton,
+            { backgroundColor: pressed ? alpha(colors.primary, 20) : colors.surfaceMuted },
+          ]}
+          hitSlop={spacing.xxs}
+          accessibilityRole="button"
+          accessibilityLabel="Прослушать"
+          onPress={(e) => {
+            e.stopPropagation();
+            triggerHaptic('selection');
+            onSpeak();
+          }}
+        >
+          <Volume2 size={iconSize.s} color={colors.primary} />
+        </Pressable>
+      ) : null}
     </View>
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScreenHeader
-        title="Карточки"
-        onBack={handleFinish}
-        right={<Button variant="icon" icon={Settings} accessibilityLabel="Настройки" onPress={openSettings} />}
-      />
-
-      {/* Прогресс бар */}
-      <View style={styles.progressSection}>
-        <Text variant="bodySmall" style={[styles.semibold, { color: colors.textSecondary }]}>
-          {progress.current}/{progress.total}
-        </Text>
-        <ProgressBar progress={progress.percentage} accessibilityLabel="Прогресс" />
-      </View>
-
+    <StageLayout
+      session={sessionRoute}
+      progress={
+        sessionRoute
+          ? // Повтор «Почти» в конце очереди не двигает полоску этапа: считаем только основную очередь
+            sessionStageProgress(
+              studiedInPhase,
+              Math.min(Math.max(0, progress.current - 1), baseQueueLengthRef.current),
+              sessionRetryCount,
+              currentTotalPhaseCards.current || baseQueueLengthRef.current
+            )
+          : { done: Math.max(0, progress.current - 1), total: progress.total }
+      }
+      task="Вспомни перевод"
+      taskAction={
+        <Button
+          variant="icon"
+          icon={Settings}
+          iconSize={iconSize.s}
+          iconColor={colors.textSecondary}
+          accessibilityLabel="Настройки"
+          onPress={openSettings}
+        />
+      }
+      onExit={handleFinish}
+      showIntro={phaseOffset === 0 && !phaseFailedIds?.length}
+      scroll={false}
+      footer={
+        <View>
+          <Text
+            variant="bodySmall"
+            align="center"
+            style={[styles.rateHint, { color: colors.textSecondary }]}
+          >
+            Оцени, насколько уверенно знаешь
+          </Text>
+          <View style={styles.ratingGrid}>
+            {ratingOptions.map(({ rating, label, bg, text }) => (
+              <Pressable
+                key={rating}
+                onPress={() => handleRate(rating)}
+                accessibilityRole="button"
+                accessibilityLabel={label}
+                style={({ pressed }) => [
+                  styles.ratingButton,
+                  { backgroundColor: bg },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text variant="label" numberOfLines={1} style={{ color: text }}>
+                  {label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      }
+    >
       {/* Основной контент */}
       <View style={styles.mainContent}>
         {/* Флеш-карточка */}
         <GestureDetector gesture={cardSwipeGesture}>
           <ReAnimated.View style={swipeStyle}>
-            <Pressable
-              onPress={handleToggleCard}
-              accessibilityRole="button"
-              accessibilityLabel={isFlipped ? `Ответ: ${answerText}. Нажми, чтобы перевернуть` : `${questionText}. Нажми, чтобы перевернуть`}
-              style={[
-                styles.cardWrapper,
-                { opacity: cardVisible ? 1 : 0 },
-              ]}
-            >
-              {/* Передняя сторона (вопрос) */}
-              <ReAnimated.View style={[styles.cardAnim, frontAnimStyle]} pointerEvents={isFlipped ? 'none' : 'auto'}>
-                <View style={[styles.cardInner, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  {renderCardTop(() => handleSpeak(questionText, questionLang, answerText))}
-
-                  <View style={styles.cardContent} onLayout={measureTextBox('front')}>
-                    <Text
-                      variant="h2"
-                      numberOfLines={questionFit.numberOfLines}
-                      style={[styles.cardWord, { color: colors.textPrimary, fontSize: questionFit.fontSize, lineHeight: questionFit.lineHeight }]}
-                    >
-                      {questionText}
-                    </Text>
-                  </View>
-
-                  <View style={styles.cardBottom}>
-                    <Text variant="bodySmall" align="center" style={{ color: colors.textSecondary }}>
-                      {showSwipeHint && session?.currentIndex === 0 ? '← Не знаю · Уверенно →' : 'Нажми, чтобы перевернуть'}
-                    </Text>
-                  </View>
-                </View>
-              </ReAnimated.View>
-
-              {/* Задняя сторона (ответ) */}
-              <ReAnimated.View style={[styles.cardAnim, backAnimStyle]} pointerEvents={isFlipped ? 'auto' : 'none'}>
-                <View style={[styles.cardInner, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  {renderCardTop(() => handleSpeak(answerText, answerLang, questionText))}
-
-                  <View style={styles.cardContent} onLayout={measureTextBox('back')}>
-                    <Text
-                      variant="h2"
-                      numberOfLines={answerFit.word.numberOfLines}
-                      style={[styles.cardWord, { color: colors.textPrimary, fontSize: answerFit.word.fontSize, lineHeight: answerFit.word.lineHeight }]}
-                    >
-                      {answerText}
-                    </Text>
-                    <View style={[styles.divider, { backgroundColor: colors.border }]} />
-                    {example ? (
-                      <Text
-                        variant="bodyLarge"
-                        align="center"
-                        numberOfLines={answerFit.example.numberOfLines}
-                        style={{ color: colors.textSecondary, fontSize: answerFit.example.fontSize, lineHeight: answerFit.example.lineHeight }}
-                      >
-                        {example}
-                      </Text>
-                    ) : null}
-                  </View>
-
-                  <View style={styles.cardBottom} />
-                </View>
-              </ReAnimated.View>
-
-              {/* Подписи свайпа: влево — «Не знаю», вправо — «Уверенно» */}
-              <ReAnimated.View
-                pointerEvents="none"
-                style={[styles.swipeOverlay, { borderColor: colors.ratingAgain, backgroundColor: alpha(colors.ratingAgain, 10) }, swipeLeftStyle]}
-              >
-                <View style={[styles.swipeLabel, { borderColor: colors.ratingAgain, backgroundColor: colors.surface }]}>
-                  <Text variant="label" style={{ color: colors.errorText }}>Не знаю</Text>
-                </View>
-              </ReAnimated.View>
-              <ReAnimated.View
-                pointerEvents="none"
-                style={[styles.swipeOverlay, { borderColor: colors.ratingGood, backgroundColor: alpha(colors.ratingGood, 10) }, swipeRightStyle]}
-              >
-                <View style={[styles.swipeLabel, { borderColor: colors.ratingGood, backgroundColor: colors.surface }]}>
-                  <Text variant="label" style={{ color: colors.successText }}>Уверенно</Text>
-                </View>
-              </ReAnimated.View>
-            </Pressable>
+            <FlashcardFace
+              colors={colors}
+              session={session}
+              isFlipped={isFlipped}
+              handleToggleCard={handleToggleCard}
+              handleSpeak={handleSpeak}
+              renderCardTop={renderCardTop}
+              measureTextBox={measureTextBox}
+              questionText={questionText}
+              answerText={answerText}
+              example={example}
+              questionLang={questionLang}
+              answerLang={answerLang}
+              questionFit={questionFit}
+              answerFit={answerFit}
+              frontAnimStyle={frontAnimStyle}
+              backAnimStyle={backAnimStyle}
+              swipeLeftStyle={swipeLeftStyle}
+              swipeRightStyle={swipeRightStyle}
+              showSwipeHint={showSwipeHint}
+            />
           </ReAnimated.View>
         </GestureDetector>
       </View>
 
-      <Modal
-        visible={isSettingsOpen}
-        transparent
-        animationType="none"
-        statusBarTranslucent
-        onRequestClose={closeSettings}
-      >
-        <View style={styles.modalRoot}>
-          <Pressable accessibilityRole="button" style={styles.backdrop} onPress={closeSettings} accessibilityLabel="Закрыть настройки">
-            <Animated.View
-              pointerEvents="none"
-              style={[styles.backdropTint, { opacity: backdropOpacity, backgroundColor: colors.overlay }]}
-            />
-          </Pressable>
-
-          {/* Панель настроек выезжает сверху (формат прежний) */}
-          <Animated.View
-            style={[
-              styles.settingsSheet,
-              {
-                top: insets.top + spacing.m,
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                transform: [{ translateY: sheetTranslate }],
-              },
-            ]}
-          >
-            <View style={styles.settingsRow}>
-              <View style={[styles.settingsIconWrap, { backgroundColor: alpha(colors.primary, 10) }]}>
-                <Settings size={iconSize.s} color={colors.primary} />
-              </View>
-              <View style={styles.settingsTexts}>
-                <Text variant="body" style={[styles.semibold, { color: colors.textPrimary }]}>Реверс карточек</Text>
-                <Text variant="caption" style={{ color: colors.textSecondary }}>
-                  Сначала показывать обратную сторону
-                </Text>
-              </View>
-              <Switch value={reverseEnabled} onValueChange={handleToggleReverse} accessibilityLabel="Реверс карточек" />
-            </View>
-          </Animated.View>
-        </View>
-      </Modal>
-
-      {/* Нижняя панель SRS - всегда доступна */}
-      <View style={[styles.bottomPanel, { backgroundColor: colors.background }]}>
-        <Text variant="bodySmall" align="center" style={[styles.rateHint, { color: colors.textSecondary }]}>
-          Оцени, насколько уверенно знаешь
-        </Text>
-        <View style={styles.ratingGrid}>
-          {ratingOptions.map(({ rating, label, bg, text }) => (
-            <Pressable
-              key={rating}
-              onPress={() => handleRate(rating)}
-              accessibilityRole="button"
-              accessibilityLabel={label}
-              style={({ pressed }) => [styles.ratingButton, { backgroundColor: bg }, pressed && styles.pressed]}
-            >
-              <Text variant="label" numberOfLines={1} style={{ color: text }}>{label}</Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-    </View>
+      <StudySettingsModal
+        colors={colors}
+        isSettingsOpen={isSettingsOpen}
+        closeSettings={closeSettings}
+        backdropOpacity={backdropOpacity}
+        sheetTranslate={sheetTranslate}
+        insets={insets}
+        reverseEnabled={reverseEnabled}
+        handleToggleReverse={handleToggleReverse}
+      />
+    </StageLayout>
   );
 }
-
-// ==================== СТИЛИ ====================
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  semibold: {
-    fontWeight: '600',
-  },
-  pressed: {
-    opacity: 0.85,
-  },
-
-  // Progress
-  progressSection: {
-    paddingHorizontal: spacing.l,
-    paddingVertical: spacing.xs,
-    gap: spacing.xs,
-  },
-
-  // Main content
-  mainContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: screenPadding,
-  },
-
-  // Card
-  cardWrapper: {
-    width: CARD_WIDTH,
-    height: Math.min(CARD_HEIGHT, 420),
-    position: 'relative',
-  },
-  cardAnim: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-  },
-  cardInner: {
-    flex: 1,
-    borderRadius: borderRadius.xl,
-    borderWidth: 1,
-    padding: spacing.l,
-    // Без overflow:'hidden': фон и рамка сами скругляются через borderRadius,
-    // а маска слоя (masksToBounds) в связке с 3D-трансформом на iOS
-    // рендерится offscreen и может срезать верх глифов.
-  },
-  // Подпись свайпа поверх карточки: рамка и лёгкая заливка цветом оценки, плашка сверху
-  swipeOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: borderRadius.xl,
-    borderWidth: 2,
-    alignItems: 'center',
-    paddingTop: spacing.l,
-  },
-  swipeLabel: {
-    borderWidth: 2,
-    borderRadius: borderRadius.full,
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.xxs,
-  },
-  cardTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  statusPlaceholder: {
-    width: 40,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-  },
-  masteredBadge: {
-    borderWidth: 1,
-    borderRadius: borderRadius.full,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: spacing.xxs,
-  },
-  audioButton: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cardContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: spacing.m,
-  },
-  cardWord: {
-    textAlign: 'center',
-    // Высота строки ×1.5 и отступ сверху: запас под умлауты и диакритику
-    // над заглавными (Ä, Ö, Ü, É), иначе iOS срезает их по рамке Text
-    lineHeight: 36,
-    paddingTop: spacing.xxs,
-  },
-  divider: {
-    width: 48,
-    height: 2,
-    borderRadius: borderRadius.full,
-  },
-  cardBottom: {
-    paddingTop: spacing.l,
-  },
-
-  // Bottom panel
-  bottomPanel: {
-    paddingHorizontal: screenPadding,
-    paddingBottom: spacing.l,
-    paddingTop: spacing.xs,
-  },
-  rateHint: {
-    marginBottom: spacing.s,
-  },
-  ratingGrid: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-    maxWidth: 448,
-    alignSelf: 'center',
-    width: '100%',
-  },
-  ratingButton: {
-    flex: 1,
-    height: heights.button,
-    borderRadius: borderRadius.m,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xxs,
-  },
-  modalRoot: {
-    flex: 1,
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  backdropTint: {
-    flex: 1,
-  },
-  // Без тени — панель отделяет затемнение
-  settingsSheet: {
-    position: 'absolute',
-    left: screenPadding,
-    right: screenPadding,
-    padding: spacing.m,
-    borderRadius: borderRadius.l,
-    borderWidth: 1,
-  },
-  settingsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.s,
-  },
-  settingsIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: borderRadius.m,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  settingsTexts: {
-    flex: 1,
-  },
-});

@@ -12,20 +12,40 @@ import {
   Linking,
   Platform,
 } from 'react-native';
-import { Bell, BellOff, BookOpen, ChevronDown, ChevronUp, Flame, Trophy, Users } from 'lucide-react-native';
+import {
+  Bell,
+  BellOff,
+  BookOpen,
+  ChevronDown,
+  ChevronUp,
+  Flame,
+  Trophy,
+  Users,
+} from 'lucide-react-native';
 import { useThemeColors } from '@/store';
 import { Text } from '@/components/common';
 import { spacing, borderRadius, alpha, iconSize } from '@/constants';
-import { Button, Card, ListGroup, ListRow, Screen, ScreenHeader, Switch, toast } from '@/components/ui';
+import {
+  Button,
+  Card,
+  ListGroup,
+  ListRow,
+  Screen,
+  ScreenHeader,
+  Switch,
+  toast,
+} from '@/components/ui';
 import {
   requestPushPermission,
   unsubscribePush,
   getPushStatus,
   type PushStatus,
 } from '@/services/pushNotifications';
-import { supabase } from '@/services';
-import { API_BASE } from '@/config/apiBase';
 import { Analytics } from '@/services/analytics';
+import { log } from '@/utils/logger';
+import { getAccessToken, getSession } from '@/services/auth/session';
+import { rawApiFetch } from '@/services/api/client';
+import type { RootStackScreenProps } from '@/types/navigation';
 
 /** «Что присылать» (plan/new/push_notifications.md, 2.4) — ключи как SETTING_GROUPS в api/push/_decide.js */
 type PushGroup = 'lesson' | 'streak' | 'course' | 'rating';
@@ -35,14 +55,20 @@ const PUSH_GROUPS: { key: PushGroup; title: string; hint: string }[] = [
   { key: 'course', title: 'Курс и учитель', hint: 'Учитель просит повторить' },
   { key: 'rating', title: 'Рейтинг', hint: 'Место в рейтинге курса, итоги недели' },
 ];
-const PUSH_GROUP_ICONS = { lesson: BookOpen, streak: Flame, course: Users, rating: Trophy } as const;
+const PUSH_GROUP_ICONS = {
+  lesson: BookOpen,
+  streak: Flame,
+  course: Users,
+  rating: Trophy,
+} as const;
 
 // Сервер проверяет напоминания каждые 15 минут и шлёт их только с 8:00 до 21:45 (api/push.js, cron-reminders)
 const MIN_HOUR = 8;
 const MAX_HOUR = 21;
 const MINUTE_STEP = 15;
 const clampHour = (h: number) => Math.min(MAX_HOUR, Math.max(MIN_HOUR, h));
-const clampMinute = (m: number) => Math.min(60 - MINUTE_STEP, Math.max(0, Math.floor(m / MINUTE_STEP) * MINUTE_STEP));
+const clampMinute = (m: number) =>
+  Math.min(60 - MINUTE_STEP, Math.max(0, Math.floor(m / MINUTE_STEP) * MINUTE_STEP));
 
 const DAYS = [
   { key: 'mon', label: 'Пн' },
@@ -54,7 +80,9 @@ const DAYS = [
   { key: 'sun', label: 'Вс' },
 ] as const;
 
-export function NotificationSettingsScreen({ navigation }: any) {
+export function NotificationSettingsScreen({
+  navigation,
+}: RootStackScreenProps<'NotificationSettings'>) {
   const colors = useThemeColors();
 
   // ---- State ----
@@ -65,7 +93,13 @@ export function NotificationSettingsScreen({ navigation }: any) {
   const [loadedTime, setLoadedTime] = useState<string | null>(null);
   // По умолчанию все дни; фильтр по дням сервер применяет, только если их выбрали здесь (Push 0.6)
   const [selectedDays, setSelectedDays] = useState<Record<string, boolean>>({
-    mon: true, tue: true, wed: true, thu: true, fri: true, sat: true, sun: true,
+    mon: true,
+    tue: true,
+    wed: true,
+    thu: true,
+    fri: true,
+    sat: true,
+    sun: true,
   });
   // Выключенные переключатели; loadedOff — как было при открытии, чтобы отметить новые выключения в аналитике
   const [groupsOff, setGroupsOff] = useState<PushGroup[]>([]);
@@ -87,12 +121,12 @@ export function NotificationSettingsScreen({ navigation }: any) {
 
   useEffect(() => {
     getPushStatus().then(setPushStatus);
-    supabase.auth.getSession().then(({ data }) => {
-      const uid = data.session?.user?.id;
-      const token = data.session?.access_token;
+    getSession().then((authSession) => {
+      const uid = authSession?.user?.id;
+      const token = authSession?.access_token;
       setUserId(uid);
       if (uid && token) {
-        fetch(`${API_BASE}/push?action=settings`, { headers: { Authorization: `Bearer ${token}` } })
+        rawApiFetch('push?action=settings', { headers: { Authorization: `Bearer ${token}` } })
           .then((r) => r.json())
           .then((d) => {
             setReminderEnabled(d.notifEnabled ?? true);
@@ -101,7 +135,9 @@ export function NotificationSettingsScreen({ navigation }: any) {
             setLoadedTime(`${clampHour(d.notifHour ?? 19)}:${clampMinute(d.notifMinute ?? 0)}`);
             const off: PushGroup[] = Array.isArray(d.notifCategoriesOff)
               ? d.notifCategoriesOff
-              : d.notifStreak === false ? ['streak'] : [];
+              : d.notifStreak === false
+                ? ['streak']
+                : [];
             setGroupsOff(off);
             setLoadedOff(off);
             if (d.notifDays) {
@@ -136,7 +172,7 @@ export function NotificationSettingsScreen({ navigation }: any) {
         setPushStatus(status);
       }
     } catch (error) {
-      console.error('[NotificationSettings] Push toggle error:', error);
+      log.error('NotificationSettings', 'Push toggle error', error);
     } finally {
       setPushLoading(false);
     }
@@ -157,13 +193,12 @@ export function NotificationSettingsScreen({ navigation }: any) {
     if (!userId || saving) return;
     setSaving(true);
     try {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
+      const token = await getAccessToken();
       if (!token) throw new Error('No session');
-      const res = await fetch(`${API_BASE}/push?action=settings`, {
+      const res = await rawApiFetch('push?action=settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
+        body: {
           notifEnabled: reminderEnabled,
           notifHour: hours,
           notifMinute: minutes,
@@ -174,13 +209,14 @@ export function NotificationSettingsScreen({ navigation }: any) {
           notifDaysExplicit: true,
           notifStreak: !groupsOff.includes('streak'),
           notifCategoriesOff: groupsOff,
-        }),
+        },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      for (const group of groupsOff) if (!loadedOff.includes(group)) Analytics.pushCategoryDisabled(group);
+      for (const group of groupsOff)
+        if (!loadedOff.includes(group)) Analytics.pushCategoryDisabled(group);
       navigation.goBack();
     } catch (e) {
-      console.error('[NotificationSettings] Save error:', e);
+      log.error('NotificationSettings', 'Save error', e);
       toast.error('Не удалось сохранить настройки. Проверь интернет и попробуй ещё раз');
     } finally {
       setSaving(false);
@@ -196,14 +232,24 @@ export function NotificationSettingsScreen({ navigation }: any) {
     >
       {/* ======== Learning Reminder ======== */}
       <View style={st.sectionHeader}>
-        <Text variant="h3" accessibilityRole="header" style={{ color: colors.textPrimary }}>Напоминание об учёбе</Text>
-        <Switch value={reminderEnabled} onValueChange={setReminderEnabled} accessibilityLabel="Напоминание об учёбе" />
+        <Text variant="h3" accessibilityRole="header" style={{ color: colors.textPrimary }}>
+          Напоминание об учёбе
+        </Text>
+        <Switch
+          value={reminderEnabled}
+          onValueChange={setReminderEnabled}
+          accessibilityLabel="Напоминание об учёбе"
+        />
       </View>
 
       {/* Time Picker */}
       <Card tone="muted" style={st.card}>
-        <Text variant="label" color="secondary">Время ежедневного напоминания</Text>
-        <Text variant="caption" color="secondary" style={st.cardHint}>Напоминания приходят с 8:00 до 21:45</Text>
+        <Text variant="label" color="secondary">
+          Время ежедневного напоминания
+        </Text>
+        <Text variant="caption" color="secondary" style={st.cardHint}>
+          Напоминания приходят с 8:00 до 21:45
+        </Text>
         <View style={st.timeRow}>
           <View style={st.timeCol}>
             <Button
@@ -217,9 +263,14 @@ export function NotificationSettingsScreen({ navigation }: any) {
             <View
               accessible
               accessibilityLabel={`Час напоминания: ${hours}`}
-              style={[st.timeBox, { backgroundColor: colors.surface, borderColor: alpha(colors.primary, 20) }]}
+              style={[
+                st.timeBox,
+                { backgroundColor: colors.surface, borderColor: alpha(colors.primary, 20) },
+              ]}
             >
-              <Text variant="h1" style={{ color: colors.primary }}>{pad(hours)}</Text>
+              <Text variant="h1" style={{ color: colors.primary }}>
+                {pad(hours)}
+              </Text>
             </View>
             <Button
               variant="icon"
@@ -231,7 +282,9 @@ export function NotificationSettingsScreen({ navigation }: any) {
             />
           </View>
 
-          <Text variant="h1" style={{ color: colors.textTertiary }}>:</Text>
+          <Text variant="h1" style={{ color: colors.textTertiary }}>
+            :
+          </Text>
 
           <View style={st.timeCol}>
             <Button
@@ -245,9 +298,14 @@ export function NotificationSettingsScreen({ navigation }: any) {
             <View
               accessible
               accessibilityLabel={`Минуты напоминания: ${pad(minutes)}`}
-              style={[st.timeBox, { backgroundColor: colors.surface, borderColor: alpha(colors.primary, 20) }]}
+              style={[
+                st.timeBox,
+                { backgroundColor: colors.surface, borderColor: alpha(colors.primary, 20) },
+              ]}
             >
-              <Text variant="h1" style={{ color: colors.primary }}>{pad(minutes)}</Text>
+              <Text variant="h1" style={{ color: colors.primary }}>
+                {pad(minutes)}
+              </Text>
             </View>
             <Button
               variant="icon"
@@ -263,20 +321,29 @@ export function NotificationSettingsScreen({ navigation }: any) {
 
       {/* Day Selector */}
       <Card tone="muted" style={st.card}>
-        <Text variant="label" color="secondary" style={st.daysLabel}>Повторять</Text>
+        <Text variant="label" color="secondary" style={st.daysLabel}>
+          Повторять
+        </Text>
         <View style={st.daysRow}>
           {DAYS.map((day) => {
             const active = selectedDays[day.key];
             return (
-              <Pressable hitSlop={spacing.xxs}
+              <Pressable
+                hitSlop={spacing.xxs}
                 key={day.key}
                 onPress={() => toggleDay(day.key)}
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: active }}
                 accessibilityLabel={day.label}
-                style={[st.dayBtn, { backgroundColor: active ? colors.primaryFill : colors.surfaceVariant }]}
+                style={[
+                  st.dayBtn,
+                  { backgroundColor: active ? colors.primaryFill : colors.surfaceVariant },
+                ]}
               >
-                <Text variant="caption" style={[st.bold, { color: active ? colors.onPrimary : colors.textSecondary }]}>
+                <Text
+                  variant="caption"
+                  style={[st.bold, { color: active ? colors.onPrimary : colors.textSecondary }]}
+                >
                   {day.label}
                 </Text>
               </Pressable>
@@ -291,13 +358,21 @@ export function NotificationSettingsScreen({ navigation }: any) {
           <View style={st.deniedHeader}>
             <BellOff size={iconSize.s} color={colors.textSecondary} />
             <View style={st.deniedText}>
-              <Text variant="body" style={[st.bold, { color: colors.textPrimary }]}>Уведомления выключены в настройках iPhone</Text>
+              <Text variant="body" style={[st.bold, { color: colors.textPrimary }]}>
+                Уведомления выключены в настройках iPhone
+              </Text>
               <Text variant="bodySmall" color="secondary">
-                Пока они выключены, напоминания не придут. Открой настройки и включи «Разрешить уведомления».
+                Пока они выключены, напоминания не придут. Открой настройки и включи «Разрешить
+                уведомления».
               </Text>
             </View>
           </View>
-          <Button title="Открыть настройки iPhone" variant="secondary" size="s" onPress={() => Linking.openSettings().catch(() => {})} />
+          <Button
+            title="Открыть настройки iPhone"
+            variant="secondary"
+            size="s"
+            onPress={() => Linking.openSettings().catch(() => {})}
+          />
         </Card>
       )}
 
@@ -333,7 +408,11 @@ export function NotificationSettingsScreen({ navigation }: any) {
             right={
               <Switch
                 value={!groupsOff.includes(group.key)}
-                onValueChange={(on) => setGroupsOff((prev) => (on ? prev.filter((g) => g !== group.key) : [...prev, group.key]))}
+                onValueChange={(on) =>
+                  setGroupsOff((prev) =>
+                    on ? prev.filter((g) => g !== group.key) : [...prev, group.key]
+                  )
+                }
                 accessibilityLabel={group.title}
               />
             }
@@ -342,7 +421,12 @@ export function NotificationSettingsScreen({ navigation }: any) {
       </ListGroup>
 
       {/* ======== Save Button ======== */}
-      <Button title={saving ? 'Сохранение...' : 'Сохранить настройки'} onPress={handleSave} disabled={saving} fullWidth />
+      <Button
+        title={saving ? 'Сохранение...' : 'Сохранить настройки'}
+        onPress={handleSave}
+        disabled={saving}
+        fullWidth
+      />
     </Screen>
   );
 }

@@ -47,7 +47,15 @@ import {
 } from 'lucide-react-native';
 import { useThemeColors } from '@/store';
 import { Text } from '@/components/common/Text';
-import { spacing, borderRadius, heights, iconSize, typography, alpha, getDeckAccentColor } from '@/constants';
+import {
+  spacing,
+  borderRadius,
+  heights,
+  iconSize,
+  typography,
+  alpha,
+  getDeckAccentColor,
+} from '@/constants';
 import { triggerHaptic } from '@/utils/haptic';
 import { pluralize } from '@/utils';
 import type { Course } from '@/types';
@@ -109,7 +117,12 @@ const CurtainButton = memo(function CurtainButton({
 }) {
   const style = useAnimatedStyle(() => {
     const start = 0.2 + index * 0.12;
-    const t = interpolate(progress.value, [start, Math.min(1, start + 0.45)], [0, 1], Extrapolation.CLAMP);
+    const t = interpolate(
+      progress.value,
+      [start, Math.min(1, start + 0.45)],
+      [0, 1],
+      Extrapolation.CLAMP
+    );
     return {
       opacity: t,
       transform: [{ translateY: (1 - t) * -10 }, { scale: 0.94 + t * 0.06 }],
@@ -118,7 +131,11 @@ const CurtainButton = memo(function CurtainButton({
   return (
     <Animated.View style={[styles.curtainButtonWrap, style]}>
       <Pressable
-        style={({ pressed }) => [styles.curtainButton, { backgroundColor: action.tint }, pressed && styles.pressed]}
+        style={({ pressed }) => [
+          styles.curtainButton,
+          { backgroundColor: action.tint },
+          pressed && styles.pressed,
+        ]}
         onPress={(e) => {
           e.stopPropagation();
           triggerHaptic('selection');
@@ -128,7 +145,11 @@ const CurtainButton = memo(function CurtainButton({
         accessibilityLabel={action.label}
       >
         {action.icon}
-        <Text variant="caption" style={[styles.semibold, { color: action.color }]} numberOfLines={1}>
+        <Text
+          variant="caption"
+          style={[styles.semibold, { color: action.color }]}
+          numberOfLines={1}
+        >
           {action.label}
         </Text>
       </Pressable>
@@ -210,7 +231,10 @@ const CourseRow = memo(function CourseRow({
   // Три точки поворачиваются, пока шторка открыта
   const dotsRotation = useSharedValue(isMenuOpen ? 1 : 0);
   useEffect(() => {
-    dotsRotation.value = withTiming(isMenuOpen ? 1 : 0, { duration: 260, easing: Easing.out(Easing.cubic) });
+    dotsRotation.value = withTiming(isMenuOpen ? 1 : 0, {
+      duration: 260,
+      easing: Easing.out(Easing.cubic),
+    });
   }, [isMenuOpen, dotsRotation]);
   const dotsStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${dotsRotation.value * 90}deg` }],
@@ -220,26 +244,42 @@ const CourseRow = memo(function CourseRow({
   const neutralTint = colors.surfaceMuted;
   const primaryTint = alpha(colors.primary, 10);
   const actions: CurtainAction[] = isStudent
-    ? [{
-        key: 'leave', label: 'Выйти из курса', color: colors.errorText, tint: dangerTint,
-        icon: <LogOut size={iconSize.s} color={colors.errorText} />,
-        onPress: () => onOpenLeaveModal(course.id),
-      }]
+    ? [
+        {
+          key: 'leave',
+          label: 'Выйти из курса',
+          color: colors.errorText,
+          tint: dangerTint,
+          icon: <LogOut size={iconSize.s} color={colors.errorText} />,
+          onPress: () => onOpenLeaveModal(course.id),
+        },
+      ]
     : [
         ...(isTeacher
-          ? [{
-              key: 'invite', label: 'Пригласить', color: colors.primary, tint: primaryTint,
-              icon: <UserPlus size={iconSize.s} color={colors.primary} />,
-              onPress: () => onOpenInvite(course.id),
-            }]
+          ? [
+              {
+                key: 'invite',
+                label: 'Пригласить',
+                color: colors.primary,
+                tint: primaryTint,
+                icon: <UserPlus size={iconSize.s} color={colors.primary} />,
+                onPress: () => onOpenInvite(course.id),
+              },
+            ]
           : []),
         {
-          key: 'rename', label: 'Переименовать', color: colors.textPrimary, tint: neutralTint,
+          key: 'rename',
+          label: 'Переименовать',
+          color: colors.textPrimary,
+          tint: neutralTint,
           icon: <Edit2 size={iconSize.s} color={colors.textPrimary} />,
           onPress: () => onOpenEditModal(course.id, course.title),
         },
         {
-          key: 'delete', label: 'Удалить', color: colors.errorText, tint: dangerTint,
+          key: 'delete',
+          label: 'Удалить',
+          color: colors.errorText,
+          tint: dangerTint,
           icon: <Trash2 size={iconSize.s} color={colors.errorText} />,
           onPress: () => onOpenDeleteModal(course.id),
         },
@@ -259,7 +299,9 @@ const CourseRow = memo(function CourseRow({
       // В режиме переименования поле и кнопки внутри должны быть доступны VoiceOver —
       // пункт перестаёт быть одной кнопкой. Иначе меню курса — действием пункта.
       accessible={!isEditing}
-      accessibilityActions={[{ name: 'menu', label: isMenuOpen ? 'Скрыть действия курса' : 'Действия курса' }]}
+      accessibilityActions={[
+        { name: 'menu', label: isMenuOpen ? 'Скрыть действия курса' : 'Действия курса' },
+      ]}
       onAccessibilityAction={(e) => {
         if (e.nativeEvent.actionName === 'menu') onToggleMenu(course.id);
       }}
@@ -323,12 +365,18 @@ const CourseRow = memo(function CourseRow({
                 </View>
               </View>
             ) : (
-              <Text variant="body" numberOfLines={2} style={[styles.semibold, { color: isActive ? courseAccent : colors.textPrimary }]}>
+              <Text
+                variant="body"
+                numberOfLines={2}
+                style={[styles.semibold, { color: isActive ? courseAccent : colors.textPrimary }]}
+              >
                 {course.title}
               </Text>
             )}
             {isStudent && course.teacherName ? (
-              <Text variant="caption" style={{ color: colors.textSecondary }}>{course.teacherName}</Text>
+              <Text variant="caption" style={{ color: colors.textSecondary }}>
+                {course.teacherName}
+              </Text>
             ) : (
               <Text variant="caption" style={{ color: colors.textSecondary }}>
                 {formatCourseStats(stats)}
@@ -347,13 +395,15 @@ const CourseRow = memo(function CourseRow({
           accessibilityLabel={isMenuOpen ? 'Скрыть действия курса' : 'Действия курса'}
         >
           <Animated.View style={dotsStyle}>
-            <MoreHorizontal size={iconSize.s} color={isMenuOpen ? colors.textPrimary : colors.textSecondary} />
+            <MoreHorizontal
+              size={iconSize.s}
+              color={isMenuOpen ? colors.textPrimary : colors.textSecondary}
+            />
           </Animated.View>
         </Pressable>
       </View>
 
       <CourseActionsCurtain open={isMenuOpen} actions={actions} />
-
     </Pressable>
   );
 });
@@ -460,7 +510,9 @@ export const CoursesDrawer = memo(function CoursesDrawer(props: CoursesDrawerPro
     interpolate(translateX.value, [-drawerWidth, 0], [0, 1], Extrapolation.CLAMP)
   );
   const backdropAnimStyle = useAnimatedStyle(() => ({ opacity: backdropOpacity.value }));
-  const panelAnimStyle = useAnimatedStyle(() => ({ transform: [{ translateX: translateX.value }] }));
+  const panelAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
 
   const keyExtractor = useCallback((item: Course) => item.id, []);
 
@@ -541,25 +593,35 @@ export const CoursesDrawer = memo(function CoursesDrawer(props: CoursesDrawerPro
             accessibilityRole="button"
             style={({ pressed }) => [
               styles.newCourseButton,
-              { backgroundColor: alpha(colors.primary, 10), borderColor: alpha(colors.primary, 20) },
+              {
+                backgroundColor: alpha(colors.primary, 10),
+                borderColor: alpha(colors.primary, 20),
+              },
               pressed && styles.pressed,
             ]}
             onPress={onStartCreatingCourse}
           >
             <Plus size={iconSize.s} color={colors.primary} />
-            <Text style={[typography.button, styles.noLetterSpacing, { color: colors.primary }]}>Новый курс</Text>
+            <Text style={[typography.button, styles.noLetterSpacing, { color: colors.primary }]}>
+              Новый курс
+            </Text>
           </Pressable>
           <Pressable
             accessibilityRole="button"
             style={({ pressed }) => [
               styles.newCourseButton,
-              { backgroundColor: alpha(colors.primary, 10), borderColor: alpha(colors.primary, 20) },
+              {
+                backgroundColor: alpha(colors.primary, 10),
+                borderColor: alpha(colors.primary, 20),
+              },
               pressed && styles.pressed,
             ]}
             onPress={onJoinByCode}
           >
             <UserPlus size={iconSize.s} color={colors.primary} />
-            <Text style={[typography.button, styles.noLetterSpacing, { color: colors.primary }]}>Войти по коду</Text>
+            <Text style={[typography.button, styles.noLetterSpacing, { color: colors.primary }]}>
+              Войти по коду
+            </Text>
           </Pressable>
         </View>
       )}
@@ -579,9 +641,18 @@ export const CoursesDrawer = memo(function CoursesDrawer(props: CoursesDrawerPro
       >
         <View style={styles.courseItemHeader}>
           <View style={styles.courseItemLeft}>
-            <Library size={iconSize.m} color={activeCourseId === null ? colors.primary : colors.textPrimary} />
+            <Library
+              size={iconSize.m}
+              color={activeCourseId === null ? colors.primary : colors.textPrimary}
+            />
             <View style={styles.flex1}>
-              <Text variant="body" style={[styles.semibold, { color: activeCourseId === null ? colors.primary : colors.textPrimary }]}>
+              <Text
+                variant="body"
+                style={[
+                  styles.semibold,
+                  { color: activeCourseId === null ? colors.primary : colors.textPrimary },
+                ]}
+              >
                 Мои наборы
               </Text>
               <Text variant="caption" style={{ color: colors.textSecondary }}>
@@ -594,13 +665,14 @@ export const CoursesDrawer = memo(function CoursesDrawer(props: CoursesDrawerPro
     </View>
   );
 
-  const listEmpty = courses.length === 0 ? (
-    <View style={styles.drawerEmpty}>
-      <Text variant="bodySmall" align="center" style={{ color: colors.textSecondary }}>
-        Создай курс, чтобы разложить наборы по темам
-      </Text>
-    </View>
-  ) : null;
+  const listEmpty =
+    courses.length === 0 ? (
+      <View style={styles.drawerEmpty}>
+        <Text variant="bodySmall" align="center" style={{ color: colors.textSecondary }}>
+          Создай курс, чтобы разложить наборы по темам
+        </Text>
+      </View>
+    ) : null;
 
   if (!mounted) return null;
 
@@ -610,8 +682,14 @@ export const CoursesDrawer = memo(function CoursesDrawer(props: CoursesDrawerPro
           иначе Gesture.Pan() внутри Modal не работает надёжно, особенно на Android. */}
       <GestureHandlerRootView style={styles.flex1}>
         <View style={styles.modalContainer}>
-          <Animated.View style={[styles.backdrop, { backgroundColor: colors.overlay }, backdropAnimStyle]}>
-            <Pressable style={StyleSheet.absoluteFill} onPress={onBackdropPress} accessibilityLabel="Закрыть список курсов" />
+          <Animated.View
+            style={[styles.backdrop, { backgroundColor: colors.overlay }, backdropAnimStyle]}
+          >
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={onBackdropPress}
+              accessibilityLabel="Закрыть список курсов"
+            />
           </Animated.View>
 
           <GestureDetector gesture={panelGesture}>
@@ -629,7 +707,9 @@ export const CoursesDrawer = memo(function CoursesDrawer(props: CoursesDrawerPro
               ]}
             >
               <View style={styles.drawerHeader}>
-                <Text variant="h2" accessibilityRole="header" style={{ color: colors.textPrimary }}>Курсы</Text>
+                <Text variant="h2" accessibilityRole="header" style={{ color: colors.textPrimary }}>
+                  Курсы
+                </Text>
               </View>
 
               <View style={styles.drawerBody}>

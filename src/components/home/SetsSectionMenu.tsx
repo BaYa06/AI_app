@@ -23,14 +23,36 @@ interface Props {
   onJoinCourse: (() => void) | null;
 }
 
-export function SetsSectionMenu({ visible, onClose, sortLabel, onSort, onSearch, onStudyAll, onCreateSet, onAddByLink, onJoinCourse }: Props) {
+export function SetsSectionMenu({
+  visible,
+  onClose,
+  sortLabel,
+  onSort,
+  onSearch,
+  onStudyAll,
+  onCreateSet,
+  onAddByLink,
+  onJoinCourse,
+}: Props) {
   const colors = useThemeColors();
   const icon = colors.textPrimary;
 
   return (
     <Sheet visible={visible} onClose={onClose} title="Наборы">
-      <ListRow icon={ArrowUpDown} iconColor={icon} title="Сортировка" value={sortLabel} onPress={onSort} />
-      <ListRow icon={Search} iconColor={icon} title="Поиск по наборам" chevron={false} onPress={onSearch} />
+      <ListRow
+        icon={ArrowUpDown}
+        iconColor={icon}
+        title="Сортировка"
+        value={sortLabel}
+        onPress={onSort}
+      />
+      <ListRow
+        icon={Search}
+        iconColor={icon}
+        title="Поиск по наборам"
+        chevron={false}
+        onPress={onSearch}
+      />
       {onStudyAll ? (
         <ListRow
           icon={GraduationCap}
@@ -41,9 +63,21 @@ export function SetsSectionMenu({ visible, onClose, sortLabel, onSort, onSearch,
         />
       ) : null}
       <ListRow icon={Plus} iconColor={icon} title="Новый набор" onPress={onCreateSet} />
-      <ListRow icon={Link2} iconColor={icon} title="Добавить набор по ссылке" subtitle="Если тебе прислали набор" onPress={onAddByLink} />
+      <ListRow
+        icon={Link2}
+        iconColor={icon}
+        title="Добавить набор по ссылке"
+        subtitle="Если тебе прислали набор"
+        onPress={onAddByLink}
+      />
       {onJoinCourse ? (
-        <ListRow icon={Users} iconColor={icon} title="Подключиться к курсу" subtitle="По коду от учителя" onPress={onJoinCourse} />
+        <ListRow
+          icon={Users}
+          iconColor={icon}
+          title="Подключиться к курсу"
+          subtitle="По коду от учителя"
+          onPress={onJoinCourse}
+        />
       ) : null}
     </Sheet>
   );

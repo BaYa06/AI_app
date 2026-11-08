@@ -28,6 +28,4 @@ export const API_ORIGIN =
       ? STAGING_ORIGIN
       : PRODUCTION_ORIGIN;
 
-export const API_BASE = __DEV__
-  ? 'http://localhost:3000/api'
-  : `${API_ORIGIN}/api`;
+export const API_BASE = __DEV__ ? 'http://localhost:3000/api' : `${API_ORIGIN}/api`;

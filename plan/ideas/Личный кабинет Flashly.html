@@ -1,0 +1,381 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Личный кабинет Flashly</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Unbounded:wght@500;600&display=swap">
+<style>
+/* Layout: one phone-width column; profile screen with a gear that opens a separate settings screen; floating tab pill at the bottom. */
+:root{
+  --bg:#f4f5fb; --surface:#ffffff; --surface-2:#eceefa; --fg:#14172b; --muted:#6a6f8f;
+  --line:#e2e5f3; --accent:#5a5cf0; --accent-soft:#e8e9fe; --gold:#e49a2c; --gold-soft:#fdf1dc;
+  --danger:#df3f4b; --danger-soft:#fde8ea; --shadow:0 1px 2px rgba(20,23,43,.04),0 8px 24px rgba(20,23,43,.06);
+  --font-body:"Onest",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-num:"Unbounded","Onest",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e0f1f; --surface:#1a1b31; --surface-2:#242643; --fg:#f2f3fb; --muted:#9c9fbf;
+  --line:#2a2c49; --accent:#8083f8; --accent-soft:#2a2c5a; --gold:#f2b457; --gold-soft:#3a3020;
+  --danger:#ff6b76; --danger-soft:#2e1b24; --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.28);
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e0f1f; --surface:#1a1b31; --surface-2:#242643; --fg:#f2f3fb; --muted:#9c9fbf;
+  --line:#2a2c49; --accent:#8083f8; --accent-soft:#2a2c5a; --gold:#f2b457; --gold-soft:#3a3020;
+  --danger:#ff6b76; --danger-soft:#2e1b24; --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.28);
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--fg);font:15px/1.4 var(--font-body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:0}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit}
+button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:12px}
+.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+.app{max-width:440px;margin:0 auto;padding:20px 0 132px;min-height:100dvh}
+.screen[hidden]{display:none}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;min-height:44px}
+.topbar h1{font-size:28px;line-height:1.1;margin:0;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
+.icon-btn{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;color:var(--fg)}
+.icon-btn:hover{background:var(--surface-2)}
+.icon-btn .i{width:24px;height:24px}
+
+.card{background:var(--surface);border-radius:24px;padding:20px;box-shadow:var(--shadow)}
+.stack{display:grid;gap:16px}
+
+/* identity card */
+.id{display:grid;gap:18px}
+.id-row{display:flex;gap:16px;align-items:center;min-width:0}
+.avatar{position:relative;flex:none;width:68px;height:68px;border-radius:50%;background:var(--accent);color:#fff;
+  display:grid;place-items:center;font:600 28px var(--font-num)}
+.avatar small{position:absolute;left:50%;bottom:-9px;transform:translateX(-50%);background:var(--surface);color:var(--accent);
+  border:2px solid var(--accent);border-radius:99px;padding:1px 8px;font:600 11px var(--font-body);white-space:nowrap}
+.who{min-width:0}
+.who b{display:block;font-size:19px;font-weight:700;overflow-wrap:anywhere}
+.who span{display:block;color:var(--muted);font-size:13.5px;overflow-wrap:anywhere}
+.who .tag{color:var(--accent);font-weight:500}
+.xp-head{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.xp-head b{color:var(--accent);font-size:13px;letter-spacing:0}
+.bar{height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden;margin:8px 0}
+.bar i{display:block;height:100%;width:1%;min-width:8px;background:var(--accent);border-radius:99px}
+.xp-note{color:var(--muted);font-size:13px;margin:0}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line);padding-top:16px}
+.stat{text-align:center;display:grid;gap:4px;justify-items:center}
+.stat+.stat{border-left:1px solid var(--line)}
+.stat .i{width:20px;height:20px}
+.stat b{font:600 22px/1 var(--font-num);font-variant-numeric:tabular-nums}
+.stat span{font-size:12.5px;color:var(--muted)}
+.stat.s1 .i{color:var(--gold)} .stat.s2 .i{color:var(--accent)} .stat.s3 .i{color:#2fae7a}
+
+/* section heads */
+.sec-head{display:flex;justify-content:space-between;align-items:center;margin:8px 4px 10px}
+.sec-head h2{margin:0;font-size:20px;font-weight:700}
+.sec-head .i{color:var(--muted);width:20px;height:20px}
+
+/* achievements */
+.ach{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:18px 8px 16px}
+.badge{display:grid;gap:8px;justify-items:center;text-align:center;min-width:0}
+.medal{position:relative;width:62px;height:62px;border-radius:50%;background:var(--gold-soft);color:var(--gold);display:grid;place-items:center}
+.medal .i{width:28px;height:28px}
+.badge.locked .medal{background:var(--surface-2);color:var(--muted)}
+.medal svg.ring{position:absolute;inset:-3px;width:68px;height:68px;transform:rotate(-90deg)}
+.ring circle{fill:none;stroke-width:3}
+.ring .t{stroke:var(--line)} .ring .p{stroke:var(--accent);stroke-linecap:round}
+.badge b{font-size:13px;font-weight:600;line-height:1.2}
+.badge span{font-size:12px;color:var(--muted);line-height:1.2}
+
+/* action cards */
+.action{display:grid;gap:14px}
+.action-top{display:flex;gap:14px;align-items:center}
+.tile{width:48px;height:48px;border-radius:14px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;flex:none}
+.action h3{margin:0;font-size:17px;font-weight:600}
+.action p{margin:2px 0 0;color:var(--muted);font-size:14px}
+.btn{display:flex;align-items:center;justify-content:center;gap:10px;height:48px;border-radius:99px;background:var(--accent-soft);color:var(--accent);font-weight:600;width:100%}
+.btn:hover{filter:brightness(.97)}
+.btn.sm{width:auto;height:40px;padding:0 20px}
+.action.inline{display:flex;align-items:center;gap:14px}
+.action.inline>div:nth-child(2){flex:1;min-width:0}
+
+/* rating */
+.rank-title{display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:16px;margin-bottom:8px}
+.rank-title .i{color:var(--muted);width:20px;height:20px}
+.row-rank{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:16px;border:1.5px solid transparent;min-width:0}
+.row-rank.me{border-color:var(--accent);background:var(--accent-soft)}
+.row-rank .n{width:34px;color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums}
+.row-rank .av{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:600;flex:none}
+.row-rank .nm{flex:1;min-width:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row-rank.me .nm{color:var(--accent);font-weight:600}
+.row-rank .xp{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+
+/* settings */
+.group-label{margin:22px 6px 8px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.group-label:first-of-type{margin-top:4px}
+.list{background:var(--surface);border-radius:20px;box-shadow:var(--shadow);overflow:hidden;border:1px solid var(--line)}
+.item{display:flex;align-items:center;gap:14px;width:100%;padding:14px 18px;min-height:58px}
+.item+.item,.item+.seg-row,.seg-row+.item{border-top:1px solid var(--line)}
+.item:hover{background:var(--surface-2)}
+.item .i.lead{color:var(--muted)}
+.item .txt{flex:1;min-width:0}
+.item .txt b{display:block;font-weight:500;font-size:16px}
+.item .txt span{display:block;color:var(--muted);font-size:13.5px}
+.item .i.tail{width:18px;height:18px;color:var(--muted)}
+.seg-row{display:flex;align-items:center;gap:14px;padding:12px 18px;flex-wrap:wrap}
+.seg-row .i{color:var(--muted)}
+.seg-row .lbl{font-size:16px;font-weight:500;flex:1;min-width:80px}
+.seg{display:flex;background:var(--surface-2);border-radius:14px;padding:4px;gap:2px}
+.seg button{padding:8px 12px;border-radius:10px;font-size:13.5px;font-weight:600;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+.switch{position:relative;width:52px;height:30px;border-radius:99px;background:var(--surface-2);flex:none;transition:background .2s}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .2s}
+.switch[aria-checked="true"]{background:var(--accent)}
+.switch[aria-checked="true"]::after{transform:translateX(22px)}
+.logout{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;height:56px;margin-top:24px;border-radius:20px;background:var(--danger-soft);color:var(--danger);font-weight:700;font-size:16px}
+.links{display:grid;gap:4px;justify-items:center;margin-top:12px}
+.links button{padding:12px 16px;color:var(--muted);font-weight:600}
+.links button.danger{color:var(--danger)}
+.ver{text-align:center;color:var(--muted);font-size:13px;margin-top:12px}
+
+/* tab pill */
+.tabs{position:fixed;z-index:20;left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));
+  bottom:calc(14px + env(safe-area-inset-bottom,0px));max-width:408px;margin:0 auto;
+  display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:6px;border-radius:30px;
+  background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow)}
+.tab{display:grid;justify-items:center;gap:3px;padding:8px 0 7px;border-radius:24px;color:var(--muted);font-size:12px;font-weight:600}
+.tab[aria-current="page"]{background:var(--accent-soft);color:var(--accent)}
+
+/* sheet + toast */
+.scrim{position:fixed;inset:0;z-index:40;background:rgba(8,9,20,.5);display:flex;align-items:flex-end;justify-content:center}
+.sheet{width:100%;max-width:440px;background:var(--surface);border-radius:28px 28px 0 0;padding:24px 20px calc(20px + env(safe-area-inset-bottom,0px));display:grid;gap:14px}
+.sheet h3{margin:0;font-size:20px}
+.sheet p{margin:0;color:var(--muted)}
+.sheet .btn.danger{background:var(--danger);color:#fff}
+.toast{position:fixed;z-index:50;left:50%;bottom:calc(104px + env(safe-area-inset-bottom,0px));transform:translate(-50%,12px);
+  max-width:min(380px,calc(100% - 32px));background:var(--fg);color:var(--bg);padding:11px 18px;border-radius:99px;font-size:14px;font-weight:500;
+  opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;text-align:center}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+@media (prefers-reduced-motion:reduce){.switch,.switch::after,.toast{transition:none}}
+@media (max-width:360px){.ach{grid-template-columns:repeat(2,1fr);row-gap:18px}}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="gear" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="back" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="next" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+  <symbol id="userx" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m17 8 5 5m0-5-5 5"/></symbol>
+  <symbol id="cap" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></symbol>
+  <symbol id="bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+  <symbol id="data" viewBox="0 0 24 24"><path d="M2 21a8 8 0 0 1 10.43-7.62"/><circle cx="10" cy="8" r="5"/><circle cx="18" cy="18" r="3"/></symbol>
+  <symbol id="palette" viewBox="0 0 24 24"><path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z"/><circle cx="13.5" cy="6.5" r=".6"/><circle cx="17.5" cy="10.5" r=".6"/><circle cx="6.5" cy="12.5" r=".6"/><circle cx="8.5" cy="7.5" r=".6"/></symbol>
+  <symbol id="sound" viewBox="0 0 24 24"><path d="M11 4.7a.7.7 0 0 0-1.2-.5L6.4 7.6A1.4 1.4 0 0 1 5.4 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.4a1.4 1.4 0 0 1 1 .4l3.4 3.4A.7.7 0 0 0 11 19.3z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.4 18.4a9 9 0 0 0 0-12.8"/></symbol>
+  <symbol id="spark" viewBox="0 0 24 24"><path d="M9.9 15.5A2 2 0 0 0 8.5 14.1l-6.1-1.6a.5.5 0 0 1 0-1l6.1-1.6A2 2 0 0 0 9.9 8.5l1.6-6.1a.5.5 0 0 1 1 0l1.6 6.1a2 2 0 0 0 1.4 1.4l6.1 1.6a.5.5 0 0 1 0 1l-6.1 1.6a2 2 0 0 0-1.4 1.4l-1.6 6.1a.5.5 0 0 1-1 0z"/><path d="M20 3v4M22 5h-4M4 17v2M5 18H3"/></symbol>
+  <symbol id="chat" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="doc" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v4a2 2 0 0 0 2 2h4M10 9H8M16 13H8M16 17H8"/></symbol>
+  <symbol id="out" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/></symbol>
+  <symbol id="ext" viewBox="0 0 24 24"><path d="M15 3h6v6M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+  <symbol id="home" viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .7-1.5l7-6a2 2 0 0 1 2.6 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="lib" viewBox="0 0 24 24"><path d="M12.8 2.2a2 2 0 0 0-1.6 0L2.6 6.1a1 1 0 0 0 0 1.8l8.6 3.9a2 2 0 0 0 1.6 0l8.6-3.9a1 1 0 0 0 0-1.8z"/><path d="M2 12.5l9.2 4.2a2 2 0 0 0 1.6 0L22 12.5M2 17.5l9.2 4.2a2 2 0 0 0 1.6 0L22 17.5"/></symbol>
+  <symbol id="test" viewBox="0 0 24 24"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></symbol>
+  <symbol id="trophy" viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0z"/></symbol>
+  <symbol id="flame" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></symbol>
+  <symbol id="target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol>
+  <symbol id="phones" viewBox="0 0 24 24"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></symbol>
+  <symbol id="share" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4M12 2v13"/></symbol>
+  <symbol id="bolt" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></symbol>
+  <symbol id="gem" viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 13L2 9z"/><path d="M11 3 8 9l4 13 4-13-3-6M2 9h20"/></symbol>
+  <symbol id="done" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></symbol>
+</svg>
+
+<main class="app">
+
+  <!-- PROFILE -->
+  <section class="screen" id="s-profile" aria-label="Профиль">
+    <div class="topbar">
+      <h1>Профиль</h1>
+      <button class="icon-btn" id="open-settings" aria-label="Настройки"><svg class="i"><use href="#gear"/></svg></button>
+    </div>
+
+    <div class="stack">
+      <div class="card id">
+        <div class="id-row">
+          <div class="avatar" aria-hidden="true">Б<small>Ур. 21</small></div>
+          <div class="who">
+            <b>Байирбек Холиков</b>
+            <span class="tag">@onlinechina06</span>
+            <span>onlinechina06@gmail.com</span>
+          </div>
+        </div>
+        <div>
+          <div class="xp-head"><span>Опыт</span><b>1 / 100</b></div>
+          <div class="bar" role="progressbar" aria-valuenow="1" aria-valuemin="0" aria-valuemax="100"><i></i></div>
+          <p class="xp-note">99 до уровня 22 · 1 карточка = 1 очко опыта</p>
+        </div>
+        <div class="stats">
+          <div class="stat s1"><svg class="i"><use href="#flame"/></svg><b>1</b><span>Серия</span></div>
+          <div class="stat s2"><svg class="i"><use href="#gem"/></svg><b>130</b><span>Алмазы</span></div>
+          <div class="stat s3"><svg class="i"><use href="#done"/></svg><b>2001</b><span>Изучено</span></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="sec-head"><h2>Достижения</h2><svg class="i"><use href="#next"/></svg></div>
+        <div class="card ach">
+          <div class="badge"><div class="medal"><svg class="i"><use href="#trophy"/></svg></div><b>Первый шаг</b><span>Урок 1</span></div>
+          <div class="badge"><div class="medal"><svg class="i"><use href="#flame"/></svg></div><b>В огне</b><span>1 день</span></div>
+          <div class="badge"><div class="medal"><svg class="i"><use href="#target"/></svg></div><b>Меткий</b><span>100% точность</span></div>
+          <div class="badge locked"><div class="medal">
+            <svg class="ring" viewBox="0 0 68 68"><circle class="t" cx="34" cy="34" r="32"/><circle class="p" cx="34" cy="34" r="32" stroke-dasharray="60.3 201"/></svg>
+            <svg class="i"><use href="#phones"/></svg></div><b>Слушатель</b><span>3 из 10</span></div>
+        </div>
+      </div>
+
+      <div class="card action">
+        <div class="action-top">
+          <div class="tile"><svg class="i"><use href="#spark"/></svg></div>
+          <div><h3>Посоветуй Flashly</h3><p>Отправь другу ссылку на приложение</p></div>
+        </div>
+        <button class="btn" data-toast="Откроется меню «Поделиться»"><svg class="i"><use href="#share"/></svg>Поделиться</button>
+      </div>
+
+      <div>
+        <div class="sec-head"><h2>Рейтинг</h2><svg class="i"><use href="#next"/></svg></div>
+        <div class="card">
+          <div class="rank-title"><span>Ты на 412 месте</span><svg class="i"><use href="#share"/></svg></div>
+          <div class="row-rank"><span class="n">411</span><span class="av" style="background:#3f6b8f">У</span><span class="nm">Ученик - 7kQmA</span><span class="xp">41 XP</span></div>
+          <div class="row-rank me"><span class="n">412</span><span class="av" style="background:var(--accent)">Б</span><span class="nm">Байирбек Холиков</span><span class="xp">40 XP</span></div>
+          <div class="row-rank"><span class="n">413</span><span class="av" style="background:#46706a">У</span><span class="nm">Ученик - Zt3Lw</span><span class="xp">38 XP</span></div>
+        </div>
+      </div>
+
+      <div class="card action inline">
+        <div class="tile"><svg class="i"><use href="#grid"/></svg></div>
+        <div><h3>Виджет на экран</h3><p>Серия и слово дня всегда на виду</p></div>
+        <button class="btn sm" data-toast="Покажем, как добавить виджет">Добавить</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="screen" id="s-settings" aria-label="Настройки" hidden>
+    <div class="topbar">
+      <button class="icon-btn" id="close-settings" aria-label="Назад к профилю"><svg class="i"><use href="#back"/></svg></button>
+      <h1 style="flex:1">Настройки</h1>
+    </div>
+
+    <div class="group-label">Аккаунт</div>
+    <div class="list">
+      <button class="item" data-toast="Откроется: Личные данные"><svg class="i lead"><use href="#user"/></svg><span class="txt"><b>Личные данные</b></span><svg class="i tail"><use href="#next"/></svg></button>
+      <button class="item" data-toast="Откроется: Заблокированные авторы"><svg class="i lead"><use href="#userx"/></svg><span class="txt"><b>Заблокированные авторы</b></span><svg class="i tail"><use href="#next"/></svg></button>
+    </div>
+
+    <div class="group-label">Обучение</div>
+    <div class="list">
+      <button class="item" data-toast="Откроется: Настройки обучения"><svg class="i lead"><use href="#cap"/></svg><span class="txt"><b>Настройки обучения</b></span><svg class="i tail"><use href="#next"/></svg></button>
+      <button class="item" data-toast="Откроется: Уведомления"><svg class="i lead"><use href="#bell"/></svg><span class="txt"><b>Уведомления</b></span><svg class="i tail"><use href="#next"/></svg></button>
+      <button class="item" data-toast="Откроется: Мои данные"><svg class="i lead"><use href="#data"/></svg><span class="txt"><b>Мои данные</b><span>Возраст, занятия, привычное время</span></span><svg class="i tail"><use href="#next"/></svg></button>
+    </div>
+
+    <div class="group-label">Приложение</div>
+    <div class="list">
+      <div class="seg-row">
+        <svg class="i"><use href="#palette"/></svg><span class="lbl">Тема</span>
+        <div class="seg" role="group" aria-label="Тема">
+          <button data-theme-set="light" aria-pressed="false">Светлая</button>
+          <button data-theme-set="dark" aria-pressed="false">Тёмная</button>
+          <button data-theme-set="auto" aria-pressed="true">Авто</button>
+        </div>
+      </div>
+      <button class="item" data-toast="Откроется: Звук и вибрация"><svg class="i lead"><use href="#sound"/></svg><span class="txt"><b>Звук и вибрация</b></span><svg class="i tail"><use href="#next"/></svg></button>
+      <button class="item" data-toast="Откроется: Что нового"><svg class="i lead"><use href="#spark"/></svg><span class="txt"><b>Что нового</b><span>Что изменилось в обновлениях</span></span><svg class="i tail"><use href="#next"/></svg></button>
+    </div>
+
+    <div class="group-label">Поддержка</div>
+    <div class="list">
+      <button class="item" data-toast="Откроется: Мои обращения"><svg class="i lead"><use href="#chat"/></svg><span class="txt"><b>Мои обращения</b><span>Написать нам и наши ответы</span></span><svg class="i tail"><use href="#next"/></svg></button>
+    </div>
+
+    <div class="group-label">Правовая информация</div>
+    <div class="list">
+      <div class="item" style="cursor:default">
+        <svg class="i lead"><use href="#spark"/></svg>
+        <span class="txt"><b>Данные для ИИ</b><span>Фото, файлы и слова для Google Gemini</span></span>
+        <button class="switch" id="ai-switch" role="switch" aria-checked="true" aria-label="Данные для ИИ"></button>
+      </div>
+      <button class="item" data-toast="Откроется: Политика конфиденциальности"><svg class="i lead"><use href="#shield"/></svg><span class="txt"><b>Политика конфиденциальности</b></span><svg class="i tail"><use href="#ext"/></svg></button>
+      <button class="item" data-toast="Откроется: Условия использования"><svg class="i lead"><use href="#doc"/></svg><span class="txt"><b>Условия использования</b></span><svg class="i tail"><use href="#ext"/></svg></button>
+    </div>
+
+    <button class="logout" id="logout"><svg class="i"><use href="#out"/></svg>Выйти</button>
+    <div class="links">
+      <button id="logout-all">Выйти на всех устройствах</button>
+      <button class="danger" id="delete-acc">Удалить аккаунт</button>
+    </div>
+    <div class="ver">Flashly v1.7.5</div>
+  </section>
+</main>
+
+<nav class="tabs" aria-label="Основная навигация">
+  <button class="tab" data-toast="Экран «Главная» не входит в этот прототип"><svg class="i"><use href="#home"/></svg>Главная</button>
+  <button class="tab" data-toast="Экран «Библиотека» не входит в этот прототип"><svg class="i"><use href="#lib"/></svg>Библиотека</button>
+  <button class="tab" data-toast="Экран «Тест» не входит в этот прототип"><svg class="i"><use href="#test"/></svg>Тест</button>
+  <button class="tab" id="tab-profile" aria-current="page"><svg class="i"><use href="#user"/></svg>Профиль</button>
+</nav>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="scrim" id="scrim" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
+
+<script>
+(function(){
+  var $=function(s,r){return (r||document).querySelector(s)}, $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))};
+  var profile=$('#s-profile'), settings=$('#s-settings'), toastEl=$('#toast'), tt;
+
+  function show(name){
+    profile.hidden = name!=='profile'; settings.hidden = name!=='settings';
+    window.scrollTo(0,0);
+  }
+  $('#open-settings').onclick=function(){show('settings')};
+  $('#close-settings').onclick=function(){show('profile')};
+  $('#tab-profile').onclick=function(){show('profile')};
+
+  function toast(msg){
+    toastEl.textContent=msg; toastEl.classList.add('on');
+    clearTimeout(tt); tt=setTimeout(function(){toastEl.classList.remove('on')},2200);
+  }
+  $$('[data-toast]').forEach(function(el){el.addEventListener('click',function(){toast(el.getAttribute('data-toast'))})});
+
+  /* theme: Авто follows the system, the other two set data-theme */
+  function applyTheme(mode){
+    var root=document.documentElement;
+    if(mode==='auto') root.removeAttribute('data-theme'); else root.setAttribute('data-theme',mode);
+    $$('[data-theme-set]').forEach(function(b){b.setAttribute('aria-pressed', String(b.getAttribute('data-theme-set')===mode))});
+  }
+  $$('[data-theme-set]').forEach(function(b){b.onclick=function(){
+    var m=b.getAttribute('data-theme-set'); applyTheme(m);
+    try{localStorage.setItem('flashly-theme',m)}catch(e){}
+  }});
+  var saved='auto'; try{saved=localStorage.getItem('flashly-theme')||'auto'}catch(e){}
+  applyTheme(saved);
+
+  var sw=$('#ai-switch');
+  sw.onclick=function(){var on=sw.getAttribute('aria-checked')!=='true'; sw.setAttribute('aria-checked',String(on)); toast(on?'Данные для ИИ включены':'Данные для ИИ выключены')};
+
+  /* confirmation sheet, built into the page */
+  var scrim=$('#scrim'), sheet=$('#sheet');
+  function ask(title,text,okLabel,danger,onOk){
+    sheet.innerHTML='<h3></h3><p></p><button class="btn '+(danger?'danger':'')+'" id="ok"></button><button class="btn" id="no" style="background:var(--surface-2);color:var(--fg)">Отмена</button>';
+    $('h3',sheet).textContent=title; $('p',sheet).textContent=text; $('#ok',sheet).textContent=okLabel;
+    scrim.hidden=false; $('#no',sheet).focus();
+    $('#no',sheet).onclick=close; $('#ok',sheet).onclick=function(){close(); onOk()};
+  }
+  function close(){scrim.hidden=true}
+  scrim.addEventListener('click',function(e){if(e.target===scrim)close()});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!scrim.hidden)close()});
+
+  $('#logout').onclick=function(){ask('Выйти из аккаунта?','Прогресс сохранится. Войти можно в любой момент.','Выйти',false,function(){toast('Вы вышли (прототип)')})};
+  $('#logout-all').onclick=function(){ask('Выйти на всех устройствах?','Вас разлогинит на телефоне, планшете и в браузере.','Выйти везде',false,function(){toast('Сеансы завершены (прототип)')})};
+  $('#delete-acc').onclick=function(){ask('Удалить аккаунт?','Прогресс, серия и алмазы удалятся без возможности восстановления.','Удалить навсегда',true,function(){toast('В прототипе аккаунт не удаляется')})};
+})();
+</script>
+
+</body></html>

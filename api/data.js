@@ -1,16 +1,60 @@
 import { neon } from '@neondatabase/serverless';
-import { createClient } from '@supabase/supabase-js';
 import { getAuthedUser } from './_auth.js';
 import { ensureDatabaseInitialized } from './_db-init.js';
-import { HttpError, uuid, assertReadableSet } from './_access.js';
-import { courseSetsForStudent } from './_course.js';
+import { HttpError } from './_access.js';
 import { notifyCoursesChanged } from './_realtime.js';
-import {
-  getAdminStats, getAdminFeedback, markAdminFeedbackRead,
-  getAdminFeedbackThread, replyAdminFeedback, closeAdminFeedback,
-} from './_admin.js';
-import { isAppleUser, isAppleRevokeConfigured, revokeAppleAuthorization } from './_apple.js';
 import { getPublicNews } from './_whatsNew.js';
+import { getAppVersion } from './_appVersion.js';
+import { log } from './_log.js';
+import {
+  loadSets,
+  loadCardsBySet,
+  loadAllCards,
+  updateCard,
+  createSet,
+  createCard,
+  createCardsBatch,
+  deleteSet,
+  deleteCard,
+  updateSetMeta,
+  updateSetCourse,
+} from './_handlers/data/sets.js';
+import {
+  upsertDailyActivity,
+  updateUserStatsStreak,
+  buyStreakFreeze,
+  logStreakEvent,
+  getWeekActivity,
+  getUserStats,
+  getDailyActivity,
+} from './_handlers/data/streak.js';
+import {
+  ensureUserExists,
+  getProfile,
+  updateDisplayName,
+  updateUserName,
+  updateLanguagePreferences,
+  getAboutMe,
+  saveAboutMe,
+  saveOnboardingData,
+  bootstrap,
+} from './_handlers/data/profile.js';
+import { loadCourses, createCourse, loadStudentCourses } from './_handlers/data/courses.js';
+import {
+  submitFeedback,
+  myFeedback,
+  feedbackThread,
+  replyFeedback,
+  feedbackUnreadCount,
+} from './_handlers/data/feedback.js';
+import {
+  adminDashboard,
+  adminMarkFeedbackRead,
+  adminFeedbackThread,
+  adminReplyFeedback,
+  adminCloseFeedback,
+} from './_handlers/data/admin.js';
+import { deleteAccount } from './_handlers/data/account.js';
 
 /**
  * API данных пользователя: профиль, наборы, карточки, курсы, прогресс, серия.
@@ -23,972 +67,55 @@ import { getPublicNews } from './_whatsNew.js';
  *
  * GET|POST /api/data?action=<имя>  — параметры в query (GET) или JSON-теле (POST).
  * GET /api/data?action=news — исключение: без входа (новости «Что нового», api/_whatsNew.js).
+ * GET /api/data?action=app-version&platform=ios — тоже без входа (последняя версия, api/_appVersion.js).
  * Ответ: { data } или { error }. Имена действий совпадают с методами NeonService.
  *
  * Прогресс по карточкам (уровень, дата повторения) здесь не пишется — только api/progress.js,
  * который сам считает уровень по ответу ученика.
  */
 
-// ─── Проверки прав ──────────────────────────────────────────────────────────
-
-function optString(value, max = 1000) {
-  if (value === undefined || value === null) return null;
-  if (typeof value !== 'string') throw new HttpError(400, 'string expected');
-  return value.slice(0, max);
-}
-
-function isoOrNull(ms) {
-  return ms ? new Date(Number(ms)).toISOString() : null;
-}
-
-/** Набор принадлежит пользователю (менять можно только свои наборы). */
-async function assertOwnSet(sql, me, setId) {
-  const rows = await sql`SELECT 1 FROM card_sets WHERE id = ${setId}::uuid AND user_id = ${me}::uuid`;
-  if (rows.length === 0) throw new HttpError(403, 'Not your set');
-}
-
-/** Курс принадлежит пользователю (учитель). */
-async function assertOwnCourse(sql, me, courseId) {
-  const rows = await sql`SELECT 1 FROM courses WHERE id = ${courseId}::uuid AND user_id = ${me}::uuid`;
-  if (rows.length === 0) throw new HttpError(403, 'Not your course');
-}
-
-/** Дата клиента YYYY-MM-DD, не дальше суток от UTC-сегодня (любой часовой пояс). */
-function localDay(value) {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new HttpError(400, 'Invalid date');
-  const today = Date.parse(new Date().toISOString().slice(0, 10) + 'T00:00:00Z');
-  if (Math.abs(Date.parse(`${value}T00:00:00Z`) - today) > 2 * 24 * 60 * 60 * 1000) {
-    throw new HttpError(400, 'Date out of range');
-  }
-  return value;
-}
-
-/** Приращения статистики за один вызов — в разумных пределах. */
-function deltas(value) {
-  const clamp = (n, max) => Math.max(0, Math.min(max, Math.trunc(Number(n) || 0)));
-  return {
-    wordsDelta: clamp(value?.wordsDelta, 500),
-    minutesDelta: clamp(value?.minutesDelta, 240),
-    cardsDelta: clamp(value?.cardsDelta, 500),
-  };
-}
-
-// ─── Профиль ────────────────────────────────────────────────────────────────
-
-async function ensureUserExists(sql, me, p, user) {
-  // email и признак гостя — из токена Supabase, не из запроса
-  const email = user.email || null;
-  const displayName = optString(p.displayName, 255) || (email ? email.split('@')[0] : null);
-  const defaultUserName = email ? '@' + email.split('@')[0].toLowerCase() : null;
-  await sql`
-    INSERT INTO users (id, email, display_name, is_anonymous, user_name)
-    VALUES (${me}::uuid, ${email}, ${displayName ?? 'Гость'}, ${user.is_anonymous === true}, ${defaultUserName})
-    ON CONFLICT (id) DO UPDATE SET
-      user_name = COALESCE(users.user_name, EXCLUDED.user_name)
-  `;
-  return true;
-}
-
-async function getProfile(sql, me) {
-  const rows = await sql`
-    SELECT teacher, user_name, display_name, native_language, target_languages, onboarding_completed
-    FROM users WHERE id = ${me}::uuid
-  `;
-  return rows[0] ?? null;
-}
-
-async function updateDisplayName(sql, me, p) {
-  const displayName = optString(p.displayName, 255);
-  if (!displayName) throw new HttpError(400, 'displayName required');
-  await sql`UPDATE users SET display_name = ${displayName} WHERE id = ${me}::uuid`;
-  return true;
-}
-
-async function updateUserName(sql, me, p) {
-  const raw = optString(p.userName, 100);
-  if (!raw) throw new HttpError(400, 'userName required');
-  const normalized = raw.startsWith('@') ? raw.toLowerCase() : '@' + raw.toLowerCase();
-  await sql`UPDATE users SET user_name = ${normalized} WHERE id = ${me}::uuid`;
-  return true;
-}
-
-function optStringArray(value) {
-  if (value === undefined || value === null) return null;
-  if (!Array.isArray(value) || value.some((v) => typeof v !== 'string')) throw new HttpError(400, 'string[] expected');
-  return value.slice(0, 20).map((v) => v.slice(0, 20));
-}
-
-async function updateLanguagePreferences(sql, me, p) {
-  await sql`
-    UPDATE users SET
-      native_language = COALESCE(${optString(p.nativeLanguage, 20)}, native_language),
-      target_languages = COALESCE(${optStringArray(p.targetLanguages)}, target_languages)
-    WHERE id = ${me}::uuid
-  `;
-  return true;
-}
-
-// ─── «О себе» для напоминаний (plan/new/push_notifications.md, 2.7) ─────────────
-
-const AGE_RANGES = ['under13', '13-17', '18-24', '25-34', '35+'];
-const WEEK_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-
-/** Возраст: диапазон из списка или null (пропустил / стёр) */
-function optAgeRange(value) {
-  return AGE_RANGES.includes(value) ? value : null;
-}
-
-/** Дни занятий в центре: только дни недели, в порядке недели; пусто — null */
-function optClassDays(value) {
-  if (!Array.isArray(value)) return null;
-  const days = WEEK_DAYS.filter((d) => value.includes(d));
-  return days.length ? days : null;
-}
-
-function optClassHour(value) {
-  const h = Number(value);
-  return Number.isInteger(h) && h >= 6 && h <= 22 ? h : null;
-}
-
-/** «Профиль → Мои данные»: ответы о себе и что приложение знает о привычках (только чтение) */
-async function getAboutMe(sql, me) {
-  const [row] = await sql`
-    SELECT u.age_range, u.class_days, u.class_hour, u.learning_goal,
-           COALESCE(us.notif_use_habits, true) AS use_habits,
-           h.usual_time::text AS usual_time, h.usual_days, h.segment
-    FROM users u
-    LEFT JOIN user_stats us ON us.user_id = u.id
-    LEFT JOIN user_habits h ON h.user_id = u.id
-    WHERE u.id = ${me}::uuid
-  `;
-  if (!row) return null;
-  return {
-    ageRange: row.age_range,
-    classDays: row.class_days || [],
-    classHour: row.class_hour,
-    learningGoal: row.learning_goal,
-    useHabits: row.use_habits,
-    habits: { usualTime: row.usual_time ? row.usual_time.slice(0, 5) : null, usualDays: row.usual_days || [] },
-  };
-}
-
-/**
- * Сохранить ответы о себе. Поле, которого нет в запросе, не трогаем; null — стереть.
- * clearHabits — «Стереть, что знаешь о моих привычках»: профиль удаляется и больше не используется.
- */
-async function saveAboutMe(sql, me, p) {
-  if ('ageRange' in p) await sql`UPDATE users SET age_range = ${optAgeRange(p.ageRange)} WHERE id = ${me}::uuid`;
-  if ('classDays' in p || 'classHour' in p) {
-    const days = optClassDays(p.classDays);
-    const hour = days ? optClassHour(p.classHour) : null;
-    await sql`UPDATE users SET class_days = ${days}, class_hour = ${hour} WHERE id = ${me}::uuid`;
-  }
-  if (typeof p.useHabits === 'boolean' || p.clearHabits === true) {
-    const use = p.clearHabits === true ? false : p.useHabits;
-    // Включил подстройку — время из настроек больше не «выбрано самим», напоминания идут по привычкам
-    await sql`
-      INSERT INTO user_stats (user_id, notif_use_habits) VALUES (${me}::uuid, ${use})
-      ON CONFLICT (user_id) DO UPDATE SET
-        notif_use_habits = ${use},
-        notif_time_custom = CASE WHEN ${use} THEN false ELSE user_stats.notif_time_custom END,
-        updated_at = NOW()
-    `;
-    if (!use) await sql`DELETE FROM user_habits WHERE user_id = ${me}::uuid`;
-  }
-  return true;
-}
-
-async function saveOnboardingData(sql, me, p) {
-  await sql`
-    UPDATE users SET
-      display_name = COALESCE(${optString(p.displayName, 255)}, display_name),
-      teacher = COALESCE(${typeof p.teacher === 'boolean' ? p.teacher : null}, teacher),
-      native_language = COALESCE(${optString(p.nativeLanguage, 20)}, native_language),
-      target_languages = COALESCE(${optStringArray(p.targetLanguages)}, target_languages),
-      learning_goal = COALESCE(${optString(p.learningGoal, 100)}, learning_goal),
-      daily_goal = COALESCE(${optString(p.dailyGoal, 100)}, daily_goal),
-      teacher_subject = COALESCE(${optString(p.teacherSubject, 100)}, teacher_subject),
-      teacher_group_size = COALESCE(${optString(p.teacherGroupSize, 100)}, teacher_group_size),
-      age_range = COALESCE(${optAgeRange(p.ageRange)}, age_range),
-      class_days = COALESCE(${optClassDays(p.classDays)}, class_days),
-      class_hour = COALESCE(${optClassDays(p.classDays) ? optClassHour(p.classHour) : null}, class_hour),
-      onboarding_completed = true
-    WHERE id = ${me}::uuid
-  `;
-  return true;
-}
-
-// ─── Наборы и карточки ──────────────────────────────────────────────────────
-
-async function loadSets(sql, me) {
-  return sql`
-    SELECT id, user_id, course_id, title, description, category, language_from, language_to,
-           is_public, created_at, updated_at, total_cards, mastered_cards, studying_cards,
-           is_hidden_from_students
-    FROM card_sets
-    WHERE user_id = ${me}::uuid
-    ORDER BY created_at DESC
-  `;
-}
-
-async function loadCardsBySet(sql, me, p) {
-  const setId = uuid(p.setId, 'setId');
-  await assertReadableSet(sql, me, setId);
-  return sql`
-    SELECT id, set_id, front, back, example, word_form, word_type, image_url, audio_url,
-           created_at, learning_step, next_review, last_reviewed, status
-    FROM cards
-    WHERE set_id = ${setId}::uuid
-    ORDER BY sort_order NULLS LAST, created_at ASC
-  `;
-}
-
-async function loadAllCards(sql, me) {
-  return sql`
-    SELECT
-      c.id, c.set_id, c.front, c.back, c.example, c.word_form, c.word_type, c.image_url, c.audio_url, c.created_at,
-      CASE WHEN s.user_id = ${me}::uuid THEN COALESCE(cp.learning_step, c.learning_step)
-           ELSE COALESCE(cp.learning_step, 0) END AS learning_step,
-      CASE WHEN s.user_id = ${me}::uuid THEN COALESCE(cp.next_review, c.next_review)
-           ELSE COALESCE(cp.next_review, NOW()) END AS next_review,
-      CASE WHEN s.user_id = ${me}::uuid THEN COALESCE(cp.last_reviewed, c.last_reviewed)
-           ELSE cp.last_reviewed END AS last_reviewed,
-      CASE WHEN s.user_id = ${me}::uuid THEN COALESCE(cp.status, c.status)
-           ELSE COALESCE(cp.status, 'new') END AS status
-    FROM cards c
-    INNER JOIN card_sets s ON c.set_id = s.id
-    LEFT JOIN card_progress cp ON cp.card_id = c.id AND cp.user_id = ${me}::uuid
-    WHERE s.user_id = ${me}::uuid
-       OR s.course_id IN (
-         SELECT course_id FROM course_members WHERE user_id = ${me}::uuid AND role = 'student'
-       )
-    ORDER BY c.created_at ASC, c.sort_order NULLS LAST
-  `;
-}
-
-async function updateCard(sql, me, p) {
-  const cardId = uuid(p.cardId, 'cardId');
-  const d = p.data || {};
-  const rows = await sql`
-    UPDATE cards c
-    SET front = COALESCE(${optString(d.frontText, 2000)}, c.front),
-        back = COALESCE(${optString(d.backText, 2000)}, c.back),
-        example = COALESCE(${optString(d.example, 4000)}, c.example),
-        word_form = COALESCE(${optString(d.wordForm, 100)}, c.word_form),
-        word_type = COALESCE(${optString(d.wordType, 20)}, c.word_type),
-        image_url = COALESCE(${optString(d.frontImage, 2000)}, c.image_url),
-        audio_url = COALESCE(${optString(d.frontAudio, 2000)}, c.audio_url)
-    FROM card_sets s
-    WHERE c.id = ${cardId}::uuid AND s.id = c.set_id AND s.user_id = ${me}::uuid
-    RETURNING c.id
-  `;
-  if (rows.length === 0) throw new HttpError(403, 'Not your card');
-  return true;
-}
-
-async function createSet(sql, me, p) {
-  const id = uuid(p.id, 'id');
-  const courseId = p.courseId ? uuid(p.courseId, 'courseId') : null;
-  if (courseId) await assertOwnCourse(sql, me, courseId);
-  const now = new Date().toISOString();
-  await sql`
-    INSERT INTO card_sets (
-      id, user_id, course_id, title, description, category, language_from, language_to,
-      is_public, created_at, updated_at, total_cards, mastered_cards, studying_cards
-    ) VALUES (
-      ${id}::uuid, ${me}::uuid, ${courseId}, ${optString(p.title, 255) || 'Без названия'},
-      ${optString(p.description, 2000)}, ${optString(p.category, 100) || 'custom'},
-      ${optString(p.languageFrom, 10)}, ${optString(p.languageTo, 10)}, ${p.isPublic === true},
-      ${isoOrNull(p.createdAt) || now}, ${isoOrNull(p.updatedAt) || now}, 0, 0, 0
-    )
-    ON CONFLICT (id) DO NOTHING
-  `;
-  return true;
-}
-
-/** Вставка карточек одним запросом; все карточки должны быть в своих наборах. */
-async function insertCards(sql, me, cards) {
-  if (!Array.isArray(cards) || cards.length === 0) return true;
-  if (cards.length > 2000) throw new HttpError(400, 'Too many cards');
-  const rows = cards.map((c) => ({
-    id: uuid(c.id, 'card.id'),
-    set_id: uuid(c.setId, 'card.setId'),
-    front: optString(c.frontText, 2000) ?? '',
-    back: optString(c.backText, 2000) ?? '',
-    example: optString(c.example, 4000),
-    word_type: optString(c.wordType, 20),
-    image_url: optString(c.frontImage, 2000),
-    audio_url: optString(c.frontAudio, 2000),
-    created_at: isoOrNull(c.createdAt) || new Date().toISOString(),
-    next_review: isoOrNull(c.nextReviewDate) || new Date().toISOString(),
-    last_reviewed: isoOrNull(c.lastReviewDate),
-    status: optString(c.status, 20) || 'new',
-  }));
-  const setIds = [...new Set(rows.map((r) => r.set_id))];
-  const own = await sql`SELECT id FROM card_sets WHERE id = ANY(${setIds}::uuid[]) AND user_id = ${me}::uuid`;
-  if (own.length !== setIds.length) throw new HttpError(403, 'Not your set');
-
-  const inserted = await sql`
-    INSERT INTO cards (id, set_id, front, back, example, word_type, image_url, audio_url,
-                       created_at, next_review, last_reviewed, status)
-    SELECT id, set_id, front, back, example, word_type, image_url, audio_url,
-           created_at, next_review, last_reviewed, status
-    FROM json_to_recordset(${JSON.stringify(rows)}::json) AS r(
-      id uuid, set_id uuid, front text, back text, example text, word_type varchar, image_url text,
-      audio_url text, created_at timestamptz, next_review timestamptz, last_reviewed timestamptz, status varchar
-    )
-    ON CONFLICT (id) DO NOTHING
-    RETURNING set_id
-  `;
-  // total_cards увеличиваем только на реально вставленные (повтор из очереди не задваивает)
-  const countsBySet = {};
-  for (const r of inserted) countsBySet[r.set_id] = (countsBySet[r.set_id] || 0) + 1;
-  for (const [setId, count] of Object.entries(countsBySet)) {
-    await sql`UPDATE card_sets SET total_cards = total_cards + ${count} WHERE id = ${setId}::uuid`;
-  }
-  return true;
-}
-
-async function createCard(sql, me, p) {
-  return insertCards(sql, me, [p.card]);
-}
-
-async function createCardsBatch(sql, me, p) {
-  return insertCards(sql, me, p.cards);
-}
-
-async function deleteSet(sql, me, p) {
-  const setId = uuid(p.setId, 'setId');
-  await assertOwnSet(sql, me, setId);
-  await sql`DELETE FROM cards WHERE set_id = ${setId}::uuid`;
-  await sql`DELETE FROM card_sets WHERE id = ${setId}::uuid`;
-  return true;
-}
-
-async function deleteCard(sql, me, p) {
-  const cardId = uuid(p.cardId, 'cardId');
-  const rows = await sql`
-    DELETE FROM cards c USING card_sets s
-    WHERE c.id = ${cardId}::uuid AND s.id = c.set_id AND s.user_id = ${me}::uuid
-    RETURNING c.id
-  `;
-  // Уже удалённая карточка (повтор из очереди) — не ошибка
-  if (rows.length === 0) {
-    const exists = await sql`SELECT 1 FROM cards WHERE id = ${cardId}::uuid`;
-    if (exists.length > 0) throw new HttpError(403, 'Not your card');
-  }
-  return true;
-}
-
-async function updateSetMeta(sql, me, p) {
-  const setId = uuid(p.setId, 'setId');
-  const f = p.fields || {};
-  const rows = await sql`
-    UPDATE card_sets
-    SET title = COALESCE(${optString(f.title, 255)}, title),
-        description = COALESCE(${optString(f.description, 2000)}, description),
-        category = COALESCE(${optString(f.category, 100)}, category),
-        language_from = COALESCE(${optString(f.languageFrom, 10)}, language_from),
-        language_to = COALESCE(${optString(f.languageTo, 10)}, language_to),
-        updated_at = NOW()
-    WHERE id = ${setId}::uuid AND user_id = ${me}::uuid
-    RETURNING id
-  `;
-  if (rows.length === 0) throw new HttpError(403, 'Not your set');
-  return true;
-}
-
-async function updateSetCourse(sql, me, p) {
-  const setId = uuid(p.setId, 'setId');
-  const courseId = p.courseId ? uuid(p.courseId, 'courseId') : null;
-  if (courseId) await assertOwnCourse(sql, me, courseId);
-  const rows = await sql`
-    UPDATE card_sets SET course_id = ${courseId}, updated_at = NOW()
-    WHERE id = ${setId}::uuid AND user_id = ${me}::uuid
-    RETURNING id
-  `;
-  if (rows.length === 0) throw new HttpError(403, 'Not your set');
-  return true;
-}
-
-// ─── Курсы ──────────────────────────────────────────────────────────────────
-
-async function loadCourses(sql, me) {
-  return sql`
-    SELECT id, title, created_at, updated_at FROM courses
-    WHERE user_id = ${me}::uuid
-    ORDER BY created_at ASC
-  `;
-}
-
-async function createCourse(sql, me, p) {
-  const id = uuid(p.id, 'id');
-  const title = optString(p.title, 255);
-  if (!title) throw new HttpError(400, 'title required');
-  const createdAt = isoOrNull(p.createdAt) || new Date().toISOString();
-  await sql`
-    INSERT INTO courses (id, user_id, title, created_at, updated_at)
-    VALUES (${id}::uuid, ${me}::uuid, ${title}, ${createdAt}, ${createdAt})
-    ON CONFLICT (id) DO NOTHING
-  `;
-  return true;
-}
-
-async function loadStudentCourses(sql, me) {
-  return sql`
-    SELECT c.id, c.title, c.user_id AS owner_id, cm.joined_at,
-           COALESCE(u.display_name, u.user_name, u.email) AS teacher_name
-    FROM course_members cm
-    JOIN courses c ON c.id = cm.course_id
-    JOIN users u ON u.id = c.user_id
-    WHERE cm.user_id = ${me}::uuid AND cm.role = 'student'
-    ORDER BY cm.joined_at DESC
-  `;
-}
-
-// ─── Серия и активность ─────────────────────────────────────────────────────
-
-async function upsertDailyActivity(sql, me, p) {
-  const day = localDay(p.localDate);
-  const d = deltas(p.deltas);
-  await sql`
-    INSERT INTO daily_activity (user_id, local_date, words_learned, minutes_learned, cards_studied)
-    VALUES (${me}::uuid, ${day}::date, ${d.wordsDelta}, ${d.minutesDelta}, ${d.cardsDelta})
-    ON CONFLICT (user_id, local_date) DO UPDATE SET
-      words_learned = daily_activity.words_learned + ${d.wordsDelta},
-      minutes_learned = daily_activity.minutes_learned + ${d.minutesDelta},
-      cards_studied = daily_activity.cards_studied + ${d.cardsDelta},
-      updated_at = NOW()
-  `;
-  return true;
-}
-
-/**
- * Пуш пользователю напрямую через sendNotification (как teacher.js), без HTTP и NOTIFY_SECRET.
- * push.js подгружаем лениво: firebase-admin нужен редко и не должен замедлять холодный старт data.js.
- * Ошибка пуша не должна ломать сохранение прогресса.
- */
-async function sendPush(sql, userId, type, data = {}) {
-  try {
-    const { sendNotification } = await import('./push.js');
-    await sendNotification(sql, userId, type, data);
-  } catch (e) {
-    console.error(`[data] push ${type} failed:`, e);
-  }
-}
-
-const STREAK_MILESTONES = [7, 14, 30, 60, 100, 365];
-/** Повторение дня выполнено, если повторено столько слов, которым пришло время (или всё, что ждало) */
-const DAILY_REVIEW_TARGET = 10;
-const DEFAULT_TIMEZONE = 'Asia/Bishkek';
-const STREAK_FREEZE_PRICE = 50;
-const MAX_STREAK_FREEZES = 2;
-
-/**
- * Засчитывается ли сегодняшний день в серию (план §3.5) — по журналу ответов, а не по словам клиента:
- * повторено ≥ 10 слов, которым пришло время; или повторено всё, что ждало (хотя бы одно);
- * или ждать было нечего и дано ≥ 10 ответов.
- */
-async function dayCountsForStreak(sql, me, today, tz) {
-  const rows = await sql`
-    SELECT
-      (SELECT COUNT(*) FROM answers
-        WHERE user_id = ${me}::uuid AND rejected_reason IS NULL
-          AND (answered_at AT TIME ZONE ${tz})::date = ${today}::date)::int AS active,
-      (SELECT COUNT(*) FROM answers
-        WHERE user_id = ${me}::uuid AND rejected_reason IS NULL AND was_due AND step_before >= 1
-          AND (answered_at AT TIME ZONE ${tz})::date = ${today}::date)::int AS reviewed,
-      (SELECT COUNT(*) FROM card_progress
-        WHERE user_id = ${me}::uuid AND learning_step >= 1 AND next_review <= NOW())::int AS waiting
-  `;
-  const { active, reviewed, waiting } = rows[0];
-  return {
-    counted: reviewed >= DAILY_REVIEW_TARGET || (waiting === 0 && (reviewed >= 1 || active >= DAILY_REVIEW_TARGET)),
-    active, reviewed, waiting,
-  };
-}
-
-async function updateUserStatsStreak(sql, me, p) {
-  const today = localDay(p.localDate);
-  const yesterday = localDay(p.yesterdayDate);
-  const d = deltas(p.deltas);
-  const existing = await sql`
-    SELECT current_streak, longest_streak, last_active_date::text AS last_active_date, timezone
-    FROM user_stats WHERE user_id = ${me}::uuid
-  `;
-  const tz = existing[0]?.timezone || DEFAULT_TIMEZONE;
-  const day = await dayCountsForStreak(sql, me, today, tz);
-  const prevStreak = existing[0]?.current_streak || 0;
-  const lastActive = existing[0]?.last_active_date ?? null;
-  if (!day.counted) {
-    // Итоги (по ним уровень) копятся и до того, как день засчитан в серию. Только для клиентов,
-    // которые шлют прибавку с прошлой отправки (incremental): старые шлют счётчик за весь день
-    // при каждом выходе с экрана — им по-прежнему только в засчитанный день (plan/done/card_rating.md, Cards 6)
-    if (p.incremental === true) {
-      await sql`
-        INSERT INTO user_stats (user_id, total_words_learned, total_minutes_learned, total_cards_studied)
-        VALUES (${me}::uuid, ${d.wordsDelta}, ${d.minutesDelta}, ${d.cardsDelta})
-        ON CONFLICT (user_id) DO UPDATE SET
-          total_words_learned = user_stats.total_words_learned + ${d.wordsDelta},
-          total_minutes_learned = user_stats.total_minutes_learned + ${d.minutesDelta},
-          total_cards_studied = user_stats.total_cards_studied + ${d.cardsDelta},
-          updated_at = NOW()
-      `;
-    }
-    return { counted: false, currentStreak: prevStreak, longestStreak: existing[0]?.longest_streak || 0, ...day };
-  }
-
-  let currentStreak = prevStreak;
-  let longestStreak = existing[0]?.longest_streak || 0;
-  if (lastActive === today) {
-    // уже засчитан сегодня — серия не меняется
-  } else if (lastActive === yesterday) {
-    currentStreak += 1;
-  } else {
-    currentStreak = 1;
-    if (existing.length > 0 && prevStreak > 1) await sendPush(sql, me, 'streak_lost', { prevStreak });
-  }
-  if (currentStreak > longestStreak) longestStreak = currentStreak;
-
-  await sql`
-    INSERT INTO user_stats (user_id, current_streak, longest_streak, last_active_date,
-                            total_words_learned, total_minutes_learned, total_cards_studied)
-    VALUES (${me}::uuid, ${currentStreak}, ${longestStreak}, ${today}::date,
-            ${d.wordsDelta}, ${d.minutesDelta}, ${d.cardsDelta})
-    ON CONFLICT (user_id) DO UPDATE SET
-      current_streak = ${currentStreak},
-      longest_streak = ${longestStreak},
-      last_active_date = ${today}::date,
-      total_words_learned = user_stats.total_words_learned + ${d.wordsDelta},
-      total_minutes_learned = user_stats.total_minutes_learned + ${d.minutesDelta},
-      total_cards_studied = user_stats.total_cards_studied + ${d.cardsDelta},
-      updated_at = NOW()
-  `;
-  const increased = lastActive !== today;
-  // Раньше этот пуш слал клиент с секретом, которого в сборке не было, — он не работал
-  if (increased && STREAK_MILESTONES.includes(currentStreak)) {
-    await sendPush(sql, me, 'streak_milestone', { days: currentStreak });
-  }
-  return { counted: true, increased, currentStreak, longestStreak, ...day };
-}
-
-/** Купить заморозку серии за алмазы (не больше двух в запасе). */
-async function buyStreakFreeze(sql, me) {
-  const rows = await sql`
-    UPDATE users SET diamond = COALESCE(diamond, 0) - ${STREAK_FREEZE_PRICE},
-                     streak_freezes = streak_freezes + 1
-    WHERE id = ${me}::uuid AND COALESCE(diamond, 0) >= ${STREAK_FREEZE_PRICE} AND streak_freezes < ${MAX_STREAK_FREEZES}
-    RETURNING diamond, streak_freezes
-  `;
-  if (rows.length === 0) {
-    const [u] = await sql`SELECT COALESCE(diamond, 0) AS diamond, streak_freezes FROM users WHERE id = ${me}::uuid`;
-    throw new HttpError(409, u && u.streak_freezes >= MAX_STREAK_FREEZES ? 'max_freezes' : 'not_enough_diamonds');
-  }
-  return { diamonds: rows[0].diamond, streakFreezes: rows[0].streak_freezes, price: STREAK_FREEZE_PRICE };
-}
-
-async function logStreakEvent(sql, me, p) {
-  const day = Math.max(0, Math.min(100000, Math.trunc(Number(p.streakDay) || 0)));
-  await sql`INSERT INTO streak_events (user_id, streak_day) VALUES (${me}::uuid, ${day})`;
-  return true;
-}
-
-async function getWeekActivity(sql, me, p) {
-  const days = Math.max(1, Math.min(366, Math.trunc(Number(p.days) || 7)));
-  return sql`
-    SELECT local_date::text AS local_date, words_learned, minutes_learned, cards_studied
-    FROM daily_activity
-    WHERE user_id = ${me}::uuid AND local_date >= CURRENT_DATE - ${days}::int
-    ORDER BY local_date DESC
-  `;
-}
-
-/**
- * Статистика + сброс серии, если пропущено больше дня (по часовому поясу пользователя).
- * Пропущен ровно один день и есть заморозка — она тратится, серия сохраняется.
- */
-async function getUserStats(sql, me) {
-  const rows = await sql`
-    SELECT us.current_streak, us.longest_streak, us.last_active_date::text AS last_active_date, us.timezone,
-           us.total_words_learned, us.total_minutes_learned, us.total_cards_studied,
-           u.streak_freezes, h.segment AS activity_segment
-    FROM user_stats us JOIN users u ON u.id = us.user_id
-    LEFT JOIN user_habits h ON h.user_id = us.user_id
-    WHERE us.user_id = ${me}::uuid
-  `;
-  const row = rows[0];
-  if (!row) return null;
-  row.freeze_used = false;
-  if (row.last_active_date && row.current_streak > 0) {
-    let todayKey;
-    try {
-      todayKey = new Intl.DateTimeFormat('en-CA', {
-        timeZone: row.timezone || 'UTC', year: 'numeric', month: '2-digit', day: '2-digit',
-      }).format(new Date());
-    } catch {
-      todayKey = new Date().toISOString().slice(0, 10);
-    }
-    const diffDays = Math.round(
-      (Date.parse(`${todayKey}T12:00:00Z`) - Date.parse(`${row.last_active_date}T12:00:00Z`)) / 86_400_000,
-    );
-    if (diffDays === 2 && row.streak_freezes > 0) {
-      // Вчера пропущен: заморозка «засчитывает» вчерашний день, серия не прерывается
-      const yesterday = new Date(Date.parse(`${todayKey}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
-      const used = await sql`
-        WITH f AS (
-          UPDATE users SET streak_freezes = streak_freezes - 1
-          WHERE id = ${me}::uuid AND streak_freezes > 0 RETURNING streak_freezes
-        )
-        UPDATE user_stats SET last_active_date = ${yesterday}::date, updated_at = NOW()
-        WHERE user_id = ${me}::uuid AND EXISTS (SELECT 1 FROM f)
-        RETURNING (SELECT streak_freezes FROM f) AS left
-      `;
-      if (used.length > 0) {
-        row.last_active_date = yesterday;
-        row.streak_freezes = used[0].left;
-        row.freeze_used = true;
-      }
-    } else if (diffDays > 1) {
-      row.current_streak = 0;
-      await sql`UPDATE user_stats SET current_streak = 0, updated_at = NOW() WHERE user_id = ${me}::uuid`;
-    }
-  }
-  return row;
-}
-
-async function getDailyActivity(sql, me, p) {
-  const day = localDay(p.localDate);
-  const rows = await sql`
-    SELECT local_date::text AS local_date, words_learned, minutes_learned, cards_studied
-    FROM daily_activity WHERE user_id = ${me}::uuid AND local_date = ${day}::date
-  `;
-  return rows[0] ?? null;
-}
-
-// ─── Запуск приложения одним запросом ───────────────────────────────────────
-
-/**
- * Всё, что приложение грузит при старте, — одним ответом (вместо 8–10 отдельных запросов, каждый
- * со своей проверкой входа): свои наборы, все карточки с прогрессом, свои курсы, курсы ученика
- * и их наборы, статистика серии.
- */
-async function bootstrap(sql, me) {
-  const [sets, cards, courses, studentCourses, stats] = await Promise.all([
-    loadSets(sql, me),
-    loadAllCards(sql, me),
-    loadCourses(sql, me),
-    loadStudentCourses(sql, me),
-    getUserStats(sql, me),
-  ]);
-  const courseSets = {};
-  await Promise.all(studentCourses.map(async (course) => {
-    courseSets[course.id] = await courseSetsForStudent(sql, course.id);
-  }));
-  return { sets, cards, courses, studentCourses, courseSets, stats, serverTime: Date.now() };
-}
-
-// ─── Роутер ─────────────────────────────────────────────────────────────────
-
-// ==================== ОБРАТНАЯ СВЯЗЬ ====================
-
-const FEEDBACK_CATEGORIES = new Set(['problem', 'idea', 'question']);
-const FEEDBACK_TAGS = new Set(['speech', 'cards', 'tests', 'courses', 'sync', 'other']);
-const FEEDBACK_DAILY_LIMIT = 10;
-
-/**
- * «Написать нам» (kind = message) и окно оценки (kind = rating). Смотрится в админке и в «Моих обращениях».
- * Роль берём из БД, а не из запроса; данные устройства — как прислало приложение (только для справки).
- */
-async function submitFeedback(sql, me, p) {
-  const kind = p.kind;
-  if (kind !== 'message' && kind !== 'rating') throw new HttpError(400, 'Invalid kind');
-
-  const message = optString(p.message, 4000)?.trim() || null;
-  let category = null;
-  let rating = null;
-  let hasProblem = null;
-  let tags = null;
-
-  if (kind === 'message') {
-    category = FEEDBACK_CATEGORIES.has(p.category) ? p.category : null;
-    if (!category) throw new HttpError(400, 'Invalid category');
-    if (!message || message.length < 3) throw new HttpError(400, 'Message required');
-  } else {
-    rating = Number(p.rating);
-    if (!Number.isInteger(rating) || rating < 1 || rating > 5) throw new HttpError(400, 'Invalid rating');
-    hasProblem = typeof p.hasProblem === 'boolean' ? p.hasProblem : null;
-    tags = Array.isArray(p.tags) ? [...new Set(p.tags.filter((t) => FEEDBACK_TAGS.has(t)))] : null;
-    if (tags && tags.length === 0) tags = null;
-  }
-
-  await assertFeedbackLimit(sql, me);
-
-  const roleRows = await sql`SELECT teacher FROM users WHERE id = ${me}::uuid`;
-  const role = roleRows[0]?.teacher === true ? 'teacher' : 'student';
-
-  const rows = await sql`
-    INSERT INTO app_feedback (user_id, kind, category, rating, has_problem, tags, message,
-                              app_version, platform, os_version, user_role)
-    VALUES (${me}::uuid, ${kind}, ${category}, ${rating}, ${hasProblem}, ${tags}, ${message},
-            ${optString(p.appVersion, 20)}, ${optString(p.platform, 10)}, ${optString(p.osVersion, 40)}, ${role})
-    RETURNING id
-  `;
-  // Старые версии приложения ждут ровно true — id отдаём только тем, кто о нём попросил
-  return p.returnId === true ? { id: rows[0].id } : true;
-}
-
-/** Общий дневной лимит: новые обращения и дописки в переписку считаются вместе */
-async function assertFeedbackLimit(sql, me) {
-  const recent = await sql`
-    SELECT
-      (SELECT count(*) FROM app_feedback
-        WHERE user_id = ${me}::uuid AND created_at > NOW() - INTERVAL '1 day')
-      + (SELECT count(*) FROM app_feedback_replies r JOIN app_feedback f ON f.id = r.feedback_id
-        WHERE f.user_id = ${me}::uuid AND r.author = 'user' AND r.created_at > NOW() - INTERVAL '1 day')
-      AS n
-  `;
-  if (Number(recent[0].n) >= FEEDBACK_DAILY_LIMIT) throw new HttpError(429, 'Too many messages today');
-}
-
-// ==================== МОИ ОБРАЩЕНИЯ (plan/new/support_threads.md) ====================
-
-/**
- * Статус для пользователя: answered — есть ответ команды, который он ещё не открыл;
- * sent — мы ещё не открыли (или он дописал после нашего ответа); read — прочитано.
- */
-const FEEDBACK_USER_STATUS = `
-  CASE
-    WHEN f.last_admin_reply_at IS NOT NULL AND f.last_admin_reply_at > COALESCE(f.user_seen_at, '-infinity'::timestamptz) THEN 'answered'
-    WHEN f.status = 'new' THEN 'sent'
-    ELSE 'read'
-  END`;
-
-/** Свои обращения, новые сверху. preview — последнее сообщение ветки (или само обращение). */
-async function myFeedback(sql, me) {
-  const rows = await sql.query(`
-    SELECT f.id, f.kind, f.category, f.rating, f.has_problem, f.tags, f.created_at, f.last_message_at,
-           f.status = 'closed' AS closed,
-           ${FEEDBACK_USER_STATUS} AS user_status,
-           COALESCE(last.message, f.message) AS preview,
-           last.author AS preview_author
-    FROM app_feedback f
-    LEFT JOIN LATERAL (
-      SELECT r.message, r.author FROM app_feedback_replies r
-      WHERE r.feedback_id = f.id ORDER BY r.created_at DESC LIMIT 1
-    ) last ON true
-    WHERE f.user_id = $1::uuid
-    ORDER BY f.last_message_at DESC
-    LIMIT 100
-  `, [me]);
-  return rows.map((r) => ({
-    id: r.id,
-    kind: r.kind,
-    category: r.category,
-    rating: r.rating,
-    hasProblem: r.has_problem,
-    tags: r.tags,
-    preview: r.preview,
-    previewAuthor: r.preview_author || 'user',
-    status: r.user_status,
-    closed: r.closed,
-    createdAt: r.created_at,
-    lastMessageAt: r.last_message_at,
-  }));
-}
-
-async function loadOwnFeedback(sql, me, id) {
-  const rows = await sql`
-    SELECT id, kind, category, rating, has_problem, tags, message, status, read_at, created_at
-    FROM app_feedback WHERE id = ${id}::uuid AND user_id = ${me}::uuid
-  `;
-  // Чужое и несуществующее неотличимы
-  if (!rows[0]) throw new HttpError(404, 'Not found');
-  return rows[0];
-}
-
-/** Одна своя переписка. Открытие считается прочтением ответа команды (бейдж в профиле гаснет). */
-async function feedbackThread(sql, me, p) {
-  const f = await loadOwnFeedback(sql, me, uuid(p.id, 'id'));
-  const [replies] = await Promise.all([
-    sql`SELECT author, message, created_at FROM app_feedback_replies
-        WHERE feedback_id = ${f.id}::uuid ORDER BY created_at`,
-    sql`UPDATE app_feedback SET user_seen_at = NOW() WHERE id = ${f.id}::uuid`,
-  ]);
-  const messages = [
-    ...(f.message ? [{ author: 'user', message: f.message, createdAt: f.created_at }] : []),
-    ...replies.map((r) => ({ author: r.author, message: r.message, createdAt: r.created_at })),
-  ];
-  return {
-    id: f.id,
-    kind: f.kind,
-    category: f.category,
-    rating: f.rating,
-    hasProblem: f.has_problem,
-    tags: f.tags,
-    closed: f.status === 'closed',
-    readAt: f.read_at,
-    createdAt: f.created_at,
-    messages,
-  };
-}
-
-/** Дописать в своё обращение: оно снова ждёт ответа в админке (в т.ч. закрытое). */
-async function replyFeedback(sql, me, p) {
-  const f = await loadOwnFeedback(sql, me, uuid(p.id, 'id'));
-  const message = optString(p.message, 4000)?.trim();
-  if (!message) throw new HttpError(400, 'Message required');
-  await assertFeedbackLimit(sql, me);
-  const rows = await sql`
-    INSERT INTO app_feedback_replies (feedback_id, author, message)
-    VALUES (${f.id}::uuid, 'user', ${message})
-    RETURNING created_at
-  `;
-  await sql`
-    UPDATE app_feedback SET status = 'new', last_message_at = ${rows[0].created_at}, user_seen_at = NOW()
-    WHERE id = ${f.id}::uuid
-  `;
-  return { author: 'user', message, createdAt: rows[0].created_at };
-}
-
-/** Сколько обращений с непрочитанным ответом команды — бейдж «Мои обращения» в профиле */
-async function feedbackUnreadCount(sql, me) {
-  const rows = await sql`
-    SELECT count(*)::int AS n FROM app_feedback
-    WHERE user_id = ${me}::uuid AND last_admin_reply_at IS NOT NULL
-      AND last_admin_reply_at > COALESCE(user_seen_at, '-infinity'::timestamptz)
-  `;
-  return rows[0].n;
-}
-
-// ==================== АДМИНКА (/admin) ====================
-
-/** Только для users.is_admin — тот же признак, что у каталога книг (api/books.js). */
-async function assertAdmin(sql, me) {
-  const rows = await sql`SELECT is_admin FROM users WHERE id = ${me}::uuid`;
-  if (rows[0]?.is_admin !== true) throw new HttpError(403, 'Admins only');
-}
-
-async function adminDashboard(sql, me) {
-  await assertAdmin(sql, me);
-  const [stats, feedback] = await Promise.all([getAdminStats(sql), getAdminFeedback(sql)]);
-  return { stats, feedback };
-}
-
-async function adminMarkFeedbackRead(sql, me, p) {
-  await assertAdmin(sql, me);
-  return markAdminFeedbackRead(sql, uuid(p.id, 'id'));
-}
-
-async function adminFeedbackThread(sql, me, p) {
-  await assertAdmin(sql, me);
-  const thread = await getAdminFeedbackThread(sql, uuid(p.id, 'id'));
-  if (!thread) throw new HttpError(404, 'Not found');
-  return thread;
-}
-
-async function adminReplyFeedback(sql, me, p) {
-  await assertAdmin(sql, me);
-  const message = optString(p.message, 4000)?.trim();
-  if (!message) throw new HttpError(400, 'Message required');
-  const reply = await replyAdminFeedback(sql, me, uuid(p.id, 'id'), message, { close: p.close === true });
-  if (!reply) throw new HttpError(404, 'Not found');
-  // Пуш — по галочке в админке; результат показываем рядом с ответом (ночью уйдёт утром, старой версии — нет)
-  let push = null;
-  if (p.push !== false && reply.user_id) {
-    try {
-      const { sendNotification } = await import('./push.js');
-      const r = await sendNotification(sql, reply.user_id, 'support_reply', { feedbackId: p.id, text: message });
-      push = { ok: r.ok === true, reason: r.reason || r.error || null };
-    } catch (e) {
-      console.error('[data] support_reply push failed:', e);
-      push = { ok: false, reason: 'error' };
-    }
-  }
-  return { ...reply, push };
-}
-
-async function adminCloseFeedback(sql, me, p) {
-  await assertAdmin(sql, me);
-  return closeAdminFeedback(sql, uuid(p.id, 'id'));
-}
-
-// ==================== УДАЛЕНИЕ АККАУНТА ====================
-
-/**
- * Удаляет все данные пользователя в Neon и сам аккаунт в Supabase (требование App Store 5.1.1(v)).
- * Почти всё уходит каскадом от users (наборы, курсы, прогресс, серия, награды, тесты). Таблицы без
- * внешнего ключа на users чистим сами, заодно откатываем лайки и оценки в чужих наборах библиотеки.
- * Если Supabase не ответит, данные в Neon уже удалены — повтор запроса безопасен.
- *
- * Аккаунт Sign in with Apple: сначала отзываем токен Apple (p.appleAuthorizationCode — свежий код
- * из повторного входа через Apple в приложении, api/_apple.js). Не вышло — ничего не удаляем.
- */
-async function deleteAccount(sql, me, p, user) {
-  if (p.confirm !== 'DELETE') throw new HttpError(400, 'confirm required');
-  if (process.env.ADMIN_USER_ID && me === process.env.ADMIN_USER_ID) {
-    throw new HttpError(403, 'Admin account cannot be deleted from the app');
-  }
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!serviceKey) throw new HttpError(503, 'Account deletion is not configured');
-
-  if (isAppleUser(user)) {
-    if (!isAppleRevokeConfigured()) throw new HttpError(503, 'Apple token revocation is not configured');
-    const code = optString(p.appleAuthorizationCode, 2000);
-    if (!code) throw new HttpError(400, 'Apple authorization required');
-    try {
-      await revokeAppleAuthorization(code);
-    } catch (e) {
-      console.error('[data] deleteAccount: Apple revoke failed:', e);
-      throw new HttpError(502, 'Failed to revoke Apple authorization');
-    }
-  }
-
-  await sql.transaction([
-    sql`
-      UPDATE library_sets ls SET likes_count = GREATEST(ls.likes_count - 1, 0)
-      FROM library_likes ll WHERE ll.library_set_id = ls.id AND ll.user_id = ${me}::uuid
-    `,
-    sql`
-      UPDATE library_sets ls SET
-        rating_sum = GREATEST(ls.rating_sum - lr.rating, 0),
-        rating_count = GREATEST(ls.rating_count - 1, 0)
-      FROM library_ratings lr WHERE lr.library_set_id = ls.id AND lr.user_id = ${me}::uuid
-    `,
-    sql`DELETE FROM library_likes WHERE user_id = ${me}::uuid`,
-    sql`DELETE FROM library_ratings WHERE user_id = ${me}::uuid`,
-    sql`DELETE FROM library_reports WHERE user_id = ${me}::uuid`,
-    sql`DELETE FROM library_imports WHERE user_id = ${me}::uuid`,
-    sql`DELETE FROM library_sets WHERE user_id = ${me}::uuid`,
-    sql`DELETE FROM push_tokens WHERE user_id = ${me}::uuid`,
-    sql`DELETE FROM api_rate_limits WHERE user_id = ${me}::uuid`,
-    sql`DELETE FROM users WHERE id = ${me}::uuid`,
-  ]);
-
-  const supabaseUrl = process.env.SUPABASE_URL || 'https://yiwsmjbeirgomkrckoju.supabase.co';
-  const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
-  const { error } = await admin.auth.admin.deleteUser(me);
-  if (error && error.status !== 404) {
-    console.error('[data] deleteAccount: Supabase deleteUser failed:', error);
-    throw new HttpError(502, 'Failed to delete auth user');
-  }
-  return true;
-}
-
 const ACTIONS = {
-  ensureUserExists, getProfile, updateDisplayName, updateUserName, updateLanguagePreferences, saveOnboardingData,
-  getAboutMe, saveAboutMe,
-  loadSets, loadCardsBySet, loadAllCards, updateCard, createSet, createCard, createCardsBatch,
-  deleteSet, deleteCard, updateSetMeta, updateSetCourse,
-  loadCourses, createCourse, loadStudentCourses,
-  upsertDailyActivity, updateUserStatsStreak, buyStreakFreeze, logStreakEvent, getWeekActivity, getUserStats,
+  ensureUserExists,
+  getProfile,
+  updateDisplayName,
+  updateUserName,
+  updateLanguagePreferences,
+  saveOnboardingData,
+  getAboutMe,
+  saveAboutMe,
+  loadSets,
+  loadCardsBySet,
+  loadAllCards,
+  updateCard,
+  createSet,
+  createCard,
+  createCardsBatch,
+  deleteSet,
+  deleteCard,
+  updateSetMeta,
+  updateSetCourse,
+  loadCourses,
+  createCourse,
+  loadStudentCourses,
+  upsertDailyActivity,
+  updateUserStatsStreak,
+  buyStreakFreeze,
+  logStreakEvent,
+  getWeekActivity,
+  getUserStats,
   bootstrap,
   getDailyActivity,
   deleteAccount,
   submitFeedback,
-  myFeedback, feedbackThread, replyFeedback, feedbackUnreadCount,
+  myFeedback,
+  feedbackThread,
+  replyFeedback,
+  feedbackUnreadCount,
   adminDashboard,
   adminMarkFeedbackRead,
-  adminFeedbackThread, adminReplyFeedback, adminCloseFeedback,
+  adminFeedbackThread,
+  adminReplyFeedback,
+  adminCloseFeedback,
 };
 
 // ─── Сигнал ученикам об изменениях в курсе ─────────────────────────────────
@@ -1027,7 +154,8 @@ async function coursesTouchedBy(sql, action, p) {
       case 'createCardsBatch': {
         const setIds = [...new Set((p.cards || []).map((c) => c?.setId).filter(Boolean))];
         if (setIds.length === 0) return [];
-        const rows = await sql`SELECT DISTINCT course_id FROM card_sets WHERE id = ANY(${setIds}::uuid[])`;
+        const rows =
+          await sql`SELECT DISTINCT course_id FROM card_sets WHERE id = ANY(${setIds}::uuid[])`;
         return rows.map((r) => r.course_id);
       }
       default:
@@ -1052,12 +180,38 @@ export default async function handler(req, res) {
       res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
       return res.status(200).json({ data: await getPublicNews(sql) });
     } catch (error) {
-      console.error('[data] news failed:', error);
+      log.error('data', 'news failed', error);
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
-  if (!Object.hasOwn(ACTIONS, action || '')) return res.status(400).json({ error: 'Unknown action' });
-  if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  // Последняя версия в магазине (plan/new/app_update_prompt.md, Update 1) — тоже без входа и без БД:
+  // окно «Обязательно обновить» должно работать даже тогда, когда вход сломан
+  if (action === 'app-version') {
+    if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+    try {
+      const data = await getAppVersion({
+        platform: req.query.platform,
+        onError: (e) => log.warn('data', `app-version lookup failed: ${e.message}`),
+      });
+      // Apple не ответил и запасного ответа нет — пустоту на час не кэшируем, через минуту спросим снова
+      const failed = req.query.platform === 'ios' && data.latest === null;
+      res.setHeader(
+        'Cache-Control',
+        failed ? 'public, s-maxage=60' : 'public, s-maxage=3600, stale-while-revalidate=86400'
+      );
+      return res.status(200).json({ data });
+    } catch (error) {
+      if (error instanceof HttpError) {
+        return res.status(error.status).json({ error: error.message });
+      }
+      log.error('data', 'app-version failed', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+  if (!Object.hasOwn(ACTIONS, action || ''))
+    return res.status(400).json({ error: 'Unknown action' });
+  if (req.method !== 'GET' && req.method !== 'POST')
+    return res.status(405).json({ error: 'Method not allowed' });
 
   const user = await getAuthedUser(req);
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
@@ -1074,7 +228,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ data });
   } catch (error) {
     if (error instanceof HttpError) return res.status(error.status).json({ error: error.message });
-    console.error(`[data] ${action} failed:`, error);
+    log.error('data', `${action} failed`, error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }

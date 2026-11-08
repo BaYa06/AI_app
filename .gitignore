@@ -21,7 +21,7 @@ ios/Pods/
 ios/build/
 *.xcworkspace
 !default.xcworkspace
-*.xcuserdata
+xcuserdata/
 DerivedData/
 
 # Android
@@ -64,6 +64,7 @@ coverage/
 .env.*
 !.env.example
 .env.local
+.env.staging
 
 # Secrets / Service Account Keys
 flashly.json
@@ -83,3 +84,9 @@ api/admin.js
 public/admin.html
 admin-server.mjs
 .vercel
+
+# Source data for import scripts (Excel books/sets) and raw sound drafts —
+# not code; originals are kept outside git, see database/README.md
+books/
+sets/
+sounds/

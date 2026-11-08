@@ -11,7 +11,15 @@ import { ChevronDown, ChevronUp, Gem, Trophy } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import { EmptyState, ErrorState, ScreenHeader, Switch } from '@/components/ui';
 import { useThemeColors } from '@/store';
-import { spacing, alpha, borderRadius, heights, iconSize, screenPadding, type ColorToken } from '@/constants';
+import {
+  spacing,
+  alpha,
+  borderRadius,
+  heights,
+  iconSize,
+  screenPadding,
+  type ColorToken,
+} from '@/constants';
 import { NeonService, type CourseLeaderboard } from '@/services/NeonService';
 import { StorageService } from '@/services/StorageService';
 import { triggerHaptic } from '@/utils/haptic';
@@ -25,11 +33,14 @@ type Row = Board['rows'][number];
 
 /** Что пользователь уже видел: место в текущей неделе и просмотренные итоги (для тизера на главной) */
 export const leaderboardSeenKey = (courseId: string) => `leaderboard_seen_${courseId}`;
-export type LeaderboardSeen = { weekStart?: string; place?: number | null; resultsWeekStart?: string };
+export type LeaderboardSeen = {
+  weekStart?: string;
+  place?: number | null;
+  resultsWeekStart?: string;
+};
 
 // Пьедестал: подложка — цвет медали 20 %, текст — textPrimary (читаемо в обеих темах)
 const PODIUM: ColorToken[] = ['star', 'silver', 'bronze'];
-
 
 function timeLeft(endsAt: number | null): string | null {
   if (!endsAt) return null;
@@ -53,7 +64,9 @@ export function CourseLeaderboardScreen({ navigation, route }: Props) {
 
   const [week, setWeek] = useState<Week>(route.params.week ?? 'current');
   // Сразу — последний сохранённый рейтинг, свежий подменит без индикатора загрузки
-  const [board, setBoard] = useState<CourseLeaderboard | null>(() => NeonService.cachedLeaderboard(courseId, route.params.week ?? 'current'));
+  const [board, setBoard] = useState<CourseLeaderboard | null>(() =>
+    NeonService.cachedLeaderboard(courseId, route.params.week ?? 'current')
+  );
   const [loading, setLoading] = useState(() => board === null);
   const [error, setError] = useState(false);
   const [showRules, setShowRules] = useState(false);
@@ -74,8 +87,10 @@ export function CourseLeaderboardScreen({ navigation, route }: Props) {
         setError(result === null && !cached);
         setLoading(false);
       });
-      return () => { active = false; };
-    }, [courseId, week, retryTick]),
+      return () => {
+        active = false;
+      };
+    }, [courseId, week, retryTick])
   );
 
   // Запоминаем увиденное — тизер на главной сравнивает с этим («тебя обогнали», «итоги готовы»)
@@ -83,9 +98,16 @@ export function CourseLeaderboardScreen({ navigation, route }: Props) {
     if (!board || !('rows' in board)) return;
     const seen = StorageService.getObject<LeaderboardSeen>(leaderboardSeenKey(courseId)) || {};
     if (board.week === 'current') {
-      StorageService.setObject(leaderboardSeenKey(courseId), { ...seen, weekStart: board.weekStart, place: board.me?.place ?? null });
+      StorageService.setObject(leaderboardSeenKey(courseId), {
+        ...seen,
+        weekStart: board.weekStart,
+        place: board.me?.place ?? null,
+      });
     } else if (board.frozen) {
-      StorageService.setObject(leaderboardSeenKey(courseId), { ...seen, resultsWeekStart: board.weekStart });
+      StorageService.setObject(leaderboardSeenKey(courseId), {
+        ...seen,
+        resultsWeekStart: board.weekStart,
+      });
     }
   }, [board, courseId]);
 
@@ -99,13 +121,16 @@ export function CourseLeaderboardScreen({ navigation, route }: Props) {
   const cardBg = colors.surface;
   const mutedBg = colors.surfaceMuted;
 
-  const toggleEnabled = useCallback(async (enabled: boolean) => {
-    if (savingToggle) return;
-    setSavingToggle(true);
-    const ok = await NeonService.setCourseRatingEnabled(courseId, enabled);
-    setSavingToggle(false);
-    if (ok) setRetryTick((t) => t + 1);
-  }, [courseId, savingToggle]);
+  const toggleEnabled = useCallback(
+    async (enabled: boolean) => {
+      if (savingToggle) return;
+      setSavingToggle(true);
+      const ok = await NeonService.setCourseRatingEnabled(courseId, enabled);
+      setSavingToggle(false);
+      if (ok) setRetryTick((t) => t + 1);
+    },
+    [courseId, savingToggle]
+  );
 
   const renderRow = (r: Row) => (
     <View
@@ -113,27 +138,52 @@ export function CourseLeaderboardScreen({ navigation, route }: Props) {
       style={[
         styles.row,
         { borderBottomColor: colors.border },
-        r.isMe && { backgroundColor: alpha(colors.primary, 10), borderRadius: borderRadius.m, borderBottomWidth: 0 },
+        r.isMe && {
+          backgroundColor: alpha(colors.primary, 10),
+          borderRadius: borderRadius.m,
+          borderBottomWidth: 0,
+        },
       ]}
     >
-      <Text variant="body" style={[styles.rowPlace, { color: r.isMe ? colors.primary : colors.textSecondary }]}>
+      <Text
+        variant="body"
+        style={[styles.rowPlace, { color: r.isMe ? colors.primary : colors.textSecondary }]}
+      >
         {r.place ?? '–'}
       </Text>
       <View style={[styles.avatar, { backgroundColor: r.isMe ? colors.primaryFill : mutedBg }]}>
-        <Text variant="label" style={[styles.bold, { color: r.isMe ? colors.onPrimary : colors.textPrimary }]}>{initial(r.name)}</Text>
+        <Text
+          variant="label"
+          style={[styles.bold, { color: r.isMe ? colors.onPrimary : colors.textPrimary }]}
+        >
+          {initial(r.name)}
+        </Text>
       </View>
       <View style={styles.flex1}>
-        <Text variant="body" style={{ color: colors.textPrimary, fontWeight: r.isMe ? '700' : '400' }} numberOfLines={1}>
+        <Text
+          variant="body"
+          style={{ color: colors.textPrimary, fontWeight: r.isMe ? '700' : '400' }}
+          numberOfLines={1}
+        >
           {r.isMe ? 'Ты' : r.name}
         </Text>
         {r.place === null && (
-          <Text variant="caption" style={{ color: colors.textTertiary }}>скрыт из рейтинга</Text>
+          <Text variant="caption" style={{ color: colors.textTertiary }}>
+            скрыт из рейтинга
+          </Text>
         )}
         {r.reward > 0 && (
-          <Text variant="caption" style={{ color: colors.warningText }}>+{r.reward} алмазов</Text>
+          <Text variant="caption" style={{ color: colors.warningText }}>
+            +{r.reward} алмазов
+          </Text>
         )}
       </View>
-      <Text variant="body" style={[styles.bold, { color: r.isMe ? colors.primary : colors.textPrimary }]}>{r.points}</Text>
+      <Text
+        variant="body"
+        style={[styles.bold, { color: r.isMe ? colors.primary : colors.textPrimary }]}
+      >
+        {r.points}
+      </Text>
     </View>
   );
 
@@ -145,9 +195,13 @@ export function CourseLeaderboardScreen({ navigation, route }: Props) {
         bordered
         center={
           <View style={styles.headerTitles} accessibilityRole="header">
-            <Text variant="button" style={[styles.noLetterSpacing, { color: colors.textPrimary }]}>Рейтинг недели</Text>
+            <Text variant="button" style={[styles.noLetterSpacing, { color: colors.textPrimary }]}>
+              Рейтинг недели
+            </Text>
             {!!courseTitle && (
-              <Text variant="caption" color="secondary" numberOfLines={1}>{courseTitle}</Text>
+              <Text variant="caption" color="secondary" numberOfLines={1}>
+                {courseTitle}
+              </Text>
             )}
           </View>
         }
@@ -158,14 +212,24 @@ export function CourseLeaderboardScreen({ navigation, route }: Props) {
         {(['current', 'previous'] as Week[]).map((w) => {
           const active = week === w;
           return (
-            <Pressable hitSlop={{ top: spacing.xxs, bottom: spacing.xxs }}
+            <Pressable
+              hitSlop={{ top: spacing.xxs, bottom: spacing.xxs }}
               key={w}
-              onPress={() => { triggerHaptic('selection'); setWeek(w); }}
+              onPress={() => {
+                triggerHaptic('selection');
+                setWeek(w);
+              }}
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
               style={[styles.segment, active && { backgroundColor: colors.surface }]}
             >
-              <Text variant="bodySmall" style={{ color: active ? colors.textPrimary : colors.textSecondary, fontWeight: active ? '700' : '400' }}>
+              <Text
+                variant="bodySmall"
+                style={{
+                  color: active ? colors.textPrimary : colors.textSecondary,
+                  fontWeight: active ? '700' : '400',
+                }}
+              >
                 {w === 'current' ? 'Эта неделя' : 'Прошлая'}
               </Text>
             </Pressable>
@@ -174,22 +238,46 @@ export function CourseLeaderboardScreen({ navigation, route }: Props) {
       </View>
 
       {loading ? (
-        <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>
+        <View style={styles.center}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
       ) : error ? (
-        <ErrorState title="Не удалось загрузить рейтинг" onRetry={() => setRetryTick((t) => t + 1)} />
+        <ErrorState
+          title="Не удалось загрузить рейтинг"
+          onRetry={() => setRetryTick((t) => t + 1)}
+        />
       ) : !data ? (
-        <EmptyState icon={Trophy} color={colors.textSecondary} title="Учитель выключил рейтинг в этом курсе" />
+        <EmptyState
+          icon={Trophy}
+          color={colors.textSecondary}
+          title="Учитель выключил рейтинг в этом курсе"
+        />
       ) : (
         <>
-          <ScrollView contentContainerStyle={{ paddingBottom: spacing.xl }} showsVerticalScrollIndicator={false}>
-            <Text variant="bodySmall" align="center" style={[styles.caption, { color: colors.textSecondary }]}>
+          <ScrollView
+            contentContainerStyle={{ paddingBottom: spacing.xl }}
+            showsVerticalScrollIndicator={false}
+          >
+            <Text
+              variant="bodySmall"
+              align="center"
+              style={[styles.caption, { color: colors.textSecondary }]}
+            >
               {data.week === 'current'
                 ? timeLeft(data.endsAt)
-                : data.frozen ? 'Итоги прошлой недели' : 'Итоги подводятся — загляни чуть позже'}
+                : data.frozen
+                  ? 'Итоги прошлой недели'
+                  : 'Итоги подводятся — загляни чуть позже'}
             </Text>
 
             {data.isTeacher && !data.enabled && (
-              <Text variant="bodySmall" align="center" style={[styles.caption, { color: colors.warningText }]}>Ученики сейчас не видят рейтинг</Text>
+              <Text
+                variant="bodySmall"
+                align="center"
+                style={[styles.caption, { color: colors.warningText }]}
+              >
+                Ученики сейчас не видят рейтинг
+              </Text>
             )}
 
             {/* Пьедестал: 2 — 1 — 3 */}
@@ -201,24 +289,68 @@ export function CourseLeaderboardScreen({ navigation, route }: Props) {
                   const podiumHeights = [104, 76, 60];
                   return (
                     <View key={r.userId} style={styles.podiumCol}>
-                      {i === 0 && <Trophy size={iconSize.m} color={colors.star} fill={alpha(colors.star, 20)} style={styles.podiumTrophy} />}
+                      {i === 0 && (
+                        <Trophy
+                          size={iconSize.m}
+                          color={colors.star}
+                          fill={alpha(colors.star, 20)}
+                          style={styles.podiumTrophy}
+                        />
+                      )}
                       <View
                         style={[
                           styles.podiumAvatar,
-                          { backgroundColor: r.isMe ? colors.primaryFill : alpha(colors[PODIUM[i]], 20) },
+                          {
+                            backgroundColor: r.isMe
+                              ? colors.primaryFill
+                              : alpha(colors[PODIUM[i]], 20),
+                          },
                           i === 0 && styles.podiumAvatarFirst,
                         ]}
                       >
-                        <Text variant="bodyLarge" style={[styles.bold, { color: r.isMe ? colors.onPrimary : colors.textPrimary }]}>{initial(r.name)}</Text>
+                        <Text
+                          variant="bodyLarge"
+                          style={[
+                            styles.bold,
+                            { color: r.isMe ? colors.onPrimary : colors.textPrimary },
+                          ]}
+                        >
+                          {initial(r.name)}
+                        </Text>
                       </View>
-                      <Text variant="label" style={[styles.podiumName, { color: colors.textPrimary }]} numberOfLines={1}>{r.isMe ? 'Ты' : r.name}</Text>
+                      <Text
+                        variant="label"
+                        style={[styles.podiumName, { color: colors.textPrimary }]}
+                        numberOfLines={1}
+                      >
+                        {r.isMe ? 'Ты' : r.name}
+                      </Text>
                       <View
                         accessible
                         accessibilityLabel={`${i + 1} место: ${r.points} ${pluralize(r.points, 'очко', 'очка', 'очков')}`}
-                        style={[styles.podiumBase, { height: podiumHeights[i], backgroundColor: r.isMe ? alpha(colors.primary, 10) : alpha(colors[PODIUM[i]], 20) }]}
+                        style={[
+                          styles.podiumBase,
+                          {
+                            height: podiumHeights[i],
+                            backgroundColor: r.isMe
+                              ? alpha(colors.primary, 10)
+                              : alpha(colors[PODIUM[i]], 20),
+                          },
+                        ]}
                       >
-                        <Text variant="h2" style={{ color: r.isMe ? colors.primary : colors.textPrimary }}>{i + 1}</Text>
-                        <Text variant="caption" style={[styles.semibold, { color: r.isMe ? colors.primary : colors.textSecondary }]}>
+                        <Text
+                          variant="h2"
+                          style={{ color: r.isMe ? colors.primary : colors.textPrimary }}
+                        >
+                          {i + 1}
+                        </Text>
+                        <Text
+                          variant="caption"
+                          style={[
+                            styles.semibold,
+                            { color: r.isMe ? colors.primary : colors.textSecondary },
+                          ]}
+                        >
                           {r.points} {pluralize(r.points, 'очко', 'очка', 'очков')}
                         </Text>
                       </View>
@@ -241,7 +373,11 @@ export function CourseLeaderboardScreen({ navigation, route }: Props) {
             {/* Список */}
             <View style={[styles.list, { backgroundColor: cardBg, borderColor: colors.border }]}>
               {!hasPoints && (
-                <Text variant="bodySmall" align="center" style={[styles.emptyText, { color: colors.textSecondary }]}>
+                <Text
+                  variant="bodySmall"
+                  align="center"
+                  style={[styles.emptyText, { color: colors.textSecondary }]}
+                >
                   {data.week === 'current'
                     ? 'Пока ни у кого нет очков — первое правильное повторение выведет тебя вперёд'
                     : 'На прошлой неделе очков не было'}
@@ -258,8 +394,14 @@ export function CourseLeaderboardScreen({ navigation, route }: Props) {
               accessibilityState={{ expanded: showRules }}
               style={[styles.rulesHeader, { backgroundColor: cardBg, borderColor: colors.border }]}
             >
-              <Text variant="body" style={[styles.semibold, { color: colors.textPrimary }]}>Как считаются очки</Text>
-              {showRules ? <ChevronUp size={iconSize.s} color={colors.textSecondary} /> : <ChevronDown size={iconSize.s} color={colors.textSecondary} />}
+              <Text variant="body" style={[styles.semibold, { color: colors.textPrimary }]}>
+                Как считаются очки
+              </Text>
+              {showRules ? (
+                <ChevronUp size={iconSize.s} color={colors.textSecondary} />
+              ) : (
+                <ChevronDown size={iconSize.s} color={colors.textSecondary} />
+              )}
             </Pressable>
             {showRules && (
               <View style={[styles.rules, { backgroundColor: cardBg, borderColor: colors.border }]}>
@@ -270,45 +412,73 @@ export function CourseLeaderboardScreen({ navigation, route }: Props) {
                   ['+5', 'слово выучено надолго'],
                 ].map(([pts, text]) => (
                   <View key={pts} style={styles.ruleRow}>
-                    <Text variant="body" style={[styles.rulePts, { color: colors.primary }]}>{pts}</Text>
-                    <Text variant="bodySmall" style={[styles.flex1, { color: colors.textPrimary }]}>{text}</Text>
+                    <Text variant="body" style={[styles.rulePts, { color: colors.primary }]}>
+                      {pts}
+                    </Text>
+                    <Text variant="bodySmall" style={[styles.flex1, { color: colors.textPrimary }]}>
+                      {text}
+                    </Text>
                   </View>
                 ))}
                 <Text variant="caption" style={[styles.ruleFoot, { color: colors.textSecondary }]}>
-                  Очки дают «Тест» и «Собери слово» по наборам курса. Повтор раньше срока очков не даёт —
-                  возвращайся к словам, когда им пришло время. В день — не больше 300 очков.
+                  Очки дают «Тест» и «Собери слово» по наборам курса. Повтор раньше срока очков не
+                  даёт — возвращайся к словам, когда им пришло время. В день — не больше 300 очков.
                 </Text>
               </View>
             )}
 
             {/* Настройки — только у учителя. Ученик скрыть себя из рейтинга не может */}
             {data.isTeacher ? (
-              <View style={[styles.settingRow, { backgroundColor: cardBg, borderColor: colors.border }]}>
+              <View
+                style={[styles.settingRow, { backgroundColor: cardBg, borderColor: colors.border }]}
+              >
                 <View style={styles.flex1}>
-                  <Text variant="body" style={[styles.semibold, { color: colors.textPrimary }]}>Рейтинг для учеников</Text>
-                  <Text variant="caption" color="secondary">Ученики видят места и соревнуются за награды</Text>
+                  <Text variant="body" style={[styles.semibold, { color: colors.textPrimary }]}>
+                    Рейтинг для учеников
+                  </Text>
+                  <Text variant="caption" color="secondary">
+                    Ученики видят места и соревнуются за награды
+                  </Text>
                 </View>
-                <Switch value={data.enabled} onValueChange={toggleEnabled} disabled={savingToggle} accessibilityLabel="Рейтинг для учеников" />
+                <Switch
+                  value={data.enabled}
+                  onValueChange={toggleEnabled}
+                  disabled={savingToggle}
+                  accessibilityLabel="Рейтинг для учеников"
+                />
               </View>
             ) : null}
           </ScrollView>
 
           {/* Моё место — закреплено внизу */}
           {data.me && !data.isTeacher && (
-            <View style={[styles.me, { borderTopColor: colors.border, backgroundColor: colors.background, paddingBottom: insets.bottom + spacing.s }]}>
+            <View
+              style={[
+                styles.me,
+                {
+                  borderTopColor: colors.border,
+                  backgroundColor: colors.background,
+                  paddingBottom: insets.bottom + spacing.s,
+                },
+              ]}
+            >
               <View style={styles.flex1}>
                 <Text variant="bodySmall" style={[styles.semibold, { color: colors.textPrimary }]}>
                   {data.me.points === 0
-                      ? 'Набери первые очки, чтобы занять место'
-                      : data.me.place === 1
-                        ? 'Ты на 1-м месте — удержи до конца недели'
-                        : `Ты на ${data.me.place}-м месте${data.me.gapToNext != null ? ` · до ${data.me.place! - 1}-го — ${data.me.gapToNext} ${pluralize(data.me.gapToNext, 'очко', 'очка', 'очков')}` : ''}`}
+                    ? 'Набери первые очки, чтобы занять место'
+                    : data.me.place === 1
+                      ? 'Ты на 1-м месте — удержи до конца недели'
+                      : `Ты на ${data.me.place}-м месте${data.me.gapToNext != null ? ` · до ${data.me.place! - 1}-го — ${data.me.gapToNext} ${pluralize(data.me.gapToNext, 'очко', 'очка', 'очков')}` : ''}`}
                 </Text>
                 {data.me.learnedTotal != null && (
-                  <Text variant="caption" color="secondary">Всего выучено в курсе: {data.me.learnedTotal}</Text>
+                  <Text variant="caption" color="secondary">
+                    Всего выучено в курсе: {data.me.learnedTotal}
+                  </Text>
                 )}
               </View>
-              <Text variant="h2" style={{ color: colors.primary }}>{data.me.points}</Text>
+              <Text variant="h2" style={{ color: colors.primary }}>
+                {data.me.points}
+              </Text>
             </View>
           )}
         </>
@@ -324,28 +494,127 @@ const styles = StyleSheet.create({
   semibold: { fontWeight: '600' },
   noLetterSpacing: { letterSpacing: 0 },
   headerTitles: { alignItems: 'center' },
-  segmented: { flexDirection: 'row', margin: screenPadding, marginBottom: 0, padding: spacing.xxs, borderRadius: borderRadius.m },
-  segment: { flex: 1, minHeight: 36, borderRadius: borderRadius.s, alignItems: 'center', justifyContent: 'center' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.s },
+  segmented: {
+    flexDirection: 'row',
+    margin: screenPadding,
+    marginBottom: 0,
+    padding: spacing.xxs,
+    borderRadius: borderRadius.m,
+  },
+  segment: {
+    flex: 1,
+    minHeight: 36,
+    borderRadius: borderRadius.s,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+    gap: spacing.s,
+  },
   caption: { marginTop: spacing.m, paddingHorizontal: screenPadding },
-  podium: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: spacing.s, marginTop: spacing.l, paddingHorizontal: screenPadding },
+  podium: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    gap: spacing.s,
+    marginTop: spacing.l,
+    paddingHorizontal: screenPadding,
+  },
   podiumCol: { flex: 1, maxWidth: 116, alignItems: 'center' },
   podiumTrophy: { marginBottom: spacing.xxs },
-  podiumAvatar: { width: 48, height: 48, borderRadius: borderRadius.full, alignItems: 'center', justifyContent: 'center' },
+  podiumAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   podiumAvatarFirst: { width: 56, height: 56 },
   podiumName: { marginVertical: spacing.xs },
-  podiumBase: { width: '100%', borderTopLeftRadius: borderRadius.m, borderTopRightRadius: borderRadius.m, alignItems: 'center', justifyContent: 'center' },
-  note: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginHorizontal: screenPadding, marginTop: spacing.m, padding: spacing.s, borderRadius: borderRadius.m },
-  list: { marginHorizontal: screenPadding, marginTop: spacing.m, borderRadius: borderRadius.l, borderWidth: 1, paddingHorizontal: spacing.xs, paddingVertical: spacing.xxs },
+  podiumBase: {
+    width: '100%',
+    borderTopLeftRadius: borderRadius.m,
+    borderTopRightRadius: borderRadius.m,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  note: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginHorizontal: screenPadding,
+    marginTop: spacing.m,
+    padding: spacing.s,
+    borderRadius: borderRadius.m,
+  },
+  list: {
+    marginHorizontal: screenPadding,
+    marginTop: spacing.m,
+    borderRadius: borderRadius.l,
+    borderWidth: 1,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xxs,
+  },
   emptyText: { padding: spacing.m },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, minHeight: 56, paddingHorizontal: spacing.xs, borderBottomWidth: 1 },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+    minHeight: 56,
+    paddingHorizontal: spacing.xs,
+    borderBottomWidth: 1,
+  },
   rowPlace: { width: 24, textAlign: 'center', fontWeight: '700' },
-  avatar: { width: 36, height: 36, borderRadius: borderRadius.full, alignItems: 'center', justifyContent: 'center' },
-  rulesHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: screenPadding, marginTop: spacing.m, minHeight: heights.input, paddingHorizontal: spacing.m, borderRadius: borderRadius.m, borderWidth: 1 },
-  rules: { marginHorizontal: screenPadding, marginTop: spacing.xxs, paddingHorizontal: spacing.m, paddingVertical: spacing.s, borderRadius: borderRadius.m, borderWidth: 1, gap: spacing.xs },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rulesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: screenPadding,
+    marginTop: spacing.m,
+    minHeight: heights.input,
+    paddingHorizontal: spacing.m,
+    borderRadius: borderRadius.m,
+    borderWidth: 1,
+  },
+  rules: {
+    marginHorizontal: screenPadding,
+    marginTop: spacing.xxs,
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.s,
+    borderRadius: borderRadius.m,
+    borderWidth: 1,
+    gap: spacing.xs,
+  },
   ruleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.s },
   rulePts: { width: 28, fontWeight: '700' },
   ruleFoot: { marginTop: spacing.xxs },
-  settingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, marginHorizontal: screenPadding, marginTop: spacing.m, padding: spacing.m, borderRadius: borderRadius.m, borderWidth: 1 },
-  me: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingHorizontal: screenPadding, paddingTop: spacing.m, borderTopWidth: 1 },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+    marginHorizontal: screenPadding,
+    marginTop: spacing.m,
+    padding: spacing.m,
+    borderRadius: borderRadius.m,
+    borderWidth: 1,
+  },
+  me: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+    paddingHorizontal: screenPadding,
+    paddingTop: spacing.m,
+    borderTopWidth: 1,
+  },
 });

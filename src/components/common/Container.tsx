@@ -31,11 +31,7 @@ export const Container = memo<ContainerProps>(function Container({
     backgroundColor: colors.background,
   };
 
-  const content = (
-    <View style={[styles.content, padded && styles.padded, style]}>
-      {children}
-    </View>
-  );
+  const content = <View style={[styles.content, padded && styles.padded, style]}>{children}</View>;
 
   return (
     <>

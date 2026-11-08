@@ -5,7 +5,10 @@
 import { Alert, Platform } from 'react-native';
 
 // В tsconfig нет lib "dom" — типизируем только то, что нужно на вебе.
-const webWindow = globalThis as unknown as { alert(message: string): void; confirm(message: string): boolean };
+const webWindow = globalThis as unknown as {
+  alert(message: string): void;
+  confirm(message: string): boolean;
+};
 
 export function showMessage(title: string, message?: string): void {
   if (Platform.OS === 'web') {
@@ -19,7 +22,10 @@ export function confirmAction(
   title: string,
   message: string,
   confirmText: string,
-  { destructive = false, cancelText = 'Отмена' }: { destructive?: boolean; cancelText?: string } = {},
+  {
+    destructive = false,
+    cancelText = 'Отмена',
+  }: { destructive?: boolean; cancelText?: string } = {}
 ): Promise<boolean> {
   if (Platform.OS === 'web') {
     return Promise.resolve(webWindow.confirm(`${title}\n${message}`));
@@ -30,9 +36,13 @@ export function confirmAction(
       message,
       [
         { text: cancelText, style: 'cancel', onPress: () => resolve(false) },
-        { text: confirmText, style: destructive ? 'destructive' : 'default', onPress: () => resolve(true) },
+        {
+          text: confirmText,
+          style: destructive ? 'destructive' : 'default',
+          onPress: () => resolve(true),
+        },
       ],
-      { cancelable: true, onDismiss: () => resolve(false) },
+      { cancelable: true, onDismiss: () => resolve(false) }
     );
   });
 }

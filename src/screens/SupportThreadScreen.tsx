@@ -14,10 +14,15 @@ import { spacing, borderRadius, heights, iconSize } from '@/constants';
 import { triggerHaptic } from '@/utils/haptic';
 import { NetworkLoadError } from '@/services/NeonService';
 import {
-  feedbackTagLabel, loadSupportThread, satisfactionLabel, sendSupportReply,
-  type SupportMessage, type SupportThread,
+  feedbackTagLabel,
+  loadSupportThread,
+  satisfactionLabel,
+  sendSupportReply,
+  type SupportMessage,
+  type SupportThread,
 } from '@/services/feedback';
 import { formatSupportDate, ticketTitle } from './SupportListScreen';
+import type { RootStackScreenProps } from '@/types/navigation';
 
 const MAX_LENGTH = 4000;
 
@@ -27,16 +32,24 @@ type Item =
 
 /** Сообщения по времени + отметка «Прочитано командой» на своём месте */
 function buildItems(thread: SupportThread): Item[] {
-  const items: Item[] = thread.messages.map((m, i) => ({ type: 'message', key: `m${i}`, message: m }));
+  const items: Item[] = thread.messages.map((m, i) => ({
+    type: 'message',
+    key: `m${i}`,
+    message: m,
+  }));
   if (thread.readAt) {
     const readTime = new Date(thread.readAt).getTime();
     const index = thread.messages.findIndex((m) => new Date(m.createdAt).getTime() > readTime);
-    items.splice(index === -1 ? items.length : index, 0, { type: 'read', key: 'read', at: thread.readAt });
+    items.splice(index === -1 ? items.length : index, 0, {
+      type: 'read',
+      key: 'read',
+      at: thread.readAt,
+    });
   }
   return items;
 }
 
-export function SupportThreadScreen({ navigation, route }: any) {
+export function SupportThreadScreen({ navigation, route }: RootStackScreenProps<'SupportThread'>) {
   const colors = useThemeColors();
   const id: string = route?.params?.id;
   const scrollRef = useRef<ScrollView>(null);
@@ -52,7 +65,8 @@ export function SupportThreadScreen({ navigation, route }: any) {
     try {
       setThread(await loadSupportThread(id));
     } catch (e) {
-      if (e instanceof NetworkLoadError && (e.status === 404 || e.status === 400)) setNotFound(true);
+      if (e instanceof NetworkLoadError && (e.status === 404 || e.status === 400))
+        setNotFound(true);
       else setLoadFailed(true);
     }
   }, [id]);
@@ -72,7 +86,9 @@ export function SupportThreadScreen({ navigation, route }: any) {
     try {
       const message = await sendSupportReply(thread.id, text);
       triggerHaptic('notificationSuccess');
-      setThread((prev) => (prev ? { ...prev, closed: false, messages: [...prev.messages, message] } : prev));
+      setThread((prev) =>
+        prev ? { ...prev, closed: false, messages: [...prev.messages, message] } : prev
+      );
       setDraft('');
       scrollToEnd();
     } catch (e) {
@@ -80,7 +96,7 @@ export function SupportThreadScreen({ navigation, route }: any) {
       toast.error(
         e instanceof NetworkLoadError && e.status === 429
           ? 'Сегодня ты уже написал много сообщений. Продолжим завтра'
-          : 'Не удалось отправить. Проверь интернет и попробуй ещё раз',
+          : 'Не удалось отправить. Проверь интернет и попробуй ещё раз'
       );
     } finally {
       setSending(false);
@@ -88,14 +104,20 @@ export function SupportThreadScreen({ navigation, route }: any) {
   };
 
   // Открыли из push при холодном старте — под экраном ничего нет: «Назад» ведёт в «Мои обращения»
-  const goBack = () => (navigation.canGoBack() ? navigation.goBack() : navigation.replace('Support'));
+  const goBack = () =>
+    navigation.canGoBack() ? navigation.goBack() : navigation.replace('Support');
   const title = thread ? ticketTitle(thread) : 'Обращение';
   const header = <ScreenHeader title={title} onBack={goBack} bordered />;
 
   if (notFound) {
     return (
       <Screen header={header} scroll={false} contentStyle={st.center}>
-        <ErrorState title="Обращение не найдено" description="Возможно, оно было удалено." onRetry={goBack} retryLabel="Назад" />
+        <ErrorState
+          title="Обращение не найдено"
+          description="Возможно, оно было удалено."
+          onRetry={goBack}
+          retryLabel="Назад"
+        />
       </Screen>
     );
   }
@@ -108,7 +130,11 @@ export function SupportThreadScreen({ navigation, route }: any) {
       <TextField
         value={draft}
         onChangeText={setDraft}
-        placeholder={thread.kind === 'rating' && thread.messages.length === 0 ? 'Хочешь что-то добавить?' : 'Написать'}
+        placeholder={
+          thread.kind === 'rating' && thread.messages.length === 0
+            ? 'Хочешь что-то добавить?'
+            : 'Написать'
+        }
         accessibilityLabel="Сообщение"
         multiline
         maxLength={MAX_LENGTH}
@@ -134,7 +160,9 @@ export function SupportThreadScreen({ navigation, route }: any) {
       footer={footer}
       keyboard
       scrollRef={scrollRef}
-      scrollProps={{ onContentSizeChange: () => scrollRef.current?.scrollToEnd({ animated: false }) }}
+      scrollProps={{
+        onContentSizeChange: () => scrollRef.current?.scrollToEnd({ animated: false }),
+      }}
       contentStyle={st.content}
     >
       {loadFailed ? (
@@ -149,10 +177,16 @@ export function SupportThreadScreen({ navigation, route }: any) {
 
           {thread.kind === 'rating' && (
             <View style={[st.ratingCard, { borderColor: colors.border }]}>
-              <Text variant="caption" color="secondary">Ответ в окне «Как тебе Flashly?»</Text>
+              <Text variant="caption" color="secondary">
+                Ответ в окне «Как тебе Flashly?»
+              </Text>
               <Text variant="bodySmall" style={{ color: colors.textPrimary }}>
                 {`«${satisfactionLabel(thread.rating)}»`}
-                {thread.hasProblem === true ? ' · Были проблемы' : thread.hasProblem === false ? ' · Проблем не было' : ''}
+                {thread.hasProblem === true
+                  ? ' · Были проблемы'
+                  : thread.hasProblem === false
+                    ? ' · Проблем не было'
+                    : ''}
                 {thread.tags?.length ? `: ${thread.tags.map(feedbackTagLabel).join(', ')}` : ''}
               </Text>
             </View>
@@ -160,12 +194,18 @@ export function SupportThreadScreen({ navigation, route }: any) {
 
           {buildItems(thread).map((item) =>
             item.type === 'read' ? (
-              <Text key={item.key} variant="caption" color="secondary" align="center" style={st.sys}>
+              <Text
+                key={item.key}
+                variant="caption"
+                color="secondary"
+                align="center"
+                style={st.sys}
+              >
                 {`Прочитано командой · ${formatSupportDate(item.at, true)}`}
               </Text>
             ) : (
               <Bubble key={item.key} message={item.message} />
-            ),
+            )
           )}
 
           {!hasAnswer && (
@@ -199,12 +239,22 @@ function Bubble({ message }: { message: SupportMessage }) {
       ]}
     >
       {!mine && (
-        <Text variant="caption" style={[st.author, { color: colors.primary }]}>Команда Flashly</Text>
+        <Text variant="caption" style={[st.author, { color: colors.primary }]}>
+          Команда Flashly
+        </Text>
       )}
-      <Text variant="body" selectable style={{ color: mine ? colors.onPrimary : colors.textPrimary }}>
+      <Text
+        variant="body"
+        selectable
+        style={{ color: mine ? colors.onPrimary : colors.textPrimary }}
+      >
         {message.message}
       </Text>
-      <Text variant="caption" align="right" style={[st.time, { color: mine ? colors.onPrimary : colors.textSecondary }]}>
+      <Text
+        variant="caption"
+        align="right"
+        style={[st.time, { color: mine ? colors.onPrimary : colors.textSecondary }]}
+      >
         {formatSupportDate(message.createdAt, true)}
       </Text>
     </View>

@@ -3,8 +3,8 @@
  * @description Экран сборки слова (интерактивный)
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, StyleSheet, Pressable, ScrollView, AppState } from 'react-native';
-import { Settings, Volume2 } from 'lucide-react-native';
+import { View, StyleSheet, Pressable, AppState } from 'react-native';
+import { Volume2 } from 'lucide-react-native';
 import {
   useThemeColors,
   useCardsStore,
@@ -13,20 +13,25 @@ import {
   selectSetStats,
 } from '@/store';
 import { Text, Loading } from '@/components/common';
-import { Button, ProgressBar, ScreenHeader } from '@/components/ui';
+import { StageLayout, AnswerPanel, sessionStageProgress } from '@/components/study/StageLayout';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card, Rating } from '@/types';
-import { spacing, borderRadius, iconSize, screenPadding, alpha } from '@/constants';
+import { spacing, borderRadius, iconSize, alpha } from '@/constants';
 import { ProgressService } from '@/services/ProgressService';
 import { speak, resolveSpeechLang, prefetchSpeech, cardSpeechLangs } from '@/utils/speech';
-import { playCorrectSound2 as playCorrectSound, preloadSound } from '@/utils/sound';
+import {
+  playCorrectSound2 as playCorrectSound,
+  playSessionSfx,
+  preloadSessionSfx,
+  preloadSound,
+} from '@/utils/sound';
+import { log } from '@/utils/logger';
+import { cardFront, cardBack } from '@/utils/cardText';
 
 type Props = RootStackScreenProps<'WordBuilder'>;
 
 type LetterSlot = { id: string; char: string | null; tileId: string | null; isFilled: boolean };
 type LetterTile = { id: string; char: string; used: boolean };
-
-const FEEDBACK_DELAY_MS = 500;
 
 const shuffleArray = <T,>(items: T[]): T[] => {
   const arr = [...items];
@@ -47,13 +52,14 @@ export function WordBuilderScreen({ navigation, route }: Props) {
     studiedInPhase = 0,
     phaseOffset = 0,
     phaseFailedIds,
+    session,
   } = route.params;
   const colors = useThemeColors();
   const updateSetStats = useSetsStore((s) => s.updateSetStats);
   const incrementTodayCards = useSettingsStore((s) => s.incrementTodayCards);
   const finishStudySession = useSettingsStore((s) => s.finishStudySession);
   const { ids, map } = useCardsStore(
-    useCallback((s) => ({ ids: s.cardsBySet[setId] || [], map: s.cards }), [setId]),
+    useCallback((s) => ({ ids: s.cardsBySet[setId] || [], map: s.cards }), [setId])
   );
   const cards = useMemo(() => {
     if (dueCardIds && dueCardIds.length > 0) {
@@ -75,6 +81,11 @@ export function WordBuilderScreen({ navigation, route }: Props) {
   const [wordResult, setWordResult] = useState<'correct' | 'wrong' | null>(null);
 
   const pendingCardsInQueueRef = useRef(0);
+  // Сессия «Изучить»: слов в порции без повторов и слова с ошибкой, ещё не исправленные.
+  // Ошибка уходит в конец той же очереди — экран не закрывается ради новой порции
+  const baseWordsRef = useRef(0);
+  const sessionRetryIdsRef = useRef<Set<string>>(new Set());
+  const [sessionRetryCount, setSessionRetryCount] = useState(0);
   const currentPhaseId = useRef(
     phaseId || `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   );
@@ -87,35 +98,30 @@ export function WordBuilderScreen({ navigation, route }: Props) {
   } | null>(null);
 
   const cardMap = useMemo(() => {
-    const map: Record<string, Card> = {};
+    const byId: Record<string, Card> = {};
     cards.forEach((card) => {
       if (card) {
-        map[card.id] = card;
+        byId[card.id] = card;
       }
     });
-    return map;
+    return byId;
   }, [cards]);
 
   const phaseFailedList = useMemo(
     () => phaseFailedIds || [],
-    [phaseFailedIds ? phaseFailedIds.join('|') : ''],
+    [phaseFailedIds ? phaseFailedIds.join('|') : '']
   );
   const phaseFailedKey = useMemo(
     () => (phaseFailedIds ? phaseFailedIds.join(',') : 'none'),
-    [phaseFailedIds ? phaseFailedIds.join(',') : 'none'],
+    [phaseFailedIds ? phaseFailedIds.join(',') : 'none']
   );
 
   const initKey = useMemo(
     () =>
-      [
-        setId,
-        cardLimit ?? 'all',
-        phaseId || 'noPhase',
-        phaseOffset,
-        phaseFailedKey,
-        cardsKey,
-      ].join('|'),
-    [setId, cardLimit, phaseId, phaseOffset, phaseFailedKey, cardsKey],
+      [setId, cardLimit ?? 'all', phaseId || 'noPhase', phaseOffset, phaseFailedKey, cardsKey].join(
+        '|'
+      ),
+    [setId, cardLimit, phaseId, phaseOffset, phaseFailedKey, cardsKey]
   );
 
   useEffect(() => {
@@ -147,6 +153,9 @@ export function WordBuilderScreen({ navigation, route }: Props) {
 
     currentTotalPhaseCards.current = totalPhaseCards || queue.length;
     setCardsQueue(queue);
+    baseWordsRef.current = queue.length;
+    sessionRetryIdsRef.current = new Set();
+    setSessionRetryCount(0);
     setCurrentIndex(0);
     setErrors(0);
     setErrorCards([]);
@@ -166,20 +175,29 @@ export function WordBuilderScreen({ navigation, route }: Props) {
   }, [initKey, totalPhaseCards]);
 
   // Предзагружаем звук правильного ответа, чтобы убрать задержку первого проигрывания
+  // В сессии — свои звуки (plan/new/session_results.md), в свободной практике — прежний
   useEffect(() => {
-    preloadSound('/correct2.wav');
+    if (session) preloadSessionSfx(['pop', 'correct', 'error']);
+    else preloadSound('/correct2.wav');
   }, []);
 
   const currentCard = cardsQueue[currentIndex];
 
-
-  const getFront = (card: Card) => card.frontText ?? (card as any).front ?? '';
-  const getBack = (card: Card) => card.backText ?? (card as any).back ?? '';
+  const getFront = (card: Card) => cardFront(card);
+  const getBack = (card: Card) => cardBack(card);
 
   // Заранее озвучиваем слово текущей и следующей карточки — кнопка динамика играет сразу
   useEffect(() => {
-    const upcoming = [cardsQueue[currentIndex], cardsQueue[currentIndex + 1]].filter(Boolean) as Card[];
-    prefetchSpeech(upcoming.map((c) => ({ text: getFront(c), counterpart: getBack(c), lang: cardSpeechLangs(c).front })));
+    const upcoming = [cardsQueue[currentIndex], cardsQueue[currentIndex + 1]].filter(
+      Boolean
+    ) as Card[];
+    prefetchSpeech(
+      upcoming.map((c) => ({
+        text: getFront(c),
+        counterpart: getBack(c),
+        lang: cardSpeechLangs(c).front,
+      }))
+    );
   }, [cardsQueue, currentIndex]);
 
   const { promptText, targetWord } = useMemo(() => {
@@ -225,14 +243,15 @@ export function WordBuilderScreen({ navigation, route }: Props) {
     setTiles(shuffleArray(initialTiles));
     setIsLocked(false);
     setWordResult(null);
-  }, [currentCard?.id, targetWord]);
+    // currentIndex — слово с ошибкой может повториться сразу следом (сессия): плитки заново
+  }, [currentCard?.id, targetWord, currentIndex]);
 
   const totalWords = cardsQueue.length;
 
   const normalizeWord = useCallback((value: string) => value.trim().toLowerCase(), []);
   const targetNormalized = useMemo(
     () => (targetWord ? normalizeWord(targetWord) : ''),
-    [normalizeWord, targetWord],
+    [normalizeWord, targetWord]
   );
 
   // Когда показано текущее слово — для времени ответа
@@ -260,25 +279,29 @@ export function WordBuilderScreen({ navigation, route }: Props) {
         cardCount: statsSnapshot.total,
         newCount: statsSnapshot.newCount,
         learningCount: statsSnapshot.learningCount,
+        youngCount: statsSnapshot.youngCount,
+        matureCount: statsSnapshot.matureCount,
         reviewCount: statsSnapshot.reviewCount,
         masteredCount: statsSnapshot.masteredCount,
       });
     },
-    [updateSetStats, incrementTodayCards],
+    [updateSetStats, incrementTodayCards]
   );
 
   const finishSession = useCallback(
     async (
       errorsCount: number,
-      errorList: Array<{ id?: string; front: string; back: string; rating: number }>,
+      errorList: Array<{ id?: string; front: string; back: string; rating: number }>
     ) => {
       const timeSpent = Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000));
-      const learnedCards = Math.max(0, totalWords - errorsCount);
+      // В сессии очередь растёт за счёт повторов ошибок — итоги по исходной порции
+      const portionTotal = session ? baseWordsRef.current : totalWords;
+      const learnedCards = Math.max(0, portionTotal - errorsCount);
 
-      const newCardsInBatch = totalWords - pendingCardsInQueueRef.current;
+      const newCardsInBatch = portionTotal - pendingCardsInQueueRef.current;
       const newStudiedInPhase = studiedInPhase + learnedCards;
       const newPhaseOffset = phaseOffset + newCardsInBatch;
-      const phaseTotal = currentTotalPhaseCards.current || totalWords;
+      const phaseTotal = currentTotalPhaseCards.current || portionTotal;
 
       const errorIds = new Set(errorList.map((c) => c.id).filter(Boolean));
       const prevFailed = new Set(phaseFailedList || []);
@@ -292,14 +315,15 @@ export function WordBuilderScreen({ navigation, route }: Props) {
           prevFailed.add(id);
         }
       });
-      const newPhaseFailedIds = Array.from(prevFailed);
+      // Сессия: все ошибки исправлены в этой же очереди — этап пройден
+      const newPhaseFailedIds = session ? [] : Array.from(prevFailed);
 
       // Серия: результат нужен экрану итогов — там праздник, если день засчитан впервые
       const streakResult = await finishStudySession();
 
       navigation.replace('StudyResults', {
         setId,
-        totalCards: totalWords,
+        totalCards: portionTotal,
         learnedCards,
         timeSpent,
         errors: errorsCount,
@@ -316,9 +340,11 @@ export function WordBuilderScreen({ navigation, route }: Props) {
         phaseFailedIds: newPhaseFailedIds,
         streakIncreased: streakResult.streakIncreased,
         newStreakCount: streakResult.newStreakCount,
+        session,
       });
     },
     [
+      session,
       finishStudySession,
       navigation,
       setId,
@@ -329,7 +355,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
       phaseOffset,
       cardsQueue,
       phaseFailedList,
-    ],
+    ]
   );
 
   const handleTilePress = useCallback(
@@ -338,6 +364,8 @@ export function WordBuilderScreen({ navigation, route }: Props) {
 
       const tile = tiles.find((t) => t.id === tileId);
       if (!tile || tile.used) return;
+      // Последняя буква сразу проверяет слово — вместо «pop» прозвучит «верно» или «ошибка»
+      if (session && slots.filter((s) => !s.char).length > 1) playSessionSfx('pop');
 
       let placed = false;
       setSlots((prevSlots) => {
@@ -358,11 +386,9 @@ export function WordBuilderScreen({ navigation, route }: Props) {
 
       if (!placed) return;
 
-      setTiles((prevTiles) =>
-        prevTiles.map((t) => (t.id === tileId ? { ...t, used: true } : t)),
-      );
+      setTiles((prevTiles) => prevTiles.map((t) => (t.id === tileId ? { ...t, used: true } : t)));
     },
-    [tiles, isLocked],
+    [tiles, slots, isLocked, session]
   );
 
   const handleSlotPress = useCallback(
@@ -370,59 +396,69 @@ export function WordBuilderScreen({ navigation, route }: Props) {
       if (isLocked) return;
       const slot = slots.find((s) => s.id === slotId);
       if (!slot || !slot.char || !slot.tileId) return;
+      if (session) playSessionSfx('pop');
 
       setSlots((prevSlots) =>
         prevSlots.map((s) =>
-          s.id === slotId ? { ...s, char: null, tileId: null, isFilled: false } : s,
-        ),
+          s.id === slotId ? { ...s, char: null, tileId: null, isFilled: false } : s
+        )
       );
 
       setTiles((prevTiles) =>
-        prevTiles.map((t) => (t.id === slot.tileId ? { ...t, used: false } : t)),
+        prevTiles.map((t) => (t.id === slot.tileId ? { ...t, used: false } : t))
       );
     },
-    [slots, isLocked],
+    [slots, isLocked, session]
   );
 
   // Обработчик озвучивания
-  const handleSpeak = useCallback(
-    (text: string, counterpartText?: string, langHint?: string) => {
-      if (!text) return;
-      const normalized = text.trim().split(/\r?\n/)[0].trim();
-      if (!normalized) return;
-      const lang = resolveSpeechLang(normalized, langHint, counterpartText);
-      speak(normalized, lang).catch((error) => {
-        console.warn('[WordBuilder] Speech error:', error);
-      });
-    },
-    [],
-  );
+  const handleSpeak = useCallback((text: string, counterpartText?: string, langHint?: string) => {
+    if (!text) return;
+    const normalized = text.trim().split(/\r?\n/)[0].trim();
+    if (!normalized) return;
+    const lang = resolveSpeechLang(normalized, langHint, counterpartText);
+    speak(normalized, lang).catch((error) => {
+      log.warn('WordBuilder', 'Speech error', error);
+    });
+  }, []);
 
   const resultBorderColor = useMemo(() => {
     if (!wordResult) return null;
     return wordResult === 'correct' ? colors.success : colors.error;
   }, [wordResult, colors.success, colors.error]);
 
-
   const advanceToNextCard = useCallback(
     (
       errorsCount: number,
-      errorList: Array<{ id?: string; front: string; back: string; rating: number }>,
+      errorList: Array<{ id?: string; front: string; back: string; rating: number }>
     ) => {
+      // Сессия: ошибка — то же слово ещё раз в конце очереди, пока не соберут верно
+      const retry = !!session && wordResult === 'wrong' && !!currentCard;
       const isLast = currentIndex >= totalWords - 1;
-      if (isLast) {
+      if (isLast && !retry) {
+        if (session) {
+          // Слово могли ошибиться несколько раз — в итогах считаем его один раз
+          const seen = new Set<string>();
+          const unique = errorList.filter((c) => {
+            const key = c.id ?? c.front;
+            return seen.has(key) ? false : (seen.add(key), true);
+          });
+          finishSession(unique.length, unique);
+          return;
+        }
         finishSession(errorsCount, errorList);
         return;
       }
+      if (retry) setCardsQueue((prev) => [...prev, currentCard]);
 
       pendingAdvanceRef.current = null;
       setSlots([]);
       setTiles([]);
       setWordResult(null);
       setIsLocked(false);
-      setCurrentIndex((idx) => Math.min(totalWords - 1, idx + 1));
+      setCurrentIndex((idx) => (retry ? idx + 1 : Math.min(totalWords - 1, idx + 1)));
     },
-    [currentIndex, totalWords, finishSession],
+    [currentIndex, totalWords, finishSession, session, wordResult, currentCard]
   );
 
   const handleCompleteWord = useCallback(() => {
@@ -447,22 +483,23 @@ export function WordBuilderScreen({ navigation, route }: Props) {
 
     setErrors(nextErrors);
     setErrorCards(updatedErrorCards);
+    if (session) {
+      const retryIds = sessionRetryIdsRef.current;
+      if (isCorrect) retryIds.delete(currentCard.id);
+      else retryIds.add(currentCard.id);
+      setSessionRetryCount(retryIds.size);
+    }
     setWordResult(isCorrect ? 'correct' : 'wrong');
     setIsLocked(true);
 
     if (advanceTimeoutRef.current) {
       clearTimeout(advanceTimeoutRef.current);
     }
-    if (isCorrect) {
-      playCorrectSound();
-      pendingAdvanceRef.current = null;
-      advanceTimeoutRef.current = setTimeout(() => {
-        advanceToNextCard(nextErrors, updatedErrorCards);
-      }, FEEDBACK_DELAY_MS);
-    } else {
-      pendingAdvanceRef.current = { errors: nextErrors, errorCards: updatedErrorCards };
-      advanceTimeoutRef.current = null;
-    }
+    // Дальше — по кнопке в нижней панели (общий скелет режима), и после верного ответа тоже
+    if (session) playSessionSfx(isCorrect ? 'correct' : 'error');
+    else if (isCorrect) playCorrectSound();
+    pendingAdvanceRef.current = { errors: nextErrors, errorCards: updatedErrorCards };
+    advanceTimeoutRef.current = null;
   }, [
     currentCard,
     targetWord,
@@ -476,6 +513,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
     totalWords,
     advanceToNextCard,
     applySrsUpdate,
+    session,
   ]);
 
   useEffect(() => {
@@ -504,173 +542,171 @@ export function WordBuilderScreen({ navigation, route }: Props) {
     return () => sub.remove();
   }, [finishStudySession]);
 
-  const progressPercent = totalWords ? Math.round(((currentIndex + 1) / totalWords) * 100) : 0;
-
   if (!currentCard) {
     return <Loading fullScreen message="Загрузка..." />;
   }
 
+  const handleExit = () => {
+    finishStudySession();
+    if (session) navigation.navigate('SetDetail', { setId: session.setId });
+    else navigation.goBack();
+  };
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <ScreenHeader
-        title="Собери слово"
-        onBack={() => { finishStudySession(); navigation.goBack(); }}
-        right={<Button variant="icon" icon={Settings} accessibilityLabel="Настройки" />}
-      />
-
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Progress */}
-        <View style={styles.progressSection}>
-          <View style={styles.progressInfo}>
-            <Text variant="bodySmall" style={[styles.semibold, { color: colors.textSecondary }]}>
-              Слово: {currentIndex + 1}/{totalWords || 1}
-            </Text>
-          </View>
-          <ProgressBar progress={progressPercent} accessibilityLabel="Прогресс" />
-        </View>
-
-        {/* Card */}
-        <View
-          style={[
-            styles.card,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-            },
-          ]}
-        >
-          <View
-            style={[
-              styles.cardTopLine,
-              { backgroundColor: colors.primary },
-            ]}
+    <StageLayout
+      session={session}
+      progress={
+        session
+          ? sessionStageProgress(
+              studiedInPhase,
+              Math.min(currentIndex + (wordResult ? 1 : 0), baseWordsRef.current),
+              sessionRetryCount,
+              currentTotalPhaseCards.current || baseWordsRef.current
+            )
+          : { done: currentIndex + (wordResult ? 1 : 0), total: totalWords }
+      }
+      task="Собери слово из букв"
+      onExit={handleExit}
+      showIntro={phaseOffset === 0 && !phaseFailedList.length}
+      footer={
+        wordResult ? (
+          <AnswerPanel
+            correct={wordResult === 'correct'}
+            answer={targetWord}
+            hint={{
+              front: targetWord,
+              back: promptText,
+              example: currentCard.example || undefined,
+            }}
+            onNext={handleConfirmNext}
           />
-          <View style={[styles.cardChip, { backgroundColor: alpha(colors.primary, 10) }]}>
-            <Text variant="overline" style={{ color: colors.primary }}>
-              Собери слово
-            </Text>
-          </View>
-
-          <View style={styles.wordBlock}>
-            <Text variant="h1" style={[styles.word, { color: colors.textPrimary }]}>
-              {promptText}
-            </Text>
-            <Text variant="body" color="secondary" align="center">
-              Составь оригинальное слово из букв
-            </Text>
-          </View>
-
-          {wordResult === 'wrong' && (
-            <Pressable
-              style={({ pressed }) => [
-                styles.audioButton,
-                {
-                  backgroundColor: pressed ? alpha(colors.primary, 20) : colors.surfaceMuted,
-                  borderColor: colors.border,
-                },
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel="Прослушать слово"
-              onPress={() => handleSpeak(targetWord, promptText, cardSpeechLangs(currentCard).front)}
-            >
-              <Volume2 size={iconSize.m} color={colors.primary} />
-            </Pressable>
-          )}
+        ) : null
+      }
+    >
+      {/* Card */}
+      <View
+        style={[
+          styles.card,
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+          },
+        ]}
+      >
+        <View style={styles.wordBlock}>
+          <Text variant="h1" style={[styles.word, { color: colors.textPrimary }]}>
+            {promptText}
+          </Text>
         </View>
 
-        {/* Slots */}
-        <View style={styles.slotsSection}>
-          <View style={styles.slotsRow}>
-            {slots.map((slot, index) => {
-              // Проверяем правильность каждой буквы отдельно
-              const expectedChar = targetWord[index]?.toLowerCase();
-              const actualChar = slot.char?.toLowerCase();
-              const isSlotCorrect = expectedChar === actualChar;
-              
-              // Определяем цвет границы для каждой ячейки
-              let slotBorderColor: string = slot.isFilled ? colors.primary : colors.border;
-              let slotBgColor: string = slot.isFilled ? alpha(colors.primary, 10) : colors.surfaceMuted;
-              let slotTextColor: string = slot.isFilled ? colors.primary : colors.textSecondary;
-              
-              if (wordResult && slot.isFilled) {
-                slotBorderColor = isSlotCorrect ? colors.success : colors.error;
-                slotBgColor = isSlotCorrect ? alpha(colors.success, 20) : alpha(colors.error, 20);
-                slotTextColor = isSlotCorrect ? colors.successText : colors.errorText;
-              }
-              
-              return (
-                <Pressable
-                  key={slot.id}
-                  disabled={!slot.isFilled || isLocked}
-                  accessibilityRole="button"
-                  accessibilityLabel={slot.char ? `Буква ${slot.char}, убрать` : 'Пустая ячейка'}
-                  onPress={() => handleSlotPress(slot.id)}
-                  style={({ pressed }) => [
-                    styles.slot,
-                    {
-                      borderColor: slotBorderColor,
-                      backgroundColor: slotBgColor,
-                      borderWidth: wordResult ? 3 : 2,
-                    },
-                    pressed && slot.isFilled && { transform: [{ translateY: 1 }] },
-                  ]}
-                  hitSlop={6}
-                >
-                  <Text variant="h3" style={[styles.bold, { color: slotTextColor }]}>
-                    {slot.char ?? ''}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          {wordResult === 'wrong' && (
-            <Button variant="secondary" title="Хорошо" onPress={handleConfirmNext} />
-          )}
-        </View>
+        {wordResult === 'wrong' && (
+          <Pressable
+            style={({ pressed }) => [
+              styles.audioButton,
+              {
+                backgroundColor: pressed ? alpha(colors.primary, 20) : colors.surfaceMuted,
+                borderColor: colors.border,
+              },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Прослушать слово"
+            onPress={() => handleSpeak(targetWord, promptText, cardSpeechLangs(currentCard).front)}
+          >
+            <Volume2 size={iconSize.m} color={colors.primary} />
+          </Pressable>
+        )}
+      </View>
 
-        {/* Letters grid */}
-        {wordResult !== 'wrong' && (
-          <View style={styles.grid}>
-            {tiles.map((tile) => (
+      {/* Slots */}
+      <View style={styles.slotsSection}>
+        <View style={styles.slotsRow}>
+          {slots.map((slot, index) => {
+            // Проверяем правильность каждой буквы отдельно
+            const expectedChar = targetWord[index]?.toLowerCase();
+            const actualChar = slot.char?.toLowerCase();
+            const isSlotCorrect = expectedChar === actualChar;
+
+            // Определяем цвет границы для каждой ячейки
+            let slotBorderColor: string = slot.isFilled ? colors.primary : colors.border;
+            let slotBgColor: string = slot.isFilled
+              ? alpha(colors.primary, 10)
+              : colors.surfaceMuted;
+            let slotTextColor: string = slot.isFilled ? colors.primary : colors.textSecondary;
+
+            if (wordResult && slot.isFilled) {
+              slotBorderColor = isSlotCorrect ? colors.success : colors.error;
+              slotBgColor = isSlotCorrect ? alpha(colors.success, 20) : alpha(colors.error, 20);
+              slotTextColor = isSlotCorrect ? colors.successText : colors.errorText;
+            }
+
+            return (
               <Pressable
-                key={tile.id}
-                disabled={tile.used || isLocked}
+                key={slot.id}
+                disabled={!slot.isFilled || isLocked}
                 accessibilityRole="button"
-                accessibilityLabel={`Буква ${tile.char}`}
-                accessibilityState={{ disabled: tile.used || isLocked }}
-                onPress={() => handleTilePress(tile.id)}
+                accessibilityLabel={slot.char ? `Буква ${slot.char}, убрать` : 'Пустая ячейка'}
+                onPress={() => handleSlotPress(slot.id)}
                 style={({ pressed }) => [
-                  styles.tile,
+                  styles.slot,
                   {
-                    backgroundColor:
-                      resultBorderColor && tile.used
-                        ? alpha(resultBorderColor, 20)
-                        : tile.used
-                          ? colors.surfaceMuted
-                          : colors.surface,
-                    borderColor:
-                      resultBorderColor && tile.used
-                        ? resultBorderColor
-                        : tile.used
-                          ? colors.surfaceMuted
-                          : colors.border,
+                    borderColor: slotBorderColor,
+                    backgroundColor: slotBgColor,
+                    borderWidth: wordResult ? 3 : 2,
                   },
-                  pressed && !tile.used && { transform: [{ translateY: 1 }] },
+                  pressed && slot.isFilled && { transform: [{ translateY: 1 }] },
                 ]}
+                hitSlop={6}
               >
-                <Text variant="h2" style={{ color: tile.used ? colors.textTertiary : colors.textPrimary }}>
-                  {tile.char}
+                <Text variant="h3" style={[styles.bold, { color: slotTextColor }]}>
+                  {slot.char ?? ''}
                 </Text>
               </Pressable>
-            ))}
-          </View>
-        )}
-      </ScrollView>
-    </View>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* Letters grid */}
+      {wordResult !== 'wrong' && (
+        <View style={styles.grid}>
+          {tiles.map((tile) => (
+            <Pressable
+              key={tile.id}
+              disabled={tile.used || isLocked}
+              accessibilityRole="button"
+              accessibilityLabel={`Буква ${tile.char}`}
+              accessibilityState={{ disabled: tile.used || isLocked }}
+              onPress={() => handleTilePress(tile.id)}
+              style={({ pressed }) => [
+                styles.tile,
+                {
+                  backgroundColor:
+                    resultBorderColor && tile.used
+                      ? alpha(resultBorderColor, 20)
+                      : tile.used
+                        ? colors.surfaceMuted
+                        : colors.surface,
+                  borderColor:
+                    resultBorderColor && tile.used
+                      ? resultBorderColor
+                      : tile.used
+                        ? colors.surfaceMuted
+                        : colors.border,
+                },
+                pressed && !tile.used && { transform: [{ translateY: 1 }] },
+              ]}
+            >
+              <Text
+                variant="h2"
+                style={{ color: tile.used ? colors.textTertiary : colors.textPrimary }}
+              >
+                {tile.char}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+    </StageLayout>
   );
 }
 
@@ -684,40 +720,13 @@ const styles = StyleSheet.create({
   bold: {
     fontWeight: '700',
   },
-  content: {
-    paddingHorizontal: screenPadding,
-    paddingBottom: spacing.xxl,
-    gap: spacing.m,
-  },
-  progressSection: {
-    gap: spacing.xs,
-  },
-  progressInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
   // Рамка без тени (брендбук, 7.3)
   card: {
     borderRadius: borderRadius.l,
     borderWidth: 1,
     padding: spacing.l,
-    paddingTop: spacing.l + spacing.xxs,
     overflow: 'hidden',
     gap: spacing.s,
-  },
-  cardTopLine: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: spacing.xxs,
-  },
-  cardChip: {
-    alignSelf: 'center',
-    paddingHorizontal: spacing.s,
-    paddingVertical: spacing.xxs,
-    borderRadius: borderRadius.full,
   },
   wordBlock: {
     alignItems: 'center',

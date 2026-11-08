@@ -3,60 +3,38 @@
  * @description Экран создания/редактирования набора
  */
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import {
-  View,
-  StyleSheet,
-  ScrollView,
-  TextInput,
-  Pressable,
-  Alert,
-  Animated,
-  Platform,
-} from 'react-native';
+import { View, ScrollView, TextInput, Pressable, Alert, Animated, Platform } from 'react-native';
 import { useSetsStore, useCardsStore, useThemeColors, useCoursesStore } from '@/store';
 import { Text } from '@/components/common';
-import { spacing, borderRadius, iconSize, TOP_LANGUAGES, alpha } from '@/constants';
-import { Button, CategoryIcon, toast, useScreenBottomInset } from '@/components/ui';
+import { iconSize } from '@/constants';
+import { Button, toast, useScreenBottomInset } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
-import type { SetCategory } from '@/types';
-import { ArrowLeftRight, Check, ChevronDown, Globe, Link2, Share2 } from 'lucide-react-native';
+import type { SetCategory, SetKind } from '@/types';
+import { SetKindPicker } from '@/components/cards/SetKindPicker';
+import { ArrowLeftRight } from 'lucide-react-native';
 import { LibraryService, ShareService, Analytics } from '@/services';
-import { supabase } from '@/services/supabaseClient';
-import { LIBRARY_CATEGORIES } from '@/constants/library';
+import { getSession } from '@/services/auth/session';
 import { describeError } from '@/utils/userErrors';
 import { confirmAction } from '@/utils/dialogs';
 import { canShareSet, useShareSet } from '@/components/share/useShareSet';
-import { pluralize } from '@/utils';
 import { COMMUNITY_LIBRARY_ENABLED } from '@/config/features';
+import { log } from '@/utils/logger';
+import { styles } from './setEditor/styles';
+import {
+  CATEGORY_OPTIONS,
+  SOURCE_LANGUAGES,
+  TARGET_LANGUAGES,
+  DESCRIPTION_LIMIT,
+  LANG_CODE_TO_LABEL,
+  LANG_LABEL_TO_CODE,
+} from './setEditor/options';
+import { SelectPill } from './setEditor/SelectPill';
+import { LanguageDropdown } from './setEditor/LanguageDropdown';
+import { CourseDropdown } from './setEditor/CourseDropdown';
+import { ShareSection } from './setEditor/ShareSection';
+import { PublishSection } from './setEditor/PublishSection';
 
 type Props = RootStackScreenProps<'SetEditor'>;
-
-// icon — эмодзи-обложка, которая сохраняется в набор и публикацию (данные, не интерфейс).
-// В интерфейсе категорию показываем иконкой lucide (CategoryIcon).
-const CATEGORY_OPTIONS: { value: SetCategory; label: string; icon: string }[] = [
-  { value: 'general', label: 'Общие', icon: '⭐️' }, // brand:data
-  { value: 'travel', label: 'Путешествия', icon: '✈️' }, // brand:data
-  { value: 'food', label: 'Еда', icon: '🍽️' }, // brand:data
-  { value: 'study', label: 'Учёба', icon: '📚' }, // brand:data
-  { value: 'work', label: 'Работа', icon: '💼' }, // brand:data
-  { value: 'grammar', label: 'Грамматика', icon: '✏️' }, // brand:data
-  { value: 'custom', label: 'Свой вариант…', icon: '✨' }, // brand:data
-];
-
-// Единый источник — тот же список из 10 языков, что и в онбординге/настройках
-// (см. constants/languages.ts), чтобы не расходиться друг с другом.
-const ALL_LANGUAGES = TOP_LANGUAGES.map((l) => `${l.flag} ${l.label} (${l.code.toUpperCase()})`);
-const SOURCE_LANGUAGES = ALL_LANGUAGES;
-const TARGET_LANGUAGES = ALL_LANGUAGES;
-const DESCRIPTION_LIMIT = 200;
-
-const LANG_CODE_TO_LABEL: Record<string, string> = Object.fromEntries(
-  TOP_LANGUAGES.map((l) => [l.code, `${l.flag} ${l.label} (${l.code.toUpperCase()})`])
-);
-
-const LANG_LABEL_TO_CODE: Record<string, string> = Object.fromEntries(
-  TOP_LANGUAGES.map((l) => [`${l.flag} ${l.label} (${l.code.toUpperCase()})`, l.code])
-);
 
 export function SetEditorScreen({ navigation, route }: Props) {
   // Клавиатура не открывается сама: только когда пользователь нажмёт на поле
@@ -106,6 +84,9 @@ export function SetEditorScreen({ navigation, route }: Props) {
   const [courseId, setCourseId] = useState<string | null>(defaultCourseId ?? null);
   // Языки не выбираются за пользователя: без явного выбора набор не создать
   // (раньше по умолчанию стояло «Английский → Английский», и озвучка/тесты шли не на том языке)
+  // Тип набора тоже не выбирается за пользователя (plan/new/set_kind.md): у старого набора без типа
+  // поле пустое, и сохранить его можно только после выбора
+  const [kind, setKind] = useState<SetKind | undefined>(undefined);
   const [sourceLanguage, setSourceLanguage] = useState('');
   const [targetLanguage, setTargetLanguage] = useState('');
   const [sourcePickerOpen, setSourcePickerOpen] = useState(false);
@@ -136,6 +117,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
         setDescription(set.description || '');
         setCategory(set.category);
         setCourseId(set.courseId ?? null);
+        setKind(set.kind);
         if (set.languageFrom) {
           const label = LANG_CODE_TO_LABEL[set.languageFrom];
           if (label) setSourceLanguage(label);
@@ -153,7 +135,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
     if (!isEditing || !setId) return;
     (async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const session = await getSession();
         if (!session?.user?.id) return;
         const result = await LibraryService.checkPublished(setId, session.user.id);
         setCanPublish(result.canPublish === true);
@@ -172,7 +154,9 @@ export function SetEditorScreen({ navigation, route }: Props) {
   const [isDisablingShare, setIsDisablingShare] = useState(false);
   const loadShareLink = useCallback(() => {
     if (!setId) return;
-    ShareService.getStatus(setId).then(setShareLink).catch(() => {});
+    ShareService.getStatus(setId)
+      .then(setShareLink)
+      .catch(() => {});
   }, [setId]);
   useEffect(() => {
     if (canShare) loadShareLink();
@@ -185,7 +169,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
       'Закрыть доступ по ссылке?',
       'Ссылка перестанет открываться. Те, кто уже добавил набор, сохранят свою копию.',
       'Закрыть доступ',
-      { destructive: true },
+      { destructive: true }
     );
     if (!confirmed) return;
     setIsDisablingShare(true);
@@ -223,11 +207,6 @@ export function SetEditorScreen({ navigation, route }: Props) {
     }
   }, [showPublishForm, publishFormInitialized, description, category]);
 
-  const categoryOption = useMemo(
-    () => CATEGORY_OPTIONS.find((c) => c.value === category),
-    [category]
-  );
-
   const selectedCourseTitle = useMemo(() => {
     if (!courseId) return 'Без курса';
     return allCourses.find((c) => c.id === courseId)?.title || 'Без курса';
@@ -236,6 +215,8 @@ export function SetEditorScreen({ navigation, route }: Props) {
   const isLanguagesSelected = !!sourceLanguage && !!targetLanguage;
   const titleError = showValidation && !title.trim();
   const languageError = showValidation && !isLanguagesSelected;
+  const kindError = showValidation && !kind;
+  const isSubject = kind === 'subject';
   // Кнопка не блокируется, пока форма не заполнена: нажатие подсвечивает, чего не хватает
   const isSaveDisabled = isSaving;
 
@@ -298,7 +279,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
 
     setIsPublishing(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getSession();
       if (!session?.user?.id) {
         toast.error('Нужно войти в аккаунт');
         return;
@@ -315,7 +296,10 @@ export function SetEditorScreen({ navigation, route }: Props) {
         });
         toast.success('Публикация обновлена');
       } else {
-        const tags = publishTags.split(',').map(t => t.trim()).filter(Boolean);
+        const tags = publishTags
+          .split(',')
+          .map((t) => t.trim())
+          .filter(Boolean);
         await LibraryService.publishSet(session.user.id, {
           setId,
           description: publishDescription.trim() || undefined,
@@ -332,13 +316,22 @@ export function SetEditorScreen({ navigation, route }: Props) {
     } finally {
       setIsPublishing(false);
     }
-  }, [setId, isPublished, librarySetId, publishDescription, publishCategory, publishTags, category, getCardsBySet]);
+  }, [
+    setId,
+    isPublished,
+    librarySetId,
+    publishDescription,
+    publishCategory,
+    publishTags,
+    category,
+    getCardsBySet,
+  ]);
 
   // Снятие с публикации
   const handleUnpublish = useCallback(async () => {
     if (!librarySetId) return;
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getSession();
       if (!session?.user?.id) return;
       await LibraryService.unpublishSet(session.user.id, librarySetId);
       setIsPublished(false);
@@ -356,7 +349,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
 
     const langFrom = LANG_LABEL_TO_CODE[sourceLanguage];
     const langTo = LANG_LABEL_TO_CODE[targetLanguage];
-    if (!title.trim() || !langFrom || !langTo) return;
+    if (!title.trim() || !kind || !langFrom || !langTo) return;
 
     setIsSaving(true);
 
@@ -372,6 +365,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
           courseId,
           languageFrom: langFrom,
           languageTo: langTo,
+          kind,
         });
       } else {
         // Создаем набор с courseId из активного курса
@@ -383,8 +377,9 @@ export function SetEditorScreen({ navigation, route }: Props) {
           courseId,
           languageFrom: langFrom,
           languageTo: langTo,
+          kind,
         });
-        
+
         // Переход к новому набору
         navigation.replace('SetDetail', { setId: newSet.id });
         return;
@@ -396,14 +391,28 @@ export function SetEditorScreen({ navigation, route }: Props) {
     } finally {
       setIsSaving(false);
     }
-  }, [title, description, category, sourceLanguage, targetLanguage, isEditing, setId, updateSet, addSet, navigation, closeSheet, courseId]);
+  }, [
+    title,
+    description,
+    category,
+    kind,
+    sourceLanguage,
+    targetLanguage,
+    isEditing,
+    setId,
+    updateSet,
+    addSet,
+    navigation,
+    closeSheet,
+    courseId,
+  ]);
 
   // Удаление
   const handleDelete = useCallback(() => {
     if (!setId) return;
 
     const performDelete = () => {
-      console.log('Удаление набора:', setId);
+      log.debug('SetEditor', 'Удаление набора', setId);
       deleteCardsBySet(setId);
       deleteSet(setId);
       navigation.navigate('Main', { screen: 'Home' });
@@ -436,394 +445,306 @@ export function SetEditorScreen({ navigation, route }: Props) {
 
   return (
     // Верхний safe area уже учтён в App.tsx; снизу — свой (экран без панели вкладок)
-    <View style={[styles.container, { backgroundColor: colors.background, paddingBottom: bottomInset }]}>
-      <Animated.View style={[styles.animatedWrapper, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-          <View style={styles.headerRow}>
-            <Text variant="h2" style={[styles.headerTitle, { color: colors.textPrimary }]}>
-              {isReadOnly ? 'Настройки набора' : isEditing ? 'Редактировать набор' : 'Создать набор'}
+    <View
+      style={[styles.container, { backgroundColor: colors.background, paddingBottom: bottomInset }]}
+    >
+      <Animated.View
+        style={[
+          styles.animatedWrapper,
+          { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+        ]}
+      >
+        <View style={styles.headerRow}>
+          <Text variant="h2" style={[styles.headerTitle, { color: colors.textPrimary }]}>
+            {isReadOnly ? 'Настройки набора' : isEditing ? 'Редактировать набор' : 'Создать набор'}
+          </Text>
+        </View>
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.content}
+        >
+          {/* Название */}
+          <View style={styles.field}>
+            <Text variant="label" color="primary" style={styles.fieldLabel}>
+              Название набора <Text style={{ color: colors.error }}>*</Text>
+            </Text>
+
+            <View
+              style={[
+                styles.inputContainer,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: titleError
+                    ? colors.error
+                    : titleFocused
+                      ? colors.primary
+                      : colors.border,
+                  shadowColor: colors.shadow,
+                },
+              ]}
+            >
+              <TextInput
+                value={title}
+                onChangeText={setTitle}
+                placeholder="Например: Путешествия (A1)"
+                placeholderTextColor={colors.textTertiary}
+                style={[
+                  styles.input,
+                  { color: colors.textPrimary },
+                  Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
+                ]}
+                onFocus={() => setTitleFocused(true)}
+                onBlur={() => setTitleFocused(false)}
+                maxLength={100}
+                editable={!isReadOnly}
+              />
+            </View>
+
+            {titleError ? (
+              <Text variant="caption" color="error" style={styles.helperText}>
+                Введи название
+              </Text>
+            ) : (
+              <Text variant="caption" color="tertiary" style={styles.helperText}>
+                Название будет видно в каталоге
+              </Text>
+            )}
+          </View>
+
+          {/* Описание */}
+          <View style={styles.field}>
+            <View style={styles.labelRow}>
+              <Text variant="label" color="primary">
+                Описание
+              </Text>
+              <Text variant="caption" color="secondary">
+                {`${description.length}/${DESCRIPTION_LIMIT}`}
+              </Text>
+            </View>
+
+            <View
+              style={[
+                styles.textareaContainer,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: descriptionFocused ? colors.primary : colors.border,
+                  shadowColor: colors.shadow,
+                },
+              ]}
+            >
+              <TextInput
+                value={description}
+                onChangeText={setDescription}
+                placeholder="Для каких тем/уровня и как использовать"
+                placeholderTextColor={colors.textTertiary}
+                style={[
+                  styles.textarea,
+                  { color: colors.textPrimary },
+                  Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
+                ]}
+                multiline
+                maxLength={DESCRIPTION_LIMIT}
+                onFocus={() => setDescriptionFocused(true)}
+                onBlur={() => setDescriptionFocused(false)}
+                textAlignVertical="top"
+                editable={!isReadOnly}
+              />
+            </View>
+          </View>
+
+          {/* Тип набора */}
+          <View style={styles.field}>
+            <Text variant="label" color="primary" style={styles.fieldLabel}>
+              Тип <Text style={{ color: colors.error }}>*</Text>
+            </Text>
+            <SetKindPicker
+              value={kind}
+              onChange={setKind}
+              hasError={kindError}
+              disabled={isReadOnly}
+            />
+            {kindError ? (
+              <Text variant="caption" color="error" style={styles.helperText}>
+                Выбери тип набора
+              </Text>
+            ) : null}
+          </View>
+
+          {/* Языки */}
+          <View style={styles.field}>
+            <Text variant="label" color="primary" style={styles.fieldLabel}>
+              Языки <Text style={{ color: colors.error }}>*</Text>
+            </Text>
+            <View style={styles.languageRow}>
+              <View style={styles.languageSelectWrapper}>
+                <SelectPill
+                  label={sourceLanguage}
+                  placeholder={isSubject ? 'Язык вопросов' : 'Язык слов'}
+                  onPress={toggleSourcePicker}
+                  isOpen={sourcePickerOpen}
+                  hasError={languageError && !sourceLanguage}
+                  colors={colors}
+                />
+                {sourcePickerOpen && (
+                  <LanguageDropdown
+                    options={SOURCE_LANGUAGES}
+                    selected={sourceLanguage}
+                    onSelect={handleSelectSourceLanguage}
+                    colors={colors}
+                  />
+                )}
+              </View>
+
+              <Pressable
+                onPress={swapLanguages}
+                accessibilityRole="button"
+                accessibilityLabel="Поменять языки местами"
+                style={[
+                  styles.swapButton,
+                  { backgroundColor: colors.surface, borderColor: colors.border },
+                ]}
+              >
+                <ArrowLeftRight size={iconSize.s} color={colors.primary} />
+              </Pressable>
+
+              <View style={styles.languageSelectWrapper}>
+                <SelectPill
+                  label={targetLanguage}
+                  placeholder={isSubject ? 'Язык ответов' : 'Язык перевода'}
+                  onPress={toggleTargetPicker}
+                  isOpen={targetPickerOpen}
+                  hasError={languageError && !targetLanguage}
+                  colors={colors}
+                />
+                {targetPickerOpen && (
+                  <LanguageDropdown
+                    options={TARGET_LANGUAGES}
+                    selected={targetLanguage}
+                    onSelect={handleSelectTargetLanguage}
+                    colors={colors}
+                  />
+                )}
+              </View>
+            </View>
+            <Text
+              variant="caption"
+              color={languageError ? 'error' : 'tertiary'}
+              style={styles.helperText}
+            >
+              {languageError
+                ? 'Выбери оба языка'
+                : isSubject
+                  ? 'На каком языке вопросы и ответы'
+                  : 'Выбери язык слов и язык перевода'}
             </Text>
           </View>
 
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={styles.content}
-          >
-            {/* Название */}
-            <View style={styles.field}>
-              <Text variant="label" color="primary" style={styles.fieldLabel}>
-                Название набора <Text style={{ color: colors.error }}>*</Text>
-              </Text>
-
-              <View
-                style={[
-                  styles.inputContainer,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: titleError
-                      ? colors.error
-                      : titleFocused
-                      ? colors.primary
-                      : colors.border,
-                    shadowColor: colors.shadow,
-                  },
-                ]}
-              >
-                <TextInput
-                  value={title}
-                  onChangeText={setTitle}
-                  placeholder="Например: Путешествия (A1)"
-                  placeholderTextColor={colors.textTertiary}
-                  style={[styles.input, { color: colors.textPrimary }, Platform.OS === 'web' && { outlineStyle: 'none' }]}
-                  onFocus={() => setTitleFocused(true)}
-                  onBlur={() => setTitleFocused(false)}
-                  maxLength={100}
-                  editable={!isReadOnly}
+          {/* Курс */}
+          <View style={styles.field}>
+            <Text variant="label" color="primary" style={styles.fieldLabel}>
+              Курс
+            </Text>
+            <View style={styles.courseSelectContainer}>
+              <SelectPill
+                label={selectedCourseTitle}
+                onPress={toggleCoursePicker}
+                isOpen={coursePickerOpen}
+                colors={colors}
+                fullWidth
+              />
+              {coursePickerOpen && (
+                <CourseDropdown
+                  courses={courses}
+                  selectedCourseId={courseId}
+                  onSelect={(value) => {
+                    setCourseId(value);
+                    setCoursePickerOpen(false);
+                    setSourcePickerOpen(false);
+                    setTargetPickerOpen(false);
+                  }}
+                  colors={colors}
                 />
-              </View>
-
-              {titleError ? (
-                <Text variant="caption" color="error" style={styles.helperText}>
-                  Введи название
-                </Text>
-              ) : (
-                <Text variant="caption" color="tertiary" style={styles.helperText}>
-                  Название будет видно в каталоге
-                </Text>
               )}
             </View>
-
-            {/* Описание */}
-            <View style={styles.field}>
-              <View style={styles.labelRow}>
-                <Text variant="label" color="primary">
-                  Описание
-                </Text>
-                <Text variant="caption" color="secondary">
-                  {`${description.length}/${DESCRIPTION_LIMIT}`}
-                </Text>
-              </View>
-
-              <View
-                style={[
-                  styles.textareaContainer,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: descriptionFocused ? colors.primary : colors.border,
-                    shadowColor: colors.shadow,
-                  },
-                ]}
-              >
-                <TextInput
-                  value={description}
-                  onChangeText={setDescription}
-                  placeholder="Для каких тем/уровня и как использовать"
-                  placeholderTextColor={colors.textTertiary}
-                  style={[styles.textarea, { color: colors.textPrimary }, Platform.OS === 'web' && { outlineStyle: 'none' }]}
-                  multiline
-                  maxLength={DESCRIPTION_LIMIT}
-                  onFocus={() => setDescriptionFocused(true)}
-                  onBlur={() => setDescriptionFocused(false)}
-                  textAlignVertical="top"
-                  editable={!isReadOnly}
-                />
-              </View>
-            </View>
-
-            {/* Языки */}
-            <View style={styles.field}>
-              <Text variant="label" color="primary" style={styles.fieldLabel}>
-                Языки <Text style={{ color: colors.error }}>*</Text>
-              </Text>
-              <View style={styles.languageRow}>
-                <View style={styles.languageSelectWrapper}>
-                  <SelectPill
-                    label={sourceLanguage}
-                    placeholder="Язык слов"
-                    onPress={toggleSourcePicker}
-                    isOpen={sourcePickerOpen}
-                    hasError={languageError && !sourceLanguage}
-                    colors={colors}
-                  />
-                  {sourcePickerOpen && (
-                    <LanguageDropdown
-                      options={SOURCE_LANGUAGES}
-                      selected={sourceLanguage}
-                      onSelect={handleSelectSourceLanguage}
-                      colors={colors}
-                    />
-                  )}
-                </View>
-
-                <Pressable
-                  onPress={swapLanguages}
-                  accessibilityRole="button"
-                  accessibilityLabel="Поменять языки местами"
-                  style={[styles.swapButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                >
-                  <ArrowLeftRight size={iconSize.s} color={colors.primary} />
-                </Pressable>
-
-                <View style={styles.languageSelectWrapper}>
-                  <SelectPill
-                    label={targetLanguage}
-                    placeholder="Язык перевода"
-                    onPress={toggleTargetPicker}
-                    isOpen={targetPickerOpen}
-                    hasError={languageError && !targetLanguage}
-                    colors={colors}
-                  />
-                  {targetPickerOpen && (
-                    <LanguageDropdown
-                      options={TARGET_LANGUAGES}
-                      selected={targetLanguage}
-                      onSelect={handleSelectTargetLanguage}
-                      colors={colors}
-                    />
-                  )}
-                </View>
-              </View>
-              <Text variant="caption" color={languageError ? 'error' : 'tertiary'} style={styles.helperText}>
-                {languageError ? 'Выбери оба языка' : 'Выбери язык слов и язык перевода'}
-              </Text>
-            </View>
-
-            {/* Курс */}
-            <View style={styles.field}>
-              <Text variant="label" color="primary" style={styles.fieldLabel}>
-                Курс
-              </Text>
-              <View style={styles.courseSelectContainer}>
-                <SelectPill
-                  label={selectedCourseTitle}
-                  onPress={toggleCoursePicker}
-                  isOpen={coursePickerOpen}
-                  colors={colors}
-                  fullWidth
-                />
-                {coursePickerOpen && (
-                  <CourseDropdown
-                    courses={courses}
-                    selectedCourseId={courseId}
-                    onSelect={(value) => {
-                      setCourseId(value);
-                      setCoursePickerOpen(false);
-                      setSourcePickerOpen(false);
-                      setTargetPickerOpen(false);
-                    }}
-                    colors={colors}
-                  />
-                )}
-              </View>
-              <Text variant="caption" color="tertiary" style={styles.helperText}>
-                Организуй наборы по курсам для удобного управления
-              </Text>
-            </View>
-
-            {/* Публикация в библиотеку */}
-            {COMMUNITY_LIBRARY_ENABLED && canPublish && isEditing && !isReadOnly && (
-              <View style={styles.field}>
-                <Text variant="label" color="primary" style={styles.fieldLabel}>
-                  Библиотека
-                </Text>
-
-                {isPublished && !showPublishForm ? (
-                  <View style={{ gap: spacing.s }}>
-                    <View style={[styles.publishedBadge, { backgroundColor: alpha(colors.success, 10), borderColor: alpha(colors.success, 20) }]}>
-                      <Globe size={16} color={colors.success} />
-                      <Text variant="bodySmall" style={{ color: colors.success, fontWeight: '600' }}>
-                        Опубликовано в библиотеке
-                      </Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', gap: spacing.s }}>
-                      <Pressable
-                        onPress={() => setShowPublishForm(true)}
-                        accessibilityRole="button"
-                        style={[styles.publishActionBtn, { borderColor: colors.primary }]}
-                      >
-                        <Text variant="bodySmall" style={{ color: colors.primary, fontWeight: '600' }}>
-                          Обновить
-                        </Text>
-                      </Pressable>
-                      <Pressable
-                        onPress={handleUnpublish}
-                        accessibilityRole="button"
-                        style={[styles.publishActionBtn, { borderColor: alpha(colors.error, 40) }]}
-                      >
-                        <Text variant="bodySmall" style={{ color: colors.errorText, fontWeight: '600' }}>
-                          Снять
-                        </Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                ) : !showPublishForm ? (
-                  <Pressable accessibilityRole="button"
-                    onPress={() => setShowPublishForm(true)}
-                    style={[styles.publishButton, { backgroundColor: alpha(colors.primary, 10), borderColor: alpha(colors.primary, 20) }]}
-                  >
-                    <Globe size={18} color={colors.primary} />
-                    <Text variant="body" style={{ color: colors.primary, fontWeight: '600' }}>
-                      Опубликовать в библиотеке
-                    </Text>
-                  </Pressable>
-                ) : null}
-
-                {showPublishForm && (
-                  <View style={[styles.publishForm, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                    <TextInput
-                      value={publishDescription}
-                      onChangeText={setPublishDescription}
-                      placeholder="Описание для библиотеки (необязательно)"
-                      placeholderTextColor={colors.textTertiary}
-                      style={[styles.publishInput, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background }]}
-                      multiline
-                      maxLength={500}
-                    />
-
-                    <Text variant="caption" color="secondary" style={{ marginTop: spacing.xs }}>
-                      Категория
-                    </Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: spacing.xs }}>
-                      <View style={{ flexDirection: 'row', gap: spacing.xs }}>
-                        {LIBRARY_CATEGORIES.map((cat) => (
-                          <Pressable
-                            key={cat.key}
-                            onPress={() => setPublishCategory(publishCategory === cat.key ? '' : cat.key)}
-                            accessibilityRole="button"
-                            accessibilityState={{ selected: publishCategory === cat.key }}
-                            style={[
-                              styles.publishChip,
-                              {
-                                backgroundColor: publishCategory === cat.key ? colors.primaryFill : colors.surfaceMuted,
-                                borderColor: publishCategory === cat.key ? colors.primaryFill : colors.surfaceMuted,
-                              },
-                            ]}
-                          >
-                            {/* Раньше здесь выводилось имя иконки Ionicons текстом («text-outline») */}
-                            <CategoryIcon
-                              category={cat.key}
-                              size="xs"
-                              color={publishCategory === cat.key ? colors.onPrimary : colors.textSecondary}
-                            />
-                            <Text variant="label" style={{ color: publishCategory === cat.key ? colors.onPrimary : colors.textPrimary }}>
-                              {cat.label}
-                            </Text>
-                          </Pressable>
-                        ))}
-                      </View>
-                    </ScrollView>
-
-                    <TextInput
-                      value={publishTags}
-                      onChangeText={setPublishTags}
-                      placeholder="Теги через запятую (необязательно)"
-                      placeholderTextColor={colors.textTertiary}
-                      style={[styles.publishInput, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background, marginTop: spacing.s }]}
-                      maxLength={200}
-                    />
-
-                    <View style={styles.publishActions}>
-                      <Button
-                        variant="quiet"
-                        tone="secondary"
-                        size="s"
-                        title="Отмена"
-                        onPress={() => setShowPublishForm(false)}
-                        style={styles.flex1}
-                      />
-                      <Button
-                        size="s"
-                        title={isPublishing ? 'Публикация...' : isPublished ? 'Обновить' : 'Опубликовать'}
-                        onPress={handlePublish}
-                        disabled={isPublishing}
-                        style={styles.flex1}
-                      />
-                    </View>
-                  </View>
-                )}
-
-                <Text variant="caption" color="tertiary" style={styles.helperText}>
-                  Опубликованные наборы доступны всем пользователям
-                </Text>
-              </View>
-            )}
-
-            {canShare && existingSet && (
-              <View style={styles.field}>
-                <Text variant="label" color="primary" style={styles.fieldLabel}>
-                  Поделиться набором
-                </Text>
-                <Button
-                  variant="secondary"
-                  title="Поделиться"
-                  icon={Share2}
-                  loading={isSharing}
-                  onPress={() => share(existingSet)}
-                  fullWidth
-                />
-                {shareLink && (
-                  <View style={[styles.shareRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                    <View style={[styles.shareIcon, { backgroundColor: alpha(colors.primary, 10) }]}>
-                      <Link2 size={iconSize.s} color={colors.primary} />
-                    </View>
-                    <View style={styles.flex1}>
-                      <Text variant="body" color="primary">Ссылка действует</Text>
-                      <Text variant="caption" color="secondary">
-                        {`Открыли ${shareLink.views} · добавили ${shareLink.imports} ${pluralize(shareLink.imports, 'раз', 'раза', 'раз')}`}
-                      </Text>
-                    </View>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={handleDisableShare}
-                      disabled={isDisablingShare}
-                      hitSlop={10}
-                      style={({ pressed }) => [styles.shareDisable, (pressed || isDisablingShare) && { opacity: 0.5 }]}
-                    >
-                      <Text variant="label" style={{ color: colors.errorText }}>Закрыть доступ</Text>
-                    </Pressable>
-                  </View>
-                )}
-                <Text variant="caption" color="tertiary" style={styles.helperText}>
-                  Отправь ссылку — друг сможет добавить все карточки себе. Набор видят только те, у кого есть ссылка
-                </Text>
-              </View>
-            )}
-
-            {isEditing && !isReadOnly && (
-              <Pressable accessibilityRole="button"
-                onPress={handleDelete}
-                style={styles.deleteLink}
-                disabled={isSaving}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Text variant="bodySmall" style={{ color: colors.error, fontWeight: '600' }}>
-                  Удалить набор
-                </Text>
-              </Pressable>
-            )}
-          </ScrollView>
-
-          <View
-            style={[
-              styles.actions,
-              { borderTopColor: colors.border, backgroundColor: 'transparent' },
-            ]}
-          >
-            {isReadOnly ? (
-              <Button title="Назад" onPress={() => navigation.goBack()} style={styles.flex1} />
-            ) : (
-              <>
-                <Button
-                  variant="secondary"
-                  title="Отмена"
-                  onPress={() => navigation.goBack()}
-                  disabled={isSaving}
-                  style={styles.flex1}
-                />
-                <Button title="Сохранить" onPress={handleSave} disabled={isSaveDisabled} style={styles.flex1} />
-              </>
-            )}
+            <Text variant="caption" color="tertiary" style={styles.helperText}>
+              Организуй наборы по курсам для удобного управления
+            </Text>
           </View>
+
+          {/* Публикация в библиотеку */}
+          {COMMUNITY_LIBRARY_ENABLED && canPublish && isEditing && !isReadOnly && (
+            <PublishSection
+              colors={colors}
+              isPublished={isPublished}
+              showPublishForm={showPublishForm}
+              setShowPublishForm={setShowPublishForm}
+              publishCategory={publishCategory}
+              setPublishCategory={setPublishCategory}
+              publishDescription={publishDescription}
+              setPublishDescription={setPublishDescription}
+              publishTags={publishTags}
+              setPublishTags={setPublishTags}
+              isPublishing={isPublishing}
+              handlePublish={handlePublish}
+              handleUnpublish={handleUnpublish}
+            />
+          )}
+
+          {canShare && existingSet && (
+            <ShareSection
+              existingSet={existingSet}
+              colors={colors}
+              share={share}
+              isSharing={isSharing}
+              shareLink={shareLink}
+              handleDisableShare={handleDisableShare}
+              isDisablingShare={isDisablingShare}
+            />
+          )}
+
+          {isEditing && !isReadOnly && (
+            <Pressable
+              accessibilityRole="button"
+              onPress={handleDelete}
+              style={styles.deleteLink}
+              disabled={isSaving}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text variant="bodySmall" style={{ color: colors.error, fontWeight: '600' }}>
+                Удалить набор
+              </Text>
+            </Pressable>
+          )}
+        </ScrollView>
+
+        <View
+          style={[
+            styles.actions,
+            { borderTopColor: colors.border, backgroundColor: 'transparent' },
+          ]}
+        >
+          {isReadOnly ? (
+            <Button title="Назад" onPress={() => navigation.goBack()} style={styles.flex1} />
+          ) : (
+            <>
+              <Button
+                variant="secondary"
+                title="Отмена"
+                onPress={() => navigation.goBack()}
+                disabled={isSaving}
+                style={styles.flex1}
+              />
+              <Button
+                title="Сохранить"
+                onPress={handleSave}
+                disabled={isSaveDisabled}
+                style={styles.flex1}
+              />
+            </>
+          )}
+        </View>
       </Animated.View>
     </View>
   );
@@ -831,497 +752,4 @@ export function SetEditorScreen({ navigation, route }: Props) {
 
 // ==================== ВСПОМОГАТЕЛЬНЫЕ КОМПОНЕНТЫ ====================
 
-function SelectPill({
-  label,
-  placeholder,
-  onPress,
-  colors,
-  isOpen = false,
-  fullWidth = false,
-  hasError = false,
-}: {
-  label: string;
-  placeholder?: string;
-  onPress: () => void;
-  colors: ReturnType<typeof useThemeColors>;
-  isOpen?: boolean;
-  fullWidth?: boolean;
-  hasError?: boolean;
-}) {
-  return (
-    <Pressable accessibilityRole="button" accessibilityState={{ expanded: !!isOpen }}
-      onPress={onPress}
-      style={[
-        styles.select,
-        fullWidth && styles.selectFullWidth,
-        {
-          backgroundColor: colors.surface,
-          borderColor: hasError ? colors.error : isOpen ? colors.primary : colors.border,
-          shadowColor: colors.shadow
-        },
-      ]}
-    >
-      <Text
-        variant="bodySmall"
-        style={[styles.selectLabel, { color: label ? colors.textPrimary : colors.textTertiary }]}
-        numberOfLines={1}
-      >
-        {label || placeholder}
-      </Text>
-      <ChevronDown
-        size={18}
-        color={isOpen ? colors.primary : colors.textSecondary}
-        style={[
-          { transition: 'transform 0.2s ease' },
-          isOpen ? { transform: [{ rotate: '180deg' }] } : undefined,
-        ]}
-      />
-    </Pressable>
-  );
-}
-
-function LanguageDropdown({
-  options,
-  selected,
-  onSelect,
-  colors,
-}: {
-  options: string[];
-  selected: string;
-  onSelect: (value: string) => void;
-  colors: ReturnType<typeof useThemeColors>;
-}) {
-  return (
-    <View
-      style={[
-        styles.languageDropdown,
-        {
-          backgroundColor: colors.background,
-          borderColor: colors.border,
-          shadowColor: colors.shadow,
-        },
-      ]}
-    >
-      <ScrollView
-        style={styles.languageDropdownScroll}
-        nestedScrollEnabled
-        showsVerticalScrollIndicator={false}
-      >
-        {options.map((option, index) => {
-          const isActive = option === selected;
-          const isFirst = index === 0;
-          const isLast = index === options.length - 1;
-          return (
-            <Pressable accessibilityRole="button" accessibilityState={{ selected: isActive }}
-              key={option}
-              onPress={() => onSelect(option)}
-              style={({ pressed }) => [
-                styles.languageDropdownOption,
-                {
-                  backgroundColor: pressed && !isActive
-                    ? colors.surfaceVariant
-                    : isActive
-                    ? alpha(colors.primary, 10)
-                    : colors.surface,
-                  borderBottomColor: colors.border,
-                },
-                isFirst && styles.languageDropdownOptionFirst,
-                isLast && styles.languageDropdownOptionLast,
-              ]}
-            >
-              <Text
-                variant="body"
-                style={{
-                  color: isActive ? colors.primary : colors.textPrimary,
-                  fontWeight: isActive ? '700' : '600',
-                  fontSize: 16,
-                }}
-              >
-                {option}
-              </Text>
-              {isActive && (
-                <View style={[styles.checkmark, { backgroundColor: colors.primaryFill }]}>
-                  <Check size={iconSize.xs} color={colors.onPrimary} strokeWidth={3} />
-                </View>
-              )}
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-    </View>
-  );
-}
-
-function CourseDropdown({
-  courses,
-  selectedCourseId,
-  onSelect,
-  colors,
-}: {
-  courses: Array<{ id: string; title: string }>;
-  selectedCourseId: string | null;
-  onSelect: (value: string | null) => void;
-  colors: ReturnType<typeof useThemeColors>;
-}) {
-  const items = [{ id: null, title: 'Без курса' }, ...courses];
-
-  return (
-    <View
-      style={[
-        styles.courseDropdown,
-        {
-          backgroundColor: colors.background,
-          borderColor: colors.border,
-          shadowColor: colors.shadow,
-        },
-      ]}
-    >
-      <ScrollView
-        style={styles.courseDropdownScroll}
-        nestedScrollEnabled
-        showsVerticalScrollIndicator={false}
-      >
-        {items.map((course, index) => {
-          const isActive = course.id === selectedCourseId;
-          const isFirst = index === 0;
-          const isLast = index === items.length - 1;
-          return (
-            <Pressable accessibilityRole="button" accessibilityState={{ selected: isActive }}
-              key={course.id ?? 'none'}
-              onPress={() => onSelect(course.id)}
-              style={({ pressed }) => [
-                styles.courseDropdownOption,
-                {
-                  backgroundColor: pressed && !isActive
-                    ? colors.surfaceVariant
-                    : isActive
-                    ? alpha(colors.primary, 10)
-                    : colors.surface,
-                  borderBottomColor: colors.border,
-                },
-                isFirst && styles.courseDropdownOptionFirst,
-                isLast && styles.courseDropdownOptionLast,
-              ]}
-            >
-              <Text
-                variant="body"
-                style={{
-                  color: isActive ? colors.primary : colors.textPrimary,
-                  fontWeight: isActive ? '700' : '600',
-                  fontSize: 16,
-                }}
-              >
-                {course.title}
-              </Text>
-              {isActive && (
-                <View style={[styles.checkmark, { backgroundColor: colors.primaryFill }]}>
-                  <Check size={iconSize.xs} color={colors.onPrimary} strokeWidth={3} />
-                </View>
-              )}
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-    </View>
-  );
-}
-
 // ==================== СТИЛИ ====================
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  animatedWrapper: {
-    flex: 1,
-    paddingHorizontal: spacing.l,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.s,
-  },
-  headerTitle: {
-    fontWeight: '700',
-  },
-  link: {
-    fontWeight: '600',
-  },
-  content: {
-    paddingBottom: spacing.xxl,
-    gap: spacing.l,
-  },
-  field: {
-    gap: spacing.xs,
-  },
-  fieldLabel: {
-    marginBottom: spacing.xs / 2,
-  },
-  inputContainer: {
-    borderWidth: 1,
-    borderRadius: borderRadius.l,
-    paddingHorizontal: spacing.m,
-    height: 56,
-    justifyContent: 'center',
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  input: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  helperText: {
-    marginTop: spacing.xs / 2,
-  },
-  labelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  textareaContainer: {
-    borderWidth: 1,
-    borderRadius: borderRadius.l,
-    padding: spacing.m,
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  textarea: {
-    fontSize: 16,
-    lineHeight: 22,
-    minHeight: 96,
-  },
-  languageRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.s,
-    zIndex: 20,
-  },
-  languageSelectWrapper: {
-    flex: 1,
-    position: 'relative',
-    zIndex: 10,
-  },
-  swapButton: {
-    width: 48,
-    height: 52,
-    borderRadius: borderRadius.l,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-    flexShrink: 0,
-  },
-  languageDropdown: {
-    marginTop: spacing.xs,
-    borderWidth: 1.5,
-    borderRadius: borderRadius.l,
-    maxHeight: 280,
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
-    overflow: 'hidden',
-    zIndex: 100,
-    position: 'relative',
-  },
-  languageDropdownScroll: {
-    maxHeight: 280,
-  },
-  languageDropdownOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.m,
-    borderBottomWidth: 1,
-  },
-  languageDropdownOptionFirst: {
-    borderTopLeftRadius: borderRadius.l,
-    borderTopRightRadius: borderRadius.l,
-  },
-  languageDropdownOptionLast: {
-    borderBottomWidth: 0,
-    borderBottomLeftRadius: borderRadius.l,
-    borderBottomRightRadius: borderRadius.l,
-  },
-  select: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.s + 2,
-    borderWidth: 1.5,
-    borderRadius: borderRadius.l,
-    flex: 1,
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-    minHeight: 52,
-    position: 'relative',
-    zIndex: 1,
-  },
-  selectFullWidth: {
-    width: '100%',
-    flex: undefined,
-  },
-  selectLabel: {
-    fontWeight: '600',
-    flex: 1,
-  },
-  dropdown: {
-    marginTop: spacing.xs,
-    borderWidth: 1,
-    borderRadius: borderRadius.l,
-    minWidth: '48%',
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-  },
-  dropdownOption: {
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.s,
-  },
-  courseSelectContainer: {
-    position: 'relative',
-    width: '100%',
-    zIndex: 10,
-    marginBottom: spacing.s,
-  },
-  courseDropdown: {
-    marginTop: spacing.xs,
-    borderWidth: 1.5,
-    borderRadius: borderRadius.l,
-    maxHeight: 280,
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
-    overflow: 'hidden',
-    zIndex: 100,
-    position: 'relative',
-  },
-  courseDropdownScroll: {
-    maxHeight: 280,
-  },
-  courseDropdownOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.m,
-    borderBottomWidth: 1,
-  },
-  courseDropdownOptionFirst: {
-    borderTopLeftRadius: borderRadius.l,
-    borderTopRightRadius: borderRadius.l,
-  },
-  courseDropdownOptionLast: {
-    borderBottomWidth: 0,
-    borderBottomLeftRadius: borderRadius.l,
-    borderBottomRightRadius: borderRadius.l,
-  },
-  checkmark: {
-    width: 22,
-    height: 22,
-    borderRadius: borderRadius.m,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deleteLink: {
-    alignSelf: 'flex-start',
-    paddingVertical: spacing.xs,
-  },
-  publishButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.s,
-    paddingVertical: spacing.m,
-    borderRadius: borderRadius.l,
-    borderWidth: 1,
-  },
-  publishedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.s,
-    paddingHorizontal: spacing.m,
-    borderRadius: borderRadius.l,
-    borderWidth: 1,
-  },
-  publishForm: {
-    borderRadius: borderRadius.l,
-    borderWidth: 1,
-    padding: spacing.m,
-    gap: spacing.xs,
-  },
-  publishInput: {
-    fontSize: 14,
-    borderWidth: 1,
-    borderRadius: borderRadius.m,
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.s,
-    minHeight: 40,
-  },
-  flex1: {
-    flex: 1,
-  },
-  publishChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xxs,
-    paddingHorizontal: spacing.s,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-  },
-  publishActions: {
-    flexDirection: 'row',
-    gap: spacing.s,
-    marginTop: spacing.m,
-  },
-  shareRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.s,
-    padding: spacing.m,
-    borderRadius: borderRadius.l,
-    borderWidth: 1,
-  },
-  shareIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: borderRadius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  shareDisable: {
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  publishActionBtn: {
-    borderWidth: 1,
-    borderRadius: borderRadius.m,
-    paddingVertical: spacing.s,
-    paddingHorizontal: spacing.m,
-    alignItems: 'center',
-  },
-  actions: {
-    flexDirection: 'row',
-    gap: spacing.s,
-    paddingHorizontal: spacing.s / 2,
-    paddingBottom: spacing.l,
-    paddingTop: spacing.m,
-    borderTopWidth: 1,
-  },
-});

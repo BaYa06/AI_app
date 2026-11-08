@@ -28,10 +28,20 @@ interface Props {
   secondary?: ImportStatusAction;
 }
 
-export const ImportStatus = memo(function ImportStatus({ icon: Icon, tone, title, text, children, primary, secondary }: Props) {
+export const ImportStatus = memo(function ImportStatus({
+  icon: Icon,
+  tone,
+  title,
+  text,
+  children,
+  primary,
+  secondary,
+}: Props) {
   const colors = useThemeColors();
-  const toneColor = tone === 'warning' ? colors.warningText : tone === 'error' ? colors.errorText : colors.primary;
-  const toneBg = tone === 'warning' ? colors.warning : tone === 'error' ? colors.error : colors.primary;
+  const toneColor =
+    tone === 'warning' ? colors.warningText : tone === 'error' ? colors.errorText : colors.primary;
+  const toneBg =
+    tone === 'warning' ? colors.warning : tone === 'error' ? colors.error : colors.primary;
 
   return (
     <View style={styles.root}>
@@ -39,13 +49,24 @@ export const ImportStatus = memo(function ImportStatus({ icon: Icon, tone, title
         <View style={[styles.icon, { backgroundColor: alpha(toneBg, 10) }]}>
           <Icon size={iconSize.xl} color={toneColor} />
         </View>
-        <Text variant="h2" align="center" style={{ color: colors.textPrimary }}>{title}</Text>
-        <Text variant="body" align="center" color="secondary">{text}</Text>
+        <Text variant="h2" align="center" style={{ color: colors.textPrimary }}>
+          {title}
+        </Text>
+        <Text variant="body" align="center" color="secondary">
+          {text}
+        </Text>
         {children}
       </View>
       <View style={styles.actions}>
         {primary && <Button title={primary.title} onPress={primary.onPress} fullWidth />}
-        {secondary && <Button variant="secondary" title={secondary.title} onPress={secondary.onPress} fullWidth />}
+        {secondary && (
+          <Button
+            variant="secondary"
+            title={secondary.title}
+            onPress={secondary.onPress}
+            fullWidth
+          />
+        )}
       </View>
     </View>
   );

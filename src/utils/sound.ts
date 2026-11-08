@@ -6,6 +6,7 @@
 
 import { Platform } from 'react-native';
 import { useSettingsStore } from '@/store/settingsStore';
+import { log } from '@/utils/logger';
 
 let Sound: any | null = null;
 if (Platform.OS !== 'web') {
@@ -13,19 +14,21 @@ if (Platform.OS !== 'web') {
     const soundModule = require('react-native-sound');
     Sound = soundModule?.default ?? soundModule;
   } catch (error) {
-    console.warn('[sound] Failed to load react-native-sound:', error);
+    log.warn('Sound', 'Failed to load react-native-sound', error);
   }
 }
 
 const isNative = Platform.OS !== 'web';
 const canUseNativeSound = Boolean(Sound && typeof Sound.setCategory === 'function');
 
-// Enable playback in silence mode (iOS)
+// Enable playback in silence mode (iOS). Без mixWithOthers: react-native-sound добавляет к нему
+// AllowBluetooth, а с Playback iOS такую опцию не принимает — категория молча не ставится, и беззвучный
+// режим глушит все звуки (plan/new/session_results.md, решение 19)
 if (isNative && canUseNativeSound) {
   try {
     Sound.setCategory('Playback');
   } catch (error) {
-    console.warn('[sound] Failed to set audio category:', error);
+    log.warn('Sound', 'Failed to set audio category', error);
   }
 }
 
@@ -85,7 +88,7 @@ function playSynthesizedSound(): void {
     osc.stop(ctx.currentTime + duration);
     osc.onended = () => ctx.close();
   } catch (error) {
-    console.warn('[sound] Synthesized sound failed:', error);
+    log.warn('Sound', 'Synthesized sound failed', error);
   }
 }
 
@@ -94,7 +97,7 @@ function playSynthesizedSound(): void {
 function playNativeSound(assetName: string, volume: number): Promise<void> {
   return new Promise((resolve) => {
     if (!canUseNativeSound) {
-      console.warn('[sound] react-native-sound is unavailable, skipping playback:', assetName);
+      log.warn('Sound', 'react-native-sound is unavailable, skipping playback', assetName);
       resolve();
       return;
     }
@@ -105,7 +108,7 @@ function playNativeSound(assetName: string, volume: number): Promise<void> {
       cached.setVolume(volume);
       cached.stop(() => {
         cached.play((success: boolean) => {
-          if (!success) console.warn('[sound] Native playback failed:', assetName);
+          if (!success) log.warn('Sound', 'Native playback failed', assetName);
           resolve();
         });
       });
@@ -115,14 +118,14 @@ function playNativeSound(assetName: string, volume: number): Promise<void> {
     // Load from assets directory
     const sound = new Sound(assetName, Sound.MAIN_BUNDLE, (err: any) => {
       if (err) {
-        console.warn('[sound] Failed to load native sound:', assetName, err);
+        log.warn('Sound', 'Failed to load native sound', assetName, err);
         resolve();
         return;
       }
       sound.setVolume(volume);
       nativeSoundCache.set(assetName, sound);
       sound.play((success: boolean) => {
-        if (!success) console.warn('[sound] Native playback failed:', assetName);
+        if (!success) log.warn('Sound', 'Native playback failed', assetName);
         resolve();
       });
     });
@@ -134,18 +137,18 @@ function playNativeSound(assetName: string, volume: number): Promise<void> {
 export function preloadSound(url: string): void {
   if (isNative) {
     if (!canUseNativeSound) {
-      console.warn('[sound] react-native-sound is unavailable, skip preload:', url);
+      log.warn('Sound', 'react-native-sound is unavailable, skip preload', url);
       return;
     }
     const assetName = urlToAssetName(url);
     if (nativeSoundCache.has(assetName)) return;
     const sound = new Sound(assetName, Sound.MAIN_BUNDLE, (err: any) => {
       if (err) {
-        console.warn('[sound] Failed to preload native sound:', assetName, err);
+        log.warn('Sound', 'Failed to preload native sound', assetName, err);
         return;
       }
       nativeSoundCache.set(assetName, sound);
-      console.log('[sound] Preloaded native:', assetName);
+      log.debug('Sound', 'Preloaded native', assetName);
     });
     return;
   }
@@ -159,7 +162,7 @@ export function preloadSound(url: string): void {
     audio.load();
     audioCache.set(url, audio);
   } catch (error) {
-    console.warn('[sound] Failed to preload:', url, error);
+    log.warn('Sound', 'Failed to preload', url, error);
   }
 }
 
@@ -207,4 +210,37 @@ export function playCorrectSound(): void {
 
 export function playCorrectSound2(): void {
   playSound('/correct2.wav', 0.7).catch(() => {});
+}
+
+// ----------------- Звуки сессии «Изучить» (plan/new/session_results.md) -----------------
+// Только на этапах сессии и её итогах; свободная практика — на playCorrectSound / playCorrectSound2.
+
+export type SessionSfx = 'correct' | 'error' | 'pop' | 'reveal' | 'count' | 'ding' | 'finish';
+
+const sessionSfxUrl = (name: SessionSfx) => `/session_${name}.wav`;
+
+/** Главный удар звука, мс от начала файла — вибрацию даём в этот момент (замеры Results 1) */
+export const SESSION_SFX_HIT_MS: Partial<Record<SessionSfx, number>> = {
+  reveal: 10,
+  finish: 300,
+};
+
+export function preloadSessionSfx(names: SessionSfx[]): void {
+  names.forEach((name) => preloadSound(sessionSfxUrl(name)));
+}
+
+export function playSessionSfx(name: SessionSfx, volume = 0.7): void {
+  playSound(sessionSfxUrl(name), volume).catch(() => {});
+}
+
+/** Оборвать звуки сессии — например, «Продолжить» нажали посреди анимации итогов */
+export function stopSessionSfx(names: SessionSfx[]): void {
+  for (const name of names) {
+    const url = sessionSfxUrl(name);
+    if (isNative) {
+      nativeSoundCache.get(urlToAssetName(url))?.stop();
+    } else {
+      audioCache.get(url)?.pause();
+    }
+  }
 }

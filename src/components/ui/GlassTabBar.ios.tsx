@@ -35,7 +35,9 @@ interface NativeProps extends ViewProps {
 
 export const isGlassTabBarSupported = UIManager.hasViewManagerConfig('GlassTabBar');
 
-const NativeGlassTabBar = isGlassTabBarSupported ? requireNativeComponent<NativeProps>('GlassTabBar') : null;
+const NativeGlassTabBar = isGlassTabBarSupported
+  ? requireNativeComponent<NativeProps>('GlassTabBar')
+  : null;
 
 /** Иконки вкладок — SF Symbols (в Android-панели те же вкладки рисует Ionicons) */
 const SYMBOLS: Record<string, string> = {
@@ -66,10 +68,17 @@ export function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProp
   if (!NativeGlassTabBar) return null;
 
   const items: TabItem[] = state.routes
-    .filter((route) => (descriptors[route.key].options.tabBarItemStyle as { display?: string } | undefined)?.display !== 'none')
+    .filter(
+      (route) =>
+        (descriptors[route.key].options.tabBarItemStyle as { display?: string } | undefined)
+          ?.display !== 'none'
+    )
     .map((route) => {
       const { options } = descriptors[route.key];
-      const label = typeof options.tabBarLabel === 'string' ? options.tabBarLabel : options.title ?? route.name;
+      const label =
+        typeof options.tabBarLabel === 'string'
+          ? options.tabBarLabel
+          : (options.title ?? route.name);
       return { key: route.key, title: label, symbol: SYMBOLS[route.name] ?? 'circle.fill' };
     });
 
@@ -78,9 +87,16 @@ export function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProp
     const route = state.routes.find((r) => r.key === event.nativeEvent.key);
     if (!route) return;
     const focused = state.routes[state.index].key === route.key;
-    const pressEvent = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+    const pressEvent = navigation.emit({
+      type: 'tabPress',
+      target: route.key,
+      canPreventDefault: true,
+    });
     if (!focused && !pressEvent.defaultPrevented) {
-      navigation.dispatch({ ...CommonActions.navigate({ name: route.name, merge: true }), target: state.key });
+      navigation.dispatch({
+        ...CommonActions.navigate({ name: route.name, merge: true }),
+        target: state.key,
+      });
     }
   };
 

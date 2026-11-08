@@ -159,7 +159,9 @@ export const Button = memo(function Button(props: ButtonProps) {
         styles.base,
         size === 's' ? styles.small : styles.large,
         fullWidth && styles.fullWidth,
-        variant === 'primary' && { backgroundColor: pressed ? colors.primaryPressed : colors.primaryFill },
+        variant === 'primary' && {
+          backgroundColor: pressed ? colors.primaryPressed : colors.primaryFill,
+        },
         variant === 'secondary' && [styles.outlined, { borderColor: colors.primary }],
         filledDanger && { backgroundColor: colors.error },
         (variant === 'quiet' || (variant === 'danger' && !filled)) && styles.bare,
@@ -175,7 +177,11 @@ export const Button = memo(function Button(props: ButtonProps) {
         {Icon ? <Icon size={iconSize.s} color={labelColor} /> : null}
         <Text
           numberOfLines={1}
-          style={[size === 's' ? typography.label : typography.button, styles.label, { color: labelColor }]}
+          style={[
+            size === 's' ? typography.label : typography.button,
+            styles.label,
+            { color: labelColor },
+          ]}
         >
           {title}
         </Text>

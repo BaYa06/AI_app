@@ -8,10 +8,26 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { Clock, Trash2 } from 'lucide-react-native';
 import { useThemeColors } from '@/store';
 import { Text } from '@/components/common';
-import { Button, Card, ListGroup, ListRow, Screen, ScreenHeader, Switch, confirmDialog, toast } from '@/components/ui';
+import {
+  Button,
+  Card,
+  ListGroup,
+  ListRow,
+  Screen,
+  ScreenHeader,
+  Switch,
+  confirmDialog,
+  toast,
+} from '@/components/ui';
 import { spacing } from '@/constants';
 import { NeonService, type AboutMe } from '@/services/NeonService';
-import { AboutMeForm, DEFAULT_CLASS_HOUR, WEEK_DAYS, type AboutMeValue } from '@/components/push/AboutMeForm';
+import {
+  AboutMeForm,
+  DEFAULT_CLASS_HOUR,
+  WEEK_DAYS,
+  type AboutMeValue,
+} from '@/components/push/AboutMeForm';
+import type { RootStackScreenProps } from '@/types/navigation';
 
 const GOAL_LABELS: Record<string, string> = {
   studies: 'Для учёбы',
@@ -21,7 +37,9 @@ const GOAL_LABELS: Record<string, string> = {
 };
 
 function daysLabel(days: string[]): string {
-  return WEEK_DAYS.filter((d) => days.includes(d.key)).map((d) => d.label).join(', ');
+  return WEEK_DAYS.filter((d) => days.includes(d.key))
+    .map((d) => d.label)
+    .join(', ');
 }
 
 function toFormValue(data: AboutMe): AboutMeValue {
@@ -33,7 +51,7 @@ function toFormValue(data: AboutMe): AboutMeValue {
   };
 }
 
-export function MyDataScreen({ navigation }: any) {
+export function MyDataScreen({ navigation }: RootStackScreenProps<'MyData'>) {
   const colors = useThemeColors();
   const [data, setData] = useState<AboutMe | null>(null);
   const [form, setForm] = useState<AboutMeValue | null>(null);
@@ -52,15 +70,18 @@ export function MyDataScreen({ navigation }: any) {
   }, []);
   useEffect(load, [load]);
 
-  const handleToggleHabits = useCallback(async (on: boolean) => {
-    if (!data) return;
-    setData({ ...data, useHabits: on });
-    const ok = await NeonService.saveAboutMe({ useHabits: on });
-    if (!ok) {
-      setData({ ...data });
-      toast.error('Не удалось сохранить. Проверь интернет');
-    }
-  }, [data]);
+  const handleToggleHabits = useCallback(
+    async (on: boolean) => {
+      if (!data) return;
+      setData({ ...data, useHabits: on });
+      const ok = await NeonService.saveAboutMe({ useHabits: on });
+      if (!ok) {
+        setData({ ...data });
+        toast.error('Не удалось сохранить. Проверь интернет');
+      }
+    },
+    [data]
+  );
 
   const handleSave = useCallback(async () => {
     if (!form || saving) return;
@@ -83,12 +104,18 @@ export function MyDataScreen({ navigation }: any) {
   const handleClearAll = useCallback(async () => {
     const confirmed = await confirmDialog({
       title: 'Стереть мои данные?',
-      message: 'Удалим возраст, занятия и привычное время. Напоминания будут приходить во время из настроек уведомлений.',
+      message:
+        'Удалим возраст, занятия и привычное время. Напоминания будут приходить во время из настроек уведомлений.',
       confirmText: 'Стереть',
       destructive: true,
     });
     if (!confirmed) return;
-    const ok = await NeonService.saveAboutMe({ ageRange: null, classDays: [], classHour: null, clearHabits: true });
+    const ok = await NeonService.saveAboutMe({
+      ageRange: null,
+      classDays: [],
+      classHour: null,
+      clearHabits: true,
+    });
     if (ok) {
       toast.success('Данные стёрты');
       load();
@@ -98,11 +125,16 @@ export function MyDataScreen({ navigation }: any) {
   }, [load]);
 
   return (
-    <Screen header={<ScreenHeader title="Мои данные" onBack={() => navigation.goBack()} bordered />} contentStyle={st.content}>
+    <Screen
+      header={<ScreenHeader title="Мои данные" onBack={() => navigation.goBack()} bordered />}
+      contentStyle={st.content}
+    >
       {!data || !form ? (
         loadFailed ? (
           <View style={st.center}>
-            <Text variant="body" color="secondary" align="center">Не удалось загрузить данные</Text>
+            <Text variant="body" color="secondary" align="center">
+              Не удалось загрузить данные
+            </Text>
             <Button title="Повторить" variant="secondary" onPress={load} />
           </View>
         ) : (
@@ -113,7 +145,8 @@ export function MyDataScreen({ navigation }: any) {
       ) : (
         <>
           <Text variant="body" color="secondary">
-            Это нужно только для напоминаний: чтобы они приходили вовремя и по делу. Не для рекламы, третьим лицам не передаётся.
+            Это нужно только для напоминаний: чтобы они приходили вовремя и по делу. Не для рекламы,
+            третьим лицам не передаётся.
           </Text>
 
           <ListGroup title="Что приложение заметило" style={st.group}>
@@ -126,10 +159,20 @@ export function MyDataScreen({ navigation }: any) {
                   : 'Пока мало занятий, чтобы понять привычное время'
               }
               chevron={false}
-              right={<Switch value={data.useHabits} onValueChange={handleToggleHabits} accessibilityLabel="Подстраивать напоминания под привычки" />}
+              right={
+                <Switch
+                  value={data.useHabits}
+                  onValueChange={handleToggleHabits}
+                  accessibilityLabel="Подстраивать напоминания под привычки"
+                />
+              }
             />
             {data.learningGoal ? (
-              <ListRow title="Цель" subtitle={GOAL_LABELS[data.learningGoal] ?? data.learningGoal} chevron={false} />
+              <ListRow
+                title="Цель"
+                subtitle={GOAL_LABELS[data.learningGoal] ?? data.learningGoal}
+                chevron={false}
+              />
             ) : null}
           </ListGroup>
 
@@ -137,7 +180,12 @@ export function MyDataScreen({ navigation }: any) {
             <AboutMeForm value={form} onChange={setForm} />
           </Card>
 
-          <Button title={saving ? 'Сохранение…' : 'Сохранить'} onPress={handleSave} disabled={saving} fullWidth />
+          <Button
+            title={saving ? 'Сохранение…' : 'Сохранить'}
+            onPress={handleSave}
+            disabled={saving}
+            fullWidth
+          />
           <Button
             title="Стереть мои данные"
             icon={Trash2}

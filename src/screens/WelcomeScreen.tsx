@@ -3,15 +3,17 @@
  * @description Экран приветствия с Google OAuth авторизацией.
  */
 import React, { useCallback, useEffect, useState } from 'react';
+import { View, StyleSheet, ScrollView, Platform, Linking, ActivityIndicator } from 'react-native';
 import {
-  View,
-  StyleSheet,
-  ScrollView,
-  Platform,
-  Linking,
-  ActivityIndicator,
-} from 'react-native';
-import { Zap, Sparkles, BookOpen, Lightbulb, Download, Share, PlusSquare, CheckCircle2 } from 'lucide-react-native';
+  Zap,
+  Sparkles,
+  BookOpen,
+  Lightbulb,
+  Download,
+  Share,
+  PlusSquare,
+  CheckCircle2,
+} from 'lucide-react-native';
 import InAppBrowser from 'react-native-inappbrowser-reborn';
 import appleAuth, { AppleButton } from '@invertase/react-native-apple-authentication';
 import { Text } from '@/components/common';
@@ -24,6 +26,7 @@ import { SUPABASE_OAUTH_REDIRECT, supabase } from '@/services/supabaseClient';
 import { describeError } from '@/utils/userErrors';
 import { setAppleSignInName } from '@/services/appleSignInName';
 import { PRIVACY_POLICY_URL, TERMS_URL } from '@/config/legal';
+import { log } from '@/utils/logger';
 
 type Props = {
   isLoading?: boolean;
@@ -58,7 +61,6 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
   const loading = isLoading || externalLoading;
   const canUseAppleSignIn = Platform.OS === 'ios' && appleAuth.isSupported;
 
-
   const getParamFromCallbackUrl = useCallback((rawUrl: string, name: string): string | null => {
     if (!rawUrl || !name) return null;
     const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -85,7 +87,7 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
         },
       });
       if (error) {
-        console.error('[auth] Google sign-in error', error);
+        log.error('Auth', 'Google sign-in error', error);
         setAuthError(describeError(error, 'Не удалось войти. Попробуй ещё раз.'));
         setIsLoading(false);
       }
@@ -102,7 +104,7 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
     });
 
     if (error) {
-      console.error('[auth] Google sign-in error', error);
+      log.error('Auth', 'Google sign-in error', error);
       setAuthError(describeError(error, 'Не удалось войти. Попробуй ещё раз.'));
       setIsLoading(false);
       return;
@@ -122,7 +124,7 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
             if (code) {
               const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
               if (exchangeError) {
-                console.error('[auth] Code exchange failed:', exchangeError.message);
+                log.error('Auth', 'Code exchange failed', exchangeError.message);
                 setAuthError(describeError(exchangeError, 'Не удалось войти. Попробуй ещё раз.'));
               }
             } else {
@@ -136,7 +138,7 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
           await Linking.openURL(data.url);
         }
       } catch (e) {
-        console.error('[auth] Failed to open browser:', e);
+        log.error('Auth', 'Failed to open browser', e);
         setAuthError('Не удалось открыть браузер для входа через Google');
       } finally {
         setIsLoading(false);
@@ -161,7 +163,8 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
       }
 
       // Имя приходит только при первом входе — запоминаем до входа, его заберёт App
-      const appleName = [fullName?.givenName, fullName?.familyName].filter(Boolean).join(' ').trim() || null;
+      const appleName =
+        [fullName?.givenName, fullName?.familyName].filter(Boolean).join(' ').trim() || null;
       setAppleSignInName(appleName);
 
       const { error } = await supabase.auth.signInWithIdToken({
@@ -172,12 +175,12 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
 
       if (error) {
         setAppleSignInName(null);
-        console.error('[auth] Apple sign-in error', error);
+        log.error('Auth', 'Apple sign-in error', error);
         setAuthError(describeError(error, 'Не удалось войти. Попробуй ещё раз.'));
       }
     } catch (e: any) {
       if (e?.code !== appleAuth.Error.CANCELED) {
-        console.error('[auth] Apple sign-in failed:', e);
+        log.error('Auth', 'Apple sign-in failed', e);
         setAuthError('Не удалось войти через Apple');
       }
     } finally {
@@ -206,15 +209,28 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
             <View style={[styles.logoCircle, { backgroundColor: colors.surfaceMuted }]}>
               <Zap size={iconSize.l} color={colors.primary} fill={colors.primary} />
             </View>
-            <Text variant="h1" align="center" accessibilityRole="header" style={{ color: colors.textPrimary }}>
+            <Text
+              variant="h1"
+              align="center"
+              accessibilityRole="header"
+              style={{ color: colors.textPrimary }}
+            >
               Flashly
             </Text>
-            <Text variant="bodyLarge" align="center" style={[styles.subtitle, { color: colors.textSecondary }]}>
+            <Text
+              variant="bodyLarge"
+              align="center"
+              style={[styles.subtitle, { color: colors.textSecondary }]}
+            >
               Учись умнее. Запоминай надолго.
             </Text>
           </View>
 
-          <View style={styles.illustration} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <View
+            style={styles.illustration}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
             <View style={styles.tilesGrid}>
               {TILES.map(({ icon: Glyph, fill, rotate, offset }, idx) => (
                 <View
@@ -222,13 +238,17 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
                   style={[
                     styles.tile,
                     {
-                      backgroundColor: fill === 'solid' ? colors.primaryFill : alpha(colors.primary, fill),
+                      backgroundColor:
+                        fill === 'solid' ? colors.primaryFill : alpha(colors.primary, fill),
                       transform: [{ rotate }],
                       marginTop: offset,
                     },
                   ]}
                 >
-                  <Glyph size={iconSize.l} color={fill === 'solid' ? colors.onPrimary : colors.primary} />
+                  <Glyph
+                    size={iconSize.l}
+                    color={fill === 'solid' ? colors.onPrimary : colors.primary}
+                  />
                 </View>
               ))}
             </View>
@@ -244,7 +264,12 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
               />
             ) : (
               <>
-                <Button title="Войти через Google" icon={GoogleIcon} onPress={signInWithGoogle} fullWidth />
+                <Button
+                  title="Войти через Google"
+                  icon={GoogleIcon}
+                  onPress={signInWithGoogle}
+                  fullWidth
+                />
                 {canUseAppleSignIn && (
                   <AppleButton
                     buttonStyle={AppleButton.Style.BLACK}
@@ -257,7 +282,12 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
               </>
             )}
             {authError && (
-              <Text variant="bodySmall" align="center" accessibilityRole="alert" style={{ color: colors.errorText }}>
+              <Text
+                variant="bodySmall"
+                align="center"
+                accessibilityRole="alert"
+                style={{ color: colors.errorText }}
+              >
                 {authError}
               </Text>
             )}

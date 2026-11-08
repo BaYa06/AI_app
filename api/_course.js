@@ -52,23 +52,24 @@ export async function courseSetsForStudent(sql, courseId) {
   `;
 
   return [...rows, ...officialRows].map((row) => ({
-      id: row.id,
-      userId: row.user_id,
-      title: row.title,
-      description: row.description || '',
-      category: row.category || '',
-      icon: row.icon || null,
-      languageFrom: row.language_from || 'de',
-      languageTo: row.language_to || 'ru',
-      totalCards: parseInt(row.total_cards, 10) || 0,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at || null,
-      // Официальный набор в курс попадает через план юнитов — отдаём его под этим курсом.
-      courseId: row.is_official ? courseId : row.course_id,
-      isOfficial: row.is_official === true,
-      unitId: row.unit_id || null,
-      bookId: row.book_id || null,
-      bookTitle: row.book_title || null,
-      unitNumber: row.unit_number ?? null,
-    }));
+    id: row.id,
+    userId: row.user_id,
+    title: row.title,
+    description: row.description || '',
+    category: row.category || '',
+    icon: row.icon || null,
+    languageFrom: row.language_from || 'de',
+    languageTo: row.language_to || 'ru',
+    kind: row.kind || null,
+    totalCards: parseInt(row.total_cards, 10) || 0,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at || null,
+    // Официальный набор в курс попадает через план юнитов — отдаём его под этим курсом.
+    courseId: row.is_official ? courseId : row.course_id,
+    isOfficial: row.is_official === true,
+    unitId: row.unit_id || null,
+    bookId: row.book_id || null,
+    bookTitle: row.book_title || null,
+    unitNumber: row.unit_number ?? null,
+  }));
 }

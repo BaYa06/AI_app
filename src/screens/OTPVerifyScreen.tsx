@@ -20,7 +20,6 @@ import { Button, ProgressBar, ScreenHeader } from '@/components/ui';
 import { spacing, borderRadius, screenPadding, typography } from '@/constants';
 import { useThemeColors } from '@/store';
 
-
 type Props = {
   onBack?: () => void;
   onSubmit?: (code: string) => void;
@@ -52,10 +51,7 @@ export function OTPVerifyScreen({ onBack, onSubmit }: Props) {
     }
   };
 
-  const handleKeyPress = (
-    e: NativeSyntheticEvent<TextInputKeyPressEventData>,
-    idx: number
-  ) => {
+  const handleKeyPress = (e: NativeSyntheticEvent<TextInputKeyPressEventData>, idx: number) => {
     if (e.nativeEvent.key === 'Backspace' && !code[idx] && idx > 0) {
       inputsRef.current[idx - 1]?.focus();
     }
@@ -67,11 +63,17 @@ export function OTPVerifyScreen({ onBack, onSubmit }: Props) {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView
+        style={styles.screen}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         {/* Навигация */}
         <ScreenHeader onBack={onBack} />
 
-        <ScrollView contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={false}
+        >
           {/* Прогресс */}
           <View style={styles.progressBlock}>
             <View style={styles.progressHeader}>
@@ -87,10 +89,19 @@ export function OTPVerifyScreen({ onBack, onSubmit }: Props) {
 
           {/* Текст */}
           <View style={styles.headlineBlock}>
-            <Text variant="h1" align="center" accessibilityRole="header" style={{ color: colors.textPrimary }}>
+            <Text
+              variant="h1"
+              align="center"
+              accessibilityRole="header"
+              style={{ color: colors.textPrimary }}
+            >
               Проверь почту
             </Text>
-            <Text variant="body" align="center" style={[styles.bodyText, { color: colors.textSecondary }]}>
+            <Text
+              variant="body"
+              align="center"
+              style={[styles.bodyText, { color: colors.textSecondary }]}
+            >
               Мы отправили 5-значный код подтверждения. Введи его ниже, чтобы продолжить.
             </Text>
           </View>

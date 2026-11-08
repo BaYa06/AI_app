@@ -75,9 +75,17 @@ export function ToastHost({ offset }: { offset?: number } = {}) {
       setCurrent(next);
       AccessibilityInfo.announceForAccessibility(next.message);
       progress.stopAnimation();
-      Animated.timing(progress, { toValue: 1, duration: animation.normal, useNativeDriver }).start();
+      Animated.timing(progress, {
+        toValue: 1,
+        duration: animation.normal,
+        useNativeDriver,
+      }).start();
       hideTimer.current = setTimeout(() => {
-        Animated.timing(progress, { toValue: 0, duration: animation.normal, useNativeDriver }).start(({ finished }) => {
+        Animated.timing(progress, {
+          toValue: 0,
+          duration: animation.normal,
+          useNativeDriver,
+        }).start(({ finished }) => {
           if (finished) setCurrent((shown) => (shown?.id === next.id ? null : shown));
         });
       }, next.duration);
@@ -110,11 +118,19 @@ export function ToastHost({ offset }: { offset?: number } = {}) {
           styles.toast,
           isGlassSupported
             ? { transform: [{ translateY }] }
-            : { backgroundColor: colors.textPrimary, opacity: progress, transform: [{ translateY }] },
+            : {
+                backgroundColor: colors.textPrimary,
+                opacity: progress,
+                transform: [{ translateY }],
+              },
         ]}
       >
         {isGlassSupported ? (
-          <GlassView fallbackColor={colors.textPrimary} cornerRadius={borderRadius.xl} style={StyleSheet.absoluteFill} />
+          <GlassView
+            fallbackColor={colors.textPrimary}
+            cornerRadius={borderRadius.xl}
+            style={StyleSheet.absoluteFill}
+          />
         ) : null}
         <Icon size={iconSize.s} color={contentColor} />
         <Text variant="bodySmall" numberOfLines={2} style={[styles.text, { color: contentColor }]}>

@@ -15,23 +15,24 @@ import {
   setUserId as fbSetUserId,
   setUserProperties as fbSetUserProperties,
 } from '@react-native-firebase/analytics';
+import { log } from '@/utils/logger';
 
 type Params = Record<string, string | number | boolean>;
 
 const enabled = Platform.OS === 'ios';
 
 export function sendEvent(event: string, params?: Params) {
-  if (__DEV__) console.log(`[Analytics] ${event}`, params);
+  log.debug('Analytics', `${event}`, params);
   if (!enabled) return;
   fbLogEvent(getAnalytics(), event, params).catch((e: unknown) => {
-    if (__DEV__) console.warn('[Analytics] logEvent error:', e);
+    log.debug('Analytics', 'logEvent error', e);
   });
 }
 
 export function sendUserProperties(props: Record<string, string>) {
   if (!enabled) return;
   fbSetUserProperties(getAnalytics(), props).catch((e: unknown) => {
-    if (__DEV__) console.warn('[Analytics] setUserProperties error:', e);
+    log.debug('Analytics', 'setUserProperties error', e);
   });
 }
 
@@ -41,6 +42,6 @@ export function sendUserProperties(props: Record<string, string>) {
 export function setAnalyticsUserId(userId: string | null) {
   if (!enabled) return;
   fbSetUserId(getAnalytics(), userId).catch((e: unknown) => {
-    if (__DEV__) console.warn('[Analytics] setUserId error:', e);
+    log.debug('Analytics', 'setUserId error', e);
   });
 }

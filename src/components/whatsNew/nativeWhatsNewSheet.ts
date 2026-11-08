@@ -29,9 +29,27 @@ export const isNativeWhatsNewSheet = !!native;
 
 // Токены, которые использует шторка (WhatsNewPalette в WhatsNewSheet.swift)
 const COLOR_KEYS = [
-  'surface', 'surfaceMuted', 'surfaceVariant', 'border', 'textPrimary', 'textSecondary', 'textTertiary',
-  'primary', 'primaryFill', 'onPrimary', 'error', 'errorText', 'warningText', 'success', 'successText',
-  'streak', 'like', 'gameViolet', 'gameRose', 'gameTeal', 'gameGreen',
+  'surface',
+  'surfaceMuted',
+  'surfaceVariant',
+  'border',
+  'textPrimary',
+  'textSecondary',
+  'textTertiary',
+  'primary',
+  'primaryFill',
+  'onPrimary',
+  'error',
+  'errorText',
+  'warningText',
+  'success',
+  'successText',
+  'streak',
+  'like',
+  'gameViolet',
+  'gameRose',
+  'gameTeal',
+  'gameGreen',
 ] as const;
 
 export interface WhatsNewCloseResult {

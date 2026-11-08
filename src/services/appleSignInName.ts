@@ -8,6 +8,7 @@
  */
 import { Platform } from 'react-native';
 import appleAuth from '@invertase/react-native-apple-authentication';
+import { log } from '@/utils/logger';
 
 let pendingName: string | null = null;
 
@@ -24,7 +25,9 @@ export function takeAppleSignInName(): string | null {
 
 export function isAppleUser(user: { app_metadata?: any }): boolean {
   const meta = user.app_metadata ?? {};
-  return meta.provider === 'apple' || (Array.isArray(meta.providers) && meta.providers.includes('apple'));
+  return (
+    meta.provider === 'apple' || (Array.isArray(meta.providers) && meta.providers.includes('apple'))
+  );
 }
 
 export type AppleCodeResult =
@@ -41,10 +44,12 @@ export async function requestAppleAuthorizationCode(): Promise<AppleCodeResult> 
       requestedOperation: appleAuth.Operation.LOGIN,
       requestedScopes: [],
     });
-    return response.authorizationCode ? { status: 'ok', code: response.authorizationCode } : { status: 'failed' };
+    return response.authorizationCode
+      ? { status: 'ok', code: response.authorizationCode }
+      : { status: 'failed' };
   } catch (e: any) {
     if (e?.code === appleAuth.Error.CANCELED) return { status: 'canceled' };
-    console.error('[auth] Apple re-auth for account deletion failed:', e);
+    log.error('Auth', 'Apple re-auth for account deletion failed', e);
     return { status: 'failed' };
   }
 }

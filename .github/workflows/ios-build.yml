@@ -1,10 +1,8 @@
 name: iOS Build
 
+# Только ручной запуск: сборки для TestFlight делает Codemagic (codemagic.yaml), а проверки кода —
+# workflow Checks (plan/new/code_cleanup.md, Clean 7).
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 jobs:

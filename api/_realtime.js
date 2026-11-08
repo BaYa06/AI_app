@@ -11,6 +11,8 @@
  * изменения при возврате в приложение.
  */
 
+import { log } from './_log.js';
+
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://yiwsmjbeirgomkrckoju.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
 const NOTIFY_TIMEOUT_MS = 2_000;
@@ -40,9 +42,9 @@ export async function notifyCoursesChanged(courseIds) {
       }),
       signal: controller.signal,
     });
-    if (!resp.ok) console.warn('[realtime] course broadcast failed:', resp.status);
+    if (!resp.ok) log.warn('realtime', 'course broadcast failed', resp.status);
   } catch (error) {
-    console.warn('[realtime] course broadcast error:', error?.message || error);
+    log.warn('realtime', 'course broadcast error', error?.message || error);
   } finally {
     clearTimeout(timer);
   }

@@ -23,7 +23,13 @@ export const ProgressService = {
    */
   recordAnswer(
     card: Card,
-    answer: { mode: AnswerMode; correct: boolean; chosen?: string; selfRating?: Rating; timeSpentMs?: number },
+    answer: {
+      mode: AnswerMode;
+      correct: boolean;
+      chosen?: string;
+      selfRating?: Rating;
+      timeSpentMs?: number;
+    }
   ): void {
     const answeredAt = Date.now();
     const next = applyAnswer(card, answer, answeredAt);

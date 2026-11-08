@@ -17,6 +17,15 @@
   },
   "headers": [
     {
+      "source": "/(.*)",
+      "missing": [{ "type": "host", "value": "flashlycards.app" }],
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+    },
+    {
+      "source": "/join/(.*)",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+    },
+    {
       "source": "/.well-known/apple-app-site-association",
       "headers": [
         { "key": "Content-Type", "value": "application/json" }
@@ -111,6 +120,20 @@
       ]
     }
   ],
+  "redirects": [
+    {
+      "source": "/:path((?!(?:api|ai|s|join|privacy|terms|support|delete-account|admin|site|icons|fonts|\\.well-known)(?:/|$))[^.]+)",
+      "has": [{ "type": "host", "value": "flashlycards.app" }],
+      "destination": "https://app.flashlycards.app/:path",
+      "permanent": false
+    },
+    {
+      "source": "/:page(privacy|terms)",
+      "has": [{ "type": "host", "value": "ai-app-seven-zeta.vercel.app" }],
+      "destination": "https://flashlycards.app/:page",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     { "source": "/api/push/subscribe",            "destination": "/api/push?action=subscribe" },
     { "source": "/api/push/unsubscribe",           "destination": "/api/push?action=unsubscribe" },
@@ -127,6 +150,10 @@
     { "source": "/admin", "destination": "/admin.html" },
     { "source": "/privacy", "destination": "/privacy.html" },
     { "source": "/terms", "destination": "/terms.html" },
+    { "source": "/robots.txt", "has": [{ "type": "host", "value": "flashlycards.app" }], "destination": "/site/robots.txt" },
+    { "source": "/sitemap.xml", "has": [{ "type": "host", "value": "flashlycards.app" }], "destination": "/site/sitemap.xml" },
+    { "source": "/support", "destination": "/site/support.html" },
+    { "source": "/delete-account", "destination": "/site/delete-account.html" },
     { "source": "/api/translate-words",           "destination": "/api/ai?fn=translate-words" },
     { "source": "/api/generate-examples",         "destination": "/api/ai?fn=generate-examples" },
     { "source": "/api/context",                   "destination": "/api/ai?fn=context" },

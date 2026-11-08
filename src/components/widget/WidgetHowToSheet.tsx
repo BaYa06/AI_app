@@ -11,10 +11,16 @@ import { Button, Sheet } from '@/components/ui';
 import { spacing, borderRadius, alpha } from '@/constants';
 
 const STEPS = [
-  { title: 'Зажми экран блокировки', hint: 'iPhone должен быть разблокирован — например, через Face ID.' },
+  {
+    title: 'Зажми экран блокировки',
+    hint: 'iPhone должен быть разблокирован — например, через Face ID.',
+  },
   { title: 'Нажми «Настроить»', hint: 'Затем выбери «Экран блокировки».' },
   { title: 'Нажми на поле под часами', hint: 'Откроется список «Добавить виджеты».' },
-  { title: 'Найди Flashly', hint: 'Выбери «Вспомни слово» — прямоугольник показывает больше всего.' },
+  {
+    title: 'Найди Flashly',
+    hint: 'Выбери «Вспомни слово» — прямоугольник показывает больше всего.',
+  },
 ];
 
 interface Props {
@@ -36,11 +42,17 @@ export function WidgetHowToSheet({ visible, onClose }: Props) {
         {STEPS.map((step, index) => (
           <View key={step.title} style={st.step}>
             <View style={[st.number, { backgroundColor: alpha(colors.primary, 10) }]}>
-              <Text variant="label" style={{ color: colors.primary }}>{index + 1}</Text>
+              <Text variant="label" style={{ color: colors.primary }}>
+                {index + 1}
+              </Text>
             </View>
             <View style={st.stepText}>
-              <Text variant="body" style={{ color: colors.textPrimary }}>{step.title}</Text>
-              <Text variant="bodySmall" color="secondary">{step.hint}</Text>
+              <Text variant="body" style={{ color: colors.textPrimary }}>
+                {step.title}
+              </Text>
+              <Text variant="bodySmall" color="secondary">
+                {step.hint}
+              </Text>
             </View>
           </View>
         ))}

@@ -109,10 +109,7 @@ const RatingButton = memo<RatingButtonProps>(function RatingButton({
     >
       {({ pressed }) => (
         <>
-          <Text
-            variant="button"
-            style={{ color: pressed ? colors.onPrimary : textColor }}
-          >
+          <Text variant="button" style={{ color: pressed ? colors.onPrimary : textColor }}>
             {label}
           </Text>
           <Caption style={{ color: pressed ? colors.onPrimary : colors.textSecondary }}>

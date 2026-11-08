@@ -8,6 +8,7 @@ export { useCoursesStore } from './coursesStore';
 export { useStudyStore } from './studyStore';
 export { useSettingsStore, useThemeColors } from './settingsStore';
 export { useLibraryStore } from './libraryStore';
+export { useCatalogStore } from './catalogStore';
 export { useDiamondStore } from './diamondStore';
 export { useChallengeStore } from './challengeStore';
 export type { ChallengeId, ChallengeStatus } from './challengeStore';

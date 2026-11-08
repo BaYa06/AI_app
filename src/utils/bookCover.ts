@@ -26,6 +26,10 @@ export function getBookCover(subject: string | null | undefined): Cover {
 }
 
 /** «3rd · A2 · English» — только заполненные части. */
-export function formatBookMeta(book: { edition: string; level: string | null; subject: string | null }): string {
+export function formatBookMeta(book: {
+  edition: string;
+  level: string | null;
+  subject: string | null;
+}): string {
   return [book.edition, book.level, book.subject].filter(Boolean).join(' · ');
 }

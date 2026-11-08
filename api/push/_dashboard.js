@@ -60,11 +60,32 @@ export async function getPushDashboard(sql, { days = 7 } = {}) {
   // Сводка по типам (варианты сложены) и красные флаги для разбора
   const byType = new Map();
   for (const r of funnel) {
-    const t = byType.get(r.type) || { type: r.type, eligible: 0, sent: 0, delivered: 0, opened: 0, lesson_started: 0, lesson_completed: 0, variants: [] };
-    for (const k of ['eligible', 'sent', 'delivered', 'opened', 'lesson_started', 'lesson_completed']) t[k] += r[k];
+    const t = byType.get(r.type) || {
+      type: r.type,
+      eligible: 0,
+      sent: 0,
+      delivered: 0,
+      opened: 0,
+      lesson_started: 0,
+      lesson_completed: 0,
+      variants: [],
+    };
+    for (const k of [
+      'eligible',
+      'sent',
+      'delivered',
+      'opened',
+      'lesson_started',
+      'lesson_completed',
+    ])
+      t[k] += r[k];
     t.variants.push({
-      variant: r.variant, sent: r.sent, opened: r.opened, lesson_completed: r.lesson_completed,
-      openPct: pct(r.opened, r.sent), openedToLessonPct: pct(r.lesson_completed, r.opened),
+      variant: r.variant,
+      sent: r.sent,
+      opened: r.opened,
+      lesson_completed: r.lesson_completed,
+      openPct: pct(r.opened, r.sent),
+      openedToLessonPct: pct(r.lesson_completed, r.opened),
       enoughForAB: r.sent >= AB_MIN_SENT,
     });
     byType.set(r.type, t);
@@ -78,16 +99,25 @@ export async function getPushDashboard(sql, { days = 7 } = {}) {
 
   const flags = [];
   for (const t of types) {
-    if (t.sent >= 50 && t.openPct !== null && t.openPct < OPEN_RED_PCT) flags.push(`${t.type}: открывают ${t.openPct}% (меньше ${OPEN_RED_PCT}%)`);
-    if (t.opened >= 20 && t.openedToLessonPct !== null && t.openedToLessonPct < OPENED_TO_LESSON_RED_PCT) {
-      flags.push(`${t.type}: после открытия урок завершают ${t.openedToLessonPct}% (меньше ${OPENED_TO_LESSON_RED_PCT}%)`);
+    if (t.sent >= 50 && t.openPct !== null && t.openPct < OPEN_RED_PCT)
+      flags.push(`${t.type}: открывают ${t.openPct}% (меньше ${OPEN_RED_PCT}%)`);
+    if (
+      t.opened >= 20 &&
+      t.openedToLessonPct !== null &&
+      t.openedToLessonPct < OPENED_TO_LESSON_RED_PCT
+    ) {
+      flags.push(
+        `${t.type}: после открытия урок завершают ${t.openedToLessonPct}% (меньше ${OPENED_TO_LESSON_RED_PCT}%)`
+      );
     }
   }
   for (const c of churn) {
     const per1000 = recipients > 0 ? Math.round((1000 * c.users) / recipients) : null;
     c.per1000 = per1000;
     if (per1000 !== null && per1000 > CHURN_RED_PER_1000) {
-      flags.push(`${c.event}${c.detail ? ` (${c.detail})` : ''}: ${per1000} на 1000 получателей (больше 2%)`);
+      flags.push(
+        `${c.event}${c.detail ? ` (${c.detail})` : ''}: ${per1000} на 1000 получателей (больше 2%)`
+      );
     }
   }
 

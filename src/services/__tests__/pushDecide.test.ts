@@ -28,19 +28,43 @@ const base = {
 
 describe('арбитр пушей', () => {
   it('выбирает самый важный тип', () => {
-    expect(decide({ ...base, fading: 7, waiting: 12 })).toMatchObject({ status: 'send', type: 'words_fading', data: { count: 7 } });
-    expect(decide({ ...base, waiting: 40 })).toMatchObject({ status: 'send', type: 'review_due', data: { count: 30 } });
-    expect(decide({ ...base, dow: 'sun', rating: { place: 3, gap: 40 }, waiting: 5 })).toMatchObject({ type: 'rating_sunday' });
+    expect(decide({ ...base, fading: 7, waiting: 12 })).toMatchObject({
+      status: 'send',
+      type: 'words_fading',
+      data: { count: 7 },
+    });
+    expect(decide({ ...base, waiting: 40 })).toMatchObject({
+      status: 'send',
+      type: 'review_due',
+      data: { count: 30 },
+    });
+    expect(
+      decide({ ...base, dow: 'sun', rating: { place: 3, gap: 40 }, waiting: 5 })
+    ).toMatchObject({ type: 'rating_sunday' });
     expect(decide(base)).toMatchObject({ status: 'send', type: 'streak_reminder' });
   });
 
   it('урок сделан — только рейтинг и итоги, остальное молчит', () => {
-    expect(decide({ ...base, doneToday: true, waiting: 10 })).toEqual({ status: 'skip', reason: 'done_today' });
-    expect(decide({ ...base, doneToday: true, dow: 'mon', weekly: { place: 2, reward: 30 } })).toMatchObject({ type: 'weekly_result' });
+    expect(decide({ ...base, doneToday: true, waiting: 10 })).toEqual({
+      status: 'skip',
+      reason: 'done_today',
+    });
+    expect(
+      decide({ ...base, doneToday: true, dow: 'mon', weekly: { place: 2, reward: 30 } })
+    ).toMatchObject({ type: 'weekly_result' });
   });
 
   it('лестница возврата: 2 / 4 / 7 / 14 / 30 дней, между ступенями и после 30 — тишина', () => {
-    const away = (daysAway: number) => eligiblePushes({ ...base, streak: 0, daysAway, waiting: 18, fading: 9, learned: 140, sets: 3 }).map((p) => p.type);
+    const away = (daysAway: number) =>
+      eligiblePushes({
+        ...base,
+        streak: 0,
+        daysAway,
+        waiting: 18,
+        fading: 9,
+        learned: 140,
+        sets: 3,
+      }).map((p) => p.type);
     expect(away(2)).toEqual(['reactivation_2d']);
     expect(away(3)).toEqual([]);
     expect(away(4)).toEqual(['reactivation_4d']);
@@ -55,20 +79,29 @@ describe('арбитр пушей', () => {
   });
 
   it('выключенная категория пропускается, берётся следующая', () => {
-    expect(decide({ ...base, waiting: 12, groupsOff: ['lesson'] })).toMatchObject({ status: 'send', type: 'streak_reminder' });
-    expect(decide({ ...base, waiting: 12, groupsOff: ['lesson', 'streak'] })).toMatchObject({ status: 'category_off', type: 'review_due' });
+    expect(decide({ ...base, waiting: 12, groupsOff: ['lesson'] })).toMatchObject({
+      status: 'send',
+      type: 'streak_reminder',
+    });
+    expect(decide({ ...base, waiting: 12, groupsOff: ['lesson', 'streak'] })).toMatchObject({
+      status: 'category_off',
+      type: 'review_due',
+    });
   });
 
   it('контрольная группа не получает маркетинговых пушей', () => {
     expect(isHoldout(HOLDOUT_USER)).toBe(true);
     expect(isHoldout(USER)).toBe(false);
-    expect(decide({ ...base, userId: HOLDOUT_USER, waiting: 12 })).toMatchObject({ status: 'holdout', type: 'review_due' });
+    expect(decide({ ...base, userId: HOLDOUT_USER, waiting: 12 })).toMatchObject({
+      status: 'holdout',
+      type: 'review_due',
+    });
   });
 
   it('контрольная группа — около 10 %', () => {
     let n = 0;
     for (let i = 0; i < 10000; i++) {
-      const hex = (i * 2654435761 % 0xfffffff).toString(16).padStart(12, '0');
+      const hex = ((i * 2654435761) % 0xfffffff).toString(16).padStart(12, '0');
       if (isHoldout(`00000000-0000-4000-8000-${hex}`)) n++;
     }
     expect(n).toBeGreaterThan(800);
@@ -83,32 +116,81 @@ describe('арбитр пушей', () => {
     expect(backoffReason(7, '2026-10-07', '2026-10-14', 'lesson')).toBeNull();
     expect(backoffReason(14, null, '2026-10-14', 'lesson')).toBe('backoff_14');
     expect(backoffReason(14, null, '2026-10-14', 'reactivation')).toBeNull();
-    expect(decide({ ...base, waiting: 12, ignored: 3, lastSentDay: '2026-10-13' })).toMatchObject({ status: 'backoff', type: 'review_due', reason: 'backoff_3' });
-    expect(decide({ ...base, streak: 0, daysAway: 7, waiting: 12, ignored: 14, learned: 5 })).toMatchObject({ status: 'send', type: 'reactivation_7d' });
+    expect(decide({ ...base, waiting: 12, ignored: 3, lastSentDay: '2026-10-13' })).toMatchObject({
+      status: 'backoff',
+      type: 'review_due',
+      reason: 'backoff_3',
+    });
+    expect(
+      decide({ ...base, streak: 0, daysAway: 7, waiting: 12, ignored: 14, learned: 5 })
+    ).toMatchObject({ status: 'send', type: 'reactivation_7d' });
   });
 
   it('привычные дни: в «чужой» день не напоминаем об уроке, но рейтинг и возврат приходят', () => {
     const weekdays = ['mon', 'tue', 'wed', 'thu', 'fri'];
-    expect(decide({ ...base, dow: 'sat', waiting: 12, habitDays: weekdays })).toEqual({ status: 'skip', reason: 'not_usual_day' });
-    expect(decide({ ...base, dow: 'wed', waiting: 12, habitDays: weekdays })).toMatchObject({ status: 'send', type: 'review_due' });
-    expect(decide({ ...base, dow: 'sun', waiting: 12, rating: { place: 2, gap: 5 }, habitDays: weekdays })).toMatchObject({ type: 'rating_sunday' });
-    expect(decide({ ...base, dow: 'sat', streak: 0, daysAway: 4, fading: 3, habitDays: weekdays })).toMatchObject({ type: 'reactivation_4d' });
+    expect(decide({ ...base, dow: 'sat', waiting: 12, habitDays: weekdays })).toEqual({
+      status: 'skip',
+      reason: 'not_usual_day',
+    });
+    expect(decide({ ...base, dow: 'wed', waiting: 12, habitDays: weekdays })).toMatchObject({
+      status: 'send',
+      type: 'review_due',
+    });
+    expect(
+      decide({
+        ...base,
+        dow: 'sun',
+        waiting: 12,
+        rating: { place: 2, gap: 5 },
+        habitDays: weekdays,
+      })
+    ).toMatchObject({ type: 'rating_sunday' });
+    expect(
+      decide({ ...base, dow: 'sat', streak: 0, daysAway: 4, fading: 3, habitDays: weekdays })
+    ).toMatchObject({ type: 'reactivation_4d' });
   });
 
   it('новые слова — только когда повторять нечего', () => {
     const newWords = { count: 10, set: 'Travel' };
-    expect(decide({ ...base, newWords })).toMatchObject({ status: 'send', type: 'lesson_new_words', data: { count: 10, set: 'Travel' } });
+    expect(decide({ ...base, newWords })).toMatchObject({
+      status: 'send',
+      type: 'lesson_new_words',
+      data: { count: 10, set: 'Travel' },
+    });
     expect(decide({ ...base, waiting: 3, newWords })).toMatchObject({ type: 'review_due' });
-    expect(decide({ ...base, doneToday: true, newWords })).toEqual({ status: 'skip', reason: 'done_today' });
+    expect(decide({ ...base, doneToday: true, newWords })).toEqual({
+      status: 'skip',
+      reason: 'done_today',
+    });
   });
 
   it('«тебя обогнали»: вт–сб, не чаще раза в неделю', () => {
     const overtaken = { rival: 'Бакыт', gap: 15, courseId: 'c1' };
-    expect(decide({ ...base, dow: 'wed', overtaken })).toMatchObject({ status: 'send', type: 'rating_overtaken' });
-    expect(decide({ ...base, dow: 'mon', streak: 0, overtaken })).toEqual({ status: 'skip', reason: 'nothing_to_send' });
-    expect(decide({ ...base, dow: 'wed', streak: 0, overtaken, lastSentByType: { rating_overtaken: '2026-10-10' } }))
-      .toMatchObject({ status: 'interval', type: 'rating_overtaken' });
-    expect(decide({ ...base, dow: 'wed', streak: 0, overtaken, lastSentByType: { rating_overtaken: '2026-10-07' } }))
-      .toMatchObject({ status: 'send', type: 'rating_overtaken' });
+    expect(decide({ ...base, dow: 'wed', overtaken })).toMatchObject({
+      status: 'send',
+      type: 'rating_overtaken',
+    });
+    expect(decide({ ...base, dow: 'mon', streak: 0, overtaken })).toEqual({
+      status: 'skip',
+      reason: 'nothing_to_send',
+    });
+    expect(
+      decide({
+        ...base,
+        dow: 'wed',
+        streak: 0,
+        overtaken,
+        lastSentByType: { rating_overtaken: '2026-10-10' },
+      })
+    ).toMatchObject({ status: 'interval', type: 'rating_overtaken' });
+    expect(
+      decide({
+        ...base,
+        dow: 'wed',
+        streak: 0,
+        overtaken,
+        lastSentByType: { rating_overtaken: '2026-10-07' },
+      })
+    ).toMatchObject({ status: 'send', type: 'rating_overtaken' });
   });
 });

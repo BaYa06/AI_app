@@ -18,11 +18,7 @@ interface SetCardProps {
   onLongPress?: (setId: string) => void;
 }
 
-export const SetCard = memo<SetCardProps>(function SetCard({
-  set,
-  onPress,
-  onLongPress,
-}) {
+export const SetCard = memo<SetCardProps>(function SetCard({ set, onPress, onLongPress }) {
   const colors = useThemeColors();
 
   const handlePress = useCallback(() => {
@@ -34,14 +30,10 @@ export const SetCard = memo<SetCardProps>(function SetCard({
   }, [set.id, onLongPress]);
 
   // Расчет прогресса
-  const progress = set.cardCount > 0 
-    ? Math.round((set.masteredCount / set.cardCount) * 100) 
-    : 0;
+  const progress = set.cardCount > 0 ? Math.round((set.masteredCount / set.cardCount) * 100) : 0;
 
   // Форматирование времени
-  const lastStudied = set.lastStudiedAt
-    ? formatRelativeTime(set.lastStudiedAt)
-    : 'Не изучался';
+  const lastStudied = set.lastStudiedAt ? formatRelativeTime(set.lastStudiedAt) : 'Не изучался';
 
   return (
     <Pressable
@@ -60,14 +52,28 @@ export const SetCard = memo<SetCardProps>(function SetCard({
       {/* Заголовок */}
       <View style={styles.header}>
         {/* Иконка категории вместо эмодзи из данных набора (брендбук, раздел 6) */}
-        <CategoryIcon category={set.category} size="m" color={getDeckAccentColor(set.id)} background />
+        <CategoryIcon
+          category={set.category}
+          size="m"
+          color={getDeckAccentColor(set.id)}
+          background
+        />
         <View style={styles.titleContainer}>
           <Text variant="h3" numberOfLines={1}>
             {set.title}
           </Text>
-          <Caption>{set.cardCount} {pluralize(set.cardCount, 'карточка', 'карточки', 'карточек')}</Caption>
+          <Caption>
+            {set.cardCount} {pluralize(set.cardCount, 'карточка', 'карточки', 'карточек')}
+          </Caption>
         </View>
-        {set.isFavorite && <Star size={iconSize.s} color={colors.star} fill={colors.star} accessibilityLabel="В избранном" />}
+        {set.isFavorite && (
+          <Star
+            size={iconSize.s}
+            color={colors.star}
+            fill={colors.star}
+            accessibilityLabel="В избранном"
+          />
+        )}
       </View>
 
       {/* Прогресс */}
@@ -78,27 +84,13 @@ export const SetCard = memo<SetCardProps>(function SetCard({
 
       {/* Статистика */}
       <View style={styles.stats}>
-        <StatBadge
-          count={set.reviewCount}
-          label="На сегодня"
-          color={colors.cardReview}
-        />
-        <StatBadge
-          count={set.learningCount}
-          label="Изучаются"
-          color={colors.cardLearning}
-        />
-        <StatBadge
-          count={set.masteredCount}
-          label="Изучено"
-          color={colors.cardMastered}
-        />
+        <StatBadge count={set.reviewCount} label="На сегодня" color={colors.cardReview} />
+        <StatBadge count={set.learningCount} label="Изучаются" color={colors.cardLearning} />
+        <StatBadge count={set.masteredCount} label="Изучено" color={colors.cardMastered} />
       </View>
 
       {/* Последняя активность */}
-      <Caption style={styles.lastStudied}>
-        Последнее изучение: {lastStudied}
-      </Caption>
+      <Caption style={styles.lastStudied}>Последнее изучение: {lastStudied}</Caption>
     </Pressable>
   );
 });
@@ -127,7 +119,7 @@ const StatBadge = memo<StatBadgeProps>(function StatBadge({ count, label, color 
 function formatRelativeTime(timestamp: number): string {
   const now = Date.now();
   const diff = now - timestamp;
-  
+
   const minutes = Math.floor(diff / 60000);
   const hours = Math.floor(diff / 3600000);
   const days = Math.floor(diff / 86400000);
@@ -136,7 +128,7 @@ function formatRelativeTime(timestamp: number): string {
   if (minutes < 60) return `${minutes} мин назад`;
   if (hours < 24) return `${hours} ч назад`;
   if (days < 7) return `${days} дн назад`;
-  
+
   return new Date(timestamp).toLocaleDateString('ru-RU');
 }
 

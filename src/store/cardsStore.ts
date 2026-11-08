@@ -5,27 +5,27 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { v4 as uuid } from 'uuid';
-import { getStatusForStep, isCardLearned } from '@/services/SRSService';
+import { getCardStatus, getStatusForStep } from '@/services/SRSService';
 import type { Card, CreateCardInput, UpdateCardInput } from '@/types';
 import { NeonService } from '@/services/NeonService';
 import { DatabaseService } from '@/services/DatabaseService';
 import { SyncQueueService } from '@/services/SyncQueueService';
+import { log } from '@/utils/logger';
 
 // ==================== SYNC QUEUE EXECUTORS ====================
 
-SyncQueueService.registerExecutor('createCard', (p) =>
-  NeonService.createCard(p as Card));
+SyncQueueService.registerExecutor('createCard', (p) => NeonService.createCard(p as Card));
 
 SyncQueueService.registerExecutor('createCardsBatch', (p) =>
-  NeonService.createCardsBatch(p as Card[]));
+  NeonService.createCardsBatch(p as Card[])
+);
 
 SyncQueueService.registerExecutor('updateCard', (p) => {
   const { cardId, input } = p as { cardId: string; input: UpdateCardInput };
   return NeonService.updateCard(cardId, input);
 });
 
-SyncQueueService.registerExecutor('deleteCard', (p) =>
-  NeonService.deleteCard(p as string));
+SyncQueueService.registerExecutor('deleteCard', (p) => NeonService.deleteCard(p as string));
 
 // Старые задачи из очереди (до серверного SRS): уровень больше не пишется клиентом — просто выбрасываем
 SyncQueueService.registerExecutor('updateCardSRS', async () => true);
@@ -65,7 +65,7 @@ interface CardsState {
   // Данные - храним в объекте для O(1) доступа
   cards: Record<string, Card>;
   cardsBySet: Record<string, string[]>; // setId -> cardIds для быстрого поиска
-  
+
   // Загрузка
   isLoading: boolean;
   error: string | null;
@@ -76,30 +76,36 @@ interface CardsActions {
   addCard: (input: CreateCardInput) => Card;
   updateCard: (cardId: string, input: UpdateCardInput) => void;
   deleteCard: (cardId: string) => void;
-  
+
   // Пакетные операции
   addCards: (inputs: CreateCardInput[]) => Card[];
   // Заменить карточки read-only набора данными с сервера (официальные наборы), без синка в Neon
   replaceSetCards: (setId: string, cards: Card[]) => void;
   deleteCardsBySet: (setId: string) => void;
-  
+
   // SRS обновления
-  updateCardSRS: (cardId: string, srsData: Partial<Pick<Card, 'learningStep' | 'nextReviewDate' | 'lastReviewDate' | 'status'>>) => void;
+  updateCardSRS: (
+    cardId: string,
+    srsData: Partial<Pick<Card, 'learningStep' | 'nextReviewDate' | 'lastReviewDate' | 'status'>>
+  ) => void;
   resetCardProgress: (cardId: string) => void;
-  
+
   // Селекторы (встроенные геттеры)
   getCard: (cardId: string) => Card | undefined;
   getCardsBySet: (setId: string) => Card[];
   getDueCards: (setId: string) => Card[];
   getNewCards: (setId: string) => Card[];
-  
+
   // Состояние
   setLoading: (isLoading: boolean) => void;
   setError: (error: string | null) => void;
   clearCards: () => void;
 }
 
-const createDefaultSRSData = (): Pick<Card, 'learningStep' | 'nextReviewDate' | 'lastReviewDate' | 'status'> => ({
+const createDefaultSRSData = (): Pick<
+  Card,
+  'learningStep' | 'nextReviewDate' | 'lastReviewDate' | 'status'
+> => ({
   learningStep: 0,
   nextReviewDate: Date.now(), // Доступна сразу
   lastReviewDate: 0,
@@ -115,7 +121,7 @@ export const useCardsStore = create<CardsState & CardsActions>()(
     error: null,
 
     // ==================== CRUD ====================
-    
+
     addCard: (input) => {
       const now = Date.now();
       const card: Card = {
@@ -128,7 +134,7 @@ export const useCardsStore = create<CardsState & CardsActions>()(
 
       set((state) => {
         state.cards[card.id] = card;
-        
+
         if (!state.cardsBySet[input.setId]) {
           state.cardsBySet[input.setId] = [];
         }
@@ -164,7 +170,7 @@ export const useCardsStore = create<CardsState & CardsActions>()(
 
     deleteCard: (cardId) => {
       let deletedCard: Card | undefined;
-      
+
       set((state) => {
         const card = state.cards[cardId];
         if (card) {
@@ -185,7 +191,7 @@ export const useCardsStore = create<CardsState & CardsActions>()(
       if (deletedCard) {
         // Сохраняем локально
         DatabaseService.saveCards();
-        console.log('✅ Карточка удалена локально:', cardId);
+        log.debug('Cards', 'Карточка удалена локально', cardId);
 
         // Удаляем из Neon (через очередь с retry)
         if (NeonService.isEnabled()) {
@@ -195,7 +201,7 @@ export const useCardsStore = create<CardsState & CardsActions>()(
     },
 
     // ==================== ПАКЕТНЫЕ ====================
-    
+
     addCards: (inputs) => {
       const now = Date.now();
       const newCards: Card[] = inputs.map((input) => ({
@@ -209,7 +215,7 @@ export const useCardsStore = create<CardsState & CardsActions>()(
       set((state) => {
         for (const card of newCards) {
           state.cards[card.id] = card;
-          
+
           if (!state.cardsBySet[card.setId]) {
             state.cardsBySet[card.setId] = [];
           }
@@ -238,11 +244,11 @@ export const useCardsStore = create<CardsState & CardsActions>()(
 
       // Сохраняем локально
       DatabaseService.saveCards();
-      console.log('✅ Карточки набора удалены локально:', setId);
+      log.debug('Cards', 'Карточки набора удалены локально', setId);
     },
 
     // ==================== SRS ====================
-    
+
     updateCardSRS: (cardId, srsData) => {
       set((state) => {
         const card = state.cards[cardId];
@@ -265,7 +271,7 @@ export const useCardsStore = create<CardsState & CardsActions>()(
     },
 
     // ==================== СЕЛЕКТОРЫ ====================
-    
+
     getCard: (cardId) => {
       return get().cards[cardId];
     },
@@ -280,7 +286,7 @@ export const useCardsStore = create<CardsState & CardsActions>()(
       const state = get();
       const cardIds = state.cardsBySet[setId] || [];
       const now = Date.now();
-      
+
       return cardIds
         .map((id) => state.cards[id])
         .filter((card) => card && card.nextReviewDate <= now && card.status !== 'new');
@@ -289,14 +295,12 @@ export const useCardsStore = create<CardsState & CardsActions>()(
     getNewCards: (setId) => {
       const state = get();
       const cardIds = state.cardsBySet[setId] || [];
-      
-      return cardIds
-        .map((id) => state.cards[id])
-        .filter((card) => card && card.status === 'new');
+
+      return cardIds.map((id) => state.cards[id]).filter((card) => card && card.status === 'new');
     },
 
     // ==================== СОСТОЯНИЕ ====================
-    
+
     setLoading: (isLoading) => {
       set((state) => {
         state.isLoading = isLoading;
@@ -335,34 +339,37 @@ export const useCardsStore = create<CardsState & CardsActions>()(
 
 /**
  * Селектор для получения количества карточек по статусам для набора.
- * Выученная — уровень «знаю» и выше (шаг ≥ 3); к повторению — время повторения пришло.
+ * Статус — по шагу слова (getCardStatus): new 0, learning 1–2, young 3–4, mature 5+
+ * (plan/new/word_status_colors.md). Выученная — young + mature; к повторению — время повторения пришло.
  */
 export const selectSetStats = (setId: string) => {
   const state = useCardsStore.getState();
   const cardIds = state.cardsBySet[setId] || [];
 
-  let learnedCount = 0;   // Выученные (шаг ≥ 3)
-  let dueCount = 0;       // К повторению (nextReview <= сейчас)
+  const byStatus = { new: 0, learning: 0, young: 0, mature: 0 };
+  let dueCount = 0; // К повторению (nextReview <= сейчас)
   const now = Date.now();
 
   for (const id of cardIds) {
     const card = state.cards[id];
     if (!card) continue;
-    if (isCardLearned(card)) learnedCount++;
+    const status = getCardStatus(card);
+    byStatus[status === 'relearning' ? 'learning' : status]++;
     if (card.nextReviewDate <= now) dueCount++;
   }
 
   const total = cardIds.length;
+  const learnedCount = byStatus.young + byStatus.mature;
 
   return {
     total,
-    newCount: dueCount,         // Для совместимости - все что нужно повторить
-    learningCount: 0,           // Deprecated
-    youngCount: 0,              // Deprecated
-    matureCount: 0,             // Deprecated
-    masteredCount: learnedCount,// Выученные
-    dueCount,                   // К повторению
-    learnedCount,               // Выученные
-    reviewCount: dueCount,      // Для совместимости
+    newCount: byStatus.new,
+    learningCount: byStatus.learning,
+    youngCount: byStatus.young,
+    matureCount: byStatus.mature,
+    masteredCount: learnedCount, // Выученные (шаг ≥ 3)
+    dueCount, // К повторению
+    learnedCount, // Выученные
+    reviewCount: dueCount, // Для совместимости
   };
 };

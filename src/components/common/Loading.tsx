@@ -36,13 +36,7 @@ export const Loading = memo<LoadingProps>(function Loading({
 
   if (fullScreen) {
     return (
-      <View
-        style={[
-          styles.fullScreen,
-          { backgroundColor: colors.background },
-          style,
-        ]}
-      >
+      <View style={[styles.fullScreen, { backgroundColor: colors.background }, style]}>
         {content}
       </View>
     );

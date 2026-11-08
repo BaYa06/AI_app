@@ -48,7 +48,11 @@ interface LibraryActions {
   rateSet: (userId: string, librarySetId: string, rating: number) => Promise<void>;
   fetchMyPublications: (userId: string) => Promise<void>;
   unpublishSet: (userId: string, librarySetId: string) => Promise<void>;
-  updatePublication: (userId: string, librarySetId: string, meta?: { description?: string; category?: string; coverEmoji?: string }) => Promise<void>;
+  updatePublication: (
+    userId: string,
+    librarySetId: string,
+    meta?: { description?: string; category?: string; coverEmoji?: string }
+  ) => Promise<void>;
   clearLibrary: () => void;
 }
 
@@ -88,23 +92,17 @@ export const useLibraryStore = create<LibraryState & LibraryActions>()(
         return;
       }
 
-      set((s) => { s.isLoading = true; s.error = null; });
+      set((s) => {
+        s.isLoading = true;
+        s.error = null;
+      });
 
       try {
         const baseFilters = get().filters;
         const [trending, topRated, recent] = await Promise.all([
-          LibraryService.getLibrarySets(
-            { ...baseFilters, sort: 'popular', page: 1 },
-            userId
-          ),
-          LibraryService.getLibrarySets(
-            { ...baseFilters, sort: 'top_rated', page: 1 },
-            userId
-          ),
-          LibraryService.getLibrarySets(
-            { ...baseFilters, sort: 'newest', page: 1 },
-            userId
-          ),
+          LibraryService.getLibrarySets({ ...baseFilters, sort: 'popular', page: 1 }, userId),
+          LibraryService.getLibrarySets({ ...baseFilters, sort: 'top_rated', page: 1 }, userId),
+          LibraryService.getLibrarySets({ ...baseFilters, sort: 'newest', page: 1 }, userId),
         ]);
 
         lastFetchedAt = Date.now();
@@ -130,7 +128,9 @@ export const useLibraryStore = create<LibraryState & LibraryActions>()(
       const { hasMoreRecent, isLoadingMore, recentPage, filters } = get();
       if (!hasMoreRecent || isLoadingMore) return;
 
-      set((s) => { s.isLoadingMore = true; });
+      set((s) => {
+        s.isLoadingMore = true;
+      });
 
       try {
         const nextPage = recentPage + 1;
@@ -146,16 +146,24 @@ export const useLibraryStore = create<LibraryState & LibraryActions>()(
           s.isLoadingMore = false;
         });
       } catch {
-        set((s) => { s.isLoadingMore = false; });
+        set((s) => {
+          s.isLoadingMore = false;
+        });
       }
     },
 
     fetchSetDetail: async (id, userId) => {
-      set((s) => { s.currentSet = null; s.isLoading = true; });
+      set((s) => {
+        s.currentSet = null;
+        s.isLoading = true;
+      });
 
       try {
         const detail = await LibraryService.getLibrarySetDetail(id, userId);
-        set((s) => { s.currentSet = detail; s.isLoading = false; });
+        set((s) => {
+          s.currentSet = detail;
+          s.isLoading = false;
+        });
       } catch (error) {
         set((s) => {
           s.isLoading = false;
@@ -181,9 +189,10 @@ export const useLibraryStore = create<LibraryState & LibraryActions>()(
 
       // Update is_imported flag in all lists
       const updateImported = (sets: LibrarySet[]) =>
-        sets.map(s => s.id === librarySetId
-          ? { ...s, is_imported: true, imports_count: s.imports_count + 1 }
-          : s
+        sets.map((s) =>
+          s.id === librarySetId
+            ? { ...s, is_imported: true, imports_count: s.imports_count + 1 }
+            : s
         );
 
       set((s) => {
@@ -203,9 +212,10 @@ export const useLibraryStore = create<LibraryState & LibraryActions>()(
       const result = await LibraryService.toggleLike(userId, librarySetId);
 
       const updateLike = (sets: LibrarySet[]) =>
-        sets.map(s => s.id === librarySetId
-          ? { ...s, is_liked: result.is_liked, likes_count: result.likes_count }
-          : s
+        sets.map((s) =>
+          s.id === librarySetId
+            ? { ...s, is_liked: result.is_liked, likes_count: result.likes_count }
+            : s
         );
 
       set((s) => {
@@ -223,9 +233,15 @@ export const useLibraryStore = create<LibraryState & LibraryActions>()(
       const result = await LibraryService.rateSet(userId, librarySetId, rating);
 
       const updateRating = (sets: LibrarySet[]) =>
-        sets.map(s => s.id === librarySetId
-          ? { ...s, user_rating: result.user_rating, average_rating: result.average_rating, rating_count: result.rating_count }
-          : s
+        sets.map((s) =>
+          s.id === librarySetId
+            ? {
+                ...s,
+                user_rating: result.user_rating,
+                average_rating: result.average_rating,
+                rating_count: result.rating_count,
+              }
+            : s
         );
 
       set((s) => {
@@ -243,7 +259,9 @@ export const useLibraryStore = create<LibraryState & LibraryActions>()(
     fetchMyPublications: async (userId) => {
       try {
         const pubs = await LibraryService.getMyPublications(userId);
-        set((s) => { s.myPublications = pubs; });
+        set((s) => {
+          s.myPublications = pubs;
+        });
       } catch (error) {
         set((s) => {
           s.error = describeError(error, 'Не удалось загрузить публикации');
@@ -254,13 +272,13 @@ export const useLibraryStore = create<LibraryState & LibraryActions>()(
     unpublishSet: async (userId, librarySetId) => {
       await LibraryService.unpublishSet(userId, librarySetId);
       set((s) => {
-        s.myPublications = s.myPublications.map(p =>
+        s.myPublications = s.myPublications.map((p) =>
           p.id === librarySetId ? { ...p, status: 'archived' as const } : p
         );
         // Remove from public lists
-        s.trendingSets = s.trendingSets.filter(s2 => s2.id !== librarySetId);
-        s.topRatedSets = s.topRatedSets.filter(s2 => s2.id !== librarySetId);
-        s.recentSets = s.recentSets.filter(s2 => s2.id !== librarySetId);
+        s.trendingSets = s.trendingSets.filter((s2) => s2.id !== librarySetId);
+        s.topRatedSets = s.topRatedSets.filter((s2) => s2.id !== librarySetId);
+        s.recentSets = s.recentSets.filter((s2) => s2.id !== librarySetId);
       });
     },
 

@@ -32,8 +32,16 @@ function deviceMeta() {
  * «Написать нам». id — открыть созданную переписку; true — отправлено, но сервер ещё без «Моих обращений»;
  * null — не отправилось.
  */
-export function sendFeedbackMessage(category: FeedbackCategory, message: string): Promise<string | true | null> {
-  return NeonService.submitFeedbackForThread({ kind: 'message', category, message: message.trim(), ...deviceMeta() });
+export function sendFeedbackMessage(
+  category: FeedbackCategory,
+  message: string
+): Promise<string | true | null> {
+  return NeonService.submitFeedbackForThread({
+    kind: 'message',
+    category,
+    message: message.trim(),
+    ...deviceMeta(),
+  });
 }
 
 export function sendRating(params: {
@@ -167,7 +175,10 @@ function writeState(patch: Partial<PromptState>) {
 /**
  * Засчитать завершённую тренировку. true — сейчас хороший момент показать окно оценки.
  */
-export function recordSessionForRatingPrompt(params: { totalCards: number; errors: number }): boolean {
+export function recordSessionForRatingPrompt(params: {
+  totalCards: number;
+  errors: number;
+}): boolean {
   const now = Date.now();
   const state = readState();
   const firstUseAt = state.firstUseAt ?? now;
@@ -181,7 +192,8 @@ export function recordSessionForRatingPrompt(params: { totalCards: number; error
   if (sessions < MIN_SESSIONS) return false;
   if ((state.skips ?? 0) >= MAX_SKIPS) return false;
   if (state.lastShownAt && now - state.lastShownAt < SHOW_COOLDOWN_DAYS * DAY_MS) return false;
-  if (state.submittedAt && now - state.submittedAt < ASK_AGAIN_AFTER_SUBMIT_DAYS * DAY_MS) return false;
+  if (state.submittedAt && now - state.submittedAt < ASK_AGAIN_AFTER_SUBMIT_DAYS * DAY_MS)
+    return false;
   return true;
 }
 

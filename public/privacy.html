@@ -1,41 +1,46 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Политика конфиденциальности — Flashly</title>
-  <meta name="description" content="Какие данные собирает Flashly, зачем и как их удалить.">
-  <style>
-    :root {
-      --bg: #FFFFFF; --text: #111827; --muted: #6B7280; --border: #dbdbe6; --accent: #6467F2;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root { --bg: #101122; --text: #F9FAFB; --muted: #9CA3AF; --border: rgba(255,255,255,0.1); --accent: #818CF8; }
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0; background: var(--bg); color: var(--text);
-      font: 16px/1.6 -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
-    }
-    main { max-width: 720px; margin: 0 auto; padding: 32px 16px 64px; }
-    h1 { font-size: 28px; line-height: 1.25; margin: 0 0 4px; }
-    h2 { font-size: 20px; margin: 32px 0 8px; }
-    .meta { color: var(--muted); font-size: 14px; margin: 0 0 24px; }
-    a { color: var(--accent); }
-    ul { padding-left: 20px; }
-    li { margin: 4px 0; }
-    table { width: 100%; border-collapse: collapse; font-size: 15px; }
-    th, td { text-align: left; vertical-align: top; padding: 8px; border-bottom: 1px solid var(--border); }
-    th { color: var(--muted); font-weight: 600; }
-    footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--muted); font-size: 14px; }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Политика конфиденциальности — Flashly</title>
+<meta name="description" content="Какие данные собирает Flashly, зачем и как их удалить.">
+<link rel="canonical" href="https://flashlycards.app/privacy">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Flashly">
+<meta property="og:locale" content="ru_RU">
+<meta property="og:url" content="https://flashlycards.app/privacy">
+<meta property="og:title" content="Политика конфиденциальности — Flashly">
+<meta property="og:description" content="Какие данные собирает Flashly, зачем и как их удалить.">
+<meta property="og:image" content="https://flashlycards.app/site/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="apple-itunes-app" content="app-id=6808731151">
+<meta name="theme-color" content="#6467F2">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link rel="stylesheet" href="/site/site.css">
 </head>
 <body>
-<main>
-  <h1>Политика конфиденциальности Flashly</h1>
-  <p class="meta">Действует с 7 октября 2026 года, обновлено 30 октября 2026 года</p>
+<header class="top">
+  <div class="wrap">
+    <a class="logo" href="https://flashlycards.app/" aria-label="Flashly, на главную"><img src="/icons/icon-192.png" alt="">Flashly</a>
+    <nav aria-label="Разделы">
+      <a href="https://flashlycards.app/#features">Возможности</a>
+      <a href="/support">Поддержка</a>
+      <a class="btn" href="https://apps.apple.com/app/id6808731151">Скачать</a>
+    </nav>
+  </div>
+</header>
 
-  <p>Flashly — приложение для изучения слов по карточкам (iOS и веб-версия). Здесь написано, какие данные мы собираем, зачем, кому передаём и как их удалить. Владелец приложения — разработчик Flashly (дальше — «мы»). Вопросы о данных пиши на <a href="mailto:onlinechina06@gmail.com">onlinechina06@gmail.com</a>.</p>
+<main class="wrap">
+<article class="doc">
+<div class="overline">Документы</div>
+  <h1>Политика конфиденциальности Flashly</h1>
+  <p class="meta">Действует с 7 октября 2026 года, обновлено 8 ноября 2026 года</p>
+
+  <p>Flashly — приложение для изучения слов по карточкам (iOS и веб-версия). Здесь написано, какие данные мы собираем, зачем, кому передаём и как их удалить. Владелец приложения — разработчик Flashly (дальше — «мы»). Вопросы о данных пиши на <a href="mailto:support@flashlycards.app">support@flashlycards.app</a>.</p>
 
   <h2>1. Какие данные мы собираем</h2>
   <ul>
@@ -69,7 +74,7 @@
 
   <h2>4. Кому мы передаём данные</h2>
   <p>Только сервисам, которые нужны для работы приложения. Они обрабатывают данные по нашему поручению.</p>
-  <table>
+  <div class="table-wrap"><table>
     <tr><th>Сервис</th><th>Зачем</th><th>Какие данные</th></tr>
     <tr><td>Supabase</td><td>вход в аккаунт</td><td>email, имя, идентификатор</td></tr>
     <tr><td>Neon</td><td>база данных</td><td>профиль, наборы, прогресс, курсы</td></tr>
@@ -79,27 +84,42 @@
     <tr><td>Google Cloud: Text-to-Speech</td><td>озвучка слов</td><td>текст карточек</td></tr>
     <tr><td>Google Firebase</td><td>push-уведомления, статистика и отчёты о сбоях (Crashlytics)</td><td>push-токен, события использования, отчёты о сбоях</td></tr>
     <tr><td>Google и Apple</td><td>вход через аккаунт Google или Apple</td><td>данные, которые ты разрешил передать при входе</td></tr>
-  </table>
+  </table></div>
   <p>Данные в ИИ отправляются только после твоего разрешения: приложение спрашивает его перед первым использованием ИИ-функции. Мы используем бесплатный уровень Gemini API: по его условиям Google может использовать отправленные данные для улучшения своих продуктов и моделей, в том числе с просмотром людьми. Поэтому не отправляй в ИИ личные и конфиденциальные данные. Мы также раскроем данные, если этого требует закон.</p>
 
   <h2>5. Сколько мы храним данные</h2>
   <p>Пока у тебя есть аккаунт. Журнал отправленных уведомлений хранится 180 дней, сведения о привычках пересчитываются каждый день по занятиям за последние 4 недели. После удаления аккаунта данные удаляются с наших серверов. Резервные копии у провайдеров удаляются по их собственному графику.</p>
 
   <h2>6. Как удалить аккаунт и данные</h2>
-  <p>В приложении: <strong>Профиль → Удалить аккаунт</strong>. Удаляются профиль, наборы, прогресс, серия, алмазы и курсы, которые ты создал. Отменить удаление нельзя. Если войти в приложение не получается, напиши на <a href="mailto:onlinechina06@gmail.com">onlinechina06@gmail.com</a> с адреса аккаунта — мы удалим его вручную.</p>
+  <p>В приложении: <strong>Профиль → Удалить аккаунт</strong>. Удаляются профиль, наборы, прогресс, серия, алмазы и курсы, которые ты создал. Отменить удаление нельзя. Если войти в приложение не получается, напиши на <a href="mailto:support@flashlycards.app">support@flashlycards.app</a> с адреса аккаунта — мы удалим его вручную.</p>
 
   <h2>7. Твои права</h2>
-  <p>Ты можешь узнать, какие данные о тебе мы храним, исправить их (имя и языки — в <strong>Профиль → Личные данные</strong>; возраст, занятия и привычное время — в <strong>Профиль → Мои данные</strong>, там же их можно стереть и выключить подстройку напоминаний), удалить их, выбрать, какие уведомления получать (<strong>Профиль → Уведомления</strong>), отказаться от уведомлений в настройках iOS и отозвать разрешение на передачу данных ИИ (<strong>Профиль → Данные для ИИ</strong>). Для запроса напиши на <a href="mailto:onlinechina06@gmail.com">onlinechina06@gmail.com</a>, ответим в течение 30 дней.</p>
+  <p>Ты можешь узнать, какие данные о тебе мы храним, исправить их (имя и языки — в <strong>Профиль → Личные данные</strong>; возраст, занятия и привычное время — в <strong>Профиль → Мои данные</strong>, там же их можно стереть и выключить подстройку напоминаний), удалить их, выбрать, какие уведомления получать (<strong>Профиль → Уведомления</strong>), отказаться от уведомлений в настройках iOS и отозвать разрешение на передачу данных ИИ (<strong>Профиль → Данные для ИИ</strong>). Для запроса напиши на <a href="mailto:support@flashlycards.app">support@flashlycards.app</a>, ответим в течение 30 дней.</p>
 
   <h2>8. Дети</h2>
   <p>Если тебе меньше 13 лет, пользуйся Flashly только с разрешения родителей или учителя. Если ты родитель и считаешь, что ребёнок передал нам данные без твоего согласия, напиши нам — мы их удалим.</p>
 
   <h2>9. Изменения политики</h2>
   <p>Если мы изменим политику, обновим дату вверху страницы. О существенных изменениях сообщим в приложении.</p>
-
-  <footer>
-    Flashly · <a href="/terms">Условия использования</a> · <a href="mailto:onlinechina06@gmail.com">onlinechina06@gmail.com</a>
-  </footer>
+</article>
 </main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <a class="logo" href="https://flashlycards.app/"><img src="/icons/icon-192.png" alt="">Flashly</a>
+      <p>Карточки с интервальным повторением для школьников, студентов и учителей.</p>
+    </div>
+    <div>
+      <h4>Документы</h4>
+      <ul><li><a href="/privacy">Политика конфиденциальности</a></li><li><a href="/terms">Условия использования</a></li><li><a href="/delete-account">Удаление аккаунта</a></li></ul>
+    </div>
+    <div>
+      <h4>Помощь</h4>
+      <ul><li><a href="/support">Поддержка</a></li><li><a href="https://flashlycards.app/#faq">Частые вопросы</a></li><li><a href="mailto:support@flashlycards.app">support@flashlycards.app</a></li></ul>
+    </div>
+    <div class="legal"><span>© 2026 Flashly</span><span>flashlycards.app</span></div>
+  </div>
+</footer>
 </body>
 </html>

@@ -1,5 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { ensureDatabaseInitialized, initDatabase } from './_db-init.js';
+import { log } from './_log.js';
 
 /**
  * Vercel Serverless Function для работы с Neon PostgreSQL
@@ -27,7 +28,7 @@ export default async function handler(req, res) {
     // GET - проверить статус БД
     if (req.method === 'GET') {
       await ensureDatabaseInitialized(sql);
-      
+
       // Подсчитать статистику
       const stats = await sql`
         SELECT 
@@ -36,11 +37,11 @@ export default async function handler(req, res) {
           (SELECT COUNT(*) FROM cards) as cards_count,
           (SELECT COUNT(*) FROM reviews) as reviews_count
       `;
-      
-      return res.status(200).json({ 
+
+      return res.status(200).json({
         status: 'ok',
         initialized: true,
-        stats: stats[0]
+        stats: stats[0],
       });
     }
 
@@ -52,7 +53,7 @@ export default async function handler(req, res) {
 
     res.status(404).json({ error: 'Endpoint not found' });
   } catch (error) {
-    console.error('Database error:', error);
+    log.error('db', 'Database error', error);
     res.status(500).json({ error: error.message });
   }
 }

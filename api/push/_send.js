@@ -10,6 +10,7 @@ import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
 import { PUSH_TYPES, pushType, buildPush, versionAtLeast } from './_registry.js';
 import { disabledCategories, isHoldout } from './_decide.js';
+import { log as logger } from '../_log.js';
 
 export const DEFAULT_TZ = 'Asia/Bishkek';
 /** Тихие часы (принцип 2): с 22:00 до 8:00 по поясу пользователя ничего не шлём, даже от учителя */
@@ -19,7 +20,9 @@ export const QUIET_TO_HOUR = 8;
 export const MINOR_QUIET_FROM_HOUR = 21;
 
 export function isQuietHour(localHour, minor = false) {
-  return localHour >= (minor ? MINOR_QUIET_FROM_HOUR : QUIET_FROM_HOUR) || localHour < QUIET_TO_HOUR;
+  return (
+    localHour >= (minor ? MINOR_QUIET_FROM_HOUR : QUIET_FROM_HOUR) || localHour < QUIET_TO_HOUR
+  );
 }
 
 export function initFirebase() {
@@ -42,12 +45,19 @@ export function isPushPaused() {
 export function isAllowedRecipient(userId) {
   const list = process.env.PUSH_ALLOWLIST;
   if (!list) return true;
-  return list.split(',').map((s) => s.trim()).filter(Boolean).includes(String(userId));
+  return list
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .includes(String(userId));
 }
 
 /** Мёртвый токен: приложение удалено или разрешение отозвано — удаляем из push_tokens */
 export function isDeadTokenError(code) {
-  return code === 'messaging/registration-token-not-registered' || code === 'messaging/invalid-registration-token';
+  return (
+    code === 'messaging/registration-token-not-registered' ||
+    code === 'messaging/invalid-registration-token'
+  );
 }
 
 /** Выключенные переключатели (2.4) с учётом старого флага notif_streak («Напоминания о серии») */
@@ -72,7 +82,7 @@ export async function logChannelEvents(sql, events) {
         AS x(user_id uuid, event text, detail text)
     `;
   } catch (e) {
-    console.error('[push] push_channel_events insert failed:', e);
+    logger.error('push', 'push_channel_events insert failed', e);
   }
 }
 
@@ -80,7 +90,10 @@ export async function logChannelEvents(sql, events) {
  * Строка push_log на каждое решение (шаг 0.3). Журнал не должен ронять отправку: ошибку
  * только логируем. local_date — по поясу пользователя, как у остальных дневных отметок.
  */
-export async function logPush(sql, { id, userId, type, status, tokens = 0, delivered = 0, data, variant = null }) {
+export async function logPush(
+  sql,
+  { id, userId, type, status, tokens = 0, delivered = 0, data, variant = null }
+) {
   try {
     await sql`
       INSERT INTO push_log (id, user_id, type, category, variant, local_date, status, tokens, delivered, payload)
@@ -91,7 +104,7 @@ export async function logPush(sql, { id, userId, type, status, tokens = 0, deliv
       )
     `;
   } catch (e) {
-    console.error('[push] push_log insert failed:', e);
+    logger.error('push', 'push_log insert failed', e);
   }
 }
 
@@ -106,9 +119,11 @@ export async function sendNotification(sql, userId, type, data = {}, { dryRun = 
   const def = pushType(type);
   if (!def) return { ok: false, error: `Unknown type: ${type}` };
   const pushId = randomUUID();
-  const log = (status, extra = {}) => logPush(sql, { id: pushId, userId, type, status, data, ...extra });
+  const log = (status, extra = {}) =>
+    logPush(sql, { id: pushId, userId, type, status, data, ...extra });
 
-  let allTokens = await sql`SELECT token, permission, app_version FROM push_tokens WHERE user_id = ${userId}`;
+  let allTokens =
+    await sql`SELECT token, permission, app_version FROM push_tokens WHERE user_id = ${userId}`;
   if (allTokens.length === 0) {
     await log('no_token');
     return { ok: false, push_id: pushId, reason: 'no token' };
@@ -140,7 +155,9 @@ export async function sendNotification(sql, userId, type, data = {}, { dryRun = 
     await log('disabled');
     return { ok: false, push_id: pushId, reason: 'notifications disabled' };
   }
-  if (disabledCategories(groupsOff(user.notif_categories_off, user.notif_streak)).has(def.category)) {
+  if (
+    disabledCategories(groupsOff(user.notif_categories_off, user.notif_streak)).has(def.category)
+  ) {
     await log('category_off');
     return { ok: false, push_id: pushId, reason: 'category off' };
   }
@@ -202,10 +219,21 @@ export async function sendNotification(sql, userId, type, data = {}, { dryRun = 
   const dead = tokens.filter((_, i) => isDeadTokenError(result.responses[i].error?.code));
   if (dead.length) {
     await sql`DELETE FROM push_tokens WHERE token = ANY(${dead})`;
-    await logChannelEvents(sql, dead.map(() => ({ userId, event: 'token_unregistered' })));
+    await logChannelEvents(
+      sql,
+      dead.map(() => ({ userId, event: 'token_unregistered' }))
+    );
   }
-  await logBuilt(result.successCount > 0 ? 'sent' : 'failed', { tokens: tokens.length, delivered: result.successCount });
-  return { ok: result.successCount > 0, push_id: pushId, sent: result.successCount, failed: result.failureCount };
+  await logBuilt(result.successCount > 0 ? 'sent' : 'failed', {
+    tokens: tokens.length,
+    delivered: result.successCount,
+  });
+  return {
+    ok: result.successCount > 0,
+    push_id: pushId,
+    sent: result.successCount,
+    failed: result.failureCount,
+  };
 }
 
 export { PUSH_TYPES };

@@ -9,3 +9,5 @@ export function initCrashReporting() {}
 export function setCrashUserId(_userId: string | null) {}
 
 export function reportError(_error: Error, _context?: string) {}
+
+export function crashLog(_message: string) {}

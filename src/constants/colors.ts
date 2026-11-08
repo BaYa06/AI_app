@@ -8,12 +8,12 @@ export const colors = {
     // Основные
     primary: '#6467F2',
     primaryPressed: '#4F46E5', // нажатая главная кнопка
-    primaryFill: '#6467F2',    // заливка главных кнопок
-    onPrimary: '#FFFFFF',      // текст и иконки на primaryFill
+    primaryFill: '#6467F2', // заливка главных кнопок
+    onPrimary: '#FFFFFF', // текст и иконки на primaryFill
     primaryLight: '#818CF8',
     primaryDark: '#4F46E5',
     secondary: '#8B5CF6',
-    
+
     // Семантические: заливка (фон, иконка, прогресс)
     success: '#10B981',
     warning: '#F59E0B',
@@ -23,55 +23,61 @@ export const colors = {
     successText: '#047857',
     warningText: '#B45309',
     errorText: '#DC2626',
-    
+
     // Фон
     background: '#FFFFFF',
     surface: '#FFFFFF',
-    surfaceMuted: '#F1F5F9',   // чипы, «назад», поиск, неактивные элементы
+    surfaceMuted: '#F1F5F9', // чипы, «назад», поиск, неактивные элементы
     surfaceVariant: '#F3F4F6', // вложенные блоки внутри карточек
-    
+
     // Текст
     textPrimary: '#111827',
     textSecondary: '#6B7280',
-    textTertiary: '#8A8F99',   // только плейсхолдеры, неактивное, мелкие мета-данные
+    textTertiary: '#8A8F99', // только плейсхолдеры, неактивное, мелкие мета-данные
     textInverse: '#FFFFFF',
-    
+
     // Границы
     border: '#dbdbe6',
     borderLight: '#F3F4F6',
-    
+
     // Карточки SRS
-    cardNew: '#3B82F6',      // Синий - новые
+    cardNew: '#3B82F6', // Синий - новые
     cardLearning: '#F59E0B', // Желтый - изучаются
-    cardReview: '#EF4444',   // Красный - на повторение
+    cardReview: '#EF4444', // Красный - на повторение
     cardMastered: '#10B981', // Зеленый - выучены
-    
+
+    // Статус слова: кружок у карточки и полоска набора (plan/new/word_status_colors.md)
+    statusLearning: '#F59E0B', // шаги 1–2: фон, рамка, сегмент полоски
+    statusLearningInk: '#D97706', // галочка learning — #F59E0B на белом почти не виден
+    statusYoung: '#10B981', // шаги 3–4
+    statusMature: '#6467F2', // шаг 5+ — фирменный
+
     // Оценки
     ratingAgain: '#EF4444',
     ratingHard: '#F59E0B',
     ratingGood: '#10B981',
     ratingEasy: '#3B82F6',
-    
+
     // Игровые
-    streak: '#F97316',  // серия
+    streak: '#F97316', // серия
     diamond: '#10B981', // алмазы
-    star: '#F59E0B',    // звёзды оценки, золото в рейтинге
-    silver: '#8A94A6',  // серебро (2-е место)
-    bronze: '#C2703D',  // бронза (3-е место)
+    star: '#F59E0B', // звёзды оценки, золото в рейтинге
+    silver: '#8A94A6', // серебро (2-е место)
+    bronze: '#C2703D', // бронза (3-е место)
     // Мини-игры на главной — заливка карточек под белый текст (контраст ≥ 5,3)
     gameViolet: '#7C3AED', // «Быстрый раунд»
-    gameRose: '#BE123C',   // «Снайпер»
-    gameTeal: '#0E7490',   // «Вспомни забытое»
-    gameGreen: '#047857',  // выполненная мини-игра
-    like: '#EC4899',       // лайки в библиотеке
-    
+    gameRose: '#BE123C', // «Снайпер»
+    gameTeal: '#0E7490', // «Вспомни забытое»
+    gameGreen: '#047857', // выполненная мини-игра
+    like: '#EC4899', // лайки в библиотеке
+
     // Overlay
     overlay: 'rgba(0, 0, 0, 0.5)',
-    
+
     // Тени
     shadow: 'rgba(0, 0, 0, 0.1)',
   },
-  
+
   dark: {
     // Основные
     primary: '#818CF8',
@@ -81,7 +87,7 @@ export const colors = {
     primaryLight: '#A5B4FC',
     primaryDark: '#6366F1',
     secondary: '#A78BFA',
-    
+
     // Семантические: заливка
     success: '#34D399',
     warning: '#FBBF24',
@@ -91,35 +97,41 @@ export const colors = {
     successText: '#34D399',
     warningText: '#FBBF24',
     errorText: '#F87171',
-    
+
     // Фон — поверхности сплошные, чтобы окно поверх окна не «грязнело»
     background: '#101122',
     surface: '#1A1B30',
     surfaceMuted: '#232540',
     surfaceVariant: '#2A2C47',
-    
+
     // Текст
     textPrimary: '#F9FAFB',
     textSecondary: '#9CA3AF',
     textTertiary: '#8A8F99',
     textInverse: '#111827',
-    
+
     // Границы
     border: 'rgba(255, 255, 255, 0.1)',
     borderLight: '#4B5563',
-    
+
     // Карточки SRS
     cardNew: '#60A5FA',
     cardLearning: '#FBBF24',
     cardReview: '#F87171',
     cardMastered: '#34D399',
-    
+
+    // Статус слова
+    statusLearning: '#FBBF24',
+    statusLearningInk: '#FBBF24',
+    statusYoung: '#34D399',
+    statusMature: '#818CF8',
+
     // Оценки
     ratingAgain: '#F87171',
     ratingHard: '#FBBF24',
     ratingGood: '#34D399',
     ratingEasy: '#60A5FA',
-    
+
     // Игровые
     streak: '#F97316',
     diamond: '#10B981',
@@ -131,10 +143,10 @@ export const colors = {
     gameTeal: '#0E7490',
     gameGreen: '#047857',
     like: '#F472B6',
-    
+
     // Overlay
     overlay: 'rgba(0, 0, 0, 0.7)',
-    
+
     // Тени
     shadow: 'rgba(0, 0, 0, 0.3)',
   },
@@ -155,7 +167,9 @@ const ALPHA_HEX: Record<AlphaStep, string> = { 10: '1A', 20: '33', 40: '66' };
 export function alpha(color: string, step: AlphaStep): string {
   const hex = color.trim();
   if (/^#[0-9a-f]{3}$/i.test(hex)) {
-    const r = hex[1], g = hex[2], b = hex[3];
+    const r = hex[1],
+      g = hex[2],
+      b = hex[3];
     return `#${r}${r}${g}${g}${b}${b}${ALPHA_HEX[step]}`;
   }
   if (/^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(hex)) {
@@ -191,3 +205,15 @@ export function getDeckAccentColor(idOrIndex: string | number): string {
   }
   return DECK_ACCENT_COLORS[hash % DECK_ACCENT_COLORS.length];
 }
+
+/**
+ * Цвета заставки (LoadingSplash) — не зависят от темы и совпадают с LaunchScreen.storyboard
+ * и windowBackground на Android (макет plan/ideas/Splash-html)
+ */
+export const SPLASH_COLORS = {
+  background: '#6467F2',
+  cardBack: '#A5A8F7', // задняя карточка логотипа
+  cardFront: '#FFFFFF', // передняя карточка и надпись «flashly»
+  letter: '#5B4FD6', // буква F
+  accent: '#F59E0B', // полоска на букве F
+} as const;

@@ -26,7 +26,9 @@ export function disabledCategories(groupsOff) {
  * и SQL — без отдельной колонки.
  */
 export function isHoldout(userId) {
-  const hex = String(userId || '').replace(/-/g, '').slice(-7);
+  const hex = String(userId || '')
+    .replace(/-/g, '')
+    .slice(-7);
   const n = parseInt(hex, 16);
   return Number.isFinite(n) && n % 100 < 10;
 }
@@ -34,7 +36,9 @@ export function isHoldout(userId) {
 const DAY_MS = 24 * 60 * 60 * 1000;
 function daysBetween(fromDay, toDay) {
   if (!fromDay || !toDay) return Infinity;
-  return Math.round((Date.parse(`${toDay}T00:00:00Z`) - Date.parse(`${fromDay}T00:00:00Z`)) / DAY_MS);
+  return Math.round(
+    (Date.parse(`${toDay}T00:00:00Z`) - Date.parse(`${fromDay}T00:00:00Z`)) / DAY_MS
+  );
 }
 
 /**
@@ -54,12 +58,18 @@ export const RETURN_LADDER_DAYS = [2, 4, 7, 14, 30];
 
 export function returnLadderStep(c) {
   switch (c.daysAway) {
-    case 2: return { type: 'reactivation_2d', data: { count: Math.min(c.waiting || 0, 30) } };
-    case 4: return { type: 'reactivation_4d', data: { count: Math.min((c.fading || c.waiting) || 0, 30) } };
-    case 7: return { type: 'reactivation_7d', data: { learned: c.learned || 0 } };
-    case 14: return { type: 'reactivation_14d', data: {} };
-    case 30: return { type: 'reactivation_30d', data: { sets: c.sets || 0 } };
-    default: return null;
+    case 2:
+      return { type: 'reactivation_2d', data: { count: Math.min(c.waiting || 0, 30) } };
+    case 4:
+      return { type: 'reactivation_4d', data: { count: Math.min(c.fading || c.waiting || 0, 30) } };
+    case 7:
+      return { type: 'reactivation_7d', data: { learned: c.learned || 0 } };
+    case 14:
+      return { type: 'reactivation_14d', data: {} };
+    case 30:
+      return { type: 'reactivation_30d', data: { sets: c.sets || 0 } };
+    default:
+      return null;
   }
 }
 
@@ -73,7 +83,8 @@ export function eligiblePushes(c) {
   if (c.dow === 'sun' && c.rating) list.push({ type: 'rating_sunday', data: c.rating });
   if (c.dow === 'mon' && c.weekly) list.push({ type: 'weekly_result', data: c.weekly });
   // Тебя обогнали (3.5): вт–сб, если вчера кто-то поднялся выше
-  if (['tue', 'wed', 'thu', 'fri', 'sat'].includes(c.dow) && c.overtaken) list.push({ type: 'rating_overtaken', data: c.overtaken });
+  if (['tue', 'wed', 'thu', 'fri', 'sat'].includes(c.dow) && c.overtaken)
+    list.push({ type: 'rating_overtaken', data: c.overtaken });
   if (!c.doneToday && c.daysAway >= 2) {
     // Лестница возврата (3.4): ушедшему — только ступень в свой день, без ежедневных «слова ждут»
     const step = returnLadderStep(c);
@@ -82,7 +93,11 @@ export function eligiblePushes(c) {
     if (c.fading > 0) list.push({ type: 'words_fading', data: { count: c.fading } });
     if (c.waiting > 0) list.push({ type: 'review_due', data: { count: Math.min(c.waiting, 30) } });
     // Новые слова — только когда повторять нечего: урок дня начнётся с них (3.2)
-    else if (c.newWords?.count > 0) list.push({ type: 'lesson_new_words', data: { count: c.newWords.count, set: c.newWords.set } });
+    else if (c.newWords?.count > 0)
+      list.push({
+        type: 'lesson_new_words',
+        data: { count: c.newWords.count, set: c.newWords.set },
+      });
     if (c.streak > 0 && c.notifStreak) list.push({ type: 'streak_reminder', data: {} });
   }
   return list.sort((a, b) => PUSH_TYPES[a.type].priority - PUSH_TYPES[b.type].priority);
@@ -101,9 +116,12 @@ const HABIT_CATEGORIES = new Set(['lesson', 'streak']);
  */
 export function decide(c) {
   const eligible = eligiblePushes(c);
-  if (eligible.length === 0) return { status: 'skip', reason: c.doneToday ? 'done_today' : 'nothing_to_send' };
+  if (eligible.length === 0)
+    return { status: 'skip', reason: c.doneToday ? 'done_today' : 'nothing_to_send' };
   const usualDay = !c.habitDays || c.habitDays.includes(c.dow);
-  const all = usualDay ? eligible : eligible.filter((p) => !HABIT_CATEGORIES.has(PUSH_TYPES[p.type].category));
+  const all = usualDay
+    ? eligible
+    : eligible.filter((p) => !HABIT_CATEGORIES.has(PUSH_TYPES[p.type].category));
   if (all.length === 0) return { status: 'skip', reason: 'not_usual_day' };
 
   const off = disabledCategories(c.groupsOff);
@@ -117,11 +135,18 @@ export function decide(c) {
   if (fresh.length === 0) return { status: 'interval', ...enabled[0] };
 
   const top = fresh[0];
-  if (!PUSH_TYPES[top.type].transactional && isHoldout(c.userId)) return { status: 'holdout', ...top };
+  if (!PUSH_TYPES[top.type].transactional && isHoldout(c.userId))
+    return { status: 'holdout', ...top };
 
-  const allowed = fresh.find((p) => !backoffReason(c.ignored || 0, c.lastSentDay, c.today, PUSH_TYPES[p.type].category));
+  const allowed = fresh.find(
+    (p) => !backoffReason(c.ignored || 0, c.lastSentDay, c.today, PUSH_TYPES[p.type].category)
+  );
   if (!allowed) {
-    return { status: 'backoff', ...top, reason: backoffReason(c.ignored || 0, c.lastSentDay, c.today, PUSH_TYPES[top.type].category) };
+    return {
+      status: 'backoff',
+      ...top,
+      reason: backoffReason(c.ignored || 0, c.lastSentDay, c.today, PUSH_TYPES[top.type].category),
+    };
   }
   return { status: 'send', ...allowed };
 }

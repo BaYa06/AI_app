@@ -10,7 +10,7 @@
  */
 
 import type { Card } from '@/types';
-import { API_BASE } from '@/config/apiBase';
+import { rawApiFetch } from '@/services/api/client';
 import { hasAiConsent } from '@/services/aiConsent';
 
 function shuffle<T>(arr: T[]): T[] {
@@ -25,56 +25,46 @@ function shuffle<T>(arr: T[]): T[] {
 export async function getDistractors(
   correctCard: Card,
   allCards: Card[],
-  count: number = 3,
+  count: number = 3
 ): Promise<string[]> {
-  const others = allCards.filter(c => c.id !== correctCard.id);
+  const others = allCards.filter((c) => c.id !== correctCard.id);
 
   // Фильтр по wordType — только если у правильной карточки он известен
   const filterByType = (cards: Card[]) =>
-    correctCard.wordType
-      ? cards.filter(c => c.wordType === correctCard.wordType)
-      : cards;
+    correctCard.wordType ? cards.filter((c) => c.wordType === correctCard.wordType) : cards;
 
   // Уровень 1: тот же набор, та же часть речи
-  const sameSet = filterByType(
-    others.filter(c => c.setId === correctCard.setId),
-  );
+  const sameSet = filterByType(others.filter((c) => c.setId === correctCard.setId));
 
   if (sameSet.length >= count) {
-    return shuffle(sameSet).slice(0, count).map(c => c.frontText);
+    return shuffle(sameSet)
+      .slice(0, count)
+      .map((c) => c.frontText);
   }
 
   // Уровень 2: другие наборы, та же часть речи
-  const otherSets = filterByType(
-    others.filter(c => c.setId !== correctCard.setId),
-  );
+  const otherSets = filterByType(others.filter((c) => c.setId !== correctCard.setId));
   const combined = shuffle([...sameSet, ...otherSets]);
 
   if (combined.length >= count) {
-    return combined.slice(0, count).map(c => c.frontText);
+    return combined.slice(0, count).map((c) => c.frontText);
   }
 
   // Уровень 3: AI генерирует недостающие дистракторы
   const needed = count - combined.length;
   const aiWords = await generateAIDistractors(correctCard, needed);
 
-  return [
-    ...combined.map(c => c.frontText),
-    ...aiWords,
-  ];
+  return [...combined.map((c) => c.frontText), ...aiWords];
 }
 
-async function generateAIDistractors(
-  card: Card,
-  count: number,
-): Promise<string[]> {
+async function generateAIDistractors(card: Card, count: number): Promise<string[]> {
   // Фоновый запрос в ИИ — только с уже данным согласием, окно здесь не показываем
   if (!hasAiConsent()) return [];
   try {
-    const res = await fetch(`${API_BASE}/context?action=distractors`, {
+    const res = await rawApiFetch('context?action=distractors', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      body: {
         word: card.frontText,
         translation: card.backText,
         wordType: card.wordType || 'other',
@@ -82,7 +72,7 @@ async function generateAIDistractors(
         // Предложение с пропуском — чтобы ИИ не предложил слово, которое тоже подходит
         example: card.example || undefined,
         wordForm: card.wordForm || undefined,
-      }),
+      },
     });
     if (!res.ok) return [];
     const json = await res.json();

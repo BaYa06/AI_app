@@ -8,7 +8,18 @@
  */
 import React, { memo } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { Medal, Trophy, Target, Flame, Dumbbell, Star, Gem, PartyPopper, Brain, Timer } from 'lucide-react-native';
+import {
+  Medal,
+  Trophy,
+  Target,
+  Flame,
+  Dumbbell,
+  Star,
+  Gem,
+  PartyPopper,
+  Brain,
+  Timer,
+} from 'lucide-react-native';
 import { useThemeColors } from '@/store';
 import { alpha, borderRadius, iconSize, type ColorToken } from '@/constants';
 import { getCategoryIcon } from '@/constants/categoryIcons';
@@ -30,7 +41,12 @@ export interface IconProps {
   strokeWidth?: number;
 }
 
-export const Icon = memo(function Icon({ icon: Glyph, size = 's', color = 'textSecondary', strokeWidth }: IconProps) {
+export const Icon = memo(function Icon({
+  icon: Glyph,
+  size = 's',
+  color = 'textSecondary',
+  strokeWidth,
+}: IconProps) {
   const colors = useThemeColors();
   const resolved = color in colors ? colors[color as ColorToken] : color;
   return <Glyph size={resolveSize(size)} color={resolved} strokeWidth={strokeWidth} />;
@@ -57,7 +73,8 @@ function IconCircle({ icon: Glyph, color, size, shape = 'circle', style }: IconC
         {
           width: box,
           height: box,
-          borderRadius: shape === 'circle' ? borderRadius.full : box >= 48 ? borderRadius.l : borderRadius.m,
+          borderRadius:
+            shape === 'circle' ? borderRadius.full : box >= 48 ? borderRadius.l : borderRadius.m,
           backgroundColor: alpha(color, 10),
         },
         style,
@@ -91,7 +108,8 @@ export const CategoryIcon = memo(function CategoryIcon({
   const Glyph = getCategoryIcon(category);
   const tint = color ?? colors.primary;
   const px = resolveSize(size);
-  if (background) return <IconCircle icon={Glyph} color={tint} size={px} shape="rounded" style={style} />;
+  if (background)
+    return <IconCircle icon={Glyph} color={tint} size={px} shape="rounded" style={style} />;
   return <Glyph size={px} color={tint} />;
 });
 
@@ -135,7 +153,12 @@ export interface CelebrationIconProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export const CelebrationIcon = memo(function CelebrationIcon({ kind, size = 'xl', plain = false, style }: CelebrationIconProps) {
+export const CelebrationIcon = memo(function CelebrationIcon({
+  kind,
+  size = 'xl',
+  plain = false,
+  style,
+}: CelebrationIconProps) {
   const colors = useThemeColors();
   const { icon: Glyph, color } = CELEBRATIONS[kind];
   const px = resolveSize(size);

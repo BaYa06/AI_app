@@ -3,13 +3,7 @@
  * @description Экран выбора набора для устного теста
  */
 import React, { useState } from 'react';
-import {
-  View,
-  ScrollView,
-  StyleSheet,
-  Pressable,
-  Platform,
-} from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Mic, Check } from 'lucide-react-native';
 import { Text } from '@/components/common';
@@ -71,9 +65,7 @@ export function OralTestLobbyScreen({ navigation, route }: Props) {
         >
           <ArrowLeft size={22} color={colors.textPrimary} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-          Устный тренажёр
-        </Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Устный тренажёр</Text>
       </View>
 
       <ScrollView
@@ -85,11 +77,10 @@ export function OralTestLobbyScreen({ navigation, route }: Props) {
           <View style={[styles.iconWrap, { backgroundColor: alpha(colors.streak, 10) }]}>
             <Mic size={32} color={colors.streak} />
           </View>
-          <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>
-            Устный тренажёр
-          </Text>
+          <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>Устный тренажёр</Text>
           <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
-            Ученик произносит перевод вслух,{'\n'}учитель свайпом отмечает результат.{'\n'}Это тренировка — результат нигде не сохраняется.
+            Ученик произносит перевод вслух,{'\n'}учитель свайпом отмечает результат.{'\n'}Это
+            тренировка — результат нигде не сохраняется.
           </Text>
         </View>
 
@@ -108,7 +99,9 @@ export function OralTestLobbyScreen({ navigation, route }: Props) {
               {sets.map((set, idx) => {
                 const active = set.id === selectedSetId;
                 return (
-                  <Pressable accessibilityRole="button" accessibilityState={{ selected: active }}
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
                     key={set.id}
                     onPress={() => setSelectedSetId(set.id)}
                     style={({ pressed }) => [
@@ -152,7 +145,8 @@ export function OralTestLobbyScreen({ navigation, route }: Props) {
 
       {/* Footer CTA */}
       <BottomBar style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        <Pressable accessibilityRole="button"
+        <Pressable
+          accessibilityRole="button"
           style={({ pressed }) => [
             styles.ctaBtn,
             { backgroundColor: !selectedSetId ? colors.textSecondary : colors.streak },
@@ -179,9 +173,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.m,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    ...Platform.select({
+    ...(Platform.select({
       web: { backdropFilter: 'blur(12px)' },
-    }) as any,
+    }) as any),
   },
   backBtn: {
     padding: spacing.xs,
@@ -277,7 +271,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: borderRadius.l,
     gap: 8,
-    
   },
   ctaText: {
     fontSize: 16,

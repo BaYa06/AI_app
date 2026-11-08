@@ -59,7 +59,12 @@ export const OnboardingOption = memo(function OnboardingOption({
       ]}
     >
       {Glyph || flag ? (
-        <View style={[styles.tile, { backgroundColor: selected ? colors.primaryFill : colors.surfaceMuted }]}>
+        <View
+          style={[
+            styles.tile,
+            { backgroundColor: selected ? colors.primaryFill : colors.surfaceMuted },
+          ]}
+        >
           {Glyph ? (
             <Glyph size={iconSize.m} color={selected ? colors.onPrimary : colors.primary} />
           ) : (
@@ -69,7 +74,10 @@ export const OnboardingOption = memo(function OnboardingOption({
       ) : null}
 
       <View style={styles.text}>
-        <Text variant={large ? 'bodyLarge' : 'body'} style={[styles.title, { color: colors.textPrimary }]}>
+        <Text
+          variant={large ? 'bodyLarge' : 'body'}
+          style={[styles.title, { color: colors.textPrimary }]}
+        >
           {title}
         </Text>
         {description ? (
@@ -89,7 +97,9 @@ export const OnboardingOption = memo(function OnboardingOption({
 
       {mode === 'single' ? (
         <View style={[styles.radio, { borderColor: selected ? colors.primary : colors.border }]}>
-          {selected ? <View style={[styles.radioDot, { backgroundColor: colors.primary }]} /> : null}
+          {selected ? (
+            <View style={[styles.radioDot, { backgroundColor: colors.primary }]} />
+          ) : null}
         </View>
       ) : (
         <View

@@ -13,7 +13,7 @@ dotenv.config({ path: join(__dirname, '..', '.env.local') });
 async function initDatabase() {
   try {
     const connectionString = process.env.POSTGRES_URL;
-    
+
     if (!connectionString) {
       console.error('❌ POSTGRES_URL не найден в .env.local');
       process.exit(1);
@@ -21,7 +21,7 @@ async function initDatabase() {
 
     console.log('🔌 Подключение к Neon PostgreSQL...');
     console.log(`📍 База: ${connectionString.split('@')[1]?.split('/')[1]?.split('?')[0]}\n`);
-    
+
     const sql = neon(connectionString);
 
     // ==================== Создание таблиц ====================
@@ -101,7 +101,7 @@ async function initDatabase() {
     await sql`CREATE INDEX IF NOT EXISTS idx_cards_next_review ON cards(next_review)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_card_sets_user_id ON card_sets(user_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_reviews_card_id ON reviews(card_id)`;
-    
+
     console.log('  ✅ 4 индекса созданы\n');
 
     // ==================== Добавление данных ====================
@@ -193,7 +193,6 @@ async function initDatabase() {
 
     console.log('\n✅ База данных успешно инициализирована!');
     console.log('🚀 Теперь можете запустить приложение: npm run web\n');
-
   } catch (error) {
     console.error('\n❌ Ошибка:', error.message);
     console.error('\nПолная информация об ошибке:');

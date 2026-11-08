@@ -55,7 +55,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
     onBlur,
     ...rest
   },
-  ref,
+  ref
 ) {
   const colors = useThemeColors();
   const [focused, setFocused] = useState(false);
@@ -108,13 +108,22 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
           textAlignVertical={multiline ? 'top' : 'center'}
           onFocus={handleFocus}
           onBlur={handleBlur}
-          style={[multiline ? typography.body : singleLineFont, styles.input, { color: colors.textPrimary }, inputStyle]}
+          style={[
+            multiline ? typography.body : singleLineFont,
+            styles.input,
+            { color: colors.textPrimary },
+            inputStyle,
+          ]}
           {...rest}
         />
         {right}
       </View>
       {error ? (
-        <Text variant="caption" accessibilityLiveRegion="polite" style={[styles.helper, { color: colors.errorText }]}>
+        <Text
+          variant="caption"
+          accessibilityLiveRegion="polite"
+          style={[styles.helper, { color: colors.errorText }]}
+        >
           {error}
         </Text>
       ) : hint ? (

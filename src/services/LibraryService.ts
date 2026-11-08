@@ -4,9 +4,8 @@
  * Строки подключения к БД в приложении нет — см. plan/course_rating_and_review_plan.md, этап 0.
  */
 
-import { supabase } from './supabaseClient';
-import { API_BASE } from '@/config/apiBase';
-import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
+import { getAccessToken } from './auth/session';
+import { apiFetch } from './api/client';
 import type {
   LibraryFilters,
   LibraryListResponse,
@@ -18,9 +17,12 @@ import type {
   ToggleLikeResponse,
   RateResponse,
   LibrarySet,
+  CatalogResponse,
+  CatalogSubjectResponse,
+  CatalogCollectionResponse,
+  CatalogSearchResponse,
+  ImportCollectionResponse,
 } from '@/types/library';
-
-const LIBRARY_API = `${API_BASE}/library`;
 
 /**
  * Запрос к api/library.js. Токен добавляется, если есть сессия (для списка/деталей он
@@ -29,35 +31,41 @@ const LIBRARY_API = `${API_BASE}/library`;
  */
 async function callLibraryApi<T>(
   params: Record<string, string | number | boolean | null | undefined>,
-  { method = 'GET', body, requireAuth = false }: { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: object; requireAuth?: boolean } = {},
+  {
+    method = 'GET',
+    body,
+    requireAuth = false,
+  }: { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: object; requireAuth?: boolean } = {}
 ): Promise<T> {
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
+  const token = await getAccessToken();
   if (requireAuth && !token) throw new Error('Необходимо войти в аккаунт');
 
+  // '' тоже пропускаем — поэтому готовый URLSearchParams, а не объект
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== null && value !== '') query.set(key, String(value));
   }
-  const qs = query.toString();
-  const resp = await fetchWithTimeout(qs ? `${LIBRARY_API}?${qs}` : LIBRARY_API, {
+  const res = await apiFetch('library', {
     method,
+    query,
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: body ? JSON.stringify(body) : undefined,
+    auth: 'none',
+    body: body || undefined,
   });
-  const json = await resp.json().catch(() => ({}));
-  if (!resp.ok) {
-    if (resp.status === 403) throw new Error('Можно добавлять только в свои курсы');
-    throw new Error(json?.error || `HTTP ${resp.status}`);
+  // Сеть/таймаут — исходное исключение fetch, как раньше
+  if (!res.response) throw res.error.original;
+  const json = res.json;
+  if (!res.ok) {
+    if (res.status === 403) throw new Error('Можно добавлять только в свои курсы');
+    throw new Error(json?.error || `HTTP ${res.status}`);
   }
   return json as T;
 }
 
 class LibraryServiceClass {
-
   /** Get library sets with filters */
   async getLibrarySets(filters: LibraryFilters, _userId?: string): Promise<LibraryListResponse> {
     const { search, category, language, sort = 'popular', cardsMin, cardsMax, page = 1 } = filters;
@@ -79,14 +87,21 @@ class LibraryServiceClass {
 
   /** Publish a personal set to the library */
   async publishSet(_userId: string, payload: PublishSetPayload): Promise<PublishResponse> {
-    return callLibraryApi<PublishResponse>({ action: 'publish' }, { method: 'POST', body: payload, requireAuth: true });
+    return callLibraryApi<PublishResponse>(
+      { action: 'publish' },
+      { method: 'POST', body: payload, requireAuth: true }
+    );
   }
 
   /** Update published set cards and metadata from original */
-  async updatePublication(_userId: string, librarySetId: string, meta?: { description?: string; category?: string; coverEmoji?: string }): Promise<{ success: boolean }> {
+  async updatePublication(
+    _userId: string,
+    librarySetId: string,
+    meta?: { description?: string; category?: string; coverEmoji?: string }
+  ): Promise<{ success: boolean }> {
     return callLibraryApi<{ success: boolean }>(
       { action: 'publish' },
-      { method: 'PUT', body: { librarySetId, ...meta }, requireAuth: true },
+      { method: 'PUT', body: { librarySetId, ...meta }, requireAuth: true }
     );
   }
 
@@ -94,7 +109,7 @@ class LibraryServiceClass {
   async unpublishSet(_userId: string, librarySetId: string): Promise<{ success: boolean }> {
     return callLibraryApi<{ success: boolean }>(
       { action: 'publish' },
-      { method: 'DELETE', body: { librarySetId }, requireAuth: true },
+      { method: 'DELETE', body: { librarySetId }, requireAuth: true }
     );
   }
 
@@ -103,22 +118,34 @@ class LibraryServiceClass {
    * Сервер сам определяет пользователя, проверяет, что курс принадлежит ему, и создаёт набор
    * с карточками одним атомарным запросом.
    */
-  async importSet(_userId: string, librarySetId: string, courseId: string | null = null): Promise<ImportResponse> {
+  async importSet(
+    _userId: string,
+    librarySetId: string,
+    courseId: string | null = null
+  ): Promise<ImportResponse> {
     const json = await callLibraryApi<{ newSetId: string }>(
       { action: 'import' },
-      { method: 'POST', body: { librarySetId, courseId }, requireAuth: true },
+      { method: 'POST', body: { librarySetId, courseId }, requireAuth: true }
     );
     return { newSetId: json.newSetId };
   }
 
   /** Fetch all cards for a library set (READ only, used for guest import) */
-  async getLibraryCards(librarySetId: string): Promise<{ front: string; back: string; hint: string | null }[]> {
-    return callLibraryApi<{ front: string; back: string; hint: string | null }[]>({ action: 'cards', id: librarySetId });
+  async getLibraryCards(
+    librarySetId: string
+  ): Promise<{ front: string; back: string; hint: string | null }[]> {
+    return callLibraryApi<{ front: string; back: string; hint: string | null }[]>({
+      action: 'cards',
+      id: librarySetId,
+    });
   }
 
   /** Toggle like on a library set */
   async toggleLike(_userId: string, librarySetId: string): Promise<ToggleLikeResponse> {
-    return callLibraryApi<ToggleLikeResponse>({ action: 'like' }, { method: 'POST', body: { librarySetId }, requireAuth: true });
+    return callLibraryApi<ToggleLikeResponse>(
+      { action: 'like' },
+      { method: 'POST', body: { librarySetId }, requireAuth: true }
+    );
   }
 
   /** Rate a library set (1-5) */
@@ -126,16 +153,20 @@ class LibraryServiceClass {
     const ratingNum = Math.max(1, Math.min(5, Math.round(rating)));
     const json = await callLibraryApi<RateResponse>(
       { action: 'rate' },
-      { method: 'POST', body: { librarySetId, rating: ratingNum }, requireAuth: true },
+      { method: 'POST', body: { librarySetId, rating: ratingNum }, requireAuth: true }
     );
     return { ...json, average_rating: json.average_rating ?? 0 };
   }
 
   /** Report a library set */
-  async reportSet(_userId: string, librarySetId: string, reason: string): Promise<{ success: boolean }> {
+  async reportSet(
+    _userId: string,
+    librarySetId: string,
+    reason: string
+  ): Promise<{ success: boolean }> {
     return callLibraryApi<{ success: boolean }>(
       { action: 'report' },
-      { method: 'POST', body: { librarySetId, reason: reason || null }, requireAuth: true },
+      { method: 'POST', body: { librarySetId, reason: reason || null }, requireAuth: true }
     );
   }
 
@@ -146,13 +177,52 @@ class LibraryServiceClass {
 
   /** Может ли пользователь публиковать в библиотеку — только админ */
   async canPublish(): Promise<boolean> {
-    const json = await callLibraryApi<{ canPublish?: boolean }>({ action: 'can-publish' }, { requireAuth: true });
+    const json = await callLibraryApi<{ canPublish?: boolean }>(
+      { action: 'can-publish' },
+      { requireAuth: true }
+    );
     return json.canPublish === true;
+  }
+
+  // ── Каталог (plan/new/library_catalog.md, Catalog 3–5). Токен необязателен ──
+
+  /** Предметы, «Продолжить» / «С чего начать», полка учебников. lang — язык для «С чего начать». */
+  async getCatalog(lang?: string | null): Promise<CatalogResponse> {
+    return callLibraryApi<CatalogResponse>({ action: 'catalog', lang });
+  }
+
+  /** Разделы, непустые уровни и подборки предмета. */
+  async getCatalogSubject(slug: string): Promise<CatalogSubjectResponse> {
+    return callLibraryApi<CatalogSubjectResponse>({ action: 'subject', subject: slug });
+  }
+
+  /** Подборка и её наборы по порядку. */
+  async getCatalogCollection(id: string): Promise<CatalogCollectionResponse> {
+    return callLibraryApi<CatalogCollectionResponse>({ action: 'collection', id });
+  }
+
+  /** Поиск по подборкам, наборам и учебникам (от 2 символов, иначе пустой ответ). */
+  async searchCatalog(q: string): Promise<CatalogSearchResponse> {
+    return callLibraryApi<CatalogSearchResponse>({ action: 'search', q });
+  }
+
+  /** Вся подборка в свой курс (учитель). Уже лежащие в курсе наборы сервер пропускает. */
+  async importCollection(
+    collectionId: string,
+    courseId: string
+  ): Promise<ImportCollectionResponse> {
+    return callLibraryApi<ImportCollectionResponse>(
+      { action: 'import-collection' },
+      { method: 'POST', body: { collectionId, courseId }, requireAuth: true }
+    );
   }
 
   /** Check if a personal set is published */
   async checkPublished(setId: string, _userId: string): Promise<CheckPublishedResponse> {
-    return callLibraryApi<CheckPublishedResponse>({ action: 'check-published', setId }, { requireAuth: true });
+    return callLibraryApi<CheckPublishedResponse>(
+      { action: 'check-published', setId },
+      { requireAuth: true }
+    );
   }
 }
 

@@ -14,7 +14,8 @@
  */
 
 function plural(n, one, few, many) {
-  const m10 = n % 10, m100 = n % 100;
+  const m10 = n % 10,
+    m100 = n % 100;
   if (m100 >= 11 && m100 <= 19) return many;
   if (m10 === 1) return one;
   if (m10 >= 2 && m10 <= 4) return few;
@@ -36,9 +37,10 @@ function newWordsMinutes(count) {
 }
 
 function minutesFor(count, secPerAnswer) {
-  const sec = Number(secPerAnswer) > 0
-    ? Math.min(MAX_SEC_PER_WORD, Math.max(MIN_SEC_PER_WORD, Number(secPerAnswer)))
-    : DEFAULT_SEC_PER_WORD;
+  const sec =
+    Number(secPerAnswer) > 0
+      ? Math.min(MAX_SEC_PER_WORD, Math.max(MIN_SEC_PER_WORD, Number(secPerAnswer)))
+      : DEFAULT_SEC_PER_WORD;
   return Math.max(1, Math.round(((count || 0) * sec) / 60));
 }
 
@@ -49,13 +51,17 @@ export const SUPPORT_MIN_APP_VERSION = '1.6.10';
 const SUPPORT_BODY_MAX = 120;
 
 function excerpt(text, max) {
-  const t = String(text ?? '').replace(/\s+/g, ' ').trim();
+  const t = String(text ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
   return t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t;
 }
 
 /** '1.6.10' >= '1.6.9' — по числам, а не по строке */
 export function versionAtLeast(version, min) {
-  const a = String(version || '').split('.').map(Number);
+  const a = String(version || '')
+    .split('.')
+    .map(Number);
   const b = String(min).split('.').map(Number);
   if (a.some(Number.isNaN) || !version) return false;
   for (let i = 0; i < Math.max(a.length, b.length); i++) {
@@ -67,9 +73,10 @@ export function versionAtLeast(version, min) {
 
 /** Рейтинг курса; без courseId — урок дня (старые записи без курса) */
 function ratingLink(week) {
-  return (data) => (data?.courseId
-    ? `flashly://rating/${encodeURIComponent(data.courseId)}?from=push${week ? `&week=${week}` : ''}`
-    : LESSON_LINK());
+  return (data) =>
+    data?.courseId
+      ? `flashly://rating/${encodeURIComponent(data.courseId)}?from=push${week ? `&week=${week}` : ''}`
+      : LESSON_LINK();
 }
 
 export const PUSH_TYPES = {
@@ -120,7 +127,8 @@ export const PUSH_TYPES = {
     priority: 1,
     transactional: true,
     minIntervalDays: 0,
-    link: (data) => (data?.setId ? `flashly://set/${encodeURIComponent(data.setId)}?from=push` : LESSON_LINK()),
+    link: (data) =>
+      data?.setId ? `flashly://set/${encodeURIComponent(data.setId)}?from=push` : LESSON_LINK(),
     variants: [
       ({ data }) => ({
         title: `Новый набор в курсе «${data.course}»`,
@@ -153,9 +161,10 @@ export const PUSH_TYPES = {
     variants: [
       ({ data }) => ({
         title: 'Последний день недели',
-        body: data.gap != null
-          ? `Ты на ${data.place}-м месте, до ${data.place - 1}-го — ${data.gap} ${plural(data.gap, 'очко', 'очка', 'очков')}. Рейтинг закроется в полночь`
-          : `Ты на ${data.place}-м месте в рейтинге курса. Удержи его до полуночи!`,
+        body:
+          data.gap != null
+            ? `Ты на ${data.place}-м месте, до ${data.place - 1}-го — ${data.gap} ${plural(data.gap, 'очко', 'очка', 'очков')}. Рейтинг закроется в полночь`
+            : `Ты на ${data.place}-м месте в рейтинге курса. Удержи его до полуночи!`,
       }),
     ],
   },
@@ -312,7 +321,10 @@ export const PUSH_TYPES = {
     minIntervalDays: 0,
     link: LESSON_LINK,
     variants: [
-      ({ name }) => ({ title: 'Давно не виделись', body: `${name}, прошло 3 дня. Карточки ждут тебя!` }),
+      ({ name }) => ({
+        title: 'Давно не виделись',
+        body: `${name}, прошло 3 дня. Карточки ждут тебя!`,
+      }),
     ],
   },
   // Ступень 7 дней (3.4): прогресс. Без выученных слов — прежний текст про рекорд серии
@@ -323,24 +335,26 @@ export const PUSH_TYPES = {
     minIntervalDays: 0,
     link: LESSON_LINK,
     variants: [
-      ({ longest, data }) => (data.learned > 0
-        ? {
-            title: 'Не дай словам пропасть',
-            body: `Выучено ${data.learned} ${plural(data.learned, 'слово', 'слова', 'слов')}. Не дай ${data.learned === 1 ? 'ему' : 'им'} пропасть`,
-          }
-        : {
-            title: 'Вернись к учёбе',
-            body: `Твой рекорд был ${longest} ${plural(longest, 'день', 'дня', 'дней')}. Начни новую серию!`,
-          }),
-      ({ longest, data }) => (data.learned > 0
-        ? {
-            title: `${data.learned} ${plural(data.learned, 'слово уже твоё', 'слова уже твои', 'слов уже твои')}`,
-            body: 'Неделя без повторения — самое время освежить',
-          }
-        : {
-            title: `Рекорд серии — ${longest} ${plural(longest, 'день', 'дня', 'дней')}`,
-            body: 'Начни новую серию сегодня',
-          }),
+      ({ longest, data }) =>
+        data.learned > 0
+          ? {
+              title: 'Не дай словам пропасть',
+              body: `Выучено ${data.learned} ${plural(data.learned, 'слово', 'слова', 'слов')}. Не дай ${data.learned === 1 ? 'ему' : 'им'} пропасть`,
+            }
+          : {
+              title: 'Вернись к учёбе',
+              body: `Твой рекорд был ${longest} ${plural(longest, 'день', 'дня', 'дней')}. Начни новую серию!`,
+            },
+      ({ longest, data }) =>
+        data.learned > 0
+          ? {
+              title: `${data.learned} ${plural(data.learned, 'слово уже твоё', 'слова уже твои', 'слов уже твои')}`,
+              body: 'Неделя без повторения — самое время освежить',
+            }
+          : {
+              title: `Рекорд серии — ${longest} ${plural(longest, 'день', 'дня', 'дней')}`,
+              body: 'Начни новую серию сегодня',
+            },
     ],
   },
   // Онбординг (3.1): зарегистрировался, но урок не начат — через 3 часа (тихие часы — в 19:00)

@@ -28,7 +28,7 @@ interface Props {
 }
 
 export function languageLabel(code: string): string {
-  const lang = TOP_LANGUAGES.find(l => l.code === code);
+  const lang = TOP_LANGUAGES.find((l) => l.code === code);
   return lang ? `${lang.label} (${code.toUpperCase()})` : code.toUpperCase();
 }
 
@@ -39,32 +39,59 @@ export const ImportLangChoice = memo(function ImportLangChoice(props: Props) {
   const newPair = `${foundLang.toUpperCase()}${setLanguageTo ? ` → ${setLanguageTo.toUpperCase()}` : ''}`;
 
   const options = [
-    { title: `Создать новый набор ${newPair}`, hint: 'Рекомендуем: слова не смешаются с набором', onPress: props.onNewSet, recommended: true },
-    { title: `Перевести на ${languageLabel(setLanguageFrom)} и добавить сюда`, hint: 'Ещё одно распознавание из дневного лимита', onPress: props.onTranslateHere, recommended: false },
-    { title: 'Добавить как есть', hint: `Слова на другом языке в наборе ${pair}`, onPress: props.onAddAsIs, recommended: false },
+    {
+      title: `Создать новый набор ${newPair}`,
+      hint: 'Рекомендуем: слова не смешаются с набором',
+      onPress: props.onNewSet,
+      recommended: true,
+    },
+    {
+      title: `Перевести на ${languageLabel(setLanguageFrom)} и добавить сюда`,
+      hint: 'Ещё одно распознавание из дневного лимита',
+      onPress: props.onTranslateHere,
+      recommended: false,
+    },
+    {
+      title: 'Добавить как есть',
+      hint: `Слова на другом языке в наборе ${pair}`,
+      onPress: props.onAddAsIs,
+      recommended: false,
+    },
   ];
 
   return (
     <View style={styles.root}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.badges} accessible accessibilityLabel={`Набор ${pair}, а слова: ${languageLabel(foundLang)}`}>
+        <View
+          style={styles.badges}
+          accessible
+          accessibilityLabel={`Набор ${pair}, а слова: ${languageLabel(foundLang)}`}
+        >
           <View style={[styles.badge, { backgroundColor: colors.surfaceMuted }]}>
-            <Text variant="h3" color="secondary">{setLanguageFrom.toUpperCase()}</Text>
+            <Text variant="h3" color="secondary">
+              {setLanguageFrom.toUpperCase()}
+            </Text>
           </View>
           <ArrowRight size={iconSize.s} color={colors.warningText} />
           <View style={[styles.badge, { backgroundColor: alpha(colors.warning, 20) }]}>
-            <Text variant="h3" style={{ color: colors.warningText }}>{foundLang.toUpperCase()}</Text>
+            <Text variant="h3" style={{ color: colors.warningText }}>
+              {foundLang.toUpperCase()}
+            </Text>
           </View>
         </View>
-        <Text variant="h2" align="center" style={{ color: colors.textPrimary }}>Похоже, слова на другом языке</Text>
+        <Text variant="h2" align="center" style={{ color: colors.textPrimary }}>
+          Похоже, слова на другом языке
+        </Text>
         <Text variant="body" align="center" color="secondary">
           {`ИИ определил язык: ${languageLabel(foundLang)}. А набор${setTitle ? ` «${setTitle}»` : ''} — ${pair}. `}
           {`Нашли ${count} ${pluralize(count, 'слово', 'слова', 'слов')}: `}
-          <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>{sampleWords.join(', ')}…</Text>
+          <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
+            {sampleWords.join(', ')}…
+          </Text>
         </Text>
 
         <View style={styles.options}>
-          {options.map(option => (
+          {options.map((option) => (
             <Pressable
               key={option.title}
               accessibilityRole="button"
@@ -78,8 +105,12 @@ export const ImportLangChoice = memo(function ImportLangChoice(props: Props) {
                 },
               ]}
             >
-              <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>{option.title}</Text>
-              <Text variant="bodySmall" color="secondary">{option.hint}</Text>
+              <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
+                {option.title}
+              </Text>
+              <Text variant="bodySmall" color="secondary">
+                {option.hint}
+              </Text>
             </Pressable>
           ))}
         </View>
@@ -93,9 +124,25 @@ export const ImportLangChoice = memo(function ImportLangChoice(props: Props) {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  content: { paddingHorizontal: screenPadding, paddingTop: spacing.xl, paddingBottom: spacing.l, gap: spacing.s, alignItems: 'stretch' },
-  badges: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.s, marginBottom: spacing.xs },
-  badge: { borderRadius: borderRadius.l, paddingHorizontal: spacing.m, paddingVertical: spacing.xs },
+  content: {
+    paddingHorizontal: screenPadding,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.l,
+    gap: spacing.s,
+    alignItems: 'stretch',
+  },
+  badges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.s,
+    marginBottom: spacing.xs,
+  },
+  badge: {
+    borderRadius: borderRadius.l,
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.xs,
+  },
   options: { gap: spacing.s, marginTop: spacing.m },
   option: { borderWidth: 1.5, borderRadius: borderRadius.l, padding: spacing.m, gap: spacing.xxs },
   actions: { paddingHorizontal: screenPadding, paddingBottom: spacing.l },

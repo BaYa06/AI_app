@@ -4,14 +4,23 @@
  * (createCourseInvite / regenerateCourseInvite).
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, StyleSheet, Pressable, ActivityIndicator, Platform, Clipboard, Share } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  Pressable,
+  ActivityIndicator,
+  Platform,
+  Clipboard,
+  Share,
+} from 'react-native';
 import { Check, X } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import { Button, Dialog, confirmDialog, toast } from '@/components/ui';
 import { useThemeColors } from '@/store';
 import { alpha, borderRadius, iconSize, spacing } from '@/constants';
 import { NeonService } from '@/services/NeonService';
-import { supabase } from '@/services/supabaseClient';
+import { getSession } from '@/services/auth/session';
+import { log } from '@/utils/logger';
 
 interface CourseJoinCodeDialogProps {
   visible: boolean;
@@ -28,7 +37,12 @@ function copyToClipboard(text: string) {
   }
 }
 
-export function CourseJoinCodeDialog({ visible, courseId, courseTitle, onClose }: CourseJoinCodeDialogProps) {
+export function CourseJoinCodeDialog({
+  visible,
+  courseId,
+  courseTitle,
+  onClose,
+}: CourseJoinCodeDialogProps) {
   const colors = useThemeColors();
   const [joinCode, setJoinCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -43,17 +57,19 @@ export function CourseJoinCodeDialog({ visible, courseId, courseTitle, onClose }
     setLoading(true);
     (async () => {
       try {
-        const { data } = await supabase.auth.getSession();
-        const userId = data.session?.user?.id;
+        const authSession = await getSession();
+        const userId = authSession?.user?.id;
         const result = userId ? await NeonService.createCourseInvite(courseId, userId) : null;
         if (mounted) setJoinCode(result?.joinCode ?? null);
       } catch (e) {
-        console.error('Failed to create invite:', e);
+        log.error('CourseJoinCodeDialog', 'Failed to create invite', e);
       } finally {
         if (mounted) setLoading(false);
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [visible, courseId]);
 
   const handleCopy = useCallback(() => {
@@ -66,14 +82,17 @@ export function CourseJoinCodeDialog({ visible, courseId, courseTitle, onClose }
     if (!joinCode) return;
     const course = courseTitle ? ` «${courseTitle}»` : '';
     try {
-      await Share.share({ message: `Присоединяйся к курсу${course} во Flashly — код подключения: ${joinCode}` });
+      await Share.share({
+        message: `Присоединяйся к курсу${course} во Flashly — код подключения: ${joinCode}`,
+      });
     } catch {}
   }, [joinCode, courseTitle]);
 
   const handleRegenerate = useCallback(async () => {
     const confirmed = await confirmDialog({
       title: 'Обновить код подключения?',
-      message: 'Старые ссылка и код перестанут работать — ученики, у которых они есть, больше не смогут по ним присоединиться.',
+      message:
+        'Старые ссылка и код перестанут работать — ученики, у которых они есть, больше не смогут по ним присоединиться.',
       confirmText: 'Обновить',
       destructive: true,
     });
@@ -117,7 +136,10 @@ export function CourseJoinCodeDialog({ visible, courseId, courseTitle, onClose }
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Код курса ${joinCode.split('').join(' ')}. Нажми, чтобы скопировать`}
-            style={[styles.codeBox, { backgroundColor: colors.surfaceMuted, borderColor: alpha(colors.primary, 40) }]}
+            style={[
+              styles.codeBox,
+              { backgroundColor: colors.surfaceMuted, borderColor: alpha(colors.primary, 40) },
+            ]}
             onPress={handleCopy}
           >
             <Text variant="h1" style={[styles.code, { color: colors.primary }]}>
@@ -132,7 +154,12 @@ export function CourseJoinCodeDialog({ visible, courseId, courseTitle, onClose }
               onPress={handleCopy}
               style={styles.flex1}
             />
-            <Button variant="secondary" title="Поделиться" onPress={handleShare} style={styles.flex1} />
+            <Button
+              variant="secondary"
+              title="Поделиться"
+              onPress={handleShare}
+              style={styles.flex1}
+            />
           </View>
 
           <Button

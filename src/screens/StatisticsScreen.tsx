@@ -3,18 +3,31 @@
  * @description Full statistics page with hero card, goals, heatmap, charts
  */
 import { isCardLearned } from '@/services/SRSService';
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import {
-  View,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  ActivityIndicator,
-} from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { Text } from '@/components/common';
-import { useThemeColors, useSettingsStore, useCardsStore, useSetsStore, useContextFillStore } from '@/store';
-import { spacing, borderRadius, iconSize, screenPadding, alpha, type ColorToken } from '@/constants';
-import { Button, Card, ProgressBar, useTabBarOverlayInset, type IconComponent } from '@/components/ui';
+import {
+  useThemeColors,
+  useSettingsStore,
+  useCardsStore,
+  useSetsStore,
+  useContextFillStore,
+} from '@/store';
+import {
+  spacing,
+  borderRadius,
+  iconSize,
+  screenPadding,
+  alpha,
+  type ColorToken,
+} from '@/constants';
+import {
+  Button,
+  Card,
+  ProgressBar,
+  useTabBarOverlayInset,
+  type IconComponent,
+} from '@/components/ui';
 import { pluralize } from '@/utils';
 import {
   BookOpen,
@@ -25,7 +38,6 @@ import {
   Library,
   Settings,
   Sparkles,
-  Sun,
   Timer,
   Trophy,
   User,
@@ -34,8 +46,9 @@ import {
 import Svg, { Circle } from 'react-native-svg';
 import { StreakService } from '@/services';
 import type { DailyActivity, UserStats } from '@/services';
-import { supabase } from '@/services/supabaseClient';
+import { getSession } from '@/services/auth/session';
 import { getLevelProgress, XP_PER_LEVEL } from '@/utils/level';
+import { log } from '@/utils/logger';
 
 // ---- Helpers ----
 
@@ -52,9 +65,21 @@ function formatHours(minutes: number): string {
   return h % 1 === 0 ? `${h}ч` : `${h.toFixed(1)}ч`;
 }
 
-
 const DAY_LABELS_SHORT = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-const MONTH_LABELS = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
+const MONTH_LABELS = [
+  'Янв',
+  'Фев',
+  'Мар',
+  'Апр',
+  'Май',
+  'Июн',
+  'Июл',
+  'Авг',
+  'Сен',
+  'Окт',
+  'Ноя',
+  'Дек',
+];
 
 function getDayLabel(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00');
@@ -74,15 +99,26 @@ export function StatisticsScreen({ navigation }: any) {
 
   const [chartTab, setChartTab] = useState<'week' | 'month' | 'year'>('week');
   // Сразу — сохранённое с прошлого раза, свежее с сервера подменит (без индикатора загрузки)
-  const [userStats, setUserStats] = useState<UserStats | null>(() => StreakService.cachedUserStats());
-  const [todayActivity, setTodayActivity] = useState<DailyActivity | null>(() => StreakService.cachedTodayActivity() ?? null);
-  const [heatmapActivity, setHeatmapActivity] = useState<DailyActivity[]>(() => StreakService.cachedWeekActivity(42) ?? []);
-  const [weekActivity, setWeekActivity] = useState<DailyActivity[]>(() => StreakService.cachedWeekActivity(7) ?? []);
-  const [monthActivity, setMonthActivity] = useState<DailyActivity[] | null>(() => StreakService.cachedWeekActivity(30));
-  const [yearActivity, setYearActivity] = useState<DailyActivity[] | null>(() => StreakService.cachedWeekActivity(365));
-  const [loading, setLoading] = useState(() => userStats === null);
+  const [userStats, setUserStats] = useState<UserStats | null>(() =>
+    StreakService.cachedUserStats()
+  );
+  const [todayActivity, setTodayActivity] = useState<DailyActivity | null>(
+    () => StreakService.cachedTodayActivity() ?? null
+  );
+  const [heatmapActivity, setHeatmapActivity] = useState<DailyActivity[]>(
+    () => StreakService.cachedWeekActivity(42) ?? []
+  );
+  const [weekActivity, setWeekActivity] = useState<DailyActivity[]>(
+    () => StreakService.cachedWeekActivity(7) ?? []
+  );
+  const [monthActivity, setMonthActivity] = useState<DailyActivity[] | null>(() =>
+    StreakService.cachedWeekActivity(30)
+  );
+  const [yearActivity, setYearActivity] = useState<DailyActivity[] | null>(() =>
+    StreakService.cachedWeekActivity(365)
+  );
+  const [, setLoading] = useState(() => userStats === null);
   const [userName, setUserName] = useState('');
-
 
   // Load data on mount
   useEffect(() => {
@@ -91,7 +127,7 @@ export function StatisticsScreen({ navigation }: any) {
     (async () => {
       try {
         // Get user name from session
-        const { data: { session } } = await supabase.auth.getSession();
+        const session = await getSession();
         if (session?.user?.email && mounted) {
           setUserName(session.user.email.split('@')[0]);
         }
@@ -111,13 +147,15 @@ export function StatisticsScreen({ navigation }: any) {
         setHeatmapActivity(heatmap);
         setWeekActivity(week);
       } catch (e) {
-        console.error('StatisticsScreen: failed to load data', e);
+        log.error('Statistics', 'failed to load data', e);
       } finally {
         if (mounted) setLoading(false);
       }
     })();
 
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // Lazy load month/year data when tab changes
@@ -133,7 +171,9 @@ export function StatisticsScreen({ navigation }: any) {
         if (mounted) setYearActivity(data);
       });
     }
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [chartTab, monthActivity, yearActivity]);
 
   // ---- Computed values ----
@@ -175,14 +215,42 @@ export function StatisticsScreen({ navigation }: any) {
     return { newCount, learningCount, masteredCount };
   }, [allCards]);
 
-  const quickStats = useMemo((): Array<{ icon: IconComponent; color: ColorToken; value: string; label: string }> => [
-    { icon: Library, color: 'info', value: formatNumber(allSets.length), label: 'Наборы' },
-    { icon: FileText, color: 'warning', value: formatNumber(totalCardsStudied), label: 'Изучено' },
-    { icon: Timer, color: 'success', value: formatHours(userStats?.total_minutes_learned ?? 0), label: 'Время' },
-    { icon: Sparkles, color: 'secondary', value: formatNumber(cardStats.newCount), label: 'Новые' },
-    { icon: BookOpen, color: 'streak', value: formatNumber(cardStats.learningCount), label: 'Изучаются' },
-    { icon: CheckCircle2, color: 'success', value: formatNumber(cardStats.masteredCount), label: 'Выучены' },
-  ], [allSets.length, totalCardsStudied, userStats?.total_minutes_learned, cardStats]);
+  const quickStats = useMemo(
+    (): Array<{ icon: IconComponent; color: ColorToken; value: string; label: string }> => [
+      { icon: Library, color: 'info', value: formatNumber(allSets.length), label: 'Наборы' },
+      {
+        icon: FileText,
+        color: 'warning',
+        value: formatNumber(totalCardsStudied),
+        label: 'Изучено',
+      },
+      {
+        icon: Timer,
+        color: 'success',
+        value: formatHours(userStats?.total_minutes_learned ?? 0),
+        label: 'Время',
+      },
+      {
+        icon: Sparkles,
+        color: 'secondary',
+        value: formatNumber(cardStats.newCount),
+        label: 'Новые',
+      },
+      {
+        icon: BookOpen,
+        color: 'streak',
+        value: formatNumber(cardStats.learningCount),
+        label: 'Изучаются',
+      },
+      {
+        icon: CheckCircle2,
+        color: 'success',
+        value: formatNumber(cardStats.masteredCount),
+        label: 'Выучены',
+      },
+    ],
+    [allSets.length, totalCardsStudied, userStats?.total_minutes_learned, cardStats]
+  );
 
   // ---- Heatmap data ----
 
@@ -259,7 +327,10 @@ export function StatisticsScreen({ navigation }: any) {
     <View style={[st.container, { backgroundColor: colors.background }]}>
       <ScrollView
         style={st.scroll}
-        contentContainerStyle={[st.scrollContent, tabBarInset > 0 && { paddingBottom: tabBarInset + spacing.m }]}
+        contentContainerStyle={[
+          st.scrollContent,
+          tabBarInset > 0 && { paddingBottom: tabBarInset + spacing.m },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {/* ======== User Hero Card ======== */}
@@ -268,12 +339,21 @@ export function StatisticsScreen({ navigation }: any) {
             {/* Avatar */}
             <View style={st.avatarWrap}>
               <View style={[st.avatarBorder, { borderColor: colors.primary }]}>
-                <View style={[st.avatarPlaceholder, { backgroundColor: alpha(colors.primary, 10) }]}>
+                <View
+                  style={[st.avatarPlaceholder, { backgroundColor: alpha(colors.primary, 10) }]}
+                >
                   <User size={iconSize.l} color={colors.primary} />
                 </View>
               </View>
-              <View style={[st.levelBadge, { backgroundColor: colors.primaryFill, borderColor: colors.surface }]}>
-                <Text variant="caption" style={[st.bold, { color: colors.onPrimary }]}>Ур. {level}</Text>
+              <View
+                style={[
+                  st.levelBadge,
+                  { backgroundColor: colors.primaryFill, borderColor: colors.surface },
+                ]}
+              >
+                <Text variant="caption" style={[st.bold, { color: colors.onPrimary }]}>
+                  Ур. {level}
+                </Text>
               </View>
             </View>
 
@@ -284,7 +364,9 @@ export function StatisticsScreen({ navigation }: any) {
               </Text>
               <View style={st.proBadgeRow}>
                 <Zap size={iconSize.xs} color={colors.primary} />
-                <Text variant="label" style={{ color: colors.primary }}>Участник Flashly</Text>
+                <Text variant="label" style={{ color: colors.primary }}>
+                  Участник Flashly
+                </Text>
               </View>
             </View>
 
@@ -301,7 +383,9 @@ export function StatisticsScreen({ navigation }: any) {
           {/* XP Bar */}
           <View style={st.xpSection}>
             <View style={st.xpLabelRow}>
-              <Text variant="overline" color="secondary">Опыт</Text>
+              <Text variant="overline" color="secondary">
+                Опыт
+              </Text>
               <Text variant="caption" color="secondary">
                 {xpCurrent} / {XP_PER_LEVEL}
               </Text>
@@ -317,18 +401,26 @@ export function StatisticsScreen({ navigation }: any) {
                 <Text variant="body" style={[st.bold, { color: colors.textPrimary }]}>
                   {currentStreak} {pluralize(currentStreak, 'день', 'дня', 'дней')}
                 </Text>
-                <Text variant="caption" color="secondary">Серия</Text>
+                <Text variant="caption" color="secondary">
+                  Серия
+                </Text>
               </View>
             </View>
             {/* Числа наград пока нет в данных — показываем только переход в «Награды» */}
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Награды"
-              style={({ pressed }) => [st.heroBadgeCard, { backgroundColor: alpha(colors.star, 10) }, pressed && st.pressed]}
+              style={({ pressed }) => [
+                st.heroBadgeCard,
+                { backgroundColor: alpha(colors.star, 10) },
+                pressed && st.pressed,
+              ]}
               onPress={() => navigation?.navigate('Achievements')}
             >
               <Trophy size={iconSize.m} color={colors.star} />
-              <Text variant="body" style={[st.bold, st.flex1, { color: colors.textPrimary }]}>Награды</Text>
+              <Text variant="body" style={[st.bold, st.flex1, { color: colors.textPrimary }]}>
+                Награды
+              </Text>
               <ChevronRight size={iconSize.xs} color={colors.textTertiary} />
             </Pressable>
           </View>
@@ -336,7 +428,9 @@ export function StatisticsScreen({ navigation }: any) {
 
         {/* ======== Daily Goal ======== */}
         <Card style={st.card}>
-          <Text variant="h3" style={[st.cardTitle, { color: colors.textPrimary }]}>Дневная цель</Text>
+          <Text variant="h3" style={[st.cardTitle, { color: colors.textPrimary }]}>
+            Дневная цель
+          </Text>
 
           <View style={st.goalCenter}>
             {/* Circular progress */}
@@ -346,7 +440,14 @@ export function StatisticsScreen({ navigation }: any) {
               accessibilityLabel={`Дневная цель: ${todayCards} из ${DAILY_GOAL} карточек`}
             >
               <Svg width={120} height={120} style={st.circleSvg}>
-                <Circle cx={60} cy={60} r={52} stroke={colors.surfaceMuted} strokeWidth={8} fill="none" />
+                <Circle
+                  cx={60}
+                  cy={60}
+                  r={52}
+                  stroke={colors.surfaceMuted}
+                  strokeWidth={8}
+                  fill="none"
+                />
                 <Circle
                   cx={60}
                   cy={60}
@@ -364,29 +465,49 @@ export function StatisticsScreen({ navigation }: any) {
                 <Text variant="h2" style={{ color: colors.textPrimary }}>
                   {todayCards}/{DAILY_GOAL}
                 </Text>
-                <Text variant="caption" color="secondary">Карточек</Text>
+                <Text variant="caption" color="secondary">
+                  Карточек
+                </Text>
               </View>
             </View>
           </View>
 
           <Text variant="bodySmall" align="center" color="secondary">
-            {remaining > 0
-              ? <>Осталось <Text variant="bodySmall" style={[st.bold, { color: colors.primary }]}>{remaining} {pluralize(remaining, 'карточка', 'карточки', 'карточек')}</Text> до дневной цели.</>
-              : <Text variant="bodySmall" style={[st.bold, { color: colors.primary }]}>Цель выполнена! Отличная работа!</Text>
-            }
+            {remaining > 0 ? (
+              <>
+                Осталось{' '}
+                <Text variant="bodySmall" style={[st.bold, { color: colors.primary }]}>
+                  {remaining} {pluralize(remaining, 'карточка', 'карточки', 'карточек')}
+                </Text>{' '}
+                до дневной цели.
+              </>
+            ) : (
+              <Text variant="bodySmall" style={[st.bold, { color: colors.primary }]}>
+                Цель выполнена! Отличная работа!
+              </Text>
+            )}
           </Text>
         </Card>
 
         {/* ======== Activity Heatmap ======== */}
         <Card style={st.card}>
           <View style={st.heatmapHeader}>
-            <Text variant="h3" style={{ color: colors.textPrimary }}>Активность</Text>
+            <Text variant="h3" style={{ color: colors.textPrimary }}>
+              Активность
+            </Text>
             <View style={st.heatmapLegend}>
-              <Text variant="caption" style={{ color: colors.textTertiary }}>Мало</Text>
+              <Text variant="caption" style={{ color: colors.textTertiary }}>
+                Мало
+              </Text>
               {[0.1, 0.4, 0.7, 1.0].map((op) => (
-                <View key={op} style={[st.legendDot, { backgroundColor: colors.primary, opacity: op }]} />
+                <View
+                  key={op}
+                  style={[st.legendDot, { backgroundColor: colors.primary, opacity: op }]}
+                />
               ))}
-              <Text variant="caption" style={{ color: colors.textTertiary }}>Много</Text>
+              <Text variant="caption" style={{ color: colors.textTertiary }}>
+                Много
+              </Text>
             </View>
           </View>
 
@@ -394,14 +515,19 @@ export function StatisticsScreen({ navigation }: any) {
             {heatmapData.map((intensity, i) => (
               <View
                 key={i}
-                style={[st.heatmapCell, { backgroundColor: colors.primary, opacity: Math.max(intensity, 0.08) }]}
+                style={[
+                  st.heatmapCell,
+                  { backgroundColor: colors.primary, opacity: Math.max(intensity, 0.08) },
+                ]}
               />
             ))}
           </View>
         </Card>
 
         {/* ======== Quick Stats ======== */}
-        <Text variant="h3" style={[st.sectionTitle, { color: colors.textPrimary }]}>Статистика</Text>
+        <Text variant="h3" style={[st.sectionTitle, { color: colors.textPrimary }]}>
+          Статистика
+        </Text>
         <View style={st.quickGrid}>
           {quickStats.map((stat) => {
             const Icon = stat.icon;
@@ -410,11 +536,18 @@ export function StatisticsScreen({ navigation }: any) {
                 key={stat.label}
                 accessible
                 accessibilityLabel={`${stat.label}: ${stat.value}`}
-                style={[st.quickItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                style={[
+                  st.quickItem,
+                  { backgroundColor: colors.surface, borderColor: colors.border },
+                ]}
               >
                 <Icon size={iconSize.m} color={colors[stat.color]} style={st.quickIcon} />
-                <Text variant="h3" style={[st.bold, { color: colors.textPrimary }]}>{stat.value}</Text>
-                <Text variant="caption" color="secondary">{stat.label}</Text>
+                <Text variant="h3" style={[st.bold, { color: colors.textPrimary }]}>
+                  {stat.value}
+                </Text>
+                <Text variant="caption" color="secondary">
+                  {stat.label}
+                </Text>
               </View>
             );
           })}
@@ -422,7 +555,9 @@ export function StatisticsScreen({ navigation }: any) {
 
         {/* ======== Cards Learned Chart ======== */}
         <Card style={st.card}>
-          <Text variant="h3" style={[st.cardTitle, { color: colors.textPrimary }]}>Карточки</Text>
+          <Text variant="h3" style={[st.cardTitle, { color: colors.textPrimary }]}>
+            Карточки
+          </Text>
 
           {/* Tabs */}
           <View style={[st.tabRow, { backgroundColor: colors.surfaceMuted }]}>
@@ -430,14 +565,18 @@ export function StatisticsScreen({ navigation }: any) {
               const isActive = chartTab === tab;
               const labels = { week: 'Неделя', month: 'Месяц', year: 'Год' };
               return (
-                <Pressable hitSlop={{ top: spacing.xxs, bottom: spacing.xxs }}
+                <Pressable
+                  hitSlop={{ top: spacing.xxs, bottom: spacing.xxs }}
                   key={tab}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: isActive }}
                   style={[st.tab, isActive && { backgroundColor: colors.surface }]}
                   onPress={() => setChartTab(tab)}
                 >
-                  <Text variant="label" style={{ color: isActive ? colors.textPrimary : colors.textSecondary }}>
+                  <Text
+                    variant="label"
+                    style={{ color: isActive ? colors.textPrimary : colors.textSecondary }}
+                  >
                     {labels[tab]}
                   </Text>
                 </Pressable>
@@ -453,11 +592,17 @@ export function StatisticsScreen({ navigation }: any) {
                   <View
                     style={[
                       st.barFill,
-                      { backgroundColor: colors.primary, opacity: Math.max(bar.value, 0.15), height: `${bar.value * 100}%` },
+                      {
+                        backgroundColor: colors.primary,
+                        opacity: Math.max(bar.value, 0.15),
+                        height: `${bar.value * 100}%`,
+                      },
                     ]}
                   />
                 </View>
-                <Text variant="caption" style={{ color: colors.textTertiary }}>{bar.label}</Text>
+                <Text variant="caption" style={{ color: colors.textTertiary }}>
+                  {bar.label}
+                </Text>
               </View>
             ))}
           </View>
@@ -466,30 +611,39 @@ export function StatisticsScreen({ navigation }: any) {
         {/* ======== Context Fill Stats ======== */}
         {contextFill.totalAnswered > 0 && (
           <>
-            <Text variant="h3" style={[st.sectionTitle, { color: colors.textPrimary }]}>Слово в контексте</Text>
+            <Text variant="h3" style={[st.sectionTitle, { color: colors.textPrimary }]}>
+              Слово в контексте
+            </Text>
             <Card style={st.card}>
               <View style={st.cfRow}>
                 <View style={st.cfItem}>
                   <Text variant="h3" style={[st.bold, { color: colors.primary }]}>
                     {contextFill.uniqueCorrect}
                   </Text>
-                  <Text variant="caption" color="secondary">Угадано слов</Text>
+                  <Text variant="caption" color="secondary">
+                    Угадано слов
+                  </Text>
                 </View>
                 <View style={[st.cfDivider, { backgroundColor: colors.border }]} />
                 <View style={st.cfItem}>
                   <Text variant="h3" style={[st.bold, { color: colors.successText }]}>
                     {contextFill.totalAnswered > 0
                       ? Math.round((contextFill.totalCorrect / contextFill.totalAnswered) * 100)
-                      : 0}%
+                      : 0}
+                    %
                   </Text>
-                  <Text variant="caption" color="secondary">Точность</Text>
+                  <Text variant="caption" color="secondary">
+                    Точность
+                  </Text>
                 </View>
                 <View style={[st.cfDivider, { backgroundColor: colors.border }]} />
                 <View style={st.cfItem}>
                   <Text variant="h3" style={[st.bold, { color: colors.textPrimary }]}>
                     {contextFill.totalAnswered}
                   </Text>
-                  <Text variant="caption" color="secondary">Всего ответов</Text>
+                  <Text variant="caption" color="secondary">
+                    Всего ответов
+                  </Text>
                 </View>
               </View>
             </Card>
@@ -497,7 +651,12 @@ export function StatisticsScreen({ navigation }: any) {
         )}
 
         {/* ======== Detailed Analytics Button ======== */}
-        <Button title="Подробная аналитика" iconRight={ChevronRight} fullWidth style={st.detailBtn} />
+        <Button
+          title="Подробная аналитика"
+          iconRight={ChevronRight}
+          fullWidth
+          style={st.detailBtn}
+        />
       </ScrollView>
     </View>
   );
@@ -512,12 +671,27 @@ const st = StyleSheet.create({
   semibold: { fontWeight: '600' },
   pressed: { opacity: 0.85 },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: screenPadding, paddingTop: spacing.xl, paddingBottom: spacing.xxl },
+  scrollContent: {
+    paddingHorizontal: screenPadding,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xxl,
+  },
   heroCard: { padding: spacing.l, marginBottom: spacing.l },
   heroTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.m },
   avatarWrap: { position: 'relative' },
-  avatarBorder: { width: 72, height: 72, borderRadius: borderRadius.full, borderWidth: 3, padding: 3 },
-  avatarPlaceholder: { flex: 1, borderRadius: borderRadius.full, alignItems: 'center', justifyContent: 'center' },
+  avatarBorder: {
+    width: 72,
+    height: 72,
+    borderRadius: borderRadius.full,
+    borderWidth: 3,
+    padding: 3,
+  },
+  avatarPlaceholder: {
+    flex: 1,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   levelBadge: {
     position: 'absolute',
     bottom: -spacing.xxs,
@@ -532,7 +706,14 @@ const st = StyleSheet.create({
   xpSection: { marginTop: spacing.l, gap: spacing.xs },
   xpLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   heroBadgesRow: { flexDirection: 'row', gap: spacing.s, marginTop: spacing.m },
-  heroBadgeCard: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.s, padding: spacing.s, borderRadius: borderRadius.m },
+  heroBadgeCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+    padding: spacing.s,
+    borderRadius: borderRadius.m,
+  },
   card: { marginBottom: spacing.l },
   cardTitle: { marginBottom: spacing.m },
   sectionTitle: { marginBottom: spacing.s },
@@ -540,16 +721,39 @@ const st = StyleSheet.create({
   circleWrap: { width: 120, height: 120, alignItems: 'center', justifyContent: 'center' },
   circleSvg: { position: 'absolute' },
   circleInner: { alignItems: 'center' },
-  heatmapHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.m },
+  heatmapHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.m,
+  },
   heatmapLegend: { flexDirection: 'row', alignItems: 'center', gap: spacing.xxs },
   legendDot: { width: 10, height: 10, borderRadius: borderRadius.full },
   heatmapGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xxs },
   heatmapCell: { width: '13%', aspectRatio: 1, borderRadius: borderRadius.s },
   quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.s, marginBottom: spacing.l },
-  quickItem: { width: '31%', flexGrow: 1, alignItems: 'center', padding: spacing.m, borderRadius: borderRadius.l, borderWidth: 1 },
+  quickItem: {
+    width: '31%',
+    flexGrow: 1,
+    alignItems: 'center',
+    padding: spacing.m,
+    borderRadius: borderRadius.l,
+    borderWidth: 1,
+  },
   quickIcon: { marginBottom: spacing.xs },
-  tabRow: { flexDirection: 'row', padding: spacing.xxs, borderRadius: borderRadius.m, marginBottom: spacing.m },
-  tab: { flex: 1, minHeight: 36, alignItems: 'center', justifyContent: 'center', borderRadius: borderRadius.s },
+  tabRow: {
+    flexDirection: 'row',
+    padding: spacing.xxs,
+    borderRadius: borderRadius.m,
+    marginBottom: spacing.m,
+  },
+  tab: {
+    flex: 1,
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: borderRadius.s,
+  },
   barChart: { flexDirection: 'row', alignItems: 'flex-end', height: 140, gap: spacing.xxs },
   barCol: { flex: 1, alignItems: 'center', gap: spacing.xxs },
   barTrack: { flex: 1, width: '70%', justifyContent: 'flex-end' },

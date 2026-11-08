@@ -3,14 +3,7 @@
  * @description Статистика ученика для учителя (реальные данные из БД)
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  View,
-  ScrollView,
-  StyleSheet,
-  Pressable,
-  Platform,
-  ActivityIndicator,
-} from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable, Platform, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, AlertTriangle } from 'lucide-react-native';
@@ -19,10 +12,11 @@ import { Text } from '@/components/common';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha } from '@/constants';
 import { NeonService } from '@/services/NeonService';
-import { supabase } from '@/services/supabaseClient';
+import { getSession } from '@/services/auth/session';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 import { pluralize } from '@/utils';
+import { log } from '@/utils/logger';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'StudentDetail'>;
 
@@ -46,7 +40,6 @@ interface StudentStats {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
 
 function setStatus(set: SetStat): 'done' | 'inProgress' | 'notStarted' {
   if (set.totalCards === 0) return 'notStarted';
@@ -95,13 +88,7 @@ export function StudentDetailScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
 
-  const {
-    studentName,
-    studentInitials,
-    courseId,
-    courseTitle,
-    studentId,
-  } = route.params;
+  const { studentName, studentInitials, courseId, courseTitle, studentId } = route.params;
 
   const [stats, setStats] = useState<StudentStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -116,14 +103,20 @@ export function StudentDetailScreen({ navigation, route }: Props) {
       setLoading(true);
       setError(false);
       NeonService.loadStudentCourseStats(courseId, studentId)
-        .then((data) => { if (mounted) setStats(data); })
+        .then((data) => {
+          if (mounted) setStats(data);
+        })
         .catch((e) => {
-          console.error('Failed to load student stats:', e);
+          log.error('StudentDetail', 'Failed to load student stats', e);
           if (mounted) setError(true);
         })
-        .finally(() => { if (mounted) setLoading(false); });
-      return () => { mounted = false; };
-    }, [courseId, studentId]),
+        .finally(() => {
+          if (mounted) setLoading(false);
+        });
+      return () => {
+        mounted = false;
+      };
+    }, [courseId, studentId])
   );
 
   // Экран открывается напрямую по courseId/studentId из route.params — без этой проверки
@@ -135,9 +128,12 @@ export function StudentDetailScreen({ navigation, route }: Props) {
     let mounted = true;
     const checkOwnership = async () => {
       try {
-        const { data } = await supabase.auth.getSession();
-        const userId = data.session?.user?.id;
-        if (!userId) { if (mounted) goBack(); return; }
+        const authSession = await getSession();
+        const userId = authSession?.user?.id;
+        if (!userId) {
+          if (mounted) goBack();
+          return;
+        }
         const isOwner = await NeonService.isCourseOwner(courseId, userId);
         if (mounted && !isOwner) goBack();
       } catch {
@@ -145,7 +141,9 @@ export function StudentDetailScreen({ navigation, route }: Props) {
       }
     };
     checkOwnership();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [courseId]);
 
   // Свежие значения из backend (студент мог позаниматься после того, как учитель открыл
@@ -155,11 +153,11 @@ export function StudentDetailScreen({ navigation, route }: Props) {
   const activeStatus = activityStatus(stats?.lastActiveDate ?? null);
   const isActive = activeStatus === 'online' || activeStatus === 'away';
 
-  const cardBg     = colors.surface;
+  const cardBg = colors.surface;
   const cardBorder = colors.border;
-  const divider    = colors.surfaceMuted;
+  const divider = colors.surfaceMuted;
   const sectionLabel = colors.textSecondary;
-  const avatarBg   = alpha(colors.primary, 10);
+  const avatarBg = alpha(colors.primary, 10);
 
   const goBack = () => {
     if (navigation.canGoBack()) {
@@ -170,7 +168,7 @@ export function StudentDetailScreen({ navigation, route }: Props) {
         routes: [
           { name: 'Main' },
           { name: 'TeacherCourseStats', params: { courseId, courseTitle } },
-          { name: 'TeacherStudents',    params: { courseId, courseTitle } },
+          { name: 'TeacherStudents', params: { courseId, courseTitle } },
         ],
       });
     }
@@ -178,7 +176,6 @@ export function StudentDetailScreen({ navigation, route }: Props) {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-
       {/* ── Header ── */}
       <View
         style={[
@@ -187,7 +184,7 @@ export function StudentDetailScreen({ navigation, route }: Props) {
             paddingTop: 12,
             backgroundColor: colors.background,
             borderBottomColor: cardBorder,
-            ...Platform.select({ web: { backdropFilter: 'blur(12px)' } }) as any,
+            ...(Platform.select({ web: { backdropFilter: 'blur(12px)' } }) as any),
           },
         ]}
       >
@@ -217,14 +214,18 @@ export function StudentDetailScreen({ navigation, route }: Props) {
           <Text style={[styles.errorText, { color: colors.textPrimary }]}>
             Не удалось загрузить данные
           </Text>
-          <Pressable accessibilityRole="button"
+          <Pressable
+            accessibilityRole="button"
             style={[styles.retryBtn, { backgroundColor: colors.primaryFill }]}
             onPress={() => {
               setLoading(true);
               setError(false);
               NeonService.loadStudentCourseStats(courseId, studentId)
                 .then(setStats)
-                .catch((e) => { console.error('Failed to load student stats:', e); setError(true); })
+                .catch((e) => {
+                  log.error('StudentDetail', 'Failed to load student stats', e);
+                  setError(true);
+                })
                 .finally(() => setLoading(false));
             }}
           >
@@ -236,10 +237,8 @@ export function StudentDetailScreen({ navigation, route }: Props) {
           contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}
           showsVerticalScrollIndicator={false}
         >
-
           {/* ── Profile card ── */}
           <View style={[styles.card, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-
             {/* Avatar + name */}
             <View style={styles.profileRow}>
               <View style={[styles.avatar, { backgroundColor: avatarBg, borderColor: cardBorder }]}>
@@ -294,9 +293,7 @@ export function StudentDetailScreen({ navigation, route }: Props) {
 
           {/* ── Progress section ── */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: sectionLabel }]}>
-              Прогресс по наборам
-            </Text>
+            <Text style={[styles.sectionTitle, { color: sectionLabel }]}>Прогресс по наборам</Text>
 
             {stats && stats.sets.length > 0 ? (
               <View style={styles.setList}>
@@ -316,7 +313,6 @@ export function StudentDetailScreen({ navigation, route }: Props) {
               </Text>
             )}
           </View>
-
         </ScrollView>
       )}
     </View>
@@ -325,7 +321,13 @@ export function StudentDetailScreen({ navigation, route }: Props) {
 
 // ── Stat cell ─────────────────────────────────────────────────────────────────
 
-function StatCell({ label, value, isLast, divider, textColor }: {
+function StatCell({
+  label,
+  value,
+  isLast,
+  divider,
+  textColor,
+}: {
   label: string;
   value: string;
   isLast: boolean;
@@ -334,12 +336,7 @@ function StatCell({ label, value, isLast, divider, textColor }: {
 }) {
   const colors = useThemeColors();
   return (
-    <View
-      style={[
-        styles.statCell,
-        !isLast && { borderRightWidth: 1, borderRightColor: divider },
-      ]}
-    >
+    <View style={[styles.statCell, !isLast && { borderRightWidth: 1, borderRightColor: divider }]}>
       <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{label}</Text>
       <Text style={[styles.statValue, { color: textColor }]}>{value}</Text>
     </View>
@@ -348,7 +345,12 @@ function StatCell({ label, value, isLast, divider, textColor }: {
 
 // ── Set progress row ──────────────────────────────────────────────────────────
 
-function SetProgressRow({ set, cardBg, cardBorder, colors }: {
+function SetProgressRow({
+  set,
+  cardBg,
+  cardBorder,
+  colors,
+}: {
   set: SetStat;
   cardBg: string;
   cardBorder: string;
@@ -357,27 +359,32 @@ function SetProgressRow({ set, cardBg, cardBorder, colors }: {
   const status = setStatus(set);
   const trackColor = colors.surfaceMuted;
 
-  const seenPct = set.totalCards > 0
-    ? Math.round((set.seenCards / set.totalCards) * 100)
-    : 0;
-  const learnedPct = set.totalCards > 0
-    ? Math.round((set.learnedCards / set.totalCards) * 100)
-    : 0;
+  const seenPct = set.totalCards > 0 ? Math.round((set.seenCards / set.totalCards) * 100) : 0;
+  const learnedPct = set.totalCards > 0 ? Math.round((set.learnedCards / set.totalCards) * 100) : 0;
 
   const badgeStyle =
-    status === 'done'       ? styles.badgeDone
-    : status === 'inProgress' ? styles.badgeProgress
-    : [styles.badgeNotStarted, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }];
+    status === 'done'
+      ? styles.badgeDone
+      : status === 'inProgress'
+        ? styles.badgeProgress
+        : [
+            styles.badgeNotStarted,
+            { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
+          ];
 
   const badgeTextStyle =
-    status === 'done'       ? styles.badgeDoneText
-    : status === 'inProgress' ? styles.badgeProgressText
-    : [styles.badgeNotStartedText, { color: colors.textTertiary }];
+    status === 'done'
+      ? styles.badgeDoneText
+      : status === 'inProgress'
+        ? styles.badgeProgressText
+        : [styles.badgeNotStartedText, { color: colors.textTertiary }];
 
   const barColor =
-    status === 'done'       ? colors.success
-    : status === 'inProgress' ? colors.primary
-    : colors.textTertiary;
+    status === 'done'
+      ? colors.success
+      : status === 'inProgress'
+        ? colors.primary
+        : colors.textTertiary;
 
   return (
     <View style={[styles.setRow, { backgroundColor: cardBg, borderColor: cardBorder }]}>
@@ -396,7 +403,8 @@ function SetProgressRow({ set, cardBg, cardBorder, colors }: {
       </View>
 
       <Text style={[styles.setMeta, { color: colors.textSecondary }]}>
-        {set.seenCards} / {set.totalCards} {pluralize(set.seenCards, 'карточка', 'карточки', 'карточек')} просмотрено · {seenPct}%
+        {set.seenCards} / {set.totalCards}{' '}
+        {pluralize(set.seenCards, 'карточка', 'карточки', 'карточек')} просмотрено · {seenPct}%
         {set.learnedCards > 0 ? `  ·  выучено: ${set.learnedCards} (${learnedPct}%)` : ''}
       </Text>
     </View>
@@ -501,7 +509,6 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.full,
   },
 
-
   // Stats
   statsRow: {
     flexDirection: 'row',
@@ -584,7 +591,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   badgeProgress: {
-
     borderWidth: 1,
 
     paddingHorizontal: 8,

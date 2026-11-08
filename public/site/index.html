@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Flashly — карточки с интервальным повторением</title>
+<meta name="description" content="Flashly помогает запоминать слова надолго: интервальное повторение, наборы из фото и PDF, озвучка, курсы для учителей. Бесплатно для iPhone.">
+<link rel="canonical" href="https://flashlycards.app/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Flashly">
+<meta property="og:locale" content="ru_RU">
+<meta property="og:url" content="https://flashlycards.app/">
+<meta property="og:title" content="Flashly — карточки с интервальным повторением">
+<meta property="og:description" content="Flashly помогает запоминать слова надолго: интервальное повторение, наборы из фото и PDF, озвучка, курсы для учителей. Бесплатно для iPhone.">
+<meta property="og:image" content="https://flashlycards.app/site/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="apple-itunes-app" content="app-id=6808731151">
+<meta name="theme-color" content="#6467F2">
+<script type="application/ld+json">[{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Flashly", "description": "Flashly помогает запоминать слова надолго: интервальное повторение, наборы из фото и PDF, озвучка, курсы для учителей. Бесплатно для iPhone.", "url": "https://flashlycards.app/", "applicationCategory": "EducationalApplication", "operatingSystem": "iOS", "inLanguage": "ru", "installUrl": "https://apps.apple.com/app/id6808731151", "downloadUrl": "https://apps.apple.com/app/id6808731151", "image": "https://flashlycards.app/site/og.png", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}, {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Flashly бесплатный?", "acceptedAnswer": {"@type": "Answer", "text": "Да. Создавать наборы, учить и повторять можно бесплатно."}}, {"@type": "Question", "name": "Какие языки можно учить?", "acceptedAnswer": {"@type": "Answer", "text": "Любые. Ты сам выбираешь язык слова и язык перевода, а озвучка работает для популярных языков."}}, {"@type": "Question", "name": "Как сделать набор из учебника?", "acceptedAnswer": {"@type": "Answer", "text": "Нажми «Создать набор», выбери импорт и сфотографируй страницу или загрузи PDF. ИИ найдёт слова и предложит перевод, а ты проверишь и сохранишь."}}, {"@type": "Question", "name": "Сохранятся ли мои слова, если я сменю телефон?", "acceptedAnswer": {"@type": "Answer", "text": "Да. Войди под тем же аккаунтом Apple, Google или по почте, и наборы с прогрессом подтянутся."}}, {"@type": "Question", "name": "Как учителю подключить класс?", "acceptedAnswer": {"@type": "Answer", "text": "Создай курс, добавь в него наборы и отправь ученикам ссылку-приглашение или код курса."}}, {"@type": "Question", "name": "Как удалить аккаунт?", "acceptedAnswer": {"@type": "Answer", "text": "В приложении открой Профиль и нажми «Удалить аккаунт». Подробнее на странице удаления аккаунта."}}]}]</script>
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<style>
+/* Layout: светлая страница бренда; герой = живая карточка-тренажёр, далее лента интервалов повторения как фирменная деталь, затем возможности, учителя, вопросы. */
+:root {
+  --bg: #FFFFFF;
+  --surface: #FFFFFF;
+  --surface-muted: #F1F5F9;
+  --surface-variant: #F3F4F6;
+  --border: #DBDBE6;
+  --text: #111827;
+  --text-2: #6B7280;
+  --text-3: #8A8F99;
+  --primary: #6467F2;
+  --primary-fill: #6467F2;
+  --primary-pressed: #4F46E5;
+  --on-primary: #FFFFFF;
+  --tint: rgba(100,103,242,0.10);
+  --tint-2: rgba(100,103,242,0.20);
+  --band: #F5F5FE;
+  --s-new: #8A8F99;
+  --s-learning: #F59E0B;
+  --s-learning-ink: #D97706;
+  --s-young: #10B981;
+  --s-mature: #6467F2;
+  --error-text: #DC2626;
+  --success-text: #047857;
+  --streak: #F97316;
+  --shadow: 0 1px 2px rgba(17,24,39,0.04), 0 12px 32px rgba(17,24,39,0.08);
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", Roboto, "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101122; --surface: #1A1B30; --surface-muted: #232540; --surface-variant: #2A2C47;
+    --border: rgba(255,255,255,0.10); --text: #F9FAFB; --text-2: #9CA3AF; --text-3: #8A8F99;
+    --primary: #818CF8; --primary-fill: #6366F1; --primary-pressed: #4F46E5; --on-primary: #FFFFFF;
+    --tint: rgba(129,140,248,0.10); --tint-2: rgba(129,140,248,0.20); --band: #15162B;
+    --s-new: #8A8F99; --s-learning: #FBBF24; --s-learning-ink: #FBBF24; --s-young: #34D399; --s-mature: #818CF8;
+    --error-text: #F87171; --success-text: #34D399; --streak: #F97316; --shadow: none;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101122; --surface: #1A1B30; --surface-muted: #232540; --surface-variant: #2A2C47;
+  --border: rgba(255,255,255,0.10); --text: #F9FAFB; --text-2: #9CA3AF; --text-3: #8A8F99;
+  --primary: #818CF8; --primary-fill: #6366F1; --primary-pressed: #4F46E5; --on-primary: #FFFFFF;
+  --tint: rgba(129,140,248,0.10); --tint-2: rgba(129,140,248,0.20); --band: #15162B;
+  --s-new: #8A8F99; --s-learning: #FBBF24; --s-learning-ink: #FBBF24; --s-young: #34D399; --s-mature: #818CF8;
+  --error-text: #F87171; --success-text: #34D399; --streak: #F97316; --shadow: none;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 16px; line-height: 24px; -webkit-font-smoothing: antialiased; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+a { color: var(--primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; border-radius: 8px; }
+svg.i { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+svg.i24 { width: 24px; height: 24px; }
+svg.i16 { width: 16px; height: 16px; }
+
+.wrap { max-width: 1120px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+section { padding-block: 72px; }
+.overline { font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: var(--primary); }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+h2 { font-size: 32px; line-height: 40px; font-weight: 700; letter-spacing: -0.4px; }
+h3 { font-size: 20px; line-height: 28px; font-weight: 600; }
+p { margin: 0; }
+.lead { font-size: 18px; line-height: 26px; color: var(--text-2); max-width: 34em; }
+.muted { color: var(--text-2); }
+.sec-head { display: grid; gap: 12px; max-width: 640px; margin-bottom: 40px; }
+
+/* header */
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--border); }
+.top .wrap { display: flex; align-items: center; gap: 24px; height: 64px; }
+.logo { display: flex; align-items: center; gap: 10px; color: var(--text); font-weight: 700; font-size: 20px; }
+.logo:hover { text-decoration: none; }
+.logo img { width: 32px; height: 32px; border-radius: 8px; }
+.nav { display: flex; gap: 24px; margin-left: auto; font-size: 14px; font-weight: 600; }
+.nav a { color: var(--text-2); }
+.nav a:hover { color: var(--text); text-decoration: none; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 20px; border-radius: 12px; font: 600 16px/24px var(--font); border: 0; cursor: pointer; transition: background .15s, transform .15s; }
+.btn:hover { text-decoration: none; }
+.btn-primary { background: var(--primary-fill); color: var(--on-primary); }
+.btn-primary:hover { background: var(--primary-pressed); }
+.btn-primary:active { transform: scale(0.98); }
+.btn-sec { background: transparent; color: var(--primary); box-shadow: inset 0 0 0 1.5px var(--primary); }
+
+/* hero */
+.hero { padding-block: 64px 56px; }
+.hero .wrap { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 56px; align-items: center; }
+.hero-copy { display: grid; gap: 20px; min-width: 0; }
+.hero h1 { font-size: 56px; line-height: 60px; font-weight: 700; letter-spacing: -1.2px; }
+.hero h1 span { color: var(--primary); }
+.stores { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
+.store { display: inline-flex; align-items: center; gap: 12px; height: 56px; padding: 0 20px 0 16px; border-radius: 12px; background: var(--text); color: var(--bg); }
+.store:hover { text-decoration: none; opacity: 0.9; }
+.store svg { width: 26px; height: 26px; fill: currentColor; }
+.store small { display: block; font-size: 12px; line-height: 14px; opacity: 0.8; }
+.store b { display: block; font-size: 18px; line-height: 22px; font-weight: 600; }
+.hero-note { font-size: 14px; line-height: 20px; color: var(--text-3); }
+.hero-note a { font-weight: 600; }
+
+/* trainer demo */
+.trainer { position: relative; justify-self: center; width: 100%; max-width: 380px; }
+.device { background: var(--surface); border: 1px solid var(--border); border-radius: 32px; padding: 20px; box-shadow: var(--shadow); display: grid; gap: 16px; }
+.dev-top { display: flex; align-items: center; justify-content: space-between; font-size: 14px; line-height: 20px; color: var(--text-2); }
+.dev-top b { color: var(--text); font-weight: 600; }
+.chip { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; line-height: 16px; font-weight: 600; padding: 4px 8px; border-radius: 999px; }
+.chip-streak { color: var(--streak); background: rgba(249,115,22,0.10); }
+.progress { height: 8px; border-radius: 999px; background: var(--surface-muted); overflow: hidden; }
+.progress i { display: block; height: 100%; width: 33%; background: var(--primary); border-radius: inherit; transition: width .25s; }
+.card { perspective: 1200px; height: 260px; cursor: pointer; }
+.card-in { position: relative; width: 100%; height: 100%; transition: transform .4s cubic-bezier(.2,.7,.2,1); transform-style: preserve-3d; }
+.card.flipped .card-in { transform: rotateY(180deg); }
+.face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 24px; background: var(--surface-variant); border: 1px solid var(--border); display: grid; place-content: center; text-align: center; gap: 8px; padding: 24px; }
+.face.back { transform: rotateY(180deg); background: var(--tint); border-color: var(--tint-2); }
+.face .word { font-size: 32px; line-height: 40px; font-weight: 700; }
+.face .hint { font-size: 14px; line-height: 20px; color: var(--text-2); }
+.face .ex { font-size: 14px; line-height: 20px; color: var(--text-2); max-width: 260px; }
+.face .tap { position: absolute; bottom: 16px; left: 0; right: 0; font-size: 12px; line-height: 16px; color: var(--text-3); }
+.status { position: absolute; top: 16px; left: 16px; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--text-2); }
+.status::before { content: ""; width: 10px; height: 10px; border-radius: 999px; background: var(--dot, var(--s-new)); }
+.speak { position: absolute; top: 10px; right: 10px; width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center; color: var(--primary); }
+.rate { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.rate button { height: 52px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: 600 14px/20px var(--font); cursor: pointer; display: grid; place-items: center; transition: transform .15s, background .15s; }
+.rate button:active { transform: scale(0.97); }
+.rate .again { color: var(--error-text); }
+.rate .good { background: var(--primary-fill); color: var(--on-primary); border-color: transparent; }
+.rate button span { display: block; font-size: 12px; line-height: 16px; font-weight: 400; opacity: 0.8; }
+.trainer-cap { margin-top: 12px; text-align: center; font-size: 12px; line-height: 16px; color: var(--text-3); }
+
+/* intervals band */
+.band { background: var(--band); border-block: 1px solid var(--border); }
+.ladder { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; align-items: end; }
+.rung { display: grid; gap: 8px; min-width: 0; }
+.rung .bar { border-radius: 12px; background: var(--c); opacity: 0.9; }
+.rung .d { font-size: 20px; line-height: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rung .l { font-size: 12px; line-height: 16px; color: var(--text-2); }
+.legend { display: flex; flex-wrap: wrap; gap: 16px 24px; margin-top: 28px; font-size: 14px; line-height: 20px; color: var(--text-2); }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+.legend span::before { content: ""; width: 10px; height: 10px; border-radius: 999px; background: var(--c); }
+
+/* steps */
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; counter-reset: s; }
+.step { display: grid; gap: 8px; align-content: start; padding-top: 20px; border-top: 2px solid var(--border); }
+.step::before { counter-increment: s; content: counter(s); font-size: 14px; line-height: 20px; font-weight: 700; color: var(--primary); }
+.step p { color: var(--text-2); font-size: 16px; }
+
+/* features */
+.feats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.feat { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; display: grid; gap: 10px; align-content: start; }
+.ic { width: 44px; height: 44px; border-radius: 12px; background: var(--tint); color: var(--primary); display: grid; place-items: center; }
+.feat p { color: var(--text-2); font-size: 14px; line-height: 20px; }
+.feat h3 { font-size: 18px; line-height: 26px; }
+
+/* teachers */
+.teach { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; }
+.teach ul { list-style: none; margin: 24px 0 0; padding: 0; display: grid; gap: 16px; }
+.teach li { display: grid; grid-template-columns: 24px 1fr; gap: 12px; }
+.teach li svg { color: var(--primary); margin-top: 2px; }
+.teach li b { display: block; font-weight: 600; }
+.teach li span { color: var(--text-2); font-size: 14px; line-height: 20px; }
+.course { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 20px; box-shadow: var(--shadow); display: grid; gap: 12px; min-width: 0; }
+.course-h { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.course-h b { font-size: 18px; line-height: 26px; }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid var(--border); font-size: 14px; line-height: 20px; }
+.seg { display: flex; height: 8px; border-radius: 999px; overflow: hidden; background: var(--surface-muted); margin-top: 8px; }
+.seg i { display: block; height: 100%; }
+.pill { font-size: 12px; line-height: 16px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: var(--tint); color: var(--primary); white-space: nowrap; }
+.ex-tag { font-size: 12px; line-height: 16px; color: var(--text-3); }
+
+/* faq */
+.faq { display: grid; gap: 0; max-width: 760px; border-top: 1px solid var(--border); }
+.faq details { border-bottom: 1px solid var(--border); }
+.faq summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; gap: 16px; padding: 20px 0; font-weight: 600; font-size: 18px; line-height: 26px; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary svg { transition: transform .25s; color: var(--text-3); margin-top: 3px; }
+.faq details[open] summary svg { transform: rotate(45deg); color: var(--primary); }
+.faq details p { padding-bottom: 20px; color: var(--text-2); max-width: 62ch; }
+
+/* cta */
+.cta { text-align: center; }
+.cta .wrap { display: grid; justify-items: center; gap: 16px; }
+.cta img { width: 72px; height: 72px; border-radius: 16px; }
+.cta .stores { justify-content: center; }
+
+/* footer */
+footer { border-top: 1px solid var(--border); padding-block: 40px; font-size: 14px; line-height: 20px; color: var(--text-2); }
+footer .wrap { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 32px; }
+footer h4 { margin: 0 0 12px; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text-3); }
+footer ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+footer a { color: var(--text-2); }
+footer a:hover { color: var(--text); }
+.legal { grid-column: 1 / -1; padding-top: 24px; border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; color: var(--text-3); font-size: 12px; line-height: 16px; }
+
+@media (max-width: 900px) {
+  .hero .wrap, .teach { grid-template-columns: 1fr; gap: 40px; }
+  .hero h1 { font-size: 40px; line-height: 48px; }
+  .feats { grid-template-columns: 1fr 1fr; }
+  .nav a:not(.btn) { display: none; }
+}
+@media (max-width: 600px) {
+  section { padding-block: 56px; }
+  h2 { font-size: 24px; line-height: 32px; }
+  .hero { padding-block: 40px; }
+  .hero h1 { font-size: 32px; line-height: 40px; letter-spacing: -0.6px; }
+  .feats, .steps { grid-template-columns: 1fr; }
+  .ladder { grid-template-columns: repeat(4, 1fr); row-gap: 20px; }
+  .ladder .rung:first-child { display: none; }
+  footer .wrap { grid-template-columns: 1fr 1fr; }
+  footer .wrap > div:first-child { grid-column: 1 / -1; }
+  .top .btn { height: 40px; padding: 0 14px; font-size: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="zap" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></symbol>
+  <symbol id="camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></symbol>
+  <symbol id="volume" viewBox="0 0 24 24"><path d="M11 4.7a.7.7 0 0 0-1.2-.5L6.4 7.6A1.4 1.4 0 0 1 5.4 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.4a1.4 1.4 0 0 1 1 .4l3.4 3.4a.7.7 0 0 0 1.2-.5z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.4 18.4a9 9 0 0 0 0-12.8"/></symbol>
+  <symbol id="library" viewBox="0 0 24 24"><path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/></symbol>
+  <symbol id="flame" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></symbol>
+  <symbol id="link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+  <symbol id="layers" viewBox="0 0 24 24"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></symbol>
+  <symbol id="users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="clipboard" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></symbol>
+  <symbol id="chart" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></symbol>
+  <symbol id="plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+  <symbol id="apple" viewBox="0 0 24 24"><path d="M16.37 12.73c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.77-3.32-1.8-1.41-.14-2.76.83-3.48.83-.72 0-1.82-.81-3-.79-1.54.02-2.97.9-3.76 2.28-1.61 2.79-.41 6.9 1.15 9.16.77 1.1 1.68 2.34 2.87 2.3 1.15-.05 1.59-.74 2.98-.74 1.39 0 1.78.74 3 .72 1.24-.02 2.02-1.12 2.78-2.23.88-1.28 1.24-2.52 1.26-2.59-.03-.01-2.41-.93-2.44-3.68zM14.1 5.96c.63-.77 1.06-1.83.94-2.89-.91.04-2.02.61-2.67 1.37-.58.67-1.1 1.76-.96 2.8 1.02.08 2.06-.52 2.69-1.28z"/></symbol>
+</svg>
+
+<header class="top">
+  <div class="wrap">
+    <a class="logo" href="#top" aria-label="Flashly, на главную"><img src="/icons/icon-192.png" alt="">Flashly</a>
+    <nav class="nav" aria-label="Разделы">
+      <a href="#how">Как это работает</a>
+      <a href="#features">Возможности</a>
+      <a href="#teachers">Учителям</a>
+      <a href="#faq">Вопросы</a>
+      <a class="btn btn-primary" href="https://apps.apple.com/app/id6808731151">Скачать</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="wrap">
+      <div class="hero-copy">
+        <div class="overline">Карточки с интервальным повторением</div>
+        <h1>Учись умнее.<br><span>Запоминай надолго.</span></h1>
+        <p class="lead">Flashly показывает каждое слово ровно тогда, когда ты начинаешь его забывать. Сфотографируй страницу учебника, и набор карточек готов за минуту.</p>
+        <div class="stores">
+          <a class="store" href="https://apps.apple.com/app/id6808731151"><svg aria-hidden="true"><use href="#apple"/></svg><span><small>Загрузить в</small><b>App Store</b></span></a>
+        </div>
+        <p class="hero-note">Бесплатно для iPhone. Есть веб-версия: <a href="https://app.flashlycards.app">app.flashlycards.app</a></p>
+      </div>
+
+      <div class="trainer">
+        <div class="device" aria-label="Пример тренировки">
+          <div class="dev-top"><span><b id="cnt">1</b> из 3</span><span class="chip chip-streak"><svg class="i i16" aria-hidden="true"><use href="#flame"/></svg>Серия</span></div>
+          <div class="progress"><i id="bar"></i></div>
+          <div class="card" id="card" role="button" tabindex="0" aria-label="Перевернуть карточку">
+            <div class="card-in">
+              <div class="face front">
+                <span class="status" id="st">Новое</span>
+                <span class="speak" aria-hidden="true"><svg class="i"><use href="#volume"/></svg></span>
+                <div class="word" id="w">journey</div>
+                <div class="hint" id="tr">[ˈdʒɜːni]</div>
+                <div class="tap">Нажми, чтобы увидеть перевод</div>
+              </div>
+              <div class="face back">
+                <div class="word" id="b">путешествие</div>
+                <div class="ex" id="ex">The journey took three days.</div>
+              </div>
+            </div>
+          </div>
+          <div class="rate">
+            <button class="again" data-r="again">Не знаю<span>сначала</span></button>
+            <button data-r="almost">Почти<span>чуть позже</span></button>
+            <button class="good" data-r="good">Уверенно<span id="nx">через 1 день</span></button>
+          </div>
+        </div>
+        <p class="trainer-cap">Пример. Нажми на карточку и оцени, как помнишь слово</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="how">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="overline">Интервальное повторение</div>
+        <h2>Каждое «Уверенно» отодвигает следующую встречу со словом</h2>
+        <p class="lead">Вместо того чтобы зубрить всё подряд, ты повторяешь только то, что пора. Так слово переходит в долгую память за шесть повторений.</p>
+      </div>
+      <div class="ladder" aria-label="Интервалы повторения">
+        <div class="rung" style="--c: var(--s-new)"><div class="bar" style="height:12px"></div><div class="d">Сегодня</div><div class="l">новое слово</div></div>
+        <div class="rung" style="--c: var(--s-learning)"><div class="bar" style="height:20px"></div><div class="d">1 день</div><div class="l">1-е повторение</div></div>
+        <div class="rung" style="--c: var(--s-learning)"><div class="bar" style="height:32px"></div><div class="d">3 дня</div><div class="l">2-е</div></div>
+        <div class="rung" style="--c: var(--s-young)"><div class="bar" style="height:48px"></div><div class="d">7 дней</div><div class="l">3-е</div></div>
+        <div class="rung" style="--c: var(--s-young)"><div class="bar" style="height:68px"></div><div class="d">14 дней</div><div class="l">4-е</div></div>
+        <div class="rung" style="--c: var(--s-mature)"><div class="bar" style="height:92px"></div><div class="d">30 дней</div><div class="l">5-е</div></div>
+        <div class="rung" style="--c: var(--s-mature)"><div class="bar" style="height:120px"></div><div class="d">60 дней</div><div class="l">и дальше</div></div>
+      </div>
+      <div class="legend">
+        <span style="--c: var(--s-new)">Новое</span>
+        <span style="--c: var(--s-learning)">Учится</span>
+        <span style="--c: var(--s-young)">Знаю</span>
+        <span style="--c: var(--s-mature)">Выучено надолго</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="overline">Три шага</div>
+        <h2>От учебника до выученных слов</h2>
+      </div>
+      <div class="steps">
+        <div class="step"><h3>Создай набор</h3><p>Сфотографируй страницу, загрузи PDF или файл. Слова, перевод и примеры появятся сами. Можно добавить и вручную.</p></div>
+        <div class="step"><h3>Учи по 5 минут в день</h3><p>Нажми «Изучить», и Flashly соберёт урок: новые слова и те, что пора повторить.</p></div>
+        <div class="step"><h3>Смотри, как растёт прогресс</h3><p>Цвет у каждого слова показывает, насколько крепко ты его знаешь. Серия держит ритм.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="features">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="overline">Возможности</div>
+        <h2>Всё для запоминания в одном приложении</h2>
+      </div>
+      <div class="feats">
+        <div class="feat"><div class="ic"><svg class="i i24"><use href="#camera"/></svg></div><h3>Набор из фото</h3><p>ИИ распознаёт слова на снимке, в PDF и таблице, переводит и добавляет примеры.</p></div>
+        <div class="feat"><div class="ic"><svg class="i i24"><use href="#volume"/></svg></div><h3>Живая озвучка</h3><p>Слушай произношение каждого слова и примера, чтобы запоминать и на слух.</p></div>
+        <div class="feat"><div class="ic"><svg class="i i24"><use href="#library"/></svg></div><h3>Библиотека наборов</h3><p>Готовые наборы по языкам и предметам. Добавь к себе в одно касание.</p></div>
+        <div class="feat"><div class="ic"><svg class="i i24"><use href="#layers"/></svg></div><h3>Не только языки</h3><p>Термины, даты, формулы: любой предмет, который нужно запомнить.</p></div>
+        <div class="feat"><div class="ic"><svg class="i i24"><use href="#flame"/></svg></div><h3>Серия и цели</h3><p>Напоминания вовремя и серия дней, чтобы не бросить на третий день.</p></div>
+        <div class="feat"><div class="ic"><svg class="i i24"><use href="#link"/></svg></div><h3>Поделиться набором</h3><p>Отправь ссылку другу, и он откроет набор у себя в приложении.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="teachers">
+    <div class="wrap teach">
+      <div>
+        <div class="sec-head" style="margin-bottom:0">
+          <div class="overline">Для учителей</div>
+          <h2>Свой курс для класса за пять минут</h2>
+          <p class="lead">Собери наборы в курс, пригласи учеников по ссылке и смотри, кто что выучил.</p>
+        </div>
+        <ul>
+          <li><svg class="i i24"><use href="#users"/></svg><div><b>Приглашение по ссылке или коду</b><span>Ученик открывает ссылку, и курс сразу появляется у него.</span></div></li>
+          <li><svg class="i i24"><use href="#clipboard"/></svg><div><b>Живые тесты на уроке</b><span>Запусти тест, ученики подключаются с телефонов, результаты видны сразу.</span></div></li>
+          <li><svg class="i i24"><use href="#chart"/></svg><div><b>Прогресс каждого ученика</b><span>Видно, какие слова выучены, а какие ещё учатся.</span></div></li>
+        </ul>
+      </div>
+      <div class="course" aria-label="Пример курса">
+        <div class="course-h"><b>English, 7 «Б»</b><span class="ex-tag">Пример</span></div>
+        <div class="row"><div><div>Unit 1. Travel</div><div class="seg"><i style="width:45%;background:var(--s-mature)"></i><i style="width:25%;background:var(--s-young)"></i><i style="width:15%;background:var(--s-learning)"></i></div></div><span class="pill">40 карточек</span></div>
+        <div class="row"><div><div>Unit 2. Food</div><div class="seg"><i style="width:20%;background:var(--s-mature)"></i><i style="width:30%;background:var(--s-young)"></i><i style="width:25%;background:var(--s-learning)"></i></div></div><span class="pill">32 карточки</span></div>
+        <div class="row"><div><div>Unit 3. School</div><div class="seg"><i style="width:10%;background:var(--s-young)"></i><i style="width:20%;background:var(--s-learning)"></i></div></div><span class="pill">36 карточек</span></div>
+        <a class="btn btn-sec" href="https://apps.apple.com/app/id6808731151"><svg class="i"><use href="#plus"/></svg>Пригласить учеников</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="faq">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="overline">Вопросы</div>
+        <h2>Частые вопросы</h2>
+      </div>
+      <div class="faq">
+        <details open><summary>Flashly бесплатный?<svg class="i"><use href="#plus"/></svg></summary><p>Да. Создавать наборы, учить и повторять можно бесплатно.</p></details>
+        <details><summary>Какие языки можно учить?<svg class="i"><use href="#plus"/></svg></summary><p>Любые. Ты сам выбираешь язык слова и язык перевода, а озвучка работает для популярных языков.</p></details>
+        <details><summary>Как сделать набор из учебника?<svg class="i"><use href="#plus"/></svg></summary><p>Нажми «Создать набор», выбери импорт и сфотографируй страницу или загрузи PDF. ИИ найдёт слова и предложит перевод, а ты проверишь и сохранишь.</p></details>
+        <details><summary>Сохранятся ли мои слова, если я сменю телефон?<svg class="i"><use href="#plus"/></svg></summary><p>Да. Войди под тем же аккаунтом Apple, Google или по почте, и наборы с прогрессом подтянутся.</p></details>
+        <details><summary>Как учителю подключить класс?<svg class="i"><use href="#plus"/></svg></summary><p>Создай курс, добавь в него наборы и отправь ученикам ссылку-приглашение или код курса.</p></details>
+        <details><summary>Как удалить аккаунт?<svg class="i"><use href="#plus"/></svg></summary><p>В приложении открой Профиль и нажми «Удалить аккаунт». Подробнее на странице <a href="/delete-account">удаления аккаунта</a>.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta" id="download">
+    <div class="wrap">
+      <img src="/icons/icon-192.png" alt="Иконка Flashly">
+      <h2>Начни с первого набора сегодня</h2>
+      <p class="lead">Пять минут в день, и через месяц слова останутся с тобой.</p>
+      <div class="stores">
+        <a class="store" href="https://apps.apple.com/app/id6808731151"><svg aria-hidden="true"><use href="#apple"/></svg><span><small>Загрузить в</small><b>App Store</b></span></a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <a class="logo" href="#top"><img src="/icons/icon-192.png" alt="">Flashly</a>
+      <p style="margin-top:12px;max-width:30em">Карточки с интервальным повторением для школьников, студентов и учителей.</p>
+    </div>
+    <div>
+      <h4>Документы</h4>
+      <ul><li><a href="/privacy">Политика конфиденциальности</a></li><li><a href="/terms">Условия использования</a></li><li><a href="/delete-account">Удаление аккаунта</a></li></ul>
+    </div>
+    <div>
+      <h4>Помощь</h4>
+      <ul><li><a href="/support">Поддержка</a></li><li><a href="#faq">Частые вопросы</a></li><li><a href="mailto:support@flashlycards.app">support@flashlycards.app</a></li></ul>
+    </div>
+    <div class="legal"><span>© 2026 Flashly</span><span>flashlycards.app</span></div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var cards = [
+    { w: 'journey', t: '[ˈdʒɜːni]', b: 'путешествие', ex: 'The journey took three days.' },
+    { w: 'although', t: '[ɔːlˈðəʊ]', b: 'хотя', ex: 'Although it was late, we kept talking.' },
+    { w: 'improve', t: '[ɪmˈpruːv]', b: 'улучшать', ex: 'Practice every day to improve.' }
+  ];
+  var i = 0;
+  var card = document.getElementById('card');
+  var el = function (id) { return document.getElementById(id); };
+  function show() {
+    var c = cards[i];
+    card.classList.remove('flipped');
+    el('w').textContent = c.w; el('tr').textContent = c.t; el('b').textContent = c.b; el('ex').textContent = c.ex;
+    el('cnt').textContent = i + 1; el('bar').style.width = ((i + 1) / cards.length * 100) + '%';
+    el('st').textContent = 'Новое'; el('st').style.setProperty('--dot', 'var(--s-new)');
+  }
+  function flip() { card.classList.toggle('flipped'); }
+  card.addEventListener('click', flip);
+  card.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } });
+  document.querySelectorAll('.rate button').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var r = btn.getAttribute('data-r');
+      var st = el('st');
+      if (r === 'good') { st.textContent = 'Учится'; st.style.setProperty('--dot', 'var(--s-learning)'); }
+      card.classList.remove('flipped');
+      setTimeout(function () { i = (i + 1) % cards.length; show(); }, r === 'good' ? 350 : 150);
+    });
+  });
+  show();
+})();
+
+// Пока flashlycards.app смотрел на приложение, браузер мог поставить его Service Worker.
+// На сайте он не нужен: приложение живёт на app.flashlycards.app (plan/new/official_site.md, Site 3).
+if (location.hostname === 'flashlycards.app' && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(function (regs) {
+    regs.forEach(function (r) { r.unregister(); });
+  }).catch(function () {});
+}
+</script>
+
+</body>
+</html>

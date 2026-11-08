@@ -24,6 +24,8 @@ import {
   Shapes,
   BookA,
   MessageCircle,
+  GraduationCap,
+  ClipboardCheck,
 } from 'lucide-react-native';
 
 export type CategoryIconComponent = typeof Star;
@@ -52,6 +54,8 @@ export const CATEGORY_ICONS: Record<string, CategoryIconComponent> = {
   vocab: BookA,
   phrases: MessageCircle,
   business: Briefcase,
+  ielts: GraduationCap,
+  kg_tests: ClipboardCheck,
 };
 
 export const DEFAULT_CATEGORY_ICON: CategoryIconComponent = Star;

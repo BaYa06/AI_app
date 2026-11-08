@@ -5,26 +5,25 @@
 import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-import {
-  X,
-  CheckCircle2,
-  XCircle,
-  Award,
-  Home,
-  PartyPopper,
-  LogOut,
-} from 'lucide-react-native';
+import { X, CheckCircle2, XCircle, Award, Home, PartyPopper, LogOut } from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { Button, Card, CelebrationIcon, Screen, ScreenHeader, toast, type CelebrationKind } from '@/components/ui';
+import {
+  Button,
+  Card,
+  CelebrationIcon,
+  Screen,
+  ScreenHeader,
+  toast,
+  type CelebrationKind,
+} from '@/components/ui';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha, iconSize, typography } from '@/constants';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
-import { supabase } from '@/services/supabaseClient';
-import { API_BASE } from '@/config/apiBase';
+import { getSession } from '@/services/auth/session';
+import { rawApiFetch } from '@/services/api/client';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TestDone'>;
-
 
 export function TestDoneScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
@@ -41,10 +40,9 @@ export function TestDoneScreen({ navigation, route }: Props) {
 
     const check = async () => {
       try {
-        const { data: authData } = await supabase.auth.getSession();
-        const session = authData.session;
+        const session = await getSession();
         if (!session || cancelled) return;
-        const resp = await fetch(`${API_BASE}/test?action=monitor&sessionId=${resume.sessionId}`, {
+        const resp = await rawApiFetch(`test?action=monitor&sessionId=${resume.sessionId}`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
         if (!resp.ok || cancelled) return;
@@ -106,9 +104,11 @@ export function TestDoneScreen({ navigation, route }: Props) {
   // Попытка завершена досрочно (plan/done/exam_lockdown.md): без поздравлений, медали и разбора —
   // иначе итог превращается в шпаргалку для тех, кто ещё проходит тест.
   const leftTitle =
-    leftReason === 'manual' ? 'Ты завершил тест досрочно'
-    : leftReason === 'relaunch' ? 'Приложение закрывали во время теста'
-    : 'Ты вышел из приложения во время теста';
+    leftReason === 'manual'
+      ? 'Ты завершил тест досрочно'
+      : leftReason === 'relaunch'
+        ? 'Приложение закрывали во время теста'
+        : 'Ты вышел из приложения во время теста';
 
   return (
     <Screen
@@ -120,7 +120,11 @@ export function TestDoneScreen({ navigation, route }: Props) {
           backLabel="Закрыть"
           center={
             <View style={styles.headerCenter}>
-              <Text variant="button" accessibilityRole="header" style={[styles.headerTitle, { color: colors.textPrimary }]}>
+              <Text
+                variant="button"
+                accessibilityRole="header"
+                style={[styles.headerTitle, { color: colors.textPrimary }]}
+              >
                 Тест завершён
               </Text>
               {!leftReason && <PartyPopper size={iconSize.s} color={colors.primary} />}
@@ -135,7 +139,11 @@ export function TestDoneScreen({ navigation, route }: Props) {
         <Card style={[styles.leftCard, { borderColor: alpha(colors.error, 40) }]}>
           <View style={styles.rankTitleRow}>
             <LogOut size={iconSize.s} color={colors.errorText} />
-            <Text variant="label" accessibilityRole="header" style={[styles.rankTitle, { color: colors.textPrimary }]}>
+            <Text
+              variant="label"
+              accessibilityRole="header"
+              style={[styles.rankTitle, { color: colors.textPrimary }]}
+            >
               {leftTitle}
             </Text>
           </View>
@@ -194,22 +202,22 @@ export function TestDoneScreen({ navigation, route }: Props) {
 
       {/* Rank Card */}
       {!leftReason && (
-      <Card style={styles.rankCard}>
-        <View style={styles.rankLeft}>
-          <View style={styles.rankTitleRow}>
-            <CelebrationIcon kind={getRankIcon()} size="s" plain />
-            <Text variant="label" style={[styles.rankTitle, { color: colors.textPrimary }]}>
-              Твой результат: {getRankText()}
+        <Card style={styles.rankCard}>
+          <View style={styles.rankLeft}>
+            <View style={styles.rankTitleRow}>
+              <CelebrationIcon kind={getRankIcon()} size="s" plain />
+              <Text variant="label" style={[styles.rankTitle, { color: colors.textPrimary }]}>
+                Твой результат: {getRankText()}
+              </Text>
+            </View>
+            <Text variant="caption" style={{ color: colors.textSecondary }}>
+              Ты опередил {percent}% курса
             </Text>
           </View>
-          <Text variant="caption" style={{ color: colors.textSecondary }}>
-            Ты опередил {percent}% курса
-          </Text>
-        </View>
-        <View style={[styles.rankIcon, { backgroundColor: alpha(colors.primary, 20) }]}>
-          <Award size={iconSize.l} color={colors.primary} />
-        </View>
-      </Card>
+          <View style={[styles.rankIcon, { backgroundColor: alpha(colors.primary, 20) }]}>
+            <Award size={iconSize.l} color={colors.primary} />
+          </View>
+        </Card>
       )}
 
       {/* Stats Row */}
@@ -243,7 +251,11 @@ export function TestDoneScreen({ navigation, route }: Props) {
       {/* Answers Review */}
       {!leftReason && answers.length > 0 && (
         <View style={styles.reviewSection}>
-          <Text variant="h3" accessibilityRole="header" style={[styles.reviewTitle, { color: colors.textPrimary }]}>
+          <Text
+            variant="h3"
+            accessibilityRole="header"
+            style={[styles.reviewTitle, { color: colors.textPrimary }]}
+          >
             Разбор ответов
           </Text>
 
@@ -260,7 +272,11 @@ export function TestDoneScreen({ navigation, route }: Props) {
                   {item.word}
                 </Text>
                 {item.isCorrect ? (
-                  <CheckCircle2 size={iconSize.s} color={colors.success} accessibilityLabel="Верно" />
+                  <CheckCircle2
+                    size={iconSize.s}
+                    color={colors.success}
+                    accessibilityLabel="Верно"
+                  />
                 ) : (
                   <XCircle size={iconSize.s} color={colors.error} accessibilityLabel="Неверно" />
                 )}
@@ -270,7 +286,10 @@ export function TestDoneScreen({ navigation, route }: Props) {
                 Твой ответ:{' '}
                 <Text
                   variant="bodySmall"
-                  style={[styles.semibold, { color: item.isCorrect ? colors.textPrimary : colors.errorText }]}
+                  style={[
+                    styles.semibold,
+                    { color: item.isCorrect ? colors.textPrimary : colors.errorText },
+                  ]}
                 >
                   {item.yourAnswer || '—'}
                 </Text>
@@ -279,7 +298,10 @@ export function TestDoneScreen({ navigation, route }: Props) {
               {!item.isCorrect && item.correctAnswer && (
                 <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
                   Верный ответ:{' '}
-                  <Text variant="bodySmall" style={[styles.semibold, { color: colors.successText }]}>
+                  <Text
+                    variant="bodySmall"
+                    style={[styles.semibold, { color: colors.successText }]}
+                  >
                     {item.correctAnswer}
                   </Text>
                 </Text>

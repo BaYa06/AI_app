@@ -36,7 +36,14 @@ export interface ChipProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export const Chip = memo(function Chip({ label, selected = false, onPress, icon: Icon, disabled, style }: ChipProps) {
+export const Chip = memo(function Chip({
+  label,
+  selected = false,
+  onPress,
+  icon: Icon,
+  disabled,
+  style,
+}: ChipProps) {
   const colors = useThemeColors();
   const textColor = selected ? colors.primary : colors.textPrimary;
 
@@ -76,7 +83,12 @@ export interface BadgeProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export const Badge = memo(function Badge({ label, tone = 'primary', icon: Icon, style }: BadgeProps) {
+export const Badge = memo(function Badge({
+  label,
+  tone = 'primary',
+  icon: Icon,
+  style,
+}: BadgeProps) {
   const colors = useThemeColors();
   const palette: Record<BadgeTone, { fill: string; text: string }> = {
     primary: { fill: alpha(colors.primary, 20), text: colors.primary },
@@ -148,6 +160,54 @@ export const ProgressBar = memo(function ProgressBar({
   );
 });
 
+// ==================== SegmentedProgressBar ====================
+
+export interface ProgressSegment {
+  value: number;
+  color: string;
+}
+
+export interface SegmentedProgressBarProps {
+  /** Сегменты слева направо; остаток до total — пустой трек */
+  segments: ProgressSegment[];
+  total: number;
+  accessibilityLabel?: string;
+  style?: StyleProp<ViewStyle>;
+}
+
+/**
+ * Одна полоска из нескольких цветов — статусы слов набора (plan/new/word_status_colors.md).
+ * Трек как у ProgressBar; непустой сегмент не уже 3 pt, чтобы одно слово было видно.
+ */
+export const SegmentedProgressBar = memo(function SegmentedProgressBar({
+  segments,
+  total,
+  accessibilityLabel,
+  style,
+}: SegmentedProgressBarProps) {
+  const colors = useThemeColors();
+  const visible = total > 0 ? segments.filter((s) => s.value > 0) : [];
+
+  return (
+    <View
+      accessible
+      accessibilityLabel={accessibilityLabel}
+      style={[styles.track, styles.segmentTrack, { backgroundColor: colors.surfaceMuted }, style]}
+    >
+      {visible.map((s, i) => (
+        <View
+          key={i}
+          style={[
+            styles.segment,
+            { width: `${Math.min(100, (s.value / total) * 100)}%`, backgroundColor: s.color },
+            i > 0 && styles.segmentGap,
+          ]}
+        />
+      ))}
+    </View>
+  );
+});
+
 // ==================== Switch ====================
 
 export interface SwitchProps {
@@ -164,7 +224,13 @@ const TRACK_HEIGHT = 28;
 const THUMB = 24;
 const THUMB_OFFSET = TRACK_WIDTH - THUMB - 4;
 
-export const Switch = memo(function Switch({ value, onValueChange, disabled, accessibilityLabel, style }: SwitchProps) {
+export const Switch = memo(function Switch({
+  value,
+  onValueChange,
+  disabled,
+  accessibilityLabel,
+  style,
+}: SwitchProps) {
   const colors = useThemeColors();
   const position = useRef(new Animated.Value(value ? 1 : 0)).current;
 
@@ -197,7 +263,9 @@ export const Switch = memo(function Switch({ value, onValueChange, disabled, acc
         style,
       ]}
     >
-      <Animated.View style={[styles.thumb, { backgroundColor: colors.onPrimary, transform: [{ translateX }] }]} />
+      <Animated.View
+        style={[styles.thumb, { backgroundColor: colors.onPrimary, transform: [{ translateX }] }]}
+      />
     </Pressable>
   );
 });
@@ -232,6 +300,16 @@ const styles = StyleSheet.create({
   fill: {
     height: '100%',
     borderRadius: borderRadius.full,
+  },
+  segmentTrack: {
+    flexDirection: 'row',
+  },
+  segment: {
+    height: '100%',
+    minWidth: 3,
+  },
+  segmentGap: {
+    marginLeft: 2,
   },
   switchTrack: {
     width: TRACK_WIDTH,

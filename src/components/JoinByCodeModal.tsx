@@ -23,7 +23,11 @@ export function JoinByCodeModal({ visible, userId, onAccepted, onDismiss }: Join
   const [code, setCode] = useState('');
   const [looking, setLooking] = useState(false);
   const [joining, setJoining] = useState(false);
-  const [info, setInfo] = useState<{ courseId: string; courseTitle: string; teacherName: string } | null>(null);
+  const [info, setInfo] = useState<{
+    courseId: string;
+    courseTitle: string;
+    teacherName: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<RNTextInput>(null);
 
@@ -124,13 +128,20 @@ export function JoinByCodeModal({ visible, userId, onAccepted, onDismiss }: Join
 
       {info && (
         <Card tone="muted" style={styles.courseCard}>
-          <Text variant="h3" style={[styles.courseTitle, { color: colors.textPrimary }]}>{info.courseTitle}</Text>
+          <Text variant="h3" style={[styles.courseTitle, { color: colors.textPrimary }]}>
+            {info.courseTitle}
+          </Text>
           <Text variant="bodySmall" style={[styles.teacherName, { color: colors.textSecondary }]}>
             Учитель: {info.teacherName}
           </Text>
 
           <View style={styles.buttons}>
-            <Button variant="secondary" title="Отклонить" onPress={handleDismiss} style={styles.button} />
+            <Button
+              variant="secondary"
+              title="Отклонить"
+              onPress={handleDismiss}
+              style={styles.button}
+            />
             <Button title="Вступить" onPress={handleJoin} loading={joining} style={styles.button} />
           </View>
         </Card>

@@ -13,14 +13,21 @@ import { RatingPromptModal } from '@/components/RatingPromptModal';
 import { wasWhatsNewShownOn } from '@/services/whatsNew';
 import { PushPreprompt, type PushPrepromptResult } from '@/components/push/PushPreprompt';
 import { getPushStatus, isPushSupported } from '@/services/pushNotifications';
-import { loadPushPromptState, markPushPromptShown, savePushPromptState, shouldShowPushPrompt } from '@/services/pushPrompt';
+import {
+  loadPushPromptState,
+  markPushPromptShown,
+  savePushPromptState,
+  shouldShowPushPrompt,
+} from '@/services/pushPrompt';
 import { spacing, borderRadius, heights, iconSize, screenPadding, alpha } from '@/constants';
 import { pluralize } from '@/utils';
-import { nextLessonStep, nextLessonLabel } from '@/services/lessonFlow';
+import { nextLessonStep, nextLessonLabel, sessionStepAfterPortion } from '@/services/lessonFlow';
 import { useCardsStore } from '@/store/cardsStore';
 import { Badge, Button, Card, ScreenHeader, Sheet, useScreenBottomInset } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
 import { WidgetPromptCard } from '@/components/widget/WidgetPromptCard';
+import { SessionSummary } from '@/components/study/SessionSummary';
+import { SUMMARY_ANIMATION_MS } from '@/components/study/useSummaryChoreography';
 import { WidgetHowToSheet } from '@/components/widget/WidgetHowToSheet';
 import {
   addLessonDay,
@@ -32,7 +39,16 @@ import {
 } from '@/services/widgetPrompt';
 import { installedWidgets } from '@/services/widgetBridge';
 import { localDay } from '@/store/challengeStore';
-import { Settings, CheckCircle2, List, ArrowRight, RotateCcw, BookOpen, X } from 'lucide-react-native';
+import {
+  Settings,
+  CheckCircle2,
+  List,
+  ArrowRight,
+  RotateCcw,
+  BookOpen,
+  X,
+} from 'lucide-react-native';
+import { log } from '@/utils/logger';
 
 type Props = RootStackScreenProps<'StudyResults'>;
 
@@ -56,23 +72,67 @@ export function StudyResultsScreen({ navigation, route }: Props) {
     streakIncreased,
     newStreakCount,
     lesson,
+    session,
   } = route.params;
   const colors = useThemeColors();
+
+  // Сессия набора (plan/new/study_session.md, Session 2): между этапами итогов нет — сразу следующая
+  // порция этапа (ошибки) или следующий этап. Считаем один раз: экран сразу заменяется.
+  const sessionRoute = React.useMemo(() => {
+    if (!session) return null;
+    const viewed = (phaseOffset ?? 0) >= totalPhaseCards;
+    const failed = (phaseFailedIds?.length ?? 0) > 0;
+    // Экран без порций (Слово в контексте) — этап пройден целиком
+    const complete = !phaseId || totalPhaseCards <= 0 || (viewed && !failed);
+    const streak = streakIncreased ? newStreakCount : undefined;
+    return {
+      complete,
+      step: sessionStepAfterPortion(
+        session,
+        { complete, phaseId, totalPhaseCards, studiedInPhase, phaseOffset, phaseFailedIds },
+        streak
+      ),
+    };
+  }, []);
+  const sessionStep = sessionRoute?.step ?? null;
+  React.useEffect(() => {
+    const current = session?.stages[session.index];
+    if (session && current && sessionRoute?.complete) {
+      Analytics.setSessionStage({
+        stage: current.stage,
+        index: session.index + 1,
+        total: session.stages.length,
+        result: route.params.sessionStageSkipped ? 'skipped' : 'done',
+      });
+    }
+    if (sessionStep) navigation.replace(sessionStep.screen, sessionStep.params);
+  }, []);
+  // Итоги сессии: серия могла вырасти на любом этапе
+  const streakCount = newStreakCount ?? session?.streakCount;
+  const streakGrew = streakIncreased === true || (!sessionStep && !!session?.streakCount);
   const bottomInset = useScreenBottomInset();
   const [showErrorsModal, setShowErrorsModal] = React.useState(false);
-  const [showStreakModal, setShowStreakModal] = React.useState(streakIncreased === true);
+  // Итоги сессии празднуют серию сами — по нажатию кнопки, после анимации (plan/new/session_results.md, решение 14)
+  const [showStreakModal, setShowStreakModal] = React.useState(
+    !sessionStep && !session && streakGrew
+  );
   const [showRatingPrompt, setShowRatingPrompt] = React.useState(false);
 
   // Окно оценки — только в хороший момент (правила в services/feedback.ts). Когда показываем
   // празднование серии, второе окно подряд не открываем — спросим в другой раз.
   React.useEffect(() => {
+    if (sessionStep) return;
     const goodMoment = recordSessionForRatingPrompt({ totalCards, errors });
     // В день, когда показали «Что нового», второе окно с просьбой не открываем
-    if (!goodMoment || streakIncreased || wasWhatsNewShownOn(localDay())) return;
-    const timer = setTimeout(() => {
-      markRatingPromptShown();
-      setShowRatingPrompt(true);
-    }, 1200);
+    if (!goodMoment || streakGrew || wasWhatsNewShownOn(localDay())) return;
+    // На итогах сессии — не раньше конца анимации счёта
+    const timer = setTimeout(
+      () => {
+        markRatingPromptShown();
+        setShowRatingPrompt(true);
+      },
+      session ? SUMMARY_ANIMATION_MS + 500 : 1200
+    );
     return () => clearTimeout(timer);
   }, []);
 
@@ -81,7 +141,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   const allCardsViewed = phaseOffset >= totalPhaseCards;
   const hasFailedCards = phaseFailedIds && phaseFailedIds.length > 0;
   const isPhaseComplete = phaseId && totalPhaseCards > 0 && allCardsViewed && !hasFailedCards;
-  
+
   // Последняя часть урока дня: дальше урок закончится и вернёт на главную
   const isLessonEnd = React.useMemo(() => {
     if (!isPhaseComplete || !lesson) return false;
@@ -104,7 +164,10 @@ export function StudyResultsScreen({ navigation, route }: Props) {
       const permission = status.provisional ? 'default' : status.permission;
       if (cancelled || !shouldShowPushPrompt(state, today, { supported, permission })) return;
       savePushPromptState(markPushPromptShown(state, today));
-      Analytics.pushPrepromptShown({ attempt: state.shownDays.length + 1, trigger: 'lesson_completed' });
+      Analytics.pushPrepromptShown({
+        attempt: state.shownDays.length + 1,
+        trigger: 'lesson_completed',
+      });
       setPushPromptReady(true);
     })().catch(() => {});
     return () => {
@@ -113,10 +176,13 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   }, [isLessonEnd]);
   const showPushPrompt = pushPromptReady && !pushPromptDone && !showStreakModal;
   const lessonWordCount = lesson ? (lesson.reviewCount ?? 0) + lesson.newIds.length : 0;
-  const handlePushPromptClose = React.useCallback((result: PushPrepromptResult) => {
-    setPushPromptDone(true);
-    if (result === 'custom') navigation.navigate('NotificationSettings');
-  }, [navigation]);
+  const handlePushPromptClose = React.useCallback(
+    (result: PushPrepromptResult) => {
+      setPushPromptDone(true);
+      if (result === 'custom') navigation.navigate('NotificationSettings');
+    },
+    [navigation]
+  );
 
   // Подсказка о виджете на экране блокировки (plan/new/widgets.md, 3.1): день с пройденным уроком
   // запоминаем всегда, а карточку показываем по правилам services/widgetPrompt.ts
@@ -132,7 +198,11 @@ export function StudyResultsScreen({ navigation, route }: Props) {
     let cancelled = false;
     installedWidgets()
       .then((families) => {
-        if (cancelled || !shouldShowWidgetPrompt(state, today, { supported, installed: families.length > 0 })) return;
+        if (
+          cancelled ||
+          !shouldShowWidgetPrompt(state, today, { supported, installed: families.length > 0 })
+        )
+          return;
         savePromptState(markPromptShown(state, today));
         Analytics.widgetPromptShown('lesson_results');
         setShowWidgetPrompt(true);
@@ -144,16 +214,17 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   }, [isLessonEnd]);
 
   // Осталось = карточки которые еще не просмотрены + ошибочные карточки
-  const remainingNewCards = phaseId && totalPhaseCards > 0 ? Math.max(0, totalPhaseCards - phaseOffset) : 0;
+  const remainingNewCards =
+    phaseId && totalPhaseCards > 0 ? Math.max(0, totalPhaseCards - phaseOffset) : 0;
   const remainingFailedCards = phaseFailedIds?.length || 0;
   const remainingInPhase = remainingNewCards + remainingFailedCards;
-  
+
   // Analytics: study_session_complete
   React.useEffect(() => {
     const modeMap: Record<string, 'flashcard' | 'quiz' | 'match'> = {
-      'Карточки': 'flashcard',
-      'Тест': 'quiz',
-      'Пары': 'match',
+      Карточки: 'flashcard',
+      Тест: 'quiz',
+      Пары: 'match',
     };
     Analytics.studySessionComplete({
       setId,
@@ -166,7 +237,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   }, []);
 
   // Debug info
-  console.log('[StudyResults] Параметры фазы:', {
+  log.debug('StudyResults', 'Параметры фазы', {
     phaseId,
     totalPhaseCards,
     phaseOffset,
@@ -177,13 +248,15 @@ export function StudyResultsScreen({ navigation, route }: Props) {
     remainingInPhase,
     isPhaseComplete,
     allCardsViewed,
-    hasFailedCards
+    hasFailedCards,
   });
 
   // Логика кнопки: если фаза завершена - "Закончить", иначе - "Следующие карточки (N осталось)"
-  const primaryButtonLabel = isPhaseComplete 
-    ? (lesson ? nextLessonLabel(lesson, (n) => pluralize(n, 'новое слово', 'новых слова', 'новых слов')) : 'Закончить')
-    : remainingInPhase > 0 
+  const primaryButtonLabel = isPhaseComplete
+    ? lesson
+      ? nextLessonLabel(lesson, (n) => pluralize(n, 'новое слово', 'новых слова', 'новых слов'))
+      : 'Закончить'
+    : remainingInPhase > 0
       ? `Следующие карточки (${remainingInPhase} ${remainingInPhase === 1 ? 'осталась' : remainingInPhase < 5 ? 'осталось' : 'осталось'})`
       : 'Следующие карточки';
 
@@ -209,16 +282,16 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   };
 
   const handleNextCards = () => {
-    console.log('[StudyResults] handleNextCards вызван:', {
+    log.debug('StudyResults', 'handleNextCards вызван', {
       isPhaseComplete,
       phaseId,
       totalPhaseCards,
       studiedInPhase,
       phaseOffset,
       phaseFailedIds,
-      remainingInPhase
+      remainingInPhase,
     });
-    
+
     // Если фаза завершена — возвращаем к набору или на главную (если запущено из HomeScreen)
     if (isPhaseComplete) {
       // Урок дня: следующая часть (повторение → новые слова → проверка), в конце — главная
@@ -326,7 +399,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
 
   const handleReviewMistakes = () => {
     // Передаем front текст ошибочных карточек для повторения
-    const errorFronts = errorCards.map(card => card.front);
+    const errorFronts = errorCards.map((card) => card.front);
     // Продолжаем ту же фазу, не сбрасывая прогресс
     navigation.push('Study', {
       setId,
@@ -349,12 +422,33 @@ export function StudyResultsScreen({ navigation, route }: Props) {
     navigation.push('Study', { setId, mode: 'classic', studyAll: true });
   };
 
+  // Пока экран заменяется следующим этапом — пустой фон, без мигания итогов
+  if (sessionStep)
+    return <View style={[styles.container, { backgroundColor: colors.background }]} />;
+
+  // Последний этап сессии — свои итоги (решение 14 плана)
+  if (session) {
+    return (
+      <>
+        <SessionSummary session={session} streakCount={streakGrew ? streakCount : undefined} />
+        <RatingPromptModal visible={showRatingPrompt} onClose={() => setShowRatingPrompt(false)} />
+      </>
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScreenHeader
         title={modeTitle}
         onBack={handleBack}
-        right={<Button variant="icon" icon={Settings} accessibilityLabel="Настройки" onPress={handleSettings} />}
+        right={
+          <Button
+            variant="icon"
+            icon={Settings}
+            accessibilityLabel="Настройки"
+            onPress={handleSettings}
+          />
+        }
       />
 
       {/* Scrollable Content */}
@@ -365,7 +459,12 @@ export function StudyResultsScreen({ navigation, route }: Props) {
       >
         {/* Hero Section */}
         <View style={styles.heroSection}>
-          <View style={[styles.medallion, { backgroundColor: colors.primaryFill, borderColor: alpha(colors.primary, 20) }]}>
+          <View
+            style={[
+              styles.medallion,
+              { backgroundColor: colors.primaryFill, borderColor: alpha(colors.primary, 20) },
+            ]}
+          >
             <CheckCircle2 size={iconSize.xl} color={colors.onPrimary} strokeWidth={3} />
           </View>
 
@@ -384,7 +483,8 @@ export function StudyResultsScreen({ navigation, route }: Props) {
           {/* Прогресс фазы */}
           {phaseId && totalPhaseCards > 0 && (
             <Text variant="body" color="secondary" align="center" style={styles.phaseProgress}>
-              Прогресс фазы: {studiedInPhase}/{totalPhaseCards} ({Math.round((studiedInPhase / totalPhaseCards) * 100)}%)
+              Прогресс фазы: {studiedInPhase}/{totalPhaseCards} (
+              {Math.round((studiedInPhase / totalPhaseCards) * 100)}%)
             </Text>
           )}
 
@@ -398,7 +498,11 @@ export function StudyResultsScreen({ navigation, route }: Props) {
         {/* Statistics Card */}
         <Card padding="none" style={styles.statsCard}>
           <View style={styles.statsGrid}>
-            <View style={styles.statItem} accessible accessibilityLabel={`Время: ${formatTime(timeSpent)}`}>
+            <View
+              style={styles.statItem}
+              accessible
+              accessibilityLabel={`Время: ${formatTime(timeSpent)}`}
+            >
               <Text variant="overline" color="secondary" style={styles.statLabel}>
                 Время
               </Text>
@@ -413,7 +517,10 @@ export function StudyResultsScreen({ navigation, route }: Props) {
               <Text variant="overline" color="secondary" style={styles.statLabel}>
                 Ошибок
               </Text>
-              <Text variant="h3" style={[styles.bold, { color: errors > 0 ? colors.errorText : colors.textPrimary }]}>
+              <Text
+                variant="h3"
+                style={[styles.bold, { color: errors > 0 ? colors.errorText : colors.textPrimary }]}
+              >
                 {errors}
               </Text>
             </View>
@@ -428,7 +535,10 @@ export function StudyResultsScreen({ navigation, route }: Props) {
             style={({ pressed }) => [
               styles.detailButton,
               { backgroundColor: colors.surface, borderColor: colors.border },
-              pressed && { backgroundColor: colors.surfaceMuted, borderColor: alpha(colors.primary, 40) },
+              pressed && {
+                backgroundColor: colors.surfaceMuted,
+                borderColor: alpha(colors.primary, 40),
+              },
             ]}
           >
             <View style={styles.detailButtonMain}>
@@ -460,8 +570,18 @@ export function StudyResultsScreen({ navigation, route }: Props) {
       <WidgetHowToSheet visible={showWidgetHowTo} onClose={() => setShowWidgetHowTo(false)} />
 
       {/* Bottom Actions */}
-      <View style={[styles.bottomActions, { backgroundColor: colors.background, paddingBottom: bottomInset + spacing.l }]}>
-        <Button title={primaryButtonLabel} iconRight={ArrowRight} onPress={handleNextCards} fullWidth />
+      <View
+        style={[
+          styles.bottomActions,
+          { backgroundColor: colors.background, paddingBottom: bottomInset + spacing.l },
+        ]}
+      >
+        <Button
+          title={primaryButtonLabel}
+          iconRight={ArrowRight}
+          onPress={handleNextCards}
+          fullWidth
+        />
 
         {/* Secondary Actions Stack */}
         <View style={styles.secondaryActions}>
@@ -490,11 +610,17 @@ export function StudyResultsScreen({ navigation, route }: Props) {
             style={({ pressed }) => [
               styles.secondaryButton,
               { borderColor: colors.border },
-              pressed && [styles.pressedScale, { backgroundColor: colors.surfaceMuted, borderColor: colors.textTertiary }],
+              pressed && [
+                styles.pressedScale,
+                { backgroundColor: colors.surfaceMuted, borderColor: colors.textTertiary },
+              ],
             ]}
           >
             <BookOpen size={iconSize.s} color={colors.textSecondary} />
-            <Text variant="button" style={[styles.noLetterSpacing, { color: colors.textSecondary }]}>
+            <Text
+              variant="button"
+              style={[styles.noLetterSpacing, { color: colors.textSecondary }]}
+            >
               Повторить слова
             </Text>
           </Pressable>
@@ -518,20 +644,30 @@ export function StudyResultsScreen({ navigation, route }: Props) {
         footer={<Button title="Закрыть" onPress={() => setShowErrorsModal(false)} fullWidth />}
       >
         <Text variant="caption" color="secondary" style={styles.sheetSubtitle}>
-          {errorCards.length} {pluralize(errorCards.length, 'слово', 'слова', 'слов')} — повтори их ещё раз
+          {errorCards.length} {pluralize(errorCards.length, 'слово', 'слова', 'слов')} — повтори их
+          ещё раз
         </Text>
         <View style={styles.errorListContent}>
           {errorCards.map((card, index) => (
             <View
               key={card.id ?? index}
-              style={[styles.errorRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              style={[
+                styles.errorRow,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
             >
               <View style={[styles.errorIndex, { backgroundColor: alpha(colors.error, 10) }]}>
-                <Text variant="label" style={[styles.bold, { color: colors.errorText }]}>{index + 1}</Text>
+                <Text variant="label" style={[styles.bold, { color: colors.errorText }]}>
+                  {index + 1}
+                </Text>
               </View>
               <View style={styles.errorBody}>
-                <Text variant="body" style={[styles.semibold, { color: colors.textPrimary }]}>{card.front}</Text>
-                <Text variant="bodySmall" style={{ color: colors.textSecondary }}>{card.back}</Text>
+                <Text variant="body" style={[styles.semibold, { color: colors.textPrimary }]}>
+                  {card.front}
+                </Text>
+                <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
+                  {card.back}
+                </Text>
               </View>
               {card.rating === 2 && <Badge label="Сомневаюсь" tone="warning" />}
             </View>
@@ -541,7 +677,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
 
       <StreakCelebration
         visible={showStreakModal}
-        streakCount={newStreakCount ?? 0}
+        streakCount={streakCount ?? 0}
         onClose={() => setShowStreakModal(false)}
       />
       {/* Окно оценки и лист о напоминаниях одновременно не показываем — напоминание важнее */}
@@ -549,7 +685,11 @@ export function StudyResultsScreen({ navigation, route }: Props) {
         visible={showRatingPrompt && !pushPromptReady}
         onClose={() => setShowRatingPrompt(false)}
       />
-      <PushPreprompt visible={showPushPrompt} wordCount={lessonWordCount} onClose={handlePushPromptClose} />
+      <PushPreprompt
+        visible={showPushPrompt}
+        wordCount={lessonWordCount}
+        onClose={handlePushPromptClose}
+      />
     </View>
   );
 }

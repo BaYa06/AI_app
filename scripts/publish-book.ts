@@ -15,7 +15,8 @@
 import { connect, describeError, type Db } from './lib/db';
 
 const FLAGS = ['--unpublish', '--students', '--no-students', '--list'];
-const USAGE = 'Использование: npx tsx scripts/publish-book.ts "<title>" ["<edition>"] [--unpublish | --students | --no-students]\n' +
+const USAGE =
+  'Использование: npx tsx scripts/publish-book.ts "<title>" ["<edition>"] [--unpublish | --students | --no-students]\n' +
   '               npx tsx scripts/publish-book.ts --list';
 
 interface BookRow {
@@ -46,7 +47,7 @@ function describeBook(b: BookRow): string {
 async function listBooks(db: Db): Promise<void> {
   const result = await db.query<BookRow>(
     `SELECT b.title, b.edition, b.level, b.is_published, b.student_visible, ${STATS_SQL}
-       FROM books b ORDER BY b.title, b.edition`,
+       FROM books b ORDER BY b.title, b.edition`
   );
   for (const b of result.rows) console.log(`• ${describeBook(b)}`);
 }
@@ -56,7 +57,12 @@ async function main(): Promise<void> {
   const flags = argv.filter((a) => a.startsWith('--'));
   const positional = argv.filter((a) => !a.startsWith('--'));
   const list = flags.includes('--list');
-  if (flags.some((f) => !FLAGS.includes(f)) || flags.length > 1 || (!list && (positional.length < 1 || positional.length > 2)) || (list && positional.length > 0)) {
+  if (
+    flags.some((f) => !FLAGS.includes(f)) ||
+    flags.length > 1 ||
+    (!list && (positional.length < 1 || positional.length > 2)) ||
+    (list && positional.length > 0)
+  ) {
     console.error(USAGE);
     process.exit(2);
   }
@@ -64,7 +70,9 @@ async function main(): Promise<void> {
   const db = await connect();
   try {
     // Колонку создаёт и api/_db-init.js (миграция 024) — здесь на случай, если API ещё не вызывали
-    await db.query('ALTER TABLE books ADD COLUMN IF NOT EXISTS student_visible BOOLEAN NOT NULL DEFAULT false');
+    await db.query(
+      'ALTER TABLE books ADD COLUMN IF NOT EXISTS student_visible BOOLEAN NOT NULL DEFAULT false'
+    );
 
     if (list) {
       await listBooks(db);
@@ -75,21 +83,23 @@ async function main(): Promise<void> {
     const edition = (positional[1] ?? '').trim();
     const flag = flags[0];
     const [column, value] =
-      flag === '--students' ? ['student_visible', true]
-        : flag === '--no-students' ? ['student_visible', false]
+      flag === '--students'
+        ? ['student_visible', true]
+        : flag === '--no-students'
+          ? ['student_visible', false]
           : ['is_published', flag !== '--unpublish'];
 
     const result = await db.query<BookRow>(
       `UPDATE books b SET ${column} = $3, updated_at = NOW()
         WHERE title = $1 AND edition = $2
         RETURNING b.title, b.edition, b.level, b.is_published, b.student_visible, ${STATS_SQL}`,
-      [title, edition, value],
+      [title, edition, value]
     );
 
     if (result.rows.length === 0) {
       const similar = await db.query<{ title: string; edition: string }>(
         'SELECT title, edition FROM books WHERE title ILIKE $1 ORDER BY title, edition LIMIT 10',
-        [`%${title}%`],
+        [`%${title}%`]
       );
       console.error(`❌ Книга «${title}»${edition ? ` (${edition})` : ''} не найдена.`);
       if (similar.rows.length > 0) {

@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import { getAuthedUserId } from './_auth.js';
 import { notifyCoursesChanged } from './_realtime.js';
+import { log } from './_log.js';
 
 /**
  * API каталога книг (Книга → Юнит → официальный набор) и планов юнитов курса.
@@ -51,23 +52,30 @@ export default async function handler(req, res) {
   const { action } = req.query;
 
   const GET_ACTIONS = new Set(['list-books', 'book-detail', 'course-plan', 'official-sets']);
-  const POST_ACTIONS = new Set(['attach-to-courses', 'detach-from-course', 'set-unit-open', 'fork-set']);
-  if (GET_ACTIONS.has(action) && req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-  if (POST_ACTIONS.has(action) && req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const POST_ACTIONS = new Set([
+    'attach-to-courses',
+    'detach-from-course',
+    'set-unit-open',
+    'fork-set',
+  ]);
+  if (GET_ACTIONS.has(action) && req.method !== 'GET')
+    return res.status(405).json({ error: 'Method not allowed' });
+  if (POST_ACTIONS.has(action) && req.method !== 'POST')
+    return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    if (action === 'list-books')         return await listBooks(req, res, sql, userId);
-    if (action === 'book-detail')        return await bookDetail(req, res, sql, userId);
-    if (action === 'attach-to-courses')  return await attachToCourses(req, res, sql, userId);
+    if (action === 'list-books') return await listBooks(req, res, sql, userId);
+    if (action === 'book-detail') return await bookDetail(req, res, sql, userId);
+    if (action === 'attach-to-courses') return await attachToCourses(req, res, sql, userId);
     if (action === 'detach-from-course') return await detachFromCourse(req, res, sql, userId);
-    if (action === 'course-plan')        return await coursePlan(req, res, sql, userId);
-    if (action === 'set-unit-open')      return await setUnitOpen(req, res, sql, userId);
-    if (action === 'fork-set')           return await forkSet(req, res, sql, userId);
-    if (action === 'official-sets')      return await officialSets(req, res, sql, userId);
+    if (action === 'course-plan') return await coursePlan(req, res, sql, userId);
+    if (action === 'set-unit-open') return await setUnitOpen(req, res, sql, userId);
+    if (action === 'fork-set') return await forkSet(req, res, sql, userId);
+    if (action === 'official-sets') return await officialSets(req, res, sql, userId);
 
     return res.status(400).json({ error: 'Unknown action' });
   } catch (error) {
-    console.error('Books API error:', error);
+    log.error('books', 'Books API error', error);
     return res.status(500).json({ error: error.message });
   }
 }
@@ -156,7 +164,8 @@ async function bookDetail(req, res, sql, userId) {
 
   const { admin, allBooks } = await catalogAccess(sql, userId);
   const book = await findVisibleBook(sql, bookId, admin);
-  if (!book || !(allBooks || book.student_visible)) return res.status(404).json({ error: 'Book not found' });
+  if (!book || !(allBooks || book.student_visible))
+    return res.status(404).json({ error: 'Book not found' });
 
   // На старте 1 юнит = 1 набор, но отдаём массив — схема допускает несколько наборов в юните.
   const units = await sql`
@@ -187,7 +196,11 @@ async function bookDetail(req, res, sql, userId) {
       number: u.number,
       title: u.title,
       pages: u.pages || null,
-      sets: u.sets.map((s) => ({ id: s.id, title: s.title, totalCards: Number(s.totalCards) || 0 })),
+      sets: u.sets.map((s) => ({
+        id: s.id,
+        title: s.title,
+        totalCards: Number(s.totalCards) || 0,
+      })),
     })),
     attachedCourseIds: attached.map((r) => r.course_id),
   });
@@ -197,7 +210,13 @@ async function bookDetail(req, res, sql, userId) {
 
 async function attachToCourses(req, res, sql, userId) {
   const { bookId, courseIds } = req.body || {};
-  if (!isUuid(bookId) || !Array.isArray(courseIds) || courseIds.length === 0 || courseIds.length > 50 || !courseIds.every(isUuid)) {
+  if (
+    !isUuid(bookId) ||
+    !Array.isArray(courseIds) ||
+    courseIds.length === 0 ||
+    courseIds.length > 50 ||
+    !courseIds.every(isUuid)
+  ) {
     return res.status(400).json({ error: 'bookId and non-empty courseIds[] required' });
   }
   const uniqueIds = [...new Set(courseIds)];
@@ -230,10 +249,13 @@ async function attachToCourses(req, res, sql, userId) {
 
 async function detachFromCourse(req, res, sql, userId) {
   const { bookId, courseId } = req.body || {};
-  if (!isUuid(bookId) || !isUuid(courseId)) return res.status(400).json({ error: 'bookId and courseId required' });
+  if (!isUuid(bookId) || !isUuid(courseId))
+    return res.status(400).json({ error: 'bookId and courseId required' });
 
-  const course = await sql`SELECT id FROM courses WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid`;
-  if (course.length === 0) return res.status(403).json({ error: 'Not the owner', reason: 'forbidden' });
+  const course =
+    await sql`SELECT id FROM courses WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid`;
+  if (course.length === 0)
+    return res.status(403).json({ error: 'Not the owner', reason: 'forbidden' });
 
   // Одним запросом (атомарно): план юнитов этой книги в курсе + сама связь.
   const deleted = await sql`
@@ -246,7 +268,8 @@ async function detachFromCourse(req, res, sql, userId) {
      WHERE course_id = ${courseId}::uuid AND book_id = ${bookId}::uuid
     RETURNING course_id
   `;
-  if (deleted.length === 0) return res.status(404).json({ error: 'Book is not attached to this course' });
+  if (deleted.length === 0)
+    return res.status(404).json({ error: 'Book is not attached to this course' });
   await notifyCoursesChanged([courseId]);
   return res.status(200).json({ ok: true });
 }
@@ -311,7 +334,9 @@ async function coursePlan(req, res, sql, userId) {
       pages: r.pages || null,
       isOpen: r.is_open === true,
       openedAt: r.opened_at,
-      set: r.set_id ? { id: r.set_id, title: r.set_title, totalCards: parseInt(r.total_cards, 10) || 0 } : null,
+      set: r.set_id
+        ? { id: r.set_id, title: r.set_title, totalCards: parseInt(r.total_cards, 10) || 0 }
+        : null,
       progress: { startedCards: parseInt(r.started_cards, 10) || 0 },
     });
   }
@@ -344,7 +369,10 @@ async function setUnitOpen(req, res, sql, userId) {
     WHERE c.id = ${courseId}::uuid AND c.user_id = ${userId}::uuid AND u.id = ${unitId}::uuid
   `;
   if (allowed.length === 0) {
-    return res.status(403).json({ error: 'Not the owner or the book is not attached to this course', reason: 'forbidden' });
+    return res.status(403).json({
+      error: 'Not the owner or the book is not attached to this course',
+      reason: 'forbidden',
+    });
   }
 
   // opened_at — время последнего открытия; при закрытии сохраняется.
@@ -382,8 +410,10 @@ async function forkSet(req, res, sql, userId) {
   if (source.length === 0) return res.status(404).json({ error: 'Official set not found' });
 
   if (courseId) {
-    const course = await sql`SELECT id FROM courses WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid`;
-    if (course.length === 0) return res.status(403).json({ error: 'Not the owner of the course', reason: 'forbidden' });
+    const course =
+      await sql`SELECT id FROM courses WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid`;
+    if (course.length === 0)
+      return res.status(403).json({ error: 'Not the owner of the course', reason: 'forbidden' });
   }
 
   // Одним запросом: новый обычный набор (is_official = false, без unit_id) + копии карточек.
@@ -425,7 +455,9 @@ async function forkSet(req, res, sql, userId) {
  */
 async function officialSets(req, res, sql, userId) {
   const requested = String(req.query.setIds || '')
-    .split(',').map((id) => id.trim()).filter(Boolean);
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
   if (requested.length > 100 || !requested.every(isUuid)) {
     return res.status(400).json({ error: 'setIds must be up to 100 comma-separated uuids' });
   }

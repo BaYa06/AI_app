@@ -15,8 +15,12 @@ function newId(): string {
 }
 
 /** Открыть системный выбор файлов; null — пользователь закрыл окно, ничего не выбрав */
-function chooseFiles(accept: string, multiple: boolean, capture?: 'environment'): Promise<File[] | null> {
-  return new Promise(resolve => {
+function chooseFiles(
+  accept: string,
+  multiple: boolean,
+  capture?: 'environment'
+): Promise<File[] | null> {
+  return new Promise((resolve) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = accept;
@@ -30,7 +34,9 @@ function chooseFiles(accept: string, multiple: boolean, capture?: 'environment')
       input.remove();
       resolve(files);
     };
-    input.addEventListener('change', () => finish(input.files?.length ? Array.from(input.files) : null));
+    input.addEventListener('change', () =>
+      finish(input.files?.length ? Array.from(input.files) : null)
+    );
     input.addEventListener('cancel', () => finish(null));
     document.body.appendChild(input);
     input.click();
@@ -50,7 +56,9 @@ function base64Of(dataUrl: string): string {
   return dataUrl.slice(dataUrl.indexOf(',') + 1);
 }
 
-async function compressImage(file: File): Promise<{ base64: string; mimeType: string; previewUri: string }> {
+async function compressImage(
+  file: File
+): Promise<{ base64: string; mimeType: string; previewUri: string }> {
   const original = await readAsDataUrl(file);
   try {
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -68,17 +76,30 @@ async function compressImage(file: File): Promise<{ base64: string; mimeType: st
     return { base64: base64Of(jpeg), mimeType: 'image/jpeg', previewUri: jpeg };
   } catch {
     // Браузер не открыл формат — отправляем исходник
-    return { base64: base64Of(original), mimeType: file.type || 'image/heic', previewUri: original };
+    return {
+      base64: base64Of(original),
+      mimeType: file.type || 'image/heic',
+      previewUri: original,
+    };
   }
 }
 
 const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,image/heic,image/heif';
 
 async function toImageFiles(files: File[]): Promise<ImportFile[]> {
-  return Promise.all(files.map(async (file, i) => {
-    const { base64, mimeType, previewUri } = await compressImage(file);
-    return { id: newId(), name: file.name || `photo_${i + 1}.jpg`, kind: 'image' as const, mimeType, base64, previewUri };
-  }));
+  return Promise.all(
+    files.map(async (file, i) => {
+      const { base64, mimeType, previewUri } = await compressImage(file);
+      return {
+        id: newId(),
+        name: file.name || `photo_${i + 1}.jpg`,
+        kind: 'image' as const,
+        mimeType,
+        base64,
+        previewUri,
+      };
+    })
+  );
 }
 
 export async function pickFromCamera(): Promise<ImportFile[] | null> {
@@ -103,15 +124,26 @@ export async function pickDocuments(limit: number): Promise<ImportFile[] | null>
   if (!picked) return null;
   const files: ImportFile[] = [];
   for (const file of picked.slice(0, limit)) {
-    const ext = Object.keys(DOC_TYPES).find(e => file.name.toLowerCase().endsWith(e));
-    if (!ext) throw new PickError(`«${file.name}» — такой формат не подходит. Нужен PDF, CSV, TSV или TXT`);
+    const ext = Object.keys(DOC_TYPES).find((e) => file.name.toLowerCase().endsWith(e));
+    if (!ext)
+      throw new PickError(`«${file.name}» — такой формат не подходит. Нужен PDF, CSV, TSV или TXT`);
     const { kind, mimeType } = DOC_TYPES[ext];
     if (kind === 'pdf' && file.size > IMPORT_LIMITS.maxPdfBytes) {
-      throw new PickError(`«${file.name}» больше 3 МБ. Раздели PDF или сфотографируй нужные страницы`);
+      throw new PickError(
+        `«${file.name}» больше 3 МБ. Раздели PDF или сфотографируй нужные страницы`
+      );
     }
-    files.push(kind === 'pdf'
-      ? { id: newId(), name: file.name, kind, mimeType, base64: base64Of(await readAsDataUrl(file)) }
-      : { id: newId(), name: file.name, kind, mimeType, content: await file.text() });
+    files.push(
+      kind === 'pdf'
+        ? {
+            id: newId(),
+            name: file.name,
+            kind,
+            mimeType,
+            base64: base64Of(await readAsDataUrl(file)),
+          }
+        : { id: newId(), name: file.name, kind, mimeType, content: await file.text() }
+    );
   }
   return files;
 }

@@ -13,12 +13,13 @@
  * Сравниваются ответы (оборот карточки), потому что их и показывает тест.
  */
 import type { Card } from '@/types';
+import { cardBack } from '@/utils/cardText';
 
 const MAX_POOL = 600; // для больших наборов считаем баллы по случайной выборке — быстро
 const MIN_SAME_SET_POOL = 8; // меньше кандидатов в наборе — добираем из наборов с той же парой языков
 const RANDOM_JITTER = 0.15; // доля случайности в выборе среди похожих
 
-const answerOf = (card: Card) => card.backText ?? (card as any).back ?? '';
+const answerOf = (card: Card) => cardBack(card);
 
 /** Для сравнения: первая строка, нижний регистр, без скобок, знаков и лишних пробелов */
 export function normalizeAnswer(text: string): string {
@@ -49,7 +50,8 @@ function levenshtein(a: string, b: string): number {
 
 const commonSuffix = (a: string, b: string, max = 3) => {
   let n = 0;
-  while (n < max && n < a.length && n < b.length && a[a.length - 1 - n] === b[b.length - 1 - n]) n++;
+  while (n < max && n < a.length && n < b.length && a[a.length - 1 - n] === b[b.length - 1 - n])
+    n++;
   return n;
 };
 
@@ -63,7 +65,7 @@ function isNearDuplicate(a: string, b: string): boolean {
   const longer = shorter === a ? b : a;
   if (shorter.length >= 4 && levenshtein(a, b) <= 1) return true;
   // «дом» и «дом здание», «to go» и «go»
-  return (` ${longer} `).includes(` ${shorter} `);
+  return ` ${longer} `.includes(` ${shorter} `);
 }
 
 /** Насколько вариант похож на правильный ответ по виду: 0..1 */
@@ -106,7 +108,7 @@ export function buildDistractorPool(
   cardsBySet: Record<string, string[]>,
   cardsMap: Record<string, Card>,
   sets: Record<string, SetLite>,
-  extra: Card[] = [],
+  extra: Card[] = []
 ): Card[] {
   const byId = new Map<string, Card>();
   const add = (card?: Card) => {

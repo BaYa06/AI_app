@@ -24,7 +24,12 @@ export interface FitResult {
 }
 
 /** Оценка числа строк при переносе по словам (слово длиннее строки переносится по буквам) */
-export function estimateLines(text: string, fontSize: number, width: number, weight: FitWeight): number {
+export function estimateLines(
+  text: string,
+  fontSize: number,
+  width: number,
+  weight: FitWeight
+): number {
   const perLine = Math.max(1, Math.floor(width / (fontSize * CHAR_WIDTH[weight])));
   let lines = 0;
   for (const paragraph of text.split('\n')) {
@@ -63,12 +68,21 @@ function sizeAt(fontSize: number, lineHeightRatio: number) {
   return { fontSize, lineHeight: Math.round(fontSize * lineHeightRatio) };
 }
 
-function textHeight(text: string, fontSize: number, lineHeight: number, width: number, weight: FitWeight) {
+function textHeight(
+  text: string,
+  fontSize: number,
+  lineHeight: number,
+  width: number,
+  weight: FitWeight
+) {
   return estimateLines(text, fontSize, width, weight) * lineHeight;
 }
 
 /** Самый крупный размер из sizes, при котором text помещается в width × height */
-export function fitText(text: string, { width, height, sizes, lineHeightRatio, weight }: FitOptions): FitResult {
+export function fitText(
+  text: string,
+  { width, height, sizes, lineHeightRatio, weight }: FitOptions
+): FitResult {
   for (const size of sizes) {
     const s = sizeAt(size, lineHeightRatio);
     if (textHeight(text, s.fontSize, s.lineHeight, width, weight) <= height) return s;
@@ -94,27 +108,39 @@ interface FitPairOptions {
 export function fitWordWithExample(
   word: string,
   example: string,
-  { width, height, gap, word: wordOpts, example: exampleOpts }: FitPairOptions,
+  { width, height, gap, word: wordOpts, example: exampleOpts }: FitPairOptions
 ): { word: FitResult; example: FitResult } {
   if (!example) {
-    return { word: fitText(word, { width, height, weight: 'bold', ...wordOpts }), example: sizeAt(exampleOpts.sizes[0], exampleOpts.lineHeightRatio) };
+    return {
+      word: fitText(word, { width, height, weight: 'bold', ...wordOpts }),
+      example: sizeAt(exampleOpts.sizes[0], exampleOpts.lineHeightRatio),
+    };
   }
   for (const wordSize of wordOpts.sizes) {
     const w = sizeAt(wordSize, wordOpts.lineHeightRatio);
     const wordHeight = textHeight(word, w.fontSize, w.lineHeight, width, 'bold');
     for (const exampleSize of exampleOpts.sizes) {
       const e = sizeAt(exampleSize, exampleOpts.lineHeightRatio);
-      if (wordHeight + gap + textHeight(example, e.fontSize, e.lineHeight, width, 'regular') <= height) {
+      if (
+        wordHeight + gap + textHeight(example, e.fontSize, e.lineHeight, width, 'regular') <=
+        height
+      ) {
         return { word: w, example: e };
       }
     }
   }
   // Не помещается и на минимальных размерах: слову — сколько нужно (но не больше половины), пример обрезаем
   const w = fitText(word, { width, height: height / 2, weight: 'bold', ...wordOpts });
-  const wordHeight = Math.min(textHeight(word, w.fontSize, w.lineHeight, width, 'bold'), w.numberOfLines ? w.numberOfLines * w.lineHeight : Infinity);
+  const wordHeight = Math.min(
+    textHeight(word, w.fontSize, w.lineHeight, width, 'bold'),
+    w.numberOfLines ? w.numberOfLines * w.lineHeight : Infinity
+  );
   const e = sizeAt(exampleOpts.sizes[exampleOpts.sizes.length - 1], exampleOpts.lineHeightRatio);
   return {
     word: w,
-    example: { ...e, numberOfLines: Math.max(1, Math.floor((height - gap - wordHeight) / e.lineHeight)) },
+    example: {
+      ...e,
+      numberOfLines: Math.max(1, Math.floor((height - gap - wordHeight) / e.lineHeight)),
+    },
   };
 }

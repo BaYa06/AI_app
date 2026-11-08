@@ -25,6 +25,7 @@ import { sendNotification, groupsOff, logChannelEvents } from './push/_send.js';
 import { runArbiter } from './push/_arbiter.js';
 import { recomputeHabits } from './push/_habits.js';
 import { SETTING_GROUPS, isHoldout } from './push/_decide.js';
+import { log } from './_log.js';
 
 // teacher.js и data.js импортируют отправку отсюда
 export { sendNotification };
@@ -38,7 +39,10 @@ const CHALLENGE_REWARDS = { quick_round: 10, sniper: 10, forgotten: 10 };
  */
 function parseRewardDay(value) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const diff = Math.abs(Date.parse(`${value}T00:00:00Z`) - Date.parse(new Date().toISOString().slice(0, 10) + 'T00:00:00Z'));
+  const diff = Math.abs(
+    Date.parse(`${value}T00:00:00Z`) -
+      Date.parse(new Date().toISOString().slice(0, 10) + 'T00:00:00Z')
+  );
   return diff <= 24 * 60 * 60 * 1000 ? value : null;
 }
 
@@ -55,7 +59,7 @@ const LEGACY_DEFAULT_DAYS = 'mon,tue,wed,thu,fri';
 async function settingsUserId(req, legacyUserId) {
   if (req.headers.authorization) return getAuthedUserId(req); // невалидный JWT → null → 401
   if (typeof legacyUserId !== 'string' || !legacyUserId) return null;
-  console.warn('[push] settings без JWT (старая сборка)');
+  log.warn('push', 'settings без JWT (старая сборка)');
   return legacyUserId;
 }
 
@@ -69,10 +73,14 @@ export default async function handler(req, res) {
     if (action === 'subscribe' && req.method === 'POST') {
       const { token, platform, userId: bodyUserId } = req.body || {};
       // Разрешение на устройстве (шаг 1.4). Старые сборки не шлют — оставляем прежнее значение.
-      const permission = ['granted', 'provisional', 'denied'].includes(req.body?.permission) ? req.body.permission : null;
+      const permission = ['granted', 'provisional', 'denied'].includes(req.body?.permission)
+        ? req.body.permission
+        : null;
       // С версии с «Моими обращениями» (Support 4); старые не присылают — пуши с новыми экранами им не уходят
-      const appVersion = typeof req.body?.appVersion === 'string' && /^\d+(\.\d+){0,3}$/.test(req.body.appVersion)
-        ? req.body.appVersion : null;
+      const appVersion =
+        typeof req.body?.appVersion === 'string' && /^\d+(\.\d+){0,3}$/.test(req.body.appVersion)
+          ? req.body.appVersion
+          : null;
       if (!token || typeof token !== 'string') {
         return res.status(400).json({ error: 'Missing or invalid token' });
       }
@@ -83,7 +91,7 @@ export default async function handler(req, res) {
       if (req.headers.authorization && !userId) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
-      if (!userId && bodyUserId) console.warn('[push] subscribe: userId без JWT проигнорирован');
+      if (!userId && bodyUserId) log.warn('push', 'subscribe: userId без JWT проигнорирован');
       // Разрешение отозвали в настройках iOS (5.1, отток канала): было granted/provisional, стало denied
       if (permission === 'denied' && userId) {
         const [prev] = await sql`SELECT permission FROM push_tokens WHERE token = ${token}`;
@@ -131,7 +139,13 @@ export default async function handler(req, res) {
       const pushGroup = isHoldout(userId) ? 'holdout' : 'push';
       if (!rows.length) {
         return res.status(200).json({
-          notifEnabled: true, notifHour: 19, notifMinute: 0, notifDays: ALL_DAYS, notifStreak: true, notifCategoriesOff: [], pushGroup,
+          notifEnabled: true,
+          notifHour: 19,
+          notifMinute: 0,
+          notifDays: ALL_DAYS,
+          notifStreak: true,
+          notifCategoriesOff: [],
+          pushGroup,
         });
       }
       const r = rows[0];
@@ -149,36 +163,54 @@ export default async function handler(req, res) {
 
     // ── settings POST ──────────────────────────────────────────
     if (action === 'settings' && req.method === 'POST') {
-      const { notifEnabled, notifHour, notifMinute, notifDays, notifStreak, notifDaysExplicit, notifTimeExplicit } = req.body || {};
+      const {
+        notifEnabled,
+        notifHour,
+        notifMinute,
+        notifDays,
+        notifStreak,
+        notifDaysExplicit,
+        notifTimeExplicit,
+      } = req.body || {};
       const userId = await settingsUserId(req, req.body?.userId);
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
       // cron-reminders запускается каждые 15 минут — минуты кратны 15
       const minute = Math.min(45, Math.max(0, Math.floor((Number(notifMinute) || 0) / 15) * 15));
       const days = typeof notifDays === 'string' ? notifDays : ALL_DAYS;
       // Старые сборки не шлют notifDaysExplicit и сохраняют показанный дефолт «пн–пт» — его выбором не считаем
-      const daysCustom = days !== ALL_DAYS && (notifDaysExplicit === true || days !== LEGACY_DEFAULT_DAYS);
+      const daysCustom =
+        days !== ALL_DAYS && (notifDaysExplicit === true || days !== LEGACY_DEFAULT_DAYS);
       // Переключатели «что присылать» (2.4). Старые сборки шлют только notifStreak — остальные
       // выключенные категории сохраняем, «Серию» берём из notifStreak.
       let categoriesOff;
       if (Array.isArray(req.body?.notifCategoriesOff)) {
-        categoriesOff = [...new Set(req.body.notifCategoriesOff.filter((g) => Object.hasOwn(SETTING_GROUPS, g)))];
+        categoriesOff = [
+          ...new Set(req.body.notifCategoriesOff.filter((g) => Object.hasOwn(SETTING_GROUPS, g))),
+        ];
       } else {
-        const [prev] = await sql`SELECT notif_categories_off FROM user_stats WHERE user_id = ${userId}`;
+        const [prev] =
+          await sql`SELECT notif_categories_off FROM user_stats WHERE user_id = ${userId}`;
         categoriesOff = (prev?.notif_categories_off || []).filter((g) => g !== 'streak');
         if (notifStreak === false) categoriesOff.push('streak');
       }
       const streakOn = !categoriesOff.includes('streak');
       // Отток канала (5.1): какие переключатели выключены сейчас и выключено ли всё
-      const [before] = await sql`SELECT notif_enabled, notif_categories_off, notif_streak FROM user_stats WHERE user_id = ${userId}`;
+      const [before] =
+        await sql`SELECT notif_enabled, notif_categories_off, notif_streak FROM user_stats WHERE user_id = ${userId}`;
       if (before) {
         const offBefore = new Set(groupsOff(before.notif_categories_off, before.notif_streak));
-        const events = categoriesOff.filter((g) => !offBefore.has(g)).map((g) => ({ userId, event: 'category_disabled', detail: g }));
-        if (before.notif_enabled && notifEnabled === false) events.push({ userId, event: 'disabled_all' });
+        const events = categoriesOff
+          .filter((g) => !offBefore.has(g))
+          .map((g) => ({ userId, event: 'category_disabled', detail: g }));
+        if (before.notif_enabled && notifEnabled === false)
+          events.push({ userId, event: 'disabled_all' });
         await logChannelEvents(sql, events);
       }
       // Время выбрано самим человеком (2.9): новый клиент шлёт notifTimeExplicit; у старых — если не 19:00
       const hour = notifHour ?? 19;
-      const timeCustom = notifTimeExplicit === true || (notifTimeExplicit === undefined && (hour !== 19 || minute !== 0));
+      const timeCustom =
+        notifTimeExplicit === true ||
+        (notifTimeExplicit === undefined && (hour !== 19 || minute !== 0));
       await sql`
         INSERT INTO user_stats (user_id, notif_enabled, notif_hour, notif_minute, notif_days, notif_days_custom, notif_streak, notif_categories_off, notif_time_custom)
         VALUES (${userId}, ${notifEnabled ?? true}, ${hour}, ${minute}, ${days}, ${daysCustom}, ${streakOn}, ${categoriesOff}::text[], ${timeCustom})
@@ -275,11 +307,14 @@ export default async function handler(req, res) {
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
       const day = parseRewardDay(req.query.day);
       if (!day) return res.status(400).json({ error: 'Invalid day' });
-      const [user] = await sql`SELECT COALESCE(diamond, 0) AS diamond FROM users WHERE id = ${userId}::uuid`;
+      const [user] =
+        await sql`SELECT COALESCE(diamond, 0) AS diamond FROM users WHERE id = ${userId}::uuid`;
       const claims = await sql`
         SELECT challenge FROM daily_rewards WHERE user_id = ${userId}::uuid AND day = ${day}::date
       `;
-      return res.status(200).json({ diamonds: user?.diamond ?? 0, claimedToday: claims.map((c) => c.challenge) });
+      return res
+        .status(200)
+        .json({ diamonds: user?.diamond ?? 0, claimedToday: claims.map((c) => c.challenge) });
     }
 
     // ── claim-reward: награда за челлендж, не больше одной в день ──
@@ -287,7 +322,9 @@ export default async function handler(req, res) {
       const userId = await getAuthedUserId(req);
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
       const { challenge } = req.body || {};
-      const amount = Object.hasOwn(CHALLENGE_REWARDS, challenge) ? CHALLENGE_REWARDS[challenge] : null;
+      const amount = Object.hasOwn(CHALLENGE_REWARDS, challenge)
+        ? CHALLENGE_REWARDS[challenge]
+        : null;
       if (!amount) return res.status(400).json({ error: 'Unknown challenge' });
       const day = parseRewardDay(req.body?.day);
       if (!day) return res.status(400).json({ error: 'Invalid day' });
@@ -310,7 +347,7 @@ export default async function handler(req, res) {
 
     return res.status(400).json({ error: 'Unknown action' });
   } catch (error) {
-    console.error('[push] Error:', error);
+    log.error('push', 'Error', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }

@@ -5,7 +5,8 @@
 
 import { NeonService, NetworkLoadError } from './NeonService';
 import { readCache, writeCache } from './localCache';
-import { supabase } from './supabaseClient';
+import { getUserId } from './auth/session';
+import { log } from '@/utils/logger';
 
 // ==================== ТИПЫ ====================
 
@@ -108,21 +109,22 @@ function getYesterdayKey(timezone: string = getDeviceTimezone()): string {
  * Записать активность за сессию — прибавку с прошлой отправки.
  * saved — активность записана (иначе прибавку надо отправить ещё раз); counted — день засчитан в серию.
  */
-export async function recordActivity(params: RecordActivityParams): Promise<{ saved: boolean; counted: boolean }> {
+export async function recordActivity(
+  params: RecordActivityParams
+): Promise<{ saved: boolean; counted: boolean }> {
   const { wordsDelta = 0, minutesDelta = 0, cardsDelta = 0 } = params;
 
   try {
     // Проверяем авторизацию
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id;
+    const userId = await getUserId();
 
     if (!userId) {
-      console.log('ℹ️ Streak: пользователь не авторизован, активность сохранена локально');
+      log.debug('Streak', 'пользователь не авторизован, активность сохранена локально');
       return { saved: false, counted: false };
     }
 
     if (!NeonService.isEnabled()) {
-      console.log('ℹ️ Streak: Neon не настроен');
+      log.debug('Streak', 'Neon не настроен');
       return { saved: false, counted: false };
     }
 
@@ -138,7 +140,13 @@ export async function recordActivity(params: RecordActivityParams): Promise<{ sa
     const localDate = getLocalDateKey(timezone);
     const yesterdayDate = getYesterdayKey(timezone);
 
-    console.log('🔄 Streak: записываем активность', { userId, localDate, wordsDelta, minutesDelta, cardsDelta });
+    log.debug('Streak', 'записываем активность', {
+      userId,
+      localDate,
+      wordsDelta,
+      minutesDelta,
+      cardsDelta,
+    });
 
     // 1. Upsert в daily_activity
     const activityResult = await upsertDailyActivity(userId, localDate, {
@@ -148,7 +156,7 @@ export async function recordActivity(params: RecordActivityParams): Promise<{ sa
     });
 
     if (!activityResult) {
-      console.warn('⚠️ Streak: не удалось записать daily_activity');
+      log.warn('Streak', 'не удалось записать daily_activity');
       return { saved: false, counted: false };
     }
 
@@ -160,11 +168,14 @@ export async function recordActivity(params: RecordActivityParams): Promise<{ sa
       cardsDelta,
     });
 
-    console.log(counted ? '✅ Streak: день засчитан' : 'ℹ️ Streak: активность записана, день в серию пока не засчитан');
+    log.debug(
+      'Streak',
+      counted ? 'день засчитан' : 'активность записана, день в серию пока не засчитан'
+    );
     // daily_activity уже записан — повторная отправка задвоила бы его, поэтому saved даже без итогов
     return { saved: true, counted };
   } catch (error) {
-    console.error('❌ Streak: ошибка при записи активности:', error);
+    log.error('Streak', 'ошибка при записи активности', error);
     return { saved: false, counted: false };
   }
 }
@@ -178,7 +189,7 @@ async function upsertDailyActivity(
   deltas: { wordsDelta: number; minutesDelta: number; cardsDelta: number }
 ): Promise<boolean> {
   if (!NeonService.isEnabled()) {
-    console.log('ℹ️ Streak: Neon не настроен');
+    log.debug('Streak', 'Neon не настроен');
     return false;
   }
 
@@ -187,7 +198,7 @@ async function upsertDailyActivity(
     const result = await NeonService.upsertDailyActivity(userId, localDate, deltas);
     return result;
   } catch (error) {
-    console.error('❌ Streak: ошибка upsert daily_activity:', error);
+    log.error('Streak', 'ошибка upsert daily_activity', error);
     return false;
   }
 }
@@ -206,10 +217,15 @@ async function updateUserStats(
   }
 
   try {
-    const result = await NeonService.updateUserStatsStreak(userId, localDate, yesterdayDate, deltas);
+    const result = await NeonService.updateUserStatsStreak(
+      userId,
+      localDate,
+      yesterdayDate,
+      deltas
+    );
     return result;
   } catch (error) {
-    console.error('❌ Streak: ошибка обновления user_stats:', error);
+    log.error('Streak', 'ошибка обновления user_stats', error);
     return false;
   }
 }
@@ -219,8 +235,7 @@ async function updateUserStats(
  */
 export async function fetchWeekActivity(days: number = 7): Promise<DailyActivity[]> {
   try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id;
+    const userId = await getUserId();
 
     if (!userId || !NeonService.isEnabled()) {
       return [];
@@ -231,8 +246,9 @@ export async function fetchWeekActivity(days: number = 7): Promise<DailyActivity
     return activity;
   } catch (error) {
     // Нет сети — последнее сохранённое
-    if (error instanceof NetworkLoadError) return readCache<DailyActivity[]>(`activity_${days}`) ?? [];
-    console.error('❌ Streak: ошибка получения активности за неделю:', error);
+    if (error instanceof NetworkLoadError)
+      return readCache<DailyActivity[]>(`activity_${days}`) ?? [];
+    log.error('Streak', 'ошибка получения активности за неделю', error);
     return [];
   }
 }
@@ -242,8 +258,7 @@ export async function fetchWeekActivity(days: number = 7): Promise<DailyActivity
  */
 export async function fetchUserStats(): Promise<UserStats | null> {
   try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id;
+    const userId = await getUserId();
 
     if (!userId || !NeonService.isEnabled()) {
       return null;
@@ -254,7 +269,7 @@ export async function fetchUserStats(): Promise<UserStats | null> {
     return stats;
   } catch (error) {
     if (error instanceof NetworkLoadError) return readCache<UserStats>('user_stats') ?? null;
-    console.error('❌ Streak: ошибка получения user_stats:', error);
+    log.error('Streak', 'ошибка получения user_stats', error);
     return null;
   }
 }
@@ -269,7 +284,7 @@ export function buildWeekStatus(
 ): WeekDayStatus[] {
   const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
   const today = new Date();
-  
+
   // Определяем день недели из todayKey (timezone-safe)
   const todayParsed = new Date(todayKey + 'T12:00:00');
   const todayDayOfWeek = (todayParsed.getDay() + 6) % 7; // Пн = 0, Вс = 6
@@ -298,7 +313,7 @@ export function buildWeekStatus(
     const dayActivity = activityMap.get(dateKey);
 
     let status: WeekDayStatus['status'];
-    
+
     if (dateKey === todayKey) {
       status = 'today';
     } else if (dateKey > todayKey) {
@@ -326,8 +341,7 @@ export function buildWeekStatus(
  */
 export async function fetchTodayActivity(): Promise<DailyActivity | null> {
   try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id;
+    const userId = await getUserId();
 
     if (!userId || !NeonService.isEnabled()) {
       return null;
@@ -339,7 +353,7 @@ export async function fetchTodayActivity(): Promise<DailyActivity | null> {
     return activity;
   } catch (error) {
     if (error instanceof NetworkLoadError) return cachedTodayActivity() ?? null;
-    console.error('❌ Streak: ошибка получения активности за сегодня:', error);
+    log.error('Streak', 'ошибка получения активности за сегодня', error);
     return null;
   }
 }

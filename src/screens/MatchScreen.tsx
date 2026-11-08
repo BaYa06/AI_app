@@ -7,25 +7,46 @@ import { View, StyleSheet, ScrollView, Pressable, Animated, Modal } from 'react-
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { triggerHaptic } from '@/utils/haptic';
 import { Layers, Settings } from 'lucide-react-native';
-import { Container, Text, Loading } from '@/components/common';
-import { Button, EmptyState, ProgressBar, ScreenHeader, Switch } from '@/components/ui';
+import { Text, Loading } from '@/components/common';
+import { Button, EmptyState, Switch } from '@/components/ui';
+import { StageLayout } from '@/components/study/StageLayout';
 import { useCardsStore, useSetsStore, useThemeColors, useSettingsStore } from '@/store';
-import { spacing, borderRadius, heights, screenPadding, alpha } from '@/constants';
+import { spacing, borderRadius, heights, iconSize, screenPadding, alpha } from '@/constants';
 import { DatabaseService } from '@/services';
 import { Analytics } from '@/services/analytics';
-import { playCorrectSound2 as playCorrectSound, preloadSound } from '@/utils/sound';
+import {
+  playCorrectSound2 as playCorrectSound,
+  playSessionSfx,
+  preloadSessionSfx,
+  preloadSound,
+} from '@/utils/sound';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card } from '@/types';
+import { cardFront, cardBack } from '@/utils/cardText';
 
 type Props = RootStackScreenProps<'Match'>;
 
+/** Найденная пара в сессии: остаётся на месте, но «цвет выключен» */
+const MATCHED_DIM_OPACITY = 0.45;
+
 export function MatchScreen({ navigation, route }: Props) {
-  const { setId, cardLimit, dueCardIds, phaseId, totalPhaseCards, studiedInPhase = 0, phaseOffset = 0 } = route.params;
+  const {
+    setId,
+    cardLimit,
+    dueCardIds,
+    phaseId,
+    totalPhaseCards,
+    studiedInPhase = 0,
+    phaseOffset = 0,
+    session,
+  } = route.params;
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
 
   // Генерируем phaseId при первом запуске (если не передан)
-  const currentPhaseId = useRef(phaseId || `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+  const currentPhaseId = useRef(
+    phaseId || `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  );
   const currentTotalPhaseCards = useRef(totalPhaseCards || 0);
 
   const set = useSetsStore((s) => s.getSet(setId));
@@ -62,8 +83,8 @@ export function MatchScreen({ navigation, route }: Props) {
   const sheetTranslate = useRef(new Animated.Value(-220)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
 
-  const getFront = (card: Card) => card.frontText ?? (card as any).front ?? '';
-  const getBack = (card: Card) => card.backText ?? (card as any).back ?? '';
+  const getFront = (card: Card) => cardFront(card);
+  const getBack = (card: Card) => cardBack(card);
   const getFadeValue = useCallback((cardId: string) => {
     if (!fadeValues.current[cardId]) {
       fadeValues.current[cardId] = new Animated.Value(1);
@@ -75,7 +96,8 @@ export function MatchScreen({ navigation, route }: Props) {
   useEffect(() => {
     // Пропускаем уже изученные карточки (используем phaseOffset)
     const availableCards = cards.slice(phaseOffset);
-    const limited = !cardLimit || cardLimit <= 0 ? availableCards : availableCards.slice(0, cardLimit);
+    const limited =
+      !cardLimit || cardLimit <= 0 ? availableCards : availableCards.slice(0, cardLimit);
     const shuffled = [...limited].sort(() => Math.random() - 0.5);
     fadeValues.current = {};
 
@@ -101,7 +123,6 @@ export function MatchScreen({ navigation, route }: Props) {
   }, [cards, cardLimit, phaseOffset]);
 
   const matchedPairs = matchedIds.size;
-  const progress = totalPairs ? Math.round((matchedPairs / totalPairs) * 100) : 0;
 
   const formatTime = useCallback((seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -115,7 +136,6 @@ export function MatchScreen({ navigation, route }: Props) {
     setSelectedLeft(null);
     setSelectedRight(null);
   }, []);
-
 
   const triggerSuccessHaptic = useCallback(() => {
     triggerHaptic('notificationSuccess');
@@ -152,17 +172,20 @@ export function MatchScreen({ navigation, route }: Props) {
   const handleSelectLeft = useCallback(
     (cardId: string) => {
       if (isComplete || matchedIds.has(cardId)) return;
+      // Выбор карточки в сессии — «pop»; вторая карточка пары сразу даёт «верно» или «ошибку»
+      if (session && !selectedRight) playSessionSfx('pop');
       setSelectedLeft((prev) => (prev === cardId ? null : cardId));
     },
-    [isComplete, matchedIds]
+    [isComplete, matchedIds, session, selectedRight]
   );
 
   const handleSelectRight = useCallback(
     (cardId: string) => {
       if (isComplete || matchedIds.has(cardId)) return;
+      if (session && !selectedLeft) playSessionSfx('pop');
       setSelectedRight((prev) => (prev === cardId ? null : cardId));
     },
-    [isComplete, matchedIds]
+    [isComplete, matchedIds, session, selectedLeft]
   );
 
   // Проверка совпадений
@@ -180,17 +203,23 @@ export function MatchScreen({ navigation, route }: Props) {
     if (isCorrect) {
       const leftFade = getFadeValue(selectedLeft);
       const rightFade = getFadeValue(selectedRight);
+      // В сессии найденная пара остаётся на месте тусклой — сетка не сдвигается.
+      // В свободной практике пара исчезает, как раньше
+      const toValue = session ? MATCHED_DIM_OPACITY : 0;
       Animated.parallel([
-        Animated.timing(leftFade, { toValue: 0, duration: 180, useNativeDriver: true }),
-        Animated.timing(rightFade, { toValue: 0, duration: 180, useNativeDriver: true }),
+        Animated.timing(leftFade, { toValue, duration: 180, useNativeDriver: true }),
+        Animated.timing(rightFade, { toValue, duration: 180, useNativeDriver: true }),
       ]).start(() => {
-        setLeftCards((prev) => prev.filter((card) => card.id !== selectedLeft));
-        setRightCards((prev) => prev.filter((card) => card.id !== selectedRight));
+        if (!session) {
+          setLeftCards((prev) => prev.filter((card) => card.id !== selectedLeft));
+          setRightCards((prev) => prev.filter((card) => card.id !== selectedRight));
+        }
         resetSelection();
       });
 
       triggerSuccessHaptic();
-      playCorrectSound();
+      if (session) playSessionSfx('correct');
+      else playCorrectSound();
       setMatchedIds((prev) => {
         const next = new Set(prev);
         next.add(selectedLeft);
@@ -198,11 +227,12 @@ export function MatchScreen({ navigation, route }: Props) {
       });
     } else {
       triggerHaptic('notificationError');
+      if (session) playSessionSfx('error');
       setMistakes((m) => m + 1);
       if (mismatchRef.current) clearTimeout(mismatchRef.current);
       mismatchRef.current = setTimeout(() => resetSelection(), 450);
     }
-  }, [selectedLeft, selectedRight, resetSelection, triggerSuccessHaptic, getFadeValue]);
+  }, [selectedLeft, selectedRight, resetSelection, triggerSuccessHaptic, getFadeValue, session]);
 
   // Завершение игры
   const finishGame = useCallback(() => {
@@ -212,7 +242,7 @@ export function MatchScreen({ navigation, route }: Props) {
     if (timerRef.current) clearInterval(timerRef.current);
 
     const timeSpent = Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000));
-    
+
     // Обновляем прогресс фазы
     const newStudiedInPhase = studiedInPhase + totalPairs;
     const newPhaseOffset = phaseOffset + totalPairs;
@@ -234,8 +264,20 @@ export function MatchScreen({ navigation, route }: Props) {
       totalPhaseCards: phaseTotal,
       studiedInPhase: newStudiedInPhase,
       phaseOffset: newPhaseOffset,
+      session,
     });
-  }, [isComplete, navigation, setId, totalPairs, mistakes, studiedInPhase, cardLimit, dueCardIds, phaseOffset]);
+  }, [
+    isComplete,
+    navigation,
+    setId,
+    totalPairs,
+    mistakes,
+    studiedInPhase,
+    cardLimit,
+    dueCardIds,
+    phaseOffset,
+    session,
+  ]);
 
   useEffect(() => {
     if (!isComplete && totalPairs > 0 && matchedPairs === totalPairs) {
@@ -252,7 +294,8 @@ export function MatchScreen({ navigation, route }: Props) {
 
   // Предзагрузка звука correct2.wav для мгновенного отклика
   useEffect(() => {
-    preloadSound('/correct2.wav');
+    if (session) preloadSessionSfx(['pop', 'correct', 'error']);
+    else preloadSound('/correct2.wav');
   }, []);
 
   if (!set) {
@@ -260,42 +303,54 @@ export function MatchScreen({ navigation, route }: Props) {
   }
 
   const emptyState = totalPairs === 0;
+  const handleExit = () => {
+    if (session) navigation.navigate('SetDetail', { setId: session.setId });
+    else navigation.goBack();
+  };
 
   return (
-    <Container padded={false}>
-      <ScreenHeader
-        title="Пары"
-        onBack={() => navigation.goBack()}
-        bordered
-        right={<Button variant="icon" icon={Settings} accessibilityLabel="Настройки" onPress={openSettings} />}
-      />
-
-      <View style={styles.statusBlock}>
-        <View style={styles.statusRow}>
-          <Text variant="bodySmall" style={[styles.semibold, { color: colors.textPrimary }]}>
-            Пары: {matchedPairs}/{totalPairs || 0}
-          </Text>
+    <StageLayout
+      session={session}
+      progress={{ done: matchedPairs, total: totalPairs }}
+      task="Найдите пары"
+      taskAction={
+        <View style={styles.taskActions}>
           <Text
             variant="bodySmall"
-            style={{ color: colors.textSecondary, fontVariant: ['tabular-nums'] }}
+            style={[styles.timer, { color: colors.textSecondary }]}
+            accessibilityLabel={`Время ${formatTime(elapsed)}`}
           >
             {formatTime(elapsed)}
           </Text>
+          <Button
+            variant="icon"
+            icon={Settings}
+            iconSize={iconSize.s}
+            iconColor={colors.textSecondary}
+            accessibilityLabel="Настройки"
+            onPress={openSettings}
+          />
         </View>
-        <ProgressBar progress={progress} accessibilityLabel="Найдено пар" />
-        {/* <Text
-          variant="caption"
-          color="secondary"
-          style={{ textAlign: 'center', marginTop: spacing.xs }}
-        >
-          Соедини слово с переводом
-        </Text> */}
-      </View>
-
+      }
+      onExit={handleExit}
+      showIntro={phaseOffset === 0}
+      scroll={false}
+      footer={
+        emptyState ? null : (
+          <Text
+            variant="bodySmall"
+            align="center"
+            style={[styles.hint, { color: colors.textSecondary }]}
+          >
+            Нажмите слово, затем его перевод
+          </Text>
+        )
+      }
+    >
       {emptyState ? (
         <EmptyState icon={Layers} title="В этом наборе пока нет карточек" />
       ) : (
-        <View style={[styles.contentWrapper, { paddingHorizontal: screenPadding }]}>
+        <View style={styles.contentWrapper}>
           <View style={styles.grid}>
             <ScrollView
               style={styles.column}
@@ -312,18 +367,25 @@ export function MatchScreen({ navigation, route }: Props) {
                     <Pressable
                       disabled={isMatched || isComplete}
                       accessibilityRole="button"
-                      accessibilityState={{ selected: isSelected, disabled: isMatched || isComplete }}
+                      accessibilityState={{
+                        selected: isSelected,
+                        disabled: isMatched || isComplete,
+                      }}
                       onPress={() => handleSelectLeft(card.id)}
                       style={({ pressed }) => [
                         styles.card,
                         {
                           backgroundColor: isMatched
-                            ? alpha(colors.success, 10)
+                            ? session
+                              ? colors.surfaceMuted
+                              : alpha(colors.success, 10)
                             : isSelected
                               ? alpha(colors.primary, 10)
                               : colors.surface,
                           borderColor: isMatched
-                            ? colors.success
+                            ? session
+                              ? colors.borderLight
+                              : colors.success
                             : isSelected
                               ? colors.primary
                               : colors.border,
@@ -337,7 +399,9 @@ export function MatchScreen({ navigation, route }: Props) {
                           styles.cardText,
                           {
                             color: isMatched
-                              ? colors.successText
+                              ? session
+                                ? colors.textTertiary
+                                : colors.successText
                               : isSelected
                                 ? colors.primary
                                 : colors.textPrimary,
@@ -371,18 +435,25 @@ export function MatchScreen({ navigation, route }: Props) {
                     <Pressable
                       disabled={isMatched || isComplete}
                       accessibilityRole="button"
-                      accessibilityState={{ selected: isSelected, disabled: isMatched || isComplete }}
+                      accessibilityState={{
+                        selected: isSelected,
+                        disabled: isMatched || isComplete,
+                      }}
                       onPress={() => handleSelectRight(card.id)}
                       style={({ pressed }) => [
                         styles.card,
                         {
                           backgroundColor: isMatched
-                            ? alpha(colors.success, 10)
+                            ? session
+                              ? colors.surfaceMuted
+                              : alpha(colors.success, 10)
                             : isSelected
                               ? alpha(colors.primary, 10)
                               : colors.surface,
                           borderColor: isMatched
-                            ? colors.success
+                            ? session
+                              ? colors.borderLight
+                              : colors.success
                             : isSelected
                               ? colors.primary
                               : colors.border,
@@ -396,7 +467,9 @@ export function MatchScreen({ navigation, route }: Props) {
                           styles.cardText,
                           {
                             color: isMatched
-                              ? colors.successText
+                              ? session
+                                ? colors.textTertiary
+                                : colors.successText
                               : isSelected
                                 ? colors.primary
                                 : colors.textPrimary,
@@ -426,10 +499,18 @@ export function MatchScreen({ navigation, route }: Props) {
         onRequestClose={closeSettings}
       >
         <View style={styles.modalRoot}>
-          <Pressable accessibilityRole="button" style={styles.backdrop} onPress={closeSettings} accessibilityLabel="Закрыть настройки">
+          <Pressable
+            accessibilityRole="button"
+            style={styles.backdrop}
+            onPress={closeSettings}
+            accessibilityLabel="Закрыть настройки"
+          >
             <Animated.View
               pointerEvents="none"
-              style={[styles.backdropTint, { backgroundColor: colors.overlay, opacity: backdropOpacity }]}
+              style={[
+                styles.backdropTint,
+                { backgroundColor: colors.overlay, opacity: backdropOpacity },
+              ]}
             />
           </Pressable>
 
@@ -445,18 +526,19 @@ export function MatchScreen({ navigation, route }: Props) {
             ]}
           >
             <View style={styles.settingsRow}>
-              <Text variant="body" style={[styles.semibold, { color: colors.textPrimary }]}>Реверс</Text>
-              <Switch value={reverseEnabled} onValueChange={handleToggleReverse} accessibilityLabel="Реверс" />
+              <Text variant="body" style={[styles.semibold, { color: colors.textPrimary }]}>
+                Реверс
+              </Text>
+              <Switch
+                value={reverseEnabled}
+                onValueChange={handleToggleReverse}
+                accessibilityLabel="Реверс"
+              />
             </View>
           </Animated.View>
         </View>
       </Modal>
-
-      <View
-        style={[styles.bottomFade, { backgroundColor: colors.background }]}
-        pointerEvents="none"
-      />
-    </Container>
+    </StageLayout>
   );
 }
 
@@ -464,15 +546,16 @@ const styles = StyleSheet.create({
   semibold: {
     fontWeight: '600',
   },
-  statusBlock: {
-    paddingHorizontal: screenPadding,
-    paddingVertical: spacing.m,
-    gap: spacing.xs,
-  },
-  statusRow: {
+  taskActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: spacing.xs,
+  },
+  timer: {
+    fontVariant: ['tabular-nums'],
+  },
+  hint: {
+    paddingBottom: spacing.xs,
   },
   contentWrapper: {
     flex: 1,
@@ -487,7 +570,7 @@ const styles = StyleSheet.create({
   },
   columnContent: {
     gap: spacing.s,
-    paddingBottom: spacing.xxl,
+    paddingBottom: spacing.m,
   },
   card: {
     borderRadius: borderRadius.l,
@@ -498,15 +581,6 @@ const styles = StyleSheet.create({
   },
   cardText: {
     fontWeight: '600',
-  },
-  // Мягкое затухание списка у нижнего края
-  bottomFade: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 40,
-    opacity: 0.8,
   },
   modalRoot: {
     flex: 1,

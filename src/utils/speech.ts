@@ -1,10 +1,12 @@
 /**
  * Speech helper
- * Google Cloud TTS (API key or service account) with Web Speech fallback.
+ * Облачный голос: Azure через наш сервер (api/ai.js?fn=tts), затем Google TTS (уходит в TTS 4),
+ * затем голос браузера (Web Speech) или устройства (react-native-tts).
  * On native (Android/iOS) uses react-native-tts as fallback instead of Web Speech API.
  */
 
 import { Platform } from 'react-native';
+import { log } from '@/utils/logger';
 
 let Tts: any | null = null;
 let RNFS: any | null = null;
@@ -14,19 +16,19 @@ if (Platform.OS !== 'web') {
     const ttsModule = require('react-native-tts');
     Tts = ttsModule?.default ?? ttsModule;
   } catch (error) {
-    console.warn('[speech] Failed to load react-native-tts:', error);
+    log.warn('Speech', 'Failed to load react-native-tts', error);
   }
   try {
     const fsModule = require('react-native-fs');
     RNFS = fsModule?.default ?? fsModule;
   } catch (error) {
-    console.warn('[speech] Failed to load react-native-fs:', error);
+    log.warn('Speech', 'Failed to load react-native-fs', error);
   }
   try {
     const soundModule = require('react-native-sound');
     Sound = soundModule?.default ?? soundModule;
   } catch (error) {
-    console.warn('[speech] Failed to load react-native-sound:', error);
+    log.warn('Speech', 'Failed to load react-native-sound', error);
   }
 }
 
@@ -38,23 +40,23 @@ if (isNative && Tts && typeof Tts.getInitStatus === 'function') {
   Tts.getInitStatus()
     .then(() => {
       nativeTtsReady = true;
-      console.log('[speech] Native TTS initialized');
+      log.debug('Speech', 'Native TTS initialized');
     })
     .catch((err: any) => {
       // On some Android devices, TTS engine needs to be installed
       if (err?.code === 'no_engine') {
-        console.warn('[speech] No TTS engine installed on device');
+        log.warn('Speech', 'No TTS engine installed on device');
         if (typeof Tts.requestInstallEngine === 'function') {
           Tts.requestInstallEngine();
         }
       } else {
-        console.warn('[speech] Native TTS init error:', err);
+        log.warn('Speech', 'Native TTS init error', err);
         // Still mark as ready — speak() may work anyway
         nativeTtsReady = true;
       }
     });
 } else if (isNative) {
-  console.warn('[speech] Native TTS module unavailable');
+  log.warn('Speech', 'Native TTS module unavailable');
 }
 
 type SpeechVoice = {
@@ -223,19 +225,35 @@ export const toSpeechLang = (code?: string | null): string | undefined => {
 };
 
 /** Язык озвучки: язык набора, если он известен, иначе — угадываем по тексту */
-export const resolveSpeechLang = (text: string, langHint?: string | null, counterpart?: string): string =>
-  toSpeechLang(langHint) || detectLanguage(text, counterpart);
+export const resolveSpeechLang = (
+  text: string,
+  langHint?: string | null,
+  counterpart?: string
+): string => toSpeechLang(langHint) || detectLanguage(text, counterpart);
 
 /**
  * Языки сторон карточки — из её набора (card.setId). Берём набор самой карточки, а не экрана:
  * в тренировке с главной карточки из разных наборов идут вперемешку.
  */
-export function cardSpeechLangs(card?: { setId?: string } | null): { front?: string; back?: string } {
+export function cardSpeechLangs(card?: { setId?: string } | null): {
+  front?: string;
+  back?: string;
+} {
   if (!card?.setId) return {};
   // Ленивый require — как в других сервисах, чтобы не было циклических импортов со store
   const { useSetsStore } = require('@/store/setsStore');
   const set = useSetsStore.getState().getSet(card.setId);
   return { front: toSpeechLang(set?.languageFrom), back: toSpeechLang(set?.languageTo) };
+}
+
+/**
+ * Озвучивать ли карточку: у предметного набора озвучки нет (plan/new/set_kind.md) — ни кнопки,
+ * ни предзагрузки. Набор берём по карточке: на главной карточки из разных наборов курса.
+ */
+export function isCardSpeakable(card?: { setId?: string } | null): boolean {
+  if (!card?.setId) return true;
+  const { useSetsStore } = require('@/store/setsStore');
+  return useSetsStore.getState().getSet(card.setId)?.kind !== 'subject';
 }
 
 // ----------------- Google auth helpers -----------------
@@ -255,9 +273,15 @@ const base64UrlEncode = (data: ArrayBuffer | string) => {
 };
 
 const importPrivateKey = async (pem: string) => {
-  const cleaned = pem.replace('-----BEGIN PRIVATE KEY-----', '').replace('-----END PRIVATE KEY-----', '').replace(/\s+/g, '');
-  const binaryStr = typeof atob !== 'undefined' ? atob(cleaned) : getGlobal().Buffer.from(cleaned, 'base64').toString('binary');
-  const binary = Uint8Array.from(binaryStr, (c) => c.charCodeAt(0));
+  const cleaned = pem
+    .replace('-----BEGIN PRIVATE KEY-----', '')
+    .replace('-----END PRIVATE KEY-----', '')
+    .replace(/\s+/g, '');
+  const binaryStr =
+    typeof atob !== 'undefined'
+      ? atob(cleaned)
+      : getGlobal().Buffer.from(cleaned, 'base64').toString('binary');
+  const binary = Uint8Array.from(binaryStr, (c: string) => c.charCodeAt(0));
   const subtle = getGlobal().crypto?.subtle;
   if (!subtle) throw new Error('WebCrypto not available');
   return await subtle.importKey(
@@ -276,7 +300,11 @@ const signJwt = async (payload: Record<string, unknown>, pem: string) => {
 
   const data = `${base64UrlEncode(JSON.stringify(header))}.${base64UrlEncode(JSON.stringify(payload))}`;
   const key = await importPrivateKey(pem);
-  const signature = await subtle.sign({ name: 'RSASSA-PKCS1-v1_5' }, key, new TextEncoder().encode(data));
+  const signature = await subtle.sign(
+    { name: 'RSASSA-PKCS1-v1_5' },
+    key,
+    new TextEncoder().encode(data)
+  );
   return `${data}.${base64UrlEncode(signature)}`;
 };
 
@@ -286,31 +314,38 @@ const getApiKey = () => {
   const key = ENV_GCLOUD_TTS_KEY || undefined;
   // Раньше логировались первые 10 символов ключа — не нужно писать фрагмент секрета в логи,
   // даже частично. См. план, пункт 52.
-  console.log('[speech] API Key available:', !!key);
+  log.debug('Speech', 'API Key available', !!key);
   return key;
 };
 
 const getServiceAccount = (): ServiceAccount | null => {
   const envJson = ENV_GCLOUD_TTS_SA || undefined;
 
-  console.log('[speech] Service Account JSON available:', !!envJson, envJson ? `(length: ${envJson.length})` : '');
+  log.debug(
+    'Speech',
+    'Service Account JSON available',
+    !!envJson,
+    envJson ? `(length: ${envJson.length})` : ''
+  );
 
   if (envJson) {
     try {
       // Remove surrounding quotes if present
       let cleaned = envJson.trim();
-      if ((cleaned.startsWith("'") && cleaned.endsWith("'")) ||
-          (cleaned.startsWith('"') && cleaned.endsWith('"'))) {
+      if (
+        (cleaned.startsWith("'") && cleaned.endsWith("'")) ||
+        (cleaned.startsWith('"') && cleaned.endsWith('"'))
+      ) {
         cleaned = cleaned.slice(1, -1);
       }
 
       const decoded = decodeMaybeBase64(cleaned);
       const parsed = JSON.parse(decoded);
-      console.log('[speech] Service Account parsed:', !!parsed?.client_email, !!parsed?.private_key);
+      log.debug('Speech', 'Service Account parsed', !!parsed?.client_email, !!parsed?.private_key);
 
       if (parsed?.client_email && parsed?.private_key) return parsed;
     } catch (e) {
-      console.warn('[speech] Failed to parse GCLOUD_TTS_SA:', e);
+      log.warn('Speech', 'Failed to parse GCLOUD_TTS_SA', e);
     }
   }
 
@@ -385,7 +420,8 @@ let ttsCachePruned = false;
 
 /** Стабильный короткий ключ: голос + язык + скорость + высота + текст (djb2 → hex) */
 const ttsKey = (text: string, lang: string, options?: { rate?: number; pitch?: number }) => {
-  const raw = `${pickGoogleVoice(lang) || ''}|${lang}|${toGoogleRate(options?.rate)}|${toGooglePitch(options?.pitch)}|${text}`;
+  // 'azure' — чтобы на телефоне не играли старые mp3 голоса Google из кэша
+  const raw = `azure|${pickGoogleVoice(lang) || ''}|${lang}|${toGoogleRate(options?.rate)}|${toGooglePitch(options?.pitch)}|${text}`;
   let h1 = 5381;
   let h2 = 52711;
   for (let i = 0; i < raw.length; i++) {
@@ -441,7 +477,7 @@ const playAudioFile = (filePath: string, volume = 1): Promise<void> => {
   return new Promise<void>((resolve, reject) => {
     const sound = new Sound(filePath, '', (err: any) => {
       if (err) {
-        console.error('[speech] Sound load error:', err);
+        log.warn('Speech', 'Sound load error', err);
         reject(err);
         return;
       }
@@ -465,13 +501,46 @@ const playCachedAudio = async (key: string, volume = 1) => {
   await audio.play();
 };
 
-/** Синтез у Google и сохранение в кэш (без проигрывания). false — нет ключа/токена. */
+/**
+ * Облачный голос Azure через наш сервер (api/_ai/tts.js) — ключ только на сервере.
+ * false — сервер не смог (не вошёл, нет ключа, лимит F0, нет сети): дальше запасные голоса.
+ */
+const synthesizeWithServer = async (
+  key: string,
+  text: string,
+  lang: string,
+  options?: { rate?: number }
+): Promise<boolean> => {
+  // Ленивый require — клиент API тянет auth/session, не создаём циклических импортов
+  const { apiFetch } = require('@/services/api/client');
+  const res = await apiFetch('ai', {
+    method: 'POST',
+    query: { fn: 'tts' },
+    auth: 'required',
+    timeoutMs: TTS_TIMEOUT_MS,
+    body: { text, lang, rate: options?.rate ?? 1 },
+  });
+  if (!res.ok || !res.json?.audioContent) {
+    log.debug('Speech', 'Server TTS unavailable', res.status, res.json?.error);
+    return false;
+  }
+  await storeCachedAudio(key, res.json.audioContent);
+  return true;
+};
+
+/** Синтез и сохранение в кэш (без проигрывания): Azure через сервер, затем Google. false — не вышло. */
 const synthesizeToCache = async (
   key: string,
   text: string,
   lang: string,
-  options?: { rate?: number; pitch?: number },
+  options?: { rate?: number; pitch?: number }
 ): Promise<boolean> => {
+  try {
+    if (await synthesizeWithServer(key, text, lang, options)) return true;
+  } catch (e) {
+    log.warn('Speech', 'Server TTS failed', e);
+  }
+
   const fetchFn = getGlobal().fetch as FetchLike | undefined;
   if (!fetchFn) return false;
 
@@ -481,11 +550,15 @@ const synthesizeToCache = async (
   try {
     token = await getAccessToken();
   } catch (e) {
-    console.warn('[speech] getAccessToken failed:', e);
+    log.warn('Speech', 'getAccessToken failed', e);
   }
   if (!token && !apiKey) return false;
 
-  const languageCode = (lang || 'en-US').split('-').slice(0, 2).join('-').replace(/^zh-CN$/i, 'cmn-CN');
+  const languageCode = (lang || 'en-US')
+    .split('-')
+    .slice(0, 2)
+    .join('-')
+    .replace(/^zh-CN$/i, 'cmn-CN');
   const url = token ? GOOGLE_TTS_ENDPOINT : `${GOOGLE_TTS_ENDPOINT}?key=${apiKey}`;
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -526,7 +599,7 @@ const ensureCached = (
   key: string,
   text: string,
   lang: string,
-  options?: { rate?: number; pitch?: number },
+  options?: { rate?: number; pitch?: number }
 ): Promise<boolean> => {
   const pending = inflight.get(key);
   if (pending) return pending;
@@ -538,7 +611,7 @@ const ensureCached = (
   return job;
 };
 
-const speakWithGoogle = async (
+const speakWithCloud = async (
   text: string,
   lang: string,
   options?: { rate?: number; pitch?: number; volume?: number }
@@ -559,7 +632,9 @@ const speakWithGoogle = async (
  * Заранее озвучить слова, которые вероятно нажмут (текущая и следующая карточка) — тогда кнопка
  * динамика играет мгновенно. Тихо: ошибки (нет сети, нет ключа) игнорируются.
  */
-export function prefetchSpeech(items: Array<{ text: string; counterpart?: string; lang?: string }>): void {
+export function prefetchSpeech(
+  items: Array<{ text: string; counterpart?: string; lang?: string }>
+): void {
   for (const item of items) {
     const normalized = (item.text || '').trim().split(/\r?\n/)[0].trim();
     if (!normalized) continue;
@@ -576,7 +651,9 @@ const speakWithWebSpeech = async (
   options?: { rate?: number; pitch?: number; volume?: number }
 ) => {
   const synth = getEngine();
-  const UtteranceCtor = getGlobal().SpeechSynthesisUtterance as (new (text?: string) => SpeechUtterance) | undefined;
+  const UtteranceCtor = getGlobal().SpeechSynthesisUtterance as
+    | (new (utteranceText?: string) => SpeechUtterance)
+    | undefined;
   if (!synth || !UtteranceCtor) return;
 
   const voices = await loadVoices();
@@ -604,17 +681,19 @@ const speakWithNativeTTS = async (
   try {
     if (typeof Tts.stop === 'function') await Tts.stop();
     if (typeof Tts.setDefaultLanguage === 'function') await Tts.setDefaultLanguage(lang);
-    if (typeof Tts.setDefaultRate === 'function') await Tts.setDefaultRate(options?.rate ?? 0.5);
+    // rate везде: 1 — обычная скорость; у голоса устройства обычная — 0.5
+    if (typeof Tts.setDefaultRate === 'function')
+      await Tts.setDefaultRate(0.5 * (options?.rate ?? 1));
     if (typeof Tts.setDefaultPitch === 'function') await Tts.setDefaultPitch(options?.pitch ?? 1);
     if (typeof Tts.speak === 'function') {
       Tts.speak(text);
     } else {
       throw new Error('TTS speak is unavailable');
     }
-    console.log('[speech] Native TTS speaking:', lang);
+    log.debug('Speech', 'Native TTS speaking', lang);
     return true;
   } catch (e) {
-    console.warn('[speech] Native TTS failed:', e);
+    log.warn('Speech', 'Native TTS failed', e);
     return false;
   }
 };
@@ -629,34 +708,34 @@ export async function speak(
   if (!text) return;
 
   if (isNative) {
-    // On native: try Google Cloud TTS first (high quality), fall back to device TTS
+    // On native: cloud voice first (Azure via server), fall back to device TTS
     try {
-      console.log('[speech] [native] Attempting Google Cloud TTS...');
-      const done = await speakWithGoogle(text, lang, options);
+      log.debug('Speech', '[native] Attempting cloud TTS...');
+      const done = await speakWithCloud(text, lang, options);
       if (done) {
-        console.log('[speech] [native] Google Cloud TTS succeeded');
+        log.debug('Speech', '[native] Cloud TTS succeeded');
         return;
       }
     } catch (e) {
-      console.warn('[speech] [native] Google TTS failed:', e);
+      log.warn('Speech', '[native] Cloud TTS failed', e);
     }
-    console.log('[speech] [native] Falling back to native TTS');
+    log.debug('Speech', '[native] Falling back to native TTS');
     await speakWithNativeTTS(text, lang, options);
     return;
   }
 
-  // On web: try Google Cloud TTS first, fall back to Web Speech API
+  // On web: cloud voice first (Azure via server), fall back to Web Speech API
   try {
-    console.log('[speech] Attempting Google Cloud TTS...');
-    const done = await speakWithGoogle(text, lang, options);
+    log.debug('Speech', 'Attempting cloud TTS...');
+    const done = await speakWithCloud(text, lang, options);
     if (done) {
-      console.log('[speech] Google Cloud TTS succeeded');
+      log.debug('Speech', 'Cloud TTS succeeded');
       return;
     }
-    console.log('[speech] Google TTS returned false, falling back to Web Speech');
+    log.debug('Speech', 'Cloud TTS unavailable, falling back to Web Speech');
   } catch (e) {
-    console.warn('[speech] Google TTS failed, fallback to Web Speech:', e);
+    log.warn('Speech', 'Cloud TTS failed, fallback to Web Speech', e);
   }
-  console.log('[speech] Using Web Speech fallback');
+  log.debug('Speech', 'Using Web Speech fallback');
   await speakWithWebSpeech(text, lang, options);
 }

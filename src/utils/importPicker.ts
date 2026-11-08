@@ -5,7 +5,12 @@
  * Результат — готовые к отправке ImportFile; null — пользователь отменил.
  */
 import DocumentPicker from 'react-native-document-picker';
-import { launchCamera, launchImageLibrary, type Asset, type ImageLibraryOptions } from 'react-native-image-picker';
+import {
+  launchCamera,
+  launchImageLibrary,
+  type Asset,
+  type ImageLibraryOptions,
+} from 'react-native-image-picker';
 import { IMPORT_LIMITS, type ImportFile } from '@/services/AiImportService';
 
 export class PickError extends Error {}
@@ -38,8 +43,10 @@ function assetToFile(asset: Asset, index: number): ImportFile | null {
 export async function pickFromCamera(): Promise<ImportFile[] | null> {
   const result = await launchCamera({ ...PHOTO_OPTIONS, saveToPhotos: false });
   if (result.didCancel) return null;
-  if (result.errorCode === 'camera_unavailable') throw new PickError('Камера недоступна на этом устройстве');
-  if (result.errorCode === 'permission') throw new PickError('Разреши доступ к камере в настройках');
+  if (result.errorCode === 'camera_unavailable')
+    throw new PickError('Камера недоступна на этом устройстве');
+  if (result.errorCode === 'permission')
+    throw new PickError('Разреши доступ к камере в настройках');
   if (result.errorCode) throw new PickError('Не удалось открыть камеру');
   const file = result.assets?.[0] && assetToFile(result.assets[0], 0);
   if (!file) throw new PickError('Не удалось прочитать фото');
@@ -80,16 +87,21 @@ export async function pickDocuments(limit: number): Promise<ImportFile[] | null>
   const files: ImportFile[] = [];
   for (const doc of picked.slice(0, limit)) {
     const name = doc.name || 'file';
-    const ext = Object.keys(DOC_TYPES).find(e => name.toLowerCase().endsWith(e));
-    if (!ext) throw new PickError(`«${name}» — такой формат не подходит. Нужен PDF, CSV, TSV или TXT`);
+    const ext = Object.keys(DOC_TYPES).find((e) => name.toLowerCase().endsWith(e));
+    if (!ext)
+      throw new PickError(`«${name}» — такой формат не подходит. Нужен PDF, CSV, TSV или TXT`);
     const { kind, mimeType } = DOC_TYPES[ext];
     if (kind === 'pdf' && doc.size && doc.size > IMPORT_LIMITS.maxPdfBytes) {
       throw new PickError(`«${name}» больше 3 МБ. Раздели PDF или сфотографируй нужные страницы`);
     }
-    const path = decodeURI(((doc as { fileCopyUri?: string }).fileCopyUri || doc.uri).replace('file://', ''));
-    files.push(kind === 'pdf'
-      ? { id: newId(), name, kind, mimeType, base64: await RNFS.readFile(path, 'base64') }
-      : { id: newId(), name, kind, mimeType, content: await RNFS.readFile(path, 'utf8') });
+    const path = decodeURI(
+      ((doc as { fileCopyUri?: string }).fileCopyUri || doc.uri).replace('file://', '')
+    );
+    files.push(
+      kind === 'pdf'
+        ? { id: newId(), name, kind, mimeType, base64: await RNFS.readFile(path, 'base64') }
+        : { id: newId(), name, kind, mimeType, content: await RNFS.readFile(path, 'utf8') }
+    );
   }
   return files;
 }

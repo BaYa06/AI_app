@@ -94,14 +94,21 @@ describe('whatsNew', () => {
   });
 
   it('даты публикации и окончания', () => {
-    const all = [item('later', { publishedAt: '2026-11-05' }), item('old', { expiresAt: '2026-10-30' })];
+    const all = [
+      item('later', { publishedAt: '2026-11-05' }),
+      item('old', { expiresAt: '2026-10-30' }),
+    ];
     expect(selectNews(all, ctx)).toEqual([]);
     expect(ids(selectNews(all, { ...ctx, today: '2026-11-05' }))).toEqual(['later']);
     expect(ids(selectNews([item('last', { expiresAt: '2026-10-31' })], ctx))).toEqual(['last']);
   });
 
   it('сортировка по priority, важное первым', () => {
-    const all = [item('low', { priority: 1 }), item('high', { priority: 50 }), item('mid', { priority: 10 })];
+    const all = [
+      item('low', { priority: 1 }),
+      item('high', { priority: 50 }),
+      item('mid', { priority: 10 }),
+    ];
     expect(ids(selectNews(all, ctx))).toEqual(['high', 'mid', 'low']);
   });
 
@@ -119,7 +126,11 @@ describe('whatsNew', () => {
   });
 
   it('незнакомая иллюстрация — страница без картинки', () => {
-    const [known, unknown, none] = toPages([item('a'), item('b', { art: 'rocket' }), item('c', { art: null })]);
+    const [known, unknown, none] = toPages([
+      item('a'),
+      item('b', { art: 'rocket' }),
+      item('c', { art: null }),
+    ]);
     expect(known).toMatchObject({ art: 'swipe' });
     expect(unknown).toMatchObject({ art: null });
     expect(none).toMatchObject({ art: null });
@@ -152,10 +163,26 @@ describe('whatsNew', () => {
   });
 
   it('страницы для окна: новость и «И ещё»', () => {
-    const pages = toPages(['a', 'b', 'c', 'd', 'e'].map((id) => item(id, { action: { label: 'Попробовать', route: 'Study' } })));
+    const pages = toPages(
+      ['a', 'b', 'c', 'd', 'e'].map((id) =>
+        item(id, { action: { label: 'Попробовать', route: 'Study' } })
+      )
+    );
     const sheet = toSheetPages(pages);
-    expect(sheet[0]).toEqual({ tag: 'Тег', title: 'a', text: 'Текст', art: 'swipe', actionLabel: 'Попробовать', items: [] });
-    expect(sheet[3]).toMatchObject({ tag: 'И ещё', art: null, actionLabel: null, items: ['d', 'e'] });
+    expect(sheet[0]).toEqual({
+      tag: 'Тег',
+      title: 'a',
+      text: 'Текст',
+      art: 'swipe',
+      actionLabel: 'Попробовать',
+      items: [],
+    });
+    expect(sheet[3]).toMatchObject({
+      tag: 'И ещё',
+      art: null,
+      actionLabel: null,
+      items: ['d', 'e'],
+    });
   });
 
   it('запуск: сессия есть при первом запуске — старый пользователь', () => {
@@ -215,12 +242,16 @@ describe('whatsNew', () => {
   });
 
   describe('новости с сервера', () => {
-    const remoteItem = (id: string, extra: Partial<WhatsNewItem> = {}) => item(id, { minVersion: '1.6.9', ...extra });
+    const remoteItem = (id: string, extra: Partial<WhatsNewItem> = {}) =>
+      item(id, { minVersion: '1.6.9', ...extra });
 
     it('битые записи отбрасываем, ответ без items — null', () => {
       expect(parseRemoteNews(null)).toBeNull();
       expect(parseRemoteNews({ items: 'x' })).toBeNull();
-      const parsed = parseRemoteNews({ items: [remoteItem('ok'), { id: 'broken' }, null], hidden: ['a', 1] });
+      const parsed = parseRemoteNews({
+        items: [remoteItem('ok'), { id: 'broken' }, null],
+        hidden: ['a', 1],
+      });
       expect(parsed && ids(parsed.items)).toEqual(['ok']);
       expect(parsed?.hidden).toEqual([]);
     });
@@ -244,12 +275,17 @@ describe('whatsNew', () => {
       mockStore.clear();
       (global as any).fetch = jest.fn(async () => ({
         ok: true,
-        json: async () => ({ data: { items: [remoteItem('server-only')], hidden: ['cards-swipe'] } }),
+        json: async () => ({
+          data: { items: [remoteItem('server-only')], hidden: ['cards-swipe'] },
+        }),
       }));
       const fresh = await refreshNews();
       expect(ids(fresh)).toContain('server-only');
       expect(ids(fresh)).not.toContain('cards-swipe');
-      expect((global as any).fetch).toHaveBeenCalledWith('https://api.test/data?action=news', expect.anything());
+      expect((global as any).fetch).toHaveBeenCalledWith(
+        'https://api.test/data?action=news',
+        expect.anything()
+      );
 
       (global as any).fetch = jest.fn(async () => {
         throw new Error('offline');
@@ -281,7 +317,11 @@ describe('whatsNew', () => {
       const student = toPages(selectNews(WHATS_NEW_FALLBACK, ctx));
       expect(student).toHaveLength(4);
       expect(student[0]).toMatchObject({ kind: 'item', item: { id: 'cards-swipe' } });
-      const teacher = selectNews(WHATS_NEW_FALLBACK, { ...ctx, role: 'teacher', platform: 'android' });
+      const teacher = selectNews(WHATS_NEW_FALLBACK, {
+        ...ctx,
+        role: 'teacher',
+        platform: 'android',
+      });
       expect(ids(teacher)).toEqual(['share-set-teacher', 'books-2026-10-teacher', 'home-skeleton']);
     });
   });

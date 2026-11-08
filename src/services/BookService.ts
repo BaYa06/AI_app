@@ -4,42 +4,59 @@
  * План: plan/book_catalog_plan.md, части 3–4.
  */
 
-import { supabase } from './supabaseClient';
-import { API_BASE } from '@/config/apiBase';
-import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
+import { getAccessToken } from './auth/session';
+import { apiFetch } from './api/client';
 import type { Card, CardSet, CardStatus } from '@/types';
+import { getCardStatus, isCardLearned } from './SRSService';
 import type { BookDetail, BookFilters, BookListItem, CoursePlan } from '@/types/books';
-
-const BOOKS_API_BASE = `${API_BASE}/books`;
+import { log } from '@/utils/logger';
 
 // Ленивый доступ к сторам — как в DatabaseService: сторы импортируют сервисы, прямой импорт дал бы цикл.
 const getStores = () => ({
-  useSetsStore: require('../store/setsStore').useSetsStore as typeof import('../store/setsStore').useSetsStore,
-  useCardsStore: require('../store/cardsStore').useCardsStore as typeof import('../store/cardsStore').useCardsStore,
+  useSetsStore: require('../store/setsStore')
+    .useSetsStore as typeof import('../store/setsStore').useSetsStore,
+  useCardsStore: require('../store/cardsStore')
+    .useCardsStore as typeof import('../store/cardsStore').useCardsStore,
 });
 
 export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string; status: number };
 
 async function callBooksApi<T>(
   action: string,
-  { method = 'GET', body, params }: { method?: 'GET' | 'POST'; body?: Record<string, unknown>; params?: Record<string, string> } = {},
+  {
+    method = 'GET',
+    body,
+    params,
+  }: {
+    method?: 'GET' | 'POST';
+    body?: Record<string, unknown>;
+    params?: Record<string, string>;
+  } = {}
 ): Promise<ApiResult<T>> {
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
+  const token = await getAccessToken();
   if (!token) return { ok: false, error: 'Not authenticated', status: 401 };
 
-  const query = new URLSearchParams({ action, ...(params || {}) }).toString();
+  const query = new URLSearchParams({ action, ...(params || {}) });
   try {
-    const resp = await fetchWithTimeout(`${BOOKS_API_BASE}?${query}`, {
+    const res = await apiFetch('books', {
       method,
+      query,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: method === 'POST' ? JSON.stringify(body || {}) : undefined,
+      auth: 'none',
+      body: method === 'POST' ? body || {} : undefined,
     });
-    const json = await resp.json().catch(() => ({}));
-    if (!resp.ok) return { ok: false, error: json?.error || `HTTP ${resp.status}`, status: resp.status };
+    // Сеть/таймаут — в catch ниже с исходным исключением fetch, как раньше
+    if (!res.response) throw res.error.original;
+    const json = res.json;
+    if (!res.ok)
+      return { ok: false, error: json?.error || `HTTP ${res.status}`, status: res.status };
     return { ok: true, data: json as T };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'Network error', status: 0 };
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Network error',
+      status: 0,
+    };
   }
 }
 
@@ -53,16 +70,36 @@ function statusFromStep(learningStep: number): CardStatus {
 
 interface OfficialSetsResponse {
   sets: Array<{
-    id: string; title: string; description: string; category: string;
-    languageFrom: string; languageTo: string; createdAt: string; updatedAt: string | null;
-    unitId: string; unitNumber: number; unitTitle: string; bookId: string; bookTitle: string;
+    id: string;
+    title: string;
+    description: string;
+    category: string;
+    languageFrom: string;
+    languageTo: string;
+    createdAt: string;
+    updatedAt: string | null;
+    unitId: string;
+    unitNumber: number;
+    unitTitle: string;
+    bookId: string;
+    bookTitle: string;
     /** Мои курсы (учитель или ученик), где юнит сейчас открыт. */
     courseIds: string[];
   }>;
   cards: Array<{
-    id: string; setId: string; front: string; back: string; example: string;
-    wordForm: string | null; wordType: Card['wordType'] | null; imageUrl: string | null; audioUrl: string | null;
-    createdAt: string; learningStep: number; nextReview: string; lastReviewed: string | null;
+    id: string;
+    setId: string;
+    front: string;
+    back: string;
+    example: string;
+    wordForm: string | null;
+    wordType: Card['wordType'] | null;
+    imageUrl: string | null;
+    audioUrl: string | null;
+    createdAt: string;
+    learningStep: number;
+    nextReview: string;
+    lastReviewed: string | null;
   }>;
 }
 
@@ -79,7 +116,7 @@ export const BookService = {
     if (filters.q) params.q = filters.q;
     const result = await callBooksApi<{ books: BookListItem[] }>('list-books', { params });
     if (!result.ok) {
-      console.warn('[BookService] listBooks failed:', result.error);
+      log.warn('BookService', 'listBooks failed', result.error);
       return [];
     }
     return result.data.books;
@@ -88,7 +125,7 @@ export const BookService = {
   async getBookDetail(bookId: string): Promise<BookDetail | null> {
     const result = await callBooksApi<BookDetail>('book-detail', { params: { bookId } });
     if (!result.ok) {
-      console.warn('[BookService] getBookDetail failed:', result.error);
+      log.warn('BookService', 'getBookDetail failed', result.error);
       return null;
     }
     return result.data;
@@ -99,12 +136,15 @@ export const BookService = {
    * Наборы всегда read-only — SRS пишется только в card_progress, не в общую таблицу cards.
    * `courseIdBySet` — под каким курсом показывать набор (для открытых юнитов курса).
    */
-  async loadOfficialSets(setIds: string[] = [], courseIdBySet: Record<string, string> = {}): Promise<OfficialSetsBundle | null> {
+  async loadOfficialSets(
+    setIds: string[] = [],
+    courseIdBySet: Record<string, string> = {}
+  ): Promise<OfficialSetsBundle | null> {
     const params: Record<string, string> = {};
     if (setIds.length > 0) params.setIds = [...new Set(setIds)].slice(0, 100).join(',');
     const result = await callBooksApi<OfficialSetsResponse>('official-sets', { params });
     if (!result.ok) {
-      console.warn('[BookService] loadOfficialSets failed:', result.error);
+      log.warn('BookService', 'loadOfficialSets failed', result.error);
       return null;
     }
 
@@ -148,12 +188,17 @@ export const BookService = {
         languageFrom: row.languageFrom,
         languageTo: row.languageTo,
         createdAt: new Date(row.createdAt).getTime(),
-        updatedAt: row.updatedAt ? new Date(row.updatedAt).getTime() : new Date(row.createdAt).getTime(),
+        updatedAt: row.updatedAt
+          ? new Date(row.updatedAt).getTime()
+          : new Date(row.createdAt).getTime(),
         cardCount: cards.length,
-        newCount: cards.filter((c) => c.status === 'new').length,
-        learningCount: cards.filter((c) => c.status === 'learning').length,
+        // Статус по шагу, как везде (plan/new/word_status_colors.md); выученные — young + mature
+        newCount: cards.filter((c) => getCardStatus(c) === 'new').length,
+        learningCount: cards.filter((c) => getCardStatus(c) === 'learning').length,
+        youngCount: cards.filter((c) => getCardStatus(c) === 'young').length,
+        matureCount: cards.filter((c) => getCardStatus(c) === 'mature').length,
         reviewCount: 0,
-        masteredCount: cards.filter((c) => c.status === 'mature').length,
+        masteredCount: cards.filter((c) => isCardLearned(c)).length,
         isPublic: false,
         isFavorite: false,
         isArchived: false,
@@ -177,7 +222,10 @@ export const BookService = {
    * Если прогресс по карточке на устройстве новее серверного (ответ ещё не дошёл до card_progress),
    * локальный прогресс не затирается.
    */
-  applyOfficialSets(bundle: OfficialSetsBundle, { preserveCourse = true }: { preserveCourse?: boolean } = {}): void {
+  applyOfficialSets(
+    bundle: OfficialSetsBundle,
+    { preserveCourse = true }: { preserveCourse?: boolean } = {}
+  ): void {
     const { useSetsStore, useCardsStore } = getStores();
     const currentSets = useSetsStore.getState().sets;
     const currentCards = useCardsStore.getState().cards;
@@ -193,7 +241,13 @@ export const BookService = {
       const cards = (bundle.cardsBySet[cardSet.id] || []).map((card) => {
         const local = currentCards[card.id];
         return local && local.lastReviewDate > card.lastReviewDate
-          ? { ...card, learningStep: local.learningStep, nextReviewDate: local.nextReviewDate, lastReviewDate: local.lastReviewDate, status: local.status }
+          ? {
+              ...card,
+              learningStep: local.learningStep,
+              nextReviewDate: local.nextReviewDate,
+              lastReviewDate: local.lastReviewDate,
+              status: local.status,
+            }
           : card;
       });
       replaceSetCards(cardSet.id, cards);
@@ -216,7 +270,10 @@ export const BookService = {
 
   // ─── Учитель: книги в курсах ───────────────────────────────
 
-  async attachToCourses(bookId: string, courseIds: string[]): Promise<ApiResult<{ attachedCourseIds: string[]; alreadyAttachedCourseIds: string[] }>> {
+  async attachToCourses(
+    bookId: string,
+    courseIds: string[]
+  ): Promise<ApiResult<{ attachedCourseIds: string[]; alreadyAttachedCourseIds: string[] }>> {
     return callBooksApi('attach-to-courses', { method: 'POST', body: { bookId, courseIds } });
   },
 
@@ -227,18 +284,25 @@ export const BookService = {
   async getCoursePlan(courseId: string): Promise<CoursePlan | null> {
     const result = await callBooksApi<CoursePlan>('course-plan', { params: { courseId } });
     if (!result.ok) {
-      console.warn('[BookService] getCoursePlan failed:', result.error);
+      log.warn('BookService', 'getCoursePlan failed', result.error);
       return null;
     }
     return result.data;
   },
 
-  async setUnitOpen(courseId: string, unitId: string, isOpen: boolean): Promise<ApiResult<{ isOpen: boolean; openedAt: string | null }>> {
+  async setUnitOpen(
+    courseId: string,
+    unitId: string,
+    isOpen: boolean
+  ): Promise<ApiResult<{ isOpen: boolean; openedAt: string | null }>> {
     return callBooksApi('set-unit-open', { method: 'POST', body: { courseId, unitId, isOpen } });
   },
 
   /** Копия официального набора в обычный свой набор (можно редактировать). Прогресс не копируется. */
-  async forkSet(setId: string, courseId: string | null = null): Promise<ApiResult<{ newSetId: string; cardsCopied: number }>> {
+  async forkSet(
+    setId: string,
+    courseId: string | null = null
+  ): Promise<ApiResult<{ newSetId: string; cardsCopied: number }>> {
     return callBooksApi('fork-set', { method: 'POST', body: { setId, courseId } });
   },
 
@@ -260,7 +324,8 @@ async function runSyncOfficialSets(): Promise<void> {
   const { useSetsStore, useCardsStore } = getStores();
   const keep = new Set(bundle.sets.map((x) => x.id));
   const stale = Object.values(useSetsStore.getState().sets).filter(
-    (x) => x.isOfficial && (!!x.courseId || (x.officialCourseIds?.length ?? 0) > 0) && !keep.has(x.id),
+    (x) =>
+      x.isOfficial && (!!x.courseId || (x.officialCourseIds?.length ?? 0) > 0) && !keep.has(x.id)
   );
   for (const cardSet of stale) {
     useCardsStore.getState().replaceSetCards(cardSet.id, []);

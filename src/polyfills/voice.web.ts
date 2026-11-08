@@ -3,6 +3,8 @@
  * Uses the Web Speech API (SpeechRecognition / webkitSpeechRecognition)
  */
 
+import { log } from '@/utils/logger';
+
 type Callback = (event: any) => void;
 
 const getSpeechRecognition = (): any => {
@@ -21,14 +23,18 @@ const Voice = {
   start: async (locale: string) => {
     const SpeechRecognition = getSpeechRecognition();
     if (!SpeechRecognition) {
-      console.warn('[voice.web] SpeechRecognition not supported');
+      log.warn('VoiceWeb', 'SpeechRecognition not supported');
       if (_onSpeechError) _onSpeechError({ error: { message: 'Not supported' } });
       return;
     }
 
     // Abort previous instance to avoid duplicate listeners / "aborted" errors
     if (recognition) {
-      try { recognition.onend = null; recognition.onerror = null; recognition.abort(); } catch {}
+      try {
+        recognition.onend = null;
+        recognition.onerror = null;
+        recognition.abort();
+      } catch {}
       recognition = null;
     }
 
@@ -100,20 +106,40 @@ const Voice = {
 
   isAvailable: async () => !!getSpeechRecognition(),
 
-  set onSpeechResults(cb: Callback | null) { _onSpeechResults = cb; },
-  get onSpeechResults() { return _onSpeechResults; },
+  set onSpeechResults(cb: Callback | null) {
+    _onSpeechResults = cb;
+  },
+  get onSpeechResults() {
+    return _onSpeechResults;
+  },
 
-  set onSpeechPartialResults(cb: Callback | null) { _onSpeechPartialResults = cb; },
-  get onSpeechPartialResults() { return _onSpeechPartialResults; },
+  set onSpeechPartialResults(cb: Callback | null) {
+    _onSpeechPartialResults = cb;
+  },
+  get onSpeechPartialResults() {
+    return _onSpeechPartialResults;
+  },
 
-  set onSpeechError(cb: Callback | null) { _onSpeechError = cb; },
-  get onSpeechError() { return _onSpeechError; },
+  set onSpeechError(cb: Callback | null) {
+    _onSpeechError = cb;
+  },
+  get onSpeechError() {
+    return _onSpeechError;
+  },
 
-  set onSpeechEnd(cb: Callback | null) { _onSpeechEnd = cb; },
-  get onSpeechEnd() { return _onSpeechEnd; },
+  set onSpeechEnd(cb: Callback | null) {
+    _onSpeechEnd = cb;
+  },
+  get onSpeechEnd() {
+    return _onSpeechEnd;
+  },
 
-  set onSpeechStart(cb: Callback | null) { _onSpeechStart = cb; },
-  get onSpeechStart() { return _onSpeechStart; },
+  set onSpeechStart(cb: Callback | null) {
+    _onSpeechStart = cb;
+  },
+  get onSpeechStart() {
+    return _onSpeechStart;
+  },
 };
 
 export default Voice;

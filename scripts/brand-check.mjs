@@ -89,19 +89,31 @@ function stripComments(src) {
     const n = src[i + 1];
     if (quote) {
       out += c;
-      if (c === '\\') { out += n ?? ''; i += 2; continue; }
+      if (c === '\\') {
+        out += n ?? '';
+        i += 2;
+        continue;
+      }
       if (c === quote) quote = null;
       i++;
       continue;
     }
     if (c === '/' && n === '/') {
-      while (i < src.length && src[i] !== '\n') { out += ' '; i++; }
+      while (i < src.length && src[i] !== '\n') {
+        out += ' ';
+        i++;
+      }
       continue;
     }
     if (c === '/' && n === '*') {
-      i += 2; out += '  ';
-      while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) { out += src[i] === '\n' ? '\n' : ' '; i++; }
-      i += 2; out += '  ';
+      i += 2;
+      out += '  ';
+      while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) {
+        out += src[i] === '\n' ? '\n' : ' ';
+        i++;
+      }
+      i += 2;
+      out += '  ';
       continue;
     }
     if (c === '"' || c === "'" || c === '`') quote = c;
@@ -134,14 +146,18 @@ function callBody(src, openIdx) {
   let depth = 0;
   for (let i = openIdx; i < src.length; i++) {
     if (src[i] === '(') depth++;
-    else if (src[i] === ')') { depth--; if (depth === 0) return src.slice(openIdx, i + 1); }
+    else if (src[i] === ')') {
+      depth--;
+      if (depth === 0) return src.slice(openIdx, i + 1);
+    }
   }
   return src.slice(openIdx);
 }
 
 const EMOJI_RE = /\p{Extended_Pictographic}/gu;
 const ICON_TAG_RE = /<([A-Z][A-Za-z0-9]*)\b/g;
-const PRESSABLE_RE = /<(TouchableOpacity|TouchableHighlight|TouchableWithoutFeedback|Pressable|AnimatedPressable)\b/g;
+const PRESSABLE_RE =
+  /<(TouchableOpacity|TouchableHighlight|TouchableWithoutFeedback|Pressable|AnimatedPressable)\b/g;
 
 // ---------------------------------------------------------------- checks
 function check(rel, raw) {
@@ -186,7 +202,8 @@ function check(rel, raw) {
   }
 
   // borderRadius и borderTopLeftRadius и т.п.
-  const radiusRe = /\bborder(?:Top|Bottom)?(?:Left|Right|Start|End)?Radius\s*:\s*(\d+(?:\.\d+)?)\b/g;
+  const radiusRe =
+    /\bborder(?:Top|Bottom)?(?:Left|Right|Start|End)?Radius\s*:\s*(\d+(?:\.\d+)?)\b/g;
   while ((m = radiusRe.exec(src))) {
     const r = Number(m[1]);
     if (!RADIUS_SCALE.has(r) && r < 999) add('radius', m.index, `radius ${r}`);
@@ -194,9 +211,11 @@ function check(rel, raw) {
 
   // Прозрачность-суффикс: color + '15'
   const alphaRe = /\+\s*(['"`])([0-9A-Fa-f]{2})\1/g;
-  while ((m = alphaRe.exec(src))) if (!ALPHA_STEPS.has(m[2].toUpperCase())) add('alpha', m.index, `+ '${m[2]}'`);
+  while ((m = alphaRe.exec(src)))
+    if (!ALPHA_STEPS.has(m[2].toUpperCase())) add('alpha', m.index, `+ '${m[2]}'`);
   const alphaTplRe = /\}([0-9A-Fa-f]{2})`/g; // `${color}15`
-  while ((m = alphaTplRe.exec(src))) if (!ALPHA_STEPS.has(m[1].toUpperCase())) add('alpha', m.index, `\${…}${m[1]}`);
+  while ((m = alphaTplRe.exec(src)))
+    if (!ALPHA_STEPS.has(m[1].toUpperCase())) add('alpha', m.index, `\${…}${m[1]}`);
 
   // Alert без выбора и не опасный
   const alertRe = /\bAlert\.alert\s*\(/g;
@@ -247,7 +266,8 @@ function check(rel, raw) {
   if (UI_FILE.test(rel)) {
     const jsxTextRe = />\s*([A-Za-z][A-Za-z' ,.!?:-]*[A-Za-z.!?])\s*</g;
     while ((m = jsxTextRe.exec(visible))) if (isEnglishPhrase(m[1])) add('en', m.index, m[1]);
-    const propRe = /\b(title|placeholder|label|subtitle|message|description|buttonText|accessibilityLabel)\s*[:=]\s*\{?\s*(['"])([^'"\n]+)\2/g;
+    const propRe =
+      /\b(title|placeholder|label|subtitle|message|description|buttonText|accessibilityLabel)\s*[:=]\s*\{?\s*(['"])([^'"\n]+)\2/g;
     while ((m = propRe.exec(visible))) if (isEnglishPhrase(m[3])) add('en', m.index, m[3]);
   }
 
@@ -259,8 +279,14 @@ function findTagEnd(src, start) {
   let quote = null;
   for (let i = start; i < src.length; i++) {
     const c = src[i];
-    if (quote) { if (c === quote) quote = null; continue; }
-    if (c === '"' || c === "'" || c === '`') { quote = c; continue; }
+    if (quote) {
+      if (c === quote) quote = null;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === '`') {
+      quote = c;
+      continue;
+    }
     if (c === '{') depth++;
     else if (c === '}') depth--;
     else if (c === '>' && depth === 0 && src[i - 1] !== '=') return i;
@@ -268,7 +294,27 @@ function findTagEnd(src, start) {
   return -1;
 }
 
-const EN_ALLOW = new Set(['Flashly', 'OK', 'ID', 'QR', 'IT', 'Apple', 'Google', 'Telegram', 'Email', 'PIN', 'AI', 'PDF', 'CSV', 'URL', 'PRO', 'Pro', 'Premium', 'Anki', 'Quizlet']);
+const EN_ALLOW = new Set([
+  'Flashly',
+  'OK',
+  'ID',
+  'QR',
+  'IT',
+  'Apple',
+  'Google',
+  'Telegram',
+  'Email',
+  'PIN',
+  'AI',
+  'PDF',
+  'CSV',
+  'URL',
+  'PRO',
+  'Pro',
+  'Premium',
+  'Anki',
+  'Quizlet',
+]);
 function isEnglishPhrase(s) {
   const text = s.trim();
   if (text.length < 3 || /[А-Яа-яЁё]/.test(text)) return false;
@@ -276,7 +322,8 @@ function isEnglishPhrase(s) {
   const words = text.split(/[\s,.!?:-]+/).filter(Boolean);
   if (words.every((w) => EN_ALLOW.has(w))) return false;
   // одно слово в camelCase / без гласных — скорее код, чем текст
-  if (words.length === 1 && (/[a-z][A-Z]/.test(text) || text.length < 4 || /^[a-z]/.test(text))) return false;
+  if (words.length === 1 && (/[a-z][A-Z]/.test(text) || text.length < 4 || /^[a-z]/.test(text)))
+    return false;
   return /[aeiouy]/i.test(text);
 }
 
@@ -284,7 +331,10 @@ function isEnglishPhrase(s) {
 const files = walk(SRC)
   .map((f) => path.relative(ROOT, f).split(path.sep).join('/'))
   .filter((rel) => !IGNORED.has(rel))
-  .filter((rel) => filters.length === 0 || filters.some((p) => rel.startsWith(p) || rel.startsWith(`src/${p}`)))
+  .filter(
+    (rel) =>
+      filters.length === 0 || filters.some((p) => rel.startsWith(p) || rel.startsWith(`src/${p}`))
+  )
   .sort();
 
 const report = {};
@@ -295,8 +345,12 @@ for (const rel of files) {
   if (ALL.some((k) => counts[k] > 0)) report[rel] = { counts, hits };
 }
 
-const rows = Object.entries(report).sort((a, b) => b[1].counts.total - a[1].counts.total || a[0].localeCompare(b[0]));
-const totals = Object.fromEntries([...ALL, 'total'].map((k) => [k, rows.reduce((s, [, r]) => s + r.counts[k], 0)]));
+const rows = Object.entries(report).sort(
+  (a, b) => b[1].counts.total - a[1].counts.total || a[0].localeCompare(b[0])
+);
+const totals = Object.fromEntries(
+  [...ALL, 'total'].map((k) => [k, rows.reduce((s, [, r]) => s + r.counts[k], 0)])
+);
 
 function pad(s, n, right = false) {
   s = String(s);
@@ -310,16 +364,24 @@ if (!flags.has('--quiet')) {
   console.log(pad('Файл', width) + cols.map((c) => pad(head[c] || c, 7, true)).join(''));
   console.log('-'.repeat(width + cols.length * 7));
   for (const [file, r] of rows) {
-    console.log(pad(file.replace(/^src\//, '').slice(0, width), width) + cols.map((c) => pad(r.counts[c] || '·', 7, true)).join(''));
+    console.log(
+      pad(file.replace(/^src\//, '').slice(0, width), width) +
+        cols.map((c) => pad(r.counts[c] || '·', 7, true)).join('')
+    );
     if (showDetails) {
-      for (const k of ALL) for (const h of r.hits[k]) console.log(`    ${pad(k, 7)} :${h.line}  ${h.note}`);
+      for (const k of ALL)
+        for (const h of r.hits[k]) console.log(`    ${pad(k, 7)} :${h.line}  ${h.note}`);
     }
   }
   console.log('-'.repeat(width + cols.length * 7));
-  console.log(pad(`Итого (${rows.length} файлов)`, width) + cols.map((c) => pad(totals[c], 7, true)).join(''));
+  console.log(
+    pad(`Итого (${rows.length} файлов)`, width) + cols.map((c) => pad(totals[c], 7, true)).join('')
+  );
   const ionFiles = rows.filter(([, r]) => r.counts.ion > 0).length;
   const mainFiles = rows.filter(([, r]) => r.counts.total > 0).length;
-  console.log(`\nНарушений: ${totals.total} в ${mainFiles} файлах · текст < 12 px: ${totals.small} · эмодзи: ${totals.emoji} · Ionicons вне панели вкладок: ${ionFiles} файлов · иконки-кнопки без подписи: ${totals.a11y} · английских строк: ${totals.en}`);
+  console.log(
+    `\nНарушений: ${totals.total} в ${mainFiles} файлах · текст < 12 px: ${totals.small} · эмодзи: ${totals.emoji} · Ionicons вне панели вкладок: ${ionFiles} файлов · иконки-кнопки без подписи: ${totals.a11y} · английских строк: ${totals.en}`
+  );
 }
 
 // ---------------------------------------------------------------- тексты пушей
@@ -327,16 +389,21 @@ const { PUSH_TYPES } = await import(path.join(ROOT, 'api', 'push', '_registry.js
 const { checkPushTexts } = await import(path.join(ROOT, 'scripts', 'lib', 'push-tone.mjs'));
 const pushProblems = filters.length ? [] : checkPushTexts(PUSH_TYPES);
 if (!flags.has('--quiet') && !filters.length) {
-  console.log(`Тексты пушей: ${pushProblems.length ? `${pushProblems.length} нарушений` : 'нарушений нет'}`);
+  console.log(
+    `Тексты пушей: ${pushProblems.length ? `${pushProblems.length} нарушений` : 'нарушений нет'}`
+  );
   if (showDetails || pushProblems.length) {
-    for (const p of pushProblems) console.log(`    ${p.type} ${p.variant}: ${p.rule} — «${p.text}»`);
+    for (const p of pushProblems)
+      console.log(`    ${p.type} ${p.variant}: ${p.rule} — «${p.text}»`);
   }
 }
 
 // ---------------------------------------------------------------- baseline
 const snapshot = {
   totals,
-  files: Object.fromEntries(rows.map(([f, r]) => [f, Object.fromEntries(Object.entries(r.counts).filter(([, v]) => v > 0))])),
+  files: Object.fromEntries(
+    rows.map(([f, r]) => [f, Object.fromEntries(Object.entries(r.counts).filter(([, v]) => v > 0))])
+  ),
 };
 
 if (flags.has('--update-baseline')) {
@@ -365,7 +432,9 @@ if (flags.has('--fail-on-new')) {
   if (worse.length) {
     console.error('\n✗ Новые нарушения брендбука (больше, чем в снимке):');
     for (const w of worse) console.error('  ' + w);
-    console.error('\nИсправь их или, если нарушения стало меньше в другом месте, обнови снимок: npm run brand:check -- --update-baseline');
+    console.error(
+      '\nИсправь их или, если нарушения стало меньше в другом месте, обнови снимок: npm run brand:check -- --update-baseline'
+    );
     process.exit(1);
   }
   console.log('\n✓ Новых нарушений нет.');

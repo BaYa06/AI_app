@@ -1,5 +1,6 @@
 import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 import { GROQ_MODELS, groqGenerate, isGroqEnabled } from './groq.js';
+import { log } from '../_log.js';
 
 /**
  * Общий клиент Gemini для AI-эндпоинтов (Google AI Studio, ключ GEMINI_API_KEY).
@@ -13,7 +14,10 @@ import { GROQ_MODELS, groqGenerate, isGroqEnabled } from './groq.js';
  */
 
 function modelList(envValue, fallback) {
-  const list = (envValue || '').split(',').map(m => m.trim()).filter(Boolean);
+  const list = (envValue || '')
+    .split(',')
+    .map((m) => m.trim())
+    .filter(Boolean);
   return list.length ? list : fallback;
 }
 
@@ -22,10 +26,15 @@ function modelList(envValue, fallback) {
 // зато почти не отказывает и даёт одинаковое качество; быстрые модели — запасные.
 export const MODELS = {
   vision: modelList(process.env.GEMINI_MODEL_VISION, [
-    'gemini-3.1-flash-lite', 'gemini-3.6-flash', 'gemini-3-flash-preview', 'gemini-3.5-flash',
+    'gemini-3.1-flash-lite',
+    'gemini-3.6-flash',
+    'gemini-3-flash-preview',
+    'gemini-3.5-flash',
   ]),
   text: modelList(process.env.GEMINI_MODEL_TEXT, [
-    'gemini-3.1-flash-lite', 'gemini-3.6-flash', 'gemini-3-flash-preview',
+    'gemini-3.1-flash-lite',
+    'gemini-3.6-flash',
+    'gemini-3-flash-preview',
   ]),
 };
 
@@ -69,7 +78,7 @@ function isRetryable(error) {
  */
 export async function generateJson({ models, prompt, files = [], temperature, maxOutputTokens }) {
   const parts = [
-    ...files.map(f => ({ inlineData: { mimeType: f.mimeType, data: f.data } })),
+    ...files.map((f) => ({ inlineData: { mimeType: f.mimeType, data: f.data } })),
     { text: prompt },
   ];
   const deadline = Date.now() + TIMEOUT_MS;
@@ -100,7 +109,10 @@ export async function generateJson({ models, prompt, files = [], temperature, ma
     } catch (error) {
       lastError = error;
       if (!isRetryable(error) && !isTimeout(error)) throw error;
-      console.warn(`[gemini] ${model} → ${isTimeout(error) ? 'timeout' : errorStatus(error)}, пробуем следующую модель`);
+      log.warn(
+        'gemini',
+        `${model} → ${isTimeout(error) ? 'timeout' : errorStatus(error)}, пробуем следующую модель`
+      );
     }
   }
 
@@ -110,14 +122,21 @@ export async function generateJson({ models, prompt, files = [], temperature, ma
       if (remaining < MIN_ATTEMPT_MS) break;
       try {
         const text = await groqGenerate({
-          model, prompt, temperature, maxOutputTokens, timeoutMs: Math.min(remaining, GROQ_ATTEMPT_MS),
+          model,
+          prompt,
+          temperature,
+          maxOutputTokens,
+          timeoutMs: Math.min(remaining, GROQ_ATTEMPT_MS),
         });
-        console.warn(`[gemini] все модели заняты — ответил резерв Groq ${model}`);
+        log.warn('gemini', `все модели заняты — ответил резерв Groq ${model}`);
         return text;
       } catch (error) {
         // Последний резерв: любая ошибка (квота, 413 «больше поминутного лимита токенов»,
         // снятая с поддержки модель) — пробуем следующую; в ответ уйдёт ошибка Gemini
-        console.warn(`[groq] ${model} → ${isTimeout(error) ? 'timeout' : errorStatus(error)}, пробуем следующую модель`);
+        log.warn(
+          'groq',
+          `${model} → ${isTimeout(error) ? 'timeout' : errorStatus(error)}, пробуем следующую модель`
+        );
       }
     }
   }
@@ -137,7 +156,7 @@ export function parseJsonArray(text) {
     const match = text.match(/\[[\s\S]*\]/);
     return match ? JSON.parse(match[0]) : [];
   } catch {
-    console.error('Failed to parse Gemini response:', text);
+    log.error('gemini', 'Failed to parse Gemini response', text);
     return [];
   }
 }
@@ -154,7 +173,7 @@ export function parseJsonObject(text) {
     const match = text.match(/\{[\s\S]*\}/);
     return match ? JSON.parse(match[0]) : {};
   } catch {
-    console.error('Failed to parse Gemini response:', text);
+    log.error('gemini', 'Failed to parse Gemini response', text);
     return {};
   }
 }
@@ -170,6 +189,8 @@ export function sendAiError(res, error, fallbackMessage) {
   if (isTimeout(error)) {
     return res.status(504).json({ error: 'ai_timeout' });
   }
-  console.error(`${fallbackMessage}:`, error?.message || error);
-  return res.status(500).json({ error: `${fallbackMessage}: ${error?.message || 'Unknown error'}` });
+  log.error('gemini', `${fallbackMessage}`, error?.message || error);
+  return res
+    .status(500)
+    .json({ error: `${fallbackMessage}: ${error?.message || 'Unknown error'}` });
 }

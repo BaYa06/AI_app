@@ -40,12 +40,32 @@ function card(extra: Partial<Card> = {}): Card {
 
 /** Слово на шаге step; срок повторения через dueIn мс; последний ответ lastAgo мс назад */
 function studied(step: number, dueIn: number, lastAgo = 5 * DAY, extra: Partial<Card> = {}): Card {
-  return card({ learningStep: step, nextReviewDate: NOW + dueIn, lastReviewDate: NOW - lastAgo, status: 'learning', ...extra });
+  return card({
+    learningStep: step,
+    nextReviewDate: NOW + dueIn,
+    lastReviewDate: NOW - lastAgo,
+    status: 'learning',
+    ...extra,
+  });
 }
 
-const SET = { id: 's1', userId: 'u', title: 'Набор', category: 'other', tags: [], createdAt: 0, updatedAt: 0, cardCount: 0, newCount: 0 } as unknown as CardSet;
+const SET = {
+  id: 's1',
+  userId: 'u',
+  title: 'Набор',
+  category: 'other',
+  tags: [],
+  createdAt: 0,
+  updatedAt: 0,
+  cardCount: 0,
+  newCount: 0,
+} as unknown as CardSet;
 
-function input(cards: Card[], day: Partial<LessonDay> = {}, extra: Partial<WidgetPlanInput> = {}): WidgetPlanInput {
+function input(
+  cards: Card[],
+  day: Partial<LessonDay> = {},
+  extra: Partial<WidgetPlanInput> = {}
+): WidgetPlanInput {
   const now = extra.now ?? NOW;
   const cardsMap = Object.fromEntries(cards.map((c) => [c.id, c]));
   const lessonDay = { ...ensureLessonDay(null, '2026-10-07', 0), ...day };
@@ -57,11 +77,21 @@ function input(cards: Card[], day: Partial<LessonDay> = {}, extra: Partial<Widge
     day: lessonDay,
     now,
   });
-  return { cards, day: lessonDay, plan, newPerDay: 10, streakDays: 0, goalReached: false, now, ...extra };
+  return {
+    cards,
+    day: lessonDay,
+    plan,
+    newPerDay: 10,
+    streakDays: 0,
+    goalReached: false,
+    now,
+    ...extra,
+  };
 }
 
 const noAnswers = { reviewed: new Set<string>(), introduced: new Set<string>() };
-const wordsOf = (entries: WidgetEntry[]) => new Set(entries.filter((e) => e.cardId).map((e) => e.cardId));
+const wordsOf = (entries: WidgetEntry[]) =>
+  new Set(entries.filter((e) => e.cardId).map((e) => e.cardId));
 const at = (h: number, m = 0, dayOffset = 0) => new Date(2026, 9, 7 + dayOffset, h, m).getTime();
 
 describe('pickPool', () => {
@@ -88,7 +118,12 @@ describe('pickPool', () => {
 
   it('новое слово с «Не знаю» сегодня — ошибка, берём первым', () => {
     const failedNew = card();
-    const pool = pickPool([failedNew], { reviewed: new Set(), introduced: new Set([failedNew.id]) }, TODAY, NOW);
+    const pool = pickPool(
+      [failedNew],
+      { reviewed: new Set(), introduced: new Set([failedNew.id]) },
+      TODAY,
+      NOW
+    );
     expect(pool.map((c) => c.id)).toEqual([failedNew.id]);
   });
 
@@ -134,11 +169,23 @@ describe('buildTimeline', () => {
 
   it('урок сделан — закрепление: вопрос, через 20 минут ответ', () => {
     const learned = studied(1, DAY, HOUR);
-    const entries = buildTimeline(input([learned], { reviewedIds: [], introducedIds: [learned.id] }));
+    const entries = buildTimeline(
+      input([learned], { reviewedIds: [], introducedIds: [learned.id] })
+    );
     const q = entries.find((e) => e.at === NOW)!;
     const a = entries.find((e) => e.at === NOW + 20 * 60 * 1000)!;
-    expect(q).toMatchObject({ state: 'review', phase: 'question', prompt: learned.frontText, cardId: learned.id });
-    expect(a).toMatchObject({ state: 'review', phase: 'answer', prompt: learned.frontText, answer: learned.backText });
+    expect(q).toMatchObject({
+      state: 'review',
+      phase: 'question',
+      prompt: learned.frontText,
+      cardId: learned.id,
+    });
+    expect(a).toMatchObject({
+      state: 'review',
+      phase: 'answer',
+      prompt: learned.frontText,
+      answer: learned.backText,
+    });
     expect(q.answer).toBe(learned.backText);
   });
 
@@ -146,7 +193,9 @@ describe('buildTimeline', () => {
     const pool = Array.from({ length: 3 }, () => studied(1, 2 * DAY, HOUR));
     const entries = buildTimeline(input(pool, { introducedIds: pool.map((c) => c.id) }));
     const shows = (id: string) =>
-      entries.filter((e) => e.cardId === id && e.phase === 'question' && e.at < at(23)).map((e) => e.at);
+      entries
+        .filter((e) => e.cardId === id && e.phase === 'question' && e.at < at(23))
+        .map((e) => e.at);
     for (const c of pool) {
       const s = shows(c.id);
       expect(s.length).toBeGreaterThanOrEqual(3);
@@ -229,8 +278,14 @@ describe('buildTimeline', () => {
     expect([...wordsOf(fromSet.filter((e) => e.at < at(23)))]).toEqual([setWord.id]);
 
     const reversed = buildTimeline({ ...base, direction: 'reverse' }).find((e) => e.cardId)!;
-    expect(reversed).toMatchObject({ reverse: true, prompt: lessonWord.backText, answer: lessonWord.frontText });
-    const auto3 = buildTimeline({ ...base, direction: 'forward' }).filter((e) => e.phase === 'question' && e.at < at(23));
+    expect(reversed).toMatchObject({
+      reverse: true,
+      prompt: lessonWord.backText,
+      answer: lessonWord.frontText,
+    });
+    const auto3 = buildTimeline({ ...base, direction: 'forward' }).filter(
+      (e) => e.phase === 'question' && e.at < at(23)
+    );
     expect(auto3.every((e) => !e.reverse)).toBe(true);
 
     expect(buildWidgetSnapshot({ ...base, hideAnswer: true }).hideAnswerLocked).toBe(true);
@@ -238,7 +293,9 @@ describe('buildTimeline', () => {
   });
 
   it('снимок 150 карточек меньше 200 КБ', () => {
-    const cards = Array.from({ length: 150 }, (_, i) => studied(1 + (i % 4), (i % 10) * DAY - HOUR));
+    const cards = Array.from({ length: 150 }, (_, i) =>
+      studied(1 + (i % 4), (i % 10) * DAY - HOUR)
+    );
     const json = JSON.stringify(buildWidgetSnapshot(input(cards)));
     expect(json.length).toBeLessThan(200 * 1024);
   });

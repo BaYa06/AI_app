@@ -4,7 +4,12 @@ jest.mock('react-native', () => ({ Platform: { OS: 'ios', Version: '17.0' } }));
 jest.mock('../localCache', () => ({ readCache: () => undefined, writeCache: () => {} }));
 jest.mock('../widgetBridge', () => ({ isWidgetSupported: true }));
 
-import { addLessonDay, markPromptShown, shouldShowWidgetPrompt, type WidgetPromptState } from '../widgetPrompt';
+import {
+  addLessonDay,
+  markPromptShown,
+  shouldShowWidgetPrompt,
+  type WidgetPromptState,
+} from '../widgetPrompt';
 
 const ok = { supported: true, installed: false };
 const empty: WidgetPromptState = { lessonDays: [], shownDays: [] };
@@ -33,7 +38,11 @@ describe('widgetPrompt', () => {
 
   it('не показываем, если виджет уже стоит или его нет на устройстве', () => {
     const state = addLessonDay(addLessonDay(empty, '2026-10-07'), '2026-10-08');
-    expect(shouldShowWidgetPrompt(state, '2026-10-08', { supported: true, installed: true })).toBe(false);
-    expect(shouldShowWidgetPrompt(state, '2026-10-08', { supported: false, installed: false })).toBe(false);
+    expect(shouldShowWidgetPrompt(state, '2026-10-08', { supported: true, installed: true })).toBe(
+      false
+    );
+    expect(
+      shouldShowWidgetPrompt(state, '2026-10-08', { supported: false, installed: false })
+    ).toBe(false);
   });
 });

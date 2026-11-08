@@ -1,5 +1,7 @@
 # Flashcards App
 
+[![Checks](https://github.com/BaYa06/AI_app/actions/workflows/checks.yml/badge.svg?branch=dev)](https://github.com/BaYa06/AI_app/actions/workflows/checks.yml)
+
 Приложение для изучения с помощью флеш-карточек с системой интервальных повторений (SRS).
 
 ## 🚀 Быстрый старт
@@ -25,35 +27,27 @@ npm run android
 
 ## 📁 Структура проекта
 
+Подробно — [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): схема (приложение → Vercel `api/` → Neon;
+Supabase — только вход; Firebase — push, аналитика, Crashlytics), раскладка папок и правила,
+которые проверяют линт и CI.
+
 ```
 src/
-├── components/          # UI компоненты
-│   ├── common/         # Переиспользуемые компоненты (Button, Input, Text)
-│   └── cards/          # Компоненты карточек (FlashCard, SetCard)
-│
-├── screens/            # Экраны приложения
-│   ├── HomeScreen      # Главный экран со списком наборов
-│   ├── StudyScreen     # Экран изучения карточек
-│   ├── SetDetailScreen # Детали набора
-│   └── ...
-│
-├── navigation/         # Навигация (React Navigation)
-│
-├── store/              # Состояние приложения (Zustand)
-│   ├── cardsStore     # Управление карточками
-│   ├── setsStore      # Управление наборами
-│   ├── studyStore     # Сессия изучения
-│   └── settingsStore  # Настройки и тема
-│
-├── services/           # Бизнес-логика
-│   ├── SRSService     # Алгоритм интервальных повторений
-│   ├── StorageService # Локальное хранилище (MMKV)
-│   └── DatabaseService # Персистентность данных
-│
-├── types/              # TypeScript типы
-├── constants/          # Константы (цвета, отступы, конфиг)
-├── hooks/              # Кастомные хуки
-└── utils/              # Утилиты
+├── screens/            # XScreen.tsx — экран; x/ — его части (styles.ts, компоненты, хуки)
+├── components/         # ui/ — UI-кит брендбука; остальное — общие компоненты по разделам
+├── navigation/         # React Navigation
+├── store/              # Zustand
+├── services/           # сеть, хранилище, нативные модули
+│   ├── auth/session.ts # единственное чтение сессии Supabase
+│   ├── api/client.ts   # HTTP-клиент к api/
+│   ├── neon/           # методы данных по доменам (фасад NeonService.ts)
+│   └── analyticsEvents/# каталог событий (фасад analytics.ts)
+├── utils/              # в т.ч. logger.ts
+├── types/ · constants/ · hooks/
+api/                    # Vercel Functions: x.js — роутер, _handlers/x/ — действия
+database/migrations/    # SQL миграций (исполняет api/_db-init.js)
+scripts/                # импорт книг/библиотеки, проверки (миграции, брендбук), git-хуки
+plan/                   # планы: new/ — в работе, done/ — готовые
 ```
 
 ## ⚡ Оптимизации производительности
@@ -110,6 +104,19 @@ npm run new:screen -- Achievements   # → src/screens/AchievementsScreen.tsx и
 
 1. Создайте файл в `src/store/`
 2. Экспортируйте из `src/store/index.ts`
+
+### Линтер, форматирование и pre-commit
+
+- `npm run lint` — ESLint по всему проекту (`.eslintrc.cjs`): ошибки должны быть 0, предупреждения пока допустимы.
+- `npm run format` — отформатировать код prettier (`.prettierrc`); `npm run format:check` — только проверить.
+
+Хук pre-commit (`scripts/git-hooks/pre-commit`, ставится `npm run hooks:install` и на `npm install`) проверяет только то, что в коммите:
+
+1. миграции (`npm run db:check-migrations`) — если в коммите `api/_db-init.js` или `database/migrations/`;
+2. брендбук (`brand:check --fail-on-new`) — если в коммите `src/**/*.ts(x)`;
+3. ESLint только по ошибкам (`--quiet`, предупреждения не блокируют) и `prettier --check` — по проиндексированным `.js/.jsx/.ts/.tsx/.mjs/.cjs` (файлы из `.eslintignore` / `.prettierignore` пропускаются).
+
+Обойти в крайнем случае: `git commit --no-verify`.
 
 ## 📱 Основные функции
 
@@ -187,6 +194,36 @@ npx tsx scripts/publish-book.ts "Solutions Pre-Intermediate" "3rd" --unpublish  
 ```
 
 Опубликовать можно и сразу при импорте, флагом `--publish`.
+
+### Где лежат исходные Excel
+
+Готовые файлы книг (`books/*.xlsx`) и наборов библиотеки (`sets/*.xlsx`) — это данные, а не код, поэтому в git их нет (папки в `.gitignore`). Источник правды — база: после импорта файл нужен только для правок. Храните оригиналы вне репозитория (Google Drive) и кладите локально в `books/` или `sets/` перед запуском скрипта. Пустые шаблоны лежат в `templates/` и в git остаются.
+
+## 🗂 Библиотека: импорт наборов из Excel
+
+Наборы библиотеки загружаются пачками локальным скриптом прямо в `library_sets` / `library_cards`. План: `plan/new/library_import.md`.
+
+### Настройка (один раз на каждую базу)
+
+```bash
+npx tsx scripts/create-library-author.ts   # служебный автор «Flashly», печатает id
+```
+
+Полученный id впишите в `.env.local` как `LIBRARY_AUTHOR_ID`. В этот аккаунт нельзя войти, поэтому его нельзя удалить из приложения вместе с библиотекой.
+
+### Шаблон и импорт
+
+```bash
+npx tsx scripts/create-library-template.ts                 # → templates/library_template.xlsx
+npx tsx scripts/import-library.ts sets.xlsx --dry-run      # проверка + отчёт, база не меняется
+npx tsx scripts/import-library.ts sets.xlsx                # импорт, новые наборы — черновики
+npx tsx scripts/import-library.ts sets.xlsx --publish      # черновики из файла → в библиотеку
+```
+
+- Один файл — сколько угодно наборов. Лист «Наборы»: `title, kind, category, language_from, language_to` обязательны (`kind` — `language` или `subject`, см. plan/new/set_kind.md; колонка `library_sets.kind` появляется миграцией 039 — сервер должен быть выложен), `description, tags, cover_emoji` по желанию. Лист «Карточки»: `set` (title набора), `term`, `translation` обязательны, `example` по желанию. В наборе не меньше 5 карточек.
+- `category` — только из списка на листе «Категории» шаблона, это категории библиотеки в приложении.
+- При повторном импорте набор находится по `title` и языкам, карточки заменяются целиком. Лайки, оценки и число импортов сохраняются. У пользователей, которые уже взяли набор, остаётся их копия.
+- Снятые с публикации (`archived`) наборы `--publish` не возвращает.
 
 ## 🤖 Сборка APK в Codemagic
 

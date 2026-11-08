@@ -13,7 +13,7 @@ import { Button, toast } from '@/components/ui';
 import { spacing, borderRadius, iconSize, alpha } from '@/constants';
 import { Analytics } from '@/services/analytics';
 import { requestPushPermission } from '@/services/pushNotifications';
-import { supabase } from '@/services/supabaseClient';
+import { getSession } from '@/services/auth/session';
 
 interface Props {
   /** denied — разрешение отозвано в iOS, default — ещё не спрашивали */
@@ -35,8 +35,8 @@ export function PushStreakNudge({ permission, onClose }: Props) {
     }
     setBusy(true);
     try {
-      const { data } = await supabase.auth.getSession();
-      const status = await requestPushPermission(data.session?.user?.id ?? null);
+      const authSession = await getSession();
+      const status = await requestPushPermission(authSession?.user?.id ?? null);
       if (status.permission === 'granted') {
         Analytics.pushPermissionGranted();
         toast.success('Напоминания включены');
@@ -68,7 +68,13 @@ export function PushStreakNudge({ permission, onClose }: Props) {
           Включи напоминания, чтобы не потерять серию
         </Text>
       </Pressable>
-      <Button variant="icon" icon={X} background="none" accessibilityLabel="Скрыть" onPress={handleDismiss} />
+      <Button
+        variant="icon"
+        icon={X}
+        background="none"
+        accessibilityLabel="Скрыть"
+        onPress={handleDismiss}
+      />
     </View>
   );
 }

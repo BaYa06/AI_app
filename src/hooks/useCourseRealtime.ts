@@ -7,7 +7,7 @@
  * открыто; свёрнутое догоняет при возврате (App.tsx, AppState).
  */
 import { useEffect } from 'react';
-import { supabase } from '@/services/supabaseClient';
+import { createChannel, removeChannel } from '@/services/realtime';
 import { DatabaseService } from '@/services/DatabaseService';
 import { useCoursesStore } from '@/store/coursesStore';
 
@@ -22,7 +22,7 @@ export function useCourseRealtime(userId: string | null | undefined) {
       .filter((c) => c.isStudentCourse)
       .map((c) => c.id)
       .sort()
-      .join(','),
+      .join(',')
   );
 
   useEffect(() => {
@@ -37,17 +37,18 @@ export function useCourseRealtime(userId: string | null | undefined) {
       }, SYNC_DEBOUNCE_MS);
     };
 
-    const channels = courseIdsKey.split(',').map((courseId) =>
-      supabase
-        .channel(`course:${courseId}`)
-        .on('broadcast', { event: COURSE_CHANGED_EVENT }, scheduleSync)
-        .subscribe(),
-    );
+    const channels = courseIdsKey
+      .split(',')
+      .map((courseId) =>
+        createChannel(`course:${courseId}`)
+          .on('broadcast', { event: COURSE_CHANGED_EVENT }, scheduleSync)
+          .subscribe()
+      );
 
     return () => {
       if (timer) clearTimeout(timer);
       channels.forEach((channel) => {
-        supabase.removeChannel(channel);
+        removeChannel(channel);
       });
     };
   }, [userId, courseIdsKey]);

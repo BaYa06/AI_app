@@ -22,6 +22,10 @@ interface Props {
   showStudentsHint: boolean;
   onClose: () => void;
   onSubmit: (courseId: string | null) => void;
+  /** Вариант «Без курса» (по умолчанию есть). Подборку целиком кладут только в курс — там его нет. */
+  allowNoCourse?: boolean;
+  /** Заголовок листа; по умолчанию «Добавить «название»». */
+  title?: string;
 }
 
 export function ChooseCourseSheet({
@@ -33,6 +37,8 @@ export function ChooseCourseSheet({
   showStudentsHint,
   onClose,
   onSubmit,
+  allowNoCourse = true,
+  title,
 }: Props) {
   const colors = useThemeColors();
   const [selected, setSelected] = useState<string | null>(initialCourseId);
@@ -42,29 +48,38 @@ export function ChooseCourseSheet({
   }, [visible, initialCourseId]);
 
   const options: Array<{ id: string | null; title: string }> = [
-    { id: null, title: 'Без курса' },
+    ...(allowNoCourse ? [{ id: null, title: 'Без курса' }] : []),
     ...courses.map((c) => ({ id: c.id, title: c.title })),
   ];
+  // Без «Без курса» ничего не выбрано быть не может — берём первый курс.
+  const effective = !allowNoCourse && selected === null ? (courses[0]?.id ?? null) : selected;
 
   return (
     <Sheet
       visible={visible}
       onClose={onClose}
-      title={`Добавить «${setTitle}»`}
+      title={title ?? `Добавить «${setTitle}»`}
       footer={
         <>
-          {showStudentsHint && selected !== null && (
+          {showStudentsHint && effective !== null && (
             <Text variant="caption" color="secondary">
-              Если в курсе есть ученики, они сразу увидят этот набор. Скрыть его можно в меню набора.
+              Если в курсе есть ученики, они сразу увидят этот набор. Скрыть его можно в меню
+              набора.
             </Text>
           )}
-          <Button title="Добавить" onPress={() => onSubmit(selected)} loading={isSubmitting} fullWidth />
+          <Button
+            title="Добавить"
+            onPress={() => onSubmit(effective)}
+            disabled={effective === null && !allowNoCourse}
+            loading={isSubmitting}
+            fullWidth
+          />
         </>
       }
     >
       <View style={styles.list} accessibilityRole="radiogroup">
         {options.map((option) => {
-          const isSelected = selected === option.id;
+          const isSelected = effective === option.id;
           return (
             <Pressable
               key={option.id ?? 'none'}
@@ -80,10 +95,18 @@ export function ChooseCourseSheet({
                 pressed && styles.pressed,
               ]}
             >
-              <View style={[styles.radio, { borderColor: isSelected ? colors.primary : colors.border }]}>
-                {isSelected && <View style={[styles.radioDot, { backgroundColor: colors.primary }]} />}
+              <View
+                style={[styles.radio, { borderColor: isSelected ? colors.primary : colors.border }]}
+              >
+                {isSelected && (
+                  <View style={[styles.radioDot, { backgroundColor: colors.primary }]} />
+                )}
               </View>
-              <Text variant="body" style={[styles.optionTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+              <Text
+                variant="body"
+                style={[styles.optionTitle, { color: colors.textPrimary }]}
+                numberOfLines={1}
+              >
                 {option.title}
               </Text>
             </Pressable>

@@ -8,6 +8,7 @@
 import { v4 as uuid } from 'uuid';
 import { useSetsStore, useCardsStore } from '@/store';
 import type { Card, CardSet } from '@/types';
+import { parseSetKind } from '@/utils/setKind';
 import { DatabaseService } from './DatabaseService';
 import { ShareService, ShareApiError, type SharePreview } from './ShareService';
 
@@ -20,7 +21,7 @@ export interface ShareImportResult {
 async function importAsGuest(
   preview: SharePreview,
   courseId: string | null,
-  userId: string,
+  userId: string
 ): Promise<ShareImportResult> {
   const sharedCards = await ShareService.getAllCards(preview.code);
   const now = Date.now();
@@ -38,6 +39,7 @@ async function importAsGuest(
     color: undefined,
     languageFrom: preview.set.languageFrom || 'en',
     languageTo: preview.set.languageTo || 'ru',
+    kind: parseSetKind(preview.set.kind),
     isPublic: false,
     createdAt: now,
     updatedAt: now,
@@ -108,7 +110,11 @@ export async function importSharedSet(params: {
     const setId = await ShareService.importSet(preview.code, serverCourseId);
     result = { setId, alreadyImported: false };
   } catch (e) {
-    if (e instanceof ShareApiError && e.code === 'already_imported' && typeof e.payload.setId === 'string') {
+    if (
+      e instanceof ShareApiError &&
+      e.code === 'already_imported' &&
+      typeof e.payload.setId === 'string'
+    ) {
       result = { setId: e.payload.setId, alreadyImported: true };
     } else {
       throw e;

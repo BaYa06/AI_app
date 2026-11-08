@@ -1,10 +1,14 @@
 import { neon } from '@neondatabase/serverless';
+import { log } from './_log.js';
 
 /**
  * Версия схемы: при добавлении миграции в applyMigrations увеличить (и дописать файл в
  * database/migrations). Пока в app_migrations есть отметка этой версии, миграции не выполняются.
+ * Правила — database/migrations/MIGRATION_GUIDE.md; проверка — `npm run db:check-migrations`.
  */
-const SCHEMA_VERSION = 'schema_037';
+// schema_039: в 038 (official_sets_guard) и 039 (set_kind) версию не подняли — миграции не выполнились,
+// и запросы с card_sets.kind падали на тестовом сервере (plan/new/set_kind.md, слабые места)
+const SCHEMA_VERSION = 'schema_040';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -20,7 +24,7 @@ async function ensureDatabaseInitialized(sql) {
   if (!initPromise) {
     initPromise = runDatabaseInit(sql).catch((error) => {
       initPromise = null; // следующий запрос попробует снова
-      console.error('Database init failed:', error);
+      log.error('db-init', 'Database init failed', error);
     });
   }
   return initPromise;
@@ -42,20 +46,20 @@ async function runDatabaseInit(sql) {
         WHERE table_name = 'users'
       );
     `;
-    
+
     const exists = result[0]?.exists;
-    
+
     if (!exists) {
-      console.log('Database not initialized. Creating tables...');
+      log.info('db-init', 'Database not initialized. Creating tables...');
       await initDatabase(sql);
-      console.log('Database initialized successfully!');
+      log.info('db-init', 'Database initialized successfully!');
     }
 
     // Миграции для существующих БД
     await applyMigrations(sql);
     await sql`INSERT INTO app_migrations (name) VALUES (${SCHEMA_VERSION}) ON CONFLICT (name) DO NOTHING`;
   } catch (error) {
-    console.error('Error checking database:', error);
+    log.error('db-init', 'Error checking database', error);
     // Если произошла ошибка, пытаемся инициализировать
     await initDatabase(sql);
   }
@@ -71,7 +75,7 @@ async function applyMigrations(sql) {
       ADD COLUMN IF NOT EXISTS is_hidden_from_students BOOLEAN NOT NULL DEFAULT false
     `;
   } catch (e) {
-    console.error('Migration is_hidden_from_students failed:', e);
+    log.error('db-init', 'Migration is_hidden_from_students failed', e);
   }
 
   // Migration: word_type for context fill mode distractors
@@ -81,7 +85,7 @@ async function applyMigrations(sql) {
       ADD COLUMN IF NOT EXISTS word_type VARCHAR(20)
     `;
   } catch (e) {
-    console.error('Migration word_type failed:', e);
+    log.error('db-init', 'Migration word_type failed', e);
   }
 
   // Migration: push_tokens table
@@ -96,14 +100,14 @@ async function applyMigrations(sql) {
       )
     `;
   } catch (e) {
-    console.error('Migration push_tokens failed:', e);
+    log.error('db-init', 'Migration push_tokens failed', e);
   }
 
   // word_form для карточек (раньше клиент делал ALTER TABLE сам при каждой загрузке карточек)
   try {
     await sql`ALTER TABLE cards ADD COLUMN IF NOT EXISTS word_form VARCHAR(100)`;
   } catch (e) {
-    console.error('Migration word_form failed:', e);
+    log.error('db-init', 'Migration word_form failed', e);
   }
 
   // Таблицы библиотеки (раньше их создавал клиент — src/services/LibraryService.ts)
@@ -174,7 +178,7 @@ async function applyMigrations(sql) {
     await sql`CREATE INDEX IF NOT EXISTS idx_library_imports_user ON library_imports(user_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_library_likes_user ON library_likes(user_id)`;
   } catch (e) {
-    console.error('Migration library tables failed:', e);
+    log.error('db-init', 'Migration library tables failed', e);
   }
 
   // Migration 020: серверный SRS — журнал ответов, поля первого выучивания, одноразовое понижение уровней
@@ -229,7 +233,7 @@ async function applyMigrations(sql) {
       `;
     }
   } catch (e) {
-    console.error('Migration 020_server_srs failed:', e);
+    log.error('db-init', 'Migration 020_server_srs failed', e);
   }
 
   // Migration 021: очки и рейтинг курса (план, этап 2)
@@ -278,7 +282,7 @@ async function applyMigrations(sql) {
       )
     `;
   } catch (e) {
-    console.error('Migration 021_course_rating failed:', e);
+    log.error('db-init', 'Migration 021_course_rating failed', e);
   }
 
   // Migration 022: триггеры повторения (план, этап 3)
@@ -297,7 +301,7 @@ async function applyMigrations(sql) {
         FROM answers WHERE rejected_reason IS NULL
     `;
   } catch (e) {
-    console.error('Migration 022_review_triggers failed:', e);
+    log.error('db-init', 'Migration 022_review_triggers failed', e);
   }
 
   // Migration 023: обратная связь — «Написать нам» и окно оценки приложения (смотрится в админке)
@@ -323,14 +327,14 @@ async function applyMigrations(sql) {
     await sql`CREATE INDEX IF NOT EXISTS idx_app_feedback_created ON app_feedback(created_at DESC)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_app_feedback_user_created ON app_feedback(user_id, created_at DESC)`;
   } catch (e) {
-    console.error('Migration 023_app_feedback failed:', e);
+    log.error('db-init', 'Migration 023_app_feedback failed', e);
   }
 
   // Migration 024: книга видна ученикам — переключатель на каждую книгу (api/books.js)
   try {
     await sql`ALTER TABLE books ADD COLUMN IF NOT EXISTS student_visible BOOLEAN NOT NULL DEFAULT false`;
   } catch (e) {
-    console.error('Migration 024_book_student_visible failed:', e);
+    log.error('db-init', 'Migration 024_book_student_visible failed', e);
   }
 
   // Migration 025: контроль выхода из приложения во время живого теста (plan/done/exam_lockdown.md).
@@ -343,7 +347,7 @@ async function applyMigrations(sql) {
     await sql`ALTER TABLE test_participants ADD COLUMN IF NOT EXISTS client_exit_control BOOLEAN NOT NULL DEFAULT false`;
     await sql`ALTER TABLE test_participants ADD COLUMN IF NOT EXISTS rejoin_allowed BOOLEAN NOT NULL DEFAULT false`;
   } catch (e) {
-    console.error('Migration 025_exam_exit_control failed:', e);
+    log.error('db-init', 'Migration 025_exam_exit_control failed', e);
   }
 
   // Migration 026: журнал push-уведомлений (plan/new/push_notifications.md, шаг 0.3). Только новая таблица.
@@ -376,7 +380,7 @@ async function applyMigrations(sql) {
       WHERE slot IS NOT NULL AND status IN ('sending', 'sent')
     `;
   } catch (e) {
-    console.error('Migration 026_push_log failed:', e);
+    log.error('db-init', 'Migration 026_push_log failed', e);
   }
 
   // Migration 027: дни недели — фильтр только для выбранных самим (план пушей, шаг 0.6)
@@ -385,14 +389,14 @@ async function applyMigrations(sql) {
     await sql`ALTER TABLE user_stats ALTER COLUMN notif_days SET DEFAULT 'mon,tue,wed,thu,fri,sat,sun'`;
     await sql`ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS notif_categories_off TEXT[] NOT NULL DEFAULT '{}'`;
   } catch (e) {
-    console.error('Migration 027_notif_days_custom failed:', e);
+    log.error('db-init', 'Migration 027_notif_days_custom failed', e);
   }
 
   // Migration 028: разрешение на уведомления на устройстве (план пушей, шаг 1.4). NULL — неизвестно.
   try {
     await sql`ALTER TABLE push_tokens ADD COLUMN IF NOT EXISTS permission TEXT`;
   } catch (e) {
-    console.error('Migration 028_push_token_permission failed:', e);
+    log.error('db-init', 'Migration 028_push_token_permission failed', e);
   }
 
   // Migration 029: профиль привычек для пушей (план пушей, шаг 2.6). Только новая таблица.
@@ -413,7 +417,7 @@ async function applyMigrations(sql) {
       )
     `;
   } catch (e) {
-    console.error('Migration 029_user_habits failed:', e);
+    log.error('db-init', 'Migration 029_user_habits failed', e);
   }
 
   // Migration 030: ответы «о себе» и согласие подстраивать напоминания (план пушей, 2.7). Nullable/DEFAULT.
@@ -432,14 +436,14 @@ async function applyMigrations(sql) {
       await sql`UPDATE user_stats SET notif_time_custom = true WHERE notif_hour <> 19 OR COALESCE(notif_minute, 0) <> 0`;
     }
   } catch (e) {
-    console.error('Migration 030_about_me failed:', e);
+    log.error('db-init', 'Migration 030_about_me failed', e);
   }
 
   // Migration 031: расписание занятий курса (план пушей, шаг 2.8). Nullable.
   try {
     await sql`ALTER TABLE courses ADD COLUMN IF NOT EXISTS schedule JSONB`;
   } catch (e) {
-    console.error('Migration 031_course_schedule failed:', e);
+    log.error('db-init', 'Migration 031_course_schedule failed', e);
   }
 
   // Migration 032: о каком наборе курса ученикам уже сообщили (план пушей, 3.5). Разово — все старые наборы.
@@ -453,7 +457,7 @@ async function applyMigrations(sql) {
       await sql`UPDATE card_sets SET announced_at = COALESCE(created_at, NOW()) WHERE announced_at IS NULL`;
     }
   } catch (e) {
-    console.error('Migration 032_set_announced failed:', e);
+    log.error('db-init', 'Migration 032_set_announced failed', e);
   }
 
   // Migration 033: дашборд пушей (план пушей, 5.1) — журнал оттока и три представления.
@@ -521,7 +525,7 @@ async function applyMigrations(sql) {
       GROUP BY cohort_week, push_group
     `;
   } catch (e) {
-    console.error('Migration 033_push_views failed:', e);
+    log.error('db-init', 'Migration 033_push_views failed', e);
   }
 
   // Migration 034: наборы по ссылке (plan/new/share_set.md, Share 1). Только новые таблицы.
@@ -566,7 +570,7 @@ async function applyMigrations(sql) {
       PRIMARY KEY (user_id, blocked_user_id)
     )`;
   } catch (e) {
-    console.error('Migration 034_set_shares failed:', e);
+    log.error('db-init', 'Migration 034_set_shares failed', e);
   }
 
   // Migration 035: «Мои обращения» (plan/new/support_threads.md, Support 1) — переписка по обращению.
@@ -593,7 +597,7 @@ async function applyMigrations(sql) {
     await sql`UPDATE app_feedback SET read_at = created_at WHERE status = 'read' AND read_at IS NULL`;
     await sql`CREATE INDEX IF NOT EXISTS idx_app_feedback_user_last ON app_feedback(user_id, last_message_at DESC)`;
   } catch (e) {
-    console.error('Migration 035_feedback_replies failed:', e);
+    log.error('db-init', 'Migration 035_feedback_replies failed', e);
   }
 
   // Migration 036: версия приложения у push-токена — пуш с новым экраном не шлём старым версиям
@@ -601,7 +605,7 @@ async function applyMigrations(sql) {
   try {
     await sql`ALTER TABLE push_tokens ADD COLUMN IF NOT EXISTS app_version VARCHAR(20)`;
   } catch (e) {
-    console.error('Migration 036_push_token_version failed:', e);
+    log.error('db-init', 'Migration 036_push_token_version failed', e);
   }
 
   // Migration 037: «Что нового» (plan/new/whats_new.md, News 5) — новости окна после обновления.
@@ -626,7 +630,181 @@ async function applyMigrations(sql) {
       updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`;
   } catch (e) {
-    console.error('Migration 037_whats_new failed:', e);
+    log.error('db-init', 'Migration 037_whats_new failed', e);
+  }
+
+  // Migration 038: защита наборов книг (database/migrations/038_official_sets_guard.sql).
+  // Триггер 018 ставился вручную и на проде его не было — 01.11.2026 SQL «удалить мои наборы без
+  // курса» у админа удалил все наборы книг с карточками и прогрессом учеников. Теперь триггер
+  // ставится здесь (только если его нет — без блокировки таблиц на каждом холодном старте), а у
+  // наборов книг нет владельца.
+  try {
+    const guard = await sql`SELECT 1 FROM pg_trigger WHERE tgname = 'trg_guard_official_sets'`;
+    if (guard.length === 0) {
+      await sql.transaction([
+        sql`
+          CREATE OR REPLACE FUNCTION flashly_official_write_allowed() RETURNS boolean
+          LANGUAGE sql STABLE AS $fn$
+            SELECT coalesce(current_setting('flashly.official_write', true), '') = 'on'
+          $fn$
+        `,
+        sql`
+          CREATE OR REPLACE FUNCTION flashly_guard_official_sets() RETURNS trigger
+          LANGUAGE plpgsql AS $fn$
+          BEGIN
+            IF flashly_official_write_allowed() THEN
+              RETURN coalesce(NEW, OLD);
+            END IF;
+            IF (TG_OP IN ('UPDATE', 'DELETE') AND OLD.is_official)
+               OR (TG_OP IN ('INSERT', 'UPDATE') AND NEW.is_official) THEN
+              RAISE EXCEPTION 'Official set % is read-only', coalesce(NEW.id, OLD.id)
+                USING ERRCODE = 'insufficient_privilege';
+            END IF;
+            RETURN coalesce(NEW, OLD);
+          END
+          $fn$
+        `,
+        sql`DROP TRIGGER IF EXISTS trg_guard_official_sets ON card_sets`,
+        sql`
+          CREATE TRIGGER trg_guard_official_sets
+            BEFORE INSERT OR UPDATE OR DELETE ON card_sets
+            FOR EACH ROW EXECUTE FUNCTION flashly_guard_official_sets()
+        `,
+        sql`
+          CREATE OR REPLACE FUNCTION flashly_guard_official_cards() RETURNS trigger
+          LANGUAGE plpgsql AS $fn$
+          BEGIN
+            IF flashly_official_write_allowed() THEN
+              RETURN coalesce(NEW, OLD);
+            END IF;
+            IF EXISTS (
+              SELECT 1 FROM card_sets cs
+               WHERE cs.is_official
+                 AND cs.id IN (
+                   CASE WHEN TG_OP IN ('UPDATE', 'DELETE') THEN OLD.set_id END,
+                   CASE WHEN TG_OP IN ('INSERT', 'UPDATE') THEN NEW.set_id END
+                 )
+            ) THEN
+              RAISE EXCEPTION 'Cards of an official set are read-only'
+                USING ERRCODE = 'insufficient_privilege';
+            END IF;
+            RETURN coalesce(NEW, OLD);
+          END
+          $fn$
+        `,
+        sql`DROP TRIGGER IF EXISTS trg_guard_official_cards ON cards`,
+        sql`
+          CREATE TRIGGER trg_guard_official_cards
+            BEFORE INSERT OR UPDATE OR DELETE ON cards
+            FOR EACH ROW EXECUTE FUNCTION flashly_guard_official_cards()
+        `,
+      ]);
+    }
+    const owned =
+      await sql`SELECT 1 FROM card_sets WHERE is_official AND user_id IS NOT NULL LIMIT 1`;
+    if (owned.length > 0) {
+      await sql.transaction([
+        sql`SET LOCAL flashly.official_write = 'on'`,
+        sql`UPDATE card_sets SET user_id = NULL WHERE is_official AND user_id IS NOT NULL`,
+      ]);
+    }
+  } catch (e) {
+    log.error('db-init', 'Migration 038_official_sets_guard failed', e);
+  }
+
+  // Migration 039: тип набора (plan/new/set_kind.md, Kind 1) — 'language' | 'subject' | NULL (= язык).
+  try {
+    await sql`ALTER TABLE card_sets ADD COLUMN IF NOT EXISTS kind TEXT CHECK (kind IN ('language', 'subject'))`;
+    await sql`ALTER TABLE library_sets ADD COLUMN IF NOT EXISTS kind TEXT CHECK (kind IN ('language', 'subject'))`;
+  } catch (e) {
+    log.error('db-init', 'Migration 039_set_kind failed', e);
+  }
+
+  // Migration 040: библиотека-каталог (plan/new/library_catalog.md, Catalog 1) — предметы, разделы,
+  // подборки, порядок наборов, курс и копия в library_imports, юниты учебника у ученика.
+  // Подробные комментарии — database/migrations/040_library_catalog.sql.
+  try {
+    await sql`CREATE TABLE IF NOT EXISTS library_subjects (
+      id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      slug         TEXT NOT NULL UNIQUE,
+      title        TEXT NOT NULL,
+      subtitle     TEXT,
+      icon         TEXT,
+      track_label  TEXT,
+      level_scale  TEXT CHECK (level_scale IN ('cefr', 'stages')),
+      set_kind     TEXT NOT NULL DEFAULT 'subject' CHECK (set_kind IN ('language', 'subject')),
+      position     INTEGER NOT NULL DEFAULT 0,
+      is_published BOOLEAN NOT NULL DEFAULT true,
+      created_at   TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at   TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )`;
+    await sql`CREATE TABLE IF NOT EXISTS library_tracks (
+      id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      subject_id UUID NOT NULL REFERENCES library_subjects(id) ON DELETE CASCADE,
+      key        TEXT NOT NULL,
+      title      TEXT NOT NULL,
+      position   INTEGER NOT NULL DEFAULT 0,
+      UNIQUE (subject_id, key)
+    )`;
+    await sql`CREATE TABLE IF NOT EXISTS library_collections (
+      id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      subject_id  UUID NOT NULL REFERENCES library_subjects(id) ON DELETE CASCADE,
+      track       TEXT,
+      level       TEXT,
+      title       VARCHAR(100) NOT NULL,
+      description TEXT,
+      icon        TEXT,
+      position    INTEGER NOT NULL DEFAULT 0,
+      status      VARCHAR(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
+      created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )`;
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_library_collections_key
+      ON library_collections (subject_id, COALESCE(track, ''), COALESCE(level, ''), title)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_library_collections_subject_status ON library_collections (subject_id, status)`;
+
+    await sql`ALTER TABLE library_sets ADD COLUMN IF NOT EXISTS collection_id UUID REFERENCES library_collections(id) ON DELETE SET NULL`;
+    await sql`ALTER TABLE library_sets ADD COLUMN IF NOT EXISTS position INTEGER`;
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_library_sets_collection_position
+      ON library_sets (collection_id, position) WHERE collection_id IS NOT NULL`;
+
+    await sql`ALTER TABLE library_imports ADD COLUMN IF NOT EXISTS course_id UUID REFERENCES courses(id) ON DELETE CASCADE`;
+    await sql`ALTER TABLE library_imports ADD COLUMN IF NOT EXISTS card_set_id UUID REFERENCES card_sets(id) ON DELETE CASCADE`;
+    // Сначала новая уникальность, потом снимаем старую — защита от двойного импорта не пропадает.
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_library_imports_user_set_course
+      ON library_imports (user_id, library_set_id, COALESCE(course_id, '00000000-0000-0000-0000-000000000000'::uuid))`;
+    await sql`ALTER TABLE library_imports DROP CONSTRAINT IF EXISTS library_imports_user_id_library_set_id_key`;
+
+    await sql`CREATE TABLE IF NOT EXISTS book_unit_imports (
+      id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id     UUID NOT NULL,
+      unit_id     UUID NOT NULL REFERENCES book_units(id) ON DELETE CASCADE,
+      card_set_id UUID REFERENCES card_sets(id) ON DELETE CASCADE,
+      imported_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      UNIQUE (user_id, unit_id)
+    )`;
+
+    await sql`INSERT INTO library_subjects (slug, title, subtitle, icon, track_label, level_scale, set_kind, position) VALUES
+      ('languages', 'Языки',     'Английский, немецкий, турецкий', 'globe',    'Язык',   'cefr',   'language', 1),
+      ('history',   'История',   'Кыргызстан и мир',               'landmark', 'Раздел', 'stages', 'subject',  2),
+      ('geography', 'География', 'Столицы, флаги, природа',        'map-pin',  NULL,     NULL,     'subject',  3),
+      ('ort',       'ОРТ и НЦТ', 'Подготовка к тестам',            'clipboard-check', 'Раздел', NULL, 'subject', 4),
+      ('science',   'Наука',     'Физика и химия',                 'flask-conical', NULL, NULL,   'subject',  5)
+      ON CONFLICT (slug) DO NOTHING`;
+    await sql`INSERT INTO library_tracks (subject_id, key, title, position)
+      SELECT s.id, t.key, t.title, t.position
+      FROM library_subjects s
+      JOIN (VALUES
+        ('history', 'kg',        'Кыргызстан', 1),
+        ('history', 'world',     'Всемирная',  2),
+        ('ort',     'math',      'Математика', 1),
+        ('ort',     'analogies', 'Аналогии',   2),
+        ('ort',     'reading',   'Чтение',     3),
+        ('ort',     'grammar',   'Грамматика', 4)
+      ) AS t(subject, key, title, position) ON t.subject = s.slug
+      ON CONFLICT (subject_id, key) DO NOTHING`;
+  } catch (e) {
+    log.error('db-init', 'Migration 040_library_catalog failed', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)
@@ -643,7 +821,7 @@ async function applyMigrations(sql) {
       )
     `;
   } catch (e) {
-    console.error('Migration 019_daily_rewards failed:', e);
+    log.error('db-init', 'Migration 019_daily_rewards failed', e);
   }
 
   // Migration: notif columns for user_stats
@@ -654,7 +832,7 @@ async function applyMigrations(sql) {
     await sql`ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS notif_days TEXT DEFAULT 'mon,tue,wed,thu,fri'`;
     await sql`ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS notif_streak BOOLEAN DEFAULT true`;
   } catch (e) {
-    console.error('Migration notif columns failed:', e);
+    log.error('db-init', 'Migration notif columns failed', e);
   }
 
   // Migration 012: Streak events log
@@ -670,7 +848,7 @@ async function applyMigrations(sql) {
     await sql`CREATE INDEX IF NOT EXISTS idx_streak_events_user ON streak_events(user_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_streak_events_created ON streak_events(created_at DESC)`;
   } catch (e) {
-    console.error('Migration 012_streak_events failed:', e);
+    log.error('db-init', 'Migration 012_streak_events failed', e);
   }
 
   // Migration 011: Live test system
@@ -726,7 +904,7 @@ async function applyMigrations(sql) {
     await sql`CREATE INDEX IF NOT EXISTS idx_test_participants_user ON test_participants(user_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_test_answers_participant ON test_answers(participant_id)`;
   } catch (e) {
-    console.error('Migration 011_live_test failed:', e);
+    log.error('db-init', 'Migration 011_live_test failed', e);
   }
 
   // Migration 014: UNIQUE(participant_id, card_id) на test_answers — без него можно было
@@ -736,7 +914,7 @@ async function applyMigrations(sql) {
   try {
     await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_test_answers_unique_participant_card ON test_answers(participant_id, card_id)`;
   } catch (e) {
-    console.error('Migration 014_test_answers_unique failed:', e);
+    log.error('db-init', 'Migration 014_test_answers_unique failed', e);
   }
 }
 

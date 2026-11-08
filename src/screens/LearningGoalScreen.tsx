@@ -25,9 +25,19 @@ type Props = {
 };
 
 const OPTIONS: GoalOption[] = [
-  { id: 'studies', title: 'Для учебы', description: 'Подготовка к экзаменам и зачетам', icon: GraduationCap },
+  {
+    id: 'studies',
+    title: 'Для учебы',
+    description: 'Подготовка к экзаменам и зачетам',
+    icon: GraduationCap,
+  },
   { id: 'courses', title: 'Для курсов', description: 'Освоить конкретный предмет', icon: BookOpen },
-  { id: 'travel', title: 'Для путешествий', description: 'Выучить базовые фразы и слова', icon: Plane },
+  {
+    id: 'travel',
+    title: 'Для путешествий',
+    description: 'Выучить базовые фразы и слова',
+    icon: Plane,
+  },
   { id: 'self', title: 'Для себя', description: 'Личное развитие и новые хобби', icon: Leaf },
 ];
 

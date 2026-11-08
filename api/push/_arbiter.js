@@ -17,9 +17,19 @@ import { courseSetIdsSql } from '../_course.js';
 import { PUSH_TYPES, buildPush } from './_registry.js';
 import { decide } from './_decide.js';
 import {
-  DEFAULT_TZ, QUIET_TO_HOUR, QUIET_FROM_HOUR, MINOR_QUIET_FROM_HOUR, groupsOff, initFirebase, isDeadTokenError, isPushPaused,
-  isAllowedRecipient, logChannelEvents, sendNotification,
+  DEFAULT_TZ,
+  QUIET_TO_HOUR,
+  QUIET_FROM_HOUR,
+  MINOR_QUIET_FROM_HOUR,
+  groupsOff,
+  initFirebase,
+  isDeadTokenError,
+  isPushPaused,
+  isAllowedRecipient,
+  logChannelEvents,
+  sendNotification,
 } from './_send.js';
+import { log } from '../_log.js';
 
 const FCM_BATCH = 500;
 const DAILY_SLOT = 'daily';
@@ -44,7 +54,7 @@ async function sendDeferred(sql) {
       const result = await sendNotification(sql, r.user_id, r.type, r.payload || {});
       if (result.ok) sent++;
     } catch (e) {
-      console.error(`[arbiter] deferred ${r.type} for ${r.user_id} failed:`, e);
+      log.error('arbiter', `deferred ${r.type} for ${r.user_id} failed`, e);
     }
   }
   return { deferred: rows.length, deferredSent: sent };
@@ -109,18 +119,39 @@ async function sendClassPrep(sql, { dryRun }) {
             WHERE user_id = ${r.user_id} AND learning_step >= 1 AND next_review <= NOW() + INTERVAL '2 hours'
           `;
       if (n === 0) {
-        if (dryRun) report.push({ user_id: r.user_id, type: 'class_prep', status: 'skip', reason: 'nothing_to_review' });
+        if (dryRun)
+          report.push({
+            user_id: r.user_id,
+            type: 'class_prep',
+            status: 'skip',
+            reason: 'nothing_to_review',
+          });
         continue;
       }
-      const data = { count: Math.min(n, 30), course: r.course || undefined, inHours: r.minutes_left >= 90 ? 2 : 1 };
+      const data = {
+        count: Math.min(n, 30),
+        course: r.course || undefined,
+        inHours: r.minutes_left >= 90 ? 2 : 1,
+      };
       const result = await sendNotification(sql, r.user_id, 'class_prep', data, { dryRun });
       if (result.ok) sent++;
-      if (dryRun) report.push({ user_id: r.user_id, type: 'class_prep', status: result.reason || 'send', data, message: result.message || null });
+      if (dryRun)
+        report.push({
+          user_id: r.user_id,
+          type: 'class_prep',
+          status: result.reason || 'send',
+          data,
+          message: result.message || null,
+        });
     } catch (e) {
-      console.error(`[arbiter] class_prep for ${r.user_id} failed:`, e);
+      log.error('arbiter', `class_prep for ${r.user_id} failed`, e);
     }
   }
-  return { classCandidates: rows.length, classSent: sent, ...(dryRun ? { classReport: report } : null) };
+  return {
+    classCandidates: rows.length,
+    classSent: sent,
+    ...(dryRun ? { classReport: report } : null),
+  };
 }
 
 /** Новые слова урока в день (DEFAULT_NEW_PER_DAY в LessonService): квота хранится на телефоне, сервер берёт обычную */
@@ -147,9 +178,16 @@ async function sendEach(sql, items, { dryRun, markDay = true }) {
         sent++;
         reminded.push(userId);
       }
-      if (dryRun) report.push({ user_id: userId, type, status: result.reason || 'send', data, message: result.message || null });
+      if (dryRun)
+        report.push({
+          user_id: userId,
+          type,
+          status: result.reason || 'send',
+          data,
+          message: result.message || null,
+        });
     } catch (e) {
-      console.error(`[arbiter] ${type} for ${userId} failed:`, e);
+      log.error('arbiter', `${type} for ${userId} failed`, e);
     }
   }
   if (!dryRun && markDay) await markRemindedToday(sql, reminded);
@@ -234,11 +272,21 @@ async function sendOnboarding(sql, { dryRun }) {
       )
   `;
   const items = [
-    ...firstLesson.map((r) => ({ userId: r.user_id, type: 'onboarding_first_lesson', data: { count: r.count, set: r.set_title } })),
-    ...day2.filter((r) => r.count > 0).map((r) => ({ userId: r.user_id, type: 'onboarding_day2', data: { count: r.count } })),
+    ...firstLesson.map((r) => ({
+      userId: r.user_id,
+      type: 'onboarding_first_lesson',
+      data: { count: r.count, set: r.set_title },
+    })),
+    ...day2
+      .filter((r) => r.count > 0)
+      .map((r) => ({ userId: r.user_id, type: 'onboarding_day2', data: { count: r.count } })),
   ];
   const { sent, report } = await sendEach(sql, items, { dryRun });
-  return { onboardingCandidates: items.length, onboardingSent: sent, ...(dryRun ? { onboardingReport: report } : null) };
+  return {
+    onboardingCandidates: items.length,
+    onboardingSent: sent,
+    ...(dryRun ? { onboardingReport: report } : null),
+  };
 }
 
 /**
@@ -279,9 +327,17 @@ async function sendStreakRisk(sql, { dryRun }) {
           AND p.local_date > c.local_now::date - 7
       ) < 2
   `;
-  const items = rows.map((r) => ({ userId: r.user_id, type: 'streak_risk', data: { streak: r.current_streak } }));
+  const items = rows.map((r) => ({
+    userId: r.user_id,
+    type: 'streak_risk',
+    data: { streak: r.current_streak },
+  }));
   const { sent, report } = await sendEach(sql, items, { dryRun, markDay: false });
-  return { streakRiskCandidates: items.length, streakRiskSent: sent, ...(dryRun ? { streakRiskReport: report } : null) };
+  return {
+    streakRiskCandidates: items.length,
+    streakRiskSent: sent,
+    ...(dryRun ? { streakRiskReport: report } : null),
+  };
 }
 
 /** Кандидаты этого 15-минутного слота — одним запросом вместо 2–4 на человека */
@@ -407,31 +463,53 @@ async function sendNewCourseSets(sql, { dryRun }) {
       AND COALESCE(s.is_hidden_from_students, false) = false
       AND s.created_at > NOW() - INTERVAL '7 days'
   `;
-  const ready = sets.filter((x) => x.cards >= NEW_SET_MIN_CARDS && x.last_card_at && Date.now() - new Date(x.last_card_at).getTime() > 15 * 60 * 1000);
+  const ready = sets.filter(
+    (x) =>
+      x.cards >= NEW_SET_MIN_CARDS &&
+      x.last_card_at &&
+      Date.now() - new Date(x.last_card_at).getTime() > 15 * 60 * 1000
+  );
   const items = [];
   for (const set of ready) {
     if (!dryRun) {
-      const claimed = await sql`UPDATE card_sets SET announced_at = NOW() WHERE id = ${set.id} AND announced_at IS NULL RETURNING id`;
+      const claimed =
+        await sql`UPDATE card_sets SET announced_at = NOW() WHERE id = ${set.id} AND announced_at IS NULL RETURNING id`;
       if (claimed.length === 0) continue;
     }
-    const students = await sql`SELECT user_id FROM course_members WHERE course_id = ${set.course_id} AND role = 'student'`;
+    const students =
+      await sql`SELECT user_id FROM course_members WHERE course_id = ${set.course_id} AND role = 'student'`;
     for (const st of students) {
       items.push({
         userId: st.user_id,
         type: 'course_new_set',
-        data: { course: set.course, set: set.title, count: set.cards, setId: set.id, courseId: set.course_id },
+        data: {
+          course: set.course,
+          set: set.title,
+          count: set.cards,
+          setId: set.id,
+          courseId: set.course_id,
+        },
       });
     }
   }
   const { sent, report } = await sendEach(sql, items, { dryRun, markDay: false });
-  return { newSets: ready.length, newSetPushes: items.length, newSetSent: sent, ...(dryRun ? { newSetReport: report } : null) };
+  return {
+    newSets: ready.length,
+    newSetPushes: items.length,
+    newSetSent: sent,
+    ...(dryRun ? { newSetReport: report } : null),
+  };
 }
 
 const OVERTAKEN_DAYS = ['tue', 'wed', 'thu', 'fri', 'sat'];
 
 /** Только имя без фамилии — на экране блокировки (принцип 7) */
 function firstName(name) {
-  return String(name || '').trim().split(/\s+/)[0] || null;
+  return (
+    String(name || '')
+      .trim()
+      .split(/\s+/)[0] || null
+  );
 }
 
 /**
@@ -443,7 +521,9 @@ function firstName(name) {
 async function loadRatings(sql, candidates) {
   const sunday = new Map();
   const overtaken = new Map();
-  const ids = candidates.filter((c) => c.dow === 'sun' || OVERTAKEN_DAYS.includes(c.dow)).map((c) => c.user_id);
+  const ids = candidates
+    .filter((c) => c.dow === 'sun' || OVERTAKEN_DAYS.includes(c.dow))
+    .map((c) => c.user_id);
   if (ids.length === 0) return { sunday, overtaken };
   const byUser = new Map(candidates.map((c) => [c.user_id, c]));
   const memberships = await sql`
@@ -477,14 +557,28 @@ async function loadRatings(sql, candidates) {
     if (c.dow === 'sun' && !sunday.has(m.user_id)) {
       const idx = st.now.findIndex((r) => r.user_id === m.user_id);
       if (idx >= 0 && st.now[idx].points > 0) {
-        sunday.set(m.user_id, { place: idx + 1, gap: idx > 0 ? st.now[idx - 1].points - st.now[idx].points : null, courseId: m.course_id });
+        sunday.set(m.user_id, {
+          place: idx + 1,
+          gap: idx > 0 ? st.now[idx - 1].points - st.now[idx].points : null,
+          courseId: m.course_id,
+        });
       }
     }
     if (OVERTAKEN_DAYS.includes(c.dow) && !overtaken.has(m.user_id)) {
       if (!st.endYesterday) {
         const visible = (rows) => rows.filter((r) => !r.hide_from_rating);
-        st.endYesterday = visible(await computeStandings(sql, m.course_id, m.tz, st.bounds.week_start, st.bounds.end_yesterday));
-        st.endBefore = visible(await computeStandings(sql, m.course_id, m.tz, st.bounds.week_start, st.bounds.end_before));
+        st.endYesterday = visible(
+          await computeStandings(
+            sql,
+            m.course_id,
+            m.tz,
+            st.bounds.week_start,
+            st.bounds.end_yesterday
+          )
+        );
+        st.endBefore = visible(
+          await computeStandings(sql, m.course_id, m.tz, st.bounds.week_start, st.bounds.end_before)
+        );
       }
       const pts = (rows) => new Map(rows.map((r) => [r.user_id, r.points]));
       const p1 = pts(st.endYesterday);
@@ -492,7 +586,9 @@ async function loadRatings(sql, candidates) {
       const mine1 = p1.get(m.user_id) ?? 0;
       const mine0 = p0.get(m.user_id) ?? 0;
       const rivals = st.endYesterday
-        .filter((r) => r.user_id !== m.user_id && (p0.get(r.user_id) ?? 0) < mine0 && r.points > mine1)
+        .filter(
+          (r) => r.user_id !== m.user_id && (p0.get(r.user_id) ?? 0) < mine0 && r.points > mine1
+        )
         .sort((a, b) => a.points - b.points);
       if (rivals.length > 0) {
         overtaken.set(m.user_id, {
@@ -555,7 +651,9 @@ export async function runArbiter(sql, { dryRun = false } = {}) {
       waiting: c.waiting || 0,
       rating: ratings.sunday.get(c.user_id) || null,
       overtaken: ratings.overtaken.get(c.user_id) || null,
-      weekly: c.weekly_place ? { place: c.weekly_place, reward: c.weekly_reward, courseId: c.weekly_course_id } : null,
+      weekly: c.weekly_place
+        ? { place: c.weekly_place, reward: c.weekly_reward, courseId: c.weekly_course_id }
+        : null,
       newWords: c.new_count > 0 ? { count: c.new_count, set: c.new_set } : null,
       learned: c.learned || 0,
       sets: c.sets || 0,
@@ -574,7 +672,14 @@ export async function runArbiter(sql, { dryRun = false } = {}) {
       secPerAnswer: c.sec_per_answer ? Number(c.sec_per_answer) : null,
     };
     if (decision.status === 'skip') {
-      if (dryRun) report.push({ user_id: c.user_id, type: null, status: 'skip', reason: decision.reason, profile });
+      if (dryRun)
+        report.push({
+          user_id: c.user_id,
+          type: null,
+          status: 'skip',
+          reason: decision.reason,
+          profile,
+        });
       continue;
     }
 
@@ -617,8 +722,13 @@ export async function runArbiter(sql, { dryRun = false } = {}) {
     if (!dryRun && status !== 'paused') markDay.push({ user_id: c.user_id, d: c.local_today });
     if (dryRun) {
       report.push({
-        user_id: c.user_id, type: decision.type, status, reason: decision.reason || null, data: decision.data,
-        message: built ? { title: built.title, body: built.body } : null, profile,
+        user_id: c.user_id,
+        type: decision.type,
+        status,
+        reason: decision.reason || null,
+        data: decision.data,
+        message: built ? { title: built.title, body: built.body } : null,
+        profile,
       });
     }
   }
@@ -629,7 +739,10 @@ export async function runArbiter(sql, { dryRun = false } = {}) {
   // Отправка: сначала резерв слота дня, потом FCM пачками
   let sent = 0;
   if (toSend.length > 0) {
-    const reserved = await insertLogRows(sql, toSend.map((s) => s.row));
+    const reserved = await insertLogRows(
+      sql,
+      toSend.map((s) => s.row)
+    );
     const ready = toSend.filter((s) => reserved.has(s.row.id));
     const userIds = ready.map((s) => s.row.user_id);
     const tokenRows = userIds.length
@@ -676,17 +789,25 @@ export async function runArbiter(sql, { dryRun = false } = {}) {
             else if (isDeadTokenError(r.error?.code)) dead.push(chunk[j]);
           });
         } catch (e) {
-          console.error('[arbiter] FCM batch failed:', e);
+          log.error('arbiter', 'FCM batch failed', e);
           for (const m of chunk) stats.get(m.pushId).tokens++;
         }
       }
     }
     if (dead.length) {
       await sql`DELETE FROM push_tokens WHERE token = ANY(${dead.map((m) => m.token)})`;
-      await logChannelEvents(sql, dead.map((m) => ({ userId: m.userId, event: 'token_unregistered' })));
+      await logChannelEvents(
+        sql,
+        dead.map((m) => ({ userId: m.userId, event: 'token_unregistered' }))
+      );
     }
 
-    const updates = [...stats].map(([id, st]) => ({ id, status: st.delivered > 0 ? 'sent' : 'failed', tokens: st.tokens, delivered: st.delivered }));
+    const updates = [...stats].map(([id, st]) => ({
+      id,
+      status: st.delivered > 0 ? 'sent' : 'failed',
+      tokens: st.tokens,
+      delivered: st.delivered,
+    }));
     sent = updates.filter((u) => u.status === 'sent').length;
     if (updates.length > 0) {
       await sql`

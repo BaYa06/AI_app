@@ -18,7 +18,13 @@ interface Props {
   onPress: () => void;
 }
 
-export const GameRow = memo(function GameRow({ icon: Icon, title, tag, description, onPress }: Props) {
+export const GameRow = memo(function GameRow({
+  icon: Icon,
+  title,
+  tag,
+  description,
+  onPress,
+}: Props) {
   const colors = useThemeColors();
 
   return (

@@ -1,27 +1,36 @@
 import { create } from 'zustand';
-import { supabase } from '@/services/supabaseClient';
-import { API_BASE } from '@/config/apiBase';
-import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
+import { getAccessToken } from '@/services/auth/session';
+import { apiFetch } from '@/services/api/client';
 import { useChallengeStore, localDay, type ChallengeId } from './challengeStore';
 import { readCache, writeCache } from '@/services/localCache';
+import { log } from '@/utils/logger';
 
 // Баланс и ежедневные награды живут в БД (users.diamond, daily_rewards). Начисляет только
 // сервер (api/push.js?action=claim-reward), он же не даёт забрать награду дважды за день.
-const REWARDS_API = `${API_BASE}/push`;
 
-async function callRewardsApi(action: string, init: { method: 'GET' | 'POST'; body?: object }, day: string) {
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
+async function callRewardsApi(
+  action: string,
+  init: { method: 'GET' | 'POST'; body?: object },
+  day: string
+) {
+  const token = await getAccessToken();
   if (!token) return null;
   try {
-    const resp = await fetchWithTimeout(`${REWARDS_API}?action=${action}&day=${day}`, {
+    // Query собран вручную, как раньше (без URLSearchParams); токен прочитан до try — auth: 'none'
+    const res = await apiFetch(`push?action=${action}&day=${day}`, {
       method: init.method,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: init.body ? JSON.stringify({ ...init.body, day }) : undefined,
+      auth: 'none',
+      body: init.body ? { ...init.body, day } : undefined,
+      parse: 'none', // невалидный JSON при 2xx бросает → catch, как `await resp.json()` раньше
     });
-    return resp.ok ? await resp.json() : null;
+    if (!res.response) {
+      log.error('Rewards', `Rewards API ${action} failed`, res.error.original);
+      return null;
+    }
+    return res.ok ? await res.response.json() : null;
   } catch (error) {
-    console.error(`Rewards API ${action} failed:`, error);
+    log.error('Rewards', `Rewards API ${action} failed`, error);
     return null;
   }
 }
@@ -56,7 +65,10 @@ export const useDiamondStore = create<DiamondState>((set) => ({
     if (!data) return null;
     const cached = readCache<{ day: string; claimed: string[] }>('challenges_claimed');
     const claimed = cached?.day === day ? cached.claimed : [];
-    writeCache('challenges_claimed', { day, claimed: Array.from(new Set([...claimed, challenge])) });
+    writeCache('challenges_claimed', {
+      day,
+      claimed: Array.from(new Set([...claimed, challenge])),
+    });
     return data.diamonds;
   },
   setDiamonds: (diamonds) => {

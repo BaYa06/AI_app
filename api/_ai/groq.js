@@ -7,8 +7,12 @@
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
-export const GROQ_MODELS = (process.env.GROQ_MODELS || 'openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b')
-  .split(',').map(m => m.trim()).filter(Boolean);
+export const GROQ_MODELS = (
+  process.env.GROQ_MODELS || 'openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b'
+)
+  .split(',')
+  .map((m) => m.trim())
+  .filter(Boolean);
 
 export function isGroqEnabled() {
   return Boolean(process.env.GROQ_API_KEY) && GROQ_MODELS.length > 0;
@@ -42,7 +46,9 @@ export async function groqGenerate({ model, prompt, temperature, maxOutputTokens
 
   if (!response.ok) {
     const body = await response.text().catch(() => '');
-    throw Object.assign(new Error(`Groq ${response.status}: ${body.slice(0, 300)}`), { status: response.status });
+    throw Object.assign(new Error(`Groq ${response.status}: ${body.slice(0, 300)}`), {
+      status: response.status,
+    });
   }
 
   const data = await response.json();

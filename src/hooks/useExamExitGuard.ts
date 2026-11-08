@@ -14,9 +14,16 @@
  * вернут 409 после льготы — это обрабатывает сам экран теста.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Dimensions, Platform, useWindowDimensions, type AppStateStatus } from 'react-native';
-import { supabase } from '@/services/supabaseClient';
-import { API_BASE } from '@/config/apiBase';
+import {
+  AppState,
+  Dimensions,
+  Platform,
+  useWindowDimensions,
+  type AppStateStatus,
+} from 'react-native';
+import { log } from '@/utils/logger';
+import { getAccessToken } from '@/services/auth/session';
+import { rawApiFetch } from '@/services/api/client';
 
 export type ExamLeftReason = 'manual' | 'background' | 'relaunch';
 
@@ -37,13 +44,12 @@ const SPLIT_WIDTH_RATIO = 0.8;
 const AWAY_WAIT_MS = 3000;
 
 async function postExam(action: string, body: Record<string, unknown>) {
-  const { data: authData } = await supabase.auth.getSession();
-  const token = authData.session?.access_token;
+  const token = await getAccessToken();
   if (!token) throw new Error('Not authenticated');
-  const res = await fetch(`${API_BASE}/test?action=${action}`, {
+  const res = await rawApiFetch(`test?action=${action}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(body),
+    body,
   });
   const json = await res.json();
   if (!res.ok) throw new Error(json.error || `Error ${res.status}`);
@@ -84,11 +90,14 @@ export function useExamExitGuard({ participantId, enabled, onLeft }: Options) {
   const onLeftRef = useRef(onLeft);
   onLeftRef.current = onLeft;
 
-  const goAway = useCallback((reason: 'background' | 'split') => {
-    if (awayRef.current) return;
-    // Ответ не нужен; ошибку глотаем — тогда `back` сам засчитает выход.
-    awayRef.current = postExam('away', { participantId, reason }).catch(() => {});
-  }, [participantId]);
+  const goAway = useCallback(
+    (reason: 'background' | 'split') => {
+      if (awayRef.current) return;
+      // Ответ не нужен; ошибку глотаем — тогда `back` сам засчитает выход.
+      awayRef.current = postExam('away', { participantId, reason }).catch(() => {});
+    },
+    [participantId]
+  );
 
   const comeBack = useCallback(async () => {
     const pendingAway = awayRef.current;
@@ -106,7 +115,7 @@ export function useExamExitGuard({ participantId, enabled, onLeft }: Options) {
       if (splitRef.current) goAway('split');
     } catch (e) {
       // Нет сети — сервер не даст ответить после льготы (409 в get-question/answer).
-      console.warn('exam back failed:', e);
+      log.warn('ExamExitGuard', 'exam back failed', e);
     } finally {
       setChecking(false);
     }

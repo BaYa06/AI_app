@@ -1,0 +1,245 @@
+/**
+ * api/teacher.js — ростер, статистика ученика, владелец, видимость набора, напоминание (Clean 10 — перенесено без изменений).
+ */
+import { courseSetIdsSql } from '../../_course.js';
+import { sendNotification } from '../../push.js';
+import { notifyCoursesChanged } from '../../_realtime.js';
+
+export async function listMembers(req, res, sql, userId) {
+  const { courseId, limit, offset } = req.query;
+  if (!courseId) return res.status(400).json({ error: 'courseId required' });
+
+  const course = await sql`
+    SELECT id FROM courses WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid
+  `;
+  if (course.length === 0) return res.status(403).json({ error: 'Not the owner' });
+
+  // limit/offset — опционально. Без них отдаём весь ростер как раньше (полный список нужен
+  // экранам агрегатов курса, которые считают средние/активных по всем ученикам сразу; клиент
+  // с постраничным UI — TeacherStudentsScreen.tsx — пока не подключён, курсы сейчас небольшие,
+  // см. план, пункт 26). Когда лимит передан — отдаём на 1 строку больше запрошенного, чтобы
+  // клиент мог понять, есть ли следующая страница, не делая отдельный COUNT(*).
+  const limitInt = limit ? Math.max(1, Math.min(200, parseInt(limit, 10) || 50)) : null;
+  const offsetInt = Math.max(0, parseInt(offset, 10) || 0);
+
+  const rows = await sql`
+    SELECT
+      u.id,
+      COALESCE(u.display_name, u.user_name, u.email) AS display_name,
+      u.email,
+      cm.joined_at,
+      cr.last_active_date,
+      COALESCE(cr.today_cards, 0) AS today_cards,
+      GREATEST(
+        COALESCE(us.current_streak, 0),
+        COALESCE((
+          SELECT COUNT(*)::int
+          FROM (
+            SELECT
+              local_date,
+              (CURRENT_DATE - local_date)::int - (ROW_NUMBER() OVER (ORDER BY local_date DESC))::int AS grp
+            FROM daily_activity da2
+            WHERE da2.user_id = cm.user_id AND da2.local_date >= CURRENT_DATE - 365
+          ) t
+          WHERE grp = 0
+        ), 0)
+      ) AS current_streak,
+      (
+        SELECT COUNT(*)::int FROM card_progress cp JOIN cards c ON c.id = cp.card_id
+        WHERE cp.user_id = cm.user_id AND cp.learning_step >= 1 AND cp.next_review <= NOW()
+          AND c.set_id IN (${courseSetIdsSql(sql, courseId)})
+      ) AS waiting_reviews
+    FROM course_members cm
+    JOIN users u ON u.id = cm.user_id
+    LEFT JOIN user_stats us ON us.user_id = cm.user_id
+    LEFT JOIN (
+      SELECT
+        r.user_id,
+        MAX(r.reviewed_at)::date AS last_active_date,
+        COUNT(DISTINCT CASE WHEN r.reviewed_at::date = CURRENT_DATE THEN r.card_id END) AS today_cards
+      FROM review_log r
+      JOIN cards c ON c.id = r.card_id
+      WHERE c.set_id IN (${courseSetIdsSql(sql, courseId)})
+      GROUP BY r.user_id
+    ) cr ON cr.user_id = cm.user_id
+    WHERE cm.course_id = ${courseId}::uuid
+    ORDER BY cm.joined_at ASC
+    LIMIT ${limitInt ? limitInt + 1 : null} OFFSET ${offsetInt}
+  `;
+
+  const hasMore = limitInt !== null && rows.length > limitInt;
+  const page = limitInt !== null ? rows.slice(0, limitInt) : rows;
+
+  const members = page.map((row) => ({
+    id: row.id,
+    displayName: row.display_name || 'Ученик',
+    email: row.email || null,
+    streak: row.current_streak || 0,
+    lastActiveDate: row.last_active_date,
+    todayCards: Number(row.today_cards) || 0,
+    joinedAt: row.joined_at,
+    // Слова курса, которым пришло время повторения (план §3.8)
+    waitingReviews: Number(row.waiting_reviews) || 0,
+  }));
+  return res.status(200).json({ ok: true, members, hasMore });
+}
+
+export async function studentStats(req, res, sql, userId) {
+  const { courseId, studentId } = req.query;
+  if (!courseId || !studentId)
+    return res.status(400).json({ error: 'courseId and studentId required' });
+
+  const course = await sql`
+    SELECT id FROM courses WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid
+  `;
+  if (course.length === 0) return res.status(403).json({ error: 'Not the owner' });
+
+  const membership = await sql`
+    SELECT 1 FROM course_members WHERE course_id = ${courseId}::uuid AND user_id = ${studentId}::uuid
+  `;
+  if (membership.length === 0) return res.status(404).json({ error: 'Student not in this course' });
+
+  const rows = await sql`
+    WITH course_sets AS (
+      SELECT id, title, created_at FROM card_sets WHERE id IN (${courseSetIdsSql(sql, courseId)})
+    ),
+    student_progress AS (
+      SELECT
+        c.set_id,
+        COUNT(DISTINCT r.card_id) AS cards_seen,
+        COUNT(DISTINCT cp.card_id) FILTER (WHERE cp.learning_step >= 3) AS cards_learned
+      FROM cards c
+      INNER JOIN course_sets cs ON cs.id = c.set_id
+      LEFT JOIN review_log r ON r.card_id = c.id AND r.user_id = ${studentId}::uuid
+      LEFT JOIN card_progress cp ON cp.card_id = c.id AND cp.user_id = ${studentId}::uuid
+      GROUP BY c.set_id
+    )
+    SELECT
+      cs.id AS set_id, cs.title,
+      (SELECT COUNT(*) FROM cards WHERE set_id = cs.id) AS total_cards,
+      COALESCE(sp.cards_seen, 0) AS cards_seen,
+      COALESCE(sp.cards_learned, 0) AS cards_learned
+    FROM course_sets cs
+    LEFT JOIN student_progress sp ON sp.set_id = cs.id
+    ORDER BY cs.created_at ASC
+  `;
+
+  const sets = rows.map((row) => ({
+    setId: row.set_id,
+    title: row.title,
+    totalCards: Number(row.total_cards) || 0,
+    learnedCards: Number(row.cards_learned) || 0,
+    seenCards: Number(row.cards_seen) || 0,
+  }));
+  const totalCards = sets.reduce((s, r) => s + r.totalCards, 0);
+  const seenCards = sets.reduce((s, r) => s + r.seenCards, 0);
+  const learnedCards = sets.reduce((s, r) => s + r.learnedCards, 0);
+
+  // Свежие streak/last_active — раньше StudentDetailScreen только наследовал их из
+  // route.params (снимок со списка учеников на момент навигации). Тот же расчёт streak, что
+  // и в listMembers, просто без course_members в качестве анкера (studentId уже проверен
+  // выше). См. план, пункт 34.
+  const activity = await sql`
+    SELECT
+      GREATEST(
+        COALESCE((SELECT current_streak FROM user_stats WHERE user_id = ${studentId}::uuid), 0),
+        COALESCE((
+          SELECT COUNT(*)::int
+          FROM (
+            SELECT
+              local_date,
+              (CURRENT_DATE - local_date)::int - (ROW_NUMBER() OVER (ORDER BY local_date DESC))::int AS grp
+            FROM daily_activity
+            WHERE user_id = ${studentId}::uuid AND local_date >= CURRENT_DATE - 365
+          ) t
+          WHERE grp = 0
+        ), 0)
+      ) AS current_streak,
+      (SELECT MAX(reviewed_at)::date FROM review_log WHERE user_id = ${studentId}::uuid) AS last_active_date
+  `;
+
+  return res.status(200).json({
+    ok: true,
+    seenCards,
+    learnedCards,
+    unlearnedCards: Math.max(0, totalCards - seenCards),
+    sets,
+    streak: activity[0]?.current_streak || 0,
+    lastActiveDate: activity[0]?.last_active_date || null,
+  });
+}
+
+export async function checkOwner(req, res, sql, userId) {
+  const { courseId } = req.query;
+  if (!courseId) return res.status(400).json({ error: 'courseId required' });
+
+  const course = await sql`
+    SELECT id FROM courses WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid
+  `;
+  return res.status(200).json({ ok: true, isOwner: course.length > 0 });
+}
+
+// ─── Видимость набора ───────────────────────────────────────
+
+export async function toggleSetHidden(req, res, sql, userId) {
+  const { setId, hidden } = req.body || {};
+  if (!setId || typeof hidden !== 'boolean') {
+    return res.status(400).json({ error: 'setId and boolean hidden required' });
+  }
+
+  const updated = await sql`
+    UPDATE card_sets SET is_hidden_from_students = ${hidden}, updated_at = NOW()
+    WHERE id = ${setId}::uuid AND user_id = ${userId}::uuid
+    RETURNING id, course_id
+  `;
+  if (updated.length === 0) return res.status(403).json({ error: 'Not found or not the owner' });
+  await notifyCoursesChanged([updated[0].course_id]);
+  return res.status(200).json({ ok: true });
+}
+
+// ─── Агрегаты курса/наборов (учитель) ────────────────────────
+// Раньше эти четыре функции жили в NeonService.ts и шли напрямую в Neon с клиента без
+// какой-либо проверки, что вызывающий преподаёт этот курс — любой мог передать чужой
+// courseId/setId и получить реальную статистику чужого курса. См. план, пункт 23.
+
+/**
+ * Учитель просит повторить слова (план §3.8): пуш ученикам курса, у которых есть слова курса
+ * к повторению. Всему классу — не чаще раза в сутки; одному ученику — в любой момент.
+ */
+export async function remindReview(req, res, sql, userId) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const { courseId, studentId = null } = req.body || {};
+  if (!courseId) return res.status(400).json({ error: 'courseId required' });
+
+  const course = await sql`
+    SELECT c.id, COALESCE(u.display_name, u.user_name) AS teacher, c.last_review_reminder_at > NOW() - INTERVAL '20 hours' AS recent
+    FROM courses c JOIN users u ON u.id = c.user_id
+    WHERE c.id = ${courseId}::uuid AND c.user_id = ${userId}::uuid
+  `;
+  if (course.length === 0) return res.status(403).json({ error: 'Not the owner' });
+  if (!studentId && course[0].recent) {
+    return res.status(429).json({ error: 'Already reminded today', reason: 'rate_limited' });
+  }
+
+  const students = await sql`
+    SELECT cm.user_id, COUNT(cp.card_id)::int AS waiting
+    FROM course_members cm
+    JOIN card_progress cp ON cp.user_id = cm.user_id AND cp.learning_step >= 1 AND cp.next_review <= NOW()
+    JOIN cards c ON c.id = cp.card_id AND c.set_id IN (${courseSetIdsSql(sql, courseId)})
+    WHERE cm.course_id = ${courseId}::uuid AND cm.role = 'student'
+      AND (${studentId}::uuid IS NULL OR cm.user_id = ${studentId}::uuid)
+    GROUP BY cm.user_id
+  `;
+  let sent = 0;
+  for (const s of students) {
+    const result = await sendNotification(sql, s.user_id, 'teacher_review', {
+      teacher: course[0].teacher,
+      count: s.waiting,
+    });
+    if (result.ok) sent++;
+  }
+  if (!studentId) {
+    await sql`UPDATE courses SET last_review_reminder_at = NOW() WHERE id = ${courseId}::uuid`;
+  }
+  return res.status(200).json({ ok: true, students: students.length, sent });
+}

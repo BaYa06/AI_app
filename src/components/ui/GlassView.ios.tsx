@@ -19,22 +19,50 @@ interface NativeGlassViewProps extends ViewProps {
   dark?: boolean;
 }
 
-const config = UIManager.hasViewManagerConfig('GlassView') ? (UIManager.getViewManagerConfig('GlassView') as any) : null;
+const config = UIManager.hasViewManagerConfig('GlassView')
+  ? (UIManager.getViewManagerConfig('GlassView') as any)
+  : null;
 
 export const isGlassSupported: boolean = !!config?.Constants?.isSupported;
 
-const NativeGlassView = isGlassSupported ? requireNativeComponent<NativeGlassViewProps>('GlassView') : null;
-const NativeGlassContainer = isGlassSupported ? requireNativeComponent<GlassContainerProps>('GlassContainer') : null;
+const NativeGlassView = isGlassSupported
+  ? requireNativeComponent<NativeGlassViewProps>('GlassView')
+  : null;
+const NativeGlassContainer = isGlassSupported
+  ? requireNativeComponent<GlassContainerProps>('GlassContainer')
+  : null;
 
-export const GlassView = memo(function GlassView({ fallbackColor, tint, cornerRadius = 0, style, ...rest }: GlassViewProps) {
+export const GlassView = memo(function GlassView({
+  fallbackColor,
+  tint,
+  cornerRadius = 0,
+  style,
+  ...rest
+}: GlassViewProps) {
   const dark = useSettingsStore((s) => s.resolvedTheme === 'dark');
   if (!NativeGlassView) {
-    return <View {...rest} style={[{ backgroundColor: fallbackColor, borderRadius: cornerRadius }, style]} />;
+    return (
+      <View
+        {...rest}
+        style={[{ backgroundColor: fallbackColor, borderRadius: cornerRadius }, style]}
+      />
+    );
   }
-  return <NativeGlassView {...rest} tint={tint} cornerRadius={cornerRadius} dark={dark} style={[{ borderRadius: cornerRadius }, style]} />;
+  return (
+    <NativeGlassView
+      {...rest}
+      tint={tint}
+      cornerRadius={cornerRadius}
+      dark={dark}
+      style={[{ borderRadius: cornerRadius }, style]}
+    />
+  );
 });
 
-export const GlassContainer = memo(function GlassContainer({ spacing = 0, ...rest }: GlassContainerProps) {
+export const GlassContainer = memo(function GlassContainer({
+  spacing = 0,
+  ...rest
+}: GlassContainerProps) {
   if (!NativeGlassContainer) return <View {...rest} />;
   return <NativeGlassContainer {...rest} spacing={spacing} />;
 });

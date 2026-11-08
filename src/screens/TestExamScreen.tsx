@@ -3,25 +3,30 @@
  * @description Экран теста для ученика — multiple choice без мгновенной обратной связи
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  View,
-  StyleSheet,
-  Pressable,
-  BackHandler,
-  Platform,
-} from 'react-native';
+import { View, StyleSheet, Pressable, BackHandler, Platform } from 'react-native';
 import { useKeepAwake } from '@sayem314/react-native-keep-awake';
 import { Maximize2, ShieldCheck } from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { Button, Card, ProgressBar, Screen, Skeleton, SkeletonCard, confirmDialog, toast } from '@/components/ui';
+import {
+  Button,
+  Card,
+  ProgressBar,
+  Screen,
+  Skeleton,
+  SkeletonCard,
+  confirmDialog,
+  toast,
+} from '@/components/ui';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha, heights, screenPadding, iconSize } from '@/constants';
 import { useExamExitGuard, leaveExam, type ExamAttemptSummary } from '@/hooks/useExamExitGuard';
-import { supabase } from '@/services/supabaseClient';
+import { createChannel, removeChannel } from '@/services/realtime';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 
-import { API_BASE } from '@/config/apiBase';
+import { log } from '@/utils/logger';
+import { getAccessToken } from '@/services/auth/session';
+import { rawApiFetch } from '@/services/api/client';
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D'];
 
@@ -44,7 +49,15 @@ type AnswerRecord = {
 export function TestExamScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
 
-  const { sessionId, participantId, testMode, questionCount, timePerQuestion, initialQuestionIndex, exitControl } = route.params;
+  const {
+    sessionId,
+    participantId,
+    testMode,
+    questionCount,
+    timePerQuestion,
+    initialQuestionIndex,
+    exitControl,
+  } = route.params;
 
   // Экран не гаснет во время теста: автоблокировка при контроле выхода считалась бы выходом,
   // да и без него неприятно на вопросе без таймера.
@@ -75,18 +88,21 @@ export function TestExamScreen({ navigation, route }: Props) {
 
   // Попытка завершена из-за выхода из приложения (plan/done/exam_lockdown.md) — итог считает сервер:
   // неотвеченные вопросы засчитаны как неверные. Разбор ответов не показываем.
-  const finishLeft = useCallback((summary: ExamAttemptSummary) => {
-    if (finishedRef.current) return;
-    finishedRef.current = true;
-    navigation.replace('TestDone', {
-      correct: summary.correct,
-      total: summary.total || questionCount,
-      answered: summary.answered,
-      leftReason: summary.leftReason ?? 'background',
-      // Учитель может разрешить продолжить — TestDone вернёт сюда с того же вопроса
-      resume: { sessionId, participantId, testMode, questionCount, timePerQuestion, exitControl },
-    });
-  }, [navigation, sessionId, participantId, testMode, questionCount, timePerQuestion, exitControl]);
+  const finishLeft = useCallback(
+    (summary: ExamAttemptSummary) => {
+      if (finishedRef.current) return;
+      finishedRef.current = true;
+      navigation.replace('TestDone', {
+        correct: summary.correct,
+        total: summary.total || questionCount,
+        answered: summary.answered,
+        leftReason: summary.leftReason ?? 'background',
+        // Учитель может разрешить продолжить — TestDone вернёт сюда с того же вопроса
+        resume: { sessionId, participantId, testMode, questionCount, timePerQuestion, exitControl },
+      });
+    },
+    [navigation, sessionId, participantId, testMode, questionCount, timePerQuestion, exitControl]
+  );
 
   const { splitView, checking } = useExamExitGuard({
     participantId,
@@ -101,34 +117,37 @@ export function TestExamScreen({ navigation, route }: Props) {
   questionIndexRef.current = questionIndex;
   const confirmingRef = useRef(false);
 
-  const confirmLeave = useCallback(async (source: 'button' | 'back') => {
-    if (finishedRef.current || confirmingRef.current) return;
-    confirmingRef.current = true;
-    try {
-      const answered = questionIndexRef.current;
-      const ok = await confirmDialog({
-        title: 'Завершить тест?',
-        message:
-          `Ты ответил на ${answered} из ${questionCount}. Неотвеченные вопросы засчитаются как неверные.\n\n` +
-          'Результат сразу отправится учителю, вернуться к тесту будет нельзя.',
-        confirmText: 'Завершить',
-        cancelText: 'Продолжить тест',
-        destructive: true,
-      });
-      if (!ok) return;
+  const confirmLeave = useCallback(
+    async (source: 'button' | 'back') => {
+      if (finishedRef.current || confirmingRef.current) return;
+      confirmingRef.current = true;
       try {
-        const summary = await leaveExam(participantId);
-        finishLeft({ ...summary, leftReason: 'manual' });
-        // Android: «Назад» → «Завершить» закрывает приложение, как и просили; итог уже у учителя.
-        if (source === 'back' && Platform.OS === 'android') BackHandler.exitApp();
-      } catch (e) {
-        console.error('leave error:', e);
-        toast.error('Не удалось завершить тест. Проверь интернет и попробуй ещё раз.');
+        const answered = questionIndexRef.current;
+        const ok = await confirmDialog({
+          title: 'Завершить тест?',
+          message:
+            `Ты ответил на ${answered} из ${questionCount}. Неотвеченные вопросы засчитаются как неверные.\n\n` +
+            'Результат сразу отправится учителю, вернуться к тесту будет нельзя.',
+          confirmText: 'Завершить',
+          cancelText: 'Продолжить тест',
+          destructive: true,
+        });
+        if (!ok) return;
+        try {
+          const summary = await leaveExam(participantId);
+          finishLeft({ ...summary, leftReason: 'manual' });
+          // Android: «Назад» → «Завершить» закрывает приложение, как и просили; итог уже у учителя.
+          if (source === 'back' && Platform.OS === 'android') BackHandler.exitApp();
+        } catch (e) {
+          log.error('TestExam', 'leave error', e);
+          toast.error('Не удалось завершить тест. Проверь интернет и попробуй ещё раз.');
+        }
+      } finally {
+        confirmingRef.current = false;
       }
-    } finally {
-      confirmingRef.current = false;
-    }
-  }, [participantId, questionCount, finishLeft]);
+    },
+    [participantId, questionCount, finishLeft]
+  );
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -148,37 +167,39 @@ export function TestExamScreen({ navigation, route }: Props) {
     };
   }, [navigation, confirmLeave]);
 
-  const fetchQuestion = useCallback(async (idx: number) => {
-    setLoadingQuestion(true);
-    setSelectedOption(null);
-    setSubmitting(false);
-    startTimeRef.current = Date.now();
-    if (timePerQuestion > 0) setTimeLeft(timePerQuestion);
+  const fetchQuestion = useCallback(
+    async (idx: number) => {
+      setLoadingQuestion(true);
+      setSelectedOption(null);
+      setSubmitting(false);
+      startTimeRef.current = Date.now();
+      if (timePerQuestion > 0) setTimeLeft(timePerQuestion);
 
-    try {
-      const { data: authData } = await supabase.auth.getSession();
-      const token = authData.session?.access_token;
-      if (!token) throw new Error('Not authenticated');
+      try {
+        const token = await getAccessToken();
+        if (!token) throw new Error('Not authenticated');
 
-      const res = await fetch(`${API_BASE}/test?action=get-question`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ participantId, questionIndex: idx }),
-      });
-      const json = await res.json();
-      // 409 — попытка уже завершена из-за выхода (сервер не выдаёт вопросы после выхода)
-      if (res.status === 409 && json.left) {
-        finishLeft(json);
-        return;
+        const res = await rawApiFetch('test?action=get-question', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: { participantId, questionIndex: idx },
+        });
+        const json = await res.json();
+        // 409 — попытка уже завершена из-за выхода (сервер не выдаёт вопросы после выхода)
+        if (res.status === 409 && json.left) {
+          finishLeft(json);
+          return;
+        }
+        if (!res.ok) throw new Error(json.error || 'Failed to load question');
+        setQuestion(json);
+      } catch (e: any) {
+        log.error('TestExam', 'get-question error', e);
+      } finally {
+        setLoadingQuestion(false);
       }
-      if (!res.ok) throw new Error(json.error || 'Failed to load question');
-      setQuestion(json);
-    } catch (e: any) {
-      console.error('get-question error:', e);
-    } finally {
-      setLoadingQuestion(false);
-    }
-  }, [participantId, timePerQuestion, finishLeft]);
+    },
+    [participantId, timePerQuestion, finishLeft]
+  );
 
   // Загрузить первый вопрос — или, при переподключении к уже идущему тесту, тот, на котором
   // ученик остановился (см. план, пункт 40).
@@ -188,14 +209,14 @@ export function TestExamScreen({ navigation, route }: Props) {
 
   // Realtime: учитель принудительно завершил тест
   useEffect(() => {
-    const channel = supabase.channel(`test:${sessionId}:exam`);
+    const channel = createChannel(`test:${sessionId}:exam`);
     channel
       .on('broadcast', { event: 'test_finished' }, () => {
         finishExam();
       })
       .subscribe();
     return () => {
-      supabase.removeChannel(channel);
+      removeChannel(channel);
     };
   }, [sessionId, finishExam]);
 
@@ -223,80 +244,94 @@ export function TestExamScreen({ navigation, route }: Props) {
     }
   }, [timeLeft]);
 
-  const handleSubmit = useCallback(async (option: string) => {
-    if (submitting || !question) return;
+  const handleSubmit = useCallback(
+    async (option: string) => {
+      if (submitting || !question) return;
 
-    setSelectedOption(option);
-    setSubmitting(true);
+      setSelectedOption(option);
+      setSubmitting(true);
 
-    const timeSpentSec = Math.round((Date.now() - startTimeRef.current) / 1000);
-    const nextIdx = questionIndex + 1;
-    const isLastQuestion = nextIdx >= questionCount;
+      const timeSpentSec = Math.round((Date.now() - startTimeRef.current) / 1000);
+      const nextIdx = questionIndex + 1;
+      const isLastQuestion = nextIdx >= questionCount;
 
-    try {
-      const { data: authData } = await supabase.auth.getSession();
-      const token = authData.session?.access_token;
-      if (!token) throw new Error('Not authenticated');
-      const authHeaders = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+      try {
+        const token = await getAccessToken();
+        if (!token) throw new Error('Not authenticated');
+        const authHeaders = {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        };
 
-      const withStatus = async (r: Response) => ({ status: r.status, body: await r.json() });
+        const withStatus = async (r: Response) => ({ status: r.status, body: await r.json() });
 
-      const answerPromise = fetch(`${API_BASE}/test?action=answer`, {
-        method: 'POST',
-        headers: authHeaders,
-        body: JSON.stringify({
-          participantId,
-          cardId: question.cardId,
-          chosenAnswer: option,
-          timeSpentSec,
-        }),
-      }).then(withStatus);
+        const answerPromise = rawApiFetch('test?action=answer', {
+          method: 'POST',
+          headers: authHeaders,
+          body: {
+            participantId,
+            cardId: question.cardId,
+            chosenAnswer: option,
+            timeSpentSec,
+          },
+        }).then(withStatus);
 
-      const nextQuestionPromise = !isLastQuestion
-        ? fetch(`${API_BASE}/test?action=get-question`, {
-            method: 'POST',
-            headers: authHeaders,
-            body: JSON.stringify({ participantId, questionIndex: nextIdx }),
-          }).then(withStatus)
-        : Promise.resolve(null);
+        const nextQuestionPromise = !isLastQuestion
+          ? rawApiFetch('test?action=get-question', {
+              method: 'POST',
+              headers: authHeaders,
+              body: { participantId, questionIndex: nextIdx },
+            }).then(withStatus)
+          : Promise.resolve(null);
 
-      const [answerRes, nextRes] = await Promise.all([answerPromise, nextQuestionPromise]);
+        const [answerRes, nextRes] = await Promise.all([answerPromise, nextQuestionPromise]);
 
-      // 409 — ответ не принят: попытка завершена из-за выхода из приложения
-      const leftRes = [answerRes, nextRes].find((r) => r?.status === 409 && r.body.left);
-      if (leftRes) {
-        finishLeft(leftRes.body);
-        return;
-      }
-      const json = answerRes.body;
-      const nextQuestion = nextRes?.body;
+        // 409 — ответ не принят: попытка завершена из-за выхода из приложения
+        const leftRes = [answerRes, nextRes].find((r) => r?.status === 409 && r.body.left);
+        if (leftRes) {
+          finishLeft(leftRes.body);
+          return;
+        }
+        const json = answerRes.body;
+        const nextQuestion = nextRes?.body;
 
-      answersRef.current = [
-        ...answersRef.current,
-        {
-          word: question.front,
-          yourAnswer: option,
-          correctAnswer: json.correctAnswer || '',
-          isCorrect: json.isCorrect || false,
-        },
-      ];
-      if (json.isCorrect) correctCountRef.current += 1;
+        answersRef.current = [
+          ...answersRef.current,
+          {
+            word: question.front,
+            yourAnswer: option,
+            correctAnswer: json.correctAnswer || '',
+            isCorrect: json.isCorrect || false,
+          },
+        ];
+        if (json.isCorrect) correctCountRef.current += 1;
 
-      if (json.done || isLastQuestion) {
-        finishExam();
-      } else {
-        setQuestion(nextQuestion);
-        setQuestionIndex(nextIdx);
-        setSelectedOption(null);
+        if (json.done || isLastQuestion) {
+          finishExam();
+        } else {
+          setQuestion(nextQuestion);
+          setQuestionIndex(nextIdx);
+          setSelectedOption(null);
+          setSubmitting(false);
+          startTimeRef.current = Date.now();
+          if (timePerQuestion > 0) setTimeLeft(timePerQuestion);
+        }
+      } catch (e: any) {
+        log.error('TestExam', 'answer error', e);
         setSubmitting(false);
-        startTimeRef.current = Date.now();
-        if (timePerQuestion > 0) setTimeLeft(timePerQuestion);
       }
-    } catch (e: any) {
-      console.error('answer error:', e);
-      setSubmitting(false);
-    }
-  }, [submitting, question, participantId, questionIndex, questionCount, timePerQuestion, finishExam, finishLeft]);
+    },
+    [
+      submitting,
+      question,
+      participantId,
+      questionIndex,
+      questionCount,
+      timePerQuestion,
+      finishExam,
+      finishLeft,
+    ]
+  );
 
   const progress = questionCount > 0 ? questionIndex / questionCount : 0;
   const timerUrgent = timeLeft <= 5 && timePerQuestion > 0;
@@ -321,7 +356,10 @@ export function TestExamScreen({ navigation, route }: Props) {
                 >
                   <Text
                     variant="label"
-                    style={[styles.timerText, { color: timerUrgent ? colors.errorText : colors.primary }]}
+                    style={[
+                      styles.timerText,
+                      { color: timerUrgent ? colors.errorText : colors.primary },
+                    ]}
                   >
                     {timeLeft} с
                   </Text>
@@ -357,12 +395,16 @@ export function TestExamScreen({ navigation, route }: Props) {
         // скрыт, таймер идёт; через 3 с сервер засчитает выход (plan/done/exam_lockdown.md).
         <Card style={styles.splitCard}>
           <Maximize2 size={iconSize.l} color={colors.errorText} />
-          <Text variant="h3" accessibilityRole="header" style={[styles.centerText, { color: colors.textPrimary }]}>
+          <Text
+            variant="h3"
+            accessibilityRole="header"
+            style={[styles.centerText, { color: colors.textPrimary }]}
+          >
             Разверните приложение на весь экран
           </Text>
           <Text variant="bodySmall" style={[styles.centerText, { color: colors.textSecondary }]}>
-            Во время теста нельзя открывать другие приложения рядом. Если не развернуть
-            за 3 секунды, тест завершится, и результат уйдёт учителю.
+            Во время теста нельзя открывать другие приложения рядом. Если не развернуть за 3
+            секунды, тест завершится, и результат уйдёт учителю.
           </Text>
         </Card>
       ) : loadingQuestion ? (
@@ -379,7 +421,9 @@ export function TestExamScreen({ navigation, route }: Props) {
             <Text variant="overline" style={{ color: colors.onPrimary }}>
               Вопрос {questionIndex + 1}
             </Text>
-            <Text variant="h2" style={{ color: colors.onPrimary }}>{question.front}</Text>
+            <Text variant="h2" style={{ color: colors.onPrimary }}>
+              {question.front}
+            </Text>
           </View>
 
           {/* Options */}

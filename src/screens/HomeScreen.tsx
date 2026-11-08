@@ -1,793 +1,2068 @@
 /**
- * Home Screen - Flashly Design
- * @description Главный экран с новым дизайном
+ * Home Screen - Новый UI
+ * @description Главная страница с современным дизайном
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   View,
-  StyleSheet,
   ScrollView,
   Pressable,
-  Text as RNText,
+  useWindowDimensions,
+  TextInput as RNTextInput,
   Platform,
+  Clipboard,
+  RefreshControl,
 } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import {
-  School,
-  Search,
-  Plus,
-  Flame,
-  Play,
-  BookOpen,
-  CheckCircle2,
-  AlertCircle,
-} from '@/components/common/Icons';
-import { useSetsStore, useSettingsStore } from '@/store';
-import { spacing, borderRadius, getDeckAccentColor } from '@/constants';
-import type { MainTabScreenProps } from '@/types/navigation';
-import type { CardSet } from '@/types';
+  useSetsStore,
+  useSettingsStore,
+  useThemeColors,
+  useCardsStore,
+  useCoursesStore,
+  useDiamondStore,
+  useChallengeStore,
+  isSetInCourse,
+  isSetInMySets,
+} from '@/store';
+import type { ChallengeId } from '@/store';
+import { selectSetStats } from '@/store/cardsStore';
+import { Text, DiamondReward } from '@/components/common';
+import type { DiamondRewardRef } from '@/components/common';
+import {
+  StudyModeSheet,
+  DEFAULT_STUDY_MODE_GAMES,
+  type StudyMode,
+} from '@/components/study/StudyModeSheet';
+import { CoursesDrawer } from '@/components/home/CoursesDrawer';
+import {
+  animateDrawerTo,
+  clampTranslateX,
+  resolveDrawerOpen,
+} from '@/components/home/drawerAnimation';
+import {
+  useSharedValue,
+  withTiming,
+  withSequence,
+  useAnimatedStyle,
+  Easing,
+  runOnJS,
+} from 'react-native-reanimated';
+import { spacing, iconSize, animation } from '@/constants';
+import { triggerHaptic } from '@/utils/haptic';
+import { pluralize } from '@/utils';
+import { isModeAllowedForSets } from '@/utils/setKind';
+import {
+  Button,
+  Skeleton,
+  SkeletonCard,
+  TextField,
+  toast,
+  useTabBarOverlayInset,
+} from '@/components/ui';
+import { Plus, X, Zap, Crosshair, Clock } from 'lucide-react-native';
+import { StreakService } from '@/services/StreakService';
+import { getSession } from '@/services/auth/session';
+import { NeonService, type CourseLeaderboard } from '@/services/NeonService';
+import { leaderboardSeenKey, type LeaderboardSeen } from '@/screens/CourseLeaderboardScreen';
+import { DatabaseService } from '@/services/DatabaseService';
+import { JoinByCodeModal } from '@/components/JoinByCodeModal';
+import type { DailyActivity } from '@/services/StreakService';
+import type { Card, CardSet } from '@/types';
+import { isCardWaitingReview } from '@/services/SRSService';
+import { StorageService, STORAGE_KEYS } from '@/services/StorageService';
+import { Analytics } from '@/services/analytics';
+import { currentPushOrigin, reportPushLesson } from '@/services/pushOpens';
+import { getPushStatus, isPushSupported } from '@/services/pushNotifications';
+import {
+  loadStreakNudgeDay,
+  saveStreakNudgeDay,
+  shouldShowStreakNudge,
+} from '@/services/pushPrompt';
+import { PushStreakNudge } from '@/components/push/PushStreakNudge';
+import { firstLessonStep } from '@/services/lessonFlow';
+import { useLessonStore } from '@/store/lessonStore';
+import { localDay } from '@/store/challengeStore';
+import {
+  buildLessonPlan,
+  countWaitingReview,
+  ensureLessonDay,
+  EXTRA_NEW_STEP,
+  type LessonDay,
+  type LessonPlan,
+} from '@/services/LessonService';
+import {
+  isLessonStartable,
+  lessonCardContent,
+  streakRiskHoursLeft,
+} from '@/components/home/lessonText';
+import { LessonCard } from '@/components/home/LessonCard';
+import { syncWidget, checkWidgetUsage } from '@/services/WidgetService';
+import type { WidgetPlanInput } from '@/services/WidgetPlanner';
+import { FocusSetSheet } from '@/components/home/FocusSetSheet';
+import { ChallengeTiles, type ChallengeTile } from '@/components/home/ChallengeTiles';
+import { SetsSectionMenu } from '@/components/home/SetsSectionMenu';
+import { AddByLinkSheet } from '@/components/share/AddByLinkSheet';
+import { requestOpenShare } from '@/services/shareLinks';
+import { useWhatsNewOnHome } from '@/components/whatsNew/useWhatsNewOnHome';
+import { useAppUpdateOnHome } from '@/components/appUpdate/useAppUpdateOnHome';
+import { WhatsNewSheet } from '@/components/whatsNew/WhatsNewSheet';
 
-type Props = MainTabScreenProps<'Home'>;
-type CourseTab = {
-  id: string;
-  label: string;
-  count: number;
-};
+import {
+  SETS_COMPARATORS,
+  SETS_SORT_OPTIONS,
+  loadSetsSort,
+  type SetsSortKey,
+} from './home/setsSort';
+import { pickCardsForGame } from './home/pickCardsForGame';
+import { styles } from './home/styles';
+import { useCourseRemoval } from './home/useCourseRemoval';
+import { useCourseInvite } from './home/useCourseInvite';
+import { SetListItem } from './home/components/SetListItem';
+import { SetActionSheet } from './home/components/SetActionSheet';
+import { SetsSortSheet } from './home/components/SetsSortSheet';
+import { InviteStudentsDialog } from './home/components/InviteStudentsDialog';
+import { LeaveCourseDialog } from './home/components/LeaveCourseDialog';
+import { DeleteCourseDialog } from './home/components/DeleteCourseDialog';
+import { EditCourseDialog } from './home/components/EditCourseDialog';
+import { StreakDialog } from './home/components/StreakDialog';
+import { HomeEmptyState } from './home/components/HomeEmptyState';
+import { SetsSectionHeader } from './home/components/SetsSectionHeader';
+import { HomeHeader } from './home/components/HomeHeader';
+import { TeacherBanner } from './home/components/TeacherBanner';
 
-export function HomeScreen({ navigation }: Props) {
-  const colors = useSettingsStore((s) => s.colors);
-  const todayStats = useSettingsStore((s) => s.todayStats);
-  const sets = useSetsStore((s) => s.getAllSets());
-  const [activeCourse, setActiveCourse] = useState<string>('all');
+export function HomeScreen({ navigation, route }: any) {
+  const colors = useThemeColors();
+  const [searchVisible, setSearchVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const closeSearch = useCallback(() => {
+    setSearchVisible(false);
+    setSearchQuery('');
+  }, []);
+  // Меню «···» секции «Мои наборы» (plan/done/home_redesign.md, 4.1). Следующее окно — после закрытия
+  // меню: одновременно не больше одного окна (брендбук, 7.6)
+  const [setsMenuVisible, setSetsMenuVisible] = useState(false);
+  const openSetsMenu = useCallback(() => {
+    triggerHaptic('selection');
+    Analytics.homeAction('sets_menu');
+    setSetsMenuVisible(true);
+  }, []);
+  const afterSetsMenu = useCallback((next: () => void) => {
+    setSetsMenuVisible(false);
+    setTimeout(next, animation.sheet);
+  }, []);
+  const [setsSort, setSetsSort] = useState<SetsSortKey>(loadSetsSort);
+  const [sortSheetVisible, setSortSheetVisible] = useState(false);
 
-  const toTitleCase = (value: string) =>
-    value
-      .replace(/[_-]/g, ' ')
-      .replace(/\b\w/g, (char) => char.toUpperCase());
+  const selectSetsSort = useCallback((key: SetsSortKey) => {
+    triggerHaptic('selection');
+    setSetsSort(key);
+    setSortSheetVisible(false);
+    try {
+      StorageService.setString(STORAGE_KEYS.HOME_SETS_SORT, key);
+    } catch {}
+  }, []);
+  const { width: windowWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  // Контент уходит под плавающую панель вкладок iOS — последний блок должен прокручиваться выше неё
+  const tabBarInset = useTabBarOverlayInset();
+  const drawerWidth = useMemo(() => Math.min(windowWidth * 0.8, 320), [windowWidth]);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [streakModalVisible, setStreakModalVisible] = useState(false);
+  // Заморозки серии в запасе (план §3.5); null — ещё не загружено
+  const [streakFreezes, setStreakFreezes] = useState<number | null>(null);
+  const [buyingFreeze, setBuyingFreeze] = useState(false);
+  // Сразу — сохранённое с прошлого раза; свежее с сервера подменит в useFocusEffect ниже
+  const [todayBackendCards, setTodayBackendCards] = useState<number | null>(
+    () => StreakService.cachedTodayActivity()?.cards_studied ?? null
+  );
+  const [weekActivity, setWeekActivity] = useState<DailyActivity[]>(
+    () => StreakService.cachedWeekActivity(10) ?? []
+  );
+  const syncStreakFromServer = useSettingsStore((s) => s.syncStreakFromServer);
+  const [courseMenuOpen, setCourseMenuOpen] = useState<string | null>(null);
+  const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
+  const [newCourseTitle, setNewCourseTitle] = useState('');
+  const [isCreatingCourse, setIsCreatingCourse] = useState(false);
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [deleteModalCourseId, setDeleteModalCourseId] = useState<string | null>(null);
+  const [leaveModalCourseId, setLeaveModalCourseId] = useState<string | null>(null);
+  const [leaveLoading, setLeaveLoading] = useState(false);
+  // «Учить все карточки» курса в любом режиме — вход из меню «···» секции «Мои наборы» (4.1)
+  const [showStudyModeModal, setShowStudyModeModal] = useState(false);
+  // Размер порции — общая настройка (Профиль → Настройки обучения)
+  const studyCardLimit = useSettingsStore((s) => s.settings.studyCardLimit);
+  const updateSettings = useSettingsStore((s) => s.updateSettings);
+  const wordLimit: '10' | '20' | '30' | 'all' =
+    studyCardLimit === null
+      ? 'all'
+      : studyCardLimit === 10 || studyCardLimit === 30
+        ? (String(studyCardLimit) as '10' | '30')
+        : '20';
+  const setWordLimit = useCallback(
+    (val: '10' | '20' | '30' | 'all') => {
+      updateSettings({ studyCardLimit: val === 'all' ? null : Number(val) });
+      DatabaseService.saveSettings();
+    },
+    [updateSettings]
+  );
+  const [onlyHard, setOnlyHard] = useState(false);
+  const isTeacher = useSettingsStore((s) => s.isTeacher);
+  const fetchIsTeacher = useSettingsStore((s) => s.fetchIsTeacher);
+  const [joinByCodeVisible, setJoinByCodeVisible] = useState(false);
+  const [addByLinkVisible, setAddByLinkVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const courseKeyFromSet = (set: CardSet) => {
-    const lang = (set.languageTo || set.languageFrom || '').trim();
-    if (lang) return lang.toLowerCase();
-    return set.category || 'general';
-  };
+  // Потянуть вниз — подтянуть изменения в курсах учителя (новые наборы, карточки, юниты)
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await DatabaseService.syncStudentCourses();
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+  const inviteBaseUrl = 'https://ai-app-seven-zeta.vercel.app';
+  const [setMenuTarget, setSetMenuTarget] = useState<CardSet | null>(null);
+  // Меню набора: действия или список курсов для «Переместить в курс…» (та же шторка)
+  const [setMenuMoving, setSetMenuMoving] = useState(false);
+  const editInputRef = useRef<RNTextInput>(null);
+  const newCourseInputRef = useRef<RNTextInput>(null);
+  const editModalInputRef = useRef<RNTextInput>(null);
 
-  const courseLabelFromSet = (set: CardSet) => {
-    const lang = (set.languageTo || set.languageFrom || '').trim();
-    if (lang) {
-      const normalized = lang.toLowerCase();
-      const languageMap: Record<string, string> = {
-        de: 'German',
-        en: 'English',
-        es: 'Spanish',
-        fr: 'French',
-        ru: 'Russian',
-      };
-      return languageMap[normalized] || toTitleCase(lang);
+  // Diamond reward animation
+  const diamondRewardRef = useRef<DiamondRewardRef>(null);
+  const diamondIconRef = useRef<View>(null);
+  const claimBtnRefs = useRef<Partial<Record<ChallengeId, View | null>>>({});
+  const [diamondTargetPos, setDiamondTargetPos] = useState<{ x: number; y: number } | null>(null);
+  const diamonds = useDiamondStore((s) => s.diamonds);
+  const loadRewards = useDiamondStore((s) => s.loadRewards);
+  const claimReward = useDiamondStore((s) => s.claimReward);
+  const setDiamonds = useDiamondStore((s) => s.setDiamonds);
+  const pendingDiamondsRef = useRef<number | null>(null);
+  const [claimingReward, setClaimingReward] = useState(false);
+  const challengeStatuses = useChallengeStore((s) => s.statuses);
+  const claimChallenge = useChallengeStore((s) => s.claimChallenge);
+  const diamondCountScale = useSharedValue(1);
+  const diamondCountAnimStyle = useAnimatedStyle(() => {
+    'worklet';
+    return {
+      transform: [{ scale: diamondCountScale.value }],
+    };
+  });
+
+  const handleQuickRound = useCallback(() => {
+    triggerHaptic('selection');
+    Analytics.homeAction('challenge_quick');
+    const allSets = useSetsStore.getState().getAllSets();
+    if (allSets.length === 0) {
+      toast.info('Нет наборов — сначала создай набор с карточками');
+      return;
+    }
+    const firstSetId = allSets[0].id;
+
+    const allCards = Object.values(useCardsStore.getState().cards);
+    if (allCards.length < 4) {
+      toast.info('Мало карточек — добавь хотя бы 4, чтобы играть в челлендж');
+      return;
     }
 
-    if (set.category) {
-      return toTitleCase(set.category);
+    const selected = pickCardsForGame(allCards, 10);
+    const dueCardIds = selected.map((c) => c.id);
+
+    navigation.navigate('MultipleChoice', {
+      setId: firstSetId,
+      cardLimit: selected.length,
+      dueCardIds,
+      challengeMode: true,
+      timeLimit: 120,
+    });
+  }, [navigation]);
+
+  // «Забрать +10» — сразу (оптимистично): алмазы летят и прибавляются, сервер подтверждает в фоне.
+  // Выдаёт награду только сервер: не подтвердил (нет сети/уже забрано) — откатываем экран.
+  const handleChallengeClaim = useCallback(
+    (id: ChallengeId) => {
+      if (!claimBtnRefs.current[id] || claimingReward) return;
+      setClaimingReward(true);
+      const balanceBefore = useDiamondStore.getState().diamonds;
+      let reverted = false;
+      pendingDiamondsRef.current = balanceBefore + 10;
+      claimBtnRefs.current[id]?.measureInWindow((x, y, w, h) => {
+        diamondRewardRef.current?.collect({ x: x + w / 2, y: y + h / 2 });
+      });
+      setTimeout(() => {
+        if (!reverted) claimChallenge(id);
+      }, 900);
+
+      claimReward(id).then((balance) => {
+        setClaimingReward(false);
+        if (balance === null) {
+          reverted = true;
+          pendingDiamondsRef.current = null;
+          setDiamonds(balanceBefore);
+          useChallengeStore.getState().revertClaim(id);
+          toast.error(
+            'Нет соединения. Награда не получена — попробуй ещё раз, когда появится интернет'
+          );
+          return;
+        }
+        // Точный баланс с сервера: если анимация ещё летит — применится по её окончании
+        if (pendingDiamondsRef.current !== null) pendingDiamondsRef.current = balance;
+        else setDiamonds(balance);
+      });
+    },
+    [claimReward, claimingReward, claimChallenge, setDiamonds]
+  );
+
+  const STREAK_FREEZE_PRICE = 50;
+  const MAX_STREAK_FREEZES = 2;
+  const handleBuyStreakFreeze = useCallback(async () => {
+    if (buyingFreeze) return;
+    setBuyingFreeze(true);
+    const result = await NeonService.buyStreakFreeze();
+    setBuyingFreeze(false);
+    if (!result) {
+      toast.error('Нет соединения. Попробуй ещё раз');
+    } else if ('error' in result) {
+      toast.info(
+        result.error === 'max_freezes'
+          ? `Уже максимум: в запасе может быть не больше ${MAX_STREAK_FREEZES} заморозок`
+          : `Не хватает алмазов: заморозка стоит ${STREAK_FREEZE_PRICE} — их дают за мини-игры`
+      );
+    } else {
+      triggerHaptic('notificationSuccess');
+      setDiamonds(result.diamonds);
+      setStreakFreezes(result.streakFreezes);
+    }
+  }, [buyingFreeze, setDiamonds]);
+
+  const handleSniperChallenge = useCallback(() => {
+    triggerHaptic('selection');
+    Analytics.homeAction('challenge_sniper');
+    const allSets = useSetsStore.getState().getAllSets();
+    if (allSets.length === 0) {
+      toast.info('Нет наборов — сначала создай набор с карточками');
+      return;
+    }
+    const firstSetId = allSets[0].id;
+
+    const allCards = Object.values(useCardsStore.getState().cards);
+    if (allCards.length < 4) {
+      toast.info('Мало карточек — добавь хотя бы 4');
+      return;
     }
 
-    return set.title;
-  };
+    const selected = pickCardsForGame(allCards, 5);
+    navigation.navigate('MultipleChoice', {
+      setId: firstSetId,
+      cardLimit: selected.length,
+      dueCardIds: selected.map((c) => c.id),
+      challengeMode: true,
+      sniperMode: true,
+    });
+  }, [navigation]);
 
-  // Подсчет карточек на сегодня
-  const totalDueCards = useMemo(() => {
-    return sets.reduce((sum, set) => sum + (set.reviewCount || 0), 0);
-  }, [sets]);
-
-  // Прогресс на сегодня (пример: 12/50)
-  const todayProgress = `${todayStats.cardsStudied}/50`;
-
-  // Расчет прогресса для каждого набора
-  const getProgress = (set: CardSet) => {
-    if (set.cardCount === 0) return 0;
-    return Math.round((set.masteredCount / set.cardCount) * 100);
-  };
-
-  // Определение статуса набора по прогрессу
-  const getStatusColor = (progress: number) => {
-    if (progress === 100) return colors.success;
-    if (progress >= 50) return colors.warning;
-    return colors.error;
-  };
-
-  const courseTabs = useMemo<CourseTab[]>(() => {
-    if (sets.length === 0) {
-      return [{ id: 'all', label: 'All Decks', count: 0 }];
+  const handleForgottenChallenge = useCallback(() => {
+    triggerHaptic('selection');
+    Analytics.homeAction('challenge_forgotten');
+    const allSets = useSetsStore.getState().getAllSets();
+    if (allSets.length === 0) {
+      toast.info('Нет наборов — сначала создай набор с карточками');
+      return;
     }
+    const firstSetId = allSets[0].id;
 
-    const aggregated = new Map<string, CourseTab>();
+    const now = Date.now();
+    const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
 
-    sets.forEach((set) => {
-      const key = courseKeyFromSet(set);
-      if (!aggregated.has(key)) {
-        aggregated.set(key, { id: key, label: courseLabelFromSet(set), count: 0 });
-      }
-      aggregated.get(key)!.count += 1;
+    const forgottenCards = Object.values(useCardsStore.getState().cards).filter((card) => {
+      const raw = (card as any).lastReviewed ?? card.updatedAt ?? 0;
+      const ms = typeof raw === 'string' ? new Date(raw).getTime() : Number(raw);
+      return now - ms >= SEVEN_DAYS;
     });
 
-    return [
-      { id: 'all', label: 'All Decks', count: sets.length },
-      ...Array.from(aggregated.values()).sort((a, b) => b.count - a.count),
-    ];
-  }, [sets]);
+    if (forgottenCards.length === 0) {
+      toast.success('Всё свежо! Нет забытых карточек — ты недавно всё повторил');
+      return;
+    }
+    if (forgottenCards.length < 4) {
+      toast.info('Мало карточек — нужно минимум 4 забытых карточки для игры');
+      return;
+    }
+
+    // Раунд — до 10 забытых карточек (сначала те, что ждут повторения); награда только если все правильные
+    const selected = pickCardsForGame(forgottenCards, 10);
+    navigation.navigate('MultipleChoice', {
+      setId: firstSetId,
+      cardLimit: selected.length,
+      dueCardIds: selected.map((c) => c.id),
+      challengeMode: true,
+      forgottenMode: true,
+    });
+  }, [navigation]);
+
+  const handleDiamondRewardComplete = useCallback(() => {
+    if (pendingDiamondsRef.current !== null) {
+      setDiamonds(pendingDiamondsRef.current);
+      pendingDiamondsRef.current = null;
+    }
+    diamondCountScale.value = withSequence(
+      withTiming(1.3, { duration: 150, easing: Easing.out(Easing.back(2)) }),
+      withTiming(1, { duration: 150, easing: Easing.inOut(Easing.quad) })
+    );
+  }, []);
+
+  // Drawer slide — translateX это единственный источник правды для позиции панели.
+  // Пишется либо жестом напрямую на UI-потоке (edge-swipe открытия здесь, drag-to-close
+  // внутри CoursesDrawer), либо этим эффектом при программном открытии/закрытии (таб по
+  // гамбургеру, крестик, тап по подложке, выбор курса и т.д. — все они просто меняют
+  // drawerOpen как раньше, эффект ниже лишь переводит это в пружинную анимацию).
+  const drawerTranslateX = useSharedValue(-drawerWidth);
+  const drawerGestureStartX = useSharedValue(-drawerWidth);
+  const [drawerMounted, setDrawerMounted] = useState(false);
+  const isGestureDrivenDrawerChange = useRef(false);
+
+  const handleDrawerGestureSettled = useCallback((open: boolean) => {
+    isGestureDrivenDrawerChange.current = true;
+    setDrawerOpen(open);
+    if (!open) setDrawerMounted(false);
+  }, []);
 
   useEffect(() => {
-    if (!courseTabs.some((tab) => tab.id === activeCourse)) {
-      setActiveCourse('all');
+    if (isGestureDrivenDrawerChange.current) {
+      // Уже анимировано и доведено самим жестом — эффекту делать нечего.
+      isGestureDrivenDrawerChange.current = false;
+      return;
     }
-  }, [activeCourse, courseTabs]);
+    if (drawerOpen) {
+      setDrawerMounted(true);
+      animateDrawerTo(drawerTranslateX, true, drawerWidth, () => {});
+    } else {
+      animateDrawerTo(drawerTranslateX, false, drawerWidth, (open) => {
+        if (!open) setDrawerMounted(false);
+      });
+    }
+  }, [drawerOpen, drawerWidth, drawerTranslateX]);
 
+  // Шторка — это отдельный <Modal>. Если открыть другой Modal, пока она ещё закрывается,
+  // iOS презентует его поверх шторки, а при её размонтировании новое окно пропадает вместе
+  // с ней, оставляя невидимый слой, который глотает все нажатия. Поэтому окна, открываемые
+  // из шторки, показываем только после её полного размонтирования.
+  const afterDrawerClosedRef = useRef<(() => void) | null>(null);
+  const runAfterDrawerClosed = useCallback(
+    (fn: () => void) => {
+      if (!drawerMounted) {
+        fn();
+        return;
+      }
+      afterDrawerClosedRef.current = fn;
+      setDrawerOpen(false);
+    },
+    [drawerMounted]
+  );
+
+  const {
+    inviteModalCourseId,
+    inviteCopied,
+    setInviteCopied,
+    inviteToken,
+    inviteJoinCode,
+    inviteLoading,
+    inviteRegenerating,
+    openInviteModal,
+    closeInviteModal,
+    handleRegenerateInvite,
+  } = useCourseInvite({ runAfterDrawerClosed, setCourseMenuOpen });
+
+  useEffect(() => {
+    if (drawerMounted || !afterDrawerClosedRef.current) return;
+    const fn = afterDrawerClosedRef.current;
+    afterDrawerClosedRef.current = null;
+    // Кадр запаса, чтобы iOS успел закончить dismiss контроллера шторки
+    const t = setTimeout(fn, 50);
+    return () => clearTimeout(t);
+  }, [drawerMounted]);
+
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    getSession().then((authSession) => {
+      setCurrentUserId(authSession?.user?.id ?? null);
+    });
+  }, []);
+
+  // Перезагружаем isTeacher при каждом возврате на Home, а не один раз за сессию —
+  // роль могла поменяться (например, вручную в БД) пока приложение было свёрнуто.
+  useFocusEffect(
+    useCallback(() => {
+      if (currentUserId) {
+        fetchIsTeacher(currentUserId);
+        // Баланс алмазов и забранные сегодня челленджи — из БД
+        loadRewards();
+      }
+    }, [currentUserId, fetchIsTeacher, loadRewards])
+  );
+
+  const SWIPE_THRESHOLD = 50;
+  const SWIPE_VELOCITY = 200;
+  const closeStreakModal = useCallback(() => setStreakModalVisible(false), []);
+  const formatDays = useCallback(
+    (value: number) => `${value} ${pluralize(value, 'день', 'дня', 'дней')}`,
+    []
+  );
+
+  // Fetch backend activity when modal opens
+  useEffect(() => {
+    let mounted = true;
+    if (streakModalVisible) {
+      // Загружаем активность за сегодня и за неделю
+      Promise.all([
+        StreakService.fetchTodayActivity(),
+        StreakService.fetchWeekActivity(10),
+        StreakService.fetchUserStats(),
+      ])
+        .then(([activity, week, stats]) => {
+          if (mounted) {
+            setTodayBackendCards(activity?.cards_studied ?? null);
+            setWeekActivity(week);
+            if (stats) {
+              syncStreakFromServer({
+                currentStreak: stats.current_streak,
+                longestStreak: stats.longest_streak,
+                lastActiveDate: stats.last_active_date,
+              });
+              setStreakFreezes(stats.streak_freezes);
+            }
+          }
+        })
+        .catch(() => {
+          if (mounted) setTodayBackendCards(null);
+        });
+    }
+    return () => {
+      mounted = false;
+    };
+  }, [streakModalVisible]);
+
+  // Courses store
+  const courses = useCoursesStore((s) => s.courses);
+  const activeCourseId = useCoursesStore((s) => s.activeCourseId);
+  const setActiveCourse = useCoursesStore((s) => s.setActiveCourse);
+  const createCourse = useCoursesStore((s) => s.createCourse);
+  const renameCourse = useCoursesStore((s) => s.renameCourse);
+  const deleteCourse = useCoursesStore((s) => s.deleteCourse);
+
+  // Sets store
+  const allSets = useSetsStore((s) => s.getAllSets());
+  const courseOrder = useMemo(() => [null, ...courses.map((c) => c.id)], [courses]);
+  const todayStats = useSettingsStore((s) => s.todayStats);
+  const DAILY_GOAL = 10;
+  const dailyGoal = DAILY_GOAL;
+  const cardsLearned = todayBackendCards ?? todayStats.cardsStudied;
+  const dateFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }),
+    []
+  );
+  const computedStreak = useMemo(() => {
+    const activeDates = new Set(
+      weekActivity.filter((a) => a.cards_studied >= 10).map((a) => a.local_date)
+    );
+    let streak = 0;
+    for (let i = 0; i < 14; i++) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const key = dateFormatter.format(date);
+      if (activeDates.has(key)) {
+        streak += 1;
+      } else {
+        break;
+      }
+    }
+    return streak;
+  }, [weekActivity, dateFormatter]);
+  const streakValue = Math.max(todayStats.streak, computedStreak);
+  const todayGoalReached = cardsLearned >= DAILY_GOAL;
+  const goalProgress = useMemo(() => {
+    if (!dailyGoal) return 0;
+    return Math.min(100, Math.round((cardsLearned / dailyGoal) * 100));
+  }, [dailyGoal, cardsLearned]);
+  const streakSupportText = useMemo(() => {
+    const remaining = Math.max(dailyGoal - cardsLearned, 0);
+    if (goalProgress >= 10) {
+      return `Отлично! Цель на сегодня выполнена — ${cardsLearned} из ${dailyGoal}. Серия продлена!`;
+    }
+    if (goalProgress === 0) {
+      return `Главное — не идеальность, а привычка. Открой на минуту, выучи одно слово — и ты уже впереди. Цель: ${dailyGoal}`;
+    }
+    if (remaining <= 3) {
+      return `Осталось всего ${remaining} — ты почти у цели! Ещё чуть-чуть и серия продлена.`;
+    }
+    return `Хорошее начало! Осталось ${remaining} ${pluralize(remaining, 'слово', 'слова', 'слов')} до цели. Продолжай в том же духе!`;
+  }, [goalProgress, dailyGoal, cardsLearned]);
+
+  // Id известных курсов: набор, чей курс пропал, показываем в «Моих наборах» (isSetInMySets)
+  const courseIdSet = useMemo(() => new Set(courses.map((c) => c.id)), [courses]);
+
+  // Фильтрация наборов по активному курсу; null — «Мои наборы», только наборы без курса
   const filteredSets = useMemo(() => {
-    if (activeCourse === 'all') return sets;
-    return sets.filter((set) => courseKeyFromSet(set) === activeCourse);
-  }, [activeCourse, sets]);
+    if (activeCourseId === null) {
+      return allSets.filter((set) => isSetInMySets(set, courseIdSet));
+    }
+    return allSets.filter((set) => isSetInCourse(set, activeCourseId));
+  }, [allSets, activeCourseId, courseIdSet]);
+  // «Мои наборы» пусты, а в курсах наборы есть — подсказываем, где они (MySets 6)
+  const mySetsEmptyButCourses =
+    activeCourseId === null &&
+    filteredSets.length === 0 &&
+    allSets.some((set) => !isSetInMySets(set, courseIdSet));
+
+  // Слова курса и ждущие повторения — для счётчиков «N ждут» у наборов и аналитики (урок — lessonPlan ниже)
+  const cardsMap = useCardsStore((s) => s.cards);
+  const cardsBySet = useCardsStore((s) => s.cardsBySet);
+  const reviewStats = useMemo(() => {
+    const now = Date.now();
+    const waiting: Card[] = [];
+    const all: Card[] = [];
+    const waitingBySet: Record<string, number> = {};
+    const seen = new Set<string>();
+    for (const set of filteredSets) {
+      for (const id of cardsBySet[set.id] || []) {
+        const card = cardsMap[id];
+        if (!card || seen.has(id)) continue;
+        seen.add(id);
+        all.push(card);
+        if (isCardWaitingReview(card, now)) {
+          waiting.push(card);
+          waitingBySet[set.id] = (waitingBySet[set.id] || 0) + 1;
+        }
+      }
+    }
+    return { waiting, all, waitingBySet };
+  }, [filteredSets, cardsBySet, cardsMap]);
+
+  // Урок дня: новые слова — из наборов открытого курса в порядке списка (без учёта поиска),
+  // повторение — из всех наборов: иначе слова других курсов не повторялись бы, пока курс закрыт
+  const lessonNewSets = useMemo(
+    () => [...filteredSets].sort(SETS_COMPARATORS[setsSort]),
+    [filteredSets, setsSort]
+  );
+  const lessonSets = useMemo(() => {
+    const inCourse = new Set(lessonNewSets.map((set) => set.id));
+    return [...lessonNewSets, ...allSets.filter((set) => !inCourse.has(set.id))];
+  }, [lessonNewSets, allSets]);
+  // Все слова урока — для добора теста и виджета (reviewStats — только открытый курс)
+  const lessonCards = useMemo(() => {
+    const seen = new Set<string>();
+    const list: Card[] = [];
+    for (const set of lessonSets) {
+      for (const id of cardsBySet[set.id] || []) {
+        const card = cardsMap[id];
+        if (!card || seen.has(id)) continue;
+        seen.add(id);
+        list.push(card);
+      }
+    }
+    return list;
+  }, [lessonSets, cardsBySet, cardsMap]);
+  const lessonDay = useLessonStore((s) => s.day);
+  const lessonNewPerDay = useSettingsStore((s) => s.settings.lessonNewPerDay);
+  const computeLessonPlan = useCallback(
+    (stored: LessonDay | null) => {
+      const now = Date.now();
+      const today = localDay();
+      // До снимка дня (или после полуночи) — считаем как будто день начинается сейчас
+      const day =
+        stored?.date === today
+          ? stored
+          : ensureLessonDay(
+              stored,
+              today,
+              countWaitingReview(lessonSets, cardsBySet, cardsMap, now)
+            );
+      return buildLessonPlan({
+        sets: lessonSets,
+        newFrom: lessonNewSets,
+        cardsBySet,
+        cards: cardsMap,
+        newPerDay: lessonNewPerDay,
+        day,
+        now,
+      });
+    },
+    [lessonSets, lessonNewSets, cardsBySet, cardsMap, lessonNewPerDay]
+  );
+  const lessonPlan = useMemo(() => computeLessonPlan(lessonDay), [computeLessonPlan, lessonDay]);
+  // Вечером при невыполненной цели — «Сохрани серию» (считается при каждой отрисовке: главная
+  // перерисовывается при заходе, так вечер наступает без перезапуска)
+  const streakRiskHours = streakRiskHoursLeft(new Date(), streakValue, todayGoalReached);
+
+  // «Включи напоминания, чтобы не потерять серию» (plan/new/push_notifications.md, 1.3): серия от 3 дней,
+  // пушей нет, не чаще раза в 14 дней. Только приложение — в вебе свой баннер.
+  const [pushNudgePermission, setPushNudgePermission] = useState<string | null>(null);
+  useEffect(() => {
+    if (Platform.OS === 'web' || isTeacher !== false || pushNudgePermission) return;
+    let cancelled = false;
+    const today = localDay();
+    const lastShown = loadStreakNudgeDay();
+    if (
+      !shouldShowStreakNudge(lastShown, today, {
+        streak: streakValue,
+        permission: 'default',
+        supported: true,
+      })
+    )
+      return;
+    Promise.all([isPushSupported(), getPushStatus()])
+      .then(([supported, status]) => {
+        if (
+          cancelled ||
+          !shouldShowStreakNudge(lastShown, today, {
+            streak: streakValue,
+            permission: status.permission,
+            supported,
+          })
+        )
+          return;
+        saveStreakNudgeDay(today);
+        Analytics.pushStreakNudge('shown');
+        setPushNudgePermission(status.permission);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [streakValue, isTeacher, pushNudgePermission]);
+  const [pushNudgeClosed, setPushNudgeClosed] = useState(false);
+  const lessonContent = useMemo(
+    () =>
+      lessonCardContent(lessonPlan, {
+        streakDays: streakValue,
+        extraNewStep: EXTRA_NEW_STEP,
+        streakRiskHours,
+      }),
+    [lessonPlan, streakValue, streakRiskHours]
+  );
+
+  // Утренний снимок дня — при заходе на главную, когда карточки уже загружены
+  // (иначе снимок «0 ждут» дал бы полную квоту новых в день большого повторения)
+  const lessonInputsRef = useRef({ lessonSets, cardsBySet, cardsMap });
+  lessonInputsRef.current = { lessonSets, cardsBySet, cardsMap };
+  const hasLessonCards = lessonCards.length > 0;
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasLessonCards) return;
+      const { lessonSets: sets, cardsBySet: bySet, cardsMap: map } = lessonInputsRef.current;
+      useLessonStore.getState().ensureToday(countWaitingReview(sets, bySet, map, Date.now()));
+    }, [hasLessonCards])
+  );
+
+  // Аналитика (plan/done/home_redesign.md, 0.2): что главная предлагала в момент захода — один раз за заход,
+  // когда роль уже известна (до этого главная не знает, показывать ли баннер учителя)
+  const [focusTick, setFocusTick] = useState(0);
+  useFocusEffect(
+    useCallback(() => {
+      setFocusTick((t) => t + 1);
+    }, [])
+  );
+  const loggedFocusTickRef = useRef(0);
+  useEffect(() => {
+    if (focusTick === 0 || loggedFocusTickRef.current === focusTick || isTeacher === null) return;
+    loggedFocusTickRef.current = focusTick;
+    Analytics.homeViewed({
+      state:
+        filteredSets.length === 0
+          ? 'no_sets'
+          : isTeacher
+            ? 'teacher'
+            : isLessonStartable(lessonPlan)
+              ? 'daily_review'
+              : 'study_all',
+      reviewCount: reviewStats.waiting.length,
+      newCount: reviewStats.all.filter((c) => (c.learningStep || 0) === 0).length,
+      setsCount: filteredSets.length,
+    });
+    // Урок дня (6.1): что предлагала карточка — у ученика с карточками
+    if (!isTeacher && lessonContent) {
+      Analytics.lessonCardViewed({
+        state: lessonPlan.state,
+        reviewCount: lessonPlan.reviewIds.length,
+        newCount: lessonPlan.newIds.length,
+        streakRisk:
+          streakRiskHours != null &&
+          lessonContent.kind === 'start' &&
+          lessonPlan.state !== 'mistakes',
+      });
+    }
+  }, [
+    focusTick,
+    isTeacher,
+    filteredSets.length,
+    reviewStats,
+    lessonPlan,
+    lessonContent,
+    streakRiskHours,
+  ]);
+
+  // «Урок дня» (plan/done/home_redesign.md, 1.4, 2.2): повторение + новые слова из текущего набора (LessonService)
+  const startLesson = useCallback(
+    (plan: LessonPlan) => {
+      let reviewIds = plan.reviewIds;
+      // Тесту нужно хотя бы 4 вопроса — добираем уже изученными словами, которым срок ещё не пришёл
+      // (ответ раньше срока уровень не меняет и в урок не записывается). Новые слова для добора не берём:
+      // правильный ответ поднял бы их на шаг 1 без показа.
+      if (reviewIds.length > 0 && reviewIds.length < 4) {
+        const taken = new Set([...reviewIds, ...plan.newIds]);
+        const extra = pickCardsForGame(
+          lessonCards.filter((c) => !taken.has(c.id) && (c.learningStep || 0) >= 1),
+          4 - reviewIds.length
+        );
+        reviewIds = [...reviewIds, ...extra.map((c) => c.id)];
+      }
+      const step = firstLessonStep(
+        {
+          reviewIds,
+          newIds: plan.newIds,
+          mistakeIds: plan.mistakeIds,
+          reviewCount: plan.reviewIds.length,
+        },
+        (id) => cardsMap[id]?.setId
+      );
+      if (!step) return;
+      Analytics.lessonStarted({
+        state: plan.state,
+        reviewCount: plan.state === 'mistakes' ? plan.mistakeIds.length : plan.reviewIds.length,
+        newCount: plan.newIds.length,
+        minutes: plan.minutes,
+        pushId: currentPushOrigin()?.pushId,
+      });
+      reportPushLesson('lesson_started');
+      const rootNav = navigation?.getParent?.() ?? navigation;
+      rootNav?.navigate(step.screen, step.params);
+    },
+    [navigation, lessonCards, cardsMap]
+  );
+
+  // «Сменить набор» (2.4): откуда урок берёт новые слова
+  const [focusSheetVisible, setFocusSheetVisible] = useState(false);
+  const openFocusSheet = useCallback(() => {
+    triggerHaptic('selection');
+    Analytics.homeAction('change_set');
+    setFocusSheetVisible(true);
+  }, []);
+  const selectFocusSet = useCallback((setId: string | null) => {
+    triggerHaptic('selection');
+    Analytics.lessonFocusChanged(setId === null);
+    useLessonStore.getState().setFocusSet(setId);
+    setFocusSheetVisible(false);
+  }, []);
+
+  const handleLessonPress = useCallback(() => {
+    if (!lessonContent) return;
+    triggerHaptic('selection');
+    if (lessonContent.kind === 'findSet') {
+      Analytics.homeAction('find_set');
+      navigation?.navigate('Library');
+      return;
+    }
+    if (lessonContent.kind === 'extraNew') {
+      // «Ещё 10 новых»: квота на сегодня растёт, урок из новых слов стартует сразу
+      Analytics.homeAction('extra_new');
+      const store = useLessonStore.getState();
+      store.addExtraNew();
+      startLesson(computeLessonPlan(useLessonStore.getState().day));
+      return;
+    }
+    Analytics.homeAction('daily_review');
+    startLesson(lessonPlan);
+  }, [lessonContent, lessonPlan, startLesson, computeLessonPlan, navigation]);
+
+  // На главной открыто своё окно — окна, которые открываются сами, ждут
+  const homeOverlayOpen =
+    searchVisible ||
+    setsMenuVisible ||
+    sortSheetVisible ||
+    drawerOpen ||
+    streakModalVisible ||
+    courseMenuOpen !== null ||
+    isEditModalVisible ||
+    joinByCodeVisible ||
+    addByLinkVisible ||
+    setMenuTarget !== null ||
+    focusSheetVisible ||
+    showStudyModeModal ||
+    deleteModalCourseId !== null ||
+    leaveModalCourseId !== null ||
+    inviteModalCourseId !== null;
+
+  // «Вышла новая версия» (plan/new/app_update_prompt.md, Update 4) — до «Что нового»: его эффект
+  // занимает очередь первым, и «Что нового» не откроется раньше
+  useAppUpdateOnHome({ ready: isTeacher !== null, blocked: homeOverlayOpen });
+
+  // «Что нового» после обновления (plan/new/whats_new.md, News 3) — ждёт, пока на главной закрыты свои окна
+  const whatsNew = useWhatsNewOnHome({
+    navigation,
+    isTeacher,
+    openedFrom: route?.params?.from,
+    blocked: homeOverlayOpen,
+  });
+
+  // Ссылка из виджета на экране блокировки (plan/new/widgets.md, 0.3): flashly://lesson?from=widget.
+  // Тап по пушу (plan/new/push_notifications.md, 0.5) — та же ссылка с from=push.
+  // Ждём, пока загрузятся карточки и станет известна роль, и запускаем урок, только если он не пройден:
+  // «Ещё 10 новых» и «Найти набор» по нажатию на виджет не делаем. Параметр сбрасываем сразу,
+  // чтобы следующее нажатие на виджет снова сработало, а возврат на главную урок не запускал.
+  const widgetFrom = route?.params?.from;
+  useEffect(() => {
+    if ((widgetFrom !== 'widget' && widgetFrom !== 'push') || isTeacher === null) return;
+    if (!isTeacher && !lessonContent && !hasLessonCards) return;
+    navigation?.setParams?.({ from: undefined, state: undefined, family: undefined });
+    if (isTeacher || lessonContent?.kind !== 'start') return;
+    startLesson(lessonPlan);
+  }, [widgetFrom, isTeacher, lessonContent, hasLessonCards, lessonPlan, startLesson, navigation]);
+
+  // Виджет на экране блокировки (plan/new/widgets.md, 1.2): расписание пересчитывается при любом изменении
+  // карточек, урока или серии и при каждом заходе на главную. Данные собираются в момент записи
+  // (WidgetService ждёт 5 секунд), поэтому план урока считаем заново — на «сейчас», с учётом нового дня.
+  const widgetInputRef = useRef<() => WidgetPlanInput | null>(() => null);
+  widgetInputRef.current = () => {
+    if (isTeacher === null || !hasLessonCards) return null;
+    const stored = useLessonStore.getState().day;
+    const { widgetSetId, widgetDirection, widgetHideAnswer } = useSettingsStore.getState().settings;
+    // Набор из настроек виджета (2.3); удалён или пуст — слова как в уроке дня
+    const setCards = widgetSetId
+      ? (cardsBySet[widgetSetId] || []).map((id) => cardsMap[id]).filter((c): c is Card => !!c)
+      : [];
+    return {
+      cards: lessonCards,
+      poolCards: setCards.length > 0 ? setCards : undefined,
+      direction: widgetDirection,
+      hideAnswer: widgetHideAnswer,
+      day: stored?.date === localDay() ? stored : null,
+      plan: computeLessonPlan(stored),
+      newPerDay: lessonNewPerDay,
+      streakDays: streakValue,
+      goalReached: todayGoalReached,
+      now: Date.now(),
+    };
+  };
+  const widgetSettingsKey = useSettingsStore(
+    (s) => `${s.settings.widgetSetId}|${s.settings.widgetDirection}|${s.settings.widgetHideAnswer}`
+  );
+  useEffect(() => {
+    syncWidget(() => widgetInputRef.current());
+  }, [
+    lessonCards,
+    lessonDay,
+    lessonPlan,
+    lessonNewPerDay,
+    streakValue,
+    todayGoalReached,
+    isTeacher,
+    focusTick,
+    widgetSettingsKey,
+  ]);
+  useEffect(() => {
+    checkWidgetUsage();
+  }, []);
+
+  // Рейтинг курса: значок-кубок в шапке, точка — есть новости (plan/done/home_redesign.md, 3.2)
+  const [leaderboard, setLeaderboard] = useState<CourseLeaderboard | null>(null);
+  const [lastWeekBoard, setLastWeekBoard] = useState<CourseLeaderboard | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      if (!activeCourseId || isTeacher !== false) {
+        setLeaderboard(null);
+        setLastWeekBoard(null);
+        return;
+      }
+      let active = true;
+      const isMonday = new Date().getDay() === 1;
+      // Сразу — сохранённое (тизер виден без ожидания и без сети), свежее подменит
+      setLeaderboard(NeonService.cachedLeaderboard(activeCourseId, 'current'));
+      if (isMonday) setLastWeekBoard(NeonService.cachedLeaderboard(activeCourseId, 'previous'));
+      Promise.all([
+        NeonService.loadLeaderboard(activeCourseId, 'current'),
+        isMonday ? NeonService.loadLeaderboard(activeCourseId, 'previous') : Promise.resolve(null),
+      ]).then(([current, previous]) => {
+        if (!active) return;
+        if (current) setLeaderboard(current);
+        if (previous) setLastWeekBoard(previous);
+      });
+      return () => {
+        active = false;
+      };
+    }, [activeCourseId, isTeacher])
+  );
+
+  const ratingTeaser = useMemo(() => {
+    if (
+      !activeCourseId ||
+      !leaderboard ||
+      !('rows' in leaderboard) ||
+      !leaderboard.enabled ||
+      !leaderboard.me
+    )
+      return null;
+    const seen =
+      StorageService.getObject<LeaderboardSeen>(leaderboardSeenKey(activeCourseId)) || {};
+    const word = (n: number) => {
+      const m10 = n % 10,
+        m100 = n % 100;
+      if (m100 >= 11 && m100 <= 19) return 'очков';
+      if (m10 === 1) return 'очко';
+      if (m10 >= 2 && m10 <= 4) return 'очка';
+      return 'очков';
+    };
+    // Понедельник: итоги прошлой недели, ещё не просмотренные
+    if (
+      lastWeekBoard &&
+      'rows' in lastWeekBoard &&
+      lastWeekBoard.frozen &&
+      lastWeekBoard.me?.place &&
+      seen.resultsWeekStart !== lastWeekBoard.weekStart
+    ) {
+      const mine = lastWeekBoard.rows.find((r) => r.isMe);
+      return {
+        badge: `#${lastWeekBoard.me.place}`,
+        title: 'Итоги недели готовы',
+        hint:
+          mine && mine.reward > 0
+            ? `Твоя награда: +${mine.reward} ${pluralize(mine.reward, 'алмаз', 'алмаза', 'алмазов')}`
+            : 'Посмотри, кто победил',
+        dot: true,
+        week: 'previous' as const,
+      };
+    }
+    const me = leaderboard.me;
+    if (me.hidden)
+      return {
+        badge: '—',
+        title: 'Рейтинг недели',
+        hint: 'Ты скрыт из рейтинга',
+        dot: false,
+        week: 'current' as const,
+      };
+    if (me.points === 0 || me.place === null) {
+      return {
+        badge: '?',
+        title: 'Узнай своё место',
+        hint: 'Первые очки — за повторение слов',
+        dot: false,
+        week: 'current' as const,
+      };
+    }
+    const lastPlace = seen.weekStart === leaderboard.weekStart ? (seen.place ?? null) : null;
+    if (lastPlace && me.place > lastPlace) {
+      return {
+        badge: `#${me.place}`,
+        title: 'Тебя обогнали',
+        hint: `Было #${lastPlace} — верни место`,
+        dot: true,
+        week: 'current' as const,
+      };
+    }
+    if (lastPlace && me.place < lastPlace) {
+      return {
+        badge: `#${me.place}`,
+        title: `Ты поднялся на ${me.place}-е место`,
+        hint:
+          me.gapToNext != null
+            ? `До ${me.place - 1}-го — ${me.gapToNext} ${word(me.gapToNext)}`
+            : 'Так держать!',
+        dot: true,
+        week: 'current' as const,
+      };
+    }
+    if (me.place === 1)
+      return {
+        badge: '#1',
+        title: 'Ты лидер недели',
+        hint: 'Удержишь до воскресенья?',
+        dot: false,
+        week: 'current' as const,
+      };
+    return {
+      badge: `#${me.place}`,
+      title:
+        me.gapToNext != null
+          ? `До ${me.place - 1}-го места — ${me.gapToNext} ${word(me.gapToNext)}`
+          : 'Рейтинг недели',
+      hint: 'Повторяй слова вовремя — это +2 за каждое',
+      dot: false,
+      week: 'current' as const,
+    };
+  }, [activeCourseId, leaderboard, lastWeekBoard]);
+
+  // Поиск и сортировка по текущему списку наборов
+  const visibleSets = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const found = !query
+      ? filteredSets
+      : filteredSets.filter((set) => {
+          const title = set.title?.toLowerCase() || '';
+          const desc = set.description?.toLowerCase() || '';
+          const tags = (set.tags || []).join(' ').toLowerCase();
+          return title.includes(query) || desc.includes(query) || tags.includes(query);
+        });
+    return [...found].sort(SETS_COMPARATORS[setsSort]);
+  }, [filteredSets, searchQuery, setsSort]);
+
+  const setsSortShortLabel = SETS_SORT_OPTIONS.find((o) => o.key === setsSort)?.short;
+
+  // Получаем название активного курса для empty state
+  const activeCourseTitle = useMemo(() => {
+    if (activeCourseId === null) return null;
+    const course = courses.find((c) => c.id === activeCourseId);
+    return course?.title || 'этот курс';
+  }, [activeCourseId, courses]);
+
+  const openLeaderboard = useCallback(
+    (week: 'current' | 'previous') => {
+      if (!activeCourseId) return;
+      triggerHaptic('selection');
+      Analytics.homeAction('rating');
+      const rootNav = navigation?.getParent?.() ?? navigation;
+      rootNav?.navigate('CourseLeaderboard', {
+        courseId: activeCourseId,
+        courseTitle: activeCourseTitle ?? undefined,
+        week,
+      });
+    },
+    [activeCourseId, activeCourseTitle, navigation]
+  );
+
+  const switchCourseByStep = useCallback(
+    (step: number) => {
+      if (drawerOpen || courseOrder.length === 0) return;
+      const currentIndex = Math.max(
+        courseOrder.findIndex((id) => id === activeCourseId),
+        0
+      );
+      const nextIndex = (currentIndex + step + courseOrder.length) % courseOrder.length;
+      setActiveCourse(courseOrder[nextIndex]);
+    },
+    [activeCourseId, courseOrder, drawerOpen, setActiveCourse]
+  );
+
+  // Свайп по всему экрану влево/вправо — переключение курса (не связано с drawer).
+  // Отключается, пока открыт drawer, и уступает приоритет edgeOpenGesture у левого края
+  // экрана (см. Gesture.Exclusive ниже) — иначе свайп вправо от самого края одновременно
+  // и открывал бы панель, и листал курс.
+  const courseSwitchGesture = Gesture.Pan()
+    .enabled(!drawerOpen)
+    .activeOffsetX([-20, 20])
+    .failOffsetY([-10, 10])
+    .onEnd((e) => {
+      if (Math.abs(e.translationX) > SWIPE_THRESHOLD && Math.abs(e.velocityX) > SWIPE_VELOCITY) {
+        if (e.translationX < 0) {
+          runOnJS(switchCourseByStep)(1); // swipe left -> next course
+        } else {
+          runOnJS(switchCourseByStep)(-1); // swipe right -> previous course
+        }
+      }
+    });
+
+  // Edge-swipe открытия drawer: жест ловится только у левых ~20px экрана (hitSlop),
+  // работает с любого места по вертикали. translateX двигается 1:1 с пальцем на UI-потоке —
+  // ни одного React re-render за время перетаскивания.
+  const EDGE_WIDTH = 20;
+  const edgeOpenGesture = Gesture.Pan()
+    .enabled(!drawerOpen)
+    .hitSlop({ left: 0, width: EDGE_WIDTH })
+    .activeOffsetX(10)
+    .failOffsetY([-15, 15])
+    .onBegin(() => {
+      drawerGestureStartX.value = drawerTranslateX.value;
+      runOnJS(setDrawerMounted)(true);
+    })
+    .onUpdate((e) => {
+      drawerTranslateX.value = clampTranslateX(
+        drawerGestureStartX.value + e.translationX,
+        drawerWidth
+      );
+    })
+    .onEnd((e) => {
+      const open = resolveDrawerOpen(drawerTranslateX.value, e.velocityX, drawerWidth);
+      animateDrawerTo(drawerTranslateX, open, drawerWidth, handleDrawerGestureSettled);
+    });
+
+  const rootGesture = Gesture.Exclusive(edgeOpenGesture, courseSwitchGesture);
+
+  // Фокус на input при создании курса
+  useEffect(() => {
+    if (isCreatingCourse) {
+      const timer = setTimeout(() => {
+        newCourseInputRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [isCreatingCourse]);
+
+  // Стиль панели вкладок задаёт только AppNavigator (шаг брендбука 1.6). Боковая панель —
+  // отдельный Modal поверх всего экрана, прятать панель вкладок под ней не нужно.
+
+  const updateSetStats = useSetsStore((s) => s.updateSetStats);
+  const updateSet = useSetsStore((s) => s.updateSet);
+
+  // Свои курсы — куда можно переложить свой набор (в курс учителя нельзя)
+  const moveTargetCourses = useMemo(() => courses.filter((c) => !c.isStudentCourse), [courses]);
+  const closeSetMenu = useCallback(() => {
+    setSetMenuTarget(null);
+    setSetMenuMoving(false);
+  }, []);
+  const handleMoveSet = useCallback(
+    (set: CardSet, courseId: string | null) => {
+      closeSetMenu();
+      if ((set.courseId ?? null) === courseId) return;
+      triggerHaptic('selection');
+      updateSet(set.id, { courseId });
+      const title = courseId ? courses.find((c) => c.id === courseId)?.title : 'Мои наборы';
+      toast.success(`Набор перенесён в «${title ?? 'курс'}»`);
+    },
+    [closeSetMenu, updateSet, courses]
+  );
+
+  const handleToggleSetHidden = useCallback(
+    async (set: CardSet) => {
+      const newHidden = !set.isHiddenFromStudents;
+      updateSet(set.id, { isHiddenFromStudents: newHidden });
+      setSetMenuTarget(null);
+      try {
+        await NeonService.toggleSetHiddenFromStudents(set.id, newHidden);
+      } catch {
+        updateSet(set.id, { isHiddenFromStudents: !newHidden });
+        toast.error('Не удалось изменить видимость набора');
+      }
+    },
+    [updateSet]
+  );
+
+  // Обновляем статистику всех наборов из БД при фокусе на экране
+  useFocusEffect(
+    React.useCallback(() => {
+      allSets.forEach((set) => {
+        const stats = selectSetStats(set.id);
+        // Карточки набора ещё не загружены — не затираем серверные счётчики нулями
+        if (stats.total === 0 && set.cardCount > 0) return;
+        updateSetStats(set.id, {
+          cardCount: stats.total,
+          newCount: stats.newCount,
+          learningCount: stats.learningCount,
+          youngCount: stats.youngCount,
+          matureCount: stats.matureCount,
+          reviewCount: stats.reviewCount,
+          masteredCount: stats.masteredCount,
+        });
+      });
+    }, [allSets.length, updateSetStats])
+  );
+
+  // Подтягиваем прогресс за сегодня + стрик из бэка при фокусе экрана
+  useFocusEffect(
+    React.useCallback(() => {
+      let active = true;
+      (async () => {
+        try {
+          const [activity, stats, week] = await Promise.all([
+            StreakService.fetchTodayActivity(),
+            StreakService.fetchUserStats(),
+            StreakService.fetchWeekActivity(10),
+          ]);
+          if (active) {
+            setTodayBackendCards(activity?.cards_studied ?? null);
+            setWeekActivity(week);
+            if (stats) {
+              syncStreakFromServer({
+                currentStreak: stats.current_streak,
+                longestStreak: stats.longest_streak,
+                lastActiveDate: stats.last_active_date,
+              });
+            }
+          }
+        } catch {
+          if (active) setTodayBackendCards(null);
+        }
+      })();
+      return () => {
+        active = false;
+      };
+    }, [syncStreakFromServer])
+  );
+
+  // Вычисляем карточки на сегодня (reviewCount и newCount — одно и то же значение dueCount)
+  const dueCards = filteredSets.reduce((sum, set) => sum + (set.reviewCount || 0), 0);
+
+  // Подсчет наборов в каждом курсе
+  const getCourseStats = useCallback(
+    (courseId: string | null) => {
+      const sets = allSets.filter((s) =>
+        courseId === null ? isSetInMySets(s, courseIdSet) : isSetInCourse(s, courseId)
+      );
+      const cards = sets.reduce((sum, s) => sum + (s.cardCount || 0), 0);
+      const mastered = sets.reduce((sum, s) => sum + (s.masteredCount || 0), 0);
+      const percent = cards > 0 ? Math.round((mastered / cards) * 100) : 0;
+      return {
+        setCount: sets.length,
+        cardCount: cards,
+        masteredPercent: percent,
+      };
+    },
+    [allSets, courseIdSet]
+  );
+
+  // Раньше считалось только по 1 / 2–4: выходило «21 наборов», «22 наборов»
+  const formatSetWord = useCallback(
+    (count: number) => pluralize(count, 'набор', 'набора', 'наборов'),
+    []
+  );
+
+  // Colбэки для CoursesDrawer — логика 1:1 перенесена из прежних инлайн-обработчиков,
+  // трогать поведение не нужно, меняется только то, что оно теперь живёт в пропсах.
+  const handleToggleCourseMenu = useCallback((id: string) => {
+    setCourseMenuOpen((prev) => (prev === id ? null : id));
+  }, []);
+
+  const handleDismissCourseMenu = useCallback(() => setCourseMenuOpen(null), []);
+
+  const handleSelectCourse = useCallback(
+    (id: string | null) => {
+      setActiveCourse(id);
+      setDrawerOpen(false);
+      setCourseMenuOpen(null);
+    },
+    [setActiveCourse]
+  );
+
+  const handleStartCreatingCourse = useCallback(() => {
+    setCourseMenuOpen(null);
+    setIsCreatingCourse(true);
+  }, []);
+
+  const handleJoinByCodePress = useCallback(() => {
+    setCourseMenuOpen(null);
+    runAfterDrawerClosed(() => setJoinByCodeVisible(true));
+  }, [runAfterDrawerClosed]);
+
+  const handleDrawerBackdropPress = useCallback(() => {
+    if (courseMenuOpen) {
+      setCourseMenuOpen(null);
+    } else {
+      setCourseMenuOpen(null);
+      setEditingCourseId(null);
+      setIsCreatingCourse(false);
+      setDrawerOpen(false);
+    }
+  }, [courseMenuOpen]);
+
+  const handleDrawerRequestClose = useCallback(() => {
+    setCourseMenuOpen(null);
+    setEditingCourseId(null);
+    setIsCreatingCourse(false);
+    setDrawerOpen(false);
+  }, []);
+
+  // Обработка создания нового курса
+  const handleCreateCourse = useCallback(() => {
+    const title = newCourseTitle.trim();
+    if (!title) {
+      setIsCreatingCourse(false);
+      setNewCourseTitle('');
+      return;
+    }
+
+    createCourse(title);
+    setIsCreatingCourse(false);
+    setNewCourseTitle('');
+  }, [newCourseTitle, createCourse]);
+
+  const {
+    deleteModalHasSets,
+    deleteConfirmed,
+    setDeleteConfirmed,
+    deleteModalStudents,
+    deleteModalMessage,
+    openDeleteModal,
+    closeDeleteModal,
+    confirmDeleteCourse,
+    openLeaveModal,
+    handleLeaveCourse,
+  } = useCourseRemoval({
+    courses,
+    allSets,
+    formatSetWord,
+    deleteCourse,
+    runAfterDrawerClosed,
+    setCourseMenuOpen,
+    deleteModalCourseId,
+    setDeleteModalCourseId,
+    leaveModalCourseId,
+    setLeaveModalCourseId,
+    setLeaveLoading,
+  });
+
+  const handleStartStudyMode = useCallback(
+    (mode: 'classic' | 'match' | 'multipleChoice' | 'wordBuilder' | 'audio') => {
+      setShowStudyModeModal(false);
+
+      // Collect cards across ALL sets in the active course — due-only when "Только «Не запомнил»"
+      // is on, otherwise every card in the course (mirrors SetDetailScreen's getShuffledDueCardIds)
+      const now = Date.now();
+      const state = useCardsStore.getState();
+      const allCardIds: string[] = [];
+      for (const set of filteredSets) {
+        const cardIds = state.cardsBySet[set.id] || [];
+        for (const id of cardIds) {
+          const card = state.cards[id];
+          if (card && (!onlyHard || card.nextReviewDate <= now)) {
+            allCardIds.push(id);
+          }
+        }
+      }
+
+      if (allCardIds.length === 0) return;
+
+      // Shuffle all cards — pass ALL to dueCardIds, use cardLimit for batch size
+      const shuffled = [...allCardIds].sort(() => Math.random() - 0.5);
+      const dueCardIds = shuffled;
+      const limit = wordLimit === 'all' ? undefined : Number(wordLimit);
+
+      // Use the first card's setId for backward compatibility (results screen, etc.)
+      const firstCard = state.cards[dueCardIds[0]];
+      const setId = firstCard?.setId || filteredSets[0]?.id;
+      if (!setId) return;
+
+      const phaseId = `phase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const totalCards = dueCardIds.length;
+      const rootNav = navigation?.getParent?.() ?? navigation;
+
+      switch (mode) {
+        case 'classic':
+          rootNav?.navigate('Study', {
+            setId,
+            mode: 'classic',
+            studyAll: true,
+            onlyHard,
+            cardLimit: limit,
+            dueCardIds,
+            phaseId,
+            totalPhaseCards: totalCards,
+            studiedInPhase: 0,
+            phaseOffset: 0,
+          });
+          break;
+        case 'match':
+          rootNav?.navigate('Match', {
+            setId,
+            cardLimit: limit,
+            dueCardIds,
+            phaseId,
+            totalPhaseCards: totalCards,
+            studiedInPhase: 0,
+            phaseOffset: 0,
+          });
+          break;
+        case 'multipleChoice':
+          rootNav?.navigate('MultipleChoice', {
+            setId,
+            cardLimit: limit,
+            dueCardIds,
+            questionIndex: 1,
+            totalQuestions: totalCards,
+            phaseId,
+            totalPhaseCards: totalCards,
+            studiedInPhase: 0,
+            phaseOffset: 0,
+          });
+          break;
+        case 'wordBuilder':
+          rootNav?.navigate('WordBuilder', {
+            setId,
+            cardLimit: limit,
+            dueCardIds,
+            phaseId,
+            totalPhaseCards: totalCards,
+            studiedInPhase: 0,
+            phaseOffset: 0,
+          });
+          break;
+        case 'audio':
+          rootNav?.navigate('AudioLearning', {
+            setId,
+            cardLimit: limit,
+            dueCardIds,
+            phaseId,
+            totalPhaseCards: totalCards,
+            studiedInPhase: 0,
+            phaseOffset: 0,
+          });
+          break;
+      }
+    },
+    [filteredSets, navigation, wordLimit, onlyHard]
+  );
+
+  // Fill in the Blank требует одного конкретного набора (setId), а Home агрегирует карточки
+  // сразу по всем наборам курса — поэтому этот режим здесь не предлагается (см. games ниже).
+  // Предметные наборы (plan/new/set_kind.md): если в выборке есть хоть один, языковые режимы
+  // (Собери слово, Аудио) не предлагаем и не запускаем.
+  const handleSelectStudyMode = useCallback(
+    (mode: StudyMode) => {
+      if (mode === 'contextFill') return;
+      if (!isModeAllowedForSets(mode, filteredSets)) return;
+      handleStartStudyMode(mode);
+    },
+    [handleStartStudyMode, filteredSets]
+  );
+
+  const homeStudyModeGames = useMemo(
+    () =>
+      DEFAULT_STUDY_MODE_GAMES.filter(
+        (game) => game.mode !== 'contextFill' && isModeAllowedForSets(game.mode, filteredSets)
+      ),
+    [filteredSets]
+  );
+
+  const saveCourseTitle = useCallback(
+    (courseId: string) => {
+      const title = editingTitle.trim();
+      if (title) {
+        renameCourse(courseId, title);
+      }
+      setEditingCourseId(null);
+      setEditingTitle('');
+      setIsEditModalVisible(false);
+    },
+    [editingTitle, renameCourse]
+  );
+
+  const cancelCourseEdit = useCallback(() => {
+    setEditingCourseId(null);
+    setEditingTitle('');
+    setIsEditModalVisible(false);
+  }, []);
+
+  // Открытие модального окна редактирования
+  const openEditModal = useCallback(
+    (courseId: string, currentTitle: string) => {
+      setEditingCourseId(courseId);
+      setEditingTitle(currentTitle);
+      setCourseMenuOpen(null);
+      runAfterDrawerClosed(() => setIsEditModalVisible(true));
+    },
+    [runAfterDrawerClosed]
+  );
+
+  // Баннер учителя — вход в курс (ученики, приглашения, тесты, «Учебники курса»). Показывается и
+  // когда в курсе ещё нет наборов: иначе в новом пустом курсе до него было не добраться.
+  const teacherBanner = (
+    <TeacherBanner
+      colors={colors}
+      activeCourseId={activeCourseId}
+      courses={courses}
+      navigation={navigation}
+    />
+  );
+
+  // Карточка ежедневного челленджа: играть → "Забрать" 10 алмазов → "Получено" до завтра
+  // Мини-игра: «Играть» → «Выполнено, забрать +10» → «Получено, снова завтра»
+  const hoursUntilTomorrow = (() => {
+    const now = new Date();
+    const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    return Math.max(1, Math.ceil((midnight.getTime() - now.getTime()) / 3_600_000));
+  })();
+  // Мини-игры «Разминка» (plan/done/home_redesign.md, 3.1): плитки — ChallengeTiles
+  const challengeTiles: ChallengeTile[] = [
+    {
+      id: 'quick_round',
+      title: 'Быстрый раунд',
+      badge: '2 минуты',
+      icon: Zap,
+      accent: colors.gameViolet,
+      onPlay: handleQuickRound,
+    },
+    {
+      id: 'sniper',
+      title: 'Снайпер',
+      badge: '5 подряд',
+      icon: Crosshair,
+      accent: colors.gameRose,
+      onPlay: handleSniperChallenge,
+    },
+    {
+      id: 'forgotten',
+      title: 'Вспомни забытое',
+      badge: '7+ дней',
+      icon: Clock,
+      accent: colors.gameTeal,
+      onPlay: handleForgottenChallenge,
+    },
+  ];
+  const setClaimRef = useCallback((id: ChallengeId, el: View | null) => {
+    claimBtnRefs.current[id] = el;
+  }, []);
+
+  // Кнопки закрытия окон — одна и та же «тихая» кнопка-иконка
+  const closeButton = (onPress: () => void, disabled?: boolean) => (
+    <Button
+      variant="icon"
+      icon={X}
+      background="none"
+      iconSize={iconSize.s}
+      iconColor={colors.textSecondary}
+      accessibilityLabel="Закрыть"
+      onPress={onPress}
+      disabled={disabled}
+    />
+  );
+
+  const copyToClipboard = (text: string) => {
+    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+    } else {
+      Clipboard.setString(text);
+    }
+  };
+
+  const leaveModalCourseTitle = courses.find((c) => c.id === leaveModalCourseId)?.title ?? '';
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Top Navigation Bar */}
-      <View
-        style={[
-          styles.header,
-          {
-            backgroundColor: Platform.select({
-              ios: 'rgba(255, 255, 255, 0.8)',
-              android: colors.surface,
-              default: 'rgba(255, 255, 255, 0.8)',
-            }),
-            borderBottomColor: colors.border,
-          },
-        ]}
-      >
-        <View style={styles.headerTop}>
-          <View style={styles.headerLeft}>
-            <View style={[styles.logoContainer, { backgroundColor: colors.primary }]}>
-              <School size={20} color="#FFFFFF" />
-            </View>
-            <RNText style={[styles.headerTitle, { color: colors.textPrimary }]}>Flashly</RNText>
-          </View>
-          <View style={styles.headerRight}>
-            <Pressable style={styles.iconButton}>
-              <Search size={20} color={colors.textPrimary} />
-            </Pressable>
-            <Pressable
-              style={styles.iconButton}
-              onPress={() => navigation.navigate('SetEditor', {})}
-            >
-              <Plus size={20} color={colors.textPrimary} />
-            </Pressable>
-          </View>
-        </View>
+    <GestureDetector gesture={rootGesture}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        {/* Header */}
+        <HomeHeader
+          colors={colors}
+          setDrawerOpen={setDrawerOpen}
+          setStreakModalVisible={setStreakModalVisible}
+          todayGoalReached={todayGoalReached}
+          formatDays={formatDays}
+          streakValue={streakValue}
+          diamondIconRef={diamondIconRef}
+          setDiamondTargetPos={setDiamondTargetPos}
+          diamonds={diamonds}
+          diamondCountAnimStyle={diamondCountAnimStyle}
+          ratingTeaser={ratingTeaser}
+          openLeaderboard={openLeaderboard}
+        />
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.courseTabsRow}
-          style={styles.courseTabsWrapper}
-        >
-          {courseTabs.map((tab) => {
-            const isActive = tab.id === activeCourse;
-            return (
-              <Pressable
-                key={tab.id}
-                style={[
-                  styles.courseTab,
-                  {
-                    backgroundColor: isActive ? colors.background : colors.surfaceVariant,
-                    borderColor: isActive ? colors.primary : colors.surfaceVariant,
-                    borderTopWidth: isActive ? 2 : 1,
-                  },
-                ]}
-                onPress={() => setActiveCourse(tab.id)}
-              >
-                <RNText
-                  style={[
-                    styles.courseTabText,
-                    isActive
-                      ? { color: colors.primary, fontWeight: '700' }
-                      : { color: colors.textSecondary },
-                  ]}
-                >
-                  {tab.label}
-                </RNText>
-                {tab.count > 0 && (
-                  <View
-                    style={[
-                      styles.courseTabBadge,
-                      {
-                        backgroundColor: isActive ? colors.primary : colors.background,
-                        borderColor: isActive ? colors.primary : colors.border,
-                      },
-                    ]}
-                  >
-                    <RNText
-                      style={[
-                        styles.courseTabBadgeText,
-                        { color: isActive ? colors.textInverse : colors.textSecondary },
-                      ]}
-                    >
-                      {tab.count}
-                    </RNText>
-                  </View>
-                )}
-              </Pressable>
-            );
-          })}
-
-          <Pressable
-            style={[
-              styles.courseAddButton,
-              {
-                backgroundColor: colors.surfaceVariant,
-                borderColor: colors.border,
-              },
+        <View style={styles.body}>
+          <ScrollView
+            style={styles.content}
+            contentContainerStyle={[
+              styles.scrollContent,
+              tabBarInset > 0 && { paddingBottom: tabBarInset + spacing.m },
             ]}
-            onPress={() => navigation.navigate('SetEditor', {})}
+            showsVerticalScrollIndicator={false}
+            bounces
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                tintColor={colors.primary}
+                colors={[colors.primary]}
+              />
+            }
           >
-            <Plus size={16} color={colors.textPrimary} />
-          </Pressable>
-        </ScrollView>
-      </View>
-
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Daily Summary Hero Card */}
-        <View style={styles.heroCard}>
-          <View style={[styles.heroGradient, { backgroundColor: colors.primary }]}>
-            {/* Decorative circle */}
-            <View style={styles.decorativeCircle} />
-            {/* Gradient overlay effect */}
-            <View style={styles.gradientOverlay} />
-
-            <View style={styles.heroContent}>
-              <View style={styles.heroHeader}>
-                <View>
-                  <RNText style={styles.heroLabel}>DAILY SUMMARY</RNText>
-                  <RNText style={styles.heroTitle}>Ready to learn?</RNText>
-                </View>
-                <View style={styles.streakBadge}>
-                  <Flame size={18} color="#FFFFFF" />
-                  <RNText style={styles.streakText}>{todayStats.streak} Days</RNText>
-                </View>
-              </View>
-
-              <View style={styles.heroStats}>
-                <View style={styles.heroStatCard}>
-                  <RNText style={styles.heroStatLabel}>Cards Due</RNText>
-                  <RNText style={styles.heroStatValue}>{totalDueCards}</RNText>
-                </View>
-                <View style={styles.heroStatCard}>
-                  <RNText style={styles.heroStatLabel}>Today's Progress</RNText>
-                  <RNText style={styles.heroStatValue}>{todayProgress}</RNText>
-                </View>
-              </View>
-
-              <Pressable style={styles.startButton}>
-                <Play size={18} color="#6467f2" fill="#6467f2" />
-                <RNText style={styles.startButtonText}>Start Learning</RNText>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-
-        {/* Your Decks Section */}
-        <View style={styles.decksSection}>
-          <View style={styles.decksHeader}>
-            <RNText style={[styles.decksTitle, { color: colors.textPrimary }]}>Your Decks</RNText>
-            <Pressable>
-              <RNText style={[styles.viewAllText, { color: colors.primary }]}>View All</RNText>
-            </Pressable>
-          </View>
-
-          <View style={styles.decksList}>
             {filteredSets.length === 0 ? (
-              <View style={styles.emptyState}>
-                <BookOpen size={64} color={colors.textSecondary} />
-                <RNText style={[styles.emptyTitle, { color: colors.textPrimary }]}>                
-                  {sets.length === 0 ? 'No decks yet' : 'No decks in this course'}
-                </RNText>
-                <RNText style={[styles.emptySubtitle, { color: colors.textSecondary }]}>                
-                  {sets.length === 0
-                    ? 'Create your first deck to get started'
-                    : 'Try another tab or create a new deck'}
-                </RNText>
-              </View>
+              <HomeEmptyState
+                colors={colors}
+                teacherBanner={teacherBanner}
+                isTeacher={isTeacher}
+                hasLessonCards={hasLessonCards}
+                lessonContent={lessonContent}
+                handleLessonPress={handleLessonPress}
+                openFocusSheet={openFocusSheet}
+                mySetsEmptyButCourses={mySetsEmptyButCourses}
+                setDrawerOpen={setDrawerOpen}
+                setJoinByCodeVisible={setJoinByCodeVisible}
+                navigation={navigation}
+              />
             ) : (
-              filteredSets.slice(0, 3).map((set, index) => {
-                const progress = getProgress(set);
-                const statusColor = getStatusColor(progress);
-                const accentColor = getDeckAccentColor(set.id || index);
-
-                return (
-                  <View
-                    key={set.id}
-                    style={[
-                      styles.deckCard,
-                      {
-                        backgroundColor: colors.surface,
-                        borderColor: colors.border,
-                      },
-                    ]}
-                  >
-                    <View style={styles.deckCardHeader}>
-                      <View style={styles.deckCardLeft}>
-                        <View
-                          style={[
-                            styles.deckIconContainer,
-                            { backgroundColor: accentColor },
-                          ]}
-                        >
-                          <BookOpen size={24} color="#FFFFFF" />
-                        </View>
-                        <View style={styles.deckInfo}>
-                          <View style={styles.deckTitleRow}>
-                            <RNText style={[styles.deckTitle, { color: colors.textPrimary }]}>
-                              {set.title}
-                            </RNText>
-                            {progress === 100 ? (
-                              <CheckCircle2 size={12} color={statusColor} fill={statusColor} />
-                            ) : progress >= 50 ? (
-                              <AlertCircle size={12} color={statusColor} />
-                            ) : (
-                              <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-                            )}
-                          </View>
-                          <RNText style={[styles.deckSubtitle, { color: colors.textSecondary }]}>
-                            {set.cardCount} cards • {progress}% Mastered
-                          </RNText>
-                        </View>
+              <>
+                {isTeacher === null ? (
+                  // Роль ещё не известна (первый вход) — заготовка урока и «Разминки», чтобы блоки не появлялись из ниоткуда
+                  <View accessibilityLabel="Загрузка" accessibilityRole="progressbar">
+                    <SkeletonCard height={156} style={styles.lessonCard} />
+                    <View style={[styles.challengesSection, styles.skeletonTiles]}>
+                      <Skeleton width={80} height={12} />
+                      <View style={styles.skeletonTilesRow}>
+                        {[0, 1, 2].map((i) => (
+                          <SkeletonCard key={i} height={148} style={styles.flex1} />
+                        ))}
                       </View>
-                      <Pressable
-                        style={[
-                          styles.studyButton,
-                          progress === 100
-                            ? {
-                                backgroundColor: colors.surfaceVariant || colors.border,
-                              }
-                            : { backgroundColor: colors.primary },
-                        ]}
-                      >
-                        <RNText
-                          style={[
-                            styles.studyButtonText,
-                            progress === 100
-                              ? { color: colors.textPrimary }
-                              : { color: colors.textInverse },
-                          ]}
-                        >
-                          {progress === 100 ? 'Review' : 'Study'}
-                        </RNText>
-                      </Pressable>
                     </View>
-
-                    <View style={styles.progressSection}>
-                      <View style={styles.progressHeader}>
-                        <RNText style={[styles.progressLabel, { color: colors.textSecondary }]}>
-                          PROGRESS
-                        </RNText>
-                        <RNText style={[styles.progressPercent, { color: colors.textSecondary }]}>
-                          {progress}%
-                        </RNText>
-                      </View>
-                      <View style={[styles.progressBarContainer, { backgroundColor: colors.border }]}>
-                        <View
-                          style={[
-                            styles.progressBarFill,
-                            {
-                              backgroundColor: progress === 100 ? colors.success : colors.primary,
-                              width: `${progress}%`,
-                            },
-                          ]}
+                  </View>
+                ) : isTeacher ? (
+                  teacherBanner
+                ) : (
+                  <>
+                    {/* Урок дня — единственное главное действие главной (plan/done/home_redesign.md, 2.2) */}
+                    {lessonContent && (
+                      <LessonCard
+                        content={lessonContent}
+                        onPress={handleLessonPress}
+                        onSecondaryPress={openFocusSheet}
+                        style={styles.lessonCard}
+                      />
+                    )}
+                    {pushNudgePermission && !pushNudgeClosed && (
+                      <View style={styles.pushNudge}>
+                        <PushStreakNudge
+                          permission={pushNudgePermission}
+                          onClose={() => setPushNudgeClosed(true)}
                         />
                       </View>
+                    )}
+                    {/* Challenges Section */}
+                    <View style={styles.challengesSection}>
+                      <ChallengeTiles
+                        tiles={challengeTiles}
+                        statuses={challengeStatuses}
+                        hoursUntilTomorrow={hoursUntilTomorrow}
+                        onClaim={handleChallengeClaim}
+                        claimRef={setClaimRef}
+                      />
                     </View>
+                  </>
+                )}
+
+                {/* Section Header */}
+                <SetsSectionHeader
+                  colors={colors}
+                  activeCourseId={activeCourseId}
+                  activeCourseTitle={activeCourseTitle}
+                  openSetsMenu={openSetsMenu}
+                  setSortSheetVisible={setSortSheetVisible}
+                  setsSort={setsSort}
+                  setsSortShortLabel={setsSortShortLabel}
+                />
+
+                {/* Поиск по наборам — у самих наборов (plan/done/home_redesign.md, 4.1) */}
+                {searchVisible && (
+                  <View style={styles.searchRow}>
+                    <TextField
+                      variant="search"
+                      placeholder="Поиск по наборам"
+                      value={searchQuery}
+                      onChangeText={setSearchQuery}
+                      // Поиск — исключение из правила «клавиатура не открывается сама»
+                      autoFocus
+                      style={styles.flex1}
+                      inputStyle={
+                        Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : undefined
+                      }
+                    />
+                    <Button variant="quiet" size="s" title="Отмена" onPress={closeSearch} />
                   </View>
-                );
-              })
+                )}
+
+                <View style={styles.setsList}>
+                  {visibleSets.length === 0 && (
+                    <Text
+                      variant="bodySmall"
+                      color="secondary"
+                      align="center"
+                      style={styles.noResults}
+                    >
+                      Ничего не нашлось по запросу «{searchQuery.trim()}»
+                    </Text>
+                  )}
+                  {visibleSets.map((set, index) => (
+                    <SetListItem
+                      key={set.id}
+                      set={set}
+                      index={index}
+                      colors={colors}
+                      isTeacher={isTeacher}
+                      lessonPlan={lessonPlan}
+                      reviewStats={reviewStats}
+                      setSetMenuTarget={setSetMenuTarget}
+                      navigation={navigation}
+                    />
+                  ))}
+                  {/* Создание набора — в конце списка, у самих наборов (plan/done/home_redesign.md, 4.2) */}
+                  <Pressable
+                    onPress={() => {
+                      triggerHaptic('selection');
+                      Analytics.homeAction('create_set');
+                      navigation?.navigate('SetEditor', {});
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Новый набор"
+                    style={({ pressed }) => [
+                      styles.newSetRow,
+                      { borderColor: colors.border },
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <Plus size={iconSize.s} color={colors.primary} />
+                    <Text variant="label" style={{ color: colors.primary }}>
+                      Новый набор
+                    </Text>
+                  </Pressable>
+                </View>
+              </>
             )}
-          </View>
+          </ScrollView>
         </View>
-      </ScrollView>
 
-      {/* Floating Action Button */}
-      <Pressable
-        style={[
-          styles.fab,
-          {
-            backgroundColor: colors.primary,
-            shadowColor: colors.primary,
-          },
-        ]}
-        onPress={() => navigation.navigate('SetEditor', {})}
-      >
-        <Plus size={28} color="#FFFFFF" />
-      </Pressable>
+        <CoursesDrawer
+          mounted={drawerMounted}
+          translateX={drawerTranslateX}
+          drawerWidth={drawerWidth}
+          onGestureSettled={handleDrawerGestureSettled}
+          colors={colors}
+          insets={insets}
+          courses={courses}
+          activeCourseId={activeCourseId}
+          isTeacher={isTeacher}
+          getCourseStats={getCourseStats}
+          courseMenuOpen={courseMenuOpen}
+          onToggleCourseMenu={handleToggleCourseMenu}
+          onDismissCourseMenu={handleDismissCourseMenu}
+          editingCourseId={editingCourseId}
+          editingTitle={editingTitle}
+          onChangeEditingTitle={setEditingTitle}
+          onSaveEditingTitle={saveCourseTitle}
+          onCancelEditingTitle={cancelCourseEdit}
+          editInputRef={editInputRef}
+          isCreatingCourse={isCreatingCourse}
+          newCourseTitle={newCourseTitle}
+          onChangeNewCourseTitle={setNewCourseTitle}
+          onStartCreatingCourse={handleStartCreatingCourse}
+          onSubmitNewCourse={handleCreateCourse}
+          newCourseInputRef={newCourseInputRef}
+          onSelectCourse={handleSelectCourse}
+          onJoinByCode={handleJoinByCodePress}
+          onOpenInvite={openInviteModal}
+          onOpenEditModal={openEditModal}
+          onOpenDeleteModal={openDeleteModal}
+          onOpenLeaveModal={openLeaveModal}
+          onBackdropPress={handleDrawerBackdropPress}
+          onRequestClose={handleDrawerRequestClose}
+        />
 
-      {/* Notification permission prompt (one-time) */}
-    </View>
+        {/* Edit Course Modal */}
+        <EditCourseDialog
+          isEditModalVisible={isEditModalVisible}
+          cancelCourseEdit={cancelCourseEdit}
+          closeButton={closeButton}
+          editModalInputRef={editModalInputRef}
+          editingCourseId={editingCourseId}
+          editingTitle={editingTitle}
+          setEditingTitle={setEditingTitle}
+          saveCourseTitle={saveCourseTitle}
+        />
+
+        {/* Delete Course Modal */}
+        <DeleteCourseDialog
+          deleteModalCourseId={deleteModalCourseId}
+          closeDeleteModal={closeDeleteModal}
+          closeButton={closeButton}
+          colors={colors}
+          confirmDeleteCourse={confirmDeleteCourse}
+          deleteConfirmed={deleteConfirmed}
+          setDeleteConfirmed={setDeleteConfirmed}
+          deleteModalHasSets={deleteModalHasSets}
+          deleteModalMessage={deleteModalMessage}
+          deleteModalStudents={deleteModalStudents}
+        />
+
+        {/* Leave Course Modal */}
+        <LeaveCourseDialog
+          leaveModalCourseId={leaveModalCourseId}
+          setLeaveModalCourseId={setLeaveModalCourseId}
+          closeButton={closeButton}
+          colors={colors}
+          handleLeaveCourse={handleLeaveCourse}
+          leaveLoading={leaveLoading}
+          leaveModalCourseTitle={leaveModalCourseTitle}
+        />
+
+        {/* Invite Students Modal */}
+        <InviteStudentsDialog
+          inviteModalCourseId={inviteModalCourseId}
+          closeInviteModal={closeInviteModal}
+          closeButton={closeButton}
+          colors={colors}
+          copyToClipboard={copyToClipboard}
+          handleRegenerateInvite={handleRegenerateInvite}
+          inviteBaseUrl={inviteBaseUrl}
+          inviteCopied={inviteCopied}
+          setInviteCopied={setInviteCopied}
+          inviteJoinCode={inviteJoinCode}
+          inviteLoading={inviteLoading}
+          inviteRegenerating={inviteRegenerating}
+          inviteToken={inviteToken}
+        />
+
+        {/* Sort Sheet */}
+        <SetsSortSheet
+          sortSheetVisible={sortSheetVisible}
+          setSortSheetVisible={setSortSheetVisible}
+          colors={colors}
+          setsSort={setsSort}
+          selectSetsSort={selectSetsSort}
+        />
+
+        <SetsSectionMenu
+          visible={setsMenuVisible}
+          onClose={() => setSetsMenuVisible(false)}
+          sortLabel={setsSortShortLabel ?? ''}
+          onSort={() =>
+            afterSetsMenu(() => {
+              Analytics.homeAction('sort');
+              setSortSheetVisible(true);
+            })
+          }
+          onSearch={() => {
+            setSetsMenuVisible(false);
+            Analytics.homeAction('search');
+            setSearchVisible(true);
+          }}
+          onStudyAll={
+            reviewStats.all.length > 0
+              ? () =>
+                  afterSetsMenu(() => {
+                    Analytics.homeAction('study_all');
+                    setShowStudyModeModal(true);
+                  })
+              : null
+          }
+          onCreateSet={() => {
+            setSetsMenuVisible(false);
+            Analytics.homeAction('create_set');
+            navigation?.navigate('SetEditor', {});
+          }}
+          onAddByLink={() =>
+            afterSetsMenu(() => {
+              Analytics.homeAction('add_by_link');
+              setAddByLinkVisible(true);
+            })
+          }
+          onJoinCourse={
+            isTeacher === true
+              ? null
+              : () =>
+                  afterSetsMenu(() => {
+                    Analytics.homeAction('join_course');
+                    setJoinByCodeVisible(true);
+                  })
+          }
+        />
+
+        <FocusSetSheet
+          visible={focusSheetVisible}
+          onClose={() => setFocusSheetVisible(false)}
+          sets={lessonPlan.newSets}
+          currentSetId={lessonPlan.focusSetId}
+          manual={lessonPlan.focusManual}
+          onSelect={selectFocusSet}
+        />
+
+        <AddByLinkSheet
+          visible={addByLinkVisible}
+          onClose={() => setAddByLinkVisible(false)}
+          onCode={(code) => {
+            // Окно превью — системный лист поверх приложения: открываем после того, как этот лист уедет
+            setAddByLinkVisible(false);
+            setTimeout(() => requestOpenShare(code), animation.sheet);
+          }}
+        />
+
+        {/* Join by Code Modal */}
+        <JoinByCodeModal
+          visible={joinByCodeVisible}
+          userId={currentUserId}
+          onAccepted={(courseId, courseTitle) => {
+            setJoinByCodeVisible(false);
+            // Курс сразу в список, наборы курса — тихой синхронизацией (без мигания экрана)
+            const { courses: storeCourses } = useCoursesStore.getState();
+            if (!storeCourses.some((c) => c.id === courseId)) {
+              useCoursesStore.setState({
+                courses: [
+                  ...storeCourses,
+                  {
+                    id: courseId,
+                    title: courseTitle,
+                    createdAt: Date.now(),
+                    isStudentCourse: true,
+                  },
+                ],
+              });
+            }
+            DatabaseService.syncStudentCourses();
+            setActiveCourse(courseId);
+            setDrawerOpen(false);
+          }}
+          onDismiss={() => setJoinByCodeVisible(false)}
+        />
+
+        {/* Streak Modal */}
+        <StreakDialog
+          streakModalVisible={streakModalVisible}
+          closeStreakModal={closeStreakModal}
+          colors={colors}
+          todayGoalReached={todayGoalReached}
+          formatDays={formatDays}
+          streakValue={streakValue}
+          weekActivity={weekActivity}
+          cardsLearned={cardsLearned}
+          dailyGoal={dailyGoal}
+          goalProgress={goalProgress}
+          streakSupportText={streakSupportText}
+          streakFreezes={streakFreezes}
+          MAX_STREAK_FREEZES={MAX_STREAK_FREEZES}
+          STREAK_FREEZE_PRICE={STREAK_FREEZE_PRICE}
+          handleBuyStreakFreeze={handleBuyStreakFreeze}
+          buyingFreeze={buyingFreeze}
+        />
+
+        <WhatsNewSheet {...whatsNew} />
+
+        <StudyModeSheet
+          visible={showStudyModeModal}
+          onClose={() => setShowStudyModeModal(false)}
+          subtitle={`${activeCourseTitle ? activeCourseTitle : 'Мои наборы'} • ${dueCards} ${pluralize(dueCards, 'карточка', 'карточки', 'карточек')}`}
+          onSelectMode={handleSelectStudyMode}
+          games={homeStudyModeGames}
+          settings={{
+            onlyHard,
+            onToggleOnlyHard: () => setOnlyHard((v) => !v),
+            wordLimit,
+            onSelectWordLimit: setWordLimit,
+          }}
+        />
+        {/* Set Action Sheet */}
+        <SetActionSheet
+          setMenuTarget={setMenuTarget}
+          setSetMenuTarget={setSetMenuTarget}
+          setMenuMoving={setMenuMoving}
+          setSetMenuMoving={setSetMenuMoving}
+          closeSetMenu={closeSetMenu}
+          colors={colors}
+          handleMoveSet={handleMoveSet}
+          handleToggleSetHidden={handleToggleSetHidden}
+          isTeacher={isTeacher}
+          moveTargetCourses={moveTargetCourses}
+          navigation={navigation}
+        />
+        <DiamondReward
+          ref={diamondRewardRef}
+          targetPosition={diamondTargetPos}
+          onComplete={handleDiamondRewardComplete}
+        />
+      </View>
+    </GestureDetector>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-
-  // Header
-  header: {
-    paddingHorizontal: spacing.m,
-    paddingTop: 10,
-    paddingBottom: spacing.s,
-    borderBottomWidth: 1,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
-  },
-  headerTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.s,
-  },
-  logoContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: borderRadius.s,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    gap: spacing.s,
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  courseTabsWrapper: {
-    marginTop: spacing.xs,
-  },
-  courseTabsRow: {
-    paddingHorizontal: spacing.s,
-    alignItems: 'flex-end',
-  },
-  courseTab: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.s,
-    borderRadius: borderRadius.l,
-    marginRight: spacing.s,
-    borderWidth: 1,
-  },
-  courseTabText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  courseTabBadge: {
-    marginLeft: spacing.xs,
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.xs,
-    borderWidth: 1,
-  },
-  courseTabBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  courseAddButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-
-  // Scroll View
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 100,
-  },
-
-  // Hero Card
-  heroCard: {
-    margin: spacing.m,
-    borderRadius: borderRadius.xl,
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 8,
-      },
-    }),
-  },
-  heroGradient: {
-    padding: spacing.l,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  gradientOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#8b5cf6',
-    opacity: 0.5,
-  },
-  decorativeCircle: {
-    position: 'absolute',
-    right: -48,
-    top: -48,
-    width: 192,
-    height: 192,
-    borderRadius: 96,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.3,
-        shadowRadius: 24,
-      },
-    }),
-  },
-  heroContent: {
-    position: 'relative',
-    zIndex: 10,
-    gap: spacing.m,
-  },
-  heroHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  heroLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.8)',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: spacing.xs,
-  },
-  heroTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  streakBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.m,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-    }),
-  },
-  streakText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginLeft: spacing.xxs,
-  },
-  heroStats: {
-    flexDirection: 'row',
-    gap: spacing.m,
-    marginVertical: spacing.m,
-  },
-  heroStatCard: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    padding: spacing.m,
-    borderRadius: borderRadius.m,
-  },
-  heroStatLabel: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginBottom: spacing.xs,
-  },
-  heroStatValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  startButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.s,
-    backgroundColor: '#FFFFFF',
-    paddingVertical: spacing.m,
-    borderRadius: borderRadius.xl,
-    marginTop: spacing.s,
-  },
-  startButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#6467f2',
-    marginLeft: spacing.xs,
-  },
-
-  // Decks Section
-  decksSection: {
-    paddingHorizontal: spacing.m,
-    gap: spacing.m,
-  },
-  decksHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  decksTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  viewAllText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  decksList: {
-    gap: spacing.m,
-  },
-  deckCard: {
-    padding: spacing.m,
-    borderRadius: borderRadius.xl,
-    borderWidth: 1,
-  },
-  deckCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.m,
-  },
-  deckCardLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.m,
-    flex: 1,
-  },
-  deckIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: borderRadius.m,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deckInfo: {
-    flex: 1,
-  },
-  deckTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.xxs,
-  },
-  deckTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  deckSubtitle: {
-    fontSize: 12,
-  },
-  studyButton: {
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.s,
-    borderRadius: borderRadius.m,
-  },
-  studyButtonText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  progressSection: {
-    gap: spacing.xs,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  progressLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  progressPercent: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  progressBarContainer: {
-    height: 8,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-
-  // Empty State
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: spacing.xxl,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: spacing.xs,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    textAlign: 'center',
-  },
-
-  // FAB
-  fab: {
-    position: 'absolute',
-    right: spacing.l,
-    bottom: 100,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#6467f2',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.4,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 8,
-      },
-    }),
-  },
-});

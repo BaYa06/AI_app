@@ -8,21 +8,45 @@ import { View, StyleSheet, Pressable, Platform } from 'react-native';
 import { Bug, Lightbulb, HelpCircle, CheckCircle2 } from 'lucide-react-native';
 import { useThemeColors } from '@/store';
 import { Text } from '@/components/common';
-import { Button, EmptyState, Screen, ScreenHeader, TextField, toast, type IconComponent } from '@/components/ui';
+import {
+  Button,
+  EmptyState,
+  Screen,
+  ScreenHeader,
+  TextField,
+  toast,
+  type IconComponent,
+} from '@/components/ui';
 import { spacing, borderRadius, heights, iconSize } from '@/constants';
 import { triggerHaptic } from '@/utils/haptic';
 import { sendFeedbackMessage, type FeedbackCategory } from '@/services/feedback';
+import type { RootStackScreenProps } from '@/types/navigation';
 
-const CATEGORIES: Array<{ value: FeedbackCategory; label: string; icon: IconComponent; placeholder: string }> = [
-  { value: 'problem', label: 'Проблема', icon: Bug, placeholder: 'Что не работает? Где это случилось и что ты делал перед этим?' },
-  { value: 'idea', label: 'Идея', icon: Lightbulb, placeholder: 'Что бы ты хотел добавить или улучшить?' },
+const CATEGORIES: Array<{
+  value: FeedbackCategory;
+  label: string;
+  icon: IconComponent;
+  placeholder: string;
+}> = [
+  {
+    value: 'problem',
+    label: 'Проблема',
+    icon: Bug,
+    placeholder: 'Что не работает? Где это случилось и что ты делал перед этим?',
+  },
+  {
+    value: 'idea',
+    label: 'Идея',
+    icon: Lightbulb,
+    placeholder: 'Что бы ты хотел добавить или улучшить?',
+  },
   { value: 'question', label: 'Вопрос', icon: HelpCircle, placeholder: 'Твой вопрос' },
 ];
 
 const MIN_LENGTH = 10;
 const MAX_LENGTH = 4000;
 
-export function FeedbackScreen({ navigation }: any) {
+export function FeedbackScreen({ navigation }: RootStackScreenProps<'Feedback'>) {
   const colors = useThemeColors();
 
   const [category, setCategory] = useState<FeedbackCategory>('problem');
@@ -71,7 +95,8 @@ export function FeedbackScreen({ navigation }: any) {
   return (
     <Screen header={header} keyboard contentStyle={st.content}>
       <Text variant="bodySmall" color="secondary">
-        Нашёл ошибку или есть идея? Напиши — мы читаем каждое сообщение и ответим в «Моих обращениях».
+        Нашёл ошибку или есть идея? Напиши — мы читаем каждое сообщение и ответим в «Моих
+        обращениях».
       </Text>
 
       {/* ======== Category ======== */}
@@ -85,10 +110,18 @@ export function FeedbackScreen({ navigation }: any) {
               onPress={() => setCategory(c.value)}
               accessibilityRole="radio"
               accessibilityState={{ checked: active }}
-              style={[st.category, { backgroundColor: active ? colors.primaryFill : colors.surfaceMuted }]}
+              style={[
+                st.category,
+                { backgroundColor: active ? colors.primaryFill : colors.surfaceMuted },
+              ]}
             >
               <Icon size={iconSize.s} color={active ? colors.onPrimary : colors.textSecondary} />
-              <Text variant="label" style={{ color: active ? colors.onPrimary : colors.textPrimary }}>{c.label}</Text>
+              <Text
+                variant="label"
+                style={{ color: active ? colors.onPrimary : colors.textPrimary }}
+              >
+                {c.label}
+              </Text>
             </Pressable>
           );
         })}
@@ -106,7 +139,13 @@ export function FeedbackScreen({ navigation }: any) {
         inputStyle={[st.input, Platform.OS === 'web' && ({ outlineStyle: 'none' } as any)]}
       />
 
-      <Button title="Отправить" onPress={handleSend} disabled={!canSend} loading={sending} fullWidth />
+      <Button
+        title="Отправить"
+        onPress={handleSend}
+        disabled={!canSend}
+        loading={sending}
+        fullWidth
+      />
     </Screen>
   );
 }

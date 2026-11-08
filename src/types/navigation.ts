@@ -21,6 +21,30 @@ export interface LessonRouteParams {
   reviewCount?: number;
 }
 
+// ==================== СЕССИЯ НАБОРА ====================
+
+/** Этап сессии «Изучить» (plan/new/study_session.md). «На слух» — вариант Теста: звучит слово, ответ из 4 */
+export type SessionStage = 'cards' | 'pairs' | 'test' | 'listen' | 'context' | 'build';
+
+/** Этап и его слова — уже отобранные под этап (слово без примера в «Слово в контексте» не попадает) */
+export interface SessionStageRoute {
+  stage: SessionStage;
+  cardIds: string[];
+}
+
+/** Экран тренировки открыт из сессии набора: этапы идут подряд, без итогов между ними */
+export interface SessionRouteParams {
+  setId: string;
+  stages: SessionStageRoute[];
+  /** Текущий этап */
+  index: number;
+  startedAt: number;
+  /** Счётчик ответов дня на старте сессии: «+N опыта» = счётчик сейчас − xpBase (1 ответ = 1 очко) */
+  xpBase?: number;
+  /** Серия выросла на одном из этапов — празднуем на итогах сессии, а не посреди неё */
+  streakCount?: number;
+}
+
 // ==================== ROOT STACK ====================
 
 export type RootStackParamList = {
@@ -41,6 +65,7 @@ export type RootStackParamList = {
     phaseOffset?: number;
     phaseFailedIds?: string[];
     lesson?: LessonRouteParams;
+    session?: SessionRouteParams;
   };
   StudyResults: {
     setId: string;
@@ -64,6 +89,9 @@ export type RootStackParamList = {
     streakIncreased?: boolean;
     newStreakCount?: number;
     lesson?: LessonRouteParams;
+    session?: SessionRouteParams;
+    /** Этап сессии пропущен («Не могу слушать») — для аналитики */
+    sessionStageSkipped?: boolean;
   };
   CardEditor: { setId: string; cardId?: string };
   SetEditor: { setId?: string; autoFocusTitle?: boolean };
@@ -77,6 +105,7 @@ export type RootStackParamList = {
     studiedInPhase?: number;
     phaseOffset?: number;
     phaseFailedIds?: string[];
+    session?: SessionRouteParams;
   };
   MultipleChoice: {
     setId: string;
@@ -96,6 +125,9 @@ export type RootStackParamList = {
     sniperMode?: boolean;
     forgottenMode?: boolean;
     lesson?: LessonRouteParams;
+    session?: SessionRouteParams;
+    /** «На слух»: вместо слова звучит озвучка (Session 4) */
+    listen?: boolean;
   };
   WordBuilder: {
     setId: string;
@@ -107,6 +139,7 @@ export type RootStackParamList = {
     studiedInPhase?: number;
     phaseOffset?: number;
     phaseFailedIds?: string[];
+    session?: SessionRouteParams;
   };
   AudioLearning: {
     setId: string;
@@ -120,6 +153,10 @@ export type RootStackParamList = {
     phaseFailedIds?: string[];
   };
   LibrarySetDetail: { setId: string };
+  /** Каталог библиотеки (plan/new/library_catalog.md): экран предмета и экран подборки */
+  LibrarySubject: { slug: string; title?: string };
+  LibraryCollection: { collectionId: string; title?: string };
+  LibraryBooks: undefined;
   BookDetail: { bookId: string };
   CourseBooks: { courseId: string; courseTitle: string };
   MyPublications: undefined;
@@ -241,6 +278,9 @@ export type RootStackParamList = {
   ContextFill: {
     setId: string;
     cardLimit?: number;
+    /** Только эти слова (сессия набора); примеры ИИ тогда не дописываются */
+    dueCardIds?: string[];
+    session?: SessionRouteParams;
   };
   /** append — пришли с проверки по «+ Фото»: новые карточки дописать к черновику */
   ImportFiles: { setId: string; append?: boolean };
@@ -280,15 +320,16 @@ export type MainTabParamList = {
 // ==================== SCREEN PROPS ====================
 
 // Root Stack
-export type RootStackScreenProps<T extends keyof RootStackParamList> = 
-  NativeStackScreenProps<RootStackParamList, T>;
+export type RootStackScreenProps<T extends keyof RootStackParamList> = NativeStackScreenProps<
+  RootStackParamList,
+  T
+>;
 
 // Main Tabs
-export type MainTabScreenProps<T extends keyof MainTabParamList> = 
-  CompositeScreenProps<
-    BottomTabScreenProps<MainTabParamList, T>,
-    NativeStackScreenProps<RootStackParamList>
-  >;
+export type MainTabScreenProps<T extends keyof MainTabParamList> = CompositeScreenProps<
+  BottomTabScreenProps<MainTabParamList, T>,
+  NativeStackScreenProps<RootStackParamList>
+>;
 
 // ==================== TYPE HELPERS ====================
 

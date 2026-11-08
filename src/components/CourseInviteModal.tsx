@@ -19,7 +19,12 @@ interface CourseInviteModalProps {
   onDismiss: () => void;
 }
 
-export function CourseInviteModal({ token, userId, onAccepted, onDismiss }: CourseInviteModalProps) {
+export function CourseInviteModal({
+  token,
+  userId,
+  onAccepted,
+  onDismiss,
+}: CourseInviteModalProps) {
   const colors = useThemeColors();
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
@@ -85,7 +90,9 @@ export function CourseInviteModal({ token, userId, onAccepted, onDismiss }: Cour
       {loading ? (
         <ActivityIndicator size="large" color={colors.primary} style={styles.spinner} />
       ) : error ? (
-        <Text variant="body" align="center" style={[styles.errorText, { color: colors.errorText }]}>{error}</Text>
+        <Text variant="body" align="center" style={[styles.errorText, { color: colors.errorText }]}>
+          {error}
+        </Text>
       ) : info ? (
         <>
           <Text variant="h2" style={[styles.courseTitle, { color: colors.textPrimary }]}>
@@ -99,7 +106,12 @@ export function CourseInviteModal({ token, userId, onAccepted, onDismiss }: Cour
           </Text>
 
           <View style={styles.buttons}>
-            <Button variant="secondary" title="Отклонить" onPress={onDismiss} style={styles.button} />
+            <Button
+              variant="secondary"
+              title="Отклонить"
+              onPress={onDismiss}
+              style={styles.button}
+            />
             <Button title="Принять" onPress={handleJoin} loading={joining} style={styles.button} />
           </View>
         </>

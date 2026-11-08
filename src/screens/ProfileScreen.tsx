@@ -3,20 +3,30 @@
  * @description Экран профиля и настроек
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  Pressable,
-  Alert,
-  Platform,
-  Linking,
-} from 'react-native';
+import { View, StyleSheet, Pressable, Alert, Platform, Linking } from 'react-native';
 import { useSettingsStore, useThemeColors, useDiamondStore } from '@/store';
-import { supabase, NeonService, Analytics, StreakService, DatabaseService, LibraryService } from '@/services';
+import {
+  supabase,
+  NeonService,
+  Analytics,
+  StreakService,
+  DatabaseService,
+  LibraryService,
+} from '@/services';
 import type { UserStats } from '@/services';
 import { Text } from '@/components/common';
 import { spacing, borderRadius, iconSize, alpha } from '@/constants';
-import { Badge, Button, Card, ListGroup, ListRow, ProgressBar, Screen, Switch, toast } from '@/components/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  ListGroup,
+  ListRow,
+  ProgressBar,
+  Screen,
+  Switch,
+  toast,
+} from '@/components/ui';
 import {
   User,
   BookOpen,
@@ -45,6 +55,7 @@ import { COMMUNITY_LIBRARY_ENABLED } from '@/config/features';
 import { isAppleUser, requestAppleAuthorizationCode } from '@/services/appleSignInName';
 import { ensureAiConsent, hasAiConsent, setAiConsent } from '@/services/aiConsent';
 import { loadSupportUnreadCount } from '@/services/feedback';
+import { log } from '@/utils/logger';
 
 const THEME_OPTIONS: Array<{ value: ThemeMode; label: string }> = [
   { value: 'light', label: 'Светлая' },
@@ -62,7 +73,9 @@ export function ProfileScreen({ navigation }: any) {
   const [session, setSession] = useState<Session | null>(null);
   const [userNameHandle, setUserNameHandle] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
-  const [userStats, setUserStats] = useState<UserStats | null>(() => StreakService.cachedUserStats());
+  const [userStats, setUserStats] = useState<UserStats | null>(() =>
+    StreakService.cachedUserStats()
+  );
   const streak = useSettingsStore((s) => s.streakCache.currentStreak);
   const diamonds = useDiamondStore((s) => s.diamonds);
   const loadRewards = useDiamondStore((s) => s.loadRewards);
@@ -71,7 +84,6 @@ export function ProfileScreen({ navigation }: any) {
   // Непрочитанные ответы команды — бейдж у «Мои обращения»
   const [supportUnread, setSupportUnread] = useState(0);
   const [newsUnseen, setNewsUnseen] = useState(0);
-
 
   // Подтягиваем актуальную сессию Supabase
   useEffect(() => {
@@ -104,8 +116,14 @@ export function ProfileScreen({ navigation }: any) {
       return;
     }
     let active = true;
-    LibraryService.canPublish().then((v) => { if (active) setCanPublish(v); }).catch(() => {});
-    return () => { active = false; };
+    LibraryService.canPublish()
+      .then((v) => {
+        if (active) setCanPublish(v);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
   }, [sessionUserId]);
   // Согласие на передачу данных ИИ (App Review 5.1.2(i)): даётся при первом использовании ИИ, здесь — отзыв
   const [aiConsent, setAiConsentState] = useState(hasAiConsent);
@@ -134,9 +152,12 @@ export function ProfileScreen({ navigation }: any) {
       loadRewards();
       loadSupportUnreadCount().then(setSupportUnread);
       setNewsUnseen(
-        unseenCount(newsHistory(currentNews(), newsContext(isTeacher === true)), loadWhatsNewState()?.seen ?? []),
+        unseenCount(
+          newsHistory(currentNews(), newsContext(isTeacher === true)),
+          loadWhatsNewState()?.seen ?? []
+        )
       );
-    }, [sessionUserId, loadRewards, isTeacher]),
+    }, [sessionUserId, loadRewards, isTeacher])
   );
 
   const userEmail = session?.user?.email;
@@ -148,7 +169,7 @@ export function ProfileScreen({ navigation }: any) {
 
   const avatarLetter = useMemo(
     () => (userName !== 'Гость' ? userName[0].toUpperCase() : '?'),
-    [userName],
+    [userName]
   );
 
   // Без входа статистики нет — показываем нули, а не кэш прошлого аккаунта
@@ -161,7 +182,7 @@ export function ProfileScreen({ navigation }: any) {
       Analytics.logout();
       await supabase.auth.signOut({ scope });
     } catch (e) {
-      console.error('Logout error:', e);
+      log.error('Profile', 'Logout error', e);
     }
   }, []);
 
@@ -200,9 +221,10 @@ export function ProfileScreen({ navigation }: any) {
       const apple = await requestAppleAuthorizationCode();
       if (apple.status === 'canceled') return;
       if (apple.status !== 'ok') {
-        const msg = apple.status === 'unsupported'
-          ? 'Аккаунт, созданный через Apple, можно удалить в приложении Flashly на iPhone.'
-          : 'Не удалось подтвердить вход через Apple. Попробуй ещё раз.';
+        const msg =
+          apple.status === 'unsupported'
+            ? 'Аккаунт, созданный через Apple, можно удалить в приложении Flashly на iPhone.'
+            : 'Не удалось подтвердить вход через Apple. Попробуй ещё раз.';
         if (Platform.OS === 'web') window.alert(msg);
         else toast.error(msg);
         return;
@@ -244,7 +266,13 @@ export function ProfileScreen({ navigation }: any) {
   return (
     <Screen contentStyle={st.content}>
       {/* ======== Header ======== */}
-      <Text variant="h2" accessibilityRole="header" style={[st.headerTitle, { color: colors.textPrimary }]}>Профиль</Text>
+      <Text
+        variant="h2"
+        accessibilityRole="header"
+        style={[st.headerTitle, { color: colors.textPrimary }]}
+      >
+        Профиль
+      </Text>
 
       {/* ======== Hero Card ======== */}
       <Card style={st.heroCard}>
@@ -254,16 +282,29 @@ export function ProfileScreen({ navigation }: any) {
             {/* Level Ring */}
             <View style={[st.avatarRing, { borderColor: alpha(colors.primary, 20) }]} />
             <View style={[st.avatar, { backgroundColor: colors.primaryFill }]}>
-              <Text variant="h1" style={{ color: colors.onPrimary }}>{avatarLetter}</Text>
+              <Text variant="h1" style={{ color: colors.onPrimary }}>
+                {avatarLetter}
+              </Text>
             </View>
-            <View style={[st.levelBadge, { backgroundColor: colors.primaryFill, borderColor: colors.surface }]}>
-              <Text variant="caption" style={[st.bold, { color: colors.onPrimary }]}>Ур. {level}</Text>
+            <View
+              style={[
+                st.levelBadge,
+                { backgroundColor: colors.primaryFill, borderColor: colors.surface },
+              ]}
+            >
+              <Text variant="caption" style={[st.bold, { color: colors.onPrimary }]}>
+                Ур. {level}
+              </Text>
             </View>
           </View>
           <View style={st.userInfo}>
-            <Text variant="h3" style={[st.bold, { color: colors.textPrimary }]} numberOfLines={1}>{userName}</Text>
+            <Text variant="h3" style={[st.bold, { color: colors.textPrimary }]} numberOfLines={1}>
+              {userName}
+            </Text>
             {userNameHandle && (
-              <Text variant="bodySmall" style={[st.semibold, { color: colors.primary }]}>{userNameHandle}</Text>
+              <Text variant="bodySmall" style={[st.semibold, { color: colors.primary }]}>
+                {userNameHandle}
+              </Text>
             )}
             <Text variant="caption" color="secondary" numberOfLines={1}>
               {userEmail ?? 'Войди, чтобы синхронизировать'}
@@ -274,44 +315,95 @@ export function ProfileScreen({ navigation }: any) {
         {/* XP Progress */}
         <View style={st.xpSection}>
           <View style={st.xpLabelRow}>
-            <Text variant="overline" color="secondary">Опыт</Text>
-            <Text variant="label" style={{ color: colors.primary }}>{xpCurrent} / {XP_PER_LEVEL}</Text>
+            <Text variant="overline" color="secondary">
+              Опыт
+            </Text>
+            <Text variant="label" style={{ color: colors.primary }}>
+              {xpCurrent} / {XP_PER_LEVEL}
+            </Text>
           </View>
           <ProgressBar progress={xpPercent} accessibilityLabel="Опыт до следующего уровня" />
-          <Text variant="caption" color="secondary">{xpToNext} до уровня {level + 1} · 1 карточка = 1 очко опыта</Text>
+          <Text variant="caption" color="secondary">
+            {xpToNext} до уровня {level + 1} · 1 карточка = 1 очко опыта
+          </Text>
         </View>
 
         {/* Quick Stats */}
         <View style={[st.statsRow, { borderTopColor: colors.border }]}>
-          <View style={st.statItem} accessible accessibilityLabel={`Серия: ${session ? streak : 0}`}>
-            <Text variant="h3" style={[st.bold, { color: colors.primary }]}>{session ? streak : 0}</Text>
-            <Text variant="caption" color="secondary">Серия</Text>
+          <View
+            style={st.statItem}
+            accessible
+            accessibilityLabel={`Серия: ${session ? streak : 0}`}
+          >
+            <Text variant="h3" style={[st.bold, { color: colors.primary }]}>
+              {session ? streak : 0}
+            </Text>
+            <Text variant="caption" color="secondary">
+              Серия
+            </Text>
           </View>
-          <View style={[st.statItem, st.statMiddle, { borderColor: colors.border }]} accessible accessibilityLabel={`Алмазы: ${session ? diamonds : 0}`}>
-            <Text variant="h3" style={[st.bold, { color: colors.primary }]}>{session ? diamonds : 0}</Text>
-            <Text variant="caption" color="secondary">Алмазы</Text>
+          <View
+            style={[st.statItem, st.statMiddle, { borderColor: colors.border }]}
+            accessible
+            accessibilityLabel={`Алмазы: ${session ? diamonds : 0}`}
+          >
+            <Text variant="h3" style={[st.bold, { color: colors.primary }]}>
+              {session ? diamonds : 0}
+            </Text>
+            <Text variant="caption" color="secondary">
+              Алмазы
+            </Text>
           </View>
           <View style={st.statItem} accessible accessibilityLabel={`Изучено: ${totalCardsStudied}`}>
-            <Text variant="h3" style={[st.bold, { color: colors.primary }]}>{totalCardsStudied}</Text>
-            <Text variant="caption" color="secondary">Изучено</Text>
+            <Text variant="h3" style={[st.bold, { color: colors.primary }]}>
+              {totalCardsStudied}
+            </Text>
+            <Text variant="caption" color="secondary">
+              Изучено
+            </Text>
           </View>
         </View>
       </Card>
 
       {/* ======== Account ======== */}
       <ListGroup title="Аккаунт" style={st.group}>
-        <ListRow icon={User} title="Личные данные" onPress={() => navigation?.navigate('PersonalInfo')} />
-        <ListRow icon={UserX} title="Заблокированные авторы" onPress={() => navigation?.navigate('BlockedAuthors')} />
+        <ListRow
+          icon={User}
+          title="Личные данные"
+          onPress={() => navigation?.navigate('PersonalInfo')}
+        />
+        <ListRow
+          icon={UserX}
+          title="Заблокированные авторы"
+          onPress={() => navigation?.navigate('BlockedAuthors')}
+        />
         {COMMUNITY_LIBRARY_ENABLED && canPublish && (
-          <ListRow icon={BookOpen} title="Мои публикации" onPress={() => navigation?.navigate('MyPublications')} />
+          <ListRow
+            icon={BookOpen}
+            title="Мои публикации"
+            onPress={() => navigation?.navigate('MyPublications')}
+          />
         )}
       </ListGroup>
 
       {/* ======== Learning ======== */}
       <ListGroup title="Обучение" style={st.group}>
-        <ListRow icon={GraduationCap} title="Настройки обучения" onPress={() => navigation?.navigate('LearningSettings')} />
-        <ListRow icon={Bell} title="Уведомления" onPress={() => navigation?.navigate('NotificationSettings')} />
-        <ListRow icon={UserCog} title="Мои данные" subtitle="Возраст, занятия, привычное время" onPress={() => navigation?.navigate('MyData')} />
+        <ListRow
+          icon={GraduationCap}
+          title="Настройки обучения"
+          onPress={() => navigation?.navigate('LearningSettings')}
+        />
+        <ListRow
+          icon={Bell}
+          title="Уведомления"
+          onPress={() => navigation?.navigate('NotificationSettings')}
+        />
+        <ListRow
+          icon={UserCog}
+          title="Мои данные"
+          subtitle="Возраст, занятия, привычное время"
+          onPress={() => navigation?.navigate('MyData')}
+        />
       </ListGroup>
 
       {/* ======== App ======== */}
@@ -320,18 +412,25 @@ export function ProfileScreen({ navigation }: any) {
           icon={Palette}
           title="Тема"
           right={
-            <View style={[st.segment, { backgroundColor: colors.surfaceMuted }]} accessibilityRole="radiogroup">
+            <View
+              style={[st.segment, { backgroundColor: colors.surfaceMuted }]}
+              accessibilityRole="radiogroup"
+            >
               {THEME_OPTIONS.map((opt) => {
                 const active = themeMode === opt.value;
                 return (
-                  <Pressable hitSlop={{ top: spacing.xs, bottom: spacing.xs }}
+                  <Pressable
+                    hitSlop={{ top: spacing.xs, bottom: spacing.xs }}
                     key={opt.value}
                     onPress={() => setTheme(opt.value)}
                     accessibilityRole="radio"
                     accessibilityState={{ checked: active }}
                     style={[st.segmentItem, active && { backgroundColor: colors.primaryFill }]}
                   >
-                    <Text variant="caption" style={[st.bold, { color: active ? colors.onPrimary : colors.textSecondary }]}>
+                    <Text
+                      variant="caption"
+                      style={[st.bold, { color: active ? colors.onPrimary : colors.textSecondary }]}
+                    >
                       {opt.label}
                     </Text>
                   </Pressable>
@@ -340,7 +439,11 @@ export function ProfileScreen({ navigation }: any) {
             </View>
           }
         />
-        <ListRow icon={Volume2} title="Звук и вибрация" onPress={() => navigation?.navigate('SoundSettings')} />
+        <ListRow
+          icon={Volume2}
+          title="Звук и вибрация"
+          onPress={() => navigation?.navigate('SoundSettings')}
+        />
         <ListRow
           icon={Sparkles}
           title="Что нового"
@@ -368,7 +471,13 @@ export function ProfileScreen({ navigation }: any) {
           title="Данные для ИИ"
           subtitle="Фото, файлы и слова для Google Gemini"
           chevron={false}
-          right={<Switch value={aiConsent} onValueChange={handleToggleAiConsent} accessibilityLabel="Передавать данные ИИ" />}
+          right={
+            <Switch
+              value={aiConsent}
+              onValueChange={handleToggleAiConsent}
+              accessibilityLabel="Передавать данные ИИ"
+            />
+          }
         />
         <ListRow
           icon={ShieldCheck}
@@ -390,17 +499,29 @@ export function ProfileScreen({ navigation }: any) {
       {session && (
         <Pressable
           accessibilityRole="button"
-          style={({ pressed }) => [st.logoutBtn, { backgroundColor: alpha(colors.error, 10) }, pressed && st.pressed]}
+          style={({ pressed }) => [
+            st.logoutBtn,
+            { backgroundColor: alpha(colors.error, 10) },
+            pressed && st.pressed,
+          ]}
           onPress={handleLogout}
         >
           <LogOut size={iconSize.s} color={colors.errorText} />
-          <Text variant="button" style={[st.noLetterSpacing, { color: colors.errorText }]}>Выйти</Text>
+          <Text variant="button" style={[st.noLetterSpacing, { color: colors.errorText }]}>
+            Выйти
+          </Text>
         </Pressable>
       )}
 
       {session && (
         <View style={st.accountLinks}>
-          <Button variant="quiet" tone="secondary" size="s" title="Выйти на всех устройствах" onPress={handleLogoutEverywhere} />
+          <Button
+            variant="quiet"
+            tone="secondary"
+            size="s"
+            title="Выйти на всех устройствах"
+            onPress={handleLogoutEverywhere}
+          />
           <Button
             variant="danger"
             size="s"
@@ -412,7 +533,13 @@ export function ProfileScreen({ navigation }: any) {
       )}
 
       {/* App Info */}
-      <Text variant="caption" align="center" style={[st.appVersion, { color: colors.textTertiary }]}>Flashly v{APP_VERSION}</Text>
+      <Text
+        variant="caption"
+        align="center"
+        style={[st.appVersion, { color: colors.textTertiary }]}
+      >
+        Flashly v{APP_VERSION}
+      </Text>
     </Screen>
   );
 }

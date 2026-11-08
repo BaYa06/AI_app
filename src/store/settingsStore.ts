@@ -10,18 +10,18 @@ import type { UserSettings, ThemeMode } from '@/types';
 import { colors, ColorScheme } from '@/constants';
 import { StreakService } from '@/services/StreakService';
 import { NeonService } from '@/services/NeonService';
-import { supabase } from '@/services';
+import { getUserId } from '@/services/auth/session';
 import { DEFAULT_NEW_PER_DAY } from '@/services/LessonService';
 
 interface SettingsState {
   // Настройки пользователя
   settings: UserSettings;
-  
+
   // Тема
   themeMode: ThemeMode;
   resolvedTheme: ThemeMode; // Разрешенная тема (если system - то light/dark)
   colors: ColorScheme;
-  
+
   // Статистика за сегодня (для быстрого доступа)
   todayStats: {
     cardsStudied: number;
@@ -31,7 +31,7 @@ interface SettingsState {
     longestStreak: number;
     lastStudyDate: string; // YYYY-MM-DD
   };
-  
+
   // Кеш статистики из БД
   streakCache: {
     currentStreak: number;
@@ -47,11 +47,11 @@ interface SettingsState {
 interface SettingsActions {
   // Настройки
   updateSettings: (updates: Partial<UserSettings>) => void;
-  
+
   // Тема
   setTheme: (mode: ThemeMode) => void;
   toggleTheme: () => void;
-  
+
   // Статистика за сегодня
   incrementTodayCards: () => void;
   finishStudySession: () => Promise<{ streakIncreased: boolean; newStreakCount: number }>;
@@ -59,7 +59,11 @@ interface SettingsActions {
   resetTodayStats: () => void;
 
   // Синхронизация стрика
-  syncStreakFromServer: (data: { currentStreak: number; longestStreak: number; lastActiveDate: string | null }) => void;
+  syncStreakFromServer: (data: {
+    currentStreak: number;
+    longestStreak: number;
+    lastActiveDate: string | null;
+  }) => void;
 
   // Роль учителя — загружается заново при каждом фокусе Home, а не один раз за сессию
   fetchIsTeacher: (userId: string) => Promise<void>;
@@ -87,6 +91,7 @@ const defaultSettings: UserSettings = {
 };
 
 import { getLocalDateKey } from '@/services/StreakService';
+import { log } from '@/utils/logger';
 
 const getTodayDate = () => getLocalDateKey();
 
@@ -114,7 +119,11 @@ const startTheme = resolveTheme(startSettings.theme);
 
 /** Серия, сохранённая при прошлом запуске (StreakService кэширует user_stats) */
 function initialStreakCache() {
-  const cached = readCache<{ current_streak?: number; longest_streak?: number; last_active_date?: string | null }>('user_stats');
+  const cached = readCache<{
+    current_streak?: number;
+    longest_streak?: number;
+    last_active_date?: string | null;
+  }>('user_stats');
   return {
     currentStreak: cached?.current_streak ?? 0,
     longestStreak: cached?.longest_streak ?? 0,
@@ -143,25 +152,25 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
     isTeacher: readCache<boolean>('is_teacher') ?? null,
 
     // ==================== НАСТРОЙКИ ====================
-    
+
     updateSettings: (updates) => {
       set((state) => {
         Object.assign(state.settings, updates);
       });
-      
+
       // Обновляем тему если изменилась (вне Immer)
       if (updates.theme) {
         const resolved = resolveTheme(updates.theme);
-        set({ 
+        set({
           themeMode: updates.theme,
           resolvedTheme: resolved,
-          colors: colors[resolved] as any
+          colors: colors[resolved] as any,
         });
       }
     },
 
     // ==================== ТЕМА ====================
-    
+
     setTheme: (mode) => {
       const resolved = resolveTheme(mode);
       set((state) => {
@@ -180,7 +189,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
     },
 
     // ==================== СТАТИСТИКА ====================
-    
+
     incrementTodayCards: () => {
       set((state) => {
         const today = getTodayDate();
@@ -228,7 +237,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
         if (success && !wasAlreadyActiveToday) {
           // Получаем актуальный стрик из БД после обновления
           const updatedStats = await StreakService.fetchUserStats();
-          const newCount = updatedStats?.current_streak ?? (get().streakCache.currentStreak + 1);
+          const newCount = updatedStats?.current_streak ?? get().streakCache.currentStreak + 1;
 
           // Обновляем кеш актуальными данными
           set((state) => {
@@ -243,8 +252,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
           // Пуш о рекорде серии шлёт сервер (api/data.js, updateUserStatsStreak)
 
           // Логируем событие стрика для админ-панели
-          supabase.auth.getSession().then(({ data }) => {
-            const userId = data.session?.user?.id;
+          getUserId().then((userId) => {
             if (userId) NeonService.logStreakEvent(userId, newCount).catch(() => {});
           });
 
@@ -255,7 +263,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
           });
         }
       } catch (e) {
-        console.warn('Streak sync error:', e);
+        log.warn('Settings', 'Streak sync error', e);
       }
       return { streakIncreased: false, newStreakCount: 0 };
     },
@@ -279,7 +287,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
     },
 
     // ==================== СИНХРОНИЗАЦИЯ СТРИКА ====================
-    
+
     syncStreakFromServer: (data) => {
       set((state) => {
         state.streakCache = {
@@ -291,7 +299,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
         state.todayStats.streak = data.currentStreak;
         state.todayStats.longestStreak = data.longestStreak;
       });
-      console.log('✅ Streak: синхронизировано с сервером', data);
+      log.debug('Settings', 'Streak: синхронизировано с сервером', data);
     },
 
     // ==================== РОЛЬ УЧИТЕЛЯ ====================
@@ -300,7 +308,10 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
       const isTeacher = await NeonService.getIsTeacher(userId);
       if (isTeacher === null) {
         // Нет ответа: оставляем роль из кэша; без кэша — экран ученика, а не вечная заготовка
-        if (get().isTeacher === null) set((state) => { state.isTeacher = false; });
+        if (get().isTeacher === null)
+          set((state) => {
+            state.isTeacher = false;
+          });
         return;
       }
       writeCache('is_teacher', isTeacher);

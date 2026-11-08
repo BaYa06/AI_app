@@ -12,9 +12,10 @@ index 749ea14..3316eab 100644
  import com.facebook.react.bridge.ReactApplicationContext
  
 diff --git a/node_modules/react-native-sound/ios/RNSound.mm b/node_modules/react-native-sound/ios/RNSound.mm
+index 94b2335..b311101 100644
 --- a/node_modules/react-native-sound/ios/RNSound.mm
 +++ b/node_modules/react-native-sound/ios/RNSound.mm
-@@ -177,7 +177,7 @@ RCT_EXPORT_METHOD(enableInSilenceMode:(BOOL)enabled) {
+@@ -177,7 +177,7 @@ - (NSString *)categoryForName:(NSString *)categoryName {
  
  #pragma mark - Audio Control Methods
  
@@ -23,3 +24,44 @@ diff --git a/node_modules/react-native-sound/ios/RNSound.mm b/node_modules/react
      NSError *error;
      NSURL *fileNameUrl;
      AVAudioPlayer *player;
+diff --git a/node_modules/react-native-sound/src/index.ts b/node_modules/react-native-sound/src/index.ts
+index 3b50e00..4d545eb 100644
+--- a/node_modules/react-native-sound/src/index.ts
++++ b/node_modules/react-native-sound/src/index.ts
+@@ -47,6 +47,12 @@ const isRelativePath = (path: string) => {
+   return !/^(\/|http(s?)|asset|file)/.test(path);
+ };
+ 
++function iosDirectories(): Record<string, string> {
++  if (typeof RNSound.getDirectories === "function") return RNSound.getDirectories();
++  if (typeof RNSound.getConstants === "function") return RNSound.getConstants();
++  return RNSound;
++}
++
+ let nextKey = 0;
+ 
+ const eventEmitter = new NativeEventEmitter(RNSound);
+@@ -376,17 +382,11 @@ class Sound {
+     }
+   }
+ 
+-  public static MAIN_BUNDLE = IsAndroid
+-    ? ""
+-    : RNSound.getDirectories().MainBundlePath;
+-  public static DOCUMENT = IsAndroid
+-    ? ""
+-    : RNSound.getDirectories().NSDocumentDirectory;
+-  public static LIBRARY = IsAndroid
+-    ? ""
+-    : RNSound.getDirectories().NSLibraryDirectory;
+-  public static CACHES = IsAndroid
+-    ? ""
+-    : RNSound.getDirectories().NSCachesDirectory;
++  // Старая архитектура (RN 0.73): getDirectories не экспортирован в мост — падал весь модуль на iOS.
++  // Там пути приходят константами модуля (constantsToExport) прямо в NativeModules.RNSound.
++  public static MAIN_BUNDLE = IsAndroid ? "" : iosDirectories().MainBundlePath;
++  public static DOCUMENT = IsAndroid ? "" : iosDirectories().NSDocumentDirectory;
++  public static LIBRARY = IsAndroid ? "" : iosDirectories().NSLibraryDirectory;
++  public static CACHES = IsAndroid ? "" : iosDirectories().NSCachesDirectory;
+ }
+ export default Sound;

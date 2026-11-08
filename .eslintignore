@@ -1,0 +1,24 @@
+# Сгенерированное, нативное и чужое — не наш исходный код
+node_modules/
+dist/
+build/
+coverage/
+ios/
+android/
+public/
+patches/
+plan/
+assets/
+templates/
+sets/
+books/
+sounds/
+.vercel/
+.expo/
+tmp/
+temp/
+
+# Локальные файлы вне git (см. .gitignore)
+api/admin.js
+admin-server.mjs
+public/admin.html

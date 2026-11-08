@@ -35,7 +35,7 @@ function BounceIcon({ name, color, focused }: { name: string; color: string; foc
       scale.value = withSequence(
         withTiming(1.15, { duration: 130 }),
         withTiming(0.95, { duration: 100 }),
-        withTiming(1.0, { duration: 100 }),
+        withTiming(1.0, { duration: 100 })
       );
     }
     prevFocused.current = focused;
@@ -53,8 +53,12 @@ function BounceIcon({ name, color, focused }: { name: string; color: string; foc
 }
 
 // Экраны
-import { HomeScreen } from '@/screens/HomeScreen.new';
+import { HomeScreen } from '@/screens/HomeScreen';
 import { LibraryScreen } from '@/screens/LibraryScreen';
+import { LibraryCatalogScreen } from '@/screens/LibraryCatalogScreen';
+import { LibrarySubjectScreen } from '@/screens/LibrarySubjectScreen';
+import { LibraryCollectionScreen } from '@/screens/LibraryCollectionScreen';
+import { LibraryBooksScreen } from '@/screens/LibraryBooksScreen';
 import { StatisticsScreen } from '@/screens/StatisticsScreen';
 import { ProfileScreen } from '@/screens/ProfileScreen';
 import { SetDetailScreen } from '@/screens/SetDetailScreen';
@@ -80,7 +84,7 @@ import { LibrarySetDetailScreen } from '@/screens/LibrarySetDetailScreen';
 import { BookDetailScreen } from '@/screens/BookDetailScreen';
 import { CourseBooksScreen } from '@/screens/CourseBooksScreen';
 import { MyPublicationsScreen } from '@/screens/MyPublicationsScreen';
-import { COMMUNITY_LIBRARY_ENABLED } from '@/config/features';
+import { COMMUNITY_LIBRARY_ENABLED, LIBRARY_CATALOG_ENABLED } from '@/config/features';
 import { PersonalInfoScreen } from '@/screens/PersonalInfoScreen';
 import { SecurityScreen } from '@/screens/SecurityScreen';
 import { TeacherCourseStatsScreen } from '@/screens/TeacherCourseStatsScreen';
@@ -116,7 +120,12 @@ function MainTabs() {
   // Иконка 24 + подпись 16 + зазор 4; снизу — полный safe area (или 8 без «полоски Home»)
   const tabBarPaddingTop = spacing.xs;
   const tabBarPaddingBottom = insets.bottom > 0 ? insets.bottom : spacing.xs;
-  const tabBarHeight = tabBarPaddingTop + iconSize.m + spacing.xxs + typography.caption.lineHeight! + tabBarPaddingBottom;
+  const tabBarHeight =
+    tabBarPaddingTop +
+    iconSize.m +
+    spacing.xxs +
+    typography.caption.lineHeight! +
+    tabBarPaddingBottom;
 
   // Синхронизируем CSS-переменную --app-bg с текущей темой (для ios-pwa-fix.css)
   useEffect(() => {
@@ -162,25 +171,39 @@ function MainTabs() {
     >
       <Tab.Screen
         name="Home"
-        options={{ tabBarLabel: 'Главная', tabBarIcon: ({ color, focused }) => <BounceIcon name="home" color={color} focused={focused} /> }}
+        options={{
+          tabBarLabel: 'Главная',
+          tabBarIcon: ({ color, focused }) => (
+            <BounceIcon name="home" color={color} focused={focused} />
+          ),
+        }}
         listeners={{ tabPress: () => triggerHaptic('selection') }}
       >
         {(props) => <HomeScreen {...props} />}
       </Tab.Screen>
       <Tab.Screen
         name="Library"
-        options={{ tabBarLabel: 'Библиотека', tabBarIcon: ({ color, focused }) => <BounceIcon name="albums" color={color} focused={focused} /> }}
+        options={{
+          tabBarLabel: 'Библиотека',
+          tabBarIcon: ({ color, focused }) => (
+            <BounceIcon name="albums" color={color} focused={focused} />
+          ),
+        }}
         listeners={{ tabPress: () => triggerHaptic('selection') }}
       >
-        {(props) => <LibraryScreen {...props} />}
+        {() => (LIBRARY_CATALOG_ENABLED ? <LibraryCatalogScreen /> : <LibraryScreen />)}
       </Tab.Screen>
       <Tab.Screen
         name="TestTab"
         options={{
           tabBarLabel: 'Тест',
-          tabBarIcon: ({ color, focused }) => <BounceIcon name="qr-code" color={color} focused={focused} />,
+          tabBarIcon: ({ color, focused }) => (
+            <BounceIcon name="qr-code" color={color} focused={focused} />
+          ),
           // Подключение к тесту по коду — только для учеников
-          ...(isTeacher ? { tabBarButton: () => null, tabBarItemStyle: { display: 'none' } } : null),
+          ...(isTeacher
+            ? { tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }
+            : null),
         }}
         listeners={{ tabPress: () => triggerHaptic('selection') }}
       >
@@ -189,18 +212,22 @@ function MainTabs() {
       <Tab.Screen
         name="Study"
         options={{
-          tabBarIcon: ({ color, focused }) => <BounceIcon name="school" color={color} focused={focused} />,
+          tabBarIcon: ({ color, focused }) => (
+            <BounceIcon name="school" color={color} focused={focused} />
+          ),
           tabBarButton: () => null,
           tabBarItemStyle: { display: 'none' },
         }}
         listeners={{ tabPress: () => triggerHaptic('selection') }}
       >
-        {(props) => <StudyPlaceholderScreen {...props} />}
+        {() => <StudyPlaceholderScreen />}
       </Tab.Screen>
       <Tab.Screen
         name="Statistics"
         options={{
-          tabBarIcon: ({ color, focused }) => <BounceIcon name="stats-chart" color={color} focused={focused} />,
+          tabBarIcon: ({ color, focused }) => (
+            <BounceIcon name="stats-chart" color={color} focused={focused} />
+          ),
           tabBarButton: () => null,
           tabBarItemStyle: { display: 'none' },
         }}
@@ -210,7 +237,12 @@ function MainTabs() {
       </Tab.Screen>
       <Tab.Screen
         name="Profile"
-        options={{ tabBarLabel: 'Профиль', tabBarIcon: ({ color, focused }) => <BounceIcon name="person" color={color} focused={focused} /> }}
+        options={{
+          tabBarLabel: 'Профиль',
+          tabBarIcon: ({ color, focused }) => (
+            <BounceIcon name="person" color={color} focused={focused} />
+          ),
+        }}
         listeners={{ tabPress: () => triggerHaptic('selection') }}
       >
         {(props) => <ProfileScreen {...props} />}
@@ -298,7 +330,9 @@ export function AppNavigator() {
   // Веб: тап по пушу открывает страницу с ?push_id= — отмечаем открытие (переход не нужен, это главная)
   useEffect(() => {
     if (Platform.OS !== 'web') return;
-    getInitialPushData().then(handlePushOpen).catch(() => {});
+    getInitialPushData()
+      .then(handlePushOpen)
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -348,21 +382,13 @@ export function AppNavigator() {
           gestureEnabled: Platform.OS === 'ios',
         }}
       >
-        <Stack.Screen
-          name="Main"
-          component={MainTabs}
-          options={{ headerShown: false }}
-        />
+        <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
         <Stack.Screen
           name="SetDetail"
           component={SetDetailScreen}
           options={{ headerShown: false }}
         />
-        <Stack.Screen
-          name="Match"
-          component={MatchScreen}
-          options={{ headerShown: false }}
-        />
+        <Stack.Screen name="Match" component={MatchScreen} options={{ headerShown: false }} />
         <Stack.Screen
           name="MultipleChoice"
           component={MultipleChoiceScreen}
@@ -499,6 +525,27 @@ export function AppNavigator() {
           component={BookDetailScreen}
           options={{ headerShown: false }}
         />
+        {LIBRARY_CATALOG_ENABLED && (
+          <Stack.Screen
+            name="LibrarySubject"
+            component={LibrarySubjectScreen}
+            options={{ headerShown: false }}
+          />
+        )}
+        {LIBRARY_CATALOG_ENABLED && (
+          <Stack.Screen
+            name="LibraryCollection"
+            component={LibraryCollectionScreen}
+            options={{ headerShown: false }}
+          />
+        )}
+        {LIBRARY_CATALOG_ENABLED && (
+          <Stack.Screen
+            name="LibraryBooks"
+            component={LibraryBooksScreen}
+            options={{ headerShown: false }}
+          />
+        )}
         <Stack.Screen
           name="CourseBooks"
           component={CourseBooksScreen}
@@ -516,11 +563,7 @@ export function AppNavigator() {
           component={PersonalInfoScreen}
           options={{ headerShown: false }}
         />
-        <Stack.Screen
-          name="Security"
-          component={SecurityScreen}
-          options={{ headerShown: false }}
-        />
+        <Stack.Screen name="Security" component={SecurityScreen} options={{ headerShown: false }} />
         <Stack.Screen
           name="TeacherCourseStats"
           component={TeacherCourseStatsScreen}

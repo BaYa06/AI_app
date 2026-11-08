@@ -4,12 +4,9 @@
  */
 
 import { Platform, Share, Clipboard } from 'react-native';
-import { supabase } from './supabaseClient';
-import { API_BASE } from '@/config/apiBase';
-import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
+import { getAccessToken } from './auth/session';
+import { apiFetch } from './api/client';
 import { pluralize } from '@/utils';
-
-const SHARE_API = `${API_BASE}/share`;
 
 export interface ShareLink {
   code: string;
@@ -25,6 +22,8 @@ export interface SharePreview {
     category: string;
     languageFrom: string | null;
     languageTo: string | null;
+    /** Тип набора; null — язык (сервер до Kind 1 поле не присылает) */
+    kind?: string | null;
     cardsCount: number;
   };
   author: { name: string | null };
@@ -61,28 +60,39 @@ export interface ShareLinkStatus extends ShareLink {
 
 /** Ошибка api/share.js: `code` — машинный код сервера (empty_set, not_found, …). */
 export class ShareApiError extends Error {
-  constructor(public code: string, public status: number, public payload: Record<string, unknown> = {}) {
+  constructor(
+    public code: string,
+    public status: number,
+    public payload: Record<string, unknown> = {}
+  ) {
     super(code);
   }
 }
 
 async function callShareApi<T>(
   action: string,
-  { method = 'GET', params, body }: { method?: 'GET' | 'POST'; params?: Record<string, string>; body?: object } = {},
+  {
+    method = 'GET',
+    params,
+    body,
+  }: { method?: 'GET' | 'POST'; params?: Record<string, string>; body?: object } = {}
 ): Promise<T> {
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
+  const token = await getAccessToken();
   const query = new URLSearchParams({ action, ...params });
-  const resp = await fetchWithTimeout(`${SHARE_API}?${query}`, {
+  const res = await apiFetch('share', {
     method,
+    query,
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: body ? JSON.stringify(body) : undefined,
+    auth: 'none',
+    body: body || undefined,
   });
-  const json = await resp.json().catch(() => ({}));
-  if (!resp.ok) throw new ShareApiError(json?.error || `http_${resp.status}`, resp.status, json);
+  // Сеть/таймаут — исходное исключение fetch, как раньше
+  if (!res.response) throw res.error.original;
+  const json = res.json;
+  if (!res.ok) throw new ShareApiError(json?.error || `http_${res.status}`, res.status, json);
   return json as T;
 }
 
@@ -122,7 +132,9 @@ class ShareServiceClass {
 
   /** Действующая ссылка своего набора или null. */
   async getStatus(setId: string): Promise<ShareLinkStatus | null> {
-    const { share } = await callShareApi<{ share: ShareLinkStatus | null }>('status', { params: { setId } });
+    const { share } = await callShareApi<{ share: ShareLinkStatus | null }>('status', {
+      params: { setId },
+    });
     return share;
   }
 
@@ -147,7 +159,10 @@ class ShareServiceClass {
    * @returns id нового набора
    */
   async importSet(code: string, courseId: string | null): Promise<string> {
-    const { newSetId } = await callShareApi<{ newSetId: string }>('import', { method: 'POST', body: { code, courseId } });
+    const { newSetId } = await callShareApi<{ newSetId: string }>('import', {
+      method: 'POST',
+      body: { code, courseId },
+    });
     return newSetId;
   }
 

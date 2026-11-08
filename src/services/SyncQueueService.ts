@@ -8,12 +8,13 @@
  */
 import { Platform } from 'react-native';
 import { StorageService, STORAGE_KEYS } from './StorageService';
+import { log } from '@/utils/logger';
 
 // ==================== TYPES ====================
 
 interface SyncTask {
   id: string;
-  type: string;          // 'createSet' | 'createCard' | 'updateCardSRS' | ...
+  type: string; // 'createSet' | 'createCard' | 'updateCardSRS' | ...
   payload: unknown;
   createdAt: number;
   retries: number;
@@ -84,7 +85,7 @@ function isOnline(): boolean {
 async function executeTask(task: SyncTask): Promise<boolean> {
   const executor = executors[task.type];
   if (!executor) {
-    console.warn(`[SyncQueue] No executor for type: ${task.type}`);
+    log.warn('SyncQueue', `No executor for type: ${task.type}`);
     return true; // Удаляем задачу без исполнителя
   }
 
@@ -126,7 +127,7 @@ async function processQueue(): Promise<void> {
       task.retries++;
       if (task.retries > task.maxRetries * 2) {
         // Слишком много попыток — удаляем безнадёжную задачу
-        console.warn(`[SyncQueue] Dropping task after too many retries: ${task.type}`, task.id);
+        log.warn('SyncQueue', `Dropping task after too many retries: ${task.type}`, task.id);
         queue.shift();
         persistQueue();
       } else {
@@ -152,7 +153,7 @@ export const SyncQueueService = {
     // Подписка на восстановление сети (только web)
     if (Platform.OS === 'web' && typeof window !== 'undefined' && !onlineListener) {
       onlineListener = () => {
-        console.log('[SyncQueue] Back online, processing queue...');
+        log.debug('SyncQueue', 'Back online, processing queue...');
         processQueue();
       };
       window.addEventListener('online', onlineListener);

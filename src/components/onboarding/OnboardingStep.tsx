@@ -82,7 +82,9 @@ export function OnboardingStep({
       </ScrollView>
 
       {footer ? (
-        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.l) }]}>{footer}</View>
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.l) }]}>
+          {footer}
+        </View>
       ) : null}
     </>
   );
@@ -106,7 +108,10 @@ export function OnboardingStep({
       ) : null}
 
       {keyboard ? (
-        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
           {body}
         </KeyboardAvoidingView>
       ) : (

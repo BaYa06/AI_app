@@ -3,25 +3,20 @@
  * @description Режим "Слово в контексте" — выбери слово по предложению с пропуском
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  View,
-  ScrollView,
-  StyleSheet,
-  Pressable,
-  ActivityIndicator,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { Dumbbell, PartyPopper, ThumbsUp } from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { Button, ProgressBar, ScreenHeader, toast } from '@/components/ui';
+import { Button, ScreenHeader, toast } from '@/components/ui';
 import { useThemeColors, useCardsStore, useContextFillStore, useSetsStore } from '@/store';
-import { spacing, borderRadius, iconSize, screenPadding, alpha } from '@/constants';
+import { spacing, borderRadius, iconSize, alpha } from '@/constants';
 import { NeonService } from '@/services/NeonService';
 import { apiService } from '@/services/ApiService';
 import { getDistractors } from '@/utils/distractors';
+import { StageLayout, AnswerPanel } from '@/components/study/StageLayout';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card } from '@/types';
 import { ensureAiConsent } from '@/services/aiConsent';
+import { playSessionSfx, preloadSessionSfx } from '@/utils/sound';
 
 type Props = RootStackScreenProps<'ContextFill'>;
 
@@ -64,9 +59,8 @@ function blankWord(example: string, word: string, wordForm?: string): string {
 }
 
 export function ContextFillScreen({ navigation, route }: Props) {
-  const { setId, cardLimit } = route.params;
+  const { setId, cardLimit, dueCardIds, session } = route.params;
   const colors = useThemeColors();
-  const insets = useSafeAreaInsets();
 
   const getCardsBySet = useCardsStore((s) => s.getCardsBySet);
   const updateCard = useCardsStore((s) => s.updateCard);
@@ -89,13 +83,36 @@ export function ContextFillScreen({ navigation, route }: Props) {
 
   const advanceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const correctIdsRef = useRef<string[]>([]);
+  const startedAtRef = useRef(Date.now());
+
+  // Сессия набора: этап закончен (или слов с примерами нет) — итоги решают, что дальше
+  const finishSessionStage = useCallback(
+    (total: number, correct: number) => {
+      if (!session) return;
+      navigation.replace('StudyResults', {
+        setId,
+        totalCards: total,
+        learnedCards: correct,
+        timeSpent: Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000)),
+        errors: total - correct,
+        errorCards: [],
+        modeTitle: 'Слово в контексте',
+        session,
+      });
+    },
+    [session, navigation, setId]
+  );
 
   // ── Подготовка ──────────────────────────────────────────────────────────
 
   const prep = useCallback(async () => {
-    const setCards = getCardsBySet(setId);
+    // Сессия передаёт уже отобранные слова (с примерами); варианты ответа всё равно из всех карточек
+    const store = useCardsStore.getState().cards;
+    const setCards = dueCardIds?.length
+      ? dueCardIds.map((id) => store[id]).filter((c): c is Card => !!c)
+      : getCardsBySet(setId);
 
-    if (setCards.length < MIN_CARDS) {
+    if (!dueCardIds?.length && setCards.length < MIN_CARDS) {
       toast.info(`Мало карточек: для этого режима нужно минимум ${MIN_CARDS} карточки в наборе`);
       navigation.goBack();
       return;
@@ -107,14 +124,15 @@ export function ContextFillScreen({ navigation, route }: Props) {
     // Карточки без примеров — генерируем на лету
     const noExample = selected.filter((c) => !c.example);
     // Примеры пишет ИИ — без согласия режим работает только с карточками, где пример уже есть
-    if (noExample.length > 0 && (await ensureAiConsent())) {
+    // В сессии примеры не дописываем: нужны согласие, сеть и время (слова без примера сессия не даёт)
+    if (!session && noExample.length > 0 && (await ensureAiConsent())) {
       setPrepStatus('AI готовит задания...');
       try {
         const set = useSetsStore.getState().getSet(setId);
         const results = await apiService.generateExamples(
           noExample.map((c) => ({ front: c.frontText, back: c.backText })),
           set?.languageFrom,
-          set?.languageTo,
+          set?.languageTo
         );
 
         for (let i = 0; i < noExample.length; i++) {
@@ -140,7 +158,12 @@ export function ContextFillScreen({ navigation, route }: Props) {
           if (c.example) return c;
           const gen = genMap.get(c.frontText);
           return gen?.example
-            ? { ...c, example: gen.example, wordForm: gen.wordForm || c.wordForm, wordType: (gen.wordType as Card['wordType']) || c.wordType }
+            ? {
+                ...c,
+                example: gen.example,
+                wordForm: gen.wordForm || c.wordForm,
+                wordType: (gen.wordType as Card['wordType']) || c.wordType,
+              }
             : c;
         });
       } catch {
@@ -151,6 +174,10 @@ export function ContextFillScreen({ navigation, route }: Props) {
     // Оставляем только карточки с примерами
     const ready = selected.filter((c) => c.example);
 
+    if (ready.length === 0 && session) {
+      finishSessionStage(0, 0);
+      return;
+    }
     if (ready.length === 0) {
       toast.error('Не удалось загрузить примеры для карточек. Попробуй позже');
       navigation.goBack();
@@ -159,10 +186,20 @@ export function ContextFillScreen({ navigation, route }: Props) {
 
     setQuestions(ready);
     setPrepLoading(false);
-  }, [setId, cardLimit, getCardsBySet, updateCard, navigation]);
+  }, [
+    setId,
+    cardLimit,
+    dueCardIds,
+    session,
+    finishSessionStage,
+    getCardsBySet,
+    updateCard,
+    navigation,
+  ]);
 
   useEffect(() => {
     prep();
+    if (session) preloadSessionSfx(['correct', 'error']);
   }, []);
 
   // ── Подбор вариантов ─────────────────────────────────────────────────────
@@ -179,7 +216,7 @@ export function ContextFillScreen({ navigation, route }: Props) {
         setOptionsLoading(false);
       }
     },
-    [allCards],
+    [allCards]
   );
 
   useEffect(() => {
@@ -199,29 +236,34 @@ export function ContextFillScreen({ navigation, route }: Props) {
 
       setSelectedOption(option);
       setOptionState(isCorrect ? 'correct' : 'wrong');
+      // Звуки ответа — только в сессии (plan/new/session_results.md); в свободной практике режим без звука
+      if (session) playSessionSfx(isCorrect ? 'correct' : 'error');
       if (isCorrect) {
         setCorrectCount((n) => n + 1);
         correctIdsRef.current = [...correctIdsRef.current, currentCard.id];
       }
-
-      advanceTimerRef.current = setTimeout(() => {
-        const next = currentIndex + 1;
-        if (next >= questions.length) {
-          recordSession(
-            correctIdsRef.current.length,
-            questions.length,
-            correctIdsRef.current,
-          );
-          setFinished(true);
-        } else {
-          setCurrentIndex(next);
-          setSelectedOption(null);
-          setOptionState('neutral');
-        }
-      }, 1500);
     },
-    [selectedOption, optionsLoading, questions, currentIndex],
+    [selectedOption, optionsLoading, questions, currentIndex, session]
   );
+
+  // Дальше — по кнопке в нижней панели (общий скелет режима)
+  const handleNext = useCallback(() => {
+    const next = currentIndex + 1;
+    if (next >= questions.length) {
+      recordSession(correctIdsRef.current.length, questions.length, correctIdsRef.current);
+      if (session) finishSessionStage(questions.length, correctIdsRef.current.length);
+      else setFinished(true);
+      return;
+    }
+    setCurrentIndex(next);
+    setSelectedOption(null);
+    setOptionState('neutral');
+  }, [currentIndex, questions.length, recordSession, session, finishSessionStage]);
+
+  const handleExit = useCallback(() => {
+    if (session) navigation.navigate('SetDetail', { setId: session.setId });
+    else navigation.goBack();
+  }, [session, navigation]);
 
   useEffect(() => {
     return () => {
@@ -232,30 +274,37 @@ export function ContextFillScreen({ navigation, route }: Props) {
   // ── Вспомогательные значения ─────────────────────────────────────────────
 
   const currentCard = questions[currentIndex];
-  const progress = questions.length > 0 ? currentIndex / questions.length : 0;
 
   // ── Экран: подготовка ────────────────────────────────────────────────────
 
+  // Подготовка — в том же скелете, чтобы экран этапа сессии не прерывался
   if (prepLoading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ScreenHeader title="Слово в контексте" onBack={() => navigation.goBack()} />
+      <StageLayout
+        session={session}
+        progress={{ done: 0, total: 0 }}
+        onExit={handleExit}
+        showIntro={!!session}
+        scroll={false}
+      >
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text variant="body" align="center" style={[styles.prepText, { color: colors.textSecondary }]}>
+          <Text
+            variant="body"
+            align="center"
+            style={[styles.prepText, { color: colors.textSecondary }]}
+          >
             {prepStatus}
           </Text>
         </View>
-      </View>
+      </StageLayout>
     );
   }
 
   // ── Экран: результат ─────────────────────────────────────────────────────
 
   if (finished) {
-    const accuracy = questions.length > 0
-      ? Math.round((correctCount / questions.length) * 100)
-      : 0;
+    const accuracy = questions.length > 0 ? Math.round((correctCount / questions.length) * 100) : 0;
     // Вместо эмодзи 🎉 👍 💪 — иконки lucide (брендбук, раздел 6)
     const ResultIcon = accuracy >= 80 ? PartyPopper : accuracy >= 50 ? ThumbsUp : Dumbbell;
 
@@ -270,13 +319,23 @@ export function ContextFillScreen({ navigation, route }: Props) {
             style={[styles.resultCard, { backgroundColor: colors.primaryFill }]}
           >
             <ResultIcon size={iconSize.xl} color={colors.onPrimary} />
-            <Text variant="display" style={{ color: colors.onPrimary }}>{correctCount}/{questions.length}</Text>
-            <Text variant="body" style={[styles.semibold, styles.onFillMuted, { color: colors.onPrimary }]}>
+            <Text variant="display" style={{ color: colors.onPrimary }}>
+              {correctCount}/{questions.length}
+            </Text>
+            <Text
+              variant="body"
+              style={[styles.semibold, styles.onFillMuted, { color: colors.onPrimary }]}
+            >
               {accuracy}% точность
             </Text>
           </View>
 
-          <Button title="Готово" onPress={() => navigation.goBack()} fullWidth style={styles.doneBtn} />
+          <Button
+            title="Готово"
+            onPress={() => navigation.goBack()}
+            fullWidth
+            style={styles.doneBtn}
+          />
         </View>
       </View>
     );
@@ -289,112 +348,122 @@ export function ContextFillScreen({ navigation, route }: Props) {
     : '';
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScreenHeader
-        title="Слово в контексте"
-        onBack={() => navigation.goBack()}
-        right={
-          <Text variant="label" style={{ color: colors.textSecondary }}>
-            {currentIndex + 1} / {questions.length}
-          </Text>
-        }
-      />
-
-      {/* Progress bar */}
-      <View style={styles.progressWrap}>
-        <ProgressBar progress={Math.round(progress * 100)} accessibilityLabel="Прогресс" />
+    <StageLayout
+      session={session}
+      progress={{ done: currentIndex + (selectedOption !== null ? 1 : 0), total: questions.length }}
+      task="Заполни пропуск"
+      onExit={handleExit}
+      showIntro={!!session}
+      footer={
+        selectedOption !== null && currentCard ? (
+          <AnswerPanel
+            correct={optionState === 'correct'}
+            answer={currentCard.frontText}
+            hint={{
+              front: currentCard.frontText,
+              back: currentCard.backText,
+              example: currentCard.example || undefined,
+            }}
+            onNext={handleNext}
+          />
+        ) : null
+      }
+    >
+      {/* Question card */}
+      <View
+        style={[
+          styles.questionCard,
+          { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}
+      >
+        <Text variant="h2" style={{ color: colors.textPrimary }}>
+          {sentenceWithBlank}
+        </Text>
       </View>
 
-      <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + spacing.xl }]}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Question card */}
-        <View style={[styles.questionCard, { backgroundColor: colors.primaryFill }]}>
-          <Text variant="overline" style={[styles.onFillMuted, { color: colors.onPrimary }]}>Заполни пропуск</Text>
-          <Text variant="h2" style={{ color: colors.onPrimary }}>{sentenceWithBlank}</Text>
+      {/* Options */}
+      {optionsLoading ? (
+        <View style={styles.optionsLoading}>
+          <ActivityIndicator color={colors.primary} />
         </View>
+      ) : (
+        <View style={styles.optionsList}>
+          {options.map((option, idx) => {
+            const isSelected = selectedOption === option;
+            const isCorrectAnswer = option === currentCard?.frontText;
 
-        {/* Options */}
-        {optionsLoading ? (
-          <View style={styles.optionsLoading}>
-            <ActivityIndicator color={colors.primary} />
-          </View>
-        ) : (
-          <View style={styles.optionsList}>
-            {options.map((option, idx) => {
-              const isSelected = selectedOption === option;
-              const isCorrectAnswer = option === currentCard?.frontText;
+            let borderColor = colors.border;
+            let bgColor = colors.surface;
+            let labelBg = colors.surfaceMuted;
+            let labelTextColor = colors.textSecondary;
+            let textColor = colors.textPrimary;
 
-              let borderColor = colors.border;
-              let bgColor = colors.surface;
-              let labelBg = colors.surfaceMuted;
-              let labelTextColor = colors.textSecondary;
-              let textColor = colors.textPrimary;
-
-              if (selectedOption !== null) {
-                if (isCorrectAnswer) {
-                  borderColor = colors.success;
-                  bgColor = alpha(colors.success, 10);
-                  labelBg = colors.success;
-                  labelTextColor = colors.onPrimary;
-                  textColor = colors.successText;
-                } else if (isSelected) {
-                  borderColor = colors.error;
-                  bgColor = alpha(colors.error, 10);
-                  labelBg = colors.error;
-                  labelTextColor = colors.onPrimary;
-                  textColor = colors.errorText;
-                } else {
-                  bgColor = colors.surfaceMuted;
-                }
-              } else if (isSelected) {
-                borderColor = colors.primary;
-                bgColor = alpha(colors.primary, 10);
-                labelBg = colors.primaryFill;
+            if (selectedOption !== null) {
+              if (isCorrectAnswer) {
+                borderColor = colors.success;
+                bgColor = alpha(colors.success, 10);
+                labelBg = colors.success;
                 labelTextColor = colors.onPrimary;
-                textColor = colors.primary;
+                textColor = colors.successText;
+              } else if (isSelected) {
+                borderColor = colors.error;
+                bgColor = alpha(colors.error, 10);
+                labelBg = colors.error;
+                labelTextColor = colors.onPrimary;
+                textColor = colors.errorText;
+              } else {
+                bgColor = colors.surfaceMuted;
               }
+            } else if (isSelected) {
+              borderColor = colors.primary;
+              bgColor = alpha(colors.primary, 10);
+              labelBg = colors.primaryFill;
+              labelTextColor = colors.onPrimary;
+              textColor = colors.primary;
+            }
 
-              return (
-                <Pressable
-                  key={idx}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${OPTION_LABELS[idx]}. ${option}${
-                    selectedOption !== null && isCorrectAnswer ? ', верно' : selectedOption !== null && isSelected ? ', неверно' : ''
-                  }`}
-                  style={({ pressed }) => [
-                    styles.optionBtn,
-                    {
-                      backgroundColor: bgColor,
-                      borderColor,
-                      borderWidth: isSelected || (selectedOption !== null && isCorrectAnswer) ? 2 : 1,
-                    },
-                    selectedOption !== null && !isSelected && !isCorrectAnswer && styles.optionDimmed,
-                    pressed && selectedOption === null && styles.optionPressed,
-                  ]}
-                  onPress={() => handleSelect(option)}
-                  disabled={selectedOption !== null}
-                >
-                  <View style={[styles.optionLabel, { backgroundColor: labelBg }]}>
-                    <Text variant="label" style={[styles.bold, { color: labelTextColor }]}>
-                      {OPTION_LABELS[idx]}
-                    </Text>
-                  </View>
-                  <Text
-                    variant="body"
-                    style={[styles.optionText, { color: textColor }, isSelected && styles.semibold]}
-                    numberOfLines={2}
-                  >
-                    {option}
+            return (
+              <Pressable
+                key={idx}
+                accessibilityRole="button"
+                accessibilityLabel={`${OPTION_LABELS[idx]}. ${option}${
+                  selectedOption !== null && isCorrectAnswer
+                    ? ', верно'
+                    : selectedOption !== null && isSelected
+                      ? ', неверно'
+                      : ''
+                }`}
+                style={({ pressed }) => [
+                  styles.optionBtn,
+                  {
+                    backgroundColor: bgColor,
+                    borderColor,
+                    borderWidth: isSelected || (selectedOption !== null && isCorrectAnswer) ? 2 : 1,
+                  },
+                  selectedOption !== null && !isSelected && !isCorrectAnswer && styles.optionDimmed,
+                  pressed && selectedOption === null && styles.optionPressed,
+                ]}
+                onPress={() => handleSelect(option)}
+                disabled={selectedOption !== null}
+              >
+                <View style={[styles.optionLabel, { backgroundColor: labelBg }]}>
+                  <Text variant="label" style={[styles.bold, { color: labelTextColor }]}>
+                    {OPTION_LABELS[idx]}
                   </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        )}
-      </ScrollView>
-    </View>
+                </View>
+                <Text
+                  variant="body"
+                  style={[styles.optionText, { color: textColor }, isSelected && styles.semibold]}
+                  numberOfLines={2}
+                >
+                  {option}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+    </StageLayout>
   );
 }
 
@@ -404,10 +473,6 @@ const styles = StyleSheet.create({
   bold: { fontWeight: '700' },
   // Второстепенный текст на цветной заливке
   onFillMuted: { opacity: 0.85 },
-
-  progressWrap: {
-    paddingHorizontal: screenPadding,
-  },
 
   centered: {
     flex: 1,
@@ -420,14 +485,10 @@ const styles = StyleSheet.create({
     marginTop: spacing.s,
   },
 
-  scroll: {
-    paddingHorizontal: screenPadding,
-    paddingTop: spacing.l,
-    gap: spacing.l,
-  },
-
+  // Рамка без тени (брендбук, 7.3)
   questionCard: {
     borderRadius: borderRadius.l,
+    borderWidth: 1,
     padding: spacing.l,
     gap: spacing.m,
   },

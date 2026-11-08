@@ -108,7 +108,12 @@ export const ListRow = memo(function ListRow({
 
   const content = (
     <>
-      {Icon ? <Icon size={iconSize.s} color={destructive ? colors.errorText : iconColor ?? colors.textSecondary} /> : null}
+      {Icon ? (
+        <Icon
+          size={iconSize.s}
+          color={destructive ? colors.errorText : (iconColor ?? colors.textSecondary)}
+        />
+      ) : null}
       <View style={styles.rowText}>
         <Text variant="body" numberOfLines={2} style={{ color: titleColor }}>
           {title}
@@ -119,11 +124,16 @@ export const ListRow = memo(function ListRow({
           </Text>
         ) : null}
       </View>
-      {right ?? (value ? (
-        <Text variant="bodySmall" numberOfLines={1} style={[styles.value, { color: colors.textSecondary }]}>
-          {value}
-        </Text>
-      ) : null)}
+      {right ??
+        (value ? (
+          <Text
+            variant="bodySmall"
+            numberOfLines={1}
+            style={[styles.value, { color: colors.textSecondary }]}
+          >
+            {value}
+          </Text>
+        ) : null)}
       {showChevron ? <ChevronRight size={iconSize.xs} color={colors.textTertiary} /> : null}
     </>
   );
@@ -162,7 +172,12 @@ export interface ListGroupProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export const ListGroup = memo(function ListGroup({ title, footer, children, style }: ListGroupProps) {
+export const ListGroup = memo(function ListGroup({
+  title,
+  footer,
+  children,
+  style,
+}: ListGroupProps) {
   const colors = useThemeColors();
   const rows = Children.toArray(children).filter(isValidElement);
 
@@ -176,7 +191,9 @@ export const ListGroup = memo(function ListGroup({ title, footer, children, styl
       <Card padding="none" style={styles.groupCard}>
         {rows.map((row, index) => (
           <Fragment key={row.key ?? index}>
-            {index > 0 ? <View style={[styles.separator, { backgroundColor: colors.border }]} /> : null}
+            {index > 0 ? (
+              <View style={[styles.separator, { backgroundColor: colors.border }]} />
+            ) : null}
             {row}
           </Fragment>
         ))}

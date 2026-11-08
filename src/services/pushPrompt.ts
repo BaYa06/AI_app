@@ -5,9 +5,10 @@
  * не раньше чем через 3 дня, снова после пройденного урока; всего не больше 3 попыток.
  * Только нативное приложение: в вебе свой баннер (App.tsx).
  */
-import { API_BASE } from '@/config/apiBase';
 import { readCache, writeCache } from './localCache';
-import { supabase } from './supabaseClient';
+import { getAccessToken } from './auth/session';
+import { apiFetch } from './api/client';
+import { log } from '@/utils/logger';
 
 const CACHE_NAME = 'push_prompt';
 export const PUSH_PROMPT_MAX_ATTEMPTS = 3;
@@ -25,13 +26,16 @@ const EMPTY: PushPromptState = { shownDays: [] };
 export function shouldShowPushPrompt(
   state: PushPromptState,
   today: string,
-  opts: { permission: string; supported: boolean },
+  opts: { permission: string; supported: boolean }
 ): boolean {
   if (!opts.supported || opts.permission !== 'default') return false;
   if (state.shownDays.length >= PUSH_PROMPT_MAX_ATTEMPTS) return false;
   const last = state.shownDays[state.shownDays.length - 1];
   if (!last) return true;
-  return Date.parse(`${today}T00:00:00Z`) - Date.parse(`${last}T00:00:00Z`) >= PUSH_PROMPT_RETRY_DAYS * DAY_MS;
+  return (
+    Date.parse(`${today}T00:00:00Z`) - Date.parse(`${last}T00:00:00Z`) >=
+    PUSH_PROMPT_RETRY_DAYS * DAY_MS
+  );
 }
 
 export function markPushPromptShown(state: PushPromptState, date: string): PushPromptState {
@@ -70,16 +74,29 @@ export function suggestedSlot(hourNow: number): ReminderSlot {
  */
 export async function saveReminderHour(hour: number): Promise<boolean> {
   try {
-    const { data } = await supabase.auth.getSession();
-    const accessToken = data.session?.access_token;
+    const accessToken = await getAccessToken();
     if (!accessToken) return false;
     const headers = { Authorization: `Bearer ${accessToken}` };
-    const current = await fetch(`${API_BASE}/push?action=settings`, { headers }).then((r) => r.json());
+    // Голый fetch без таймаута; статус GET не проверяется, невалидный JSON — в catch (как раньше)
+    const got = await apiFetch('push', {
+      query: { action: 'settings' },
+      headers,
+      auth: 'none',
+      timeoutMs: false,
+      parse: 'none',
+    });
+    if (!got.response) throw got.error.original;
+    const current = await got.response.json();
     const days = typeof current?.notifDays === 'string' ? current.notifDays : undefined;
-    const res = await fetch(`${API_BASE}/push?action=settings`, {
+    const res = await apiFetch('push', {
       method: 'POST',
+      query: { action: 'settings' },
+      // Authorization перед Content-Type — как раньше
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      auth: 'none',
+      timeoutMs: false,
+      parse: 'none',
+      body: {
         notifEnabled: true,
         notifHour: hour,
         notifMinute: 0,
@@ -89,11 +106,12 @@ export async function saveReminderHour(hour: number): Promise<boolean> {
         notifStreak: current?.notifStreak ?? true,
         // Время выбрано в листе — оно важнее привычек (plan/new/push_notifications.md, 2.9)
         notifTimeExplicit: true,
-      }),
+      },
     });
+    if (!res.response) throw res.error.original;
     return res.ok;
   } catch (error) {
-    console.warn('[PushPrompt] save hour failed:', error);
+    log.warn('PushPrompt', 'save hour failed', error);
     return false;
   }
 }
@@ -111,12 +129,16 @@ export const STREAK_NUDGE_INTERVAL_DAYS = 14;
 export function shouldShowStreakNudge(
   lastShownDay: string | undefined,
   today: string,
-  opts: { streak: number; permission: string; supported: boolean },
+  opts: { streak: number; permission: string; supported: boolean }
 ): boolean {
-  if (!opts.supported || opts.permission === 'granted' || opts.permission === 'unsupported') return false;
+  if (!opts.supported || opts.permission === 'granted' || opts.permission === 'unsupported')
+    return false;
   if (opts.streak < STREAK_NUDGE_MIN_STREAK) return false;
   if (!lastShownDay) return true;
-  return Date.parse(`${today}T00:00:00Z`) - Date.parse(`${lastShownDay}T00:00:00Z`) >= STREAK_NUDGE_INTERVAL_DAYS * DAY_MS;
+  return (
+    Date.parse(`${today}T00:00:00Z`) - Date.parse(`${lastShownDay}T00:00:00Z`) >=
+    STREAK_NUDGE_INTERVAL_DAYS * DAY_MS
+  );
 }
 
 export function loadStreakNudgeDay(): string | undefined {

@@ -2,11 +2,13 @@ import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState, AppStateStatus, Platform } from 'react-native';
 import { createClient } from '@supabase/supabase-js';
+import { log } from '@/utils/logger';
 
 /**
  * Safe AsyncStorage adapter — prevents crashes if the native module is not linked.
  */
-const safeStorage = AsyncStorage?.getItem
+// Модуль может быть не слинкован — в рантайме getItem бывает undefined, хотя по типам он есть
+const safeStorage = (AsyncStorage as Partial<typeof AsyncStorage> | undefined)?.getItem
   ? AsyncStorage
   : {
       getItem: async () => null,
@@ -21,10 +23,12 @@ const safeStorage = AsyncStorage?.getItem
  * - PKCE flow is required for mobile OAuth.
  */
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://yiwsmjbeirgomkrckoju.supabase.co';
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlpd3NtamJlaXJnb21rcmNrb2p1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1NzUzMTksImV4cCI6MjA4NTE1MTMxOX0.d8ck5zaELDtMYLyLHVrYEyiytj3a_8Q7XikSLWM1o3Q';
+const SUPABASE_ANON_KEY =
+  process.env.SUPABASE_ANON_KEY ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlpd3NtamJlaXJnb21rcmNrb2p1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1NzUzMTksImV4cCI6MjA4NTE1MTMxOX0.d8ck5zaELDtMYLyLHVrYEyiytj3a_8Q7XikSLWM1o3Q';
 
-console.log('[supabase] URL:', SUPABASE_URL ? 'SET' : 'NOT SET');
-console.log('[supabase] ANON_KEY:', SUPABASE_ANON_KEY ? 'SET' : 'NOT SET');
+log.debug('Supabase', 'URL', SUPABASE_URL ? 'SET' : 'NOT SET');
+log.debug('Supabase', 'ANON_KEY', SUPABASE_ANON_KEY ? 'SET' : 'NOT SET');
 
 const isWeb = Platform.OS === 'web';
 const defaultWebRedirect =
@@ -32,12 +36,15 @@ const defaultWebRedirect =
     ? `${window.location.origin}/auth-callback`
     : '';
 const SUPABASE_REDIRECT_URI = isWeb
-  ? process.env.SUPABASE_WEB_REDIRECT_URI ?? defaultWebRedirect
-  : process.env.SUPABASE_REDIRECT_URI ?? 'flashly://auth-callback';
+  ? // `||`, а не `??`: webpack подставляет '' для незаданной переменной — с `??` вход на
+    // localhost уходил на боевой сайт (Site URL в Supabase)
+    process.env.SUPABASE_WEB_REDIRECT_URI || defaultWebRedirect
+  : process.env.SUPABASE_REDIRECT_URI || 'flashly://auth-callback';
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.warn(
-    '[supabase] Missing SUPABASE_URL / SUPABASE_ANON_KEY. Set them in your mobile env (e.g. .env, Xcode/Gradle).',
+  log.warn(
+    'Supabase',
+    'Missing SUPABASE_URL / SUPABASE_ANON_KEY. Set them in your mobile env (e.g. .env, Xcode/Gradle).'
   );
 }
 

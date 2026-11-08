@@ -14,24 +14,19 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { triggerHaptic } from '@/utils/haptic';
-import {
-  GraduationCap,
-  Copy,
-  UserPlus,
-  CheckCircle2,
-  ArrowRight,
-} from 'lucide-react-native';
+import { GraduationCap, Copy, UserPlus, CheckCircle2, ArrowRight } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha, type ColorToken } from '@/constants';
-import { supabase } from '@/services/supabaseClient';
+import { createChannel, removeChannel, type RealtimeChannel } from '@/services/realtime';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
-import type { RealtimeChannel } from '@supabase/supabase-js';
 
-import { API_BASE } from '@/config/apiBase';
 import { describeTestError } from '@/utils/testApiErrors';
 import { BottomBar } from '@/components/ui';
+import { log } from '@/utils/logger';
+import { getAccessToken } from '@/services/auth/session';
+import { rawApiFetch } from '@/services/api/client';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TestLobby'>;
 
@@ -61,10 +56,9 @@ export function TestLobbyScreen({ navigation, route }: Props) {
     const fetchParticipants = async () => {
       if (cancelled) return;
       try {
-        const { data: authData } = await supabase.auth.getSession();
-        const token = authData.session?.access_token;
+        const token = await getAccessToken();
         if (!token) return;
-        const resp = await fetch(`${API_BASE}/test?action=monitor&sessionId=${sessionId}`, {
+        const resp = await rawApiFetch(`test?action=monitor&sessionId=${sessionId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!resp.ok || cancelled) return;
@@ -91,25 +85,28 @@ export function TestLobbyScreen({ navigation, route }: Props) {
 
   // Realtime — мгновенное добавление студента (без ожидания следующего polling)
   useEffect(() => {
-    const channel = supabase.channel(`test:${sessionId}`);
+    const channel = createChannel(`test:${sessionId}`);
     channelRef.current = channel;
 
     channel
       .on('broadcast', { event: 'student_joined' }, ({ payload }) => {
         if (!payload) return;
-        setStudents(prev => {
-          if (prev.some(s => s.id === payload.userId)) return prev;
-          return [...prev, {
-            id: payload.userId,
-            name: payload.displayName || 'Ученик',
-            initials: payload.initials || '??',
-          }];
+        setStudents((prev) => {
+          if (prev.some((s) => s.id === payload.userId)) return prev;
+          return [
+            ...prev,
+            {
+              id: payload.userId,
+              name: payload.displayName || 'Ученик',
+              initials: payload.initials || '??',
+            },
+          ];
         });
       })
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      removeChannel(channel);
     };
   }, [sessionId]);
 
@@ -129,14 +126,13 @@ export function TestLobbyScreen({ navigation, route }: Props) {
     if (starting || students.length === 0) return;
     setStarting(true);
     try {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
+      const token = await getAccessToken();
       if (!token) throw new Error('Not authenticated');
 
-      const resp = await fetch(`${API_BASE}/test?action=start`, {
+      const resp = await rawApiFetch('test?action=start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ sessionId }),
+        body: { sessionId },
       });
       const result = await resp.json();
       if (!resp.ok) throw new Error(result.error || 'Failed to start test');
@@ -147,7 +143,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
         sessionId,
       });
     } catch (e: any) {
-      console.error('Start test error:', e);
+      log.error('TestLobby', 'Start test error', e);
       alert(describeTestError(e, 'Не удалось запустить тест. Попробуй ещё раз.'));
       setStarting(false);
     }
@@ -170,11 +166,10 @@ export function TestLobbyScreen({ navigation, route }: Props) {
       >
         <View style={styles.headerLeft}>
           <GraduationCap size={22} color={colors.primary} />
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-            Лобби теста
-          </Text>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Лобби теста</Text>
         </View>
-        <Pressable accessibilityRole="button"
+        <Pressable
+          accessibilityRole="button"
           style={({ pressed }) => [
             styles.endBtn,
             {
@@ -202,8 +197,11 @@ export function TestLobbyScreen({ navigation, route }: Props) {
             </View>
           </View>
           <View style={[styles.codeCardShare, { backgroundColor: alpha(colors.onPrimary, 10) }]}>
-            <Text style={[styles.shareText, { color: colors.onPrimary }]}>Отправь код ученикам</Text>
-            <Pressable accessibilityRole="button"
+            <Text style={[styles.shareText, { color: colors.onPrimary }]}>
+              Отправь код ученикам
+            </Text>
+            <Pressable
+              accessibilityRole="button"
               style={({ pressed }) => [
                 [styles.copyBtn, { backgroundColor: colors.surface }],
                 pressed && { opacity: 0.7 },
@@ -215,7 +213,9 @@ export function TestLobbyScreen({ navigation, route }: Props) {
               ) : (
                 <Copy size={14} color={colors.primaryFill} />
               )}
-              <Text style={[styles.copyBtnText, { color: colors.primary }]}>{copied ? 'Скопировано' : 'Копировать'}</Text>
+              <Text style={[styles.copyBtnText, { color: colors.primary }]}>
+                {copied ? 'Скопировано' : 'Копировать'}
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -243,10 +243,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
           {students.map((s, idx) => (
             <View
               key={s.id}
-              style={[
-                styles.studentRow,
-                { backgroundColor: cardBg, borderColor: cardBorder },
-              ]}
+              style={[styles.studentRow, { backgroundColor: cardBg, borderColor: cardBorder }]}
             >
               <View style={styles.studentLeft}>
                 <View
@@ -268,9 +265,7 @@ export function TestLobbyScreen({ navigation, route }: Props) {
                   </Text>
                 </View>
                 <View>
-                  <Text style={[styles.studentName, { color: colors.textPrimary }]}>
-                    {s.name}
-                  </Text>
+                  <Text style={[styles.studentName, { color: colors.textPrimary }]}>{s.name}</Text>
                   <Text style={[styles.studentStatus, { color: colors.textSecondary }]}>
                     Готов к тесту
                   </Text>
@@ -281,18 +276,8 @@ export function TestLobbyScreen({ navigation, route }: Props) {
           ))}
 
           {/* Empty placeholder */}
-          <View
-            style={[
-              styles.emptySlot,
-              { borderColor: colors.border },
-            ]}
-          >
-            <View
-              style={[
-                styles.emptyAvatar,
-                { backgroundColor: colors.surfaceMuted },
-              ]}
-            >
+          <View style={[styles.emptySlot, { borderColor: colors.border }]}>
+            <View style={[styles.emptyAvatar, { backgroundColor: colors.surfaceMuted }]}>
               <UserPlus size={18} color={colors.textSecondary} />
             </View>
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
@@ -329,23 +314,28 @@ export function TestLobbyScreen({ navigation, route }: Props) {
                 </View>
               ))}
             </View>
-            <Text style={[styles.crewLabel, { color: colors.textSecondary }]}>
-              Подключились
-            </Text>
+            <Text style={[styles.crewLabel, { color: colors.textSecondary }]}>Подключились</Text>
           </View>
         )}
       </ScrollView>
 
       {/* Footer CTA */}
       <BottomBar style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        <Pressable accessibilityRole="button"
+        <Pressable
+          accessibilityRole="button"
           style={({ pressed }) => [
             styles.ctaBtn,
-            { backgroundColor: students.length === 0 || starting ? colors.textSecondary : colors.primary },
+            {
+              backgroundColor:
+                students.length === 0 || starting ? colors.textSecondary : colors.primary,
+            },
             pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
           ]}
           disabled={students.length === 0 || starting}
-          onPress={() => { triggerHaptic('selection'); handleStart(); }}
+          onPress={() => {
+            triggerHaptic('selection');
+            handleStart();
+          }}
         >
           {starting ? (
             <ActivityIndicator color={colors.onPrimary} />
@@ -373,9 +363,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.l,
     paddingBottom: spacing.m,
-    ...Platform.select({
+    ...(Platform.select({
       web: { backdropFilter: 'blur(12px)' },
-    }) as any,
+    }) as any),
   },
   headerLeft: {
     flexDirection: 'row',
@@ -509,7 +499,6 @@ const styles = StyleSheet.create({
     padding: spacing.s,
     borderRadius: borderRadius.m,
     borderWidth: 1,
-    
   },
   studentLeft: {
     flexDirection: 'row',
@@ -606,7 +595,6 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: borderRadius.l,
     gap: 8,
-    
   },
   ctaText: {
     fontSize: 16,

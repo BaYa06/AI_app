@@ -2,43 +2,59 @@
  * Set Detail Screen
  * @description Экран детали набора карточек
  */
-import { isCardLearned, isCardWaitingReview } from '@/services/SRSService';
+import { getCardStatus, isCardLearned, isCardWaitingReview } from '@/services/SRSService';
+import { StatusBadge, STATUS_LABEL } from '@/components/cards';
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { shallow } from 'zustand/shallow';
-import { View, FlatList, StyleSheet, Pressable, TextInput, ScrollView, ActivityIndicator, Platform, KeyboardAvoidingView, Modal, Dimensions } from 'react-native';
+import { View, FlatList, Pressable, TextInput, Platform } from 'react-native';
 import { triggerHaptic } from '@/utils/haptic';
-import { BlurView } from '@/utils/BlurView';
-import { useSetsStore, useCardsStore, useThemeColors, selectSetStats, useSettingsStore, useCoursesStore, isSetInCourse } from '@/store';
-import { Container, Text, Loading } from '@/components/common';
-import { StudyModeSheet, type StudyMode } from '@/components/study/StudyModeSheet';
-import { spacing, borderRadius, iconSize, alpha, config } from '@/constants';
+import {
+  useSetsStore,
+  useCardsStore,
+  useThemeColors,
+  selectSetStats,
+  useSettingsStore,
+  useCoursesStore,
+  isSetInCourse,
+} from '@/store';
+import { Container, Text } from '@/components/common';
+import {
+  StudyModeSheet,
+  DEFAULT_STUDY_MODE_GAMES,
+  type StudyMode,
+} from '@/components/study/StudyModeSheet';
+import { currentSetSessionPlan, startSetSession } from '@/components/study/setSession';
+import { isModeAllowedForSets } from '@/utils/setKind';
+import { spacing, iconSize, alpha } from '@/constants';
 import { BottomBar, EmptyState, ProgressBar, toast } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
 import type { Card } from '@/types';
 import { DatabaseService, LibraryService, Analytics, NeonService, BookService } from '@/services';
 import { confirmAction } from '@/utils/dialogs';
-import { supabase } from '@/services/supabaseClient';
-import { LIBRARY_CATEGORIES } from '@/constants/library';
+import { getSession } from '@/services/auth/session';
 import {
   ArrowLeft,
   MoreHorizontal,
   Search,
   SlidersHorizontal,
   Edit3,
-  Check,
-  Circle,
   Camera,
-  Globe,
-  X,
   BookOpen,
   Layers,
 } from 'lucide-react-native';
 import { describeError } from '@/utils/userErrors';
 import { pluralize } from '@/utils';
+import { cardFront, cardBack, type LegacyCard } from '@/utils/cardText';
+import { styles } from './setDetail/styles';
+import { FilterPill } from './setDetail/FilterPill';
+import { MissingSet } from './setDetail/MissingSet';
+import { CardPreviewModal } from './setDetail/CardPreviewModal';
+import { PublishSetModal } from './setDetail/PublishSetModal';
+import { AddCardSheet } from './setDetail/AddCardSheet';
+import { CardActionSheet } from './setDetail/CardActionSheet';
 
 type Props = RootStackScreenProps<'SetDetail'>;
 type Filter = 'all' | 'mastered' | 'unmastered';
-const EXPORT_BUTTON_HEIGHT = 42;
 
 export function SetDetailScreen({ navigation, route }: Props) {
   const { setId } = route.params;
@@ -66,11 +82,9 @@ export function SetDetailScreen({ navigation, route }: Props) {
   const [newFront, setNewFront] = useState('');
   const [newBack, setNewBack] = useState('');
   const [newExample, setNewExample] = useState('');
-  const [newMnemonic, setNewMnemonic] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [showStudySheet, setShowStudySheet] = useState(false);
   const [onlyHard, setOnlyHard] = useState(false);
-  const [showMnemonic, setShowMnemonic] = useState(true);
   const [previewCard, setPreviewCard] = useState<Card | null>(null);
   const [wordLimit, setWordLimit] = useState<'10' | '20' | '30' | 'all'>(() => {
     const limit = userSettings.studyCardLimit;
@@ -79,10 +93,9 @@ export function SetDetailScreen({ navigation, route }: Props) {
     return '20';
   });
 
-
   // Publish states
-  const [isPublished, setIsPublished] = useState(false);
-  const [librarySetId, setLibrarySetId] = useState<string | null>(null);
+  const [, setIsPublished] = useState(false);
+  const [, setLibrarySetId] = useState<string | null>(null);
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [publishDescription, setPublishDescription] = useState('');
   const [publishCategory, setPublishCategory] = useState('');
@@ -92,9 +105,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
   // Расчет статистики
   const stats = useMemo(() => {
     if (!set) return { progress: 0, dueCount: 0 };
-    const progress = set.cardCount > 0 
-      ? Math.round((set.masteredCount / set.cardCount) * 100) 
-      : 0;
+    const progress = set.cardCount > 0 ? Math.round((set.masteredCount / set.cardCount) * 100) : 0;
     const dueCount = set.reviewCount;
     return { progress, dueCount };
   }, [set]);
@@ -109,8 +120,8 @@ export function SetDetailScreen({ navigation, route }: Props) {
   const modalInputBg = colors.surface;
 
   const filteredCards = useMemo(() => {
-    const getFront = (card: Card) => card.frontText ?? (card as any).front ?? '';
-    const getBack = (card: Card) => card.backText ?? (card as any).back ?? '';
+    const getFront = (card: Card) => cardFront(card);
+    const getBack = (card: Card) => cardBack(card);
     const query = search.trim().toLowerCase();
 
     return cards
@@ -131,8 +142,8 @@ export function SetDetailScreen({ navigation, route }: Props) {
   // Синхронизация выбранного лимита с сохраненными настройками (поддержка загрузки)
   useEffect(() => {
     const limit = userSettings.studyCardLimit;
-    const next = limit === null ? 'all' : (limit === 10 || limit === 30 ? String(limit) : '20');
-    setWordLimit((prev) => (prev === next ? prev : next as '10' | '20' | '30' | 'all'));
+    const next = limit === null ? 'all' : limit === 10 || limit === 30 ? String(limit) : '20';
+    setWordLimit((prev) => (prev === next ? prev : (next as '10' | '20' | '30' | 'all')));
   }, [userSettings.studyCardLimit]);
 
   // Analytics: set_viewed
@@ -146,7 +157,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
   useEffect(() => {
     (async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const session = await getSession();
         if (!session?.user?.id) return;
         const result = await LibraryService.checkPublished(setId, session.user.id);
         setIsPublished(result.isPublished);
@@ -159,8 +170,8 @@ export function SetDetailScreen({ navigation, route }: Props) {
   const getShuffledDueCardIds = useCallback(() => {
     const now = Date.now();
     const dueCards = onlyHard
-      ? cards.filter(c => c.nextReviewDate <= now).map(c => c.id)
-      : cards.map(c => c.id);
+      ? cards.filter((c) => c.nextReviewDate <= now).map((c) => c.id)
+      : cards.map((c) => c.id);
     return [...dueCards].sort(() => Math.random() - 0.5);
   }, [onlyHard, cards]);
 
@@ -304,18 +315,46 @@ export function SetDetailScreen({ navigation, route }: Props) {
     });
   }, [navigation, setId, wordLimit, getShuffledDueCardIds]);
 
+  // Предметный набор (plan/new/set_kind.md): только Карточки, Пары и Тест — языковые режимы
+  // не показываем в шторке и не запускаем, даже если их вызвали.
+  const studyModeGames = useMemo(
+    () => DEFAULT_STUDY_MODE_GAMES.filter((game) => isModeAllowedForSets(game.mode, [set])),
+    [set]
+  );
+
   const handleSelectStudyMode = useCallback(
     (mode: StudyMode) => {
+      if (!isModeAllowedForSets(mode, [set])) return;
       switch (mode) {
-        case 'classic': handleStartStudy(); break;
-        case 'match': handleStartMatch(); break;
-        case 'multipleChoice': handleStartMultipleChoice(); break;
-        case 'wordBuilder': handleStartWordBuilder(); break;
-        case 'audio': handleStartAudio(); break;
-        case 'contextFill': handleStartContextFill(); break;
+        case 'classic':
+          handleStartStudy();
+          break;
+        case 'match':
+          handleStartMatch();
+          break;
+        case 'multipleChoice':
+          handleStartMultipleChoice();
+          break;
+        case 'wordBuilder':
+          handleStartWordBuilder();
+          break;
+        case 'audio':
+          handleStartAudio();
+          break;
+        case 'contextFill':
+          handleStartContextFill();
+          break;
       }
     },
-    [handleStartStudy, handleStartMatch, handleStartMultipleChoice, handleStartWordBuilder, handleStartAudio, handleStartContextFill]
+    [
+      set,
+      handleStartStudy,
+      handleStartMatch,
+      handleStartMultipleChoice,
+      handleStartWordBuilder,
+      handleStartAudio,
+      handleStartContextFill,
+    ]
   );
 
   const handleSelectWordLimit = useCallback(
@@ -328,12 +367,17 @@ export function SetDetailScreen({ navigation, route }: Props) {
     [updateSettings]
   );
 
+  // План сессии «Изучить» — на момент открытия шторки (plan/new/study_session.md)
+  const sessionInfo = useMemo(
+    () => (showStudySheet ? currentSetSessionPlan(setId) : null),
+    [showStudySheet, setId]
+  );
+
   const openAddCardSheet = useCallback(() => {
     setNewFront('');
     setNewBack('');
     setShowAddCard(true);
   }, []);
-
 
   const handleEditCard = useCallback(
     (cardId: string) => {
@@ -351,6 +395,8 @@ export function SetDetailScreen({ navigation, route }: Props) {
       cardCount: statsSnapshot.total,
       newCount: statsSnapshot.newCount,
       learningCount: statsSnapshot.learningCount,
+      youngCount: statsSnapshot.youngCount,
+      matureCount: statsSnapshot.matureCount,
       reviewCount: statsSnapshot.reviewCount,
       masteredCount: statsSnapshot.masteredCount,
     });
@@ -361,22 +407,22 @@ export function SetDetailScreen({ navigation, route }: Props) {
     const front = newFront.trim();
     const back = newBack.trim();
     const example = newExample.trim();
-    const mnemonic = newMnemonic.trim();
     if (!front || !back) return;
     setIsAdding(true);
     try {
-      addCard({ 
-        setId, 
-        frontText: front, 
-        backText: back, 
+      addCard({
+        setId,
+        frontText: front,
+        backText: back,
         example: example || undefined,
-        mnemonic: mnemonic || undefined,
       });
       const statsSnapshot = selectSetStats(setId);
       updateSetStats(setId, {
         cardCount: statsSnapshot.total,
         newCount: statsSnapshot.newCount,
         learningCount: statsSnapshot.learningCount,
+        youngCount: statsSnapshot.youngCount,
+        matureCount: statsSnapshot.matureCount,
         reviewCount: statsSnapshot.reviewCount,
         masteredCount: statsSnapshot.masteredCount,
       });
@@ -384,11 +430,10 @@ export function SetDetailScreen({ navigation, route }: Props) {
       setNewFront('');
       setNewBack('');
       setNewExample('');
-      setNewMnemonic('');
     } finally {
       setIsAdding(false);
     }
-  }, [addCard, newFront, newBack, newExample, newMnemonic, setId, updateSetStats]);
+  }, [addCard, newFront, newBack, newExample, setId, updateSetStats]);
 
   const handleEditSet = useCallback(() => {
     navigation.navigate('SetEditor', { setId });
@@ -402,7 +447,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
     const ok = await confirmAction(
       'Сделать копию себе?',
       'Официальный набор нельзя менять. Копию можно редактировать, но обновления учебника в неё не попадут, а прогресс учеников начнётся заново.',
-      'Сделать копию',
+      'Сделать копию'
     );
     if (!ok) return;
     const result = await BookService.forkSet(setId);
@@ -411,7 +456,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
       return;
     }
     const { newSetId } = result.data;
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getSession();
     const [ownSets, newCards] = await Promise.all([
       NeonService.loadSets(session?.user?.id),
       NeonService.loadCardsBySet(newSetId),
@@ -432,7 +477,8 @@ export function SetDetailScreen({ navigation, route }: Props) {
   const allCardsBySet = useCardsStore((s) => s.cardsBySet);
   const warmup = useMemo(() => {
     if (!set) return { waiting: [] as Card[], pool: [] as Card[] };
-    const courseId = activeCourseId && isSetInCourse(set, activeCourseId) ? activeCourseId : set.courseId;
+    const courseId =
+      activeCourseId && isSetInCourse(set, activeCourseId) ? activeCourseId : set.courseId;
     if (!courseId) return { waiting: [] as Card[], pool: [] as Card[] };
     const now = Date.now();
     const waiting: Card[] = [];
@@ -487,12 +533,15 @@ export function SetDetailScreen({ navigation, route }: Props) {
     }
     setIsPublishing(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getSession();
       if (!session?.user?.id) {
         toast.error('Нужно войти в аккаунт');
         return;
       }
-      const tags = publishTags.split(',').map(t => t.trim()).filter(Boolean);
+      const tags = publishTags
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
       const result = await LibraryService.publishSet(session.user.id, {
         setId,
         description: publishDescription.trim() || undefined,
@@ -517,10 +566,15 @@ export function SetDetailScreen({ navigation, route }: Props) {
         accessibilityRole="button"
         // Вложенные кнопки (изменить, меню) VoiceOver внутри доступного родителя не видит —
         // отдаём их действиями карточки (жест вверх/вниз)
-        accessibilityLabel={`${item.frontText ?? (item as any).front}. ${item.backText ?? (item as any).back}${isCardLearned(item) ? '. Выучена' : ''}`}
+        accessibilityLabel={`${item.frontText ?? (item as LegacyCard).front}. ${item.backText ?? (item as LegacyCard).back}. ${STATUS_LABEL[getCardStatus(item)]}`}
         accessibilityActions={[
           { name: 'longpress', label: 'Посмотреть' },
-          ...(isReadOnly ? [] : [{ name: 'edit', label: 'Изменить' }, { name: 'menu', label: 'Действия' }]),
+          ...(isReadOnly
+            ? []
+            : [
+                { name: 'edit', label: 'Изменить' },
+                { name: 'menu', label: 'Действия' },
+              ]),
         ]}
         onAccessibilityAction={(e) => {
           const action = e.nativeEvent.actionName;
@@ -542,27 +596,7 @@ export function SetDetailScreen({ navigation, route }: Props) {
         ]}
       >
         <View style={styles.cardTopRow}>
-          <View
-            style={[
-              styles.statusBadge,
-              {
-                backgroundColor:
-                  isCardLearned(item)
-                    ? alpha(colors.success, 10)
-                    : colors.surfaceMuted,
-                borderColor:
-                  isCardLearned(item)
-                    ? alpha(colors.success, 40)
-                    : colors.border,
-              },
-            ]}
-          >
-            {isCardLearned(item) ? (
-              <Check size={iconSize.xs} color={colors.successText} strokeWidth={2.5} />
-            ) : (
-              <Circle size={14} color={colors.textTertiary} strokeWidth={2} />
-            )}
-          </View>
+          <StatusBadge status={getCardStatus(item)} />
 
           {!isReadOnly && (
             <Pressable
@@ -577,16 +611,15 @@ export function SetDetailScreen({ navigation, route }: Props) {
           )}
         </View>
 
-        <Text variant="h3" style={[styles.cardFront, { color: colors.textPrimary }]} numberOfLines={2}>
-          {item.frontText ?? (item as any).front}
-        </Text>
         <Text
-          variant="bodySmall"
-          color="secondary"
+          variant="h3"
+          style={[styles.cardFront, { color: colors.textPrimary }]}
           numberOfLines={2}
-          style={styles.cardBack}
         >
-          {item.backText ?? (item as any).back}
+          {item.frontText ?? (item as LegacyCard).front}
+        </Text>
+        <Text variant="bodySmall" color="secondary" numberOfLines={2} style={styles.cardBack}>
+          {item.backText ?? (item as LegacyCard).back}
         </Text>
 
         {!isReadOnly && (
@@ -649,15 +682,23 @@ export function SetDetailScreen({ navigation, route }: Props) {
         )}
 
         {warmup.waiting.length > 0 && (
-          <Pressable accessibilityRole="button"
+          <Pressable
+            accessibilityRole="button"
             onPress={handleWarmup}
-            style={[styles.warmupBanner, { backgroundColor: alpha(colors.warning, 10), borderColor: alpha(colors.warning, 40) }]}
+            style={[
+              styles.warmupBanner,
+              {
+                backgroundColor: alpha(colors.warning, 10),
+                borderColor: alpha(colors.warning, 40),
+              },
+            ]}
           >
             {/* Компактно, в одну строку: баннер не должен отодвигать прогресс и карточки */}
             <Text style={[styles.warmupTitle, { color: colors.textPrimary }]} numberOfLines={1}>
               Разминка · {warmup.waiting.length} слов из прошлых уроков
               <Text style={{ color: colors.textSecondary, fontWeight: '400' }}>
-                {' '}· ~{Math.max(1, Math.round(warmup.waiting.length / 4))} мин
+                {' '}
+                · ~{Math.max(1, Math.round(warmup.waiting.length / 4))} мин
               </Text>
             </Text>
             <Text style={[styles.warmupAction, { color: colors.warning }]}>Начать</Text>
@@ -705,10 +746,15 @@ export function SetDetailScreen({ navigation, route }: Props) {
               onChangeText={setSearch}
               placeholder="Поиск по словам…"
               placeholderTextColor={colors.textTertiary}
-              style={[styles.searchInput, { color: colors.textPrimary }, Platform.OS === 'web' && { outlineStyle: 'none' }]}
+              style={[
+                styles.searchInput,
+                { color: colors.textPrimary },
+                Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
+              ]}
             />
           </View>
-          <Pressable accessibilityRole="button"
+          <Pressable
+            accessibilityRole="button"
             accessibilityLabel="Фильтр"
             style={[
               styles.sortButton,
@@ -725,9 +771,13 @@ export function SetDetailScreen({ navigation, route }: Props) {
           </Text>
           {/* «+ Добавить» здесь убран — он дублировал «Добавить карточку» в нижней панели */}
           {!isReadOnly && (
-            <Pressable accessibilityRole="button"
+            <Pressable
+              accessibilityRole="button"
               accessibilityLabel="Создать карточки из фото или файла"
-              onPress={() => { triggerHaptic('selection'); navigation.navigate('ImportFiles', { setId }); }}
+              onPress={() => {
+                triggerHaptic('selection');
+                navigation.navigate('ImportFiles', { setId });
+              }}
               hitSlop={8}
               style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xxs }}
             >
@@ -740,12 +790,25 @@ export function SetDetailScreen({ navigation, route }: Props) {
         </View>
       </View>
     ),
-    [set, stats, colors, filteredCards.length, navigation, openAddCardSheet, handleSetMenu, filter, search, setId, warmup, handleWarmup]
+    [
+      set,
+      stats,
+      colors,
+      filteredCards.length,
+      navigation,
+      openAddCardSheet,
+      handleSetMenu,
+      filter,
+      search,
+      setId,
+      warmup,
+      handleWarmup,
+    ]
   );
 
   // Пустой список
   const ListEmpty = useMemo(
-    () => (
+    () =>
       isReadOnly ? (
         <EmptyState icon={Layers} compact title="Учитель пока не добавил карточки" />
       ) : (
@@ -755,20 +818,28 @@ export function SetDetailScreen({ navigation, route }: Props) {
           compact
           title="Пока нет карточек"
           description="Сфотографируй страницу учебника — карточки появятся сами"
-          action={{ label: 'Из фото или файла', onPress: () => navigation.navigate('ImportFiles', { setId }) }}
+          action={{
+            label: 'Из фото или файла',
+            onPress: () => navigation.navigate('ImportFiles', { setId }),
+          }}
           secondaryAction={{ label: 'Добавить вручную', onPress: openAddCardSheet }}
         />
-      )
-    ),
+      ),
     [openAddCardSheet, isReadOnly, navigation, setId]
   );
 
   if (!set) {
-    return <MissingSet missing={setMissing} onMissing={setSetMissing} onBack={() => navigation.goBack()} />;
+    return (
+      <MissingSet
+        missing={setMissing}
+        onMissing={setSetMissing}
+        onBack={() => navigation.goBack()}
+      />
+    );
   }
 
   return (
-    <Container padded={false} edges={['top', 'bottom']}>
+    <Container padded={false}>
       <FlatList
         data={filteredCards}
         renderItem={renderCard}
@@ -786,17 +857,28 @@ export function SetDetailScreen({ navigation, route }: Props) {
         updateCellsBatchingPeriod={50}
       />
 
-      <BottomBar color={colors.surface} style={[styles.bottomBar, { borderTopColor: colors.border }]}>
-        <Pressable accessibilityRole="button"
-          onPress={() => { triggerHaptic('selection'); openAddCardSheet(); }}
+      <BottomBar
+        color={colors.surface}
+        style={[styles.bottomBar, { borderTopColor: colors.border }]}
+      >
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => {
+            triggerHaptic('selection');
+            openAddCardSheet();
+          }}
           style={[styles.secondaryAction, { borderColor: colors.border }]}
         >
           <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '700' }}>
             Добавить карточку
           </Text>
         </Pressable>
-        <Pressable accessibilityRole="button"
-          onPress={() => { triggerHaptic('selection'); setShowStudySheet(true); }}
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => {
+            triggerHaptic('selection');
+            setShowStudySheet(true);
+          }}
           style={[styles.primaryAction, { backgroundColor: colors.primaryFill }]}
         >
           <Text variant="body" style={{ color: colors.onPrimary, fontWeight: '700' }}>
@@ -809,185 +891,39 @@ export function SetDetailScreen({ navigation, route }: Props) {
       </BottomBar>
 
       {actionCardId && (
-        <View style={[styles.sheetWrapper, { zIndex: 25 }]} pointerEvents="box-none">
-          <Pressable
-            style={[styles.sheetBackdrop, { backgroundColor: backdropColor }]}
-            onPress={() => setActionCardId(null)}
-          />
-          <View
-            style={[
-              styles.sheet,
-              { backgroundColor: modalSurface, borderColor: modalBorder },
-            ]}
-          >
-            <Pressable accessibilityRole="button" style={styles.sheetAction} onPress={handleDeleteCard}>
-              <Text variant="body" style={{ color: colors.error, fontWeight: '700' }}>
-                Удалить
-              </Text>
-            </Pressable>
-            <Pressable accessibilityRole="button" style={styles.sheetAction} onPress={() => setActionCardId(null)}>
-              <Text variant="body" style={{ color: modalTextPrimary, fontWeight: '700' }}>
-                Отмена
-              </Text>
-            </Pressable>
-          </View>
-        </View>
+        <CardActionSheet
+          colors={colors}
+          backdropColor={backdropColor}
+          modalSurface={modalSurface}
+          modalBorder={modalBorder}
+          modalTextPrimary={modalTextPrimary}
+          setActionCardId={setActionCardId}
+          handleDeleteCard={handleDeleteCard}
+        />
       )}
 
       {showAddCard && (
-        <KeyboardAvoidingView
-          style={[styles.sheetWrapper, { zIndex: 30 }]}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          pointerEvents="box-none"
-        >
-          <Pressable
-            style={[styles.sheetBackdrop, { backgroundColor: backdropColor }]}
-            onPress={() => setShowAddCard(false)}
-          />
-          <View
-            style={[
-              styles.addSheet,
-              { backgroundColor: modalSurface, borderColor: modalBorder, maxHeight: '85%' },
-            ]}
-          >
-            <View style={styles.addSheetHeader}>
-              <Text variant="h3" style={{ color: modalTextPrimary }}>
-                Новая карточка
-              </Text>
-              <Pressable accessibilityRole="button"
-                onPress={() => { setShowAddCard(false); navigation.navigate('ImportFiles', { setId }); }}
-                style={[styles.exportButton, { backgroundColor: colors.primaryFill }]}
-              >
-                <Camera size={iconSize.xs} color={colors.onPrimary} />
-                <Text variant="bodySmall" style={{ color: colors.onPrimary, fontWeight: '700' }}>
-                  Из фото или файла
-                </Text>
-              </Pressable>
-            </View>
-
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ gap: spacing.m, paddingBottom: spacing.s }}
-            >
-              <View style={styles.addField}>
-                <Text variant="label" color="primary" style={styles.fieldLabel}>
-                  Иностранное слово
-                </Text>
-                <TextInput
-                  value={newFront}
-                  onChangeText={setNewFront}
-                  maxLength={config.limits.maxCardFrontLength}
-                  placeholder="Например: scharf"
-                  placeholderTextColor={modalPlaceholder}
-                  style={[
-                    styles.addInput,
-                    {
-                      color: modalTextPrimary,
-                      borderColor: modalBorder,
-                      backgroundColor: modalInputBg,
-                      ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
-                    }
-                  ]}
-                />
-              </View>
-
-              <View style={styles.addField}>
-                <Text variant="label" color="primary" style={styles.fieldLabel}>
-                  Перевод
-                </Text>
-                <TextInput
-                  value={newBack}
-                  onChangeText={setNewBack}
-                  maxLength={config.limits.maxCardBackLength}
-                  placeholder="Например: острый"
-                  placeholderTextColor={modalPlaceholder}
-                  style={[
-                    styles.addInput,
-                    {
-                      color: modalTextPrimary,
-                      borderColor: modalBorder,
-                      backgroundColor: modalInputBg,
-                      ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
-                    }
-                  ]}
-                />
-              </View>
-
-              <View style={styles.addField}>
-                <Text variant="label" color="primary" style={styles.fieldLabel}>
-                  Пример
-                </Text>
-                <TextInput
-                  value={newExample}
-                  onChangeText={setNewExample}
-                  maxLength={config.limits.maxCardExampleLength}
-                  placeholder="Например: Der scharfe Pfeffer..."
-                  placeholderTextColor={modalPlaceholder}
-                  style={[
-                    styles.addInput,
-                    {
-                      color: modalTextPrimary,
-                      borderColor: modalBorder,
-                      backgroundColor: modalInputBg,
-                      ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
-                    }
-                  ]}
-                  multiline
-                />
-              </View>
-
-              <View style={styles.addField}>
-                <Text variant="label" color="primary" style={styles.fieldLabel}>
-                  Мнемоника
-                </Text>
-                <TextInput
-                  value={newMnemonic}
-                  onChangeText={setNewMnemonic}
-                  placeholder="Своя ассоциация для запоминания"
-                  placeholderTextColor={modalPlaceholder}
-                  style={[
-                    styles.addInput,
-                    {
-                      color: modalTextPrimary,
-                      borderColor: modalBorder,
-                      backgroundColor: modalInputBg,
-                      ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
-                    }
-                  ]}
-                  multiline
-                />
-              </View>
-            </ScrollView>
-
-            <View style={styles.addActions}>
-              <Pressable accessibilityRole="button" style={[styles.secondaryAction, { borderColor: modalBorder }]} onPress={() => setShowAddCard(false)}>
-                <Text variant="body" style={{ color: modalTextSecondary, fontWeight: '700' }}>
-                  Отмена
-                </Text>
-              </Pressable>
-              <Pressable accessibilityRole="button"
-                style={[
-                  styles.primaryAction,
-                  {
-                    backgroundColor: newFront.trim() && newBack.trim() && !isAdding
-                      ? colors.primaryFill
-                      : modalBorder,
-                  },
-                ]}
-                disabled={!newFront.trim() || !newBack.trim() || isAdding}
-                onPress={handleCreateCard}
-              >
-                <Text
-                  variant="body"
-                  style={{ color: colors.onPrimary, fontWeight: '700' }}
-                >
-                  Сохранить
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
+        <AddCardSheet
+          colors={colors}
+          backdropColor={backdropColor}
+          modalSurface={modalSurface}
+          modalBorder={modalBorder}
+          modalTextPrimary={modalTextPrimary}
+          modalTextSecondary={modalTextSecondary}
+          modalInputBg={modalInputBg}
+          modalPlaceholder={modalPlaceholder}
+          setShowAddCard={setShowAddCard}
+          handleCreateCard={handleCreateCard}
+          isAdding={isAdding}
+          newFront={newFront}
+          setNewFront={setNewFront}
+          newBack={newBack}
+          setNewBack={setNewBack}
+          newExample={newExample}
+          setNewExample={setNewExample}
+          navigation={navigation}
+          setId={setId}
+        />
       )}
 
       <StudyModeSheet
@@ -995,665 +931,62 @@ export function SetDetailScreen({ navigation, route }: Props) {
         onClose={() => setShowStudySheet(false)}
         subtitle={`Набор: ${set?.title || 'Набор'} • ${set?.cardCount || 0} ${pluralize(set?.cardCount || 0, 'слово', 'слова', 'слов')}`}
         onSelectMode={handleSelectStudyMode}
+        games={studyModeGames}
+        setSession={
+          sessionInfo
+            ? {
+                title: set?.title || 'Набор',
+                info: sessionInfo,
+                onStart: () => {
+                  setShowStudySheet(false);
+                  startSetSession(navigation, setId, sessionInfo.plan);
+                },
+                onAddWords: () => {
+                  setShowStudySheet(false);
+                  openAddCardSheet();
+                },
+              }
+            : undefined
+        }
         settings={{
           onlyHard,
           onToggleOnlyHard: () => setOnlyHard((v) => !v),
-          showMnemonic,
-          onToggleShowMnemonic: () => setShowMnemonic((v) => !v),
           wordLimit,
           onSelectWordLimit: handleSelectWordLimit,
         }}
       />
 
       {showPublishModal && (
-        <View style={[styles.importOverlay, { backgroundColor: backdropColor }]} pointerEvents="box-none">
-          <Pressable
-            style={[styles.sheetBackdrop, { backgroundColor: backdropColor }]}
-            onPress={() => !isPublishing && setShowPublishModal(false)}
-          />
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{ width: '100%', maxWidth: 480, alignItems: 'center' }}
-          >
-            <View
-              style={[
-                styles.importCard,
-                { backgroundColor: modalSurface, borderColor: modalBorder },
-              ]}
-            >
-              <View style={styles.importTopBar}>
-                <Pressable
-                  onPress={() => !isPublishing && setShowPublishModal(false)}
-                  hitSlop={10}
-                  style={styles.topIcon}
-                  accessibilityRole="button"
-                  accessibilityLabel="Закрыть"
-                >
-                  <X size={iconSize.m} color={modalTextPrimary} />
-                </Pressable>
-                <Text variant="body" style={[styles.importTitle, { color: modalTextPrimary }]}>
-                  Опубликовать в библиотеке
-                </Text>
-                <View style={styles.topIcon} />
-              </View>
-
-              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.m, paddingBottom: spacing.s }}>
-                <View style={styles.addField}>
-                  <Text variant="label" color="primary" style={styles.fieldLabel}>
-                    Описание (необязательно)
-                  </Text>
-                  <TextInput
-                    value={publishDescription}
-                    onChangeText={setPublishDescription}
-                    placeholder="Расскажи о наборе..."
-                    placeholderTextColor={modalPlaceholder}
-                    maxLength={500}
-                    multiline
-                    style={[
-                      styles.addInput,
-                      {
-                        color: modalTextPrimary,
-                        borderColor: modalBorder,
-                        backgroundColor: modalInputBg,
-                        minHeight: 80,
-                        textAlignVertical: 'top',
-                        ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
-                      },
-                    ]}
-                  />
-                  <Text variant="caption" color="secondary" style={{ alignSelf: 'flex-end' }}>
-                    {publishDescription.length}/500
-                  </Text>
-                </View>
-
-                <View style={styles.addField}>
-                  <Text variant="label" color="primary" style={styles.fieldLabel}>
-                    Категория *
-                  </Text>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
-                    {LIBRARY_CATEGORIES.map((cat) => (
-                      <Pressable accessibilityRole="button" accessibilityState={{ selected: publishCategory === cat.key }}
-                        key={cat.key}
-                        onPress={() => setPublishCategory(cat.key)}
-                        style={[
-                          styles.wordChip,
-                          {
-                            backgroundColor: publishCategory === cat.key ? colors.primaryFill : 'transparent',
-                            borderColor: publishCategory === cat.key ? colors.primaryFill : modalBorder,
-                          },
-                        ]}
-                      >
-                        <Text
-                          variant="caption"
-                          style={{
-                            color: publishCategory === cat.key ? colors.onPrimary : modalTextSecondary,
-                            fontWeight: '700',
-                          }}
-                        >
-                          {cat.label}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
-
-                <View style={styles.addField}>
-                  <Text variant="label" color="primary" style={styles.fieldLabel}>
-                    Теги (через запятую)
-                  </Text>
-                  <TextInput
-                    value={publishTags}
-                    onChangeText={setPublishTags}
-                    placeholder="например: A1, начинающим, еда"
-                    placeholderTextColor={modalPlaceholder}
-                    style={[
-                      styles.addInput,
-                      {
-                        color: modalTextPrimary,
-                        borderColor: modalBorder,
-                        backgroundColor: modalInputBg,
-                        ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
-                      },
-                    ]}
-                  />
-                </View>
-              </ScrollView>
-
-              <View style={styles.addActions}>
-                <Pressable accessibilityRole="button"
-                  style={[styles.secondaryAction, { borderColor: modalBorder }]}
-                  onPress={() => !isPublishing && setShowPublishModal(false)}
-                >
-                  <Text variant="body" style={{ color: modalTextSecondary, fontWeight: '700' }}>
-                    Отмена
-                  </Text>
-                </Pressable>
-                <Pressable accessibilityRole="button"
-                  style={[
-                    styles.primaryAction,
-                    {
-                      backgroundColor: publishCategory && !isPublishing ? colors.primaryFill : modalBorder,
-                      flexDirection: 'row',
-                      gap: spacing.xs,
-                    },
-                  ]}
-                  disabled={!publishCategory || isPublishing}
-                  onPress={handlePublish}
-                >
-                  {isPublishing ? (
-                    <ActivityIndicator size="small" color={colors.onPrimary} />
-                  ) : (
-                    <>
-                      <Globe size={18} color={colors.onPrimary} />
-                      <Text variant="body" style={{ color: colors.onPrimary, fontWeight: '700' }}>
-                        Опубликовать
-                      </Text>
-                    </>
-                  )}
-                </Pressable>
-              </View>
-            </View>
-          </KeyboardAvoidingView>
-        </View>
+        <PublishSetModal
+          colors={colors}
+          backdropColor={backdropColor}
+          modalSurface={modalSurface}
+          modalBorder={modalBorder}
+          modalTextPrimary={modalTextPrimary}
+          modalTextSecondary={modalTextSecondary}
+          modalInputBg={modalInputBg}
+          modalPlaceholder={modalPlaceholder}
+          setShowPublishModal={setShowPublishModal}
+          handlePublish={handlePublish}
+          isPublishing={isPublishing}
+          publishCategory={publishCategory}
+          setPublishCategory={setPublishCategory}
+          publishDescription={publishDescription}
+          setPublishDescription={setPublishDescription}
+          publishTags={publishTags}
+          setPublishTags={setPublishTags}
+        />
       )}
 
       {/* Card Preview Modal */}
-      <Modal
-        visible={previewCard !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPreviewCard(null)}
-      >
-        <Pressable accessibilityRole="button"
-          style={[styles.previewOverlay, { backgroundColor: colors.overlay }]}
-          onPress={() => setPreviewCard(null)}
-          accessibilityLabel="Закрыть"
-        >
-          {Platform.OS === 'web' ? (
-            <View
-              style={[
-                styles.previewCard,
-                {
-                  backgroundColor: alpha(colors.surface, 40),
-                  borderColor: colors.border,
-                },
-              ]}
-            >
-              <View style={styles.previewFrontSection}>
-                <Text
-                  style={[styles.previewFrontText, { color: colors.textPrimary }]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.6}
-                  allowFontScaling={false}
-                >
-                  {previewCard?.frontText ?? (previewCard as any)?.front}
-                </Text>
-              </View>
-              <View style={[styles.previewDivider, { backgroundColor: colors.border }]} />
-              <View style={styles.previewBackSection}>
-                <Text
-                  style={[styles.previewBackText, { color: colors.textSecondary }]}
-                  numberOfLines={2}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.7}
-                  allowFontScaling={false}
-                >
-                  {previewCard?.backText ?? (previewCard as any)?.back}
-                </Text>
-                {previewCard?.example ? (
-                  <Text style={[styles.previewExample, { color: colors.textTertiary }]}>
-                    {previewCard.example}
-                  </Text>
-                ) : null}
-              </View>
-            </View>
-          ) : (
-            <BlurView
-              blurType={theme === 'dark' ? 'dark' : 'xlight'}
-              blurAmount={24}
-              style={[
-                styles.previewCard,
-                { borderColor: colors.border },
-              ]}
-            >
-              <View style={styles.previewFrontSection}>
-                <Text
-                  style={[styles.previewFrontText, { color: colors.textPrimary }]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.6}
-                  allowFontScaling={false}
-                >
-                  {previewCard?.frontText ?? (previewCard as any)?.front}
-                </Text>
-              </View>
-              <View style={[styles.previewDivider, { backgroundColor: colors.border }]} />
-              <View style={styles.previewBackSection}>
-                <Text
-                  style={[styles.previewBackText, { color: colors.textSecondary }]}
-                  numberOfLines={2}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.7}
-                  allowFontScaling={false}
-                >
-                  {previewCard?.backText ?? (previewCard as any)?.back}
-                </Text>
-                {previewCard?.example ? (
-                  <Text style={[styles.previewExample, { color: colors.textTertiary }]}>
-                    {previewCard.example}
-                  </Text>
-                ) : null}
-              </View>
-            </BlurView>
-          )}
-        </Pressable>
-      </Modal>
-
-    </Container>
-  );
-}
-
-function FilterPill({
-  label,
-  active,
-  onPress,
-  colors,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-  colors: ReturnType<typeof useThemeColors>;
-}) {
-  return (
-    <Pressable accessibilityRole="button" accessibilityState={{ selected: active }}
-      onPress={() => { triggerHaptic('selection'); onPress(); }}
-      style={[
-        styles.filterPill,
-        {
-          backgroundColor: active ? colors.primaryFill : 'transparent',
-          borderColor: active ? colors.primaryFill : colors.border,
-        },
-      ]}
-    >
-      <Text
-        variant="bodySmall"
-        style={{ color: active ? colors.onPrimary : colors.textSecondary, fontWeight: '700' }}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
-// ==================== СТИЛИ ====================
-
-function MissingSet({ missing, onMissing, onBack }: { missing: boolean; onMissing: (missing: boolean) => void; onBack: () => void }) {
-  useEffect(() => {
-    DatabaseService.syncStudentCourses().catch(() => {});
-    const timer = setTimeout(() => onMissing(true), 8000);
-    return () => clearTimeout(timer);
-  }, [onMissing]);
-  if (!missing) return <Loading fullScreen message="Загрузка..." />;
-  return (
-    <Container>
-      <EmptyState
-        icon={Layers}
-        title="Набор не найден"
-        description="Возможно, его удалили или скрыли. Попробуй открыть курс ещё раз."
-        action={{ label: 'Назад', onPress: onBack }}
+      <CardPreviewModal
+        previewCard={previewCard}
+        setPreviewCard={setPreviewCard}
+        colors={colors}
+        theme={theme}
       />
     </Container>
   );
 }
 
-const styles = StyleSheet.create({
-  header: {
-    paddingHorizontal: spacing.m,
-    paddingTop: spacing.m,
-    paddingBottom: spacing.s,
-  },
-
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: spacing.s,
-    borderBottomWidth: 1,
-  },
-  topIcon: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  topTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontWeight: '700',
-  },
-  warmupBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginHorizontal: 16,
-    marginTop: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: borderRadius.m,
-    borderWidth: 1,
-    minHeight: 44,
-  },
-  warmupTitle: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  warmupAction: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  officialBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'center',
-    gap: 6,
-    marginTop: spacing.s,
-    paddingHorizontal: spacing.s,
-    paddingVertical: 4,
-    borderRadius: borderRadius.full,
-    maxWidth: '100%',
-  },
-  officialBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    flexShrink: 1,
-  },
-  progressBlock: {
-    marginTop: spacing.m,
-    marginBottom: spacing.s,
-  },
-  segmented: {
-    flexDirection: 'row',
-    gap: spacing.s,
-    marginTop: spacing.m,
-  },
-  filterPill: {
-    flex: 1,
-    paddingVertical: spacing.s,
-    borderRadius: borderRadius.l,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  searchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.s,
-    marginTop: spacing.m,
-  },
-  searchBox: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: borderRadius.l,
-    paddingHorizontal: spacing.m,
-    height: 46,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-  },
-  sortButton: {
-    width: 46,
-    height: 46,
-    borderRadius: borderRadius.l,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing.l,
-    marginBottom: spacing.s,
-  },
-  listContent: {
-    paddingBottom: spacing.xl,
-  },
-  columns: {
-    paddingHorizontal: spacing.m,
-    gap: spacing.s,
-  },
-  cardItem: {
-    flex: 1,
-    borderRadius: borderRadius.xl,
-    padding: spacing.m,
-    marginBottom: spacing.s,
-    borderWidth: 1,
-    minHeight: 140,
-    position: 'relative',
-  },
-  cardTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.s,
-  },
-  statusBadge: {
-    paddingHorizontal: spacing.s,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  iconButton: {
-    padding: spacing.xs,
-  },
-  cardFront: {
-    marginBottom: spacing.xs,
-  },
-  cardBack: {
-    marginBottom: spacing.m,
-  },
-  menuButton: {
-    position: 'absolute',
-    right: spacing.s,
-    bottom: spacing.s,
-    padding: spacing.xs,
-  },
-  bottomBar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    padding: spacing.m,
-    paddingBottom: spacing.m + 10,
-    flexDirection: 'row',
-    gap: spacing.m,
-    borderTopWidth: 1,
-  },
-  secondaryAction: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: borderRadius.l,
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 54,
-    paddingHorizontal: spacing.s,
-  },
-  primaryAction: {
-    flex: 1.2,
-    borderRadius: borderRadius.l,
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 54,
-    paddingHorizontal: spacing.s,
-  },
-  sheetWrapper: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
-    zIndex: 20,
-  },
-  sheetBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  sheet: {
-    borderTopLeftRadius: borderRadius.xl,
-    borderTopRightRadius: borderRadius.xl,
-    borderWidth: 1,
-    padding: spacing.m,
-    gap: spacing.s,
-  },
-  sheetAction: {
-    paddingVertical: spacing.m,
-    alignItems: 'center',
-  },
-  wordChip: {
-    paddingHorizontal: spacing.s,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.m,
-    borderWidth: 1,
-  },
-  startBlock: {
-    marginTop: spacing.s,
-  },
-  startButton: {
-    borderRadius: borderRadius.l,
-    paddingVertical: spacing.m,
-    alignItems: 'center',
-  },
-  addSheet: {
-    borderTopLeftRadius: borderRadius.xl,
-    borderTopRightRadius: borderRadius.xl,
-    borderWidth: 1,
-    padding: spacing.l,
-    gap: spacing.m,
-  },
-  addSheetHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.s,
-  },
-  addField: {
-    gap: spacing.xs,
-  },
-  fieldLabel: {
-    marginBottom: spacing.xs / 2,
-  },
-  addInput: {
-    borderWidth: 1,
-    borderRadius: borderRadius.l,
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.s + 2,
-    fontSize: 16,
-  },
-  exportButton: {
-    height: EXPORT_BUTTON_HEIGHT,
-    minWidth: 132,
-    paddingHorizontal: spacing.m,
-    borderRadius: Math.round(EXPORT_BUTTON_HEIGHT * 0.2),
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-  },
-  addActions: {
-    flexDirection: 'row',
-    gap: spacing.s,
-    marginTop: spacing.s,
-  },
-  importOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.m,
-    zIndex: 45,
-  },
-  importCard: {
-    width: '100%',
-    maxWidth: 480,
-    borderRadius: borderRadius.xl,
-    borderWidth: 1,
-    padding: spacing.l,
-    gap: spacing.m,
-  },
-  importTopBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  importTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  importButton: {
-    height: 56,
-    borderRadius: borderRadius.l,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.s,
-  },
-
-  // Card Preview Modal
-  previewOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.xl,
-  },
-  previewCard: {
-    width: Math.min(340, Dimensions.get('window').width - 48),
-    borderRadius: borderRadius.xl,
-    borderWidth: 1,
-    overflow: 'hidden',
-    // Без тени: карточку отделяет затемнение (брендбук, 10)
-    ...Platform.select({
-      web: {
-        backdropFilter: 'blur(40px)',
-        WebkitBackdropFilter: 'blur(40px)',
-      },
-    }) as any,
-  },
-  previewFrontSection: {
-    padding: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 140,
-  },
-  previewFrontText: {
-    fontSize: 32,
-    fontWeight: '700',
-    textAlign: 'center',
-    letterSpacing: -0.5,
-  },
-  previewDivider: {
-    height: 1,
-    marginHorizontal: 24,
-  },
-  previewBackSection: {
-    padding: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 120,
-    gap: 12,
-  },
-  previewBackText: {
-    fontSize: 24,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  previewExample: {
-    fontSize: 16,
-    fontWeight: '400',
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-});
+// ==================== СТИЛИ ====================

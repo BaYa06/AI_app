@@ -4,9 +4,8 @@
  * карточки через api/ai?fn=import-files, и дневной лимит распознаваний (fn=usage).
  * Ошибки сервера превращаются в AiImportError с кодом — экран показывает понятный текст.
  */
-import { API_BASE } from '@/config/apiBase';
-import { supabase } from './supabaseClient';
-import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
+import { getAccessToken } from './auth/session';
+import { apiFetch } from './api/client';
 
 /** Файл, подготовленный к отправке (фото уже сжато, PDF/таблица прочитаны) */
 export type ImportFileKind = 'image' | 'pdf' | 'table' | 'text';
@@ -59,15 +58,17 @@ export interface ImportRequest {
   prompt?: string;
   languageFrom?: string;
   languageTo?: string;
+  /** Тип набора: для 'subject' сервер делает только «Вопрос-ответ» / «Термины», без перевода */
+  setKind?: 'language' | 'subject';
 }
 
 export type AiImportErrorCode =
-  | 'ai_busy'      // все модели перегружены — повторить через retryAfter
-  | 'daily_limit'  // исчерпан дневной лимит — до resetAt
-  | 'too_large'    // больше ~3 МБ за раз
+  | 'ai_busy' // все модели перегружены — повторить через retryAfter
+  | 'daily_limit' // исчерпан дневной лимит — до resetAt
+  | 'too_large' // больше ~3 МБ за раз
   | 'unauthorized'
   | 'network'
-  | 'cancelled'    // пользователь нажал «Отменить»
+  | 'cancelled' // пользователь нажал «Отменить»
   | 'server';
 
 export class AiImportError extends Error {
@@ -80,7 +81,7 @@ export class AiImportError extends Error {
   constructor(
     code: AiImportErrorCode,
     message: string,
-    extra: { retryAfter?: number; resetAt?: string; detail?: string } = {},
+    extra: { retryAfter?: number; resetAt?: string; detail?: string } = {}
   ) {
     super(message);
     this.code = code;
@@ -106,24 +107,31 @@ export function payloadSize(file: ImportFile): number {
 }
 
 async function authHeaders(): Promise<Record<string, string>> {
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
-  if (!token) throw new AiImportError('unauthorized', 'Войди в аккаунт, чтобы создавать карточки с ИИ');
+  const token = await getAccessToken();
+  if (!token)
+    throw new AiImportError('unauthorized', 'Войди в аккаунт, чтобы создавать карточки с ИИ');
   return { Authorization: `Bearer ${token}` };
 }
 
 async function toAiError(response: Response): Promise<AiImportError> {
-  const body = await response.json().catch(() => ({} as Record<string, unknown>));
+  const body = await response.json().catch(() => ({}) as Record<string, unknown>);
   const error = typeof body.error === 'string' ? body.error : '';
   if (response.status === 429 && error === 'daily_limit') {
-    return new AiImportError('daily_limit', 'Лимит распознаваний на сегодня исчерпан', { resetAt: body.resetAt as string });
+    return new AiImportError('daily_limit', 'Лимит распознаваний на сегодня исчерпан', {
+      resetAt: body.resetAt as string,
+    });
   }
   if (response.status === 429) {
-    return new AiImportError('ai_busy', 'ИИ сейчас перегружен', { retryAfter: Number(body.retryAfter) || 30 });
+    return new AiImportError('ai_busy', 'ИИ сейчас перегружен', {
+      retryAfter: Number(body.retryAfter) || 30,
+    });
   }
-  if (response.status === 413) return new AiImportError('too_large', 'Слишком много за раз — максимум ~3 МБ');
-  if (response.status === 401) return new AiImportError('unauthorized', 'Войди в аккаунт, чтобы создавать карточки с ИИ');
-  if (response.status === 504) return new AiImportError('ai_busy', 'ИИ не успел ответить', { retryAfter: 10 });
+  if (response.status === 413)
+    return new AiImportError('too_large', 'Слишком много за раз — максимум ~3 МБ');
+  if (response.status === 401)
+    return new AiImportError('unauthorized', 'Войди в аккаунт, чтобы создавать карточки с ИИ');
+  if (response.status === 504)
+    return new AiImportError('ai_busy', 'ИИ не успел ответить', { retryAfter: 10 });
   return new AiImportError('server', 'Не удалось создать карточки', {
     detail: `${response.status}${error ? ` · ${error.slice(0, 160)}` : ''}`,
   });
@@ -133,29 +141,40 @@ async function toAiError(response: Response): Promise<AiImportError> {
  * Распознать файлы и создать карточки. Ответ ждём до ~2 минут: сервер перебирает модели.
  * signal — отмена пользователем (AiImportError 'cancelled').
  */
-export async function importFiles(request: ImportRequest, signal?: AbortSignal): Promise<ImportResult> {
+export async function importFiles(
+  request: ImportRequest,
+  signal?: AbortSignal
+): Promise<ImportResult> {
   const headers = await authHeaders();
-  const files = request.files.map(f =>
+  const files = request.files.map((f) =>
     f.kind === 'image' || f.kind === 'pdf'
       ? { type: 'binary', name: f.name, mimeType: f.mimeType, base64: f.base64 }
-      : { type: 'text', name: f.name, mimeType: f.mimeType, content: f.content },
+      : { type: 'text', name: f.name, mimeType: f.mimeType, content: f.content }
   );
 
   let response: Response;
   try {
-    response = await fetchWithTimeout(`${API_BASE}/ai?fn=import-files`, {
+    const res = await apiFetch('ai', {
       method: 'POST',
+      query: { fn: 'import-files' },
       headers: { 'Content-Type': 'application/json', ...headers },
-      body: JSON.stringify({
+      auth: 'none',
+      body: {
         files,
         goal: request.goal,
         level: request.level,
         prompt: request.prompt?.trim() || undefined,
         languageFrom: request.languageFrom,
         languageTo: request.languageTo,
-      }),
+        setKind: request.setKind,
+      },
       signal,
-    }, 120_000);
+      timeoutMs: 120_000,
+      // toAiError и разбор успеха читают тело сами (невалидный JSON успеха — исключение, как раньше)
+      parse: 'none',
+    });
+    if (!res.response) throw res.error.original;
+    response = res.response;
   } catch {
     if (signal?.aborted) throw new AiImportError('cancelled', 'Отменено');
     throw new AiImportError('network', 'Нет связи с сервером. Проверь интернет');
@@ -177,9 +196,15 @@ export async function importFiles(request: ImportRequest, signal?: AbortSignal):
 export async function getAiUsage(): Promise<AiUsage | null> {
   try {
     const headers = await authHeaders();
-    const response = await fetchWithTimeout(`${API_BASE}/ai?fn=usage`, { headers }, 15_000);
-    if (!response.ok) return null;
-    return (await response.json()) as AiUsage;
+    const res = await apiFetch('ai', {
+      query: { fn: 'usage' },
+      headers,
+      auth: 'none',
+      timeoutMs: 15_000,
+      parse: 'none',
+    });
+    if (!res.ok) return null;
+    return (await res.response.json()) as AiUsage;
   } catch {
     return null;
   }

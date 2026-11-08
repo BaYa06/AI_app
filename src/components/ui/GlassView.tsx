@@ -19,8 +19,19 @@ export interface GlassViewProps extends ViewProps {
 
 export const isGlassSupported = false;
 
-export const GlassView = memo(function GlassView({ fallbackColor, tint: _tint, cornerRadius = 0, style, ...rest }: GlassViewProps) {
-  return <View {...rest} style={[{ backgroundColor: fallbackColor, borderRadius: cornerRadius }, style]} />;
+export const GlassView = memo(function GlassView({
+  fallbackColor,
+  tint: _tint,
+  cornerRadius = 0,
+  style,
+  ...rest
+}: GlassViewProps) {
+  return (
+    <View
+      {...rest}
+      style={[{ backgroundColor: fallbackColor, borderRadius: cornerRadius }, style]}
+    />
+  );
 });
 
 export interface GlassContainerProps extends ViewProps {
@@ -28,6 +39,9 @@ export interface GlassContainerProps extends ViewProps {
   spacing?: number;
 }
 
-export const GlassContainer = memo(function GlassContainer({ spacing: _spacing, ...rest }: GlassContainerProps) {
+export const GlassContainer = memo(function GlassContainer({
+  spacing: _spacing,
+  ...rest
+}: GlassContainerProps) {
   return <View {...rest} />;
 });

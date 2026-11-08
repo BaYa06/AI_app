@@ -3,6 +3,7 @@ import { getAuthedUserId, hasBearerSecret } from './_auth.js';
 import { ensureDatabaseInitialized } from './_db-init.js';
 import { HttpError, UUID_RE, uuid, assertReadableSet } from './_access.js';
 import { courseSetIdsSql } from './_course.js';
+import { log } from './_log.js';
 
 /**
  * Прогресс по карточкам — единственное место, где меняется уровень карточки.
@@ -60,7 +61,10 @@ function statusForStep(step) {
   return 'mature';
 }
 
-const normalize = (value) => String(value ?? '').trim().toLowerCase();
+const normalize = (value) =>
+  String(value ?? '')
+    .trim()
+    .toLowerCase();
 
 /**
  * Новое состояние карточки после ответа (план §1.2):
@@ -115,34 +119,45 @@ export function scoreAnswer(a, correct, state, next) {
   if (a.timeSpentMs !== null && a.timeSpentMs < MIN_ANSWER_MS_FOR_POINTS) return [];
   const events = [];
   if (state.step === 0 && next.step === 1) events.push({ kind: 'new', points: POINTS.new });
-  else if (next.due && state.reviewScheduled) events.push({ kind: 'review', points: POINTS.review });
-  if (next.step >= 3 && !state.firstLearnedAt) events.push({ kind: 'learned', points: POINTS.learned });
-  if (next.step >= 5 && !state.firstMatureAt) events.push({ kind: 'mature', points: POINTS.mature });
+  else if (next.due && state.reviewScheduled)
+    events.push({ kind: 'review', points: POINTS.review });
+  if (next.step >= 3 && !state.firstLearnedAt)
+    events.push({ kind: 'learned', points: POINTS.learned });
+  if (next.step >= 5 && !state.firstMatureAt)
+    events.push({ kind: 'mature', points: POINTS.mature });
   return events;
 }
 
 /** Проверка ответа сервером — клиент может только сообщить, что выбрал/собрал. */
 function judge(answer, card) {
   if (answer.mode === 'test') return answer.chosen === card.id;
-  if (answer.mode === 'builder') return normalize(answer.chosen) === normalize(card.front) && normalize(card.front) !== '';
+  if (answer.mode === 'builder')
+    return normalize(answer.chosen) === normalize(card.front) && normalize(card.front) !== '';
   return answer.selfRating >= 3;
 }
 
 function parseAnswer(raw) {
   if (!raw || typeof raw !== 'object') throw new HttpError(400, 'answer must be an object');
   const { answerId, cardId, mode, chosen, selfRating, answeredAt, timeSpentMs } = raw;
-  if (!UUID_RE.test(answerId || '') || !UUID_RE.test(cardId || '')) throw new HttpError(400, 'answerId and cardId must be uuids');
+  if (!UUID_RE.test(answerId || '') || !UUID_RE.test(cardId || ''))
+    throw new HttpError(400, 'answerId and cardId must be uuids');
   if (!MODES.has(mode)) throw new HttpError(400, 'unknown mode');
-  if (mode === 'flashcard' && ![1, 2, 3, 4].includes(selfRating)) throw new HttpError(400, 'selfRating 1..4 required');
-  if (mode !== 'flashcard' && typeof chosen !== 'string') throw new HttpError(400, 'chosen required');
+  if (mode === 'flashcard' && ![1, 2, 3, 4].includes(selfRating))
+    throw new HttpError(400, 'selfRating 1..4 required');
+  if (mode !== 'flashcard' && typeof chosen !== 'string')
+    throw new HttpError(400, 'chosen required');
   const at = Number(answeredAt);
   if (!Number.isFinite(at)) throw new HttpError(400, 'answeredAt required');
   return {
-    answerId, cardId, mode,
+    answerId,
+    cardId,
+    mode,
     chosen: typeof chosen === 'string' ? chosen.slice(0, 500) : null,
     selfRating: mode === 'flashcard' ? selfRating : null,
     answeredAt: Math.trunc(at),
-    timeSpentMs: Number.isFinite(Number(timeSpentMs)) ? Math.max(0, Math.min(3_600_000, Math.trunc(Number(timeSpentMs)))) : null,
+    timeSpentMs: Number.isFinite(Number(timeSpentMs))
+      ? Math.max(0, Math.min(3_600_000, Math.trunc(Number(timeSpentMs))))
+      : null,
   };
 }
 
@@ -220,7 +235,11 @@ async function processAnswer(sql, me, a, now, recentCount) {
     }
 
     const correct = judge(a, card);
-    const next = applyAnswer(state, { correct, selfRating: a.selfRating, mode: a.mode }, a.answeredAt);
+    const next = applyAnswer(
+      state,
+      { correct, selfRating: a.selfRating, mode: a.mode },
+      a.answeredAt
+    );
     const events = scoreAnswer(a, correct, state, next);
     // «Выучено» для рейтинга фиксирует только объективная проверка (тест / «Собери слово»)
     const objectiveCorrect = a.mode !== 'flashcard' && correct;
@@ -266,7 +285,10 @@ async function processAnswer(sql, me, a, now, recentCount) {
       if (rows[0]?.id) {
         recentCount.value += 1;
         return {
-          status: 'ok', learningStep: next.step, nextReview: next.nextReview, lastReviewed: a.answeredAt,
+          status: 'ok',
+          learningStep: next.step,
+          nextReview: next.nextReview,
+          lastReviewed: a.answeredAt,
           points: rows[0].points,
         };
       }
@@ -430,14 +452,28 @@ async function leaderboard(sql, me, q) {
       `
     : [];
   const closed = previous
-    ? (await sql`SELECT 1 FROM weekly_closures WHERE course_id = ${courseId}::uuid AND week_start = ${weekStart}::date`).length > 0
+    ? (
+        await sql`SELECT 1 FROM weekly_closures WHERE course_id = ${courseId}::uuid AND week_start = ${weekStart}::date`
+      ).length > 0
     : false;
 
   if (closed) {
-    rows = frozen.map((r) => ({ userId: r.user_id, name: r.name, points: r.points, place: r.place, reward: r.reward, hidden: false }));
+    rows = frozen.map((r) => ({
+      userId: r.user_id,
+      name: r.name,
+      points: r.points,
+      place: r.place,
+      reward: r.reward,
+      hidden: false,
+    }));
   } else {
     rows = rankRows(await computeStandings(sql, courseId, ctx.tz, weekStart)).map((r) => ({
-      userId: r.user_id, name: r.name, points: r.points, place: r.place, reward: 0, hidden: r.hide_from_rating,
+      userId: r.user_id,
+      name: r.name,
+      points: r.points,
+      place: r.place,
+      reward: 0,
+      hidden: r.hide_from_rating,
     }));
   }
 
@@ -453,7 +489,8 @@ async function leaderboard(sql, me, q) {
           AND c.set_id IN (${courseSetIdsSql(sql, courseId)})
       `
     : [{ n: null }];
-  const ends = await sql`SELECT (EXTRACT(EPOCH FROM ((${addDays(thisWeek, 7)}::date::timestamp AT TIME ZONE ${ctx.tz}))) * 1000)::bigint AS ms`;
+  const ends =
+    await sql`SELECT (EXTRACT(EPOCH FROM ((${addDays(thisWeek, 7)}::date::timestamp AT TIME ZONE ${ctx.tz}))) * 1000)::bigint AS ms`;
 
   return {
     enabled: ctx.rating_enabled,
@@ -517,7 +554,8 @@ export async function closeWeeks(sql, onlyCourseId = null) {
   const summary = [];
   for (const course of courses) {
     const weekStart = addDays(await currentWeekStart(sql, course.tz), -7);
-    const done = await sql`SELECT 1 FROM weekly_closures WHERE course_id = ${course.id} AND week_start = ${weekStart}::date`;
+    const done =
+      await sql`SELECT 1 FROM weekly_closures WHERE course_id = ${course.id} AND week_start = ${weekStart}::date`;
     if (done.length > 0) continue;
 
     const ranked = rankRows(await computeStandings(sql, course.id, course.tz, weekStart))
@@ -526,8 +564,12 @@ export async function closeWeeks(sql, onlyCourseId = null) {
         user_id: r.user_id,
         place: r.place,
         points: r.points,
-        reward: course.rating_enabled && r.place <= WEEKLY_REWARDS.length && r.points >= MIN_POINTS_FOR_REWARD
-          ? WEEKLY_REWARDS[r.place - 1] : 0,
+        reward:
+          course.rating_enabled &&
+          r.place <= WEEKLY_REWARDS.length &&
+          r.points >= MIN_POINTS_FOR_REWARD
+            ? WEEKLY_REWARDS[r.place - 1]
+            : 0,
       }));
 
     const rows = await sql`
@@ -566,7 +608,7 @@ export default async function handler(req, res) {
     try {
       return res.status(200).json(await closeWeeks(sql));
     } catch (error) {
-      console.error('[progress] close-week failed:', error);
+      log.error('progress', 'close-week failed', error);
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
@@ -589,10 +631,19 @@ export default async function handler(req, res) {
     return res.status(200).json(await route.run(me));
   } catch (error) {
     if (error instanceof HttpError) return res.status(error.status).json({ error: error.message });
-    console.error(`[progress] ${action} failed:`, error);
+    log.error('progress', `${action} failed`, error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
 
 // Для проверки без HTTP (скрипты/тесты)
-export const __test = { submitAnswers, applyAnswer, scoreAnswer, leaderboard, closeWeeks, computeStandings, setRatingEnabled, hideMe };
+export const __test = {
+  submitAnswers,
+  applyAnswer,
+  scoreAnswer,
+  leaderboard,
+  closeWeeks,
+  computeStandings,
+  setRatingEnabled,
+  hideMe,
+};

@@ -6,7 +6,6 @@ import Animated, {
   withDelay,
   withSequence,
   Easing,
-  runOnJS,
   useAnimatedStyle,
 } from 'react-native-reanimated';
 import { Gem } from 'lucide-react-native';
@@ -80,8 +79,8 @@ const SingleDiamond = ({
       delay,
       withSequence(
         withTiming(fromX + offsetX, { duration: PHASE1, easing: Easing.out(Easing.back(2)) }),
-        withDelay(PAUSE, withTiming(targetX, { duration: PHASE3, easing: Easing.in(Easing.quad) })),
-      ),
+        withDelay(PAUSE, withTiming(targetX, { duration: PHASE3, easing: Easing.in(Easing.quad) }))
+      )
     );
 
     // Y: spread out → fly to target
@@ -89,8 +88,8 @@ const SingleDiamond = ({
       delay,
       withSequence(
         withTiming(fromY + offsetY, { duration: PHASE1, easing: Easing.out(Easing.back(2)) }),
-        withDelay(PAUSE, withTiming(targetY, { duration: PHASE3, easing: Easing.in(Easing.quad) })),
-      ),
+        withDelay(PAUSE, withTiming(targetY, { duration: PHASE3, easing: Easing.in(Easing.quad) }))
+      )
     );
 
     // Scale: 0 → 1.2 → 1.2 (hold) → 0.3
@@ -98,14 +97,14 @@ const SingleDiamond = ({
       delay,
       withSequence(
         withTiming(1.2, { duration: PHASE1, easing: Easing.out(Easing.back(2)) }),
-        withDelay(PAUSE, withTiming(0.3, { duration: PHASE3, easing: Easing.in(Easing.quad) })),
-      ),
+        withDelay(PAUSE, withTiming(0.3, { duration: PHASE3, easing: Easing.in(Easing.quad) }))
+      )
     );
 
     // Opacity: stay 1 until last 150ms of phase 3
     opacity.value = withDelay(
       delay + PHASE1 + PAUSE + PHASE3 - 150,
-      withTiming(0, { duration: 150 }),
+      withTiming(0, { duration: 150 })
     );
 
     // Haptic when each diamond arrives at target
@@ -116,7 +115,10 @@ const SingleDiamond = ({
     if (index === DIAMOND_COUNT - 1) {
       const totalDuration = arrivalTime + 30;
       const timeout = setTimeout(() => onFinish(), totalDuration);
-      return () => { clearTimeout(timeout); clearTimeout(hapticTimeout); };
+      return () => {
+        clearTimeout(timeout);
+        clearTimeout(hapticTimeout);
+      };
     }
 
     return () => clearTimeout(hapticTimeout);
@@ -184,6 +186,5 @@ export const DiamondReward = forwardRef<DiamondRewardRef, Props>(
         ))}
       </View>
     );
-  },
+  }
 );
-

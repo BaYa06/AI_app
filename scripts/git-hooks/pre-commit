@@ -1,25 +1,66 @@
 #!/bin/sh
-# Брендбук: коммит не проходит, если нарушений стало больше, чем в снимке
-# scripts/brand-baseline.json (plan/done/brandbook_migration.md, шаг 8.1).
-# Ставится командой `npm run hooks:install` (и автоматически при npm install).
+# Проверки перед коммитом. Ставится командой `npm run hooks:install` (и автоматически при npm install).
 # Обойти в крайнем случае: git commit --no-verify
-
-# Проверяем только когда в коммите есть файлы интерфейса
-if ! git diff --cached --name-only --diff-filter=ACMR | grep -qE '^src/.*\.(ts|tsx)$'; then
-  exit 0
-fi
+#  1. Миграции: _db-init.js и database/migrations/ сходятся (plan/new/code_cleanup.md, Clean 2).
+#  2. Брендбук: нарушений не больше, чем в снимке scripts/brand-baseline.json
+#     (plan/done/brandbook_migration.md, шаг 8.1).
+#  3. ESLint: в проиндексированных .js/.jsx/.ts/.tsx/.mjs/.cjs нет ошибок
+#     (предупреждения не блокируют; plan/new/code_cleanup.md, Clean 4c).
+#  4. Prettier: те же файлы отформатированы (Clean 4c).
+# Файлы из .eslintignore / .prettierignore пропускаются. Проверяется рабочая копия файла,
+# поэтому при частично проиндексированном файле (git add -p) результат может отличаться.
 
 command -v node >/dev/null 2>&1 || exit 0
 
 repo_root=$(git rev-parse --show-toplevel) || exit 0
 cd "$repo_root" || exit 0
 
-if ! node scripts/brand-check.mjs --fail-on-new >/tmp/brand-check-precommit.log 2>&1; then
-  # таблицу не показываем — только новые нарушения и подсказку
-  sed -n '/✗ Новые нарушения/,$p' /tmp/brand-check-precommit.log
-  echo ""
-  echo "Подробно по строкам: npm run brand:check -- --details <путь к файлу>"
-  exit 1
+staged=$(git diff --cached --name-only --diff-filter=ACMRD)
+
+# 1. Миграции — только когда в коммите схема БД
+if printf '%s\n' "$staged" | grep -qE '^(api/_db-init\.js|database/migrations/)'; then
+  if ! node scripts/check-migrations.mjs; then
+    exit 1
+  fi
+fi
+
+# 2. Брендбук — только когда в коммите файлы интерфейса
+if printf '%s\n' "$staged" | grep -qE '^src/.*\.(ts|tsx)$'; then
+  if ! node scripts/brand-check.mjs --fail-on-new >/tmp/brand-check-precommit.log 2>&1; then
+    # таблицу не показываем — только новые нарушения и подсказку
+    sed -n '/✗ Новые нарушения/,$p' /tmp/brand-check-precommit.log
+    echo ""
+    echo "Подробно по строкам: npm run brand:check -- --details <путь к файлу>"
+    exit 1
+  fi
+fi
+
+# 3–4. ESLint и Prettier — только по проиндексированным JS/TS (без удалённых).
+# Список берём с -z и передаём через xargs -0: пробелы и кириллица в именах не ломаются.
+# Расширения фильтрует pathspec git (`*` в нём совпадает и через `/`).
+staged_code() {
+  git -c core.quotepath=off diff --cached --name-only --diff-filter=ACMR "$@" -- \
+    '*.js' '*.jsx' '*.ts' '*.tsx' '*.mjs' '*.cjs'
+}
+
+if [ -n "$(staged_code)" ]; then
+  failed=0
+  # --quiet: только ошибки; игнорируемые файлы ESLint 8 отмечает предупреждением,
+  # которое --quiet тоже скрывает.
+  if ! staged_code -z | xargs -0 npx eslint --quiet --no-error-on-unmatched-pattern; then
+    echo ""
+    echo "✗ ESLint нашёл ошибки. Список по проекту: npm run lint"
+    failed=1
+  fi
+
+  # --log-level warn: печатаем только неотформатированные файлы, без «Checking formatting...»
+  if ! staged_code -z | xargs -0 npx prettier --check --log-level warn --ignore-unknown --no-error-on-unmatched-pattern; then
+    echo ""
+    echo "✗ Prettier: файлы выше не отформатированы. Исправить: npm run format (проверка: npm run format:check)"
+    failed=1
+  fi
+
+  [ "$failed" -eq 0 ] || exit 1
 fi
 
 exit 0

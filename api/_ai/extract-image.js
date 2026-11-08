@@ -39,7 +39,9 @@ export default async function handler(req, res) {
   }
 
   if (!mimeType || !ALLOWED_MIME_TYPES.includes(mimeType)) {
-    return res.status(400).json({ error: 'Valid image mimeType is required (jpeg, png, webp, heic)' });
+    return res
+      .status(400)
+      .json({ error: 'Valid image mimeType is required (jpeg, png, webp, heic)' });
   }
 
   if (base64.length > MAX_BASE64_LENGTH) {
@@ -73,8 +75,10 @@ Example: [{"front": "der Abschnitt, -e", "back": "раздел"}, {"front": "ste
 
     // Validate and clean cards — back can be empty for image imports
     const validCards = cards
-      .filter(c => c && typeof c.front === 'string' && typeof c.back === 'string' && c.front.trim())
-      .map(c => ({ front: c.front.trim(), back: c.back.trim() }));
+      .filter(
+        (c) => c && typeof c.front === 'string' && typeof c.back === 'string' && c.front.trim()
+      )
+      .map((c) => ({ front: c.front.trim(), back: c.back.trim() }));
 
     return res.status(200).json({ cards: validCards });
   } catch (error) {

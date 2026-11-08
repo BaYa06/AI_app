@@ -9,25 +9,78 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ban, BookOpen, Check, CheckCircle2, Flag, Folder, Layers, MoreHorizontal, Plus, Unlink, X } from 'lucide-react-native';
+import {
+  Ban,
+  BookOpen,
+  Check,
+  CheckCircle2,
+  Flag,
+  Folder,
+  Layers,
+  MoreHorizontal,
+  Plus,
+  Unlink,
+  X,
+} from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { Button, ErrorState, ListGroup, ListRow, Sheet, Skeleton, SkeletonText, ToastHost, toast } from '@/components/ui';
+import {
+  Button,
+  ErrorState,
+  ListGroup,
+  ListRow,
+  Sheet,
+  Skeleton,
+  SkeletonText,
+  ToastHost,
+  toast,
+} from '@/components/ui';
 import { useCoursesStore, useSettingsStore, useThemeColors } from '@/store';
-import { alpha, borderRadius, getLanguageFlag, getLanguageLabel, iconSize, spacing } from '@/constants';
-import { Analytics, ShareApiError, ShareService, supabase, type SharePreview, type ShareReportReason } from '@/services';
+import {
+  alpha,
+  borderRadius,
+  getLanguageFlag,
+  getLanguageLabel,
+  iconSize,
+  spacing,
+} from '@/constants';
+import {
+  Analytics,
+  ShareApiError,
+  ShareService,
+  type SharePreview,
+  type ShareReportReason,
+} from '@/services';
+import { getSession } from '@/services/auth/session';
 import { importSharedSet } from '@/services/shareImport';
 import { confirmAction } from '@/utils/dialogs';
-import { ShareMenuButton, isNativeShareMenu, isNativeReportSheet, presentNativeReportSheet } from './nativeShareActions';
+import {
+  ShareMenuButton,
+  isNativeShareMenu,
+  isNativeReportSheet,
+  presentNativeReportSheet,
+} from './nativeShareActions';
 import { describeError } from '@/utils/userErrors';
 import { pluralize } from '@/utils';
 
 type LoadError = 'not_found' | 'disabled' | 'blocked' | 'reported' | 'network';
 
 const ERROR_TEXT: Record<Exclude<LoadError, 'network'>, { title: string; description: string }> = {
-  not_found: { title: 'Набор не найден', description: 'Возможно, автор удалил набор или в ссылке ошибка.' },
-  disabled: { title: 'Ссылка больше не действует', description: 'Автор закрыл доступ к этому набору. Попроси автора прислать новую ссылку.' },
-  blocked: { title: 'Автор заблокирован', description: 'Ссылки этого автора у тебя не открываются. Разблокировать можно в профиле.' },
-  reported: { title: 'Набор скрыт', description: 'Жалоба на этот набор отправлена — команда его проверит.' },
+  not_found: {
+    title: 'Набор не найден',
+    description: 'Возможно, автор удалил набор или в ссылке ошибка.',
+  },
+  disabled: {
+    title: 'Ссылка больше не действует',
+    description: 'Автор закрыл доступ к этому набору. Попроси автора прислать новую ссылку.',
+  },
+  blocked: {
+    title: 'Автор заблокирован',
+    description: 'Ссылки этого автора у тебя не открываются. Разблокировать можно в профиле.',
+  },
+  reported: {
+    title: 'Набор скрыт',
+    description: 'Жалоба на этот набор отправлена — команда его проверит.',
+  },
 };
 
 const REPORT_REASONS: { reason: ShareReportReason; title: string }[] = [
@@ -61,7 +114,14 @@ interface Props {
   onOpenSet: (setId: string) => void;
 }
 
-export function SharedSetPreviewModal({ code, signedIn, autoAdd, onRequestSignIn, onClose, onOpenSet }: Props) {
+export function SharedSetPreviewModal({
+  code,
+  signedIn,
+  autoAdd,
+  onRequestSignIn,
+  onClose,
+  onOpenSet,
+}: Props) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const isTeacher = useSettingsStore((s) => s.isTeacher) === true;
@@ -77,7 +137,7 @@ export function SharedSetPreviewModal({ code, signedIn, autoAdd, onRequestSignIn
   const [reloadKey, setReloadKey] = useState(0);
   const [session, setSession] = useState<{ userId: string; isGuest: boolean } | null>(null);
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(
-    ownCourses.some((c) => c.id === activeCourseId) ? activeCourseId : null,
+    ownCourses.some((c) => c.id === activeCourseId) ? activeCourseId : null
   );
   const [creatingCourse, setCreatingCourse] = useState(false);
   const [newCourseTitle, setNewCourseTitle] = useState('');
@@ -96,9 +156,10 @@ export function SharedSetPreviewModal({ code, signedIn, autoAdd, onRequestSignIn
     let cancelled = false;
     setLoadError(null);
     (async () => {
-      const { data } = await supabase.auth.getSession();
-      const user = data.session?.user;
-      if (!cancelled) setSession(user ? { userId: user.id, isGuest: (user as any).is_anonymous === true } : null);
+      const authSession = await getSession();
+      const user = authSession?.user;
+      if (!cancelled)
+        setSession(user ? { userId: user.id, isGuest: (user as any).is_anonymous === true } : null);
       try {
         const result = await ShareService.preview(code);
         if (!cancelled) setPreview(result);
@@ -106,7 +167,9 @@ export function SharedSetPreviewModal({ code, signedIn, autoAdd, onRequestSignIn
         if (!cancelled) setLoadError(toLoadError(e));
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [code, signedIn, reloadKey]);
 
   const viewer = preview?.viewer ?? null;
@@ -122,7 +185,8 @@ export function SharedSetPreviewModal({ code, signedIn, autoAdd, onRequestSignIn
     setAdding(true);
     try {
       // Курс, которого ещё нет на сервере (создан только что), — через «Мои наборы» и переезд
-      const onServer = !selectedCourseId || !!viewer?.courses.some((c) => c.id === selectedCourseId);
+      const onServer =
+        !selectedCourseId || !!viewer?.courses.some((c) => c.id === selectedCourseId);
       const result = await importSharedSet({
         preview,
         userId: session.userId,
@@ -140,12 +204,16 @@ export function SharedSetPreviewModal({ code, signedIn, autoAdd, onRequestSignIn
       toast.success(
         result.alreadyImported
           ? 'Набор уже у тебя'
-          : selectedCourse ? `Набор добавлен в «${selectedCourse.title}»` : 'Набор добавлен',
+          : selectedCourse
+            ? `Набор добавлен в «${selectedCourse.title}»`
+            : 'Набор добавлен'
       );
       onOpenSet(result.setId);
     } catch (e) {
-      if (e instanceof ShareApiError && e.status === 429) toast.error('Слишком много добавлений — попробуй через час');
-      else if (e instanceof ShareApiError && (e.status === 404 || e.status === 410)) setLoadError(toLoadError(e));
+      if (e instanceof ShareApiError && e.status === 429)
+        toast.error('Слишком много добавлений — попробуй через час');
+      else if (e instanceof ShareApiError && (e.status === 404 || e.status === 410))
+        setLoadError(toLoadError(e));
       else toast.error(describeError(e, 'Не удалось добавить набор'));
     } finally {
       setAdding(false);
@@ -169,17 +237,20 @@ export function SharedSetPreviewModal({ code, signedIn, autoAdd, onRequestSignIn
     setSelectedCourseId(course.id);
   }, [newCourseTitle, createCourse]);
 
-  const handleReport = useCallback(async (reason: ShareReportReason, comment?: string) => {
-    setReportVisible(false);
-    try {
-      await ShareService.report(code, reason, comment || undefined);
-      Analytics.shareSetReported(reason);
-      toast.success('Спасибо, мы проверим набор');
-      onClose();
-    } catch (e) {
-      toast.error(describeError(e, 'Не удалось отправить жалобу'));
-    }
-  }, [code, onClose]);
+  const handleReport = useCallback(
+    async (reason: ShareReportReason, comment?: string) => {
+      setReportVisible(false);
+      try {
+        await ShareService.report(code, reason, comment || undefined);
+        Analytics.shareSetReported(reason);
+        toast.success('Спасибо, мы проверим набор');
+        onClose();
+      } catch (e) {
+        toast.error(describeError(e, 'Не удалось отправить жалобу'));
+      }
+    },
+    [code, onClose]
+  );
 
   // iOS — системный лист (Share 6), иначе общий Sheet
   const openReport = useCallback(async () => {
@@ -199,7 +270,7 @@ export function SharedSetPreviewModal({ code, signedIn, autoAdd, onRequestSignIn
       `Заблокировать ${name}?`,
       'Ссылки этого автора больше не будут у тебя открываться.',
       'Заблокировать',
-      { destructive: true },
+      { destructive: true }
     );
     if (!confirmed) return;
     try {
@@ -231,13 +302,34 @@ export function SharedSetPreviewModal({ code, signedIn, autoAdd, onRequestSignIn
     } else if (existingCopy) {
       main = <Button title="Открыть набор" onPress={() => onOpenSet(existingCopy)} fullWidth />;
     } else {
-      main = <Button title="Добавить все карточки" icon={Plus} onPress={handleAdd} loading={adding} fullWidth />;
+      main = (
+        <Button
+          title="Добавить все карточки"
+          icon={Plus}
+          onPress={handleAdd}
+          loading={adding}
+          fullWidth
+        />
+      );
       hint = `Набор появится ${selectedCourse ? `в курсе «${selectedCourse.title}»` : 'в «Мои наборы»'} — это твоя копия, правки автора её не изменят`;
     }
     return (
-      <View style={[styles.footer, { borderTopColor: colors.border, backgroundColor: colors.background, paddingBottom: spacing.s + insets.bottom }]}>
+      <View
+        style={[
+          styles.footer,
+          {
+            borderTopColor: colors.border,
+            backgroundColor: colors.background,
+            paddingBottom: spacing.s + insets.bottom,
+          },
+        ]}
+      >
         {main}
-        {hint && <Text variant="caption" color="secondary" style={styles.center}>{hint}</Text>}
+        {hint && (
+          <Text variant="caption" color="secondary" style={styles.center}>
+            {hint}
+          </Text>
+        )}
       </View>
     );
   };
@@ -286,7 +378,13 @@ export function SharedSetPreviewModal({ code, signedIn, autoAdd, onRequestSignIn
             />
           </View>
         ) : (
-          <ListRow title="Новый курс" icon={Plus} iconColor={colors.primary} onPress={() => setCreatingCourse(true)} chevron={false} />
+          <ListRow
+            title="Новый курс"
+            icon={Plus}
+            iconColor={colors.primary}
+            onPress={() => setCreatingCourse(true)}
+            chevron={false}
+          />
         )}
       </ListGroup>
     );
@@ -295,7 +393,12 @@ export function SharedSetPreviewModal({ code, signedIn, autoAdd, onRequestSignIn
   const renderBody = () => {
     if (loadError) {
       if (loadError === 'network') {
-        return <ErrorState description="Проверь интернет и попробуй ещё раз" onRetry={() => setReloadKey((k) => k + 1)} />;
+        return (
+          <ErrorState
+            description="Проверь интернет и попробуй ещё раз"
+            onRetry={() => setReloadKey((k) => k + 1)}
+          />
+        );
       }
       const text = ERROR_TEXT[loadError];
       return (
@@ -303,8 +406,12 @@ export function SharedSetPreviewModal({ code, signedIn, autoAdd, onRequestSignIn
           <View style={[styles.deck, { backgroundColor: colors.surfaceMuted }]}>
             <Unlink size={iconSize.l} color={colors.textSecondary} />
           </View>
-          <Text variant="h3" color="primary" style={styles.center}>{text.title}</Text>
-          <Text variant="bodySmall" color="secondary" style={styles.center}>{text.description}</Text>
+          <Text variant="h3" color="primary" style={styles.center}>
+            {text.title}
+          </Text>
+          <Text variant="bodySmall" color="secondary" style={styles.center}>
+            {text.description}
+          </Text>
         </View>
       );
     }
@@ -327,7 +434,9 @@ export function SharedSetPreviewModal({ code, signedIn, autoAdd, onRequestSignIn
           <View style={[styles.deck, { backgroundColor: alpha(colors.primary, 10) }]}>
             <BookOpen size={iconSize.l} color={colors.primary} />
           </View>
-          <Text variant="h2" color="primary" style={styles.center}>{set.title}</Text>
+          <Text variant="h2" color="primary" style={styles.center}>
+            {set.title}
+          </Text>
           <View style={styles.authorRow}>
             <View style={[styles.avatar, { backgroundColor: colors.secondary }]}>
               <Text variant="caption" style={[styles.avatarText, { color: colors.onPrimary }]}>
@@ -335,7 +444,10 @@ export function SharedSetPreviewModal({ code, signedIn, autoAdd, onRequestSignIn
               </Text>
             </View>
             <Text variant="bodySmall" color="secondary">
-              Набор от <Text variant="bodySmall" color="primary" style={styles.bold}>{authorName}</Text>
+              Набор от{' '}
+              <Text variant="bodySmall" color="primary" style={styles.bold}>
+                {authorName}
+              </Text>
             </Text>
           </View>
           <View style={styles.chips}>
@@ -348,15 +460,23 @@ export function SharedSetPreviewModal({ code, signedIn, autoAdd, onRequestSignIn
             ) : null}
             <View style={[styles.chip, { backgroundColor: colors.surfaceMuted }]}>
               <Layers size={iconSize.xs} color={colors.textSecondary} />
-              <Text variant="bodySmall" color="primary">{cardsLabel(set.cardsCount)}</Text>
+              <Text variant="bodySmall" color="primary">
+                {cardsLabel(set.cardsCount)}
+              </Text>
             </View>
           </View>
-          {set.description ? <Text variant="bodySmall" color="secondary" style={styles.center}>{set.description}</Text> : null}
+          {set.description ? (
+            <Text variant="bodySmall" color="secondary" style={styles.center}>
+              {set.description}
+            </Text>
+          ) : null}
           {existingCopy && (
             <View style={[styles.addedBadge, { backgroundColor: alpha(colors.success, 10) }]}>
               <CheckCircle2 size={iconSize.s} color={colors.successText} />
               <Text variant="label" style={{ color: colors.successText }}>
-                {selectedCourse ? `Набор уже в курсе «${selectedCourse.title}»` : 'Набор уже у тебя'}
+                {selectedCourse
+                  ? `Набор уже в курсе «${selectedCourse.title}»`
+                  : 'Набор уже у тебя'}
               </Text>
             </View>
           )}
@@ -366,19 +486,36 @@ export function SharedSetPreviewModal({ code, signedIn, autoAdd, onRequestSignIn
 
         <View style={styles.section}>
           <View style={styles.sectionHead}>
-            <Text variant="overline" color="secondary">Карточки</Text>
+            <Text variant="overline" color="secondary">
+              Карточки
+            </Text>
             {restCards > 0 && (
-              <Text variant="caption" color="tertiary">{`показаны ${shownCards.length} из ${set.cardsCount}`}</Text>
+              <Text
+                variant="caption"
+                color="tertiary"
+              >{`показаны ${shownCards.length} из ${set.cardsCount}`}</Text>
             )}
           </View>
-          <View style={[styles.cards, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+          <View
+            style={[styles.cards, { borderColor: colors.border, backgroundColor: colors.surface }]}
+          >
             {shownCards.map((card, index) => (
               <View
                 key={index}
-                style={[styles.cardRow, index > 0 && { borderTopWidth: StyleSheet.hairlineWidth * 2, borderTopColor: colors.border }]}
+                style={[
+                  styles.cardRow,
+                  index > 0 && {
+                    borderTopWidth: StyleSheet.hairlineWidth * 2,
+                    borderTopColor: colors.border,
+                  },
+                ]}
               >
-                <Text variant="body" color="primary" style={[styles.bold, styles.cardFront]}>{card.front}</Text>
-                <Text variant="body" color="secondary" style={styles.cardBack}>{card.back}</Text>
+                <Text variant="body" color="primary" style={[styles.bold, styles.cardFront]}>
+                  {card.front}
+                </Text>
+                <Text variant="body" color="secondary" style={styles.cardBack}>
+                  {card.back}
+                </Text>
               </View>
             ))}
           </View>
@@ -399,22 +536,45 @@ export function SharedSetPreviewModal({ code, signedIn, autoAdd, onRequestSignIn
       presentationStyle={isSheet ? 'pageSheet' : 'fullScreen'}
       onRequestClose={onClose}
     >
-      <View style={[styles.root, { backgroundColor: colors.background, paddingTop: isSheet ? 0 : insets.top }]}>
+      <View
+        style={[
+          styles.root,
+          { backgroundColor: colors.background, paddingTop: isSheet ? 0 : insets.top },
+        ]}
+      >
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
           <Button variant="icon" icon={X} accessibilityLabel="Закрыть" onPress={onClose} />
-          <Text variant="body" color="primary" style={[styles.bold, styles.headerTitle]}>Набор по ссылке</Text>
+          <Text variant="body" color="primary" style={[styles.bold, styles.headerTitle]}>
+            Набор по ссылке
+          </Text>
           {canModerate && isNativeShareMenu ? (
             <ShareMenuButton
               title={`Набор от ${authorName}`}
               tint={colors.textPrimary}
               items={[
-                { id: 'report', title: 'Пожаловаться', subtitle: 'Набор скроется у тебя, команда проверит его', symbol: 'flag' },
-                { id: 'block', title: 'Заблокировать автора', subtitle: 'Ссылки этого автора больше не будут открываться', symbol: 'nosign', destructive: true },
+                {
+                  id: 'report',
+                  title: 'Пожаловаться',
+                  subtitle: 'Набор скроется у тебя, команда проверит его',
+                  symbol: 'flag',
+                },
+                {
+                  id: 'block',
+                  title: 'Заблокировать автора',
+                  subtitle: 'Ссылки этого автора больше не будут открываться',
+                  symbol: 'nosign',
+                  destructive: true,
+                },
               ]}
               onSelect={(id) => (id === 'report' ? openReport() : handleBlock())}
             />
           ) : canModerate ? (
-            <Button variant="icon" icon={MoreHorizontal} accessibilityLabel="Ещё" onPress={() => setMenuVisible(true)} />
+            <Button
+              variant="icon"
+              icon={MoreHorizontal}
+              accessibilityLabel="Ещё"
+              onPress={() => setMenuVisible(true)}
+            />
           ) : (
             <View style={styles.headerSpacer} />
           )}
@@ -426,7 +586,11 @@ export function SharedSetPreviewModal({ code, signedIn, autoAdd, onRequestSignIn
 
         {!loadError && renderFooter()}
 
-        <Sheet visible={menuVisible} onClose={() => setMenuVisible(false)} title={`Набор от ${authorName}`}>
+        <Sheet
+          visible={menuVisible}
+          onClose={() => setMenuVisible(false)}
+          title={`Набор от ${authorName}`}
+        >
           <ListGroup>
             <ListRow
               title="Пожаловаться"
@@ -446,10 +610,19 @@ export function SharedSetPreviewModal({ code, signedIn, autoAdd, onRequestSignIn
           </ListGroup>
         </Sheet>
 
-        <Sheet visible={reportVisible} onClose={() => setReportVisible(false)} title="Что не так с набором?">
+        <Sheet
+          visible={reportVisible}
+          onClose={() => setReportVisible(false)}
+          title="Что не так с набором?"
+        >
           <ListGroup>
             {REPORT_REASONS.map(({ reason, title }) => (
-              <ListRow key={reason} title={title} chevron={false} onPress={() => handleReport(reason)} />
+              <ListRow
+                key={reason}
+                title={title}
+                chevron={false}
+                onPress={() => handleReport(reason)}
+              />
             ))}
           </ListGroup>
         </Sheet>

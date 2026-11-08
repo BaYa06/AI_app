@@ -7,7 +7,7 @@ export const API_TIMEOUT_MS = 20_000;
 export async function fetchWithTimeout(
   url: string,
   init: RequestInit = {},
-  timeoutMs: number = API_TIMEOUT_MS,
+  timeoutMs: number = API_TIMEOUT_MS
 ): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);

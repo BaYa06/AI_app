@@ -23,7 +23,15 @@ const MAX_FONT_SCALE_DEFAULT = 2;
 
 interface TextProps extends RNTextProps {
   variant?: TypographyVariant;
-  color?: 'primary' | 'secondary' | 'tertiary' | 'inverse' | 'error' | 'success' | 'warning' | 'accent';
+  color?:
+    | 'primary'
+    | 'secondary'
+    | 'tertiary'
+    | 'inverse'
+    | 'error'
+    | 'success'
+    | 'warning'
+    | 'accent';
   align?: 'left' | 'center' | 'right';
 }
 
@@ -62,12 +70,7 @@ export const Text = memo<TextProps>(function Text({
 
   return (
     <RNText
-      style={[
-        typography[variant],
-        { color: textColor, textAlign: align },
-        style,
-        lineHeightFix,
-      ]}
+      style={[typography[variant], { color: textColor, textAlign: align }, style, lineHeightFix]}
       maxFontSizeMultiplier={MAX_FONT_SCALE[variant] ?? MAX_FONT_SCALE_DEFAULT}
       {...rest}
     >

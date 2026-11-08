@@ -18,6 +18,7 @@ import { isLockScreenWidgetAvailable } from '@/services/widgetPrompt';
 import { Analytics } from '@/services/analytics';
 import { NEW_PER_DAY_OPTIONS } from '@/services/LessonService';
 import { pluralize } from '@/utils';
+import type { RootStackScreenProps } from '@/types/navigation';
 
 const CARD_LIMIT_OPTIONS: Array<{ value: number | null; label: string }> = [
   { value: 10, label: '10' },
@@ -38,7 +39,7 @@ const WIDGET_DIRECTION_HINTS: Record<UserSettings['widgetDirection'], string> = 
   reverse: 'Всегда показывать перевод, а вспоминать слово.',
 };
 
-export function LearningSettingsScreen({ navigation }: any) {
+export function LearningSettingsScreen({ navigation }: RootStackScreenProps<'LearningSettings'>) {
   const colors = useThemeColors();
   const lessonNewPerDay = useSettingsStore((s) => s.settings.lessonNewPerDay);
   const studyCardLimit = useSettingsStore((s) => s.settings.studyCardLimit);
@@ -51,7 +52,7 @@ export function LearningSettingsScreen({ navigation }: any) {
   const setsOrder = useSetsStore((s) => s.setsOrder);
   const sets = useMemo(
     () => setsOrder.map((id) => setsMap[id]).filter((set) => !!set && set.cardCount > 0),
-    [setsMap, setsOrder],
+    [setsMap, setsOrder]
   );
   // Выбранный набор удалён — виджет и так берёт слова урока дня (HomeScreen), подпись та же
   const widgetSetTitle = (widgetSetId && setsMap[widgetSetId]?.title) || 'Как в уроке дня';
@@ -63,7 +64,7 @@ export function LearningSettingsScreen({ navigation }: any) {
       updateSettings({ studyCardLimit: value });
       DatabaseService.saveSettings();
     },
-    [updateSettings],
+    [updateSettings]
   );
 
   const handleSelectNewPerDay = useCallback(
@@ -71,15 +72,17 @@ export function LearningSettingsScreen({ navigation }: any) {
       updateSettings({ lessonNewPerDay: value });
       DatabaseService.saveSettings();
     },
-    [updateSettings],
+    [updateSettings]
   );
 
   const updateWidget = useCallback(
-    (patch: Partial<Pick<UserSettings, 'widgetSetId' | 'widgetDirection' | 'widgetHideAnswer'>>) => {
+    (
+      patch: Partial<Pick<UserSettings, 'widgetSetId' | 'widgetDirection' | 'widgetHideAnswer'>>
+    ) => {
       updateSettings(patch);
       DatabaseService.saveSettings();
     },
-    [updateSettings],
+    [updateSettings]
   );
 
   const handleToggleReverse = useCallback(
@@ -87,20 +90,27 @@ export function LearningSettingsScreen({ navigation }: any) {
       updateSettings({ reverseCards: value });
       DatabaseService.saveSettings();
     },
-    [updateSettings],
+    [updateSettings]
   );
 
   return (
     <Screen
-      header={<ScreenHeader title="Настройки обучения" onBack={() => navigation.goBack()} bordered />}
+      header={
+        <ScreenHeader title="Настройки обучения" onBack={() => navigation.goBack()} bordered />
+      }
       contentStyle={st.content}
     >
       {/* ======== Урок дня ======== */}
-      <Text variant="overline" color="secondary" style={st.groupLabel}>Урок дня</Text>
+      <Text variant="overline" color="secondary" style={st.groupLabel}>
+        Урок дня
+      </Text>
       <Card style={st.card}>
-        <Text variant="body" style={[st.cardTitle, { color: colors.textPrimary }]}>Новых слов в день</Text>
+        <Text variant="body" style={[st.cardTitle, { color: colors.textPrimary }]}>
+          Новых слов в день
+        </Text>
         <Text variant="bodySmall" color="secondary" style={st.cardHint}>
-          Сколько новых слов добавлять в урок на главной. Больше — быстрее пройдёшь наборы, но урок дольше.
+          Сколько новых слов добавлять в урок на главной. Больше — быстрее пройдёшь наборы, но урок
+          дольше.
         </Text>
         <View style={st.chipsRow} accessibilityRole="radiogroup">
           {NEW_PER_DAY_OPTIONS.map((value) => {
@@ -112,9 +122,15 @@ export function LearningSettingsScreen({ navigation }: any) {
                 accessibilityRole="radio"
                 accessibilityState={{ checked: active }}
                 accessibilityLabel={`${value} ${pluralize(value, 'новое слово', 'новых слова', 'новых слов')} в день`}
-                style={[st.chip, { backgroundColor: active ? colors.primaryFill : colors.surfaceMuted }]}
+                style={[
+                  st.chip,
+                  { backgroundColor: active ? colors.primaryFill : colors.surfaceMuted },
+                ]}
               >
-                <Text variant="button" style={[st.chipText, { color: active ? colors.onPrimary : colors.textPrimary }]}>
+                <Text
+                  variant="button"
+                  style={[st.chipText, { color: active ? colors.onPrimary : colors.textPrimary }]}
+                >
                   {value}
                 </Text>
               </Pressable>
@@ -124,9 +140,13 @@ export function LearningSettingsScreen({ navigation }: any) {
       </Card>
 
       {/* ======== Card Limit ======== */}
-      <Text variant="overline" color="secondary" style={[st.groupLabel, st.groupLabelSpaced]}>Тренировка</Text>
+      <Text variant="overline" color="secondary" style={[st.groupLabel, st.groupLabelSpaced]}>
+        Тренировка
+      </Text>
       <Card style={st.card}>
-        <Text variant="body" style={[st.cardTitle, { color: colors.textPrimary }]}>Слов за одну тренировку</Text>
+        <Text variant="body" style={[st.cardTitle, { color: colors.textPrimary }]}>
+          Слов за одну тренировку
+        </Text>
         <Text variant="bodySmall" color="secondary" style={st.cardHint}>
           Сколько карточек в одной порции. Остальные будут в следующей.
         </Text>
@@ -139,9 +159,15 @@ export function LearningSettingsScreen({ navigation }: any) {
                 onPress={() => handleSelectLimit(opt.value)}
                 accessibilityRole="radio"
                 accessibilityState={{ checked: active }}
-                style={[st.chip, { backgroundColor: active ? colors.primaryFill : colors.surfaceMuted }]}
+                style={[
+                  st.chip,
+                  { backgroundColor: active ? colors.primaryFill : colors.surfaceMuted },
+                ]}
               >
-                <Text variant="button" style={[st.chipText, { color: active ? colors.onPrimary : colors.textPrimary }]}>
+                <Text
+                  variant="button"
+                  style={[st.chipText, { color: active ? colors.onPrimary : colors.textPrimary }]}
+                >
                   {opt.label}
                 </Text>
               </Pressable>
@@ -154,12 +180,18 @@ export function LearningSettingsScreen({ navigation }: any) {
       <Card style={st.card}>
         <View style={st.toggleRow}>
           <View style={st.toggleInfo}>
-            <Text variant="body" style={[st.cardTitle, { color: colors.textPrimary }]}>Обратный режим</Text>
+            <Text variant="body" style={[st.cardTitle, { color: colors.textPrimary }]}>
+              Обратный режим
+            </Text>
             <Text variant="bodySmall" color="secondary">
               Показывать перевод, а вспоминать слово
             </Text>
           </View>
-          <Switch value={reverseCards} onValueChange={handleToggleReverse} accessibilityLabel="Обратный режим" />
+          <Switch
+            value={reverseCards}
+            onValueChange={handleToggleReverse}
+            accessibilityLabel="Обратный режим"
+          />
         </View>
       </Card>
 
@@ -184,7 +216,9 @@ export function LearningSettingsScreen({ navigation }: any) {
           </ListGroup>
 
           <Card style={[st.card, st.widgetCard]}>
-            <Text variant="body" style={[st.cardTitle, { color: colors.textPrimary }]}>Направление</Text>
+            <Text variant="body" style={[st.cardTitle, { color: colors.textPrimary }]}>
+              Направление
+            </Text>
             <Text variant="bodySmall" color="secondary" style={st.cardHint}>
               {WIDGET_DIRECTION_HINTS[widgetDirection]}
             </Text>
@@ -197,9 +231,18 @@ export function LearningSettingsScreen({ navigation }: any) {
                     onPress={() => updateWidget({ widgetDirection: opt.value })}
                     accessibilityRole="radio"
                     accessibilityState={{ checked: active }}
-                    style={[st.chip, { backgroundColor: active ? colors.primaryFill : colors.surfaceMuted }]}
+                    style={[
+                      st.chip,
+                      { backgroundColor: active ? colors.primaryFill : colors.surfaceMuted },
+                    ]}
                   >
-                    <Text variant="button" style={[st.chipText, { color: active ? colors.onPrimary : colors.textPrimary }]}>
+                    <Text
+                      variant="button"
+                      style={[
+                        st.chipText,
+                        { color: active ? colors.onPrimary : colors.textPrimary },
+                      ]}
+                    >
                       {opt.label}
                     </Text>
                   </Pressable>
@@ -211,7 +254,9 @@ export function LearningSettingsScreen({ navigation }: any) {
           <Card style={st.card}>
             <View style={st.toggleRow}>
               <View style={st.toggleInfo}>
-                <Text variant="body" style={[st.cardTitle, { color: colors.textPrimary }]}>Скрывать перевод</Text>
+                <Text variant="body" style={[st.cardTitle, { color: colors.textPrimary }]}>
+                  Скрывать перевод
+                </Text>
                 <Text variant="bodySmall" color="secondary">
                   Пока iPhone заблокирован, вместо перевода будет заглушка
                 </Text>
@@ -224,7 +269,10 @@ export function LearningSettingsScreen({ navigation }: any) {
             </View>
           </Card>
 
-          <WidgetHowToSheet visible={widgetHowToVisible} onClose={() => setWidgetHowToVisible(false)} />
+          <WidgetHowToSheet
+            visible={widgetHowToVisible}
+            onClose={() => setWidgetHowToVisible(false)}
+          />
 
           <Sheet
             visible={widgetSetSheetVisible}
@@ -247,7 +295,11 @@ export function LearningSettingsScreen({ navigation }: any) {
               <ListRow
                 key={set.id}
                 title={set.title}
-                right={set.id === widgetSetId ? <Check size={iconSize.s} color={colors.primary} /> : undefined}
+                right={
+                  set.id === widgetSetId ? (
+                    <Check size={iconSize.s} color={colors.primary} />
+                  ) : undefined
+                }
                 chevron={false}
                 onPress={() => {
                   updateWidget({ widgetSetId: set.id });

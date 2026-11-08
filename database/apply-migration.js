@@ -12,7 +12,7 @@ const path = require('path');
  */
 async function applyMigration(sql, migrationFile) {
   const migrationPath = path.join(__dirname, 'migrations', migrationFile);
-  
+
   if (!fs.existsSync(migrationPath)) {
     console.error(`❌ Файл миграции не найден: ${migrationFile}`);
     return false;
@@ -23,16 +23,16 @@ async function applyMigration(sql, migrationFile) {
   try {
     console.log(`\n📄 Применение миграции: ${migrationFile}`);
     console.log('─'.repeat(60));
-    
+
     // Разбиваем на отдельные команды
     const commands = migrationSQL
       .split(';')
-      .map(cmd => cmd.trim())
-      .filter(cmd => cmd.length > 0 && !cmd.startsWith('--'));
+      .map((cmd) => cmd.trim())
+      .filter((cmd) => cmd.length > 0 && !cmd.startsWith('--'));
 
     for (let i = 0; i < commands.length; i++) {
       const command = commands[i];
-      
+
       // Пропускаем комментарии
       if (command.startsWith('/*') || command.startsWith('--')) {
         continue;
@@ -40,20 +40,14 @@ async function applyMigration(sql, migrationFile) {
 
       try {
         await sql(command);
-        
+
         // Показываем краткое описание выполненной команды
-        const cmdPreview = command
-          .split('\n')[0]
-          .substring(0, 60)
-          .trim();
-        
+        const cmdPreview = command.split('\n')[0].substring(0, 60).trim();
+
         console.log(`✅ [${i + 1}/${commands.length}] ${cmdPreview}...`);
       } catch (error) {
         // Игнорируем ошибки "already exists" - миграция уже применена
-        if (
-          error.message.includes('already exists') ||
-          error.message.includes('duplicate')
-        ) {
+        if (error.message.includes('already exists') || error.message.includes('duplicate')) {
           console.log(`⚠️  [${i + 1}/${commands.length}] Уже существует (пропуск)`);
         } else {
           throw error;
@@ -79,7 +73,7 @@ async function main() {
 
   // Проверяем наличие DATABASE_URL
   const DATABASE_URL = process.env.NEON_DATABASE_URL;
-  
+
   if (!DATABASE_URL) {
     console.error('❌ Не установлена переменная окружения NEON_DATABASE_URL');
     console.error('\nИспользование:');

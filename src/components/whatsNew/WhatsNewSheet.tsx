@@ -23,7 +23,11 @@ import { Button, Sheet } from '@/components/ui';
 import { alpha, borderRadius, screenPadding, spacing } from '@/constants';
 import { toSheetPages, type WhatsNewSheetPage } from '@/services/whatsNew';
 import { hasArtImage, WhatsNewArt } from './WhatsNewArt';
-import { isNativeWhatsNewSheet, useNativeWhatsNewSheet, type WhatsNewSheetProps } from './nativeWhatsNewSheet';
+import {
+  isNativeWhatsNewSheet,
+  useNativeWhatsNewSheet,
+  type WhatsNewSheetProps,
+} from './nativeWhatsNewSheet';
 
 export function WhatsNewSheet(props: WhatsNewSheetProps) {
   useNativeWhatsNewSheet(props);
@@ -60,7 +64,7 @@ function WhatsNewSheetRN({ visible, version, pages, onPage, onClose }: WhatsNewS
       setIndex(next);
       onPage?.(next);
     },
-    [onPage],
+    [onPage]
   );
 
   const handleScroll = useCallback(
@@ -69,7 +73,7 @@ function WhatsNewSheetRN({ visible, version, pages, onPage, onClose }: WhatsNewS
       const next = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
       changeIndex(Math.max(0, Math.min(sheetPages.length - 1, next)));
     },
-    [pageWidth, sheetPages.length, changeIndex],
+    [pageWidth, sheetPages.length, changeIndex]
   );
 
   const goTo = useCallback(
@@ -77,7 +81,7 @@ function WhatsNewSheetRN({ visible, version, pages, onPage, onClose }: WhatsNewS
       list.current?.scrollToOffset({ offset: next * pageWidth, animated: true });
       changeIndex(next);
     },
-    [pageWidth, changeIndex],
+    [pageWidth, changeIndex]
   );
 
   const close = useCallback(() => onClose({ index: indexRef.current }), [onClose]);
@@ -92,7 +96,7 @@ function WhatsNewSheetRN({ visible, version, pages, onPage, onClose }: WhatsNewS
       const page = pages[pageIndex];
       onClose({ index: pageIndex, tryItem: page?.kind === 'item' ? page.item : undefined });
     },
-    [pages, onClose],
+    [pages, onClose]
   );
 
   const handleLayout = useCallback((e: LayoutChangeEvent) => {
@@ -155,7 +159,12 @@ function WhatsNewSheetRN({ visible, version, pages, onPage, onClose }: WhatsNewS
           getItemLayout={(_, i) => ({ length: pageWidth, offset: pageWidth * i, index: i })}
           style={{ height: pageHeight }}
           renderItem={({ item, index: i }) => (
-            <PageView page={item} width={pageWidth} height={pageHeight} onTry={() => handleTry(i)} />
+            <PageView
+              page={item}
+              width={pageWidth}
+              height={pageHeight}
+              onTry={() => handleTry(i)}
+            />
           )}
         />
       </View>
@@ -176,13 +185,19 @@ function PageView({
 }) {
   const colors = useThemeColors();
   return (
-    <ScrollView style={{ width, height }} contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={{ width, height }}
+      contentContainerStyle={styles.page}
+      showsVerticalScrollIndicator={false}
+    >
       {page.items.length > 0 ? (
         <View style={styles.summary}>
           {page.items.map((title, i) => (
             <View key={i} style={[styles.summaryRow, { backgroundColor: colors.surfaceVariant }]}>
               <View style={[styles.bullet, { backgroundColor: colors.primary }]} />
-              <Text variant="body" style={[styles.flex1, { color: colors.textPrimary }]}>{title}</Text>
+              <Text variant="body" style={[styles.flex1, { color: colors.textPrimary }]}>
+                {title}
+              </Text>
             </View>
           ))}
         </View>
@@ -192,16 +207,33 @@ function PageView({
 
       <View style={styles.texts}>
         {!!page.tag && (
-          <Text variant="caption" style={[styles.tag, { color: colors.primary, backgroundColor: alpha(colors.primary, 20) }]}>
+          <Text
+            variant="caption"
+            style={[
+              styles.tag,
+              { color: colors.primary, backgroundColor: alpha(colors.primary, 20) },
+            ]}
+          >
             {page.tag}
           </Text>
         )}
-        <Text variant="h2" accessibilityRole="header" style={{ color: colors.textPrimary }}>{page.title}</Text>
-        {!!page.text && <Text variant="body" style={{ color: colors.textSecondary }}>{page.text}</Text>}
+        <Text variant="h2" accessibilityRole="header" style={{ color: colors.textPrimary }}>
+          {page.title}
+        </Text>
+        {!!page.text && (
+          <Text variant="body" style={{ color: colors.textSecondary }}>
+            {page.text}
+          </Text>
+        )}
       </View>
 
       {!!page.actionLabel && (
-        <Button variant="quiet" title={`${page.actionLabel} →`} onPress={onTry} style={styles.try} />
+        <Button
+          variant="quiet"
+          title={`${page.actionLabel} →`}
+          onPress={onTry}
+          style={styles.try}
+        />
       )}
     </ScrollView>
   );

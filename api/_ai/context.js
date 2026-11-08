@@ -40,9 +40,10 @@ async function generateDistractors(req, res) {
   const safeCount = Math.min(Math.max(1, Number(count)), 5);
 
   try {
-    const sentence = typeof example === 'string' && example.trim()
-      ? `\nThe learner sees this sentence with a blank instead of "${typeof wordForm === 'string' && wordForm ? wordForm : word}":\n"${example.trim()}"\nEach distractor must NOT fit the blank naturally — only "${word}" should make sense there.\n`
-      : '';
+    const sentence =
+      typeof example === 'string' && example.trim()
+        ? `\nThe learner sees this sentence with a blank instead of "${typeof wordForm === 'string' && wordForm ? wordForm : word}":\n"${example.trim()}"\nEach distractor must NOT fit the blank naturally — only "${word}" should make sense there.\n`
+        : '';
 
     const prompt = `You create wrong answer options for a flashcard quiz. The correct answer is the flashcard word "${word}" (meaning: "${translation}", part of speech: ${wordType}).
 ${sentence}
@@ -56,9 +57,14 @@ Reply ONLY with a JSON array of ${safeCount} strings.
 Example for "der Hund" (собака): ["die Katze", "der Vogel", "das Pferd"]`;
 
     // Ответ крошечный, но лимит с запасом: размышления модели тоже расходуют токены ответа
-    const text = await generateJson({ models: MODELS.text, prompt, temperature: 0.8, maxOutputTokens: 1024 });
+    const text = await generateJson({
+      models: MODELS.text,
+      prompt,
+      temperature: 0.8,
+      maxOutputTokens: 1024,
+    });
     const distractors = parseJsonArray(text)
-      .filter(w => typeof w === 'string' && w.trim().toLowerCase() !== word.toLowerCase())
+      .filter((w) => typeof w === 'string' && w.trim().toLowerCase() !== word.toLowerCase())
       .slice(0, safeCount);
 
     return res.status(200).json({ distractors });

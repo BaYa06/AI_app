@@ -46,8 +46,12 @@ export interface WhatsNewContext {
 
 /** Сравнение версий по числам: 1.6.10 > 1.6.9. Отрицательное — a раньше b */
 export function compareVersions(a: string | number, b: string | number): number {
-  const pa = String(a).split('.').map((p) => parseInt(p, 10) || 0);
-  const pb = String(b).split('.').map((p) => parseInt(p, 10) || 0);
+  const pa = String(a)
+    .split('.')
+    .map((p) => parseInt(p, 10) || 0);
+  const pb = String(b)
+    .split('.')
+    .map((p) => parseInt(p, 10) || 0);
   for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
     const d = (pa[i] ?? 0) - (pb[i] ?? 0);
     if (d !== 0) return d;
@@ -84,7 +88,10 @@ export interface WhatsNewVersionGroup {
  * История для Профиля: все новости про этого человека, в том числе просмотренные и с истёкшим
  * сроком (срок — только для окна). Новые версии сверху, внутри версии — по priority.
  */
-export function newsHistory(all: WhatsNewItem[], ctx: Omit<WhatsNewContext, 'seen'>): WhatsNewVersionGroup[] {
+export function newsHistory(
+  all: WhatsNewItem[],
+  ctx: Omit<WhatsNewContext, 'seen'>
+): WhatsNewVersionGroup[] {
   const groups = new Map<string, WhatsNewItem[]>();
   for (const n of all.filter((item) => fitsUser(item, ctx))) {
     groups.set(n.minVersion, [...(groups.get(n.minVersion) ?? []), n]);
@@ -106,9 +113,11 @@ export function unseenCount(groups: WhatsNewVersionGroup[], seen: string[]): num
  */
 export function shouldShowProfileHint(
   state: WhatsNewState | undefined,
-  close: { index: number; pageCount: number; tried: boolean },
+  close: { index: number; pageCount: number; tried: boolean }
 ): boolean {
-  return !!state && !state.profileHintShown && !close.tried && close.index === 0 && close.pageCount > 1;
+  return (
+    !!state && !state.profileHintShown && !close.tried && close.index === 0 && close.pageCount > 1
+  );
 }
 
 export function knownArt(art: string | null | undefined): WhatsNewArt | null {
@@ -117,7 +126,11 @@ export function knownArt(art: string | null | undefined): WhatsNewArt | null {
 
 /** Не больше 4 страниц: если новостей больше — первые три, остальные списком на странице «И ещё» */
 export function toPages(items: WhatsNewItem[]): WhatsNewPage[] {
-  const page = (item: WhatsNewItem): WhatsNewPage => ({ kind: 'item', item, art: knownArt(item.art) });
+  const page = (item: WhatsNewItem): WhatsNewPage => ({
+    kind: 'item',
+    item,
+    art: knownArt(item.art),
+  });
   if (items.length <= WHATS_NEW_MAX_PAGES) return items.map(page);
   const head = items.slice(0, WHATS_NEW_MAX_PAGES - 1);
   return [...head.map(page), { kind: 'summary', items: items.slice(WHATS_NEW_MAX_PAGES - 1) }];
@@ -135,7 +148,7 @@ export function pageItemIds(pages: WhatsNewPage[]): string[] {
  */
 export function resolveState(
   saved: WhatsNewState | undefined,
-  opts: { isSignedIn: boolean; allIds: string[] },
+  opts: { isSignedIn: boolean; allIds: string[] }
 ): WhatsNewState {
   if (!saved) return opts.isSignedIn ? { seen: [] } : { seen: [], markOnSignIn: true };
   if (saved.markOnSignIn && opts.isSignedIn) return { seen: markSeen(saved.seen, opts.allIds) };
@@ -151,9 +164,16 @@ export function canShowNews(state: WhatsNewState): boolean {
  * Запуск приложения: состояние на устройстве по входу. Новичок или старый — решаем по сессии при
  * первом запуске (онбординг ещё может идти), а «после входа» — когда человек дошёл до приложения.
  */
-export function initWhatsNew(opts: { hasSession: boolean; signedIn: boolean; allIds: string[] }): void {
+export function initWhatsNew(opts: {
+  hasSession: boolean;
+  signedIn: boolean;
+  allIds: string[];
+}): void {
   const saved = loadWhatsNewState();
-  const next = resolveState(saved, { isSignedIn: saved ? opts.signedIn : opts.hasSession, allIds: opts.allIds });
+  const next = resolveState(saved, {
+    isSignedIn: saved ? opts.signedIn : opts.hasSession,
+    allIds: opts.allIds,
+  });
   if (next !== saved) saveWhatsNewState(next);
 }
 
@@ -203,7 +223,14 @@ export function toSheetPages(pages: WhatsNewPage[]): WhatsNewSheetPage[] {
           actionLabel: p.item.action?.label ?? null,
           items: [],
         }
-      : { tag: 'И ещё', title: 'Ещё изменения', text: '', art: null, actionLabel: null, items: p.items.map((n) => n.title) },
+      : {
+          tag: 'И ещё',
+          title: 'Ещё изменения',
+          text: '',
+          art: null,
+          actionLabel: null,
+          items: p.items.map((n) => n.title),
+        }
   );
 }
 
@@ -219,14 +246,23 @@ export interface RemoteNews {
   hidden: string[];
 }
 
-const isStrArray = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === 'string');
+const isStrArray = (v: unknown): v is string[] =>
+  Array.isArray(v) && v.every((x) => typeof x === 'string');
 
 function isItem(v: any): v is WhatsNewItem {
   return (
-    !!v && typeof v.id === 'string' && v.id.length > 0 && typeof v.minVersion === 'string' &&
-    isStrArray(v.roles) && isStrArray(v.platforms) && typeof v.priority === 'number' &&
-    typeof v.tag === 'string' && typeof v.title === 'string' && v.title.length > 0 &&
-    typeof v.text === 'string' && typeof v.publishedAt === 'string' &&
+    !!v &&
+    typeof v.id === 'string' &&
+    v.id.length > 0 &&
+    typeof v.minVersion === 'string' &&
+    isStrArray(v.roles) &&
+    isStrArray(v.platforms) &&
+    typeof v.priority === 'number' &&
+    typeof v.tag === 'string' &&
+    typeof v.title === 'string' &&
+    v.title.length > 0 &&
+    typeof v.text === 'string' &&
+    typeof v.publishedAt === 'string' &&
     (v.action == null || (typeof v.action.label === 'string' && typeof v.action.route === 'string'))
   );
 }
@@ -239,7 +275,10 @@ export function parseRemoteNews(data: unknown): RemoteNews | null {
 }
 
 /** Сервер поверх сборки: тот же id — текст с сервера, снятые — скрыты, новые — добавлены */
-export function mergeNews(fallback: WhatsNewItem[], remote: RemoteNews | null | undefined): WhatsNewItem[] {
+export function mergeNews(
+  fallback: WhatsNewItem[],
+  remote: RemoteNews | null | undefined
+): WhatsNewItem[] {
   if (!remote) return fallback;
   const hidden = new Set(remote.hidden);
   const fromServer = new Map(remote.items.map((n) => [n.id, n]));

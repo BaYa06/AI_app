@@ -3,25 +3,22 @@
  * @description Экран редактирования личных данных пользователя
  */
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  TextInput,
-  Platform,
-} from 'react-native';
+import { View, StyleSheet, ScrollView, Pressable, TextInput, Platform } from 'react-native';
 import { Text, Container } from '@/components/common';
 import { useThemeColors } from '@/store';
-import { supabase, NeonService } from '@/services';
-import { spacing, borderRadius, TOP_LANGUAGES, MAX_TARGET_LANGUAGES, getLanguageLabel, getLanguageFlag, alpha } from '@/constants';
-import { Button, ScreenHeader, toast, useScreenBottomInset } from '@/components/ui';
+import { NeonService } from '@/services';
+import { getSession } from '@/services/auth/session';
 import {
-  ChevronDown,
-  X,
-  Plus,
-  CheckCircle,
-} from 'lucide-react-native';
+  spacing,
+  borderRadius,
+  TOP_LANGUAGES,
+  MAX_TARGET_LANGUAGES,
+  getLanguageLabel,
+  getLanguageFlag,
+  alpha,
+} from '@/constants';
+import { Button, ScreenHeader, toast, useScreenBottomInset } from '@/components/ui';
+import { ChevronDown, X, Plus, CheckCircle } from 'lucide-react-native';
 import type { RootStackScreenProps } from '@/types/navigation';
 
 type Props = RootStackScreenProps<'PersonalInfo'>;
@@ -40,8 +37,8 @@ export function PersonalInfoScreen({ navigation }: Props) {
 
   // Загрузить user_name, display_name и языковые предпочтения из БД
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      const userId = data.session?.user?.id;
+    getSession().then((authSession) => {
+      const userId = authSession?.user?.id;
       if (!userId) return;
       NeonService.getUserName(userId).then((name) => {
         if (name) setUserName(name);
@@ -97,7 +94,10 @@ export function PersonalInfoScreen({ navigation }: Props) {
         <View style={s.avatarSection}>
           <View style={s.avatarWrap}>
             <View style={[s.avatar, { backgroundColor: colors.primaryFill }]}>
-              <Text variant="display" style={{ color: colors.onPrimary }}>{(firstName?.[0] || '').toUpperCase()}{(lastName?.[0] || '').toUpperCase()}</Text>
+              <Text variant="display" style={{ color: colors.onPrimary }}>
+                {(firstName?.[0] || '').toUpperCase()}
+                {(lastName?.[0] || '').toUpperCase()}
+              </Text>
             </View>
           </View>
         </View>
@@ -120,7 +120,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
                     backgroundColor: inputBg,
                     borderColor: inputBorder,
                   },
-                  Platform.OS === 'web' && { outlineStyle: 'none' },
+                  Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
                 ]}
               />
             </View>
@@ -138,7 +138,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
                     backgroundColor: inputBg,
                     borderColor: inputBorder,
                   },
-                  Platform.OS === 'web' && { outlineStyle: 'none' },
+                  Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
                 ]}
               />
             </View>
@@ -148,10 +148,14 @@ export function PersonalInfoScreen({ navigation }: Props) {
           <View style={s.field}>
             <Text style={[s.label, { color: colors.textTertiary }]}>Имя пользователя</Text>
             <View style={[s.inputWrap, { backgroundColor: inputBg, borderColor: inputBorder }]}>
-              <Text variant="body" style={{ color: colors.textTertiary, fontWeight: '600' }}>@</Text>
+              <Text variant="body" style={{ color: colors.textTertiary, fontWeight: '600' }}>
+                @
+              </Text>
               <TextInput
                 value={userName.replace(/^@/, '')}
-                onChangeText={(text) => setUserName('@' + text.toLowerCase().replace(/[^a-z0-9._-]/g, ''))}
+                onChangeText={(text) =>
+                  setUserName('@' + text.toLowerCase().replace(/[^a-z0-9._-]/g, ''))
+                }
                 placeholder="ник"
                 placeholderTextColor={colors.textTertiary}
                 autoCapitalize="none"
@@ -159,7 +163,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
                 style={[
                   s.inputInner,
                   { color: colors.textPrimary },
-                  Platform.OS === 'web' && { outlineStyle: 'none' },
+                  Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
                 ]}
               />
             </View>
@@ -168,7 +172,9 @@ export function PersonalInfoScreen({ navigation }: Props) {
           {/* Native Language */}
           <View style={s.field}>
             <Text style={[s.label, { color: colors.textTertiary }]}>Родной язык</Text>
-            <Pressable accessibilityRole="button" accessibilityState={{ expanded: showNativeLangPicker }}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: showNativeLangPicker }}
               onPress={() => setShowNativeLangPicker(!showNativeLangPicker)}
               style={[s.inputWrap, { backgroundColor: inputBg, borderColor: inputBorder }]}
             >
@@ -178,9 +184,13 @@ export function PersonalInfoScreen({ navigation }: Props) {
               <ChevronDown size={20} color={colors.textTertiary} />
             </Pressable>
             {showNativeLangPicker && (
-              <View style={[s.picker, { backgroundColor: colors.surface, borderColor: inputBorder }]}>
+              <View
+                style={[s.picker, { backgroundColor: colors.surface, borderColor: inputBorder }]}
+              >
                 {TOP_LANGUAGES.map((lang) => (
-                  <Pressable accessibilityRole="button" accessibilityState={{ selected: nativeLang === lang.code }}
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: nativeLang === lang.code }}
                     key={lang.code}
                     style={[
                       s.pickerItem,
@@ -202,9 +212,7 @@ export function PersonalInfoScreen({ navigation }: Props) {
                     >
                       {lang.flag} {lang.label}
                     </Text>
-                    {nativeLang === lang.code && (
-                      <CheckCircle size={18} color={colors.primary} />
-                    )}
+                    {nativeLang === lang.code && <CheckCircle size={18} color={colors.primary} />}
                   </Pressable>
                 ))}
               </View>
@@ -216,7 +224,10 @@ export function PersonalInfoScreen({ navigation }: Props) {
             <Text style={[s.label, { color: colors.textTertiary }]}>Изучаемые языки</Text>
             <View style={[s.chipsWrap, { backgroundColor: inputBg, borderColor: inputBorder }]}>
               {learningLangs.map((code) => (
-                <View key={code} style={[s.chip, { backgroundColor: chipBg, borderColor: chipBorder }]}>
+                <View
+                  key={code}
+                  style={[s.chip, { backgroundColor: chipBg, borderColor: chipBorder }]}
+                >
                   <Text variant="bodySmall" style={{ color: colors.primary, fontWeight: '600' }}>
                     {getLanguageFlag(code)} {getLanguageLabel(code)}
                   </Text>
@@ -231,25 +242,37 @@ export function PersonalInfoScreen({ navigation }: Props) {
                 </View>
               ))}
               {learningLangs.length < MAX_TARGET_LANGUAGES && (
-                <Pressable accessibilityRole="button" accessibilityState={{ expanded: showLearningLangPicker }}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: showLearningLangPicker }}
                   style={[s.addChip, { backgroundColor: addChipBg }]}
                   onPress={() => setShowLearningLangPicker((v) => !v)}
                 >
                   <Plus size={16} color={colors.textSecondary} />
-                  <Text variant="bodySmall" style={{ color: colors.textSecondary, fontWeight: '600' }}>
+                  <Text
+                    variant="bodySmall"
+                    style={{ color: colors.textSecondary, fontWeight: '600' }}
+                  >
                     Добавить
                   </Text>
                 </Pressable>
               )}
             </View>
             {showLearningLangPicker && (
-              <View style={[s.picker, { backgroundColor: colors.surface, borderColor: inputBorder }]}>
+              <View
+                style={[s.picker, { backgroundColor: colors.surface, borderColor: inputBorder }]}
+              >
                 {TOP_LANGUAGES.filter((l) => l.code !== nativeLang).map((lang) => {
                   const active = learningLangs.includes(lang.code);
                   return (
-                    <Pressable accessibilityRole="button" accessibilityState={{ selected: active }}
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
                       key={lang.code}
-                      style={[s.pickerItem, active && { backgroundColor: alpha(colors.primary, 10) }]}
+                      style={[
+                        s.pickerItem,
+                        active && { backgroundColor: alpha(colors.primary, 10) },
+                      ]}
                       onPress={() => toggleLearningLang(lang.code)}
                     >
                       <Text
@@ -288,8 +311,8 @@ export function PersonalInfoScreen({ navigation }: Props) {
           loading={saving}
           fullWidth
           onPress={async () => {
-            const { data } = await supabase.auth.getSession();
-            const userId = data.session?.user?.id;
+            const authSession = await getSession();
+            const userId = authSession?.user?.id;
             if (!userId) {
               toast.error('Нужно войти в аккаунт');
               return;
@@ -301,7 +324,9 @@ export function PersonalInfoScreen({ navigation }: Props) {
             setSaving(true);
             const displayName = `${lastName.trim()} ${firstName.trim()}`.trim();
             const [nameOk, userNameOk, langOk] = await Promise.all([
-              displayName ? NeonService.updateDisplayName(userId, displayName) : Promise.resolve(true),
+              displayName
+                ? NeonService.updateDisplayName(userId, displayName)
+                : Promise.resolve(true),
               NeonService.updateUserName(userId, userName),
               NeonService.updateLanguagePreferences(userId, {
                 nativeLanguage: nativeLang,

@@ -14,6 +14,8 @@
 		5C3D2A1E9B7F40A1C6E8D202 /* StudyModeSheet.m in Sources */ = {isa = PBXBuildFile; fileRef = 5C3D2A1E9B7F40A1C6E8D204 /* StudyModeSheet.m */; };
 		8B4E6D2F1A3C50B2D7F9E401 /* WhatsNewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B4E6D2F1A3C50B2D7F9E403 /* WhatsNewSheet.swift */; };
 		8B4E6D2F1A3C50B2D7F9E402 /* WhatsNewSheet.m in Sources */ = {isa = PBXBuildFile; fileRef = 8B4E6D2F1A3C50B2D7F9E404 /* WhatsNewSheet.m */; };
+		9D5F7E3A2B4C60C3E8A1F501 /* AppUpdateSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D5F7E3A2B4C60C3E8A1F503 /* AppUpdateSheet.swift */; };
+		9D5F7E3A2B4C60C3E8A1F502 /* AppUpdateSheet.m in Sources */ = {isa = PBXBuildFile; fileRef = 9D5F7E3A2B4C60C3E8A1F504 /* AppUpdateSheet.m */; };
 		7A1E5C3D9B2F40A1C6E8D301 /* ShareSetActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A1E5C3D9B2F40A1C6E8D303 /* ShareSetActions.swift */; };
 		7A1E5C3D9B2F40A1C6E8D302 /* ShareSetActions.m in Sources */ = {isa = PBXBuildFile; fileRef = 7A1E5C3D9B2F40A1C6E8D304 /* ShareSetActions.m */; };
 		434213A3719B8722F951511C /* GlassTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69F91CDF434213A3719B8722 /* GlassTabBar.swift */; };
@@ -25,6 +27,13 @@
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		AA000001AAAA000000000001 /* correct.wav in Resources */ = {isa = PBXBuildFile; fileRef = AA000001AAAA000000000002 /* correct.wav */; };
 		AA000001AAAA000000000003 /* correct2.wav in Resources */ = {isa = PBXBuildFile; fileRef = AA000001AAAA000000000004 /* correct2.wav */; };
+		AA000001AAAA000000000005 /* session_correct.wav in Resources */ = {isa = PBXBuildFile; fileRef = AA000001AAAA000000000006 /* session_correct.wav */; };
+		AA000001AAAA000000000007 /* session_error.wav in Resources */ = {isa = PBXBuildFile; fileRef = AA000001AAAA000000000008 /* session_error.wav */; };
+		AA000001AAAA000000000009 /* session_pop.wav in Resources */ = {isa = PBXBuildFile; fileRef = AA000001AAAA00000000000A /* session_pop.wav */; };
+		AA000001AAAA00000000000B /* session_reveal.wav in Resources */ = {isa = PBXBuildFile; fileRef = AA000001AAAA00000000000C /* session_reveal.wav */; };
+		AA000001AAAA00000000000D /* session_count.wav in Resources */ = {isa = PBXBuildFile; fileRef = AA000001AAAA00000000000E /* session_count.wav */; };
+		AA000001AAAA00000000000F /* session_ding.wav in Resources */ = {isa = PBXBuildFile; fileRef = AA000001AAAA000000000010 /* session_ding.wav */; };
+		AA000001AAAA000000000011 /* session_finish.wav in Resources */ = {isa = PBXBuildFile; fileRef = AA000001AAAA000000000012 /* session_finish.wav */; };
 		EDF3C2BA2A6E9C8B54328699 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = F21748F2D7B422E320F4F52B /* GoogleService-Info.plist */; };
 		FA25C05C307605970001D4E5 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FA25C05B307605960001D4E5 /* WidgetKit.framework */; };
 		FA25C05E307605970001D4E5 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FA25C05D307605970001D4E5 /* SwiftUI.framework */; };
@@ -70,6 +79,8 @@
 		5C3D2A1E9B7F40A1C6E8D204 /* StudyModeSheet.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlashcardsApp/StudyModeSheet.m; sourceTree = "<group>"; };
 		8B4E6D2F1A3C50B2D7F9E403 /* WhatsNewSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/WhatsNewSheet.swift; sourceTree = "<group>"; };
 		8B4E6D2F1A3C50B2D7F9E404 /* WhatsNewSheet.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlashcardsApp/WhatsNewSheet.m; sourceTree = "<group>"; };
+		9D5F7E3A2B4C60C3E8A1F503 /* AppUpdateSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/AppUpdateSheet.swift; sourceTree = "<group>"; };
+		9D5F7E3A2B4C60C3E8A1F504 /* AppUpdateSheet.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlashcardsApp/AppUpdateSheet.m; sourceTree = "<group>"; };
 		7A1E5C3D9B2F40A1C6E8D303 /* ShareSetActions.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/ShareSetActions.swift; sourceTree = "<group>"; };
 		7A1E5C3D9B2F40A1C6E8D304 /* ShareSetActions.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlashcardsApp/ShareSetActions.m; sourceTree = "<group>"; };
 		69F91CDF434213A3719B8722 /* GlassTabBar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/GlassTabBar.swift; sourceTree = "<group>"; };
@@ -84,6 +95,13 @@
 		A7D72821F52AE455224D6A08 /* FlashcardsApp-Bridging-Header.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = "FlashcardsApp/FlashcardsApp-Bridging-Header.h"; sourceTree = "<group>"; };
 		AA000001AAAA000000000002 /* correct.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = correct.wav; path = FlashcardsApp/correct.wav; sourceTree = "<group>"; };
 		AA000001AAAA000000000004 /* correct2.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = correct2.wav; path = FlashcardsApp/correct2.wav; sourceTree = "<group>"; };
+		AA000001AAAA000000000006 /* session_correct.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = session_correct.wav; path = FlashcardsApp/session_correct.wav; sourceTree = "<group>"; };
+		AA000001AAAA000000000008 /* session_error.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = session_error.wav; path = FlashcardsApp/session_error.wav; sourceTree = "<group>"; };
+		AA000001AAAA00000000000A /* session_pop.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = session_pop.wav; path = FlashcardsApp/session_pop.wav; sourceTree = "<group>"; };
+		AA000001AAAA00000000000C /* session_reveal.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = session_reveal.wav; path = FlashcardsApp/session_reveal.wav; sourceTree = "<group>"; };
+		AA000001AAAA00000000000E /* session_count.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = session_count.wav; path = FlashcardsApp/session_count.wav; sourceTree = "<group>"; };
+		AA000001AAAA000000000010 /* session_ding.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = session_ding.wav; path = FlashcardsApp/session_ding.wav; sourceTree = "<group>"; };
+		AA000001AAAA000000000012 /* session_finish.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = session_finish.wav; path = FlashcardsApp/session_finish.wav; sourceTree = "<group>"; };
 		B67EA28DB52588A4B1214301 /* FlashlyWidget.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = FlashlyWidget.entitlements; sourceTree = "<group>"; };
 		D3D7608701811AA6E686C4B5 /* FlashlyWidgetBridge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/FlashlyWidgetBridge.swift; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
@@ -131,6 +149,13 @@
 				100B5DA60BD87A0B62C81809 /* FlashcardsApp.entitlements */,
 				AA000001AAAA000000000002 /* correct.wav */,
 				AA000001AAAA000000000004 /* correct2.wav */,
+				AA000001AAAA000000000006 /* session_correct.wav */,
+				AA000001AAAA000000000008 /* session_error.wav */,
+				AA000001AAAA00000000000A /* session_pop.wav */,
+				AA000001AAAA00000000000C /* session_reveal.wav */,
+				AA000001AAAA00000000000E /* session_count.wav */,
+				AA000001AAAA000000000010 /* session_ding.wav */,
+				AA000001AAAA000000000012 /* session_finish.wav */,
 				F21748F2D7B422E320F4F52B /* GoogleService-Info.plist */,
 				D3D7608701811AA6E686C4B5 /* FlashlyWidgetBridge.swift */,
 				52B11D15E0DD18295FE59251 /* FlashlyWidgetBridge.m */,
@@ -138,6 +163,8 @@
 				5C3D2A1E9B7F40A1C6E8D204 /* StudyModeSheet.m */,
 				8B4E6D2F1A3C50B2D7F9E403 /* WhatsNewSheet.swift */,
 				8B4E6D2F1A3C50B2D7F9E404 /* WhatsNewSheet.m */,
+				9D5F7E3A2B4C60C3E8A1F503 /* AppUpdateSheet.swift */,
+				9D5F7E3A2B4C60C3E8A1F504 /* AppUpdateSheet.m */,
 				7A1E5C3D9B2F40A1C6E8D303 /* ShareSetActions.swift */,
 				7A1E5C3D9B2F40A1C6E8D304 /* ShareSetActions.m */,
 				69F91CDF434213A3719B8722 /* GlassTabBar.swift */,
@@ -299,6 +326,13 @@
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				AA000001AAAA000000000001 /* correct.wav in Resources */,
 				AA000001AAAA000000000003 /* correct2.wav in Resources */,
+				AA000001AAAA000000000005 /* session_correct.wav in Resources */,
+				AA000001AAAA000000000007 /* session_error.wav in Resources */,
+				AA000001AAAA000000000009 /* session_pop.wav in Resources */,
+				AA000001AAAA00000000000B /* session_reveal.wav in Resources */,
+				AA000001AAAA00000000000D /* session_count.wav in Resources */,
+				AA000001AAAA00000000000F /* session_ding.wav in Resources */,
+				AA000001AAAA000000000011 /* session_finish.wav in Resources */,
 				EDF3C2BA2A6E9C8B54328699 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -428,6 +462,8 @@
 				5C3D2A1E9B7F40A1C6E8D202 /* StudyModeSheet.m in Sources */,
 				8B4E6D2F1A3C50B2D7F9E401 /* WhatsNewSheet.swift in Sources */,
 				8B4E6D2F1A3C50B2D7F9E402 /* WhatsNewSheet.m in Sources */,
+				9D5F7E3A2B4C60C3E8A1F501 /* AppUpdateSheet.swift in Sources */,
+				9D5F7E3A2B4C60C3E8A1F502 /* AppUpdateSheet.m in Sources */,
 				7A1E5C3D9B2F40A1C6E8D301 /* ShareSetActions.swift in Sources */,
 				7A1E5C3D9B2F40A1C6E8D302 /* ShareSetActions.m in Sources */,
 				434213A3719B8722F951511C /* GlassTabBar.swift in Sources */,
@@ -464,7 +500,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = FlashcardsApp/FlashcardsApp.entitlements;
-				CURRENT_PROJECT_VERSION = 80;
+				CURRENT_PROJECT_VERSION = 93;
 				DEVELOPMENT_TEAM = QY39YM9ZQ2;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = FlashcardsApp/Info.plist;
@@ -473,7 +509,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.7.1;
+				MARKETING_VERSION = 1.8.4;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -496,7 +532,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = FlashcardsApp/FlashcardsApp.entitlements;
-				CURRENT_PROJECT_VERSION = 80;
+				CURRENT_PROJECT_VERSION = 93;
 				DEVELOPMENT_TEAM = QY39YM9ZQ2;
 				INFOPLIST_FILE = FlashcardsApp/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
@@ -504,7 +540,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.7.1;
+				MARKETING_VERSION = 1.8.4;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -680,7 +716,7 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CODE_SIGN_ENTITLEMENTS = FlashlyWidget/FlashlyWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 80;
+				CURRENT_PROJECT_VERSION = 93;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = QY39YM9ZQ2;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -696,7 +732,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 1.7.1;
+				MARKETING_VERSION = 1.8.4;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.baiirbek.flashly.widget;
@@ -725,7 +761,7 @@
 				CODE_SIGN_ENTITLEMENTS = FlashlyWidget/FlashlyWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 80;
+				CURRENT_PROJECT_VERSION = 93;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = QY39YM9ZQ2;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -741,7 +777,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 1.7.1;
+				MARKETING_VERSION = 1.8.4;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.baiirbek.flashly.widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";

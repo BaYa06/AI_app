@@ -3,25 +3,20 @@
  * @description Экран мониторинга теста в реальном времени для учителя
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  View,
-  ScrollView,
-  StyleSheet,
-  Pressable,
-  Platform,
-  ActivityIndicator,
-} from 'react-native';
+import { View, ScrollView, StyleSheet, Pressable, Platform, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Users, Check, StopCircle, ClipboardList, LogOut } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import { Badge, Button, confirmDialog, toast, BottomBar } from '@/components/ui';
 import { useThemeColors } from '@/store';
 import { spacing, borderRadius, alpha, type ColorToken, iconSize } from '@/constants';
-import { supabase } from '@/services/supabaseClient';
+import { createChannel, removeChannel } from '@/services/realtime';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 
-import { API_BASE } from '@/config/apiBase';
+import { log } from '@/utils/logger';
+import { getAccessToken } from '@/services/auth/session';
+import { rawApiFetch } from '@/services/api/client';
 
 // Цвета аватаров участников — имена токенов, значения берутся из темы
 const AVATAR_TOKENS: ColorToken[] = ['primaryFill', 'warning', 'like', 'success', 'streak'];
@@ -78,50 +73,64 @@ export function LiveTestScreen({ navigation, route }: Props) {
   // (раньше был только один вызов при монтировании + подписка; если broadcast пропадёт —
   // например, реконнект сокета — экран замирал до следующего realtime-события). См. план,
   // пункт 44.
-  const fetchMonitor = useCallback(async (mountedRef: { current: boolean }) => {
-    try {
-      const { data: authData } = await supabase.auth.getSession();
-      const token = authData.session?.access_token;
-      if (!token) return;
-      const resp = await fetch(`${API_BASE}/test?action=monitor&sessionId=${sessionId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await resp.json();
-      if (!mountedRef.current) return;
+  const fetchMonitor = useCallback(
+    async (mountedRef: { current: boolean }) => {
+      try {
+        const token = await getAccessToken();
+        if (!token) return;
+        const resp = await rawApiFetch(`test?action=monitor&sessionId=${sessionId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await resp.json();
+        if (!mountedRef.current) return;
 
-      if (data.status === 'finished') { goToResults(); return; }
+        if (data.status === 'finished') {
+          goToResults();
+          return;
+        }
 
-      setQuestionCount(data.questionCount || 0);
-      setExitControl(data.exitControl === true);
-      // lastAwaySec приходит только в realtime (student_back) — не терять его при опросе
-      setStudents(prev => (data.participants || []).map((p: StudentProgress) => {
-        const old = prev.find(s => s.userId === p.userId);
-        return { ...p, lastAwaySec: old?.lastAwaySec, awayReason: p.away ? old?.awayReason : undefined };
-      }));
+        setQuestionCount(data.questionCount || 0);
+        setExitControl(data.exitControl === true);
+        // lastAwaySec приходит только в realtime (student_back) — не терять его при опросе
+        setStudents((prev) =>
+          (data.participants || []).map((p: StudentProgress) => {
+            const old = prev.find((s) => s.userId === p.userId);
+            return {
+              ...p,
+              lastAwaySec: old?.lastAwaySec,
+              awayReason: p.away ? old?.awayReason : undefined,
+            };
+          })
+        );
 
-      // Вычислить оставшееся время
-      if (data.timePerQuestion > 0 && data.startedAt && data.questionCount) {
-        const totalSec = data.timePerQuestion * data.questionCount;
-        const elapsed = Math.floor((Date.now() - new Date(data.startedAt).getTime()) / 1000);
-        setTimeLeft(Math.max(0, totalSec - elapsed));
+        // Вычислить оставшееся время
+        if (data.timePerQuestion > 0 && data.startedAt && data.questionCount) {
+          const totalSec = data.timePerQuestion * data.questionCount;
+          const elapsed = Math.floor((Date.now() - new Date(data.startedAt).getTime()) / 1000);
+          setTimeLeft(Math.max(0, totalSec - elapsed));
+        }
+      } catch (e) {
+        log.warn('LiveTest', 'Monitor fetch error', e);
       }
-    } catch (e) {
-      console.error('Monitor fetch error:', e);
-    }
-  }, [sessionId, goToResults]);
+    },
+    [sessionId, goToResults]
+  );
 
   useEffect(() => {
     const mountedRef = { current: true };
     fetchMonitor(mountedRef);
     const interval = setInterval(() => fetchMonitor(mountedRef), 4000);
-    return () => { mountedRef.current = false; clearInterval(interval); };
+    return () => {
+      mountedRef.current = false;
+      clearInterval(interval);
+    };
   }, [fetchMonitor]);
 
   // Таймер обратного отсчёта
   useEffect(() => {
     if (timeLeft === null || timeLeft <= 0) return;
     timerRef.current = setInterval(() => {
-      setTimeLeft(t => {
+      setTimeLeft((t) => {
         if (t === null || t <= 1) {
           if (timerRef.current) clearInterval(timerRef.current);
           return 0;
@@ -129,7 +138,9 @@ export function LiveTestScreen({ navigation, route }: Props) {
         return t - 1;
       });
     }, 1000);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, [timeLeft !== null && timeLeft > 0]);
 
   // Auto-finish: время вышло
@@ -141,8 +152,8 @@ export function LiveTestScreen({ navigation, route }: Props) {
 
   // Auto-finish: все ученики завершили. Если кто-то вышел досрочно (контроль выхода), тест не
   // закрываем сами — учитель может разрешить ему продолжить; после закрытия это уже нельзя.
-  const leftCount = students.filter(s => s.leftReason).length;
-  const allDone = students.length > 0 && students.every(s => s.done);
+  const leftCount = students.filter((s) => s.leftReason).length;
+  const allDone = students.length > 0 && students.every((s) => s.done);
   useEffect(() => {
     if (allDone && leftCount === 0 && !hasNavigated.current) {
       handleEndTest();
@@ -152,12 +163,12 @@ export function LiveTestScreen({ navigation, route }: Props) {
   // Realtime: progress_update — сопоставление по userId, а не по displayName (два "Гостя" в
   // одной сессии раньше перезаписывали друг друга, т.к. имена не уникальны). См. план, пункт 43.
   useEffect(() => {
-    const channel = supabase.channel(`test:${sessionId}`);
+    const channel = createChannel(`test:${sessionId}`);
     channel
       .on('broadcast', { event: 'progress_update' }, ({ payload }) => {
         if (!payload) return;
-        setStudents(prev =>
-          prev.map(s =>
+        setStudents((prev) =>
+          prev.map((s) =>
             s.userId === payload.userId
               ? {
                   ...s,
@@ -166,111 +177,129 @@ export function LiveTestScreen({ navigation, route }: Props) {
                   done: payload.done,
                   // left: true — досрочный выход, false — учитель разрешил продолжить,
                   // нет поля — обычный ответ (вышедший ответить не может)
-                  leftReason: payload.left === true ? payload.leftReason
-                    : payload.left === false ? null : s.leftReason,
+                  leftReason:
+                    payload.left === true
+                      ? payload.leftReason
+                      : payload.left === false
+                        ? null
+                        : s.leftReason,
                   away: payload.left !== undefined ? false : s.away,
                 }
-              : s,
-          ),
+              : s
+          )
         );
       })
       .on('broadcast', { event: 'student_joined' }, ({ payload }) => {
         if (!payload) return;
-        setStudents(prev => {
-          if (prev.some(s => s.userId === payload.userId)) return prev;
-          return [...prev, {
-            userId: payload.userId,
-            name: payload.displayName,
-            initial: (payload.displayName || '?')[0].toUpperCase(),
-            answered: 0,
-            total: questionCount,
-            done: false,
-            clientExitControl: payload.clientExitControl === true,
-          }];
+        setStudents((prev) => {
+          if (prev.some((s) => s.userId === payload.userId)) return prev;
+          return [
+            ...prev,
+            {
+              userId: payload.userId,
+              name: payload.displayName,
+              initial: (payload.displayName || '?')[0].toUpperCase(),
+              answered: 0,
+              total: questionCount,
+              done: false,
+              clientExitControl: payload.clientExitControl === true,
+            },
+          ];
         });
       })
       .on('broadcast', { event: 'student_away' }, ({ payload }) => {
         if (!payload) return;
-        setStudents(prev => prev.map(s =>
-          s.userId === payload.userId ? { ...s, away: true, awayReason: payload.reason } : s,
-        ));
+        setStudents((prev) =>
+          prev.map((s) =>
+            s.userId === payload.userId ? { ...s, away: true, awayReason: payload.reason } : s
+          )
+        );
       })
       .on('broadcast', { event: 'student_back' }, ({ payload }) => {
         if (!payload) return;
-        setStudents(prev => prev.map(s =>
-          s.userId === payload.userId
-            ? { ...s, away: false, awayCount: payload.awayCount, lastAwaySec: payload.awaySec }
-            : s,
-        ));
+        setStudents((prev) =>
+          prev.map((s) =>
+            s.userId === payload.userId
+              ? { ...s, away: false, awayCount: payload.awayCount, lastAwaySec: payload.awaySec }
+              : s
+          )
+        );
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      removeChannel(channel);
+    };
   }, [sessionId, questionCount]);
 
   const handleEndTest = useCallback(async () => {
     if (ending || hasNavigated.current) return;
     setEnding(true);
     try {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
+      const token = await getAccessToken();
       if (!token) throw new Error('Not authenticated');
 
-      await fetch(`${API_BASE}/test?action=finish`, {
+      await rawApiFetch('test?action=finish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ sessionId }),
+        body: { sessionId },
       });
       goToResults();
     } catch (e: any) {
-      console.error('End test error:', e);
+      log.error('LiveTest', 'End test error', e);
       setEnding(false);
     }
   }, [ending, sessionId, goToResults]);
 
   // Ложное срабатывание (звонок, блокировка телефона, сбой) — вернуть ученика к тесту
-  const handleReinstate = useCallback(async (st: StudentProgress) => {
-    const ok = await confirmDialog({
-      title: 'Разрешить продолжить?',
-      message:
-        `${st.name} продолжит с вопроса ${st.answered + 1}. ` +
-        'Используйте, если выход был случайным: звонок, блокировка телефона, сбой приложения.',
-      confirmText: 'Разрешить',
-    });
-    if (!ok) return;
-    setReinstating(st.userId);
-    try {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-      if (!token) throw new Error('Not authenticated');
-      const resp = await fetch(`${API_BASE}/test?action=reinstate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ sessionId, userId: st.userId }),
+  const handleReinstate = useCallback(
+    async (st: StudentProgress) => {
+      const ok = await confirmDialog({
+        title: 'Разрешить продолжить?',
+        message:
+          `${st.name} продолжит с вопроса ${st.answered + 1}. ` +
+          'Используйте, если выход был случайным: звонок, блокировка телефона, сбой приложения.',
+        confirmText: 'Разрешить',
       });
-      const result = await resp.json();
-      if (!resp.ok) throw new Error(result.error || `Error ${resp.status}`);
-      setStudents(prev => prev.map(s =>
-        s.userId === st.userId ? { ...s, leftReason: null, done: false, away: false } : s,
-      ));
-      toast.success(`${st.name} может продолжить`);
-    } catch (e) {
-      console.error('Reinstate error:', e);
-      toast.error('Не удалось разрешить. Попробуйте ещё раз.');
-    } finally {
-      setReinstating(null);
-    }
-  }, [sessionId]);
+      if (!ok) return;
+      setReinstating(st.userId);
+      try {
+        const token = await getAccessToken();
+        if (!token) throw new Error('Not authenticated');
+        const resp = await rawApiFetch('test?action=reinstate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: { sessionId, userId: st.userId },
+        });
+        const result = await resp.json();
+        if (!resp.ok) throw new Error(result.error || `Error ${resp.status}`);
+        setStudents((prev) =>
+          prev.map((s) =>
+            s.userId === st.userId ? { ...s, leftReason: null, done: false, away: false } : s
+          )
+        );
+        toast.success(`${st.name} может продолжить`);
+      } catch (e) {
+        log.error('LiveTest', 'Reinstate error', e);
+        toast.error('Не удалось разрешить. Попробуйте ещё раз.');
+      } finally {
+        setReinstating(null);
+      }
+    },
+    [sessionId]
+  );
 
   const displayTime = timeLeft !== null && timeLeft >= 0 ? timeLeft : null;
-  const minutes = displayTime !== null ? String(Math.floor(displayTime / 60)).padStart(2, '0') : '--';
+  const minutes =
+    displayTime !== null ? String(Math.floor(displayTime / 60)).padStart(2, '0') : '--';
   const seconds = displayTime !== null ? String(displayTime % 60).padStart(2, '0') : '--';
 
-  const totalQuestions = questionCount || (students[0]?.total || 0);
+  const totalQuestions = questionCount || students[0]?.total || 0;
   const totalAnswered = students.reduce((s, st) => s + st.answered, 0);
-  const classPct = students.length > 0 && totalQuestions > 0
-    ? Math.round((totalAnswered / (students.length * totalQuestions)) * 100)
-    : 0;
+  const classPct =
+    students.length > 0 && totalQuestions > 0
+      ? Math.round((totalAnswered / (students.length * totalQuestions)) * 100)
+      : 0;
   const avgQuestion = students.length > 0 ? Math.round(totalAnswered / students.length) : 0;
 
   const cardBg = colors.surface;
@@ -298,15 +327,16 @@ export function LiveTestScreen({ navigation, route }: Props) {
         >
           <ArrowLeft size={22} color={colors.textPrimary} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-          Тест идёт
-        </Text>
-        <Pressable accessibilityRole="button"
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Тест идёт</Text>
+        <Pressable
+          accessibilityRole="button"
           style={({ pressed }) => [pressed && { opacity: 0.6 }]}
           onPress={handleEndTest}
           disabled={ending}
         >
-          <Text style={[styles.endHeaderBtn, { color: colors.errorText }]}>{ending ? '...' : 'Завершить'}</Text>
+          <Text style={[styles.endHeaderBtn, { color: colors.errorText }]}>
+            {ending ? '...' : 'Завершить'}
+          </Text>
         </Pressable>
       </View>
 
@@ -316,10 +346,26 @@ export function LiveTestScreen({ navigation, route }: Props) {
       >
         {/* Timer */}
         <View style={styles.timerRow}>
-          <View style={[styles.timerBox, { backgroundColor: alpha(colors.primary, 10), borderColor: alpha(colors.primary, 20) }]}>
+          <View
+            style={[
+              styles.timerBox,
+              {
+                backgroundColor: alpha(colors.primary, 10),
+                borderColor: alpha(colors.primary, 20),
+              },
+            ]}
+          >
             <Text style={[styles.timerValue, { color: colors.primary }]}>{minutes}</Text>
           </View>
-          <View style={[styles.timerBox, { backgroundColor: alpha(colors.primary, 10), borderColor: alpha(colors.primary, 20) }]}>
+          <View
+            style={[
+              styles.timerBox,
+              {
+                backgroundColor: alpha(colors.primary, 10),
+                borderColor: alpha(colors.primary, 20),
+              },
+            ]}
+          >
             <Text style={[styles.timerValue, { color: colors.primary }]}>{seconds}</Text>
           </View>
         </View>
@@ -361,9 +407,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
                 <Text style={[styles.completionLabel, { color: colors.textSecondary }]}>
                   Прогресс класса
                 </Text>
-                <Text style={[styles.completionPct, { color: colors.primary }]}>
-                  {classPct}%
-                </Text>
+                <Text style={[styles.completionPct, { color: colors.primary }]}>{classPct}%</Text>
               </View>
               <View style={[styles.progressBar, { backgroundColor: barBg }]}>
                 <View
@@ -378,15 +422,21 @@ export function LiveTestScreen({ navigation, route }: Props) {
         </View>
 
         {/* Student Progress */}
-        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-          Ученики
-        </Text>
+        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Ученики</Text>
 
         {allDone && leftCount > 0 && (
-          <View style={[styles.leftHint, { backgroundColor: alpha(colors.warning, 10), borderColor: alpha(colors.warning, 40) }]}>
+          <View
+            style={[
+              styles.leftHint,
+              {
+                backgroundColor: alpha(colors.warning, 10),
+                borderColor: alpha(colors.warning, 40),
+              },
+            ]}
+          >
             <Text style={[styles.leftHintText, { color: colors.textPrimary }]}>
-              Все закончили, но {leftCount === 1 ? 'один ученик вышел' : `вышли: ${leftCount}`} досрочно.
-              Разрешите продолжить или завершите тест.
+              Все закончили, но {leftCount === 1 ? 'один ученик вышел' : `вышли: ${leftCount}`}{' '}
+              досрочно. Разрешите продолжить или завершите тест.
             </Text>
           </View>
         )}
@@ -399,8 +449,8 @@ export function LiveTestScreen({ navigation, route }: Props) {
             const avatarBg = left
               ? alpha(colors.error, 10)
               : st.done
-                ? (alpha(colors.success, 10))
-                : (alpha(accentColor, 10));
+                ? alpha(colors.success, 10)
+                : alpha(accentColor, 10);
             const avatarTextColor = st.done ? colors.success : accentColor;
             const awayCount = st.awayCount || 0;
 
@@ -443,7 +493,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
                 <View
                   style={[
                     styles.studentBar,
-                    { backgroundColor: st.done ? (alpha(colors.success, 10)) : barBg },
+                    { backgroundColor: st.done ? alpha(colors.success, 10) : barBg },
                   ]}
                 >
                   <View
@@ -451,35 +501,48 @@ export function LiveTestScreen({ navigation, route }: Props) {
                       styles.studentBarFill,
                       {
                         width: `${pct}%` as any,
-                        backgroundColor: left ? colors.error : st.done ? colors.success : accentColor,
+                        backgroundColor: left
+                          ? colors.error
+                          : st.done
+                            ? colors.success
+                            : accentColor,
                       },
                     ]}
                   />
                 </View>
 
                 {/* Контроль выхода: состояние и история выходов */}
-                {exitControl && (left || st.away || awayCount > 0 || st.clientExitControl === false) && (
-                  <View style={styles.exitRow}>
-                    {left && <Badge tone="error" label={LEFT_LABELS[st.leftReason!] || 'Вышел'} />}
-                    {!left && st.away && (
-                      <Badge
-                        tone="warning"
-                        label={st.awayReason === 'split' ? 'Рядом другое приложение' : 'Не в приложении'}
-                      />
-                    )}
-                    {awayCount > 0 && (
-                      <Badge
-                        tone="warning"
-                        label={awayCount === 1 && st.lastAwaySec !== undefined
-                          ? `Выходил на ${st.lastAwaySec} с`
-                          : `Выходил ×${awayCount}`}
-                      />
-                    )}
-                    {st.clientExitControl === false && (
-                      <Badge tone="neutral" label="Старая версия — контроль не работает" />
-                    )}
-                  </View>
-                )}
+                {exitControl &&
+                  (left || st.away || awayCount > 0 || st.clientExitControl === false) && (
+                    <View style={styles.exitRow}>
+                      {left && (
+                        <Badge tone="error" label={LEFT_LABELS[st.leftReason!] || 'Вышел'} />
+                      )}
+                      {!left && st.away && (
+                        <Badge
+                          tone="warning"
+                          label={
+                            st.awayReason === 'split'
+                              ? 'Рядом другое приложение'
+                              : 'Не в приложении'
+                          }
+                        />
+                      )}
+                      {awayCount > 0 && (
+                        <Badge
+                          tone="warning"
+                          label={
+                            awayCount === 1 && st.lastAwaySec !== undefined
+                              ? `Выходил на ${st.lastAwaySec} с`
+                              : `Выходил ×${awayCount}`
+                          }
+                        />
+                      )}
+                      {st.clientExitControl === false && (
+                        <Badge tone="neutral" label="Старая версия — контроль не работает" />
+                      )}
+                    </View>
+                  )}
                 {left && (
                   <Button
                     title="Разрешить продолжить"
@@ -498,7 +561,8 @@ export function LiveTestScreen({ navigation, route }: Props) {
 
       {/* Footer */}
       <BottomBar style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        <Pressable accessibilityRole="button"
+        <Pressable
+          accessibilityRole="button"
           style={({ pressed }) => [
             styles.endBtn,
             pressed && { opacity: 0.6, backgroundColor: alpha(colors.error, 10) },
@@ -511,7 +575,9 @@ export function LiveTestScreen({ navigation, route }: Props) {
           ) : (
             <>
               <StopCircle size={22} color={colors.error} />
-              <Text style={[styles.endBtnText, { color: colors.errorText }]}>Завершить досрочно</Text>
+              <Text style={[styles.endBtnText, { color: colors.errorText }]}>
+                Завершить досрочно
+              </Text>
             </>
           )}
         </Pressable>
@@ -549,9 +615,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.m,
     paddingBottom: spacing.s,
-    ...Platform.select({
+    ...(Platform.select({
       web: { backdropFilter: 'blur(12px)' },
-    }) as any,
+    }) as any),
   },
   backBtn: {
     padding: spacing.xs,
@@ -614,7 +680,6 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.l,
     borderWidth: 1,
     overflow: 'hidden',
-    
   },
   statusBanner: {
     height: 100,
