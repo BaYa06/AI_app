@@ -125,12 +125,24 @@ plan/new/release_safety.md.
 - **Кривые версии** (в ответе или у самого приложения) — окна нет: лучше не показать, чем запереть
   приложение. Ссылка на магазин принимается только `https://apps.apple.com/…`.
 
-## Update 3 — Swift-шторка ⬜
+## Update 3 — Swift-шторка ✅ (код) / ⬜ (проверка в TestFlight)
 - `ios/FlashcardsApp/AppUpdateSheet.swift` + `.m` по образцу `WhatsNewSheet`. Вход:
   `{ variant, current, latest }`. События в JS: `update`, `later`, `dismiss`.
 - Внешний вид — по таблице выше, обе темы.
 - Кнопка «Обновить» открывает `itms-apps://apps.apple.com/app/id6808731151`. Обязательная
   шторка после возврата из магазина остаётся на месте.
+
+Сделано (08.11.2026): ios/FlashcardsApp/AppUpdateSheet.swift + .m (добавлены в project.pbxproj),
+JS-обёртка src/components/appUpdate/nativeAppUpdateSheet.ts (`useNativeAppUpdateSheet`).
+- Высота листа — по содержимому (iOS 16+, `.custom`, меряется вид без прокрутки); на iOS 15 —
+  `.medium()`. При крупном шрифте лист не выше большого, содержимое прокручивается.
+- Мягкое: «Обновить» закрывает лист и шлёт `update` после закрытия; «Позже» → `later`; свайп →
+  `dismiss`. Обязательное: без «ручки», `isModalInPresentation`, «Обновить» шлёт `update`, лист
+  остаётся.
+- Вариант открытого листа не меняется: сменить мягкое на обязательное можно только закрыв лист
+  (следит Update 4).
+- Проверено без сборки: `swiftc -parse` и `-typecheck` против iOS SDK 15.1 и 16.0 с заглушками
+  React Native; `xcodebuild -list` читает проект. Как выглядит на устройстве — только TestFlight.
 
 ## Update 4 — подключение ⬜
 - Проверка при запуске и при возврате из фона (`AppState`), владелец `appUpdate` в `modalGate`
