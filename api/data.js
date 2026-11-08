@@ -4,6 +4,7 @@ import { ensureDatabaseInitialized } from './_db-init.js';
 import { HttpError } from './_access.js';
 import { notifyCoursesChanged } from './_realtime.js';
 import { getPublicNews } from './_whatsNew.js';
+import { getAppVersion } from './_appVersion.js';
 import { log } from './_log.js';
 import {
   loadSets,
@@ -66,6 +67,7 @@ import { deleteAccount } from './_handlers/data/account.js';
  *
  * GET|POST /api/data?action=<имя>  — параметры в query (GET) или JSON-теле (POST).
  * GET /api/data?action=news — исключение: без входа (новости «Что нового», api/_whatsNew.js).
+ * GET /api/data?action=app-version&platform=ios — тоже без входа (последняя версия, api/_appVersion.js).
  * Ответ: { data } или { error }. Имена действий совпадают с методами NeonService.
  *
  * Прогресс по карточкам (уровень, дата повторения) здесь не пишется — только api/progress.js,
@@ -179,6 +181,30 @@ export default async function handler(req, res) {
       return res.status(200).json({ data: await getPublicNews(sql) });
     } catch (error) {
       log.error('data', 'news failed', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+  // Последняя версия в магазине (plan/new/app_update_prompt.md, Update 1) — тоже без входа и без БД:
+  // окно «Обязательно обновить» должно работать даже тогда, когда вход сломан
+  if (action === 'app-version') {
+    if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+    try {
+      const data = await getAppVersion({
+        platform: req.query.platform,
+        onError: (e) => log.warn('data', `app-version lookup failed: ${e.message}`),
+      });
+      // Apple не ответил и запасного ответа нет — пустоту на час не кэшируем, через минуту спросим снова
+      const failed = req.query.platform === 'ios' && data.latest === null;
+      res.setHeader(
+        'Cache-Control',
+        failed ? 'public, s-maxage=60' : 'public, s-maxage=3600, stale-while-revalidate=86400'
+      );
+      return res.status(200).json({ data });
+    } catch (error) {
+      if (error instanceof HttpError) {
+        return res.status(error.status).json({ error: error.message });
+      }
+      log.error('data', 'app-version failed', error);
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
