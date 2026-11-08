@@ -32,3 +32,6 @@ package-lock.json
 *.yaml
 *.html
 *.css
+
+# Тексты страниц сайта (собирает scripts/build-site.mjs)
+site/

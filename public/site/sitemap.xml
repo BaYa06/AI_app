@@ -1,8 +1,70 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://flashlycards.app/</loc><lastmod>2026-11-08</lastmod><priority>1.0</priority></url>
-  <url><loc>https://flashlycards.app/support</loc><lastmod>2026-11-08</lastmod><priority>0.6</priority></url>
-  <url><loc>https://flashlycards.app/privacy</loc><lastmod>2026-11-08</lastmod><priority>0.4</priority></url>
-  <url><loc>https://flashlycards.app/terms</loc><lastmod>2026-11-08</lastmod><priority>0.4</priority></url>
-  <url><loc>https://flashlycards.app/delete-account</loc><lastmod>2026-11-08</lastmod><priority>0.3</priority></url>
+<!-- Генерируется scripts/build-site.mjs — правь там -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://flashlycards.app/</loc>
+    <lastmod>2026-11-09</lastmod>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://flashlycards.app/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://flashlycards.app/en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://flashlycards.app/"/>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/support</loc>
+    <lastmod>2026-11-08</lastmod>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/privacy</loc>
+    <lastmod>2026-11-08</lastmod>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/terms</loc>
+    <lastmod>2026-11-08</lastmod>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/delete-account</loc>
+    <lastmod>2026-11-08</lastmod>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/en</loc>
+    <lastmod>2026-11-09</lastmod>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://flashlycards.app/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://flashlycards.app/en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://flashlycards.app/"/>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/how-to-learn-words</loc>
+    <lastmod>2026-11-09</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/learn/english</loc>
+    <lastmod>2026-11-09</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/learn/german</loc>
+    <lastmod>2026-11-09</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/learn/turkish</loc>
+    <lastmod>2026-11-09</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/spaced-repetition</loc>
+    <lastmod>2026-11-09</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers</loc>
+    <lastmod>2026-11-09</lastmod>
+    <priority>0.8</priority>
+  </url>
 </urlset>

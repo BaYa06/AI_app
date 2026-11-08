@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Интервальное повторение: как работает и зачем — Flashly</title>
+<meta name="description" content="Что такое интервальное повторение, кривая забывания и система Лейтнера. Как Flashly решает, когда повторить слово: 1, 3, 7, 14, 30 и 60 дней.">
+<link rel="canonical" href="https://flashlycards.app/spaced-repetition">
+
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Flashly">
+<meta property="og:locale" content="ru_RU">
+<meta property="og:url" content="https://flashlycards.app/spaced-repetition">
+<meta property="og:title" content="Интервальное повторение: как работает и зачем — Flashly">
+<meta property="og:description" content="Что такое интервальное повторение, кривая забывания и система Лейтнера. Как Flashly решает, когда повторить слово: 1, 3, 7, 14, 30 и 60 дней.">
+<meta property="og:image" content="https://flashlycards.app/site/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="apple-itunes-app" content="app-id=6808731151">
+<meta name="theme-color" content="#6467F2">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="stylesheet" href="/site/site.css">
+<script>(function(){var u=navigator.userAgent,n=navigator,p=/iPhone|iPad|iPod/.test(u)||(n.platform==='MacIntel'&&n.maxTouchPoints>1)?'ios':/Android/i.test(u)?'android':/Mobi/i.test(u)?'mobile':'desktop';document.documentElement.classList.add('p-'+p)})()</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Главная","item":"https://flashlycards.app/"},{"@type":"ListItem","position":2,"name":"Интервальное повторение: как запоминать надолго","item":"https://flashlycards.app/spaced-repetition"}]},{"@type":"Article","headline":"Интервальное повторение: как запоминать надолго","description":"Что такое интервальное повторение, кривая забывания и система Лейтнера. Как Flashly решает, когда повторить слово: 1, 3, 7, 14, 30 и 60 дней.","inLanguage":"ru","url":"https://flashlycards.app/spaced-repetition","mainEntityOfPage":"https://flashlycards.app/spaced-repetition","image":"https://flashlycards.app/site/og.png","dateModified":"2026-11-09","datePublished":"2026-11-09","author":{"@id":"https://flashlycards.app/#organization"},"publisher":{"@id":"https://flashlycards.app/#organization"},"about":{"@id":"https://flashlycards.app/#app"}},{"@type":"Organization","@id":"https://flashlycards.app/#organization","name":"Flashly","url":"https://flashlycards.app/","logo":"https://flashlycards.app/icons/icon-512.png","email":"support@flashlycards.app"},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Сколько времени в день нужно заниматься?","acceptedAnswer":{"@type":"Answer","text":"Обычно хватает 5–15 минут. Главное — заниматься каждый день или почти каждый день: пропуски сбивают расписание повторений."}},{"@type":"Question","name":"Что будет, если я пропущу несколько дней?","acceptedAnswer":{"@type":"Answer","text":"Слова, которым пришло время, будут ждать в следующем уроке. Если пауза была намного дольше интервала, слово опустится на ступень, чтобы ты повторил его чаще."}},{"@type":"Question","name":"Чем Flashly отличается от бумажных карточек?","acceptedAnswer":{"@type":"Answer","text":"Принцип тот же, но приложение само считает даты, напоминает о повторении, озвучивает слова и умеет делать наборы из фото и PDF."}}]}]}</script>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="apple" viewBox="0 0 24 24"><path d="M16.37 12.73c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.77-3.32-1.8-1.41-.14-2.76.83-3.48.83-.72 0-1.82-.81-3-.79-1.54.02-2.97.9-3.76 2.28-1.61 2.79-.41 6.9 1.15 9.16.77 1.1 1.68 2.34 2.87 2.3 1.15-.05 1.59-.74 2.98-.74 1.39 0 1.78.74 3 .72 1.24-.02 2.02-1.12 2.78-2.23.88-1.28 1.24-2.52 1.26-2.59-.03-.01-2.41-.93-2.44-3.68zM14.1 5.96c.63-.77 1.06-1.83.94-2.89-.91.04-2.02.61-2.67 1.37-.58.67-1.1 1.76-.96 2.8 1.02.08 2.06-.52 2.69-1.28z"/></symbol>
+  <symbol id="download" viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></symbol>
+  <symbol id="globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></symbol>
+</svg>
+<header class="top">
+  <div class="wrap">
+    <a class="logo" href="/" aria-label="Flashly, на главную"><img src="/icons/icon-192.png" alt="" width="32" height="32">Flashly</a>
+    <nav aria-label="Разделы">
+      <a href="/how-to-learn-words">Как учить слова</a>
+      <a href="/spaced-repetition" aria-current="page">Интервальное повторение</a>
+      <a href="/teachers">Учителям</a>
+      <a class="btn" href="#download">Скачать</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+<article class="doc">
+<div class="overline">Метод</div>
+<h1>Интервальное повторение: как запоминать надолго</h1>
+<p class="lead">Интервальное повторение — способ учить, при котором ты возвращаешься к материалу не каждый день и не «когда вспомнишь», а через растущие промежутки времени. Так каждое повторение приходится на момент, когда ты уже начал забывать, и память закрепляется сильнее всего.</p>
+
+<h2>Кривая забывания</h2>
+<p>В 1880-х годах немецкий психолог Герман Эббингауз заучивал бессмысленные слоги и проверял, сколько помнит через разное время. Он увидел, что забывание идёт быстро в первые часы и дни, а потом замедляется. Эту зависимость называют кривой забывания.</p>
+<p>Вторая его находка важнее для практики: после каждого повторения забывание идёт медленнее. Если повторить вовремя, следующий раз можно отложить на более долгий срок. Так и появилась идея растущих интервалов: день, несколько дней, неделя, месяц.</p>
+
+<h2>Почему не повторять всё каждый день</h2>
+<p>Можно, но это неэффективно. Слова, которые ты уже хорошо помнишь, отнимают время, а трудные теряются среди лёгких. При интервальном повторении каждое слово получает своё расписание: лёгкие уходят далеко вперёд, трудные возвращаются часто. За те же 10 минут в день ты повторяешь именно то, что нужно.</p>
+<p>Есть и обратная ошибка — учить перед контрольной всё за один вечер. Наутро ответить получится, а через пару недель от выученного мало что останется. Распределённые повторения дают меньше «вау» в первый день, но гораздо больше через месяц.</p>
+
+<h2>Система Лейтнера: интервалы на бумаге</h2>
+<p>В 1970-х годах Себастьян Лейтнер предложил простой способ без компьютера: карточки лежат в нескольких коробках. Вспомнил ответ — карточка переезжает в следующую коробку, которую открывают реже. Ошибся — возвращается в первую. Приложения с карточками делают то же самое, только сами считают даты и не дают ничего забыть.</p>
+
+<h2>Активное вспоминание</h2>
+<p>Интервалы работают в паре с ещё одним приёмом: ответ нужно вспомнить самому, прежде чем посмотреть. Перечитывать слово легко и приятно, но память от этого почти не растёт. А попытка достать ответ из головы — даже неудачная — укрепляет связь. Поэтому на карточке сначала только слово, а перевод открывается по нажатию.</p>
+
+<h2>Как это устроено в Flashly</h2>
+<p>У каждого слова есть ступень. Новое слово стоит на нулевой ступени, и чем выше ступень, тем дольше пауза до следующего повторения:</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Ступень</th><th>Следующее повторение</th><th>Статус слова</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td>сегодня</td><td>Новое</td></tr>
+    <tr><td>1</td><td>через 1 день</td><td>Учится</td></tr>
+    <tr><td>2</td><td>через 3 дня</td><td>Учится</td></tr>
+    <tr><td>3</td><td>через 7 дней</td><td>Знаю</td></tr>
+    <tr><td>4</td><td>через 14 дней</td><td>Знаю</td></tr>
+    <tr><td>5</td><td>через 30 дней</td><td>Выучено надолго</td></tr>
+    <tr><td>6 и выше</td><td>через 60 дней</td><td>Выучено надолго</td></tr>
+  </tbody>
+</table>
+</div>
+<p>После того как ты перевернул карточку, ты оцениваешь, как вспомнил слово:</p>
+<ul>
+  <li><strong>«Уверенно»</strong> — слово поднимается на ступень выше, следующая встреча отодвигается;</li>
+  <li><strong>«Почти»</strong> — ступень не меняется, слово вернётся ещё раз в этом же уроке;</li>
+  <li><strong>«Не знаю»</strong> — слово начинает путь заново.</li>
+</ul>
+<p>В режимах «Тест» и «Собери слово» ответ проверяет приложение: ошибка опускает слово на одну ступень и возвращает его к повторению.</p>
+<p>Есть ещё два правила, которые делают расписание честным:</p>
+<ul>
+  <li><strong>Правильный ответ раньше срока ничего не меняет.</strong> Если повторять слово каждые пять минут, оно не станет «выученным надолго» за вечер — ступень растёт только когда пришло время.</li>
+  <li><strong>Забытое слово «угасает».</strong> Если не повторять слово намного дольше его интервала, при следующем ответе оно сначала опустится на ступень. Так статус показывает, что ты знаешь сейчас, а не когда-то.</li>
+</ul>
+<p>Цвет статуса виден у каждого слова, а у набора — полоска из четырёх цветов. По ней понятно, сколько слов уже выучено, а сколько ещё учится.</p>
+
+<h2>Урок на 5 минут вместо расписания в голове</h2>
+<p>Тебе не нужно помнить, что и когда повторять. Кнопка «Изучить» сама собирает урок: слова, которым пора на повторение, и несколько новых — по цели на день (5, 10 или 20 новых слов). Напоминания и серия дней помогают не выпадать из ритма, ведь интервальное повторение работает только при регулярных занятиях.</p>
+
+<h2>Кому подходит метод</h2>
+<p>Всем, кому нужно запомнить много отдельных фактов: иностранные слова, термины по биологии или истории, даты, формулы, определения. В Flashly можно создавать не только языковые наборы, но и предметные — в формате «вопрос — ответ» или «термин — определение».</p>
+
+<h2>Вопросы</h2>
+<details><summary>Сколько времени в день нужно заниматься?</summary><p>Обычно хватает 5–15 минут. Главное — заниматься каждый день или почти каждый день: пропуски сбивают расписание повторений.</p></details>
+<details><summary>Что будет, если я пропущу несколько дней?</summary><p>Слова, которым пришло время, будут ждать в следующем уроке. Если пауза была намного дольше интервала, слово опустится на ступень, чтобы ты повторил его чаще.</p></details>
+<details><summary>Чем Flashly отличается от бумажных карточек?</summary><p>Принцип тот же, но приложение само считает даты, напоминает о повторении, озвучивает слова и умеет делать наборы из фото и PDF.</p></details>
+</article>
+<aside class="related" aria-labelledby="related-h">
+  <h2 id="related-h">Читай также</h2>
+  <ul><li><a href="/how-to-learn-words"><b>Как выучить иностранные слова и не забыть их через неделю</b><span>Семь приёмов, чтобы запоминать иностранные слова надолго: вспоминание, интервалы, примеры, озвучка. И как заниматься по 5 минут в день.</span></a></li><li><a href="/learn/english"><b>Карточки для изучения английских слов</b><span>Как учить английские слова по карточкам с уровня A1–A2: какие слова брать, сколько в день, как не забывать. Карточки с озвучкой в Flashly — бесплатно.</span></a></li><li><a href="/learn/german"><b>Карточки для изучения немецких слов</b><span>Как учить немецкие слова по карточкам: артикли der, die, das, множественное число, глаголы с приставками. Карточки с озвучкой и повторением в Flashly.</span></a></li><li><a href="/learn/turkish"><b>Карточки для изучения турецких слов</b><span>Как учить турецкие слова по карточкам: буквы ç, ş, ğ, ı, суффиксы, гармония гласных, общие корни с казахским и кыргызским. Карточки с озвучкой в Flashly.</span></a></li></ul>
+</aside>
+<section class="cta" id="download" aria-labelledby="dl-h">
+  <h2 id="dl-h">Попробуй Flashly бесплатно</h2>
+  <p class="lead">Первый набор можно сделать за минуту: сфотографируй страницу учебника или добавь слова вручную.</p>
+  <div class="stores">
+  <a class="store dl-ios" href="https://apps.apple.com/app/id6808731151"><svg aria-hidden="true" class="fill"><use href="#apple"/></svg><span><small>Загрузить в</small><b>App Store</b></span></a>
+  <a class="store dl-android" href="https://app.flashlycards.app/?install=1"><svg aria-hidden="true"><use href="#download"/></svg><span><small>Для Android</small><b>Установить</b></span></a>
+  <a class="store store-sec dl-web" href="https://app.flashlycards.app/"><svg aria-hidden="true"><use href="#globe"/></svg><span><small>На компьютере</small><b>Открыть в браузере</b></span></a>
+</div>
+<div class="dl-qr"><img src="/site/qr.svg" width="112" height="112" alt="QR-код flashlycards.app" loading="lazy"><span>Наведи камеру телефона, чтобы открыть Flashly на телефоне</span></div>
+<p class="meta dl-note">iPhone — приложение из App Store. Android и компьютер — веб-версия, которую можно установить на главный экран.</p>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <a class="logo" href="/"><img src="/icons/icon-192.png" alt="" width="32" height="32" loading="lazy">Flashly</a>
+      <p>Flashly — карточки для изучения слов с интервальным повторением. Для школьников, студентов и учителей.</p>
+    </div>
+    <div>
+      <h2 class="fh">Изучать</h2>
+      <ul><li><a href="/how-to-learn-words">Как учить слова</a></li><li><a href="/learn/english">Английские слова</a></li><li><a href="/learn/german">Немецкие слова</a></li><li><a href="/learn/turkish">Турецкие слова</a></li><li><a href="/spaced-repetition">Интервальное повторение</a></li><li><a href="/teachers">Учителям и репетиторам</a></li></ul>
+    </div>
+    <div>
+      <h2 class="fh">Документы</h2>
+      <ul><li><a href="/privacy">Политика конфиденциальности</a></li><li><a href="/terms">Условия использования</a></li><li><a href="/delete-account">Удаление аккаунта</a></li></ul>
+    </div>
+    <div>
+      <h2 class="fh">Помощь</h2>
+      <ul><li><a href="/support">Поддержка</a></li><li><a href="/#faq">Частые вопросы</a></li><li><a href="mailto:support@flashlycards.app">support@flashlycards.app</a></li></ul>
+    </div>
+    <div class="legal"><span>© 2026 Flashly</span><a href="/en" hreflang="en">English</a></div>
+  </div>
+</footer>
+</body>
+</html>
