@@ -49,7 +49,7 @@ export async function upsertDailyActivity(sql, me, p) {
  */
 export async function sendPush(sql, userId, type, data = {}) {
   try {
-    const { sendNotification } = await import('./push.js');
+    const { sendNotification } = await import('../../push.js');
     await sendNotification(sql, userId, type, data);
   } catch (e) {
     log.error('data', `push ${type} failed`, e);

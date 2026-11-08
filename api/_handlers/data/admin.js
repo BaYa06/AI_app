@@ -49,7 +49,7 @@ export async function adminReplyFeedback(sql, me, p) {
   let push = null;
   if (p.push !== false && reply.user_id) {
     try {
-      const { sendNotification } = await import('./push.js');
+      const { sendNotification } = await import('../../push.js');
       const r = await sendNotification(sql, reply.user_id, 'support_reply', {
         feedbackId: p.id,
         text: message,
