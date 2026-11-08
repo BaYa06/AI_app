@@ -12,27 +12,51 @@
  *   3. node scripts/rehearse-migrations.mjs
  *   4. Ветку rehearsal-1-8 удалить.
  *
- * Скрипт отказывается работать с рабочей и тестовой базой (по адресу compute).
+ * Без флагов скрипт отказывается работать с рабочей и тестовой базой (по адресу compute).
+ *
+ * Режим --prod (шаг B0, за несколько минут до слияния dev → main): те же миграции на РАБОЧЕЙ
+ * базе заранее, чтобы после деплоя первый запрос не ждал ~35 с. Миграции только добавляют
+ * (Release 2), текущий сервер 1.7.1 с ними работает. Строка — POSTGRES_URL из .env.local
+ * (должна вести на рабочую базу), запуск только после ввода слова «prod».
+ *   node scripts/rehearse-migrations.mjs --prod
  */
 import { config } from 'dotenv';
 import { neon } from '@neondatabase/serverless';
+import readline from 'node:readline/promises';
 
-config({ path: '.env.rehearsal', quiet: true });
+const PROD_EP = 'ep-misty-scene-ahkv29p5';
+const STAGING_EP = 'ep-wild-king-ah80ir3s';
+const PROD = process.argv.includes('--prod');
 
-const FORBIDDEN = {
-  'ep-misty-scene-ahkv29p5': 'рабочая база (main)',
-  'ep-wild-king-ah80ir3s': 'тестовая база (staging)',
-};
-
-const url = process.env.REHEARSAL_DATABASE_URL;
-if (!url) {
-  console.error('Нет REHEARSAL_DATABASE_URL в .env.rehearsal — см. комментарий в начале файла.');
-  process.exit(1);
-}
-const host = new URL(url).hostname;
-for (const [ep, name] of Object.entries(FORBIDDEN)) {
-  if (host.includes(ep)) {
-    console.error(`Стоп: это ${name}. Нужна строка временной ветки rehearsal-1-8.`);
+let url;
+if (PROD) {
+  config({ path: '.env.local', quiet: true });
+  url = process.env.POSTGRES_URL;
+  if (!url || !new URL(url).hostname.includes(PROD_EP)) {
+    console.error('Стоп: POSTGRES_URL в .env.local не ведёт на рабочую базу.');
+    process.exit(1);
+  }
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const answer = await rl.question(
+    'Применить миграции к РАБОЧЕЙ базе? Напиши prod и нажми Enter (иначе — отмена): '
+  );
+  rl.close();
+  if (answer.trim() !== 'prod') {
+    console.log('Отменено.');
+    process.exit(0);
+  }
+} else {
+  config({ path: '.env.rehearsal', quiet: true });
+  url = process.env.REHEARSAL_DATABASE_URL;
+  if (!url) {
+    console.error('Нет REHEARSAL_DATABASE_URL в .env.rehearsal — см. комментарий в начале файла.');
+    process.exit(1);
+  }
+  const host = new URL(url).hostname;
+  if (host.includes(PROD_EP) || host.includes(STAGING_EP)) {
+    console.error(
+      `Стоп: это ${host.includes(PROD_EP) ? 'рабочая' : 'тестовая'} база. Нужна строка временной ветки rehearsal-1-8 (для рабочей базы — флаг --prod).`
+    );
     process.exit(1);
   }
 }
