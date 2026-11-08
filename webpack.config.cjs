@@ -154,6 +154,11 @@ module.exports = (env, argv) => {
           // Страница «не найдено» для адресов с точкой (Vercel отдаёт 404.html из корня) и favicon — plan/new/seo_launch.md
           { from: 'public/site/404.html', to: '404.html' },
           { from: 'public/favicon.ico', to: 'favicon.ico' },
+          // Ключ IndexNow (Bing, Яндекс) — должен лежать в корне сайта: scripts/indexnow.mjs
+          {
+            from: 'public/392fcc1ba5ab770c0f679e825b876a40.txt',
+            to: '392fcc1ba5ab770c0f679e825b876a40.txt',
+          },
           // Universal Links: iOS открывает /join/* сразу в приложении
           {
             from: 'public/.well-known/apple-app-site-association',
