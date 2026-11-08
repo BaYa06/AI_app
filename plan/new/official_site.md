@@ -117,7 +117,7 @@ ai-app-seven-zeta.vercel.app → старый адрес, НЕ отключае�
   - Триггер 038 (наборы книг только для чтения): все записи в card_sets/cards ограничены владельцем, кроме `announced_at` в push «новый набор» — он берёт только наборы с `course_id`, а наборы книг создаются без него (scripts/import-book.ts). Подтвердить на A2.
 - ✅ A2 (08.11.2026): репетиция на копии рабочей базы. schema_037 → schema_040 без ошибок, данные не тронуты (448 пользователей, 972 набора, 52 182 карточки). Наборы книг на проде уже без владельца и с триггерами (038 ничего не меняет), риск push «новый набор» = 0. **Миграции идут ~35 с** — поэтому шаг B0. Ветку `rehearsal-1-8` и `.env.rehearsal` удалить.
 - ✅ A3 (владелец, 08.11.2026): `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION` заданы для Production и Preview (коннектор Vercel список переменных не читает — проверка озвучки в B5).
-- ⬜ A4 (владелец): Supabase → Redirect URLs — `https://app.flashlycards.app/auth-callback`.
+- ⬜ A4 (владелец): Supabase → Redirect URLs — `https://app.flashlycards.app/auth-callback`. **Site URL не менять** до переноса: `app.` пока смотрит на dev и тестовую базу.
 - ⬜ A5 (владелец): Neon — ветка `before-1.8` из рабочей базы перед слиянием.
 - ⬜ A6 (я): Site 5 в dev.
 - A7: заморозка dev на время переноса. A8: утро буднего дня, не вечер и не около 20:30 UTC (cron close-week).
@@ -135,7 +135,7 @@ ai-app-seven-zeta.vercel.app → старый адрес, НЕ отключае�
 Vercel → предыдущий Production-деплой → Instant Rollback (миграции аддитивные — старый код с ними работает); домены → Preview; данные — ветка Neon `before-1.8`.
 
 ### D. После
-Импорт каталога библиотеки `--prod`; сборка 1.8.x из main → TestFlight → ревью (данные о сбоях, поэтапный выпуск); Site 8; Site 6–7 в новой сборке.
+Supabase → Site URL = `https://app.flashlycards.app` (по желанию, когда домены на Production; старый адрес продолжает работать). Импорт каталога библиотеки `--prod`; сборка 1.8.x из main → TestFlight → ревью (данные о сбоях, поэтапный выпуск); Site 8; Site 6–7 в новой сборке.
 
 ## Отложено
 Проблема: при входе через Google (окно браузера в `SignInScreen` / `EmailAuthScreen`) Google пишет «перейти на yiwsmjbeirgomkrckoju.supabase.co» — выглядит подозрительно. Вход через Apple нативный, его не касается. Supabase сейчас на тарифе **Free**.
