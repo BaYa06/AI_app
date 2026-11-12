@@ -171,7 +171,10 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
   `DatePicker(.hourAndMinute)`), кнопка «Создать курс» неактивна без названия. По нажатию —
   событие `create` с `{ title, bookId, days, time }`, лист ждёт ответа JS (индикатор на кнопке)
   и закрывается по команде `dismiss`. Ошибка создания → лист не закрывается, JS показывает тост.
-- [ ] **Teacher 8. Страница курса** ([TeacherCourseStatsScreen.tsx](src/screens/TeacherCourseStatsScreen.tsx),
+- [x] **Teacher 8. Страница курса** ✅ Сводка — `teacherCourseStats/courseOverview.ts` (+ тесты):
+  строка расписания, вывод под графиком (только «7д»), число тестов из `test?action=history`;
+  учебники и открытые юниты — `BookService.getCoursePlan`. Плитки и список — новый `CourseActions`.
+  ([TeacherCourseStatsScreen.tsx](src/screens/TeacherCourseStatsScreen.tsx),
   [CourseActions.tsx](src/screens/teacherCourseStats/CourseActions.tsx)).
   - Шапка: название курса + строка «Harmoni Türkçe · пн–пт 10:30» (учебник и расписание).
   - Вместо 6 строк — **4 плитки:** Живой тест (подпись «ещё ни одного» / дата последнего),

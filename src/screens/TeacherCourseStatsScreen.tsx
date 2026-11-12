@@ -2,7 +2,7 @@
  * Teacher Course Stats Screen
  * @description Статистика курса для учителя
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft } from 'lucide-react-native';
@@ -12,6 +12,8 @@ import { Text } from '@/components/common';
 import { useThemeColors } from '@/store';
 import { spacing } from '@/constants';
 import { NeonService } from '@/services/NeonService';
+import { BookService } from '@/services/BookService';
+import { toast } from '@/components/ui';
 import { getSession } from '@/services/auth/session';
 import type { RootStackParamList } from '@/types/navigation';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -28,7 +30,12 @@ import { TestLobbySheet } from './teacherCourseStats/TestLobbySheet';
 import { StudentListModal } from './teacherCourseStats/StudentListModal';
 import { CourseSetsList } from './teacherCourseStats/CourseSetsList';
 import { ActivityChart } from './teacherCourseStats/ActivityChart';
-import { CourseActions } from './teacherCourseStats/CourseActions';
+import { CourseActions, type CourseOverview } from './teacherCourseStats/CourseActions';
+import {
+  activityInsight,
+  formatScheduleLabel,
+  loadTestHistorySummary,
+} from './teacherCourseStats/courseOverview';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TeacherCourseStats'>;
 
@@ -117,6 +124,53 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
     };
   }, [isOwner, route.params.courseId, retryTick]);
 
+  // Сводка для плиток и шапки (Teacher 8): тесты, учебники курса, расписание
+  const [overview, setOverview] = useState<Omit<CourseOverview, 'membersCount'>>({});
+  const [bookTitles, setBookTitles] = useState<string | null>(null);
+  const loadSchedule = useCallback(() => {
+    NeonService.getCourseSchedule(route.params.courseId).then((schedule) => {
+      if (schedule) setOverview((o) => ({ ...o, scheduleLabel: formatScheduleLabel(schedule) }));
+    });
+  }, [route.params.courseId]);
+  useEffect(() => {
+    if (!isOwner) return;
+    let mounted = true;
+    loadTestHistorySummary(route.params.courseId).then((tests) => {
+      if (mounted) setOverview((o) => ({ ...o, tests }));
+    });
+    BookService.getCoursePlan(route.params.courseId).then((plan) => {
+      if (!mounted || !plan) return;
+      const open = plan.books.reduce((n, b) => n + b.units.filter((u) => u.isOpen).length, 0);
+      setOverview((o) => ({ ...o, openUnits: plan.books.length > 0 ? open : null }));
+      setBookTitles(plan.books.map((b) => b.title).join(', ') || null);
+    });
+    loadSchedule();
+    return () => {
+      mounted = false;
+    };
+  }, [isOwner, route.params.courseId, retryTick, loadSchedule]);
+
+  // «Напомнить» у «Не заходили 7д+» — то же, что на главной и в списке учеников
+  const [reminding, setReminding] = useState(false);
+  const [remindedToday, setRemindedToday] = useState(false);
+  const handleRemind = async () => {
+    if (reminding || remindedToday) return;
+    setReminding(true);
+    const result = await NeonService.remindCourseReview(route.params.courseId);
+    setReminding(false);
+    if (result === 'rate_limited') {
+      setRemindedToday(true);
+      toast.info('Уже напомнили: классу можно напоминать не чаще раза в сутки');
+    } else if (!result) {
+      toast.error('Не получилось. Проверь соединение и попробуй ещё раз');
+    } else {
+      setRemindedToday(true);
+      toast.success(
+        `Напоминание отправлено: ученикам с уведомлениями ${result.sent} из ${result.students}`
+      );
+    }
+  };
+
   const activeStudents = members.filter((s) => s.status === 'online' || s.status === 'away');
   const inactiveStudents = members.filter((s) => s.status === 'inactive');
   const modalStudents = studentModal === 'active' ? activeStudents : inactiveStudents;
@@ -202,9 +256,16 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
         >
           <ArrowLeft size={22} color={colors.textPrimary} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-          {courseTitle || 'Статистика курса'}
-        </Text>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+            {courseTitle || 'Статистика курса'}
+          </Text>
+          {(bookTitles || overview.scheduleLabel) && (
+            <Text variant="caption" numberOfLines={1} style={{ color: colors.textSecondary }}>
+              {[bookTitles, overview.scheduleLabel].filter(Boolean).join(' · ')}
+            </Text>
+          )}
+        </View>
       </View>
 
       <ScrollView
@@ -219,6 +280,10 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
           setJoinCodeDialog={setJoinCodeDialog}
           setLobbyModal={setLobbyModal}
           setScheduleSheet={setScheduleSheet}
+          overview={{
+            ...overview,
+            membersCount: membersLoading || membersError ? undefined : members.length,
+          }}
         />
 
         {/* Metric tiles */}
@@ -257,9 +322,36 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
             ) : membersError ? (
               <Text style={[styles.metricValue, { color: colors.textSecondary }]}>—</Text>
             ) : (
-              <Text style={[styles.metricValue, { color: colors.error }]}>
-                {inactiveStudents.length}
-              </Text>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'baseline',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <Text style={[styles.metricValue, { color: colors.errorText }]}>
+                  {inactiveStudents.length}
+                </Text>
+                {inactiveStudents.length > 0 && (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: remindedToday || reminding }}
+                    onPress={handleRemind}
+                    disabled={remindedToday || reminding}
+                    hitSlop={8}
+                  >
+                    <Text
+                      variant="label"
+                      style={{
+                        color: colors.primary,
+                        opacity: remindedToday || reminding ? 0.5 : 1,
+                      }}
+                    >
+                      {remindedToday ? 'Напомнили' : 'Напомнить'}
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
             )}
           </Pressable>
         </View>
@@ -276,6 +368,10 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
           chartTooltip={chartTooltip}
           handleBarPress={handleBarPress}
           setRetryTick={setRetryTick}
+          insight={
+            // Только «7д»: в «30д» столбец — сумма за 5 дней, «учились N» было бы неверно
+            chartPeriod !== '7d' || chartLoading || chartError ? null : activityInsight(chartData)
+          }
         />
 
         {/* Students carousel */}
@@ -353,7 +449,10 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
       <CourseScheduleSheet
         visible={scheduleSheet}
         courseId={route.params.courseId}
-        onClose={() => setScheduleSheet(false)}
+        onClose={() => {
+          setScheduleSheet(false);
+          loadSchedule();
+        }}
       />
 
       <CourseJoinCodeDialog

@@ -1,6 +1,7 @@
 /**
  * Наборы курса: прогресс учеников по каждому
  * (Clean 8 — вынесено из TeacherCourseStatsScreen.tsx без изменений разметки.)
+ * Teacher 8: полоска «прошли / начали / не открывали» вместо среднего процента — как на главной учителя.
  */
 import React from 'react';
 import { View, Pressable, ActivityIndicator } from 'react-native';
@@ -9,6 +10,7 @@ import { Text } from '@/components/common';
 import { useThemeColors } from '@/store';
 import { spacing } from '@/constants';
 import { NeonService } from '@/services/NeonService';
+import { SegmentedProgressBar } from '@/components/ui';
 import { styles } from './styles';
 import { type CourseMember } from './helpers';
 
@@ -86,29 +88,24 @@ export function CourseSetsList({
                 </Text>
               </View>
 
-              {/* Progress bar */}
-              <View style={[styles.progressBg, { backgroundColor: colors.surfaceMuted }]}>
-                <View
-                  style={[
-                    styles.progressFill,
-                    {
-                      width: `${Math.min(set.progressPct, 100)}%` as any,
-                      backgroundColor: colors.primary,
-                    },
-                  ]}
-                />
-              </View>
+              {/* Прогресс группы (Teacher 8): прошли все карточки / начали / не открывали */}
+              <SegmentedProgressBar
+                total={members.length}
+                segments={[
+                  { value: set.studentsCompleted, color: colors.success },
+                  {
+                    value: Math.max(0, set.studentsStarted - set.studentsCompleted),
+                    color: colors.warning,
+                  },
+                ]}
+              />
 
               <View style={styles.setCardMeta}>
                 <Text style={[styles.setCardMetaText, { color: colors.textSecondary }]}>
-                  {set.studentsStarted} из {members.length} начали
-                  {members.length > set.studentsStarted
-                    ? ` · ${members.length - set.studentsStarted} не начинали`
-                    : ''}
-                  {` · ${set.studentsCompleted} завершили`}
-                </Text>
-                <Text style={[styles.setCardAccuracy, { color: colors.primary }]}>
-                  {set.progressPct}%
+                  {`Прошли ${set.studentsCompleted} · начали ${Math.max(
+                    0,
+                    set.studentsStarted - set.studentsCompleted
+                  )} · не открывали ${Math.max(0, members.length - set.studentsStarted)}`}
                 </Text>
               </View>
             </View>

@@ -1,24 +1,40 @@
 /**
- * Действия курса: тест, код подключения, история, рейтинг, расписание, учебники
- * (Clean 8 — вынесено из TeacherCourseStatsScreen.tsx без изменений разметки.)
+ * Действия курса (plan/new/teacher_cabinet.md, Teacher 8): вместо шести одинаковых строк —
+ * плитки главных действий (Живой тест, Задание, Код подключения, Учебники курса) с живыми
+ * подписями и короткий список (История тестов, Рейтинг недели, Расписание).
+ * Плитка «Задание» — только при TEACHER_HOMEWORK_ENABLED (этап 2).
  */
 import React from 'react';
-import { View, Pressable } from 'react-native';
+import { View, Pressable, StyleSheet } from 'react-native';
 import {
-  ArrowLeft,
-  GraduationCap,
-  Clock,
   BookOpen,
-  Trophy,
   CalendarClock,
+  ChevronRight,
+  ClipboardCheck,
+  Clock,
+  GraduationCap,
+  Trophy,
   UserPlus,
 } from 'lucide-react-native';
 import { Text } from '@/components/common';
+import type { IconComponent } from '@/components/ui';
 import { useThemeColors } from '@/store';
-import { alpha } from '@/constants';
+import { alpha, borderRadius, heights, iconSize, spacing } from '@/constants';
+import { TEACHER_HOMEWORK_ENABLED } from '@/config/features';
 import type { RootStackParamList } from '@/types/navigation';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { styles } from './styles';
+import { pluralize } from '@/utils';
+import { formatShortDate, type TestHistorySummary } from './courseOverview';
+
+/** Подписи плиток и списка; undefined — ещё грузится (подпись не показываем) */
+export interface CourseOverview {
+  tests?: TestHistorySummary | null;
+  membersCount?: number;
+  /** null — учебника нет */
+  openUnits?: number | null;
+  /** «пн–пт 10:30»; null — расписания нет */
+  scheduleLabel?: string | null;
+}
 
 type Props = {
   colors: ReturnType<typeof useThemeColors>;
@@ -27,6 +43,9 @@ type Props = {
   setJoinCodeDialog: React.Dispatch<React.SetStateAction<boolean>>;
   setLobbyModal: React.Dispatch<React.SetStateAction<boolean>>;
   setScheduleSheet: React.Dispatch<React.SetStateAction<boolean>>;
+  overview: CourseOverview;
+  /** Этап 2: «Задание» */
+  onAssignHomework?: () => void;
 };
 
 export function CourseActions({
@@ -36,171 +55,231 @@ export function CourseActions({
   setJoinCodeDialog,
   setLobbyModal,
   setScheduleSheet,
+  overview,
+  onAssignHomework,
 }: Props) {
+  const { courseId, courseTitle } = route.params;
+  const { tests, membersCount, openUnits, scheduleLabel } = overview;
+
+  const testCaption =
+    tests === undefined || tests === null
+      ? undefined
+      : tests.count === 0
+        ? 'ещё ни одного'
+        : tests.lastFinishedAt
+          ? `последний ${formatShortDate(tests.lastFinishedAt)}`
+          : undefined;
+  const membersCaption =
+    membersCount === undefined
+      ? undefined
+      : `${membersCount} ${pluralize(membersCount, 'ученик', 'ученика', 'учеников')} в курсе`;
+  const booksCaption =
+    openUnits === undefined
+      ? undefined
+      : openUnits === null
+        ? 'подключить учебник'
+        : `открыто ${openUnits} ${pluralize(openUnits, 'юнит', 'юнита', 'юнитов')}`;
+
   return (
-    <View style={styles.actionList}>
-      {/* Test Lobby Button */}
-      <Pressable
-        accessibilityRole="button"
-        style={({ pressed }) => [
-          styles.testLobbyBtn,
-          {
-            backgroundColor: alpha(colors.primary, 10),
-            borderColor: alpha(colors.primary, 10),
-          },
-          pressed && { opacity: 0.75, transform: [{ scale: 0.985 }] },
-        ]}
-        onPress={() => setLobbyModal(true)}
-      >
-        <View style={[styles.testLobbyIcon, { backgroundColor: colors.primaryFill }]}>
-          <GraduationCap size={18} color={colors.onPrimary} />
-        </View>
-        <Text style={[styles.testLobbyText, { color: colors.textPrimary }]}>Живой тест</Text>
-        <ArrowLeft
-          size={16}
-          color={colors.textSecondary}
-          style={{ transform: [{ rotate: '180deg' }] }}
+    <View style={st.wrap}>
+      <View style={st.grid}>
+        <Tile
+          colors={colors}
+          filled
+          icon={GraduationCap}
+          title="Живой тест"
+          caption={testCaption}
+          onPress={() => setLobbyModal(true)}
         />
-      </Pressable>
+        {TEACHER_HOMEWORK_ENABLED && (
+          <Tile
+            colors={colors}
+            icon={ClipboardCheck}
+            title="Задание"
+            caption="с дедлайном"
+            onPress={onAssignHomework}
+          />
+        )}
+        <Tile
+          colors={colors}
+          icon={UserPlus}
+          title="Код подключения"
+          caption={membersCaption}
+          onPress={() => setJoinCodeDialog(true)}
+        />
+        <Tile
+          colors={colors}
+          icon={BookOpen}
+          title="Учебники курса"
+          caption={booksCaption}
+          onPress={() => navigation.navigate('CourseBooks', { courseId, courseTitle })}
+        />
+      </View>
 
-      {/* Код подключения к курсу — тот же код, что в «Пригласить учеников» */}
-      <Pressable
-        accessibilityRole="button"
-        style={({ pressed }) => [
-          styles.testLobbyBtn,
-          {
-            backgroundColor: alpha(colors.primary, 10),
-            borderColor: alpha(colors.primary, 10),
-          },
-          pressed && { opacity: 0.75, transform: [{ scale: 0.985 }] },
-        ]}
-        onPress={() => setJoinCodeDialog(true)}
-      >
-        <View style={[styles.testLobbyIcon, { backgroundColor: colors.primaryFill }]}>
-          <UserPlus size={18} color={colors.onPrimary} />
-        </View>
-        <Text style={[styles.testLobbyText, { color: colors.textPrimary }]}>
-          Код подключения к курсу
-        </Text>
-        <ArrowLeft
-          size={16}
-          color={colors.textSecondary}
-          style={{ transform: [{ rotate: '180deg' }] }}
+      <View style={[st.list, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Row
+          colors={colors}
+          icon={Clock}
+          title="История тестов"
+          value={tests ? String(tests.count) : undefined}
+          onPress={() => navigation.navigate('TestHistory', { courseId, courseTitle })}
         />
-      </Pressable>
-
-      {/* История тестов */}
-      <Pressable
-        accessibilityRole="button"
-        style={({ pressed }) => [
-          styles.testLobbyBtn,
-          {
-            backgroundColor: alpha(colors.primary, 10),
-            borderColor: alpha(colors.primary, 10),
-          },
-          pressed && { opacity: 0.75, transform: [{ scale: 0.985 }] },
-        ]}
-        onPress={() =>
-          navigation.navigate('TestHistory', {
-            courseId: route.params.courseId,
-            courseTitle: route.params.courseTitle,
-          })
-        }
-      >
-        <View style={[styles.testLobbyIcon, { backgroundColor: colors.primaryFill }]}>
-          <Clock size={18} color={colors.onPrimary} />
-        </View>
-        <Text style={[styles.testLobbyText, { color: colors.textPrimary }]}>История тестов</Text>
-        <ArrowLeft
-          size={16}
-          color={colors.textSecondary}
-          style={{ transform: [{ rotate: '180deg' }] }}
+        <Row
+          colors={colors}
+          icon={Trophy}
+          title="Рейтинг недели"
+          onPress={() => navigation.navigate('CourseLeaderboard', { courseId, courseTitle })}
+          divider
         />
-      </Pressable>
-
-      {/* Рейтинг недели (план, этап 4): места учеников, награды, включение рейтинга */}
-      <Pressable
-        accessibilityRole="button"
-        style={({ pressed }) => [
-          styles.testLobbyBtn,
-          {
-            backgroundColor: alpha(colors.primary, 10),
-            borderColor: alpha(colors.primary, 10),
-          },
-          pressed && { opacity: 0.75, transform: [{ scale: 0.985 }] },
-        ]}
-        onPress={() =>
-          navigation.navigate('CourseLeaderboard', {
-            courseId: route.params.courseId,
-            courseTitle: route.params.courseTitle,
-          })
-        }
-      >
-        <View style={[styles.testLobbyIcon, { backgroundColor: colors.warning }]}>
-          <Trophy size={18} color={colors.onPrimary} />
-        </View>
-        <Text style={[styles.testLobbyText, { color: colors.textPrimary }]}>Рейтинг недели</Text>
-        <ArrowLeft
-          size={16}
-          color={colors.textSecondary}
-          style={{ transform: [{ rotate: '180deg' }] }}
+        <Row
+          colors={colors}
+          icon={CalendarClock}
+          title="Расписание"
+          value={scheduleLabel === undefined ? undefined : (scheduleLabel ?? 'не задано')}
+          onPress={() => setScheduleSheet(true)}
+          divider
         />
-      </Pressable>
-
-      {/* Расписание занятий (plan/new/push_notifications.md, 2.8): ученикам — «Скоро занятие» за 1–2 часа */}
-      <Pressable
-        accessibilityRole="button"
-        style={({ pressed }) => [
-          styles.testLobbyBtn,
-          {
-            backgroundColor: alpha(colors.primary, 10),
-            borderColor: alpha(colors.primary, 10),
-          },
-          pressed && { opacity: 0.75, transform: [{ scale: 0.985 }] },
-        ]}
-        onPress={() => setScheduleSheet(true)}
-      >
-        <View style={[styles.testLobbyIcon, { backgroundColor: colors.primaryFill }]}>
-          <CalendarClock size={18} color={colors.onPrimary} />
-        </View>
-        <Text style={[styles.testLobbyText, { color: colors.textPrimary }]}>
-          Расписание занятий
-        </Text>
-        <ArrowLeft
-          size={16}
-          color={colors.textSecondary}
-          style={{ transform: [{ rotate: '180deg' }] }}
-        />
-      </Pressable>
-
-      {/* Учебники курса (каталог книг): план юнитов этой группы */}
-      <Pressable
-        accessibilityRole="button"
-        style={({ pressed }) => [
-          styles.testLobbyBtn,
-          {
-            backgroundColor: alpha(colors.primary, 10),
-            borderColor: alpha(colors.primary, 10),
-          },
-          pressed && { opacity: 0.75, transform: [{ scale: 0.985 }] },
-        ]}
-        onPress={() =>
-          navigation.navigate('CourseBooks', {
-            courseId: route.params.courseId,
-            courseTitle: route.params.courseTitle,
-          })
-        }
-      >
-        <View style={[styles.testLobbyIcon, { backgroundColor: colors.primaryFill }]}>
-          <BookOpen size={18} color={colors.onPrimary} />
-        </View>
-        <Text style={[styles.testLobbyText, { color: colors.textPrimary }]}>Учебники курса</Text>
-        <ArrowLeft
-          size={16}
-          color={colors.textSecondary}
-          style={{ transform: [{ rotate: '180deg' }] }}
-        />
-      </Pressable>
+      </View>
     </View>
   );
 }
+
+function Tile({
+  colors,
+  icon: Icon,
+  title,
+  caption,
+  filled,
+  onPress,
+}: {
+  colors: ReturnType<typeof useThemeColors>;
+  icon: IconComponent;
+  title: string;
+  caption?: string;
+  filled?: boolean;
+  onPress?: () => void;
+}) {
+  const fg = filled ? colors.onPrimary : colors.textPrimary;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={caption ? `${title}, ${caption}` : title}
+      onPress={onPress}
+      style={({ pressed }) => [
+        st.tile,
+        filled
+          ? { backgroundColor: colors.primaryFill, borderColor: colors.primaryFill }
+          : { backgroundColor: colors.surface, borderColor: colors.border },
+        pressed && st.pressed,
+      ]}
+    >
+      <View
+        style={[
+          st.tileIcon,
+          { backgroundColor: filled ? alpha(colors.onPrimary, 20) : alpha(colors.primary, 10) },
+        ]}
+      >
+        <Icon size={iconSize.s} color={filled ? colors.onPrimary : colors.primary} />
+      </View>
+      <View>
+        <Text variant="label" style={{ color: fg }} numberOfLines={1}>
+          {title}
+        </Text>
+        <Text
+          variant="caption"
+          numberOfLines={1}
+          style={{
+            color: filled ? colors.onPrimary : colors.textSecondary,
+            opacity: caption ? 0.9 : 0,
+          }}
+        >
+          {caption ?? ' '}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function Row({
+  colors,
+  icon: Icon,
+  title,
+  value,
+  onPress,
+  divider,
+}: {
+  colors: ReturnType<typeof useThemeColors>;
+  icon: IconComponent;
+  title: string;
+  value?: string;
+  onPress: () => void;
+  divider?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={value ? `${title}: ${value}` : title}
+      onPress={onPress}
+      style={({ pressed }) => [
+        st.row,
+        divider && { borderTopWidth: 1, borderTopColor: colors.border },
+        pressed && st.pressed,
+      ]}
+    >
+      <Icon size={iconSize.s} color={colors.textSecondary} />
+      <Text variant="body" style={[st.rowTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+        {title}
+      </Text>
+      {value !== undefined && (
+        <Text variant="bodySmall" style={{ color: colors.textSecondary }} numberOfLines={1}>
+          {value}
+        </Text>
+      )}
+      <ChevronRight size={iconSize.s} color={colors.textTertiary} />
+    </Pressable>
+  );
+}
+
+const st = StyleSheet.create({
+  wrap: {
+    gap: spacing.s,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  tile: {
+    flexGrow: 1,
+    flexBasis: '45%',
+    borderWidth: 1,
+    borderRadius: borderRadius.l,
+    padding: spacing.s,
+    gap: spacing.xs,
+  },
+  tileIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: borderRadius.m,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  list: {
+    borderWidth: 1,
+    borderRadius: borderRadius.l,
+    overflow: 'hidden',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+    minHeight: heights.listRow,
+    paddingHorizontal: spacing.m,
+  },
+  rowTitle: {
+    flex: 1,
+  },
+  pressed: {
+    opacity: 0.85,
+  },
+});

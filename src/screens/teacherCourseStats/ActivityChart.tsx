@@ -3,10 +3,11 @@
  * (Clean 8 — вынесено из TeacherCourseStatsScreen.tsx без изменений разметки.)
  */
 import React from 'react';
-import { View, Pressable, ActivityIndicator } from 'react-native';
+import { View, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
 import { AlertTriangle } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import { useThemeColors } from '@/store';
+import { alpha, borderRadius, spacing } from '@/constants';
 import { styles } from './styles';
 
 type Props = {
@@ -20,6 +21,8 @@ type Props = {
   chartTooltip: { index: number; day: string; count: number } | null;
   handleBarPress: (index: number, day: string, count: number) => void;
   setRetryTick: React.Dispatch<React.SetStateAction<number>>;
+  /** Teacher 8: «Пн учились 22, сейчас 1–3 в день» — только при спаде больше чем вдвое */
+  insight?: string | null;
 };
 
 export function ActivityChart({
@@ -33,6 +36,7 @@ export function ActivityChart({
   chartTooltip,
   handleBarPress,
   setRetryTick,
+  insight,
 }: Props) {
   return (
     <View style={styles.section}>
@@ -139,6 +143,30 @@ export function ActivityChart({
           ))}
         </View>
       )}
+
+      {insight ? (
+        <View style={[insightStyles.box, { backgroundColor: alpha(colors.warning, 10) }]}>
+          <AlertTriangle size={16} color={colors.warningText} />
+          <Text variant="bodySmall" style={[insightStyles.text, { color: colors.warningText }]}>
+            {insight}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
+
+const insightStyles = StyleSheet.create({
+  box: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    borderRadius: borderRadius.m,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.s,
+    marginTop: spacing.xs,
+  },
+  text: {
+    flex: 1,
+  },
+});
