@@ -195,7 +195,10 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
   - Новое: «В курсе N учеников» и последние подключившиеся по `joinedAt` из `list-members`.
   - «На экран» и QR-код не делаем (решение 12.11.2026).
   - JS-обёртка `nativeJoinCodeSheet.ts`: события `copy`, `share`, `regenerate` (с подтверждением).
-- [ ] **Teacher 10. «Код подключения» — Swift (iOS).** `JoinCodeSheet.swift` + `.m`: лист `.medium()`,
+- [x] **Teacher 10. «Код подключения» — Swift (iOS).** ✅ `JoinCodeSheet.swift` + `.m` (в project.pbxproj).
+  JS присылает состояние через `update()`, Swift — нажатия событиями. «Обновить код?» — системный
+  алерт в Swift. Высота листа по содержимому (iOS 16+), на iOS 15 — `.medium()` / `.large()`.
+  Проверено только `swiftc -parse` — сборка и устройство через TestFlight. `JoinCodeSheet.swift` + `.m`: лист `.medium()`,
   код крупно, «Копировать», «Поделиться», «Обновить код подключения», список подключившихся.
 - [ ] **Teacher 11. Окна курса на Swift: «Выбери тип теста» и «Расписание».**
   - `TestTypeSheet.swift`: Экзамен / Устный тренажёр → событие `select` → JS открывает
