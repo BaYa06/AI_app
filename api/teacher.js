@@ -30,6 +30,13 @@ import {
   setHardCards,
   courseSetsByMembership,
 } from './_handlers/teacher/stats.js';
+import {
+  homeworkCreate,
+  homeworkList,
+  homeworkStatus,
+  homeworkCancel,
+  homeworkRemind,
+} from './_handlers/teacher/homework.js';
 
 /**
  * API для учительских мутаций (курсы, приглашения, ростер, видимость наборов)
@@ -60,6 +67,12 @@ import {
  * GET  /api/teacher?action=course-sets-by-membership ?courseId= (ученик — курс, в котором состоит)
  * POST /api/teacher?action=remind-review       { courseId, studentId? } — пуш «повтори слова»
  *                                               (всему классу — не чаще раза в сутки)
+ * Задания (plan/new/teacher_cabinet.md, этап 2):
+ * POST /api/teacher?action=homework-create  { courseId, title, cardIds, dueAt, minScore?, userIds? }
+ * GET  /api/teacher?action=homework-list    ?courseId=
+ * GET  /api/teacher?action=homework-status  ?homeworkId=
+ * POST /api/teacher?action=homework-cancel  { homeworkId }
+ * POST /api/teacher?action=homework-remind  { homeworkId, userIds } — каждому не чаще раза в 20 ч
  */
 
 export default async function handler(req, res) {
@@ -101,8 +114,14 @@ export default async function handler(req, res) {
     if (action === 'course-activity-chart') return await courseActivityChart(req, res, sql, userId);
     if (action === 'course-set-stats') return await courseSetStats(req, res, sql, userId);
     if (action === 'set-hard-cards') return await setHardCards(req, res, sql, userId);
-    if (action === 'course-sets-by-membership')
+    if (action === 'course-sets-by-membership') {
       return await courseSetsByMembership(req, res, sql, userId);
+    }
+    if (action === 'homework-create') return await homeworkCreate(req, res, sql, userId);
+    if (action === 'homework-list') return await homeworkList(req, res, sql, userId);
+    if (action === 'homework-status') return await homeworkStatus(req, res, sql, userId);
+    if (action === 'homework-cancel') return await homeworkCancel(req, res, sql, userId);
+    if (action === 'homework-remind') return await homeworkRemind(req, res, sql, userId);
 
     return res.status(400).json({ error: 'Unknown action' });
   } catch (error) {

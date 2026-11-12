@@ -93,6 +93,21 @@ export const PUSH_TYPES = {
       }),
     ],
   },
+  // «Напомнить» учителя по заданию (plan/new/teacher_cabinet.md, Teacher 15). Ссылка на экран
+  // задания и пуши «выдано» / «завтра срок» — Teacher 29.
+  homework_reminder: {
+    category: 'course',
+    priority: 1,
+    transactional: true,
+    minIntervalDays: 0,
+    link: LESSON_LINK,
+    variants: [
+      ({ data }) => ({
+        title: `${data.teacher || 'Учитель'} напоминает о задании`,
+        body: `«${data.title}»: осталось ${data.count} ${plural(data.count, 'слово', 'слова', 'слов')} · ~${newWordsMinutes(data.count)} мин`,
+      }),
+    ],
+  },
   // «Повтори перед занятием» (2.8): по расписанию курса от учителя или по занятиям из «о себе»
   class_prep: {
     category: 'course',

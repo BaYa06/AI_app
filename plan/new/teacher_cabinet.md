@@ -311,7 +311,9 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
   - `homework_results` (`homework_id`, `user_id`, `submitted_at`, `late`, `score`, `diamonds`) —
     снимок сдачи.
   - Индексы по `course_id`, `due_at`, `user_id`.
-- [ ] **Teacher 15. API учителя** (`api/teacher.js`, новые `action`), проверка «учитель этого курса», тесты:
+- [x] **Teacher 15. API учителя** ✅ `_handlers/teacher/homework.js`, общий `api/_homework.js` (`settleHomework` —
+  снимок и алмазы одной SQL-командой), пуш `homework_reminder`, тесты `api/__tests__/homework.test.js`.
+  (`api/teacher.js`, новые `action`), проверка «учитель этого курса», тесты:
   - `homework-create` `{ courseId, title, cardIds, dueAt, minScore, userIds? }` → проверка, что слова из наборов
     курса; сразу засчитать слова, которые у ученика уже на «Знаю»;
   - `homework-list` `{ courseId }` — активные и прошлые, по каждому «сдали N из M»;
