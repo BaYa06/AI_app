@@ -9,8 +9,10 @@ import { setsApi } from './neon/sets';
 import { streakApi } from './neon/streak';
 import { progressApi } from './neon/progress';
 import { coursesApi } from './neon/courses';
+import { homeworkApi } from './neon/homework';
 
 export { NetworkLoadError } from './neon/core';
+export type { CreateHomeworkInput } from './neon/homework';
 export type {
   TeacherApiReason,
   CourseLeaderboard,
@@ -29,4 +31,5 @@ export const NeonService = {
   ...streakApi,
   ...progressApi,
   ...coursesApi,
+  ...homeworkApi,
 };

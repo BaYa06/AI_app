@@ -38,6 +38,7 @@ function sampleData(n) {
     prevStreak: n + 2,
     days: n + 2,
     course: 'English A2',
+    title: 'Unit 4',
     set: 'Travel',
     inHours: n % 2 ? 1 : 2,
     streak: n + 2,

@@ -104,7 +104,7 @@ export const PUSH_TYPES = {
     variants: [
       ({ data }) => ({
         title: `${data.teacher || 'Учитель'} напоминает о задании`,
-        body: `«${data.title}»: осталось ${data.count} ${plural(data.count, 'слово', 'слова', 'слов')} · ~${newWordsMinutes(data.count)} мин`,
+        body: `${data.title ? `«${data.title}»: о` : 'О'}сталось ${data.count} ${plural(data.count, 'слово', 'слова', 'слов')} · ~${newWordsMinutes(data.count)} мин`,
       }),
     ],
   },

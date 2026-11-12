@@ -334,7 +334,12 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
 
 **Клиент: общая часть**
 
-- [ ] **Teacher 17. Сервис, хранилище, зачёт из сессии.**
+- [x] **Teacher 17. Сервис, хранилище, зачёт из сессии.** ✅ `services/homework.ts` (типы, объём, сроки,
+  `buildHomeworkSessionPlan`), `services/neon/homework.ts`, `store/homeworkStore.ts` (кэш, очередь
+  `homeworkSession`), отправка из `StudyResultsScreen` в конце сессии. «Верно с первой попытки» =
+  слово не слабое к концу сессии (`isSessionWordWeak` — то же правило, что «на повторение» в итогах
+  сессии). Лимит новых: квота дня в сессиях набора меняет только подпись кнопки, а сессии задания
+  строит отдельный план без квоты — `buildStudyQueue` не трогали. Тесты `services/__tests__/homework.test.ts`.
   - `NeonService` / `homeworkStore`: задания ученика и учителя, кэш, обновление по свайпу.
   - [lessonFlow.ts](src/services/lessonFlow.ts): в конце **законченной** сессии — `session-complete`
     с пройденными словами; без сети — через [SyncQueueService](src/services/SyncQueueService.ts).

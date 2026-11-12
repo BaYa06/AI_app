@@ -21,7 +21,14 @@ import {
 } from '@/services/pushPrompt';
 import { spacing, borderRadius, heights, iconSize, screenPadding, alpha } from '@/constants';
 import { pluralize } from '@/utils';
-import { nextLessonStep, nextLessonLabel, sessionStepAfterPortion } from '@/services/lessonFlow';
+import {
+  nextLessonStep,
+  nextLessonLabel,
+  sessionStepAfterPortion,
+  sessionCardIds,
+  isSessionWordWeak,
+} from '@/services/lessonFlow';
+import { useHomeworkStore } from '@/store/homeworkStore';
 import { useCardsStore } from '@/store/cardsStore';
 import { Badge, Button, Card, ScreenHeader, Sheet, useScreenBottomInset } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
@@ -106,6 +113,16 @@ export function StudyResultsScreen({ navigation, route }: Props) {
       });
     }
     if (sessionStep) navigation.replace(sessionStep.screen, sessionStep.params);
+  }, []);
+  // Сессия закончена (все этапы) — итог уходит на сервер: засчитываем слова заданий учителя
+  // (plan/new/teacher_cabinet.md, решение 1, вариант Б). Брошенная сессия сюда не доходит.
+  React.useEffect(() => {
+    if (!session || sessionStep) return;
+    const ids = sessionCardIds(session);
+    const cards = useCardsStore.getState().cards;
+    const now = Date.now();
+    const weak = ids.filter((id) => cards[id] && isSessionWordWeak(cards[id], now));
+    useHomeworkStore.getState().reportSession(ids, weak);
   }, []);
   // Итоги сессии: серия могла вырасти на любом этапе
   const streakCount = newStreakCount ?? session?.streakCount;
