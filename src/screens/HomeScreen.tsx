@@ -133,6 +133,7 @@ import { HomeEmptyState } from './home/components/HomeEmptyState';
 import { SetsSectionHeader } from './home/components/SetsSectionHeader';
 import { HomeHeader } from './home/components/HomeHeader';
 import { TeacherBanner } from './home/components/TeacherBanner';
+import { TeacherLessonCard } from './home/components/TeacherLessonCard';
 
 export function HomeScreen({ navigation, route }: any) {
   const colors = useThemeColors();
@@ -1575,14 +1576,24 @@ export function HomeScreen({ navigation, route }: any) {
 
   // Баннер учителя — вход в курс (ученики, приглашения, тесты, «Учебники курса»). Показывается и
   // когда в курсе ещё нет наборов: иначе в новом пустом курсе до него было не добраться.
-  const teacherBanner = (
-    <TeacherBanner
-      colors={colors}
-      activeCourseId={activeCourseId}
-      courses={courses}
-      navigation={navigation}
-    />
-  );
+  // Учитель в своём курсе — карточка урока (plan/new/teacher_cabinet.md, Teacher 2); в «Мои наборы»
+  // и без курсов — прежний баннер.
+  const teacherBanner =
+    teacherCourseTitle !== null && activeCourseId !== null ? (
+      <TeacherLessonCard
+        colors={colors}
+        courseId={activeCourseId}
+        courseTitle={teacherCourseTitle}
+        navigation={navigation}
+      />
+    ) : (
+      <TeacherBanner
+        colors={colors}
+        activeCourseId={activeCourseId}
+        courses={courses}
+        navigation={navigation}
+      />
+    );
 
   // Карточка ежедневного челленджа: играть → "Забрать" 10 алмазов → "Получено" до завтра
   // Мини-игра: «Играть» → «Выполнено, забрать +10» → «Получено, снова завтра»
