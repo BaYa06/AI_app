@@ -48,4 +48,25 @@ export const teacherEvents = {
       with_schedule: params.withSchedule,
       problems: params.problems,
     }),
+
+  /**
+   * Учитель выдал задание через окно «Новое задание» (этап 2).
+   * Зачем: какой объём задают, ставят ли порог, сколько дней дают; result — ok или причина отказа.
+   */
+  teacherHomeworkCreated: (params: {
+    words: number;
+    sets: number;
+    minScore: number;
+    allStudents: boolean;
+    days: number;
+    result: string;
+  }) =>
+    log('teacher_homework_created', {
+      words: params.words,
+      sets: params.sets,
+      min_score: params.minScore,
+      all_students: params.allStudents,
+      days: params.days,
+      result: params.result,
+    }),
 };
