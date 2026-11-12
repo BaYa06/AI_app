@@ -179,7 +179,12 @@ export type RootStackParamList = {
   Settings: undefined;
   Search: undefined;
   TeacherCourseStats: { courseId: string; courseTitle: string };
-  TeacherStudents: { courseId: string; courseTitle: string };
+  TeacherStudents: {
+    courseId: string;
+    courseTitle: string;
+    /** С какого фильтра открыть список (главная учителя → «Не заходят 7+ дней») */
+    filter?: 'all' | 'active' | 'away3d' | 'away7d';
+  };
   StudentDetail: {
     courseId: string;
     courseTitle: string;

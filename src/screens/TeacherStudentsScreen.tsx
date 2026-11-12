@@ -45,7 +45,7 @@ export function TeacherStudentsScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
 
   const [query, setQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
+  const [activeFilter, setActiveFilter] = useState<FilterKey>(route.params.filter ?? 'all');
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);

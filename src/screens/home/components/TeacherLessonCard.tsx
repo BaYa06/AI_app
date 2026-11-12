@@ -2,7 +2,8 @@
  * Карточка урока на главной учителя (plan/new/teacher_cabinet.md, Teacher 2).
  * Заменяет баннер «Режим учителя», когда учитель в своём курсе.
  *
- * Есть логика: ближайший урок из расписания курса, «Не заходили 7+ дней» и «Напомнить».
+ * Есть логика: ближайший урок из расписания курса, быстрые действия (Teacher 3),
+ * «Кому уделить внимание» — кто не заходит 7+ дней и «Напомнить» (Teacher 4).
  * Макет (флаг TEACHER_HOMEWORK_ENABLED, в проде false): блок задания — «Задания пока нет»
  * или «Сдали N из M». Пока сервера заданий нет, `homework` всегда null.
  */
@@ -21,7 +22,7 @@ import {
 } from 'lucide-react-native';
 import { useThemeColors } from '@/store';
 import { Text } from '@/components/common';
-import { toast, type IconComponent } from '@/components/ui';
+import { Button, toast, type IconComponent } from '@/components/ui';
 import { alpha, borderRadius, heights, iconSize, screenPadding, spacing } from '@/constants';
 import { NeonService } from '@/services/NeonService';
 import { CourseScheduleSheet } from '@/components/push/CourseScheduleSheet';
@@ -54,7 +55,14 @@ type Props = {
   onHomeworkStatus?: () => void;
 };
 
-type Members = { total: number; inactive: number } | null;
+type InactiveStudent = { id: string; name: string; lastActiveDate: string | null };
+type Members = { total: number; inactive: InactiveStudent[] } | null;
+
+/** «Batyrov Batyr» → «Batyrov B.»; одно слово — как есть */
+const shortName = (name: string) => {
+  const [first, second] = name.trim().split(/\s+/);
+  return second ? `${first} ${second.charAt(0)}.` : first;
+};
 
 export function TeacherLessonCard({
   colors,
@@ -88,10 +96,12 @@ export function TeacherLessonCard({
     NeonService.loadCourseMembers(courseId)
       .then((list) => {
         if (cancelled) return;
-        setMembers({
-          total: list.length,
-          inactive: list.filter((m) => getStudentStatus(m.lastActiveDate) === 'inactive').length,
-        });
+        // Дольше всех не заходил — первым; ни разу не заходил — в самом начале
+        const inactive = list
+          .filter((m) => getStudentStatus(m.lastActiveDate) === 'inactive')
+          .map((m) => ({ id: m.id, name: m.displayName, lastActiveDate: m.lastActiveDate }))
+          .sort((a, b) => (a.lastActiveDate ?? '').localeCompare(b.lastActiveDate ?? ''));
+        setMembers({ total: list.length, inactive });
       })
       .catch(() => {
         // Нет данных об учениках — строку просто не показываем, урок и расписание остаются
@@ -106,9 +116,9 @@ export function TeacherLessonCard({
     rootNav?.navigate('TeacherCourseStats', { courseId, courseTitle });
   };
 
-  const openStudents = () => {
+  const openStudents = (filter?: 'away7d') => {
     const rootNav = navigation?.getParent?.() ?? navigation;
-    rootNav?.navigate('TeacherStudents', { courseId, courseTitle });
+    rootNav?.navigate('TeacherStudents', { courseId, courseTitle, filter });
   };
 
   const remind = async () => {
@@ -195,7 +205,7 @@ export function TeacherLessonCard({
           />
         )}
 
-        {/* Ученики: нет учеников / кто не заходит неделю */}
+        {/* Учеников нет — предлагаем код курса */}
         {members && members.total === 0 && (
           <View style={[styles.studentsRow, { backgroundColor: softFill }]}>
             <Text variant="bodySmall" style={[styles.shrink, { color: onFill }]}>
@@ -207,30 +217,6 @@ export function TeacherLessonCard({
               title="Код курса"
               onPress={() => setCodeDialog(true)}
             />
-          </View>
-        )}
-        {members && members.total > 0 && (
-          <View style={[styles.studentsRow, { backgroundColor: softFill }]}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={openStudents}
-              style={({ pressed }) => [styles.shrink, pressed && styles.pressed]}
-            >
-              <Text variant="label" style={{ color: onFill }}>
-                {members.inactive > 0
-                  ? `Не заходили 7+ дней: ${members.inactive} из ${members.total}`
-                  : `Все ${members.total} ${pluralize(members.total, 'ученик заходил', 'ученика заходили', 'учеников заходили')} на неделе`}
-              </Text>
-            </Pressable>
-            {members.inactive > 0 && (
-              <SoftButton
-                colors={colors}
-                title={remindedToday ? 'Напомнили сегодня' : 'Напомнить'}
-                onPress={remind}
-                loading={reminding}
-                disabled={remindedToday}
-              />
-            )}
           </View>
         )}
       </View>
@@ -261,9 +247,57 @@ export function TeacherLessonCard({
           colors={colors}
           icon={Users}
           title={members ? `Ученики ${members.total}` : 'Ученики'}
-          onPress={openStudents}
+          onPress={() => openStudents()}
         />
       </View>
+
+      {/* Кому уделить внимание (Teacher 4): кто не заходит 7+ дней + «Напомнить» */}
+      {members && members.inactive.length > 0 && (
+        <View style={styles.attention}>
+          <Text variant="h3" style={{ color: colors.textPrimary }}>
+            Кому уделить внимание
+          </Text>
+          <View
+            style={[
+              styles.attentionCard,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => openStudents('away7d')}
+              style={({ pressed }) => [styles.attentionRow, pressed && styles.pressed]}
+            >
+              <View style={[styles.attentionBadge, { backgroundColor: alpha(colors.error, 10) }]}>
+                <Text variant="label" style={{ color: colors.errorText }}>
+                  {members.inactive.length}
+                </Text>
+              </View>
+              <View style={styles.shrink}>
+                <Text variant="label" style={{ color: colors.textPrimary }}>
+                  {`${pluralize(members.inactive.length, 'Не заходит', 'Не заходят', 'Не заходят')} 7+ дней`}
+                </Text>
+                <Text variant="bodySmall" numberOfLines={2} style={{ color: colors.textSecondary }}>
+                  {members.inactive
+                    .slice(0, 3)
+                    .map((m) => shortName(m.name))
+                    .join(', ') +
+                    (members.inactive.length > 3 ? ` и ещё ${members.inactive.length - 3}` : '')}
+                </Text>
+              </View>
+              <ChevronRight size={iconSize.s} color={colors.textTertiary} />
+            </Pressable>
+            <Button
+              variant="secondary"
+              size="s"
+              title={remindedToday ? 'Напомнили сегодня' : 'Напомнить повторить слова'}
+              onPress={remind}
+              loading={reminding}
+              disabled={remindedToday}
+            />
+          </View>
+        </View>
+      )}
 
       <TestLobbySheet
         colors={colors}
@@ -544,6 +578,28 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.5,
+  },
+  attention: {
+    marginTop: spacing.l,
+    gap: spacing.s,
+  },
+  attentionCard: {
+    borderWidth: 1,
+    borderRadius: borderRadius.l,
+    padding: spacing.m,
+    gap: spacing.s,
+  },
+  attentionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+  },
+  attentionBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   actions: {
     flexDirection: 'row',
