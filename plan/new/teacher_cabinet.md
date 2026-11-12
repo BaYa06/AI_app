@@ -386,7 +386,11 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
   как «Результаты теста»). `exceljs` в `devDependencies` — Vercel ставит их при сборке; при переносе
   в `dependencies` нужен `npm install`. Файл: ученик, статус, засчитано, оценка, дата сдачи,
   «с опозданием» (`exceljs` уже в зависимостях) → системное «Поделиться».
-- [ ] **Teacher 23. «Кто не сдал» — RN и Swift.** Макет 12а: фильтр «Все / В процессе / Не начали»,
+- [x] **Teacher 23. «Кто не сдал» — RN и Swift.** ✅ Правила — `teacherHomework/notSubmitted.ts` (+ тесты),
+  RN — `NotSubmittedSheet.tsx`, iOS — `NotSubmittedSheet.swift` + `.m` (в project.pbxproj): состояние
+  в JS (`nativeNotSubmittedSheet.ts`), Swift рисует и присылает нажатия. Кому напоминали за 20 ч —
+  галочка недоступна. «Напомнить N» на экране сдачи открывает это окно. **Swift проверен только
+  `swiftc -parse`.** Макет 12а: фильтр «Все / В процессе / Не начали»,
   галочки, «Выбрать всех», «Напомнить N ученикам» (`homework-remind`), последний заход, 7+ дней —
   красным. `NotSubmittedSheet.swift` + `.m`.
 - [ ] **Teacher 24. Главная и курс учителя на настоящих данных.**

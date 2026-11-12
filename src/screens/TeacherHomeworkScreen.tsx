@@ -37,6 +37,7 @@ import {
   statusLabel,
   type RowTone,
 } from './teacherHomework/homeworkStatus';
+import { NotSubmittedSheet } from './teacherHomework/NotSubmittedSheet';
 import { exportHomeworkGrades } from './teacherHomework/exportHomework';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TeacherHomework'>;
@@ -112,7 +113,6 @@ export function TeacherHomeworkScreen({ navigation, route }: Props) {
   const [data, setData] = useState<HomeworkStatusData | null>(null);
   const [failed, setFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [reminding, setReminding] = useState(false);
 
   const load = useCallback(async () => {
     const res = await NeonService.loadHomeworkStatus(homeworkId);
@@ -140,19 +140,8 @@ export function TeacherHomeworkScreen({ navigation, route }: Props) {
         ? { fg: colors.warningText, bg: alpha(colors.warning, 10) }
         : { fg: colors.textSecondary, bg: colors.surfaceMuted };
 
-  const handleRemind = async () => {
-    if (toRemind.length === 0 || reminding) return;
-    setReminding(true);
-    Analytics.teacherAction('remind', 'course');
-    const res = await NeonService.remindHomework(homeworkId, toRemind);
-    setReminding(false);
-    if (!res) {
-      toast.error('Не получилось напомнить. Проверь интернет');
-      return;
-    }
-    toast.success(res.reminded > 0 ? `Напомнили: ${res.reminded}` : 'Всем уже напоминали сегодня');
-    load();
-  };
+  // «Напомнить N» — окно «Кто не сдал» (12а): там видно, кому, и можно снять галочки
+  const [remindOpen, setRemindOpen] = useState(false);
 
   const [exporting, setExporting] = useState(false);
   const handleExport = async () => {
@@ -309,9 +298,8 @@ export function TeacherHomeworkScreen({ navigation, route }: Props) {
             <Button
               title={toRemind.length > 0 ? remindButtonText(toRemind.length) : 'Всем уже напомнили'}
               icon={Send}
-              onPress={handleRemind}
+              onPress={() => setRemindOpen(true)}
               disabled={toRemind.length === 0}
-              loading={reminding}
               fullWidth
             />
             <Button
@@ -325,6 +313,19 @@ export function TeacherHomeworkScreen({ navigation, route }: Props) {
           </View>
         </>
       )}
+      <NotSubmittedSheet
+        visible={remindOpen}
+        homeworkId={homeworkId}
+        courseTitle={courseTitle}
+        onClose={() => {
+          setRemindOpen(false);
+          load();
+        }}
+        onOpenStudent={(id, name) => {
+          const row = data?.students.find((s) => s.id === id);
+          openStudent(id, name, row?.lastActiveDate ?? null);
+        }}
+      />
     </View>
   );
 }
