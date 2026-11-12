@@ -1,6 +1,7 @@
 /**
- * Окно «Новый курс» учителя (plan/new/teacher_cabinet.md, Teacher 6) — RN-версия для Android и веба.
- * На iOS то же окно на Swift (Teacher 7) вызывает ту же логику createCourseWithSetup.
+ * Окно «Новый курс» учителя (plan/new/teacher_cabinet.md, Teacher 6–7).
+ * iOS — нативное окно на Swift (nativeNewCourseSheet.ts), Android и веб — RN-окно ниже.
+ * Оба вызывают одну логику createCourseWithSetup и берут тексты из NEW_COURSE_TEXTS.
  *
  * Название (обязательно) → учебник (по желанию) → дни уроков и время (по желанию) → «Создать курс».
  * Расписание — так же, как в окне «Расписание занятий» (CourseScheduleSheet).
@@ -22,10 +23,15 @@ import {
 } from '@/components/push/CourseScheduleSheet';
 import type { Course } from '@/types';
 import type { BookListItem } from '@/types/books';
-import { createCourseWithSetup, loadBooksForNewCourse, newCourseProblemMessage } from './newCourse';
-
-/** Учебников больше — показываем поиск */
-const SEARCH_FROM = 6;
+import {
+  NEW_COURSE_SEARCH_FROM,
+  NEW_COURSE_TEXTS as T,
+  bookSubtitle,
+  createCourseWithSetup,
+  loadBooksForNewCourse,
+  newCourseProblemMessage,
+} from './newCourse';
+import { isNativeNewCourseSheet, useNativeNewCourseSheet } from './nativeNewCourseSheet';
 
 interface Props {
   visible: boolean;
@@ -34,7 +40,13 @@ interface Props {
   onCreated: (course: Course) => void;
 }
 
-export function NewCourseSheet({ visible, onClose, onCreated }: Props) {
+export function NewCourseSheet(props: Props) {
+  useNativeNewCourseSheet(props);
+  if (isNativeNewCourseSheet) return null;
+  return <NewCourseSheetRN {...props} />;
+}
+
+function NewCourseSheetRN({ visible, onClose, onCreated }: Props) {
   const colors = useThemeColors();
   const [title, setTitle] = useState('');
   const [books, setBooks] = useState<BookListItem[] | null>(null);
@@ -98,10 +110,10 @@ export function NewCourseSheet({ visible, onClose, onCreated }: Props) {
       visible={visible}
       onClose={saving ? () => {} : onClose}
       dismissOnBackdrop={!saving}
-      title="Новый курс"
+      title={T.title}
       footer={
         <Button
-          title="Создать курс"
+          title={T.create}
           onPress={handleCreate}
           disabled={!canCreate}
           loading={saving}
@@ -111,8 +123,8 @@ export function NewCourseSheet({ visible, onClose, onCreated }: Props) {
     >
       <View style={st.body}>
         <TextField
-          label="Название группы"
-          placeholder="Например: A1-C"
+          label={T.nameLabel}
+          placeholder={T.namePlaceholder}
           value={title}
           onChangeText={setTitle}
           maxLength={255}
@@ -121,11 +133,11 @@ export function NewCourseSheet({ visible, onClose, onCreated }: Props) {
 
         <View style={st.section}>
           <Text variant="label" color="secondary">
-            Учебник
+            {T.bookLabel}
           </Text>
           <ListRow
-            title="Без учебника"
-            subtitle="Свои наборы или из библиотеки"
+            title={T.noBook}
+            subtitle={T.noBookHint}
             icon={CircleOff}
             onPress={() => setBookId(null)}
             right={bookId === null ? checkMark : <View style={st.checkSpace} />}
@@ -134,10 +146,10 @@ export function NewCourseSheet({ visible, onClose, onCreated }: Props) {
             <ActivityIndicator color={colors.primary} style={st.loading} />
           ) : (
             <>
-              {books.length > SEARCH_FROM && (
+              {books.length > NEW_COURSE_SEARCH_FROM && (
                 <TextField
                   variant="search"
-                  placeholder="Найти учебник"
+                  placeholder={T.bookSearch}
                   value={bookQuery}
                   onChangeText={setBookQuery}
                 />
@@ -146,7 +158,7 @@ export function NewCourseSheet({ visible, onClose, onCreated }: Props) {
                 <ListRow
                   key={b.id}
                   title={b.title}
-                  subtitle={[b.level, `${b.unitsCount} юн.`].filter(Boolean).join(' · ')}
+                  subtitle={bookSubtitle(b)}
                   icon={BookOpen}
                   iconColor={bookId === b.id ? colors.primary : undefined}
                   onPress={() => setBookId(b.id)}
@@ -156,13 +168,13 @@ export function NewCourseSheet({ visible, onClose, onCreated }: Props) {
             </>
           )}
           <Text variant="caption" color="secondary">
-            Юниты откроешь ученикам по ходу курса в «Учебниках курса»
+            {T.bookHint}
           </Text>
         </View>
 
         <View style={st.section}>
           <Text variant="label" color="secondary">
-            Дни уроков
+            {T.daysLabel}
           </Text>
           <View style={st.days}>
             {WEEK_DAYS.map((d) => (
@@ -180,12 +192,12 @@ export function NewCourseSheet({ visible, onClose, onCreated }: Props) {
                 variant="icon"
                 icon={ChevronDown}
                 background="none"
-                accessibilityLabel="Раньше на 15 минут"
+                accessibilityLabel={T.earlier}
                 onPress={() => shift(-STEP_MIN)}
               />
               <Text
                 variant="h2"
-                accessibilityLabel={`Начало в ${toTime(minutes)}`}
+                accessibilityLabel={`${T.startsAt} ${toTime(minutes)}`}
                 style={{ color: colors.textPrimary }}
               >
                 {toTime(minutes)}
@@ -194,13 +206,13 @@ export function NewCourseSheet({ visible, onClose, onCreated }: Props) {
                 variant="icon"
                 icon={ChevronUp}
                 background="none"
-                accessibilityLabel="Позже на 15 минут"
+                accessibilityLabel={T.later}
                 onPress={() => shift(STEP_MIN)}
               />
             </View>
           ) : (
             <Text variant="caption" color="secondary">
-              Можно пропустить и указать позже в курсе
+              {T.daysHint}
             </Text>
           )}
         </View>

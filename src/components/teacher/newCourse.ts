@@ -64,6 +64,33 @@ export function newCourseProblemMessage(problems: NewCourseProblem[]): string | 
   return `Курс создан, но ${lost.join(' и ')} не ${lost.length > 1 ? 'сохранились' : 'сохранилось'} — добавь в курсе`;
 }
 
+/** Тексты окна — общие для RN и Swift (в Swift строк нет) */
+export const NEW_COURSE_TEXTS = {
+  title: 'Новый курс',
+  close: 'Закрыть',
+  nameLabel: 'Название группы',
+  namePlaceholder: 'Например: A1-C',
+  bookLabel: 'Учебник',
+  noBook: 'Без учебника',
+  noBookHint: 'Свои наборы или из библиотеки',
+  bookSearch: 'Найти учебник',
+  bookHint: 'Юниты откроешь ученикам по ходу курса в «Учебниках курса»',
+  daysLabel: 'Дни уроков',
+  daysHint: 'Можно пропустить и указать позже в курсе',
+  earlier: 'Раньше на 15 минут',
+  later: 'Позже на 15 минут',
+  startsAt: 'Начало в',
+  create: 'Создать курс',
+} as const;
+
+/** Учебников больше — в окне появляется поиск */
+export const NEW_COURSE_SEARCH_FROM = 6;
+
+/** Подпись учебника в списке: «A1 · 12 юн.» */
+export function bookSubtitle(book: BookListItem): string {
+  return [book.level, `${book.unitsCount} юн.`].filter(Boolean).join(' · ');
+}
+
 /** Учебники для выбора в окне: опубликованные книги каталога, по названию */
 export async function loadBooksForNewCourse(): Promise<BookListItem[]> {
   const books = await BookService.listBooks();

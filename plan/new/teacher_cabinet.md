@@ -161,7 +161,12 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
   - Учебник или расписание не сохранились → курс не откатываем, тост «Курс создан, расписание
     не сохранилось — укажи в курсе».
   - RN-окно (`Sheet`): название, «Учебник» (список + «Без учебника»), дни пн–вс, время, «Создать курс».
-- [ ] **Teacher 7. «Новый курс» — Swift (iOS).** `NewCourseSheet.swift` + `.m`: системный лист
+- [x] **Teacher 7. «Новый курс» — Swift (iOS).** ✅ `NewCourseSheet.swift` + `.m` (в project.pbxproj),
+  обёртка `nativeNewCourseSheet.ts`; `NewCourseSheet` на iOS показывает Swift-окно, иначе RN.
+  Тексты — `NEW_COURSE_TEXTS` (общие для обоих окон). События: `create` → JS `setBusy` →
+  `createCourseWithSetup` → `finish` → `finished` (лист закрылся) → тост и код подключения.
+  Учебники приходят в открытое окно через `setBooks`. Проверено только `swiftc -parse` —
+  сборка и проверка на устройстве через TestFlight. Было в плане: системный лист
   `.large()`, SwiftUI-форма (поле названия с фокусом, выбор учебника, дни кнопками, время через
   `DatePicker(.hourAndMinute)`), кнопка «Создать курс» неактивна без названия. По нажатию —
   событие `create` с `{ title, bookId, days, time }`, лист ждёт ответа JS (индикатор на кнопке)
