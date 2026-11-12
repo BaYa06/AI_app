@@ -13,6 +13,7 @@ import { useThemeColors } from '@/store';
 import { spacing } from '@/constants';
 import { NeonService } from '@/services/NeonService';
 import { BookService } from '@/services/BookService';
+import { Analytics } from '@/services/analytics';
 import { toast } from '@/components/ui';
 import { getSession } from '@/services/auth/session';
 import type { RootStackParamList } from '@/types/navigation';
@@ -155,6 +156,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
   const [remindedToday, setRemindedToday] = useState(false);
   const handleRemind = async () => {
     if (reminding || remindedToday) return;
+    Analytics.teacherAction('remind', 'course');
     setReminding(true);
     const result = await NeonService.remindCourseReview(route.params.courseId);
     setReminding(false);

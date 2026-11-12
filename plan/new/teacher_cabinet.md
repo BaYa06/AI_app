@@ -209,7 +209,15 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
     `ExamLobby` / `OralTestLobby`. RN-шторка остаётся для Android и веба.
   - `ScheduleSheet.swift`: дни пн–вс, время, «Сохранить» / «Убрать расписание» → событие `save` →
     JS вызывает `setCourseSchedule` и показывает тост. RN-окно остаётся для Android и веба.
-- [ ] **Teacher 12. Проверка.**
+- [x] **Teacher 12. Проверка.** ✅ (автоматическая часть, 12.11.2026) Аналитика —
+  `analyticsEvents/teacher.ts`: `teacher_home_viewed`, `teacher_action` (action + place home/course),
+  `teacher_course_created`. type-check 0, тесты 435/435, eslint 0 ошибок по 34 файлам этапа.
+  **Флаг `TEACHER_CABINET_ENABLED` откатывает только главную учителя** (шапка, карточка урока,
+  быстрые действия, «Кому уделить внимание», прогресс наборов, окно «Новый курс»). Страница курса,
+  окно кода, листы теста и расписания флагом не откатываются — только через git.
+  **Осталось вручную:** сборка iOS (Swift проверен только `swiftc -parse`), TestFlight, скриншоты
+  в светлой и тёмной теме на iOS и Android.
+  Было в плане:
   - `npm run type-check` = 0.
   - Скриншоты всех экранов и окон этапа в **светлой и тёмной** теме, iOS и Android.
   - Флаг `TEACHER_CABINET_ENABLED = false` → всё как до этапа.

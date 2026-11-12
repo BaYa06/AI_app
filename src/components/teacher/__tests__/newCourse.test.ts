@@ -5,6 +5,7 @@ let mockSynced = true;
 let mockAttachOk = true;
 let mockScheduleOk = true;
 
+jest.mock('@/services/analytics', () => ({ Analytics: { teacherCourseCreated: () => {} } }));
 jest.mock('@/store', () => ({
   useCoursesStore: {
     getState: () => ({

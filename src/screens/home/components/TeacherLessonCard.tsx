@@ -7,7 +7,7 @@
  * Макет (флаг TEACHER_HOMEWORK_ENABLED, в проде false): блок задания — «Задания пока нет»
  * или «Сдали N из M». Пока сервера заданий нет, `homework` всегда null.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -25,6 +25,8 @@ import { Text } from '@/components/common';
 import { Button, toast, type IconComponent } from '@/components/ui';
 import { alpha, borderRadius, heights, iconSize, screenPadding, spacing } from '@/constants';
 import { NeonService } from '@/services/NeonService';
+import { Analytics } from '@/services/analytics';
+import type { TeacherAction } from '@/services/analyticsEvents/teacher';
 import { CourseScheduleSheet } from '@/components/push/CourseScheduleSheet';
 import { CourseJoinCodeDialog } from '@/components/CourseJoinCodeDialog';
 import { TEACHER_HOMEWORK_ENABLED } from '@/config/features';
@@ -93,6 +95,19 @@ export function TeacherLessonCard({
     loadSchedule();
   }, [courseId, loadSchedule]);
 
+  // Аналитика: главная учителя в этом курсе (раз на курс за показ)
+  const viewedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!courseMembers || schedule === undefined || viewedFor.current === courseId) return;
+    viewedFor.current = courseId;
+    Analytics.teacherHomeViewed({
+      hasSchedule: !!schedule && schedule.length > 0,
+      students: courseMembers.length,
+      inactive: courseMembers.filter((m) => getStudentStatus(m.lastActiveDate) === 'inactive')
+        .length,
+    });
+  }, [courseId, courseMembers, schedule]);
+
   // Дольше всех не заходил — первым; ни разу не заходил — в самом начале
   const members = useMemo(
     () =>
@@ -105,18 +120,23 @@ export function TeacherLessonCard({
     [courseMembers]
   );
 
+  const track = (action: TeacherAction) => Analytics.teacherAction(action, 'home');
+
   const openCourse = () => {
+    track('course');
     const rootNav = navigation?.getParent?.() ?? navigation;
     rootNav?.navigate('TeacherCourseStats', { courseId, courseTitle });
   };
 
   const openStudents = (filter?: 'away7d') => {
+    track(filter ? 'inactive' : 'students');
     const rootNav = navigation?.getParent?.() ?? navigation;
     rootNav?.navigate('TeacherStudents', { courseId, courseTitle, filter });
   };
 
   const remind = async () => {
     if (reminding || remindedToday) return;
+    track('remind');
     setReminding(true);
     const result = await NeonService.remindCourseReview(courseId);
     setReminding(false);
@@ -183,7 +203,10 @@ export function TeacherLessonCard({
               colors={colors}
               icon={CalendarClock}
               title="Указать расписание"
-              onPress={() => setScheduleSheet(true)}
+              onPress={() => {
+                track('schedule');
+                setScheduleSheet(true);
+              }}
             />
           </View>
         )}
@@ -209,7 +232,10 @@ export function TeacherLessonCard({
               colors={colors}
               icon={UserPlus}
               title="Код курса"
-              onPress={() => setCodeDialog(true)}
+              onPress={() => {
+                track('join_code');
+                setCodeDialog(true);
+              }}
             />
           </View>
         )}
@@ -221,21 +247,30 @@ export function TeacherLessonCard({
           colors={colors}
           icon={Play}
           title="Живой тест"
-          onPress={() => setTestSheet(true)}
+          onPress={() => {
+            track('live_test');
+            setTestSheet(true);
+          }}
         />
         {TEACHER_HOMEWORK_ENABLED && (
           <QuickAction
             colors={colors}
             icon={ClipboardCheck}
             title="Задание"
-            onPress={onAssignHomework}
+            onPress={() => {
+              track('homework');
+              onAssignHomework?.();
+            }}
           />
         )}
         <QuickAction
           colors={colors}
           icon={UserPlus}
           title="Код курса"
-          onPress={() => setCodeDialog(true)}
+          onPress={() => {
+            track('join_code');
+            setCodeDialog(true);
+          }}
         />
         <QuickAction
           colors={colors}

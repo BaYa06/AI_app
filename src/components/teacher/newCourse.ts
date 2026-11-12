@@ -8,6 +8,7 @@
 import { useCoursesStore } from '@/store';
 import { BookService } from '@/services/BookService';
 import { NeonService } from '@/services/NeonService';
+import { Analytics } from '@/services/analytics';
 import type { Course } from '@/types';
 import type { BookListItem } from '@/types/books';
 
@@ -29,6 +30,16 @@ export interface NewCourseResult {
 }
 
 export async function createCourseWithSetup(input: NewCourseInput): Promise<NewCourseResult> {
+  const result = await createCourseSteps(input);
+  Analytics.teacherCourseCreated({
+    withBook: !!input.bookId,
+    withSchedule: input.days.length > 0,
+    problems: result.problems.join(',') || 'none',
+  });
+  return result;
+}
+
+async function createCourseSteps(input: NewCourseInput): Promise<NewCourseResult> {
   const { course, synced } = await useCoursesStore.getState().createCourseSynced(input.title);
   if (!synced) {
     // Курса нет на сервере — учебник и расписание туда тоже не записать

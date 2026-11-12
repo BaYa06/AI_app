@@ -24,6 +24,8 @@ import { TEACHER_HOMEWORK_ENABLED } from '@/config/features';
 import type { RootStackParamList } from '@/types/navigation';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { pluralize } from '@/utils';
+import { Analytics } from '@/services/analytics';
+import type { TeacherAction } from '@/services/analyticsEvents/teacher';
 import { formatShortDate, type TestHistorySummary } from './courseOverview';
 
 /** Подписи плиток и списка; undefined — ещё грузится (подпись не показываем) */
@@ -59,6 +61,11 @@ export function CourseActions({
   onAssignHomework,
 }: Props) {
   const { courseId, courseTitle } = route.params;
+  // Нажатие + запись в аналитику (Teacher 12)
+  const tap = (action: TeacherAction, fn?: () => void) => () => {
+    Analytics.teacherAction(action, 'course');
+    fn?.();
+  };
   const { tests, membersCount, openUnits, scheduleLabel } = overview;
 
   const testCaption =
@@ -89,7 +96,7 @@ export function CourseActions({
           icon={GraduationCap}
           title="Живой тест"
           caption={testCaption}
-          onPress={() => setLobbyModal(true)}
+          onPress={tap('live_test', () => setLobbyModal(true))}
         />
         {TEACHER_HOMEWORK_ENABLED && (
           <Tile
@@ -97,7 +104,7 @@ export function CourseActions({
             icon={ClipboardCheck}
             title="Задание"
             caption="с дедлайном"
-            onPress={onAssignHomework}
+            onPress={tap('homework', onAssignHomework)}
           />
         )}
         <Tile
@@ -105,14 +112,16 @@ export function CourseActions({
           icon={UserPlus}
           title="Код подключения"
           caption={membersCaption}
-          onPress={() => setJoinCodeDialog(true)}
+          onPress={tap('join_code', () => setJoinCodeDialog(true))}
         />
         <Tile
           colors={colors}
           icon={BookOpen}
           title="Учебники курса"
           caption={booksCaption}
-          onPress={() => navigation.navigate('CourseBooks', { courseId, courseTitle })}
+          onPress={tap('books', () =>
+            navigation.navigate('CourseBooks', { courseId, courseTitle })
+          )}
         />
       </View>
 
@@ -136,7 +145,7 @@ export function CourseActions({
           icon={CalendarClock}
           title="Расписание"
           value={scheduleLabel === undefined ? undefined : (scheduleLabel ?? 'не задано')}
-          onPress={() => setScheduleSheet(true)}
+          onPress={tap('schedule', () => setScheduleSheet(true))}
           divider
         />
       </View>
