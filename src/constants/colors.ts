@@ -24,6 +24,11 @@ export const colors = {
     warningText: '#B45309',
     errorText: '#DC2626',
 
+    // Задание учителя (plan/new/teacher_cabinet.md, этап 2): рамка, полоска, фон alpha 10
+    homework: '#F59E0B',
+    homeworkText: '#B45309', // «до: …», подписи задания (контраст ≥ 4,5)
+    homeworkFill: '#B45309', // заливка под белый текст и иконку (аватар учителя, значок набора)
+
     // Фон
     background: '#FFFFFF',
     surface: '#FFFFFF',
@@ -97,6 +102,11 @@ export const colors = {
     successText: '#34D399',
     warningText: '#FBBF24',
     errorText: '#F87171',
+
+    // Задание учителя
+    homework: '#FBBF24',
+    homeworkText: '#FBBF24',
+    homeworkFill: '#B45309', // белый текст на #FBBF24 нечитаем — заливка та же, что в светлой
 
     // Фон — поверхности сплошные, чтобы окно поверх окна не «грязнело»
     background: '#101122',
