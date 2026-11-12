@@ -321,7 +321,9 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
     `late`, `score`, `lastActiveDate`; «закреплено» (слов на шаге ≥ 3) — после 7 дней от выдачи;
   - `homework-cancel`;
   - `homework-remind` `{ homeworkId, userIds }` — каждому ученику не чаще раза в сутки.
-- [ ] **Teacher 16. API ученика и зачёт** (`api/progress.js`), тесты:
+- [x] **Teacher 16. API ученика и зачёт** ✅ `_handlers/homework/student.js`, тесты
+  `api/__tests__/homeworkStudent.test.js`. `my-homework` отдаёт и `creditedCardIds` / `wrongCardIds` —
+  клиенту для «осталось N» и «повторить трудные». (`api/progress.js`), тесты:
   - `my-homework` — активные задания ученика (ближайшее по сроку первым): слова, засчитано,
     срок, автор, «в группе сдали N из M»;
   - `session-complete` `{ cardIds, firstTry: { cardId: bool } }` — после законченной сессии.

@@ -4,6 +4,7 @@ import { ensureDatabaseInitialized } from './_db-init.js';
 import { HttpError, UUID_RE, uuid, assertReadableSet } from './_access.js';
 import { courseSetIdsSql } from './_course.js';
 import { log } from './_log.js';
+import { myHomework, sessionComplete } from './_handlers/homework/student.js';
 
 /**
  * Прогресс по карточкам — единственное место, где меняется уровень карточки.
@@ -24,6 +25,9 @@ import { log } from './_log.js';
  * GET  /api/progress?action=leaderboard&courseId=…&week=current|previous — рейтинг курса (этап 2)
  * POST /api/progress?action=rating-enabled  { courseId, enabled }  — учитель включает/выключает рейтинг
  * POST /api/progress?action=hide-me         { courseId, hidden }   — только вернуться в рейтинг (скрываться нельзя)
+ * GET  /api/progress?action=my-homework       — задания ученика (plan/new/teacher_cabinet.md, Teacher 16)
+ * POST /api/progress?action=session-complete  { cards: [{ cardId, firstTry }] } — после законченной
+ *                                              сессии: зачёт слов заданий, снимок сдачи, +20 алмазов
  * GET  /api/progress?action=close-week      — Vercel Cron (Authorization: Bearer CRON_SECRET):
  *                                              заморозка итогов прошлой недели и награды топ-3
  */
@@ -618,6 +622,8 @@ export default async function handler(req, res) {
     leaderboard: { method: 'GET', run: (me) => leaderboard(sql, me, req.query) },
     'rating-enabled': { method: 'POST', run: (me) => setRatingEnabled(sql, me, req.body || {}) },
     'hide-me': { method: 'POST', run: (me) => hideMe(sql, me, req.body || {}) },
+    'my-homework': { method: 'GET', run: (me) => myHomework(sql, me) },
+    'session-complete': { method: 'POST', run: (me) => sessionComplete(sql, me, req.body || {}) },
   };
   const route = Object.hasOwn(routes, action || '') ? routes[action] : null;
   if (!route) return res.status(400).json({ error: 'Unknown action' });
