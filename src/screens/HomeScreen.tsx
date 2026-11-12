@@ -38,6 +38,8 @@ import {
 } from '@/components/study/StudyModeSheet';
 import { CoursesDrawer } from '@/components/home/CoursesDrawer';
 import { TEACHER_CABINET_ENABLED } from '@/config/features';
+import { NewCourseSheet } from '@/components/teacher/NewCourseSheet';
+import { CourseJoinCodeDialog } from '@/components/CourseJoinCodeDialog';
 import {
   animateDrawerTo,
   clampTranslateX,
@@ -1365,10 +1367,27 @@ export function HomeScreen({ navigation, route }: any) {
     [setActiveCourse]
   );
 
+  // «Новый курс»: у учителя — окно с учебником и расписанием (plan/new/teacher_cabinet.md, Teacher 6),
+  // у ученика курс — просто папка, поле ввода в шторке, как раньше
+  const [newCourseSheetVisible, setNewCourseSheetVisible] = useState(false);
+  const [joinCodeCourse, setJoinCodeCourse] = useState<{ id: string; title: string } | null>(null);
   const handleStartCreatingCourse = useCallback(() => {
     setCourseMenuOpen(null);
+    if (TEACHER_CABINET_ENABLED && isTeacher === true) {
+      runAfterDrawerClosed(() => setNewCourseSheetVisible(true));
+      return;
+    }
     setIsCreatingCourse(true);
-  }, []);
+  }, [isTeacher, runAfterDrawerClosed]);
+  const handleNewCourseCreated = useCallback(
+    (course: { id: string; title: string }) => {
+      setNewCourseSheetVisible(false);
+      setActiveCourse(course.id);
+      // Курс создан — сразу код подключения, когда окно «Новый курс» закроется
+      setTimeout(() => setJoinCodeCourse(course), animation.sheet);
+    },
+    [setActiveCourse]
+  );
 
   const handleJoinByCodePress = useCallback(() => {
     setCourseMenuOpen(null);
@@ -1931,6 +1950,20 @@ export function HomeScreen({ navigation, route }: any) {
         />
 
         {/* Invite Students Modal */}
+        <NewCourseSheet
+          visible={newCourseSheetVisible}
+          onClose={() => setNewCourseSheetVisible(false)}
+          onCreated={handleNewCourseCreated}
+        />
+        {joinCodeCourse && (
+          <CourseJoinCodeDialog
+            visible
+            courseId={joinCodeCourse.id}
+            courseTitle={joinCodeCourse.title}
+            onClose={() => setJoinCodeCourse(null)}
+          />
+        )}
+
         <InviteStudentsDialog
           inviteModalCourseId={inviteModalCourseId}
           closeInviteModal={closeInviteModal}

@@ -150,10 +150,12 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
     тоже есть. В курсе без учеников — обычная полоска.
   - «Новый набор» в конце списка — как сейчас (`SetEditor`). Окно «Новый набор» из макета (экран 6) — не
     в этом этапе.
-- [ ] **Teacher 6. «Новый курс» — логика и RN-окно (Android, веб).**
-  - В шторке «Новый курс» вызывает `openNewCourse()` вместо поля ввода.
-  - JS-обёртка `nativeNewCourseSheet.ts` (по образцу `nativeStudyModeSheet.ts`): данные для окна
-    (список учебников из `BookService`, тексты, токены), обработка события `create`.
+- [x] **Teacher 6. «Новый курс» — логика и RN-окно (Android, веб).** ✅
+  `src/components/teacher/newCourse.ts` (`createCourseWithSetup`, + тесты), `NewCourseSheet.tsx`,
+  `coursesStore.createCourseSynced` (ждёт сервер; старый `createCourse` не тронут).
+  - У **учителя** «Новый курс» в шторке открывает окно вместо поля ввода. У ученика курс — папка,
+    поле ввода как раньше. Сама шторка не менялась.
+  - JS-обёртка для Swift (`nativeNewCourseSheet.ts`) — в Teacher 7, вместе с нативным модулем.
   - `create` → `createCourse` → учебник выбран — `attachToCourses` → дни заданы — `setCourseSchedule` →
     курс становится активным → сразу окно «Код подключения».
   - Учебник или расписание не сохранились → курс не откатываем, тост «Курс создан, расписание

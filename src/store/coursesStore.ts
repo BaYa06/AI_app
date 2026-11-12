@@ -35,6 +35,13 @@ interface CoursesState {
 interface CoursesActions {
   // CRUD
   createCourse: (title: string) => Course;
+  /**
+   * Создать курс и дождаться сервера (окно «Новый курс» учителя, plan/new/teacher_cabinet.md,
+   * Teacher 6): после него сразу подключаются учебник и расписание, а им нужен курс на сервере.
+   * synced = false — курс есть только на устройстве (нет входа или сети); окна об ошибке нет —
+   * его показывает вызывающий.
+   */
+  createCourseSynced: (title: string) => Promise<{ course: Course; synced: boolean }>;
   renameCourse: (id: string, title: string) => void;
   deleteCourse: (id: string) => void;
   removeLocalCourse: (id: string) => void;
@@ -114,6 +121,33 @@ export const useCoursesStore = create<CoursesState & CoursesActions>()(
       }
 
       return newCourse;
+    },
+
+    createCourseSynced: async (title) => {
+      const now = Date.now();
+      const newCourse: Course = {
+        id: uuid(),
+        title: title.trim(),
+        createdAt: now,
+        updatedAt: now,
+      };
+      set((state) => {
+        state.courses.push(newCourse);
+      });
+      get().saveCourses();
+      log.debug('Courses', 'Курс создан (окно «Новый курс»)', newCourse.title);
+
+      if (!NeonService.isEnabled()) return { course: newCourse, synced: false };
+      const currentUserId = await getUserId();
+      if (!currentUserId) return { course: newCourse, synced: false };
+      const ok = await NeonService.createCourse({
+        id: newCourse.id,
+        userId: currentUserId,
+        title: newCourse.title,
+        createdAt: newCourse.createdAt,
+      });
+      if (!ok) log.warn('Courses', 'Не удалось синхронизировать курс с Neon', newCourse.title);
+      return { course: newCourse, synced: ok };
     },
 
     renameCourse: (id, title) => {

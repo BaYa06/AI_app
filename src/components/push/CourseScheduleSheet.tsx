@@ -13,13 +13,14 @@ import { spacing } from '@/constants';
 import { NeonService } from '@/services/NeonService';
 import { WEEK_DAYS } from './AboutMeForm';
 
-const STEP_MIN = 15;
-const DEFAULT_MINUTES = 18 * 60;
-const MIN_MINUTES = 7 * 60;
-const MAX_MINUTES = 22 * 60;
+// Шаг и границы времени занятия — общие с окном «Новый курс» (Teacher 6)
+export const STEP_MIN = 15;
+export const DEFAULT_MINUTES = 18 * 60;
+export const MIN_MINUTES = 7 * 60;
+export const MAX_MINUTES = 22 * 60;
 
 const pad = (n: number) => String(n).padStart(2, '0');
-const toTime = (minutes: number) => `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
+export const toTime = (minutes: number) => `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
 const fromTime = (time: string) => {
   const [h, m] = time.split(':').map(Number);
   return h * 60 + m;
