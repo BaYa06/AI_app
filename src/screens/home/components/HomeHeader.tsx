@@ -1,6 +1,9 @@
 /**
  * Шапка главной: меню курсов, серия, алмазы, рейтинг курса
  * (Clean 8 — вынесено из HomeScreen.tsx без изменений разметки.)
+ *
+ * Учитель в своём курсе (plan/new/teacher_cabinet.md, Teacher 1): вместо серии и алмазов —
+ * название курса, рейтинга нет. В «Мои наборы» шапка как у ученика.
  */
 import React from 'react';
 import { View, Pressable } from 'react-native';
@@ -31,6 +34,8 @@ type Props = {
     week: 'current' | 'previous';
   } | null;
   openLeaderboard: (week: 'current' | 'previous') => void;
+  /** Учитель в своём курсе — название курса вместо серии, алмазов и рейтинга; иначе null */
+  teacherCourseTitle: string | null;
 };
 
 export function HomeHeader({
@@ -46,7 +51,41 @@ export function HomeHeader({
   diamondCountAnimStyle,
   ratingTeaser,
   openLeaderboard,
+  teacherCourseTitle,
 }: Props) {
+  if (teacherCourseTitle !== null) {
+    return (
+      <View
+        style={[
+          styles.header,
+          { backgroundColor: colors.background, borderBottomColor: colors.border },
+        ]}
+      >
+        <Button
+          variant="icon"
+          icon={Menu}
+          background="none"
+          accessibilityLabel="Курсы"
+          onPress={() => setDrawerOpen(true)}
+        />
+        <View style={styles.headerCenter}>
+          <Pressable
+            style={styles.headerStat}
+            onPress={() => setDrawerOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={`Курс ${teacherCourseTitle}. Открыть список курсов`}
+          >
+            <Text variant="button" numberOfLines={1} style={{ color: colors.textPrimary }}>
+              {teacherCourseTitle}
+            </Text>
+          </Pressable>
+        </View>
+        {/* Пустое место справа — чтобы название стояло ровно по центру */}
+        <View style={styles.headerRight} />
+      </View>
+    );
+  }
+
   return (
     <View
       style={[

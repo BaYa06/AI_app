@@ -105,7 +105,7 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
 ### Шаги
 
 - [x] **Teacher 0. План.** ✅ Этот файл + запись в памяти.
-- [ ] **Teacher 1. Флаги и шапка учителя.**
+- [x] **Teacher 1. Флаги и шапка учителя.** ✅
   - Флаги `TEACHER_CABINET_ENABLED`, `TEACHER_HOMEWORK_ENABLED`, `TEACHER_LESSON_PREP_ENABLED`.
   - [HomeHeader.tsx](src/screens/home/components/HomeHeader.tsx): учитель и выбран его курс → без серии,
     алмазов и `ratingTeaser`. Слева, как и сейчас, кнопка шторки (☰). В центре вместо серии

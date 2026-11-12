@@ -37,6 +37,7 @@ import {
   type StudyMode,
 } from '@/components/study/StudyModeSheet';
 import { CoursesDrawer } from '@/components/home/CoursesDrawer';
+import { TEACHER_CABINET_ENABLED } from '@/config/features';
 import {
   animateDrawerTo,
   clampTranslateX,
@@ -1126,6 +1127,15 @@ export function HomeScreen({ navigation, route }: any) {
     return course?.title || 'этот курс';
   }, [activeCourseId, courses]);
 
+  // Учитель в своём курсе (plan/new/teacher_cabinet.md, Teacher 1): в шапке название курса вместо
+  // серии, алмазов и рейтинга. «Мои наборы» и чужой курс, где учитель сам ученик, — как у ученика.
+  const teacherCourseTitle = useMemo(() => {
+    if (!TEACHER_CABINET_ENABLED || isTeacher !== true || activeCourseId === null) return null;
+    const course = courses.find((c) => c.id === activeCourseId);
+    if (!course || course.isStudentCourse) return null;
+    return course.title || 'Курс';
+  }, [isTeacher, activeCourseId, courses]);
+
   const openLeaderboard = useCallback(
     (week: 'current' | 'previous') => {
       if (!activeCourseId) return;
@@ -1653,6 +1663,7 @@ export function HomeScreen({ navigation, route }: any) {
           diamondCountAnimStyle={diamondCountAnimStyle}
           ratingTeaser={ratingTeaser}
           openLeaderboard={openLeaderboard}
+          teacherCourseTitle={teacherCourseTitle}
         />
 
         <View style={styles.body}>

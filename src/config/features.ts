@@ -16,3 +16,18 @@ export const COMMUNITY_LIBRARY_ENABLED = true;
  * false — прежний экран с полками (LibraryScreen), откат одной строкой. Прежний экран удаляется в Catalog 10.
  */
 export const LIBRARY_CATALOG_ENABLED = true;
+
+/**
+ * Кабинет учителя, этап 1 (plan/new/teacher_cabinet.md): главная и страница курса учителя.
+ * false — всё как раньше, откат одной строкой.
+ */
+export const TEACHER_CABINET_ENABLED = true;
+
+/**
+ * Блоки заданий у учителя (этап 2). Пока сервера заданий нет — только вёрстка, в проде false:
+ * выдуманные цифры к пользователям не попадают.
+ */
+export const TEACHER_HOMEWORK_ENABLED = false;
+
+/** «Подготовка к уроку» у учителя (этап 3). До этапа 3 — false. */
+export const TEACHER_LESSON_PREP_ENABLED = false;
