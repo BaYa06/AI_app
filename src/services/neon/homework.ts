@@ -61,6 +61,14 @@ export const homeworkApi = {
     return res.ok ? res.data : null;
   },
 
+  /** «Оценки в Excel»: xlsx собирает сервер. null — нет сети или ошибка. */
+  async exportHomework(homeworkId: string): Promise<{ filename: string; base64: string } | null> {
+    const res = await callTeacherApi<{ filename: string; base64: string }>('homework-export', {
+      params: { homeworkId },
+    });
+    return res.ok ? res.data : null;
+  },
+
   /** Задания ученика; null — нет сети или ошибка (показываем кэш). */
   async loadMyHomework(): Promise<StudentHomework[] | null> {
     const res = await callProgressApi<{ homework: StudentHomework[] }>('my-homework', {

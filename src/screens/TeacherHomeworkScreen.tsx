@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
-import { Clock, Send } from 'lucide-react-native';
+import { Clock, Download, Send } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useThemeColors } from '@/store';
 import { Text } from '@/components/common';
@@ -37,6 +37,7 @@ import {
   statusLabel,
   type RowTone,
 } from './teacherHomework/homeworkStatus';
+import { exportHomeworkGrades } from './teacherHomework/exportHomework';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TeacherHomework'>;
 
@@ -151,6 +152,16 @@ export function TeacherHomeworkScreen({ navigation, route }: Props) {
     }
     toast.success(res.reminded > 0 ? `Напомнили: ${res.reminded}` : 'Всем уже напоминали сегодня');
     load();
+  };
+
+  const [exporting, setExporting] = useState(false);
+  const handleExport = async () => {
+    if (!data || exporting) return;
+    setExporting(true);
+    Analytics.teacherAction('homework_export', 'course');
+    const ok = await exportHomeworkGrades(data, courseTitle);
+    setExporting(false);
+    if (!ok) toast.error('Не получилось выгрузить оценки. Проверь интернет');
   };
 
   const openStudent = (id: string, name: string, lastActiveDate: string | null) =>
@@ -301,6 +312,14 @@ export function TeacherHomeworkScreen({ navigation, route }: Props) {
               onPress={handleRemind}
               disabled={toRemind.length === 0}
               loading={reminding}
+              fullWidth
+            />
+            <Button
+              title="Оценки в Excel"
+              icon={Download}
+              variant="secondary"
+              onPress={handleExport}
+              loading={exporting}
               fullWidth
             />
           </View>

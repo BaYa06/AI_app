@@ -12,13 +12,15 @@ import {
   KNOWN_STEP,
   FIXED_AFTER_DAYS,
 } from '../../_homework.js';
+import { buildHomeworkWorkbook, DEFAULT_TIMEZONE } from '../../_homeworkExcel.js';
 
 const isUuid = (v) => typeof v === 'string' && UUID_RE.test(v);
 
 /** Задание, если текущий пользователь — учитель его курса. */
 async function ownedHomework(sql, homeworkId, userId) {
   const rows = await sql`
-    SELECT h.*, COALESCE(u.display_name, u.user_name) AS teacher
+    SELECT h.*, COALESCE(u.display_name, u.user_name) AS teacher,
+      c.title AS course_title, c.timezone AS course_timezone
     FROM homework h
     JOIN courses c ON c.id = h.course_id AND c.user_id = ${userId}::uuid
     JOIN users u ON u.id = c.user_id
@@ -147,7 +149,12 @@ export async function homeworkStatus(req, res, sql, userId) {
   if (!isUuid(homeworkId)) return res.status(400).json({ error: 'homeworkId required' });
   const hw = await ownedHomework(sql, homeworkId, userId);
   if (!hw) return res.status(403).json({ error: 'Not the owner' });
+  return res.status(200).json(await loadHomeworkStatus(sql, hw));
+}
 
+/** Статусы учеников по заданию — для экрана сдачи и выгрузки в Excel. Права проверяет вызывающий. */
+async function loadHomeworkStatus(sql, hw) {
+  const homeworkId = hw.id;
   const showFixed = Date.now() - new Date(hw.created_at).getTime() >= FIXED_AFTER_DAYS * 86400000;
   const rows = await sql`
     WITH words AS (SELECT id FROM cards WHERE id = ANY(${hw.card_ids}::uuid[]))
@@ -175,7 +182,7 @@ export async function homeworkStatus(req, res, sql, userId) {
   const words =
     await sql`SELECT COUNT(*)::int AS n FROM cards WHERE id = ANY(${hw.card_ids}::uuid[])`;
 
-  return res.status(200).json({
+  return {
     homework: {
       id: hw.id,
       courseId: hw.course_id,
@@ -198,7 +205,24 @@ export async function homeworkStatus(req, res, sql, userId) {
       remindedAt: r.reminded_at,
       fixed: r.fixed,
     })),
+  };
+}
+
+/**
+ * GET ?homeworkId= → { filename, base64 } — «Оценки в Excel» (Teacher 22). Файл собирает сервер
+ * (exceljs), даты — в поясе курса. Приложение сохраняет файл и открывает «Поделиться».
+ */
+export async function homeworkExport(req, res, sql, userId) {
+  const { homeworkId } = req.query;
+  if (!isUuid(homeworkId)) return res.status(400).json({ error: 'homeworkId required' });
+  const hw = await ownedHomework(sql, homeworkId, userId);
+  if (!hw) return res.status(403).json({ error: 'Not the owner' });
+  const data = await loadHomeworkStatus(sql, hw);
+  const file = await buildHomeworkWorkbook(data, {
+    courseTitle: hw.course_title,
+    timeZone: hw.course_timezone || DEFAULT_TIMEZONE,
   });
+  return res.status(200).json(file);
 }
 
 /** POST { homeworkId } — отменить задание (ученики его больше не видят, сданные снимки остаются). */

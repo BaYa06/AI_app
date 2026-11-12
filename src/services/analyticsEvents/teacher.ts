@@ -12,7 +12,8 @@ export type TeacherAction =
   | 'schedule'
   | 'course'
   | 'books'
-  | 'homework';
+  | 'homework'
+  | 'homework_export';
 
 export const teacherEvents = {
   // ═══════════════════════════════════════════════════════════════════════════

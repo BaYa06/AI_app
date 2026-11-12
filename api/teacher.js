@@ -36,6 +36,7 @@ import {
   homeworkStatus,
   homeworkCancel,
   homeworkRemind,
+  homeworkExport,
 } from './_handlers/teacher/homework.js';
 
 /**
@@ -73,6 +74,7 @@ import {
  * GET  /api/teacher?action=homework-status  ?homeworkId=
  * POST /api/teacher?action=homework-cancel  { homeworkId }
  * POST /api/teacher?action=homework-remind  { homeworkId, userIds } — каждому не чаще раза в 20 ч
+ * GET  /api/teacher?action=homework-export  ?homeworkId= → { filename, base64 } (xlsx)
  */
 
 export default async function handler(req, res) {
@@ -122,6 +124,7 @@ export default async function handler(req, res) {
     if (action === 'homework-status') return await homeworkStatus(req, res, sql, userId);
     if (action === 'homework-cancel') return await homeworkCancel(req, res, sql, userId);
     if (action === 'homework-remind') return await homeworkRemind(req, res, sql, userId);
+    if (action === 'homework-export') return await homeworkExport(req, res, sql, userId);
 
     return res.status(400).json({ error: 'Unknown action' });
   } catch (error) {
