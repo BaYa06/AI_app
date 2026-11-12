@@ -369,8 +369,12 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
         insets={insets}
         lobbyModal={lobbyModal}
         setLobbyModal={setLobbyModal}
-        navigation={navigation}
-        route={route}
+        onSelect={(kind) =>
+          navigation.navigate(kind === 'exam' ? 'ExamLobby' : 'OralTestLobby', {
+            courseId: route.params.courseId,
+            courseTitle: route.params.courseTitle,
+          })
+        }
       />
     </View>
   );

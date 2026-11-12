@@ -1,6 +1,8 @@
 /**
  * Шторка запуска теста: живой тест или устный
  * (Clean 8 — вынесено из TeacherCourseStatsScreen.tsx без изменений разметки.)
+ * Teacher 3 (plan/new/teacher_cabinet.md): шторка только сообщает выбор (`onSelect`), переход делает
+ * тот, кто её открыл, — главная учителя или страница курса.
  */
 import React from 'react';
 import { View, Pressable, Modal } from 'react-native';
@@ -8,8 +10,6 @@ import { ArrowLeft, FileText, Mic } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import { useThemeColors } from '@/store';
 import { alpha } from '@/constants';
-import type { RootStackParamList } from '@/types/navigation';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { styles } from './styles';
 import type { EdgeInsets } from 'react-native-safe-area-context';
 
@@ -18,18 +18,12 @@ type Props = {
   insets: EdgeInsets;
   lobbyModal: boolean;
   setLobbyModal: React.Dispatch<React.SetStateAction<boolean>>;
-  navigation: NativeStackScreenProps<RootStackParamList, 'TeacherCourseStats'>['navigation'];
-  route: NativeStackScreenProps<RootStackParamList, 'TeacherCourseStats'>['route'];
+  onSelect: (kind: TestKind) => void;
 };
 
-export function TestLobbySheet({
-  colors,
-  insets,
-  lobbyModal,
-  setLobbyModal,
-  navigation,
-  route,
-}: Props) {
+export type TestKind = 'exam' | 'oral';
+
+export function TestLobbySheet({ colors, insets, lobbyModal, setLobbyModal, onSelect }: Props) {
   return (
     <Modal
       visible={lobbyModal}
@@ -69,10 +63,7 @@ export function TestLobbySheet({
             ]}
             onPress={() => {
               setLobbyModal(false);
-              navigation.navigate('ExamLobby', {
-                courseId: route.params.courseId,
-                courseTitle: route.params.courseTitle,
-              });
+              onSelect('exam');
             }}
           >
             <View style={[styles.sheetOptionIcon, { backgroundColor: colors.primaryFill }]}>
@@ -104,10 +95,7 @@ export function TestLobbySheet({
             ]}
             onPress={() => {
               setLobbyModal(false);
-              navigation.navigate('OralTestLobby', {
-                courseId: route.params.courseId,
-                courseTitle: route.params.courseTitle,
-              });
+              onSelect('oral');
             }}
           >
             <View style={[styles.sheetOptionIcon, { backgroundColor: colors.streak }]}>

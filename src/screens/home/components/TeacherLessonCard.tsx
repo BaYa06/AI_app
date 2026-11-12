@@ -8,13 +8,16 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   CalendarClock,
   ChevronRight,
+  ClipboardCheck,
   GraduationCap,
   Play,
   Plus,
   UserPlus,
+  Users,
 } from 'lucide-react-native';
 import { useThemeColors } from '@/store';
 import { Text } from '@/components/common';
@@ -27,6 +30,7 @@ import { TEACHER_HOMEWORK_ENABLED } from '@/config/features';
 import { getNextLesson, type ScheduleItem } from '@/utils/nextLesson';
 import { pluralize } from '@/utils';
 import { getStudentStatus } from '@/screens/teacherCourseStats/helpers';
+import { TestLobbySheet } from '@/screens/teacherCourseStats/TestLobbySheet';
 
 /** Сводка задания для карточки — придёт с сервера на этапе 2 */
 export interface TeacherHomeworkSummary {
@@ -66,6 +70,8 @@ export function TeacherLessonCard({
   const [members, setMembers] = useState<Members>(null);
   const [scheduleSheet, setScheduleSheet] = useState(false);
   const [codeDialog, setCodeDialog] = useState(false);
+  const [testSheet, setTestSheet] = useState(false);
+  const insets = useSafeAreaInsets();
   const [reminding, setReminding] = useState(false);
   const [remindedToday, setRemindedToday] = useState(false);
 
@@ -100,7 +106,7 @@ export function TeacherLessonCard({
     rootNav?.navigate('TeacherCourseStats', { courseId, courseTitle });
   };
 
-  const openInactive = () => {
+  const openStudents = () => {
     const rootNav = navigation?.getParent?.() ?? navigation;
     rootNav?.navigate('TeacherStudents', { courseId, courseTitle });
   };
@@ -207,7 +213,7 @@ export function TeacherLessonCard({
           <View style={[styles.studentsRow, { backgroundColor: softFill }]}>
             <Pressable
               accessibilityRole="button"
-              onPress={openInactive}
+              onPress={openStudents}
               style={({ pressed }) => [styles.shrink, pressed && styles.pressed]}
             >
               <Text variant="label" style={{ color: onFill }}>
@@ -229,6 +235,49 @@ export function TeacherLessonCard({
         )}
       </View>
 
+      {/* Быстрые действия курса (Teacher 3): то, что раньше было только внутри курса */}
+      <View style={styles.actions}>
+        <QuickAction
+          colors={colors}
+          icon={Play}
+          title="Живой тест"
+          onPress={() => setTestSheet(true)}
+        />
+        {TEACHER_HOMEWORK_ENABLED && (
+          <QuickAction
+            colors={colors}
+            icon={ClipboardCheck}
+            title="Задание"
+            onPress={onAssignHomework}
+          />
+        )}
+        <QuickAction
+          colors={colors}
+          icon={UserPlus}
+          title="Код курса"
+          onPress={() => setCodeDialog(true)}
+        />
+        <QuickAction
+          colors={colors}
+          icon={Users}
+          title={members ? `Ученики ${members.total}` : 'Ученики'}
+          onPress={openStudents}
+        />
+      </View>
+
+      <TestLobbySheet
+        colors={colors}
+        insets={insets}
+        lobbyModal={testSheet}
+        setLobbyModal={setTestSheet}
+        onSelect={(kind) => {
+          const rootNav = navigation?.getParent?.() ?? navigation;
+          rootNav?.navigate(kind === 'exam' ? 'ExamLobby' : 'OralTestLobby', {
+            courseId,
+            courseTitle,
+          });
+        }}
+      />
       <CourseScheduleSheet
         visible={scheduleSheet}
         courseId={courseId}
@@ -294,6 +343,39 @@ function HomeworkBlock({
         <SoftButton colors={colors} title="Кто не сдал" onPress={onStatus} />
       </View>
     </View>
+  );
+}
+
+/** Плитка быстрого действия под карточкой урока */
+function QuickAction({
+  colors,
+  title,
+  icon: Icon,
+  onPress,
+}: {
+  colors: ReturnType<typeof useThemeColors>;
+  title: string;
+  icon: IconComponent;
+  onPress?: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      onPress={onPress}
+      style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+    >
+      <View style={[styles.actionIcon, { backgroundColor: alpha(colors.primary, 10) }]}>
+        <Icon size={iconSize.m} color={colors.primary} />
+      </View>
+      <Text
+        variant="caption"
+        numberOfLines={1}
+        style={[styles.actionLabel, { color: colors.textPrimary }]}
+      >
+        {title}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -462,6 +544,28 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.5,
+  },
+  actions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.xs,
+    marginTop: spacing.m,
+  },
+  action: {
+    flex: 1,
+    alignItems: 'center',
+    gap: spacing.xxs,
+  },
+  actionIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: borderRadius.l,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionLabel: {
+    fontWeight: '600',
+    textAlign: 'center',
   },
   pressed: {
     opacity: 0.85,
