@@ -373,7 +373,9 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
   `swiftc -parse`** — сборка и устройство через TestFlight. Было в плане: `NewHomeworkSheet.swift`,
   `WordPickerSheet.swift` + `.m`, обёртки `native…Sheet.ts`; срок — SwiftUI `DatePicker` `.wheel`
   (дата + время, шаг 5 мин). Тексты и цвета из JS, события `create` / `pickWords` / `done` / `dismiss`.
-- [ ] **Teacher 21. Экран сдачи (12).** Новый экран `TeacherHomeworkScreen`: кольцо «сдали /
+- [x] **Teacher 21. Экран сдачи (12).** ✅ `TeacherHomeworkScreen` (маршрут `TeacherHomework`), правила —
+  `teacherHomework/homeworkStatus.ts` (+ тесты). «Напомнить N» — всем, кто не сдал и кому не
+  напоминали 20 ч; выбор учеников — окно 12а (Teacher 23). Новый экран `TeacherHomeworkScreen`: кольцо «сдали /
   в процессе / не начали», срок, список учеников (статус, «с опозданием», оценка), строка
   «закреплено» (через 7 дней), «Напомнить N». Нажатие на ученика → `StudentDetailScreen`.
   Статусы по решению 4: «Сдала · 98%», «48/48 · 70%» (все слова, оценка ниже порога — в процессе).

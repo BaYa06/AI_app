@@ -185,6 +185,8 @@ export type RootStackParamList = {
     /** С какого фильтра открыть список (главная учителя → «Не заходят 7+ дней») */
     filter?: 'all' | 'active' | 'away3d' | 'away7d';
   };
+  /** Сдача задания учителем (plan/new/teacher_cabinet.md, Teacher 21) */
+  TeacherHomework: { homeworkId: string; courseId: string; courseTitle: string };
   StudentDetail: {
     courseId: string;
     courseTitle: string;
