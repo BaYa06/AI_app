@@ -17,6 +17,7 @@ import { MIN_SCORE_OPTIONS, dueRelative, homeworkVolumeText } from '@/services/h
 import type { ScheduleItem } from '@/utils/nextLesson';
 import { pluralize } from '@/utils';
 import { DueWheelPicker } from './DueWheelPicker';
+import { WordPickerSheet } from './WordPickerSheet';
 import {
   DEFAULT_MIN_SCORE,
   NEW_HOMEWORK_TEXTS as T,
@@ -44,14 +45,6 @@ export interface NewHomeworkSheetProps {
   schedule: ScheduleItem[] | null;
   /** Слова при открытии (обычно весь набор, из которого открыли окно) */
   initialWords: HomeworkWords | null;
-  /** Открыть выбор слов (окно 11а, Teacher 19); новые слова приходят через onWordsPicked */
-  renderWordPicker?: (args: {
-    visible: boolean;
-    words: HomeworkWords | null;
-    onClose: () => void;
-    onDone: (words: HomeworkWords) => void;
-    due: Date;
-  }) => React.ReactNode;
   onCreated: (homeworkId: string) => void;
 }
 
@@ -70,7 +63,6 @@ export function NewHomeworkSheetRN({
   students,
   schedule,
   initialWords,
-  renderWordPicker,
   onCreated,
 }: NewHomeworkSheetProps) {
   const colors = useThemeColors();
@@ -222,8 +214,7 @@ export function NewHomeworkSheetRN({
             title={words ? wordsSummary(words) : T.wordsPick}
             subtitle={wordCount > 0 ? homeworkVolumeText(wordCount) : undefined}
             icon={BookOpen}
-            onPress={renderWordPicker ? () => setPickerOpen(true) : undefined}
-            chevron={!!renderWordPicker}
+            onPress={() => setPickerOpen(true)}
           />
         </View>
 
@@ -304,16 +295,17 @@ export function NewHomeworkSheetRN({
         </View>
       </View>
 
-      {renderWordPicker?.({
-        visible: pickerOpen,
-        words,
-        due,
-        onClose: () => setPickerOpen(false),
-        onDone: (w) => {
+      <WordPickerSheet
+        visible={pickerOpen}
+        courseId={courseId}
+        words={words}
+        due={due}
+        onClose={() => setPickerOpen(false)}
+        onDone={(w) => {
           setWords(w);
           setPickerOpen(false);
-        },
-      })}
+        }}
+      />
     </Sheet>
   );
 }
