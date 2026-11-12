@@ -48,6 +48,8 @@ type Props = {
   overview: CourseOverview;
   /** Этап 2: «Задание» */
   onAssignHomework?: () => void;
+  /** «сдали 7 из 22» — есть текущее задание; без него «с дедлайном» */
+  homeworkCaption?: string;
 };
 
 export function CourseActions({
@@ -59,6 +61,7 @@ export function CourseActions({
   setScheduleSheet,
   overview,
   onAssignHomework,
+  homeworkCaption,
 }: Props) {
   const { courseId, courseTitle } = route.params;
   // Нажатие + запись в аналитику (Teacher 12)
@@ -103,7 +106,7 @@ export function CourseActions({
             colors={colors}
             icon={ClipboardCheck}
             title="Задание"
-            caption="с дедлайном"
+            caption={homeworkCaption ?? 'с дедлайном'}
             onPress={tap('homework', onAssignHomework)}
           />
         )}

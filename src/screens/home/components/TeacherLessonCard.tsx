@@ -4,8 +4,9 @@
  *
  * Есть логика: ближайший урок из расписания курса, быстрые действия (Teacher 3),
  * «Кому уделить внимание» — кто не заходит 7+ дней и «Напомнить» (Teacher 4).
- * Макет (флаг TEACHER_HOMEWORK_ENABLED, в проде false): блок задания — «Задания пока нет»
- * или «Сдали N из M». Пока сервера заданий нет, `homework` всегда null.
+ * Задание (этап 2, флаг TEACHER_HOMEWORK_ENABLED): «Задания пока нет» → окно «Новое задание»
+ * или текущее задание «Сдали N из M» → экран сдачи и окно «Кто не сдал» (useTeacherHomework).
+ * «Проверить на уроке» — этап 3, за флагом TEACHER_LESSON_PREP_ENABLED.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
@@ -29,22 +30,17 @@ import { Analytics } from '@/services/analytics';
 import type { TeacherAction } from '@/services/analyticsEvents/teacher';
 import { CourseScheduleSheet } from '@/components/push/CourseScheduleSheet';
 import { CourseJoinCodeDialog } from '@/components/CourseJoinCodeDialog';
-import { TEACHER_HOMEWORK_ENABLED } from '@/config/features';
+import { TEACHER_HOMEWORK_ENABLED, TEACHER_LESSON_PREP_ENABLED } from '@/config/features';
+import { useTeacherHomework } from '@/components/teacher/useTeacherHomework';
+import {
+  homeworkCardSummary,
+  type HomeworkCardSummary,
+} from '@/components/teacher/teacherHomework';
 import { getNextLesson, type ScheduleItem } from '@/utils/nextLesson';
 import { pluralize } from '@/utils';
 import { getStudentStatus } from '@/screens/teacherCourseStats/helpers';
 import { TestLobbySheet } from '@/screens/teacherCourseStats/TestLobbySheet';
 import type { TeacherCourseMember } from '../useTeacherCourseData';
-
-/** Сводка задания для карточки — придёт с сервера на этапе 2 */
-export interface TeacherHomeworkSummary {
-  title: string;
-  /** «15.11.2026 20:00» */
-  dueLabel: string;
-  done: number;
-  inProgress: number;
-  notStarted: number;
-}
 
 type Props = {
   colors: ReturnType<typeof useThemeColors>;
@@ -53,11 +49,6 @@ type Props = {
   navigation: any;
   /** Ученики курса из useTeacherCourseData; null — ещё грузятся или не загрузились */
   courseMembers: TeacherCourseMember[] | null;
-  /** Этап 2. До него всегда null, блок виден только при TEACHER_HOMEWORK_ENABLED */
-  homework?: TeacherHomeworkSummary | null;
-  onAssignHomework?: () => void;
-  onCheckHomework?: () => void;
-  onHomeworkStatus?: () => void;
 };
 
 /** «Batyrov Batyr» → «Batyrov B.»; одно слово — как есть */
@@ -72,10 +63,6 @@ export function TeacherLessonCard({
   courseTitle,
   navigation,
   courseMembers,
-  homework = null,
-  onAssignHomework,
-  onCheckHomework,
-  onHomeworkStatus,
 }: Props) {
   const [schedule, setSchedule] = useState<ScheduleItem[] | null | undefined>(undefined);
   const [scheduleSheet, setScheduleSheet] = useState(false);
@@ -84,6 +71,18 @@ export function TeacherLessonCard({
   const insets = useSafeAreaInsets();
   const [reminding, setReminding] = useState(false);
   const [remindedToday, setRemindedToday] = useState(false);
+
+  const homeworkStudents = useMemo(
+    () => courseMembers?.map((m) => ({ id: m.id, displayName: m.name })) ?? null,
+    [courseMembers]
+  );
+  const hw = useTeacherHomework({
+    courseId,
+    courseTitle,
+    students: homeworkStudents,
+    schedule: schedule ?? null,
+    navigation,
+  });
 
   const loadSchedule = useCallback(() => {
     NeonService.getCourseSchedule(courseId).then(setSchedule);
@@ -215,10 +214,23 @@ export function TeacherLessonCard({
         {TEACHER_HOMEWORK_ENABLED && (
           <HomeworkBlock
             colors={colors}
-            homework={homework}
-            onAssign={onAssignHomework}
-            onCheck={onCheckHomework}
-            onStatus={onHomeworkStatus}
+            homework={hw.current ? homeworkCardSummary(hw.current) : null}
+            onAssign={() => {
+              track('homework');
+              hw.openNew();
+            }}
+            onOpen={(id) => {
+              track('homework');
+              hw.openStatus(id);
+            }}
+            onCheck={() => {
+              track('live_test');
+              setTestSheet(true);
+            }}
+            onStatus={(id) => {
+              track('homework');
+              hw.openNotSubmitted(id);
+            }}
           />
         )}
 
@@ -259,7 +271,7 @@ export function TeacherLessonCard({
             title="Задание"
             onPress={() => {
               track('homework');
-              onAssignHomework?.();
+              hw.openHomework();
             }}
           />
         )}
@@ -349,6 +361,7 @@ export function TeacherLessonCard({
           loadSchedule();
         }}
       />
+      {hw.sheets}
       <CourseJoinCodeDialog
         visible={codeDialog}
         courseId={courseId}
@@ -364,14 +377,16 @@ function HomeworkBlock({
   colors,
   homework,
   onAssign,
+  onOpen,
   onCheck,
   onStatus,
 }: {
   colors: ReturnType<typeof useThemeColors>;
-  homework: TeacherHomeworkSummary | null;
-  onAssign?: () => void;
-  onCheck?: () => void;
-  onStatus?: () => void;
+  homework: HomeworkCardSummary | null;
+  onAssign: () => void;
+  onOpen: (id: string) => void;
+  onCheck: () => void;
+  onStatus: (id: string) => void;
 }) {
   const onFill = colors.onPrimary;
   if (!homework) {
@@ -387,23 +402,40 @@ function HomeworkBlock({
   const total = homework.done + homework.inProgress + homework.notStarted;
   return (
     <View style={styles.block}>
-      <Text variant="overline" style={[styles.muted, { color: onFill }]}>
-        {`Текущее задание · ${homework.title}`}
-      </Text>
-      <Text variant="h2" style={{ color: onFill }}>
-        {`Сдали ${homework.done} из ${total}`}
-      </Text>
-      <Text variant="bodySmall" style={[styles.muted, { color: onFill }]}>
-        {`до: ${homework.dueLabel} · в процессе ${homework.inProgress} · не начали ${homework.notStarted}`}
-      </Text>
-      <View style={[styles.bar, { backgroundColor: alpha(onFill, 20) }]}>
-        <View style={{ flex: homework.done, backgroundColor: onFill }} />
-        <View style={{ flex: homework.inProgress, backgroundColor: alpha(onFill, 40) }} />
-        <View style={{ flex: homework.notStarted }} />
-      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Задание ${homework.title}: сдали ${homework.done} из ${total}`}
+        onPress={() => onOpen(homework.id)}
+        style={({ pressed }) => [styles.block, pressed && styles.pressed]}
+      >
+        <Text variant="overline" style={[styles.muted, { color: onFill }]}>
+          {`Текущее задание · ${homework.title}`}
+        </Text>
+        <Text variant="h2" style={{ color: onFill }}>
+          {`Сдали ${homework.done} из ${total}`}
+        </Text>
+        <Text variant="bodySmall" style={[styles.muted, { color: onFill }]}>
+          {`до: ${homework.dueLabel} · в процессе ${homework.inProgress} · не начали ${homework.notStarted}`}
+        </Text>
+        <View style={[styles.bar, { backgroundColor: alpha(onFill, 20) }]}>
+          <View style={{ flex: homework.done, backgroundColor: onFill }} />
+          <View style={{ flex: homework.inProgress, backgroundColor: alpha(onFill, 40) }} />
+          <View style={{ flex: homework.notStarted }} />
+        </View>
+      </Pressable>
       <View style={styles.buttonsRow}>
-        <FillButton colors={colors} icon={Play} title="Проверить на уроке" onPress={onCheck} grow />
-        <SoftButton colors={colors} title="Кто не сдал" onPress={onStatus} />
+        {TEACHER_LESSON_PREP_ENABLED && (
+          <FillButton
+            colors={colors}
+            icon={Play}
+            title="Проверить на уроке"
+            onPress={onCheck}
+            grow
+          />
+        )}
+        {total - homework.done > 0 && (
+          <SoftButton colors={colors} title="Кто не сдал" onPress={() => onStatus(homework.id)} />
+        )}
       </View>
     </View>
   );

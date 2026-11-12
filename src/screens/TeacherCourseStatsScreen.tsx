@@ -2,7 +2,7 @@
  * Teacher Course Stats Screen
  * @description Статистика курса для учителя
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft } from 'lucide-react-native';
@@ -11,7 +11,9 @@ import { CourseJoinCodeDialog } from '@/components/CourseJoinCodeDialog';
 import { Text } from '@/components/common';
 import { useThemeColors } from '@/store';
 import { spacing } from '@/constants';
-import { NeonService } from '@/services/NeonService';
+import { NeonService, type CourseScheduleItem } from '@/services/NeonService';
+import { useTeacherHomework } from '@/components/teacher/useTeacherHomework';
+import { homeworkTileCaption } from '@/components/teacher/teacherHomework';
 import { BookService } from '@/services/BookService';
 import { Analytics } from '@/services/analytics';
 import { toast } from '@/components/ui';
@@ -128,9 +130,11 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
   // Сводка для плиток и шапки (Teacher 8): тесты, учебники курса, расписание
   const [overview, setOverview] = useState<Omit<CourseOverview, 'membersCount'>>({});
   const [bookTitles, setBookTitles] = useState<string | null>(null);
+  const [schedule, setSchedule] = useState<CourseScheduleItem[] | null>(null);
   const loadSchedule = useCallback(() => {
-    NeonService.getCourseSchedule(route.params.courseId).then((schedule) => {
-      if (schedule) setOverview((o) => ({ ...o, scheduleLabel: formatScheduleLabel(schedule) }));
+    NeonService.getCourseSchedule(route.params.courseId).then((items) => {
+      setSchedule(items);
+      if (items) setOverview((o) => ({ ...o, scheduleLabel: formatScheduleLabel(items) }));
     });
   }, [route.params.courseId]);
   useEffect(() => {
@@ -236,6 +240,19 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
     setChartTooltip({ index, day, count });
   };
 
+  // Задание курса (этап 2): плитка «Задание», окна «Новое задание» и «Кто не сдал»
+  const homeworkStudents = useMemo(
+    () => (membersLoading ? null : members.map((m) => ({ id: m.id, displayName: m.name }))),
+    [members, membersLoading]
+  );
+  const hw = useTeacherHomework({
+    courseId: route.params.courseId,
+    courseTitle: route.params.courseTitle,
+    students: homeworkStudents,
+    schedule,
+    navigation,
+  });
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
@@ -286,6 +303,8 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
             ...overview,
             membersCount: membersLoading || membersError ? undefined : members.length,
           }}
+          onAssignHomework={hw.openHomework}
+          homeworkCaption={homeworkTileCaption(hw.current)}
         />
 
         {/* Metric tiles */}
@@ -457,6 +476,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
         }}
       />
 
+      {hw.sheets}
       <CourseJoinCodeDialog
         visible={joinCodeDialog}
         courseId={route.params.courseId}
