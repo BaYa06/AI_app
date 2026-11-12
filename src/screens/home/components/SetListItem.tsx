@@ -27,6 +27,11 @@ type Props = {
   reviewStats: { waitingBySet: Record<string, number> };
   setSetMenuTarget: React.Dispatch<React.SetStateAction<CardSet | null>>;
   navigation: any;
+  /**
+   * Учитель в своём курсе (plan/new/teacher_cabinet.md, Teacher 5): прогресс группы вместо личного —
+   * сколько учеников прошли все карточки, начали и не открывали. null/нет — личная полоска, как раньше.
+   */
+  groupProgress?: { total: number; started: number; completed: number } | null;
 };
 
 export function SetListItem({
@@ -38,13 +43,16 @@ export function SetListItem({
   reviewStats,
   setSetMenuTarget,
   navigation,
+  groupProgress,
 }: Props) {
   // Статусы слов (plan/new/word_status_colors.md); у набора с сервера нет разбивки — выученные считаем «знаю»
   const learning = set.learningCount || 0;
   const young = set.youngCount ?? (set.masteredCount || 0);
   const mature = set.matureCount ?? 0;
   const fresh = Math.max(0, set.cardCount - learning - young - mature);
-  const statusLabel = `учится ${learning}, знаю ${young}, выучено надолго ${mature}, новых ${fresh}`;
+  const statusLabel = groupProgress
+    ? groupProgressLabel(groupProgress)
+    : `учится ${learning}, знаю ${young}, выучено надолго ${mature}, новых ${fresh}`;
   // Цвет набора — лёгким оттенком плитки даты: помогает узнать набор, но не спорит с «N ждут»
   const accentColor = getDeckAccentColor(set.id || index);
   const created = new Date(set.createdAt);
@@ -135,41 +143,102 @@ export function SetListItem({
           />
         </View>
 
-        <SegmentedProgressBar
-          total={set.cardCount}
-          segments={[
-            { value: mature, color: colors.statusMature },
-            { value: young, color: colors.statusYoung },
-            { value: learning, color: colors.statusLearning },
-          ]}
-          style={styles.setProgress}
-        />
-        <View
-          style={styles.setStatusCounts}
-          importantForAccessibility="no-hide-descendants"
-          accessibilityElementsHidden
-        >
-          {[
-            { n: mature, color: colors.statusMature },
-            { n: young, color: colors.statusYoung },
-            { n: learning, color: colors.statusLearning },
-            { n: fresh, color: colors.surfaceMuted },
-          ].map(({ n, color }, i) => (
-            <View key={i} style={styles.setStatusCount}>
-              <View
-                style={[
-                  styles.setStatusDot,
-                  { backgroundColor: color },
-                  i === 3 && { borderWidth: 1, borderColor: colors.border },
-                ]}
-              />
-              <Text variant="caption" style={[styles.tabular, { color: colors.textSecondary }]}>
-                {n}
-              </Text>
+        {groupProgress ? (
+          <GroupProgress progress={groupProgress} colors={colors} />
+        ) : (
+          <>
+            <SegmentedProgressBar
+              total={set.cardCount}
+              segments={[
+                { value: mature, color: colors.statusMature },
+                { value: young, color: colors.statusYoung },
+                { value: learning, color: colors.statusLearning },
+              ]}
+              style={styles.setProgress}
+            />
+            <View
+              style={styles.setStatusCounts}
+              importantForAccessibility="no-hide-descendants"
+              accessibilityElementsHidden
+            >
+              {[
+                { n: mature, color: colors.statusMature },
+                { n: young, color: colors.statusYoung },
+                { n: learning, color: colors.statusLearning },
+                { n: fresh, color: colors.surfaceMuted },
+              ].map(({ n, color }, i) => (
+                <View key={i} style={styles.setStatusCount}>
+                  <View
+                    style={[
+                      styles.setStatusDot,
+                      { backgroundColor: color },
+                      i === 3 && { borderWidth: 1, borderColor: colors.border },
+                    ]}
+                  />
+                  <Text variant="caption" style={[styles.tabular, { color: colors.textSecondary }]}>
+                    {n}
+                  </Text>
+                </View>
+              ))}
             </View>
-          ))}
-        </View>
+          </>
+        )}
       </SurfaceCard>
     </StaggerCard>
+  );
+}
+
+/** «прошли 8 из 22, начали 7, не открывали 7» */
+function groupProgressLabel(p: { total: number; started: number; completed: number }) {
+  const started = Math.max(0, p.started - p.completed);
+  const none = Math.max(0, p.total - p.started);
+  return `прошли ${p.completed} из ${p.total}, начали ${started}, не открывали ${none}`;
+}
+
+/** Прогресс группы по набору: прошли все карточки / начали / не открывали */
+function GroupProgress({
+  progress,
+  colors,
+}: {
+  progress: { total: number; started: number; completed: number };
+  colors: ReturnType<typeof useThemeColors>;
+}) {
+  const started = Math.max(0, progress.started - progress.completed);
+  const none = Math.max(0, progress.total - progress.started);
+  return (
+    <>
+      <SegmentedProgressBar
+        total={progress.total}
+        segments={[
+          { value: progress.completed, color: colors.success },
+          { value: started, color: colors.warning },
+        ]}
+        style={styles.setProgress}
+      />
+      <View
+        style={styles.setStatusCounts}
+        importantForAccessibility="no-hide-descendants"
+        accessibilityElementsHidden
+      >
+        {[
+          { n: progress.completed, label: 'прошли', color: colors.success },
+          { n: started, label: 'начали', color: colors.warning },
+          { n: none, label: 'не открывали', color: colors.surfaceMuted },
+        ].map(({ n, label, color }, i) => (
+          <View key={label} style={styles.setStatusCount}>
+            <View
+              style={[
+                styles.setStatusDot,
+                { backgroundColor: color },
+                i === 2 && { borderWidth: 1, borderColor: colors.border },
+              ]}
+            />
+            <Text variant="caption" style={[styles.tabular, { color: colors.textSecondary }]}>
+              {`${label} ${n}`}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </>
   );
 }

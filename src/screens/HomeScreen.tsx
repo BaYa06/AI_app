@@ -134,6 +134,7 @@ import { SetsSectionHeader } from './home/components/SetsSectionHeader';
 import { HomeHeader } from './home/components/HomeHeader';
 import { TeacherBanner } from './home/components/TeacherBanner';
 import { TeacherLessonCard } from './home/components/TeacherLessonCard';
+import { useTeacherCourseData } from './home/useTeacherCourseData';
 
 export function HomeScreen({ navigation, route }: any) {
   const colors = useThemeColors();
@@ -218,9 +219,12 @@ export function HomeScreen({ navigation, route }: any) {
   const [addByLinkVisible, setAddByLinkVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Потянуть вниз — подтянуть изменения в курсах учителя (новые наборы, карточки, юниты)
+  // Потянуть вниз — подтянуть изменения в курсах учителя (новые наборы, карточки, юниты),
+  // а у учителя в своём курсе — ещё учеников и прогресс группы (Teacher 5)
+  const [teacherRefreshTick, setTeacherRefreshTick] = useState(0);
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
+    setTeacherRefreshTick((t) => t + 1);
     try {
       await DatabaseService.syncStudentCourses();
     } finally {
@@ -1137,6 +1141,12 @@ export function HomeScreen({ navigation, route }: any) {
     return course.title || 'Курс';
   }, [isTeacher, activeCourseId, courses]);
 
+  // Ученики и прогресс группы по наборам — для карточки урока и строк наборов (Teacher 4–5)
+  const teacherCourse = useTeacherCourseData(
+    teacherCourseTitle !== null ? activeCourseId : null,
+    teacherRefreshTick
+  );
+
   const openLeaderboard = useCallback(
     (week: 'current' | 'previous') => {
       if (!activeCourseId) return;
@@ -1585,6 +1595,7 @@ export function HomeScreen({ navigation, route }: any) {
         courseId={activeCourseId}
         courseTitle={teacherCourseTitle}
         navigation={navigation}
+        courseMembers={teacherCourse.members}
       />
     ) : (
       <TeacherBanner
@@ -1810,6 +1821,14 @@ export function HomeScreen({ navigation, route }: any) {
                       reviewStats={reviewStats}
                       setSetMenuTarget={setSetMenuTarget}
                       navigation={navigation}
+                      groupProgress={
+                        teacherCourse.members?.length && teacherCourse.setProgress?.[set.id]
+                          ? {
+                              total: teacherCourse.members.length,
+                              ...teacherCourse.setProgress[set.id],
+                            }
+                          : null
+                      }
                     />
                   ))}
                   {/* Создание набора — в конце списка, у самих наборов (plan/done/home_redesign.md, 4.2) */}

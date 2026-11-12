@@ -7,7 +7,7 @@
  * Макет (флаг TEACHER_HOMEWORK_ENABLED, в проде false): блок задания — «Задания пока нет»
  * или «Сдали N из M». Пока сервера заданий нет, `homework` всегда null.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -32,6 +32,7 @@ import { getNextLesson, type ScheduleItem } from '@/utils/nextLesson';
 import { pluralize } from '@/utils';
 import { getStudentStatus } from '@/screens/teacherCourseStats/helpers';
 import { TestLobbySheet } from '@/screens/teacherCourseStats/TestLobbySheet';
+import type { TeacherCourseMember } from '../useTeacherCourseData';
 
 /** Сводка задания для карточки — придёт с сервера на этапе 2 */
 export interface TeacherHomeworkSummary {
@@ -48,15 +49,14 @@ type Props = {
   courseId: string;
   courseTitle: string;
   navigation: any;
+  /** Ученики курса из useTeacherCourseData; null — ещё грузятся или не загрузились */
+  courseMembers: TeacherCourseMember[] | null;
   /** Этап 2. До него всегда null, блок виден только при TEACHER_HOMEWORK_ENABLED */
   homework?: TeacherHomeworkSummary | null;
   onAssignHomework?: () => void;
   onCheckHomework?: () => void;
   onHomeworkStatus?: () => void;
 };
-
-type InactiveStudent = { id: string; name: string; lastActiveDate: string | null };
-type Members = { total: number; inactive: InactiveStudent[] } | null;
 
 /** «Batyrov Batyr» → «Batyrov B.»; одно слово — как есть */
 const shortName = (name: string) => {
@@ -69,13 +69,13 @@ export function TeacherLessonCard({
   courseId,
   courseTitle,
   navigation,
+  courseMembers,
   homework = null,
   onAssignHomework,
   onCheckHomework,
   onHomeworkStatus,
 }: Props) {
   const [schedule, setSchedule] = useState<ScheduleItem[] | null | undefined>(undefined);
-  const [members, setMembers] = useState<Members>(null);
   const [scheduleSheet, setScheduleSheet] = useState(false);
   const [codeDialog, setCodeDialog] = useState(false);
   const [testSheet, setTestSheet] = useState(false);
@@ -89,27 +89,21 @@ export function TeacherLessonCard({
 
   useEffect(() => {
     setSchedule(undefined);
-    setMembers(null);
     setRemindedToday(false);
     loadSchedule();
-    let cancelled = false;
-    NeonService.loadCourseMembers(courseId)
-      .then((list) => {
-        if (cancelled) return;
-        // Дольше всех не заходил — первым; ни разу не заходил — в самом начале
-        const inactive = list
-          .filter((m) => getStudentStatus(m.lastActiveDate) === 'inactive')
-          .map((m) => ({ id: m.id, name: m.displayName, lastActiveDate: m.lastActiveDate }))
-          .sort((a, b) => (a.lastActiveDate ?? '').localeCompare(b.lastActiveDate ?? ''));
-        setMembers({ total: list.length, inactive });
-      })
-      .catch(() => {
-        // Нет данных об учениках — строку просто не показываем, урок и расписание остаются
-      });
-    return () => {
-      cancelled = true;
-    };
   }, [courseId, loadSchedule]);
+
+  // Дольше всех не заходил — первым; ни разу не заходил — в самом начале
+  const members = useMemo(
+    () =>
+      courseMembers && {
+        total: courseMembers.length,
+        inactive: courseMembers
+          .filter((m) => getStudentStatus(m.lastActiveDate) === 'inactive')
+          .sort((a, b) => (a.lastActiveDate ?? '').localeCompare(b.lastActiveDate ?? '')),
+      },
+    [courseMembers]
+  );
 
   const openCourse = () => {
     const rootNav = navigation?.getParent?.() ?? navigation;
