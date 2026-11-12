@@ -8,7 +8,7 @@ import { log } from './_log.js';
  */
 // schema_039: в 038 (official_sets_guard) и 039 (set_kind) версию не подняли — миграции не выполнились,
 // и запросы с card_sets.kind падали на тестовом сервере (plan/new/set_kind.md, слабые места)
-const SCHEMA_VERSION = 'schema_040';
+const SCHEMA_VERSION = 'schema_041';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -805,6 +805,68 @@ async function applyMigrations(sql) {
       ON CONFLICT (subject_id, key) DO NOTHING`;
   } catch (e) {
     log.error('db-init', 'Migration 040_library_catalog failed', e);
+  }
+
+  // Migration 041: задания учителя (plan/new/teacher_cabinet.md, Teacher 14). Задание — снимок списка
+  // слов; «сдано» — вариант Б (слово засчитано после законченной сессии). Только новые таблицы —
+  // старые версии приложения их не замечают. Комментарии — database/migrations/041_homework.sql.
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS homework (
+        id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        course_id   UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        created_by  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title       TEXT NOT NULL,
+        card_ids    UUID[] NOT NULL,
+        kind        TEXT NOT NULL DEFAULT 'learn',
+        due_at      TIMESTAMPTZ NOT NULL,
+        min_score   SMALLINT,
+        assign_all  BOOLEAN NOT NULL DEFAULT true,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        canceled_at TIMESTAMPTZ
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_homework_course ON homework(course_id, due_at) WHERE canceled_at IS NULL`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS homework_assignees (
+        homework_id UUID NOT NULL REFERENCES homework(id) ON DELETE CASCADE,
+        user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        PRIMARY KEY (homework_id, user_id)
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_homework_assignees_user ON homework_assignees(user_id)`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS homework_credits (
+        homework_id       UUID NOT NULL REFERENCES homework(id) ON DELETE CASCADE,
+        user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        card_id           UUID NOT NULL,
+        credited_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        first_try_correct BOOLEAN NOT NULL,
+        PRIMARY KEY (homework_id, user_id, card_id)
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_homework_credits_user ON homework_credits(user_id)`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS homework_results (
+        homework_id  UUID NOT NULL REFERENCES homework(id) ON DELETE CASCADE,
+        user_id      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        late         BOOLEAN NOT NULL,
+        score        SMALLINT NOT NULL,
+        diamonds     SMALLINT NOT NULL DEFAULT 0,
+        PRIMARY KEY (homework_id, user_id)
+      )
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS homework_reminders (
+        homework_id UUID NOT NULL REFERENCES homework(id) ON DELETE CASCADE,
+        user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        sent_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (homework_id, user_id)
+      )
+    `;
+  } catch (e) {
+    log.error('db-init', 'Migration 041_homework failed', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)

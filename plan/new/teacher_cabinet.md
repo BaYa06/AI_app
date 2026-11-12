@@ -283,8 +283,8 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
 7. **Пуш накануне срока идёт всегда** (кому не сдано); переключатель «Напомнить отстающим» (11)
    не делаем.
 9. **Работа шагами 13–29 — без команды на каждый шаг** (разрешено 12.11.2026): коммит «Teacher N»
-   в dev после type-check 0 / тестов / eslint, **без push**. Остановки: перед применением схемы
-   Teacher 14 на staging, при расхождении кода с планом. Swift (20, 23) — только `swiftc -parse`.
+   в dev после type-check 0 / тестов / eslint, **без push**. Остановка — только при расхождении
+   кода с планом; результат этапа показать целиком после Teacher 29. Swift (20, 23) — только `swiftc -parse`.
 8. **Окна 11а «Выбор слов» и 12а «Кто не сдал»** — по макету (дорисованы 12.11.2026).
 
 ### Шаги этапа 2
@@ -298,7 +298,9 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
 - [x] **Teacher 13. Токен `homework` и решения.** ✅ `homework` (рамка, полоска, фон `alpha 10`),
   `homeworkText` (подписи «до: …»), `homeworkFill` (#B45309 в обеих темах — под белый текст и иконку)
   в [colors.ts](src/constants/colors.ts). Решения этапа 2 записаны выше.
-- [ ] **Teacher 14. Таблицы (staging).** В [_db-init.js](api/_db-init.js):
+- [x] **Teacher 14. Таблицы (staging).** ✅ Миграция 041 (`schema_041`) в [_db-init.js](api/_db-init.js) +
+  `database/migrations/041_homework.sql`; добавлена `homework_reminders` (анти-спам «Напомнить»).
+  На staging применится сама после push в dev.
   - `homework`: `id`, `course_id`, `created_by`, `title`, `card_ids UUID[]`, `kind` ('learn'),
     `due_at TIMESTAMPTZ`, `min_score SMALLINT NULL` (порог, NULL = без порога), `assign_all BOOLEAN`,
     `created_at`, `canceled_at`.
