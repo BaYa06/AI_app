@@ -18,6 +18,7 @@ import type { ScheduleItem } from '@/utils/nextLesson';
 import { pluralize } from '@/utils';
 import { DueWheelPicker } from './DueWheelPicker';
 import { WordPickerSheet } from './WordPickerSheet';
+import { isNativeNewHomeworkSheet, useNativeNewHomeworkSheet } from './nativeNewHomeworkSheet';
 import {
   DEFAULT_MIN_SCORE,
   NEW_HOMEWORK_TEXTS as T,
@@ -50,8 +51,10 @@ export interface NewHomeworkSheetProps {
 
 type Task = 'learn' | 'test' | 'hard';
 
-/** iOS-версия на Swift подключается в Teacher 20; пока везде RN-окно */
+/** iOS — Swift-окно (nativeNewHomeworkSheet.ts), Android, веб и сборки без модуля — RN-окно */
 export function NewHomeworkSheet(props: NewHomeworkSheetProps) {
+  useNativeNewHomeworkSheet(props);
+  if (isNativeNewHomeworkSheet) return null;
   return <NewHomeworkSheetRN {...props} />;
 }
 

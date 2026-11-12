@@ -238,7 +238,7 @@ export function WordPickerSheetRN({
   );
 }
 
-/** iOS-версия на Swift подключается в Teacher 20; пока везде RN-окно */
+/** На iOS выбор слов — второй лист Swift-окна «Новое задание» (NewHomeworkSheet.swift) */
 export function WordPickerSheet(props: WordPickerSheetProps) {
   return <WordPickerSheetRN {...props} />;
 }

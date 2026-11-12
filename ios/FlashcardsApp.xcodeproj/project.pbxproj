@@ -14,6 +14,8 @@
 		5C3D2A1E9B7F40A1C6E8D202 /* StudyModeSheet.m in Sources */ = {isa = PBXBuildFile; fileRef = 5C3D2A1E9B7F40A1C6E8D204 /* StudyModeSheet.m */; };
 		7B4E2C1A9D3F40B2A1C6E701 /* NewCourseSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B4E2C1A9D3F40B2A1C6E703 /* NewCourseSheet.swift */; };
 		7B4E2C1A9D3F40B2A1C6E702 /* NewCourseSheet.m in Sources */ = {isa = PBXBuildFile; fileRef = 7B4E2C1A9D3F40B2A1C6E704 /* NewCourseSheet.m */; };
+		9C5F3D2B8E4A41C3B2D7F801 /* NewHomeworkSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C5F3D2B8E4A41C3B2D7F803 /* NewHomeworkSheet.swift */; };
+		9C5F3D2B8E4A41C3B2D7F802 /* NewHomeworkSheet.m in Sources */ = {isa = PBXBuildFile; fileRef = 9C5F3D2B8E4A41C3B2D7F804 /* NewHomeworkSheet.m */; };
 		8C5F3D2B0E4A41C3B2D7F801 /* JoinCodeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C5F3D2B0E4A41C3B2D7F803 /* JoinCodeSheet.swift */; };
 		8C5F3D2B0E4A41C3B2D7F802 /* JoinCodeSheet.m in Sources */ = {isa = PBXBuildFile; fileRef = 8C5F3D2B0E4A41C3B2D7F804 /* JoinCodeSheet.m */; };
 		9D6A4E3C1F5B42D4C3E8A901 /* TestTypeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D6A4E3C1F5B42D4C3E8A905 /* TestTypeSheet.swift */; };
@@ -87,6 +89,8 @@
 		5C3D2A1E9B7F40A1C6E8D204 /* StudyModeSheet.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlashcardsApp/StudyModeSheet.m; sourceTree = "<group>"; };
 		7B4E2C1A9D3F40B2A1C6E703 /* NewCourseSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/NewCourseSheet.swift; sourceTree = "<group>"; };
 		7B4E2C1A9D3F40B2A1C6E704 /* NewCourseSheet.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlashcardsApp/NewCourseSheet.m; sourceTree = "<group>"; };
+		9C5F3D2B8E4A41C3B2D7F803 /* NewHomeworkSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/NewHomeworkSheet.swift; sourceTree = "<group>"; };
+		9C5F3D2B8E4A41C3B2D7F804 /* NewHomeworkSheet.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlashcardsApp/NewHomeworkSheet.m; sourceTree = "<group>"; };
 		8C5F3D2B0E4A41C3B2D7F803 /* JoinCodeSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/JoinCodeSheet.swift; sourceTree = "<group>"; };
 		8C5F3D2B0E4A41C3B2D7F804 /* JoinCodeSheet.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlashcardsApp/JoinCodeSheet.m; sourceTree = "<group>"; };
 		9D6A4E3C1F5B42D4C3E8A905 /* TestTypeSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/TestTypeSheet.swift; sourceTree = "<group>"; };
@@ -179,6 +183,8 @@
 				5C3D2A1E9B7F40A1C6E8D204 /* StudyModeSheet.m */,
 				7B4E2C1A9D3F40B2A1C6E703 /* NewCourseSheet.swift */,
 				7B4E2C1A9D3F40B2A1C6E704 /* NewCourseSheet.m */,
+				9C5F3D2B8E4A41C3B2D7F803 /* NewHomeworkSheet.swift */,
+				9C5F3D2B8E4A41C3B2D7F804 /* NewHomeworkSheet.m */,
 				8C5F3D2B0E4A41C3B2D7F803 /* JoinCodeSheet.swift */,
 				8C5F3D2B0E4A41C3B2D7F804 /* JoinCodeSheet.m */,
 				9D6A4E3C1F5B42D4C3E8A905 /* TestTypeSheet.swift */,
@@ -486,6 +492,8 @@
 				5C3D2A1E9B7F40A1C6E8D202 /* StudyModeSheet.m in Sources */,
 				7B4E2C1A9D3F40B2A1C6E701 /* NewCourseSheet.swift in Sources */,
 				7B4E2C1A9D3F40B2A1C6E702 /* NewCourseSheet.m in Sources */,
+				9C5F3D2B8E4A41C3B2D7F801 /* NewHomeworkSheet.swift in Sources */,
+				9C5F3D2B8E4A41C3B2D7F802 /* NewHomeworkSheet.m in Sources */,
 				8C5F3D2B0E4A41C3B2D7F801 /* JoinCodeSheet.swift in Sources */,
 				8C5F3D2B0E4A41C3B2D7F802 /* JoinCodeSheet.m in Sources */,
 				9D6A4E3C1F5B42D4C3E8A901 /* TestTypeSheet.swift in Sources */,

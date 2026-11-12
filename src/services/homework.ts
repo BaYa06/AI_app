@@ -96,8 +96,8 @@ export const HOMEWORK_MANY_WORDS = 30;
 /** «Взять 25» в плашке «Много к сроку» */
 export const HOMEWORK_PART_WORDS = 25;
 /** Объём: 5 слов и ~7 минут на сессию (план, «48 слов ≈ 10 сессий ≈ 70 мин») */
-const WORDS_PER_SESSION = 5;
-const MINUTES_PER_SESSION = 7;
+export const WORDS_PER_SESSION = 5;
+export const MINUTES_PER_SESSION = 7;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

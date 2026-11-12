@@ -366,7 +366,11 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
   из строки «Слова» окна «Новое задание». Макет 11а: поиск, наборы курса с галочкой
   (все / часть / ни одного), раскрытие набора со словами, итог «Выбрано N слов · ≈ сессий · ≈ мин»,
   больше 30 слов — плашка «Много к сроку… Взять 25».
-- [ ] **Teacher 20. «Новое задание» + «Выбор слов» — Swift (iOS).** `NewHomeworkSheet.swift`,
+- [x] **Teacher 20. «Новое задание» + «Выбор слов» — Swift (iOS).** ✅ Один модуль `NewHomeworkSheet.swift` + `.m`
+  (в project.pbxproj): форма и «Слова для задания» — вторым листом из SwiftUI `.sheet`; срок —
+  `UIDatePicker` `.wheels` (дата + время, шаг 5 мин, быстрые варианты докручивают барабан). Обёртка
+  `nativeNewHomeworkSheet.ts` (тексты и формы слов — `NATIVE_HOMEWORK_TEXTS`). **Проверено только
+  `swiftc -parse`** — сборка и устройство через TestFlight. Было в плане: `NewHomeworkSheet.swift`,
   `WordPickerSheet.swift` + `.m`, обёртки `native…Sheet.ts`; срок — SwiftUI `DatePicker` `.wheel`
   (дата + время, шаг 5 мин). Тексты и цвета из JS, события `create` / `pickWords` / `done` / `dismiss`.
 - [ ] **Teacher 21. Экран сдачи (12).** Новый экран `TeacherHomeworkScreen`: кольцо «сдали /
