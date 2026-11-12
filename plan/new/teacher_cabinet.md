@@ -187,7 +187,9 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
   - «Ученики (N)» — как сейчас.
   - «Наборы курса» ([CourseSetsList.tsx](src/screens/teacherCourseStats/CourseSetsList.tsx)): полоска
     «прошли / начали / не открывали» и строка с цифрами, данные те же (`course-set-stats`).
-- [ ] **Teacher 9. «Код подключения» — логика и RN-окно (Android, веб).**
+- [x] **Teacher 9. «Код подключения» — логика и RN-окно (Android, веб).** ✅ Логика —
+  `teacher/useCourseJoinCode.ts` (+ тесты), тексты `JOIN_CODE_TEXTS`; ошибка обновления кода —
+  строкой в окне (тост под нативным листом не виден).
   ([CourseJoinCodeDialog.tsx](src/components/CourseJoinCodeDialog.tsx))
   - Как сейчас: код, «Копировать», «Поделиться», «Обновить код подключения».
   - Новое: «В курсе N учеников» и последние подключившиеся по `joinedAt` из `list-members`.

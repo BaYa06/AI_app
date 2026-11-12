@@ -2,25 +2,27 @@
  * CourseJoinCodeDialog — код подключения к курсу для учителя.
  * Код берётся тем же способом, что в «Пригласить учеников» на главной
  * (createCourseInvite / regenerateCourseInvite).
+ *
+ * plan/new/teacher_cabinet.md, Teacher 9–10: логика — useCourseJoinCode (общая), плюс «В курсе
+ * N учеников» и последние подключившиеся. iOS — нативный лист (JoinCodeSheet.swift), Android
+ * и веб — этот RN-диалог.
  */
-import React, { useCallback, useEffect, useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  Pressable,
-  ActivityIndicator,
-  Platform,
-  Clipboard,
-  Share,
-} from 'react-native';
+import React from 'react';
+import { View, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { Check, X } from 'lucide-react-native';
 import { Text } from '@/components/common';
-import { Button, Dialog, confirmDialog, toast } from '@/components/ui';
+import { Button, Dialog, confirmDialog } from '@/components/ui';
 import { useThemeColors } from '@/store';
 import { alpha, borderRadius, iconSize, spacing } from '@/constants';
-import { NeonService } from '@/services/NeonService';
-import { getSession } from '@/services/auth/session';
-import { log } from '@/utils/logger';
+import {
+  JOIN_CODE_TEXTS as T,
+  membersCountLabel,
+  useCourseJoinCode,
+} from '@/components/teacher/useCourseJoinCode';
+import {
+  isNativeJoinCodeSheet,
+  useNativeJoinCodeSheet,
+} from '@/components/teacher/nativeJoinCodeSheet';
 
 interface CourseJoinCodeDialogProps {
   visible: boolean;
@@ -29,90 +31,39 @@ interface CourseJoinCodeDialogProps {
   onClose: () => void;
 }
 
-function copyToClipboard(text: string) {
-  if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
-    navigator.clipboard.writeText(text);
-  } else {
-    Clipboard.setString(text);
-  }
+export function CourseJoinCodeDialog(props: CourseJoinCodeDialogProps) {
+  const joinCode = useCourseJoinCode(props.visible, props.courseId, props.courseTitle);
+  useNativeJoinCodeSheet({ visible: props.visible, onClose: props.onClose, ...joinCode });
+  if (isNativeJoinCodeSheet) return null;
+  return <CourseJoinCodeDialogRN {...props} {...joinCode} />;
 }
 
-export function CourseJoinCodeDialog({
+function CourseJoinCodeDialogRN({
   visible,
-  courseId,
-  courseTitle,
   onClose,
-}: CourseJoinCodeDialogProps) {
+  state,
+  copy,
+  share,
+  regenerate,
+}: CourseJoinCodeDialogProps & ReturnType<typeof useCourseJoinCode>) {
   const colors = useThemeColors();
-  const [joinCode, setJoinCode] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [regenerating, setRegenerating] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const { code, loading, regenerating, copied, error, membersCount, recent } = state;
 
-  useEffect(() => {
-    if (!visible) return;
-    let mounted = true;
-    setCopied(false);
-    setJoinCode(null);
-    setLoading(true);
-    (async () => {
-      try {
-        const authSession = await getSession();
-        const userId = authSession?.user?.id;
-        const result = userId ? await NeonService.createCourseInvite(courseId, userId) : null;
-        if (mounted) setJoinCode(result?.joinCode ?? null);
-      } catch (e) {
-        log.error('CourseJoinCodeDialog', 'Failed to create invite', e);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [visible, courseId]);
-
-  const handleCopy = useCallback(() => {
-    if (!joinCode) return;
-    copyToClipboard(joinCode);
-    setCopied(true);
-  }, [joinCode]);
-
-  const handleShare = useCallback(async () => {
-    if (!joinCode) return;
-    const course = courseTitle ? ` «${courseTitle}»` : '';
-    try {
-      await Share.share({
-        message: `Присоединяйся к курсу${course} во Flashly — код подключения: ${joinCode}`,
-      });
-    } catch {}
-  }, [joinCode, courseTitle]);
-
-  const handleRegenerate = useCallback(async () => {
+  const handleRegenerate = async () => {
     const confirmed = await confirmDialog({
-      title: 'Обновить код подключения?',
-      message:
-        'Старые ссылка и код перестанут работать — ученики, у которых они есть, больше не смогут по ним присоединиться.',
-      confirmText: 'Обновить',
+      title: T.regenerateTitle,
+      message: T.regenerateMessage,
+      confirmText: T.regenerateConfirm,
       destructive: true,
     });
-    if (!confirmed) return;
-    setRegenerating(true);
-    setCopied(false);
-    try {
-      const result = await NeonService.regenerateCourseInvite(courseId);
-      if (result) setJoinCode(result.joinCode);
-      else toast.error('Не удалось обновить код подключения');
-    } finally {
-      setRegenerating(false);
-    }
-  }, [courseId]);
+    if (confirmed) regenerate();
+  };
 
   return (
     <Dialog
       visible={visible}
       onClose={onClose}
-      title="Код подключения к курсу"
+      title={T.title}
       headerRight={
         <Button
           variant="icon"
@@ -120,62 +71,96 @@ export function CourseJoinCodeDialog({
           background="none"
           iconSize={iconSize.s}
           iconColor={colors.textSecondary}
-          accessibilityLabel="Закрыть"
+          accessibilityLabel={T.close}
           onPress={onClose}
         />
       }
     >
       <Text variant="bodySmall" style={[styles.description, { color: colors.textSecondary }]}>
-        Ученик вводит этот код в приложении, чтобы присоединиться к курсу.
+        {T.description}
       </Text>
 
       {loading ? (
         <ActivityIndicator size="small" color={colors.primary} style={styles.spinner} />
-      ) : joinCode ? (
+      ) : code ? (
         <>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`Код курса ${joinCode.split('').join(' ')}. Нажми, чтобы скопировать`}
+            accessibilityLabel={`Код курса ${code.split('').join(' ')}. ${T.codeHint}`}
             style={[
               styles.codeBox,
               { backgroundColor: colors.surfaceMuted, borderColor: alpha(colors.primary, 40) },
             ]}
-            onPress={handleCopy}
+            onPress={copy}
           >
             <Text variant="h1" style={[styles.code, { color: colors.primary }]}>
-              {joinCode}
+              {code}
             </Text>
           </Pressable>
 
           <View style={styles.buttons}>
             <Button
-              title={copied ? 'Скопировано' : 'Копировать'}
+              title={copied ? T.copied : T.copy}
               icon={copied ? Check : undefined}
-              onPress={handleCopy}
+              onPress={copy}
               style={styles.flex1}
             />
-            <Button
-              variant="secondary"
-              title="Поделиться"
-              onPress={handleShare}
-              style={styles.flex1}
-            />
+            <Button variant="secondary" title={T.share} onPress={share} style={styles.flex1} />
           </View>
 
           <Button
             variant="quiet"
             tone="secondary"
-            title="Обновить код подключения"
+            title={T.regenerate}
             onPress={handleRegenerate}
             loading={regenerating}
             fullWidth
             style={styles.regenerate}
           />
+          {error && (
+            <Text variant="bodySmall" align="center" style={{ color: colors.errorText }}>
+              {error}
+            </Text>
+          )}
         </>
       ) : (
         <Text variant="bodySmall" style={{ color: colors.errorText }}>
-          Не удалось получить код
+          {T.failed}
         </Text>
+      )}
+
+      {/* Кто в курсе (Teacher 9) */}
+      {membersCount !== null && (
+        <View style={[styles.members, { borderTopColor: colors.border }]}>
+          <Text variant="label" style={{ color: colors.textPrimary }}>
+            {membersCountLabel(membersCount)}
+          </Text>
+          {recent.length === 0 ? (
+            <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
+              {T.noStudents}
+            </Text>
+          ) : (
+            <>
+              <Text variant="caption" style={{ color: colors.textSecondary }}>
+                {T.recentTitle}
+              </Text>
+              {recent.map((j, i) => (
+                <View key={`${j.name}-${i}`} style={styles.joinerRow}>
+                  <Text
+                    variant="bodySmall"
+                    numberOfLines={1}
+                    style={[styles.flex1, { color: colors.textPrimary }]}
+                  >
+                    {j.name}
+                  </Text>
+                  <Text variant="caption" style={{ color: colors.textSecondary }}>
+                    {j.date}
+                  </Text>
+                </View>
+              ))}
+            </>
+          )}
+        </View>
       )}
     </Dialog>
   );
@@ -207,5 +192,16 @@ const styles = StyleSheet.create({
   },
   regenerate: {
     marginTop: spacing.s,
+  },
+  members: {
+    borderTopWidth: 1,
+    marginTop: spacing.m,
+    paddingTop: spacing.m,
+    gap: spacing.xxs,
+  },
+  joinerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
   },
 });
