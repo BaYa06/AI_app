@@ -16,7 +16,7 @@ import {
   MIN_MINUTES,
   STEP_MIN,
   toTime,
-} from '@/components/push/CourseScheduleSheet';
+} from '@/components/push/courseSchedule';
 import type { Course } from '@/types';
 import {
   NEW_COURSE_SEARCH_FROM,

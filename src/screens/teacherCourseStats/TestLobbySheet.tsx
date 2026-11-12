@@ -3,6 +3,7 @@
  * (Clean 8 — вынесено из TeacherCourseStatsScreen.tsx без изменений разметки.)
  * Teacher 3 (plan/new/teacher_cabinet.md): шторка только сообщает выбор (`onSelect`), переход делает
  * тот, кто её открыл, — главная учителя или страница курса.
+ * Teacher 11: на iOS — нативный лист (TestTypeSheet.swift, nativeTestTypeSheet.ts), здесь — Android и веб.
  */
 import React from 'react';
 import { View, Pressable, Modal } from 'react-native';
@@ -11,6 +12,8 @@ import { Text } from '@/components/common';
 import { useThemeColors } from '@/store';
 import { alpha } from '@/constants';
 import { styles } from './styles';
+import { isNativeTestTypeSheet, useNativeTestTypeSheet } from './nativeTestTypeSheet';
+import { TEST_TYPE_TEXTS, type TestKind } from './testType';
 import type { EdgeInsets } from 'react-native-safe-area-context';
 
 type Props = {
@@ -21,9 +24,19 @@ type Props = {
   onSelect: (kind: TestKind) => void;
 };
 
-export type TestKind = 'exam' | 'oral';
+export type { TestKind };
 
-export function TestLobbySheet({ colors, insets, lobbyModal, setLobbyModal, onSelect }: Props) {
+export function TestLobbySheet(props: Props) {
+  useNativeTestTypeSheet({
+    visible: props.lobbyModal,
+    onClose: () => props.setLobbyModal(false),
+    onSelect: props.onSelect,
+  });
+  if (isNativeTestTypeSheet) return null;
+  return <TestLobbySheetRN {...props} />;
+}
+
+function TestLobbySheetRN({ colors, insets, lobbyModal, setLobbyModal, onSelect }: Props) {
   return (
     <Modal
       visible={lobbyModal}
@@ -48,7 +61,9 @@ export function TestLobbySheet({ colors, insets, lobbyModal, setLobbyModal, onSe
           onPress={() => {}}
         >
           <View style={[styles.sheetHandle, { backgroundColor: alpha(colors.textTertiary, 40) }]} />
-          <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>Выбери тип теста</Text>
+          <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>
+            {TEST_TYPE_TEXTS.title}
+          </Text>
 
           {/* Exam option */}
           <Pressable
@@ -70,9 +85,11 @@ export function TestLobbySheet({ colors, insets, lobbyModal, setLobbyModal, onSe
               <FileText size={20} color={colors.onPrimary} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.sheetOptionTitle, { color: colors.textPrimary }]}>Экзамен</Text>
+              <Text style={[styles.sheetOptionTitle, { color: colors.textPrimary }]}>
+                {TEST_TYPE_TEXTS.examTitle}
+              </Text>
               <Text style={[styles.sheetOptionDesc, { color: colors.textSecondary }]}>
-                Письменный тест с вопросами
+                {TEST_TYPE_TEXTS.examDescription}
               </Text>
             </View>
             <ArrowLeft
@@ -103,10 +120,10 @@ export function TestLobbySheet({ colors, insets, lobbyModal, setLobbyModal, onSe
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.sheetOptionTitle, { color: colors.textPrimary }]}>
-                Устный тренажёр
+                {TEST_TYPE_TEXTS.oralTitle}
               </Text>
               <Text style={[styles.sheetOptionDesc, { color: colors.textSecondary }]}>
-                Тренировка произношения — результат не сохраняется
+                {TEST_TYPE_TEXTS.oralDescription}
               </Text>
             </View>
             <ArrowLeft

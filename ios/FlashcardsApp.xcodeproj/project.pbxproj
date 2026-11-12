@@ -16,6 +16,10 @@
 		7B4E2C1A9D3F40B2A1C6E702 /* NewCourseSheet.m in Sources */ = {isa = PBXBuildFile; fileRef = 7B4E2C1A9D3F40B2A1C6E704 /* NewCourseSheet.m */; };
 		8C5F3D2B0E4A41C3B2D7F801 /* JoinCodeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C5F3D2B0E4A41C3B2D7F803 /* JoinCodeSheet.swift */; };
 		8C5F3D2B0E4A41C3B2D7F802 /* JoinCodeSheet.m in Sources */ = {isa = PBXBuildFile; fileRef = 8C5F3D2B0E4A41C3B2D7F804 /* JoinCodeSheet.m */; };
+		9D6A4E3C1F5B42D4C3E8A901 /* TestTypeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D6A4E3C1F5B42D4C3E8A905 /* TestTypeSheet.swift */; };
+		9D6A4E3C1F5B42D4C3E8A902 /* TestTypeSheet.m in Sources */ = {isa = PBXBuildFile; fileRef = 9D6A4E3C1F5B42D4C3E8A906 /* TestTypeSheet.m */; };
+		9D6A4E3C1F5B42D4C3E8A903 /* ScheduleSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D6A4E3C1F5B42D4C3E8A907 /* ScheduleSheet.swift */; };
+		9D6A4E3C1F5B42D4C3E8A904 /* ScheduleSheet.m in Sources */ = {isa = PBXBuildFile; fileRef = 9D6A4E3C1F5B42D4C3E8A908 /* ScheduleSheet.m */; };
 		8B4E6D2F1A3C50B2D7F9E401 /* WhatsNewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B4E6D2F1A3C50B2D7F9E403 /* WhatsNewSheet.swift */; };
 		8B4E6D2F1A3C50B2D7F9E402 /* WhatsNewSheet.m in Sources */ = {isa = PBXBuildFile; fileRef = 8B4E6D2F1A3C50B2D7F9E404 /* WhatsNewSheet.m */; };
 		9D5F7E3A2B4C60C3E8A1F501 /* AppUpdateSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D5F7E3A2B4C60C3E8A1F503 /* AppUpdateSheet.swift */; };
@@ -85,6 +89,10 @@
 		7B4E2C1A9D3F40B2A1C6E704 /* NewCourseSheet.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlashcardsApp/NewCourseSheet.m; sourceTree = "<group>"; };
 		8C5F3D2B0E4A41C3B2D7F803 /* JoinCodeSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/JoinCodeSheet.swift; sourceTree = "<group>"; };
 		8C5F3D2B0E4A41C3B2D7F804 /* JoinCodeSheet.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlashcardsApp/JoinCodeSheet.m; sourceTree = "<group>"; };
+		9D6A4E3C1F5B42D4C3E8A905 /* TestTypeSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/TestTypeSheet.swift; sourceTree = "<group>"; };
+		9D6A4E3C1F5B42D4C3E8A906 /* TestTypeSheet.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlashcardsApp/TestTypeSheet.m; sourceTree = "<group>"; };
+		9D6A4E3C1F5B42D4C3E8A907 /* ScheduleSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/ScheduleSheet.swift; sourceTree = "<group>"; };
+		9D6A4E3C1F5B42D4C3E8A908 /* ScheduleSheet.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlashcardsApp/ScheduleSheet.m; sourceTree = "<group>"; };
 		8B4E6D2F1A3C50B2D7F9E403 /* WhatsNewSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/WhatsNewSheet.swift; sourceTree = "<group>"; };
 		8B4E6D2F1A3C50B2D7F9E404 /* WhatsNewSheet.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlashcardsApp/WhatsNewSheet.m; sourceTree = "<group>"; };
 		9D5F7E3A2B4C60C3E8A1F503 /* AppUpdateSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/AppUpdateSheet.swift; sourceTree = "<group>"; };
@@ -173,6 +181,10 @@
 				7B4E2C1A9D3F40B2A1C6E704 /* NewCourseSheet.m */,
 				8C5F3D2B0E4A41C3B2D7F803 /* JoinCodeSheet.swift */,
 				8C5F3D2B0E4A41C3B2D7F804 /* JoinCodeSheet.m */,
+				9D6A4E3C1F5B42D4C3E8A905 /* TestTypeSheet.swift */,
+				9D6A4E3C1F5B42D4C3E8A906 /* TestTypeSheet.m */,
+				9D6A4E3C1F5B42D4C3E8A907 /* ScheduleSheet.swift */,
+				9D6A4E3C1F5B42D4C3E8A908 /* ScheduleSheet.m */,
 				8B4E6D2F1A3C50B2D7F9E403 /* WhatsNewSheet.swift */,
 				8B4E6D2F1A3C50B2D7F9E404 /* WhatsNewSheet.m */,
 				9D5F7E3A2B4C60C3E8A1F503 /* AppUpdateSheet.swift */,
@@ -476,6 +488,10 @@
 				7B4E2C1A9D3F40B2A1C6E702 /* NewCourseSheet.m in Sources */,
 				8C5F3D2B0E4A41C3B2D7F801 /* JoinCodeSheet.swift in Sources */,
 				8C5F3D2B0E4A41C3B2D7F802 /* JoinCodeSheet.m in Sources */,
+				9D6A4E3C1F5B42D4C3E8A901 /* TestTypeSheet.swift in Sources */,
+				9D6A4E3C1F5B42D4C3E8A902 /* TestTypeSheet.m in Sources */,
+				9D6A4E3C1F5B42D4C3E8A903 /* ScheduleSheet.swift in Sources */,
+				9D6A4E3C1F5B42D4C3E8A904 /* ScheduleSheet.m in Sources */,
 				8B4E6D2F1A3C50B2D7F9E401 /* WhatsNewSheet.swift in Sources */,
 				8B4E6D2F1A3C50B2D7F9E402 /* WhatsNewSheet.m in Sources */,
 				9D5F7E3A2B4C60C3E8A1F501 /* AppUpdateSheet.swift in Sources */,

@@ -20,7 +20,7 @@ import {
   MIN_MINUTES,
   STEP_MIN,
   toTime,
-} from '@/components/push/CourseScheduleSheet';
+} from '@/components/push/courseSchedule';
 import type { Course } from '@/types';
 import type { BookListItem } from '@/types/books';
 import {

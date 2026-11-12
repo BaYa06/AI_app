@@ -200,7 +200,11 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
   алерт в Swift. Высота листа по содержимому (iOS 16+), на iOS 15 — `.medium()` / `.large()`.
   Проверено только `swiftc -parse` — сборка и устройство через TestFlight. `JoinCodeSheet.swift` + `.m`: лист `.medium()`,
   код крупно, «Копировать», «Поделиться», «Обновить код подключения», список подключившихся.
-- [ ] **Teacher 11. Окна курса на Swift: «Выбери тип теста» и «Расписание».**
+- [x] **Teacher 11. Окна курса на Swift: «Выбери тип теста» и «Расписание».** ✅
+  `TestTypeSheet.swift` + `nativeTestTypeSheet.ts` (тексты и тип — `testType.ts`);
+  `ScheduleSheet.swift` + `nativeScheduleSheet.ts` (время, тексты, загрузка и сохранение —
+  `push/courseSchedule.ts`, + тесты). Ошибка сохранения — строкой в листе, «Сохранено» — после закрытия.
+  Проверено только `swiftc -parse`.
   - `TestTypeSheet.swift`: Экзамен / Устный тренажёр → событие `select` → JS открывает
     `ExamLobby` / `OralTestLobby`. RN-шторка остаётся для Android и веба.
   - `ScheduleSheet.swift`: дни пн–вс, время, «Сохранить» / «Убрать расписание» → событие `save` →

@@ -2,6 +2,8 @@
  * CourseScheduleSheet — «Расписание занятий» курса для учителя (plan/new/push_notifications.md, 2.8)
  * @description Учитель указывает дни и время один раз — ученики курса получают «Скоро занятие:
  * повтори N слов курса» за 1–2 часа до начала. Одно время на все выбранные дни (так у большинства групп).
+ * Teacher 11 (plan/new/teacher_cabinet.md): на iOS — нативный лист (ScheduleSheet.swift,
+ * nativeScheduleSheet.ts), здесь — Android и веб. Время, тексты и сохранение — courseSchedule.ts.
  */
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
@@ -10,21 +12,21 @@ import { useThemeColors } from '@/store';
 import { Text } from '@/components/common';
 import { Button, Chip, Sheet, toast } from '@/components/ui';
 import { spacing } from '@/constants';
-import { NeonService } from '@/services/NeonService';
 import { WEEK_DAYS } from './AboutMeForm';
+import {
+  DEFAULT_MINUTES,
+  MAX_MINUTES,
+  MIN_MINUTES,
+  SCHEDULE_TEXTS as T,
+  STEP_MIN,
+  loadScheduleForm,
+  saveSchedule,
+  toTime,
+} from './courseSchedule';
+import { isNativeScheduleSheet, useNativeScheduleSheet } from './nativeScheduleSheet';
 
-// Шаг и границы времени занятия — общие с окном «Новый курс» (Teacher 6)
-export const STEP_MIN = 15;
-export const DEFAULT_MINUTES = 18 * 60;
-export const MIN_MINUTES = 7 * 60;
-export const MAX_MINUTES = 22 * 60;
-
-const pad = (n: number) => String(n).padStart(2, '0');
-export const toTime = (minutes: number) => `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
-const fromTime = (time: string) => {
-  const [h, m] = time.split(':').map(Number);
-  return h * 60 + m;
-};
+// Прежние экспорты — для тех, кто брал время отсюда
+export { STEP_MIN, DEFAULT_MINUTES, MIN_MINUTES, MAX_MINUTES, toTime } from './courseSchedule';
 
 interface Props {
   visible: boolean;
@@ -32,7 +34,13 @@ interface Props {
   onClose: () => void;
 }
 
-export function CourseScheduleSheet({ visible, courseId, onClose }: Props) {
+export function CourseScheduleSheet(props: Props) {
+  useNativeScheduleSheet(props);
+  if (isNativeScheduleSheet) return null;
+  return <CourseScheduleSheetRN {...props} />;
+}
+
+function CourseScheduleSheetRN({ visible, courseId, onClose }: Props) {
   const colors = useThemeColors();
   const [days, setDays] = useState<string[]>([]);
   const [minutes, setMinutes] = useState(DEFAULT_MINUTES);
@@ -42,11 +50,10 @@ export function CourseScheduleSheet({ visible, courseId, onClose }: Props) {
   useEffect(() => {
     if (!visible) return;
     setLoading(true);
-    NeonService.getCourseSchedule(courseId)
-      .then((schedule) => {
-        if (!schedule) return;
-        setDays(schedule.map((s) => s.day));
-        if (schedule[0]) setMinutes(fromTime(schedule[0].time));
+    loadScheduleForm(courseId)
+      .then((form) => {
+        setDays(form.days);
+        setMinutes(form.minutes);
       })
       .finally(() => setLoading(false));
   }, [visible, courseId]);
@@ -59,16 +66,13 @@ export function CourseScheduleSheet({ visible, courseId, onClose }: Props) {
   const handleSave = async () => {
     if (saving) return;
     setSaving(true);
-    const ok = await NeonService.setCourseSchedule(
-      courseId,
-      days.map((day) => ({ day, time: toTime(minutes) }))
-    );
+    const ok = await saveSchedule(courseId, days, minutes);
     setSaving(false);
     if (ok) {
-      toast.success(days.length ? 'Расписание сохранено' : 'Расписание убрано');
+      toast.success(days.length ? T.saved : T.removed);
       onClose();
     } else {
-      toast.error('Не удалось сохранить. Проверь интернет');
+      toast.error(T.saveFailed);
     }
   };
 
@@ -76,10 +80,10 @@ export function CourseScheduleSheet({ visible, courseId, onClose }: Props) {
     <Sheet
       visible={visible}
       onClose={onClose}
-      title="Расписание занятий"
+      title={T.title}
       footer={
         <Button
-          title={saving ? 'Сохранение…' : 'Сохранить'}
+          title={saving ? T.saving : T.save}
           onPress={handleSave}
           disabled={saving || loading}
           fullWidth
@@ -93,10 +97,10 @@ export function CourseScheduleSheet({ visible, courseId, onClose }: Props) {
       ) : (
         <View style={st.body}>
           <Text variant="body" color="secondary">
-            За 1–2 часа до занятия ученики получат напоминание повторить слова курса.
+            {T.description}
           </Text>
           <Text variant="label" color="secondary">
-            Дни занятий
+            {T.daysLabel}
           </Text>
           <View style={st.days}>
             {WEEK_DAYS.map((d) => (
@@ -109,19 +113,19 @@ export function CourseScheduleSheet({ visible, courseId, onClose }: Props) {
             ))}
           </View>
           <Text variant="label" color="secondary">
-            Начало занятия
+            {T.timeLabel}
           </Text>
           <View style={st.timeRow}>
             <Button
               variant="icon"
               icon={ChevronDown}
               background="none"
-              accessibilityLabel="Раньше на 15 минут"
+              accessibilityLabel={T.earlier}
               onPress={() => shift(-STEP_MIN)}
             />
             <Text
               variant="h2"
-              accessibilityLabel={`Начало в ${toTime(minutes)}`}
+              accessibilityLabel={`${T.startsAt} ${toTime(minutes)}`}
               style={{ color: colors.textPrimary }}
             >
               {toTime(minutes)}
@@ -130,12 +134,12 @@ export function CourseScheduleSheet({ visible, courseId, onClose }: Props) {
               variant="icon"
               icon={ChevronUp}
               background="none"
-              accessibilityLabel="Позже на 15 минут"
+              accessibilityLabel={T.later}
               onPress={() => shift(STEP_MIN)}
             />
           </View>
           <Text variant="caption" color="secondary">
-            Время — по часовому поясу курса
+            {T.timeHint}
           </Text>
         </View>
       )}
