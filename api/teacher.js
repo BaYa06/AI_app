@@ -28,6 +28,7 @@ import {
   courseActivityChart,
   courseSetStats,
   setHardCards,
+  courseHardCards,
   courseSetsByMembership,
 } from './_handlers/teacher/stats.js';
 import {
@@ -65,6 +66,7 @@ import {
  * GET  /api/teacher?action=course-activity-chart ?courseId=&days=
  * GET  /api/teacher?action=course-set-stats      ?courseId=
  * GET  /api/teacher?action=set-hard-cards        ?setId=&courseId=
+ * GET  /api/teacher?action=course-hard-cards     ?courseId=&days=14&limit=20 — трудные слова группы
  * GET  /api/teacher?action=course-sets-by-membership ?courseId= (ученик — курс, в котором состоит)
  * POST /api/teacher?action=remind-review       { courseId, studentId? } — пуш «повтори слова»
  *                                               (всему классу — не чаще раза в сутки)
@@ -116,6 +118,7 @@ export default async function handler(req, res) {
     if (action === 'course-activity-chart') return await courseActivityChart(req, res, sql, userId);
     if (action === 'course-set-stats') return await courseSetStats(req, res, sql, userId);
     if (action === 'set-hard-cards') return await setHardCards(req, res, sql, userId);
+    if (action === 'course-hard-cards') return await courseHardCards(req, res, sql, userId);
     if (action === 'course-sets-by-membership') {
       return await courseSetsByMembership(req, res, sql, userId);
     }

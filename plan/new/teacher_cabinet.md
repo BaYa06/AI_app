@@ -545,7 +545,9 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
 
 **Сервер**
 
-- [ ] **Teacher 33. Трудные слова курса.** `course-hard-cards` `{ courseId, days = 14, limit = 20 }`
+- [x] **Teacher 33. Трудные слова курса.** ✅ `courseHardCards` в `_handlers/teacher/stats.js`
+  (GET, `days` 1–90, `limit` 1–50, отклонённые ответы `rejected_reason` не считаются), тесты —
+  `api/__tests__/lessonPrep.test.js`. Задание: `course-hard-cards` `{ courseId, days = 14, limit = 20 }`
   в `api/teacher.js`: все наборы курса (`courseSetIdsSql`, юниты учебников тоже), ответы из `answers`
   учеников курса, правило — решение 4. Ответ: `cardId`, `front`, `back`, `setId`, название набора,
   `errorRate`, `wrongUsers`, `answers`. `set-hard-cards` не трогаем (им пользуется старый клиент).
