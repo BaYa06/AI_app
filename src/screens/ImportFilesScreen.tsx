@@ -407,7 +407,7 @@ export function ImportFilesScreen({ navigation, route }: Props) {
       const pairs = inputs.map((f) => parseWordTable(f.content || ''));
       if (pairs.every((p) => p !== null)) {
         const cards = pairs.flat() as Array<{ front: string; back: string }>;
-        navigation.navigate('PreviewImport', { cards, setId });
+        navigation.navigate('PreviewImport', { cards, setId, origin: 'file' });
         return;
       }
     }

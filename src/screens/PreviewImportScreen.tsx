@@ -541,6 +541,7 @@ export function PreviewImportScreen({ navigation, route }: Props) {
           languageFrom,
           languageTo,
           kind,
+          origin: route.params.origin ?? 'ai',
           courseId,
         });
         setModalVisible(false);
@@ -556,7 +557,7 @@ export function PreviewImportScreen({ navigation, route }: Props) {
         toast.error(describeError(e, 'Не удалось сохранить набор'));
       }
     },
-    [addSet, save]
+    [addSet, save, route.params.origin]
   );
 
   /** «Догенерировать»: примеры для уже добавленных карточек без них */

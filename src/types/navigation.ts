@@ -311,6 +311,8 @@ export type RootStackParamList = {
     /** Языки нового набора по умолчанию (ИИ определил, что слова на другом языке) */
     languageFrom?: string;
     languageTo?: string;
+    /** Откуда слова нового набора: таблица без ИИ — 'file'; по умолчанию 'ai' (Teacher 31) */
+    origin?: 'ai' | 'file';
     /** Чей черновик ИИ-импорта очистить после сохранения (по умолчанию — setId) */
     draftKey?: string;
   };

@@ -8,7 +8,7 @@ import { log } from './_log.js';
  */
 // schema_039: в 038 (official_sets_guard) и 039 (set_kind) версию не подняли — миграции не выполнились,
 // и запросы с card_sets.kind падали на тестовом сервере (plan/new/set_kind.md, слабые места)
-const SCHEMA_VERSION = 'schema_041';
+const SCHEMA_VERSION = 'schema_042';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -867,6 +867,14 @@ async function applyMigrations(sql) {
     `;
   } catch (e) {
     log.error('db-init', 'Migration 041_homework failed', e);
+  }
+
+  // Migration 042: откуда набор (plan/new/teacher_cabinet.md, Teacher 31): manual / ai / file /
+  // library / share, NULL у старых наборов. Только новая колонка — старые клиенты её не замечают.
+  try {
+    await sql`ALTER TABLE card_sets ADD COLUMN IF NOT EXISTS origin TEXT`;
+  } catch (e) {
+    log.error('db-init', 'Migration 042_set_origin failed', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)

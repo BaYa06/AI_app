@@ -20,10 +20,11 @@ import {
 } from 'lucide-react-native';
 import { formatDue } from '@/services/homework';
 import type { CardSet } from '@/types';
+import { SET_ORIGIN_LABEL, setOriginIcon } from '@/utils/setOrigin';
 import { Analytics } from '@/services/analytics';
 import { type LessonPlan } from '@/services/LessonService';
 import { StaggerCard } from '../StaggerCard';
-import { SHORT_MONTHS } from '../setsSort';
+import { SetOriginTile } from './SetOriginTile';
 import { styles } from '../styles';
 
 type Props = {
@@ -64,9 +65,8 @@ export function SetListItem({
   const statusLabel = groupProgress
     ? groupProgressLabel(groupProgress)
     : `учится ${learning}, знаю ${young}, выучено надолго ${mature}, новых ${fresh}`;
-  // Цвет набора — лёгким оттенком плитки даты: помогает узнать набор, но не спорит с «N ждут»
+  // Цвет набора — лёгким оттенком плитки значка: помогает узнать набор, но не спорит с «N ждут»
   const accentColor = getDeckAccentColor(set.id || index);
-  const created = new Date(set.createdAt);
   const waitingCount = reviewStats.waitingBySet[set.id] || 0;
   const cardsLabel = `${set.cardCount} ${pluralize(set.cardCount, 'карточка', 'карточки', 'карточек')}`;
   const showHidden = !!(set.isHiddenFromStudents && set.courseId && isTeacher);
@@ -98,21 +98,15 @@ export function SetListItem({
           waitingCount > 0 ? `${waitingCount} ждут повторения` : null,
           isFocus ? 'сейчас учишь' : null,
           homeworkDue ? `задание до ${formatDue(homeworkDue)}` : null,
+          SET_ORIGIN_LABEL[setOriginIcon(set)],
         ]
           .filter(Boolean)
           .join(', ')}
       >
-        {/* Строка набора (plan/done/home_redesign.md, 5.1): дата, название, «48 карточек · 62%», бейджи, прогресс */}
+        {/* Строка набора (plan/done/home_redesign.md, 5.1): значок происхождения (Teacher 31), название, «48 карточек · 62%», бейджи, прогресс */}
         <View style={styles.setCardHeader}>
           <View style={styles.setCardLeft}>
-            <View style={[styles.dateIcon, { backgroundColor: alpha(accentColor, 10) }]}>
-              <Text variant="caption" style={[styles.dateMonth, { color: colors.textSecondary }]}>
-                {SHORT_MONTHS[created.getMonth()]}
-              </Text>
-              <Text variant="bodyLarge" style={[styles.dateDay, { color: colors.textPrimary }]}>
-                {created.getDate()}
-              </Text>
-            </View>
+            <SetOriginTile set={set} accentColor={accentColor} />
 
             <View style={styles.flex1}>
               <Text

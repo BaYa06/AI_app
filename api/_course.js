@@ -67,6 +67,7 @@ export async function courseSetsForStudent(sql, courseId) {
     // Официальный набор в курс попадает через план юнитов — отдаём его под этим курсом.
     courseId: row.is_official ? courseId : row.course_id,
     isOfficial: row.is_official === true,
+    origin: row.origin || null,
     unitId: row.unit_id || null,
     bookId: row.book_id || null,
     bookTitle: row.book_title || null,

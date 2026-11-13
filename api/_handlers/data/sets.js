@@ -5,6 +5,12 @@ import { HttpError, uuid, assertReadableSet } from '../../_access.js';
 import { optString, isoOrNull } from './_shared.js';
 
 /** Тип набора (plan/new/set_kind.md): нет поля → null (не менять), неизвестное значение → 400. */
+/** Откуда набор (Teacher 31). Старый клиент поле не шлёт — NULL. */
+const SET_ORIGINS = ['manual', 'ai', 'file', 'library', 'share'];
+export function optSetOrigin(value) {
+  return SET_ORIGINS.includes(value) ? value : null;
+}
+
 export function optSetKind(value) {
   if (value === undefined || value === null) return null;
   if (value !== 'language' && value !== 'subject') throw new HttpError(400, 'Invalid kind');
@@ -26,10 +32,15 @@ export async function assertOwnCourse(sql, me, courseId) {
 }
 
 export async function loadSets(sql, me) {
+  // origin старых наборов (NULL): копия из библиотеки / по ссылке видна по таблицам импорта
   return sql`
     SELECT id, user_id, course_id, title, description, category, language_from, language_to, kind,
            is_public, created_at, updated_at, total_cards, mastered_cards, studying_cards,
-           is_hidden_from_students
+           is_hidden_from_students,
+           COALESCE(origin, CASE
+             WHEN EXISTS (SELECT 1 FROM library_imports li WHERE li.card_set_id = card_sets.id) THEN 'library'
+             WHEN EXISTS (SELECT 1 FROM set_share_imports si WHERE si.new_set_id = card_sets.id) THEN 'share'
+           END) AS origin
     FROM card_sets
     WHERE user_id = ${me}::uuid
     ORDER BY created_at DESC
@@ -99,12 +110,13 @@ export async function createSet(sql, me, p) {
   await sql`
     INSERT INTO card_sets (
       id, user_id, course_id, title, description, category, language_from, language_to, kind,
-      is_public, created_at, updated_at, total_cards, mastered_cards, studying_cards
+      is_public, created_at, updated_at, total_cards, mastered_cards, studying_cards, origin
     ) VALUES (
       ${id}::uuid, ${me}::uuid, ${courseId}, ${optString(p.title, 255) || 'Без названия'},
       ${optString(p.description, 2000)}, ${optString(p.category, 100) || 'custom'},
       ${optString(p.languageFrom, 10)}, ${optString(p.languageTo, 10)}, ${optSetKind(p.kind)}, ${p.isPublic === true},
-      ${isoOrNull(p.createdAt) || now}, ${isoOrNull(p.updatedAt) || now}, 0, 0, 0
+      ${isoOrNull(p.createdAt) || now}, ${isoOrNull(p.updatedAt) || now}, 0, 0, 0,
+      ${optSetOrigin(p.origin)}
     )
     ON CONFLICT (id) DO NOTHING
   `;

@@ -132,6 +132,9 @@ export interface Course {
   ownerId?: string;
 }
 
+/** Откуда набор (Teacher 31); нет — старый набор, значок общий */
+export type SetOrigin = 'manual' | 'ai' | 'file' | 'library' | 'share';
+
 /** Тип набора: язык (слова с переводом) или предмет (вопрос → ответ). Пусто = язык. */
 export type SetKind = 'language' | 'subject';
 
@@ -152,6 +155,7 @@ export interface CardSet {
   color?: string; // Цвет набора
   languageFrom?: string; // Язык лицевой стороны
   languageTo?: string; // Язык оборотной стороны
+  origin?: SetOrigin; // Откуда набор (значок в списке); нет — старый набор
   kind?: SetKind; // Тип набора; нет — язык (isSubjectSet в src/utils/setKind.ts)
 
   // Метаданные
@@ -200,6 +204,7 @@ export interface CreateSetInput {
   languageFrom?: string;
   languageTo?: string;
   kind?: SetKind;
+  origin?: SetOrigin;
   isPublic?: boolean;
   courseId?: string | null; // ID курса, к которому принадлежит набор
 }

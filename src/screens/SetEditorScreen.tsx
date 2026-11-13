@@ -378,6 +378,7 @@ export function SetEditorScreen({ navigation, route }: Props) {
           languageFrom: langFrom,
           languageTo: langTo,
           kind,
+          origin: 'manual',
         });
 
         // Переход к новому набору

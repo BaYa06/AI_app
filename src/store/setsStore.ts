@@ -149,6 +149,7 @@ export const useSetsStore = create<SetsState & SetsActions>()(
         languageFrom: input.languageFrom || 'de',
         languageTo: input.languageTo || 'ru',
         kind: input.kind,
+        origin: input.origin,
         isPublic: input.isPublic ?? false,
         createdAt: now,
         updatedAt: now,
@@ -186,6 +187,7 @@ export const useSetsStore = create<SetsState & SetsActions>()(
           languageFrom: newSet.languageFrom,
           languageTo: newSet.languageTo,
           kind: newSet.kind,
+          origin: newSet.origin,
         });
       }
 

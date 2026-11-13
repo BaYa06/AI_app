@@ -227,21 +227,6 @@ export const styles = StyleSheet.create({
     flex: 1,
     gap: spacing.s,
   },
-  dateIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: borderRadius.m,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dateMonth: {
-    fontWeight: '600',
-    opacity: 0.85,
-  },
-  dateDay: {
-    fontWeight: '700',
-    lineHeight: 20,
-  },
   setTitle: {
     fontWeight: '600',
     flexShrink: 1,

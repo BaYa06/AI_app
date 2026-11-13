@@ -6,6 +6,7 @@ import { getAccessToken } from '../auth/session';
 import { apiFetch } from '../api/client';
 import type { Card, CardSet, CardStatus, Course } from '@/types';
 import { parseSetKind } from '@/utils/setKind';
+import { parseSetOrigin } from '@/utils/setOrigin';
 import { log } from '@/utils/logger';
 
 // Учительские мутации (курсы/инвайты/ростер/видимость наборов) идут через настоящий backend
@@ -343,6 +344,7 @@ export function mapSetRow(set: any): CardSet {
     languageFrom: set.language_from || 'de',
     languageTo: set.language_to || 'ru',
     kind: parseSetKind(set.kind),
+    origin: parseSetOrigin(set.origin),
     createdAt: new Date(set.created_at).getTime(),
     updatedAt: new Date(set.updated_at).getTime(),
     cardCount: set.total_cards || 0,
@@ -393,6 +395,7 @@ export type MembershipSetRow = {
   languageFrom: string;
   languageTo: string;
   kind?: string | null;
+  origin?: string | null;
   totalCards: number;
   createdAt: string;
   updatedAt: string | null;
@@ -415,6 +418,7 @@ export function mapMembershipSetRow(row: MembershipSetRow, courseId: string): Ca
     languageFrom: row.languageFrom || 'de',
     languageTo: row.languageTo || 'ru',
     kind: parseSetKind(row.kind),
+    origin: parseSetOrigin(row.origin),
     totalCards: row.totalCards || 0,
     createdAt: new Date(row.createdAt).getTime(),
     updatedAt: row.updatedAt ? new Date(row.updatedAt).getTime() : undefined,

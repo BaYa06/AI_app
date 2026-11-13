@@ -483,9 +483,9 @@ async function ownsCourse(sql, userId, courseId) {
 function importQuery(sql, userId, set, courseId) {
   return sql`
     WITH new_set AS (
-      INSERT INTO card_sets (user_id, course_id, title, description, category, language_from, language_to, kind, total_cards)
+      INSERT INTO card_sets (user_id, course_id, title, description, category, language_from, language_to, kind, origin, total_cards)
       VALUES (${userId}::uuid, ${courseId}::uuid, ${set.title}, ${set.description || ''},
-              ${set.category || 'general'}, ${set.language_from || 'en'}, ${set.language_to || 'ru'}, ${set.kind || null},
+              ${set.category || 'general'}, ${set.language_from || 'en'}, ${set.language_to || 'ru'}, ${set.kind || null}, 'library',
               (SELECT COUNT(*) FROM library_cards WHERE library_set_id = ${set.id}::uuid))
       RETURNING id
     ), copied AS (

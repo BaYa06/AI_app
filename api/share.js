@@ -384,9 +384,9 @@ async function importShared(res, sql, userId, code, courseId) {
     const created = await sql`
       WITH new_set AS (
         INSERT INTO card_sets (user_id, course_id, title, description, category, language_from, language_to,
-                               kind, is_public, total_cards)
+                               kind, origin, is_public, total_cards)
         VALUES (${userId}::uuid, ${courseId}::uuid, ${s.title}, ${s.description || ''}, ${s.category || 'general'},
-                ${s.language_from}, ${s.language_to}, ${s.kind}, false, ${Number(s.cards_count) || 0})
+                ${s.language_from}, ${s.language_to}, ${s.kind}, 'share', false, ${Number(s.cards_count) || 0})
         RETURNING id
       ), copied AS (
         INSERT INTO cards (set_id, front, back, example, word_form, word_type, sort_order)
