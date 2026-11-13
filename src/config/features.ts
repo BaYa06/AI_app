@@ -24,10 +24,11 @@ export const LIBRARY_CATALOG_ENABLED = true;
 export const TEACHER_CABINET_ENABLED = true;
 
 /**
- * Блоки заданий у учителя (этап 2). Пока сервера заданий нет — только вёрстка, в проде false:
- * выдуманные цифры к пользователям не попадают.
+ * Задания (этап 2): блоки у учителя, карточка и экраны задания у ученика, пуши.
+ * true — для проверки на staging (Teacher 30). Сервер заданий есть только на staging:
+ * в прод-сборку с true не выпускать, пока этап 2 не выкатан на прод.
  */
-export const TEACHER_HOMEWORK_ENABLED = false;
+export const TEACHER_HOMEWORK_ENABLED = true;
 
 /** «Подготовка к уроку» у учителя (этап 3). До этапа 3 — false. */
 export const TEACHER_LESSON_PREP_ENABLED = false;
