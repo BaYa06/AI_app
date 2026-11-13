@@ -12,6 +12,7 @@ import {
   ChevronRight,
   ClipboardCheck,
   Clock,
+  FileText,
   GraduationCap,
   Trophy,
   UserPlus,
@@ -21,7 +22,11 @@ import { Text } from '@/components/common';
 import type { IconComponent } from '@/components/ui';
 import { useThemeColors } from '@/store';
 import { alpha, borderRadius, heights, iconSize, spacing } from '@/constants';
-import { TEACHER_HOMEWORK_ENABLED, TEACHER_LESSON_PREP_ENABLED } from '@/config/features';
+import {
+  TEACHER_HOMEWORK_ENABLED,
+  TEACHER_INSIGHTS_ENABLED,
+  TEACHER_LESSON_PREP_ENABLED,
+} from '@/config/features';
 import type { RootStackParamList } from '@/types/navigation';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { pluralize } from '@/utils';
@@ -165,6 +170,17 @@ export function CourseActions({
           onPress={tap('schedule', () => setScheduleSheet(true))}
           divider
         />
+        {TEACHER_INSIGHTS_ENABLED && (
+          <Row
+            colors={colors}
+            icon={FileText}
+            title="Отчёт по группе"
+            onPress={tap('report', () =>
+              navigation.navigate('TeacherReport', { courseId, courseTitle })
+            )}
+            divider
+          />
+        )}
       </View>
     </View>
   );

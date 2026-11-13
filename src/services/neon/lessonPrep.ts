@@ -2,6 +2,7 @@
 import { callTeacherApi } from './core';
 import type { HardCard, SetStudent } from '../lessonPrep';
 import type { TeacherNotification } from '../teacherNotifications';
+import { reportQuery, type ReportParams, type TeacherReport } from '../teacherReport';
 
 export const lessonPrepApi = {
   /** Трудные слова группы за 14 дней; null — нет сети или ошибка. */
@@ -45,5 +46,31 @@ export const lessonPrepApi = {
 
   async markTeacherNotificationsSeen(): Promise<boolean> {
     return (await callTeacherApi('teacher-notifications-seen', { method: 'POST' })).ok;
+  },
+
+  /** Превью отчёта (Teacher 55); null — нет сети или ошибка. */
+  async loadReport(params: ReportParams): Promise<TeacherReport | null> {
+    const res = await callTeacherApi<{ report: TeacherReport }>('report-data', {
+      params: reportQuery(params),
+    });
+    return res.ok ? res.data.report : null;
+  },
+
+  /** Ссылка на отчёт `/r/<код>` — снимок с комментарием учителя, живёт 30 дней. */
+  async createReportLink(params: ReportParams): Promise<{ code: string; url: string } | null> {
+    const res = await callTeacherApi<{ code: string; url: string }>('report-create', {
+      method: 'POST',
+      body: { ...reportQuery(params), comment: params.comment ?? '' },
+    });
+    return res.ok ? { code: res.data.code, url: res.data.url } : null;
+  },
+
+  /** PDF отчёта: файл собирает сервер. */
+  async loadReportPdf(params: ReportParams): Promise<{ filename: string; base64: string } | null> {
+    const res = await callTeacherApi<{ filename: string; base64: string }>('report-pdf', {
+      method: 'POST',
+      body: { ...reportQuery(params), comment: params.comment ?? '' },
+    });
+    return res.ok ? { filename: res.data.filename, base64: res.data.base64 } : null;
   },
 };
