@@ -374,6 +374,14 @@ const SUBJECT_STAGES: Record<'learn' | 'review', SessionStage[]> = {
   review: ['test'],
 };
 
+/** Этапы сессии по типу набора: «Изучить» или «Повторить» (сессии заданий учителя — Teacher 26) */
+export function sessionStagesFor(
+  set: Pick<CardSet, 'kind'> | undefined,
+  kind: 'learn' | 'review'
+): SessionStage[] {
+  return (set && isSubjectSet(set) ? SUBJECT_STAGES : LANGUAGE_STAGES)[kind];
+}
+
 /** Примерное время на одно задание этапа, секунды: у новых слов дольше (показ, перевод) */
 const SESSION_LEARN_SEC = 14;
 const SESSION_REVIEW_SEC = 8;

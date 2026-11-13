@@ -255,6 +255,14 @@ export const styles = StyleSheet.create({
   setProgress: {
     marginTop: spacing.s,
   },
+  setHomeworkDue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.s,
+    paddingTop: spacing.s,
+    borderTopWidth: 1,
+  },
   setStatusCounts: {
     flexDirection: 'row',
     flexWrap: 'wrap',

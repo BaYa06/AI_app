@@ -10,7 +10,15 @@ import { iconSize, alpha, getDeckAccentColor } from '@/constants';
 import { triggerHaptic } from '@/utils/haptic';
 import { pluralize } from '@/utils';
 import { Button, Card as SurfaceCard, Badge, SegmentedProgressBar } from '@/components/ui';
-import { MoreVertical, EyeOff, BookOpen, RotateCcw } from 'lucide-react-native';
+import {
+  MoreVertical,
+  EyeOff,
+  BookOpen,
+  RotateCcw,
+  Clock,
+  ClipboardCheck,
+} from 'lucide-react-native';
+import { formatDue } from '@/services/homework';
 import type { CardSet } from '@/types';
 import { Analytics } from '@/services/analytics';
 import { type LessonPlan } from '@/services/LessonService';
@@ -32,6 +40,8 @@ type Props = {
    * сколько учеников прошли все карточки, начали и не открывали. null/нет — личная полоска, как раньше.
    */
   groupProgress?: { total: number; started: number; completed: number } | null;
+  /** Набор в задании учителя (Teacher 26): янтарная рамка, бейдж «Задание» и «до: …» под карточкой */
+  homeworkDue?: string | null;
 };
 
 export function SetListItem({
@@ -44,6 +54,7 @@ export function SetListItem({
   setSetMenuTarget,
   navigation,
   groupProgress,
+  homeworkDue = null,
 }: Props) {
   // Статусы слов (plan/new/word_status_colors.md); у набора с сервера нет разбивки — выученные считаем «знаю»
   const learning = set.learningCount || 0;
@@ -61,11 +72,20 @@ export function SetListItem({
   const showHidden = !!(set.isHiddenFromStudents && set.courseId && isTeacher);
   // Набор, из которого урок дня берёт новые слова (5.2) — связывает список с карточкой урока
   const isFocus = isTeacher !== true && lessonPlan.focusSetId === set.id;
-  const hasBadges = isFocus || waitingCount > 0 || !!set.isOfficial || showHidden;
+  const hasBadges = !!homeworkDue || isFocus || waitingCount > 0 || !!set.isOfficial || showHidden;
 
   return (
     <StaggerCard key={set.id} index={index}>
       <SurfaceCard
+        style={
+          homeworkDue
+            ? {
+                borderWidth: 2,
+                borderColor: colors.homework,
+                backgroundColor: alpha(colors.homework, 10),
+              }
+            : undefined
+        }
         onPress={() => {
           triggerHaptic('selection');
           Analytics.homeAction('set');
@@ -77,6 +97,7 @@ export function SetListItem({
           statusLabel,
           waitingCount > 0 ? `${waitingCount} ждут повторения` : null,
           isFocus ? 'сейчас учишь' : null,
+          homeworkDue ? `задание до ${formatDue(homeworkDue)}` : null,
         ]
           .filter(Boolean)
           .join(', ')}
@@ -106,6 +127,7 @@ export function SetListItem({
               </Text>
               {hasBadges && (
                 <View style={styles.setBadges}>
+                  {homeworkDue && <Badge label="Задание" tone="warning" icon={ClipboardCheck} />}
                   {isFocus && <Badge label="Сейчас учишь" tone="primary" />}
                   {/* «N ждут» — единственный цветной сигнал строки: здесь есть дело */}
                   {waitingCount > 0 && (
@@ -182,6 +204,14 @@ export function SetListItem({
               ))}
             </View>
           </>
+        )}
+        {homeworkDue && (
+          <View style={[styles.setHomeworkDue, { borderTopColor: alpha(colors.homework, 40) }]}>
+            <Clock size={iconSize.xs} color={colors.homeworkText} />
+            <Text variant="caption" style={{ color: colors.homeworkText, fontWeight: '600' }}>
+              {`до: ${formatDue(homeworkDue)}`}
+            </Text>
+          </View>
         )}
       </SurfaceCard>
     </StaggerCard>

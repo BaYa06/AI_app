@@ -37,7 +37,7 @@ import {
   type StudyMode,
 } from '@/components/study/StudyModeSheet';
 import { CoursesDrawer } from '@/components/home/CoursesDrawer';
-import { TEACHER_CABINET_ENABLED } from '@/config/features';
+import { TEACHER_CABINET_ENABLED, TEACHER_HOMEWORK_ENABLED } from '@/config/features';
 import { NewCourseSheet } from '@/components/teacher/NewCourseSheet';
 import { CourseJoinCodeDialog } from '@/components/CourseJoinCodeDialog';
 import {
@@ -102,6 +102,10 @@ import {
   streakRiskHoursLeft,
 } from '@/components/home/lessonText';
 import { LessonCard } from '@/components/home/LessonCard';
+import { StudentHomeworkCard } from '@/components/home/StudentHomeworkCard';
+import { useHomeworkStore } from '@/store/homeworkStore';
+import { nearestActiveHomework } from '@/services/homework';
+import { startHomeworkSession } from '@/components/study/homeworkSession';
 import { syncWidget, checkWidgetUsage } from '@/services/WidgetService';
 import type { WidgetPlanInput } from '@/services/WidgetPlanner';
 import { FocusSetSheet } from '@/components/home/FocusSetSheet';
@@ -559,6 +563,36 @@ export function HomeScreen({ navigation, route }: any) {
   // Courses store
   const courses = useCoursesStore((s) => s.courses);
   const activeCourseId = useCoursesStore((s) => s.activeCourseId);
+
+  // Задания учителя у ученика (plan/new/teacher_cabinet.md, Teacher 26): есть задание в этом курсе —
+  // карточка задания вместо «Урока дня», набор задания в списке — янтарный с «до: …»
+  const homeworkItems = useHomeworkStore((s) => s.items);
+  useFocusEffect(
+    useCallback(() => {
+      if (TEACHER_HOMEWORK_ENABLED && isTeacher === false) {
+        useHomeworkStore
+          .getState()
+          .load()
+          .catch(() => {});
+      }
+    }, [isTeacher])
+  );
+  const courseHomework = useMemo(
+    () =>
+      TEACHER_HOMEWORK_ENABLED && isTeacher === false && activeCourseId
+        ? homeworkItems.filter((h) => h.courseId === activeCourseId && !h.submitted)
+        : [],
+    [homeworkItems, isTeacher, activeCourseId]
+  );
+  const activeHomework = useMemo(() => nearestActiveHomework(courseHomework), [courseHomework]);
+  /** setId → срок ближайшего задания с этим набором */
+  const homeworkDueBySet = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const h of [...courseHomework].sort((a, b) => Date.parse(b.dueAt) - Date.parse(a.dueAt))) {
+      for (const setId of h.setIds) out[setId] = h.dueAt;
+    }
+    return out;
+  }, [courseHomework]);
   const setActiveCourse = useCoursesStore((s) => s.setActiveCourse);
   const createCourse = useCoursesStore((s) => s.createCourse);
   const renameCourse = useCoursesStore((s) => s.renameCourse);
@@ -1759,13 +1793,22 @@ export function HomeScreen({ navigation, route }: any) {
                 ) : (
                   <>
                     {/* Урок дня — единственное главное действие главной (plan/done/home_redesign.md, 2.2) */}
-                    {lessonContent && (
-                      <LessonCard
-                        content={lessonContent}
-                        onPress={handleLessonPress}
-                        onSecondaryPress={openFocusSheet}
+                    {activeHomework ? (
+                      <StudentHomeworkCard
+                        homework={activeHomework}
+                        onOpen={() => startHomeworkSession(navigation, activeHomework)}
+                        onContinue={() => startHomeworkSession(navigation, activeHomework)}
                         style={styles.lessonCard}
                       />
+                    ) : (
+                      lessonContent && (
+                        <LessonCard
+                          content={lessonContent}
+                          onPress={handleLessonPress}
+                          onSecondaryPress={openFocusSheet}
+                          style={styles.lessonCard}
+                        />
+                      )
                     )}
                     {pushNudgePermission && !pushNudgeClosed && (
                       <View style={styles.pushNudge}>
@@ -1840,6 +1883,7 @@ export function HomeScreen({ navigation, route }: any) {
                       reviewStats={reviewStats}
                       setSetMenuTarget={setSetMenuTarget}
                       navigation={navigation}
+                      homeworkDue={homeworkDueBySet[set.id] ?? null}
                       groupProgress={
                         teacherCourse.members?.length && teacherCourse.setProgress?.[set.id]
                           ? {
