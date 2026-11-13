@@ -24,6 +24,7 @@ import { getAuthedUserId, hasBearerSecret } from './_auth.js';
 import { sendNotification, groupsOff, logChannelEvents } from './push/_send.js';
 import { runArbiter } from './push/_arbiter.js';
 import { recomputeHabits } from './push/_habits.js';
+import { runTeacherPushes } from './push/_teacherCron.js';
 import { SETTING_GROUPS, isHoldout } from './push/_decide.js';
 import { log } from './_log.js';
 
@@ -263,6 +264,15 @@ export default async function handler(req, res) {
       const daily = !dryRun && now.getUTCHours() === 0 && now.getUTCMinutes() < 15;
       const habits = daily || req.query.habits === '1' ? await recomputeHabits(sql) : undefined;
       const result = await runArbiter(sql, { dryRun });
+      // Уведомления учителям (plan/new/teacher_cabinet.md, этап 4) — после учеников и отдельно:
+      // их сбой не должен ронять основную рассылку. В пробном прогоне не запускаем.
+      if (!dryRun) {
+        try {
+          result.teacher = await runTeacherPushes(sql);
+        } catch (e) {
+          log.error('push', 'teacher pushes failed', e);
+        }
+      }
       if (daily) {
         await sql`DELETE FROM push_log WHERE created_at < NOW() - INTERVAL '180 days'`;
       }

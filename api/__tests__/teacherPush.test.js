@@ -195,3 +195,70 @@ describe('notifyTeacher (Teacher 45)', () => {
     expect(mockQueries).toEqual([]);
   });
 });
+
+describe('П1 «Урок через 2 часа» (Teacher 46)', () => {
+  const { lessonSoonData, sendLessonSoon } = require('../push/_teacherCron.js');
+  const course = { course_id: COURSE, course: 'A1-B', time_label: '10:30' };
+
+  it('данные пуша: готовность и до трёх трудных слов', () => {
+    expect(
+      lessonSoonData(course, { ready: 7, total: 22, readyLabel: 'Сдали задание' }, [
+        'a',
+        'b',
+        'c',
+        'd',
+      ])
+    ).toEqual({
+      courseId: COURSE,
+      course: 'A1-B',
+      time: '10:30',
+      ready: 7,
+      total: 22,
+      readyLabel: 'Сдали задание',
+      hardWords: ['a', 'b', 'c'],
+    });
+  });
+
+  it('цифр не набралось — пуш не собирается; хватает и одних трудных слов', () => {
+    expect(lessonSoonData(course, null, [])).toBeNull();
+    expect(lessonSoonData(course, { ready: 0, total: 0 }, [])).toBeNull();
+    expect(lessonSoonData(course, null, ['a']).hardWords).toEqual(['a']);
+  });
+
+  it('один пуш на урок: ключ — курс, день и время урока; пояс — курса', async () => {
+    mockRules = [
+      [
+        /WITH slots AS/,
+        () => [
+          {
+            course_id: COURSE,
+            teacher_id: TEACHER,
+            course: 'A1-B',
+            tz: 'Asia/Bishkek',
+            time_label: '10:30',
+            local_day: '2026-11-13',
+          },
+        ],
+      ],
+      [/FROM homework h/, () => [{ id: 'h1', assigned: 22, submitted: 7 }]],
+      [/FROM answers a/, () => [{ front: 'görüşmek üzere' }]],
+      user(),
+      token(),
+    ];
+    const res = await sendLessonSoon(mockSql);
+    expect(res).toEqual({ lessons: 1, lessonNotes: 1 });
+    const dedupe = mockQueries.find((q) => /payload->>'dedupe'/.test(q.text));
+    expect(dedupe.values).toContain(`lesson:${COURSE}:2026-11-13:10:30`);
+    const message = mockMulticast.mock.calls[0][0].notification;
+    expect(message).toEqual({
+      title: 'Урок A1-B в 10:30',
+      body: 'Сдали задание 7 из 22 · Трудные слова: görüşmek üzere',
+    });
+  });
+
+  it('тестовый сервер без белого списка никому не шлёт', () => {
+    const { teacherRecipientAllowed } = require('../push/_teacher.js');
+    expect(teacherRecipientAllowed(TEACHER, { VERCEL_ENV: 'preview' })).toBe(false);
+    expect(teacherRecipientAllowed(TEACHER, { VERCEL_ENV: 'production' })).toBe(true);
+  });
+});

@@ -185,22 +185,9 @@ const clampInt = (value, def, min, max) => {
   return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : def;
 };
 
-/**
- * Слова, в которых группа ошибается: все наборы курса (и юниты учебников), ответы учеников курса
- * из `answers` за `days` дней. Сортировка — по доле неверных. Мало данных — слова нет в списке.
- */
-export async function courseHardCards(req, res, sql, userId) {
-  const { courseId } = req.query;
-  if (!courseId) return res.status(400).json({ error: 'courseId required' });
-  const days = clampInt(req.query.days, 14, 1, 90);
-  const limit = clampInt(req.query.limit, 20, 1, 50);
-
-  const course = await sql`
-    SELECT id FROM courses WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid
-  `;
-  if (course.length === 0) return res.status(403).json({ error: 'Not the owner' });
-
-  const rows = await sql`
+/** Запрос трудных слов курса — общий для экрана «Перед уроком» и пуша «Урок через 2 часа» */
+export async function hardCardRows(sql, courseId, days, limit) {
+  return sql`
     SELECT
       c.id AS card_id, c.front, c.back, c.set_id, s.title AS set_title,
       COUNT(*)::int AS answers,
@@ -223,6 +210,24 @@ export async function courseHardCards(req, res, sql, userId) {
              COUNT(*) FILTER (WHERE NOT a.correct) DESC, c.id
     LIMIT ${limit}::int
   `;
+}
+
+/**
+ * Слова, в которых группа ошибается: все наборы курса (и юниты учебников), ответы учеников курса
+ * из `answers` за `days` дней. Сортировка — по доле неверных. Мало данных — слова нет в списке.
+ */
+export async function courseHardCards(req, res, sql, userId) {
+  const { courseId } = req.query;
+  if (!courseId) return res.status(400).json({ error: 'courseId required' });
+  const days = clampInt(req.query.days, 14, 1, 90);
+  const limit = clampInt(req.query.limit, 20, 1, 50);
+
+  const course = await sql`
+    SELECT id FROM courses WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid
+  `;
+  if (course.length === 0) return res.status(403).json({ error: 'Not the owner' });
+
+  const rows = await hardCardRows(sql, courseId, days, limit);
 
   return res.status(200).json({
     ok: true,

@@ -40,6 +40,15 @@ export function isTeacherCategory(category) {
 }
 
 /**
+ * Кому можно отправить. База тестового сервера — копия рабочей с настоящими токенами, поэтому вне
+ * прода без белого списка PUSH_ALLOWLIST не шлём никому (запись в колокольчике остаётся).
+ */
+export function teacherRecipientAllowed(userId, env = process.env) {
+  if (env.VERCEL_ENV && env.VERCEL_ENV !== 'production' && !env.PUSH_ALLOWLIST) return false;
+  return isAllowedRecipient(userId);
+}
+
+/**
  * Что делать с уведомлением — чистая функция. 'send' — отправить пуш; остальное — причина,
  * по которой запись остаётся только в колокольчике (она же статус строки push_log).
  * c: { bellOnly, enabled, notifEnabled, categoryOff, sentToday, localHour, tokens, freshTokens }
@@ -140,7 +149,7 @@ export async function notifyTeacher(sql, teacherId, type, data = {}, { dedupe, t
     await write(decision);
     return { status: decision, pushId };
   }
-  if (!isAllowedRecipient(teacherId)) {
+  if (!teacherRecipientAllowed(teacherId)) {
     await write('not_allowlisted');
     return { status: 'not_allowlisted', pushId };
   }
