@@ -98,6 +98,7 @@ import { TeacherStudentsScreen } from '@/screens/TeacherStudentsScreen';
 import { TeacherHomeworkScreen } from '@/screens/TeacherHomeworkScreen';
 import { TeacherLessonPrepScreen } from '@/screens/TeacherLessonPrepScreen';
 import { TeacherNotificationsScreen } from '@/screens/TeacherNotificationsScreen';
+import { StudentInsightScreen } from '@/screens/StudentInsightScreen';
 import { StudentHomeworkScreen } from '@/screens/StudentHomeworkScreen';
 import { HomeworkDoneScreen } from '@/screens/HomeworkDoneScreen';
 import { StudentDetailScreen } from '@/screens/StudentDetailScreen';
@@ -631,7 +632,8 @@ export function AppNavigator() {
         />
         <Stack.Screen
           name="StudentDetail"
-          component={StudentDetailScreen}
+          // Этап 4: новый экран ученика за флагом, прежний остаётся для отката
+          component={TEACHER_INSIGHTS_ENABLED ? StudentInsightScreen : StudentDetailScreen}
           options={{ headerShown: false, gestureEnabled: true }}
         />
         <Stack.Screen

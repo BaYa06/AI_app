@@ -192,6 +192,10 @@ export type RootStackParamList = {
   /** Сдача задания учителем (plan/new/teacher_cabinet.md, Teacher 21) */
   /** courseTitle нет, когда экран открыт ссылкой из пуша учителю */
   TeacherHomework: { homeworkId: string; courseId: string; courseTitle?: string };
+  /**
+   * Ученик глазами учителя. По ссылке из пуша (этап 4) приходят только courseId и studentId —
+   * новый экран (StudentInsightScreen) остальное загружает сам.
+   */
   StudentDetail: {
     courseId: string;
     courseTitle: string;
@@ -201,6 +205,16 @@ export type RootStackParamList = {
     streak: number;
     todayCards: number;
     lastActivity: string;
+  };
+  /**
+   * Отчёт (экран 14, Teacher 55): вкладка «Родителям» — по ученику, «Группе» — по курсу.
+   * studentId нет — открывается вкладка «Группе».
+   */
+  TeacherReport: {
+    courseId: string;
+    courseTitle?: string;
+    studentId?: string;
+    studentName?: string;
   };
   /**
    * Настройка живого теста. cardIds — тест по списку слов вместо набора, purpose = 'warmup' —
