@@ -521,6 +521,107 @@ export const PUSH_TYPES = {
       }),
     ],
   },
+  // «Итоги недели» (Teacher 47): понедельник 09:00 по поясу учителя, по всем его курсам
+  teacher_week_summary: {
+    category: 'teacher_week',
+    priority: 2,
+    transactional: true,
+    minIntervalDays: 0,
+    minAppVersion: TEACHER_PUSH_MIN_APP_VERSION,
+    link: () => TEACHER_HOME_LINK,
+    variants: [
+      ({ data }) => ({
+        title: `Итоги недели: занимались ${data.active} из ${data.total}`,
+        body: [
+          data.answers > 0
+            ? `${data.answers} ${plural(data.answers, 'ответ', 'ответа', 'ответов')} · ${data.correctPct}% верных`
+            : null,
+          data.inactive > 0
+            ? `${data.inactive} ${plural(data.inactive, 'не заходит', 'не заходят', 'не заходят')} неделю`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+      }),
+    ],
+  },
+  // «N не заходят 7+ дней» — сводно по курсу, не чаще раза в 3 дня
+  teacher_inactive: {
+    category: 'teacher_students',
+    priority: 3,
+    transactional: true,
+    minIntervalDays: 3,
+    minAppVersion: TEACHER_PUSH_MIN_APP_VERSION,
+    link: teacherLinkOr(teacherLink.students),
+    variants: [
+      ({ data }) => {
+        const names = Array.isArray(data.names) ? data.names : [];
+        const more = data.count - Math.min(names.length, 2);
+        return {
+          title: `${data.course}: ${data.count} ${plural(data.count, 'не заходит', 'не заходят', 'не заходят')} 7+ дней`,
+          body: `${names.slice(0, 2).join(', ')}${more > 0 ? ` и ещё ${more}` : ''}`,
+        };
+      },
+    ],
+  },
+  // Задание: все сдали / срок прошёл
+  teacher_homework_done: {
+    category: 'teacher_students',
+    priority: 2,
+    transactional: true,
+    minIntervalDays: 0,
+    minAppVersion: TEACHER_PUSH_MIN_APP_VERSION,
+    link: teacherLinkOr(teacherLink.homework),
+    variants: [
+      ({ data }) => ({
+        title: `Все сдали задание: ${data.total} из ${data.total}`,
+        body: `«${data.title}» · ${data.course}`,
+      }),
+    ],
+  },
+  teacher_homework_due: {
+    category: 'teacher_students',
+    priority: 2,
+    transactional: true,
+    minIntervalDays: 0,
+    minAppVersion: TEACHER_PUSH_MIN_APP_VERSION,
+    link: teacherLinkOr(teacherLink.homework),
+    variants: [
+      ({ data }) => ({
+        title: `Срок задания прошёл: сдали ${data.submitted} из ${data.total}`,
+        body: `«${data.title}» · ${data.course}`,
+      }),
+    ],
+  },
+  // Только колокольчик, без пуша (решение 2 этапа 4): похвала ученику и «юнит открыт 2 дня»
+  teacher_streak_praise: {
+    category: 'teacher_students',
+    priority: 4,
+    transactional: true,
+    minIntervalDays: 0,
+    bellOnly: true,
+    link: teacherLinkOr(teacherLink.student),
+    variants: [
+      ({ data }) => ({
+        title: `${data.student}: ${data.streak} ${plural(data.streak, 'день', 'дня', 'дней')} подряд`,
+        body: `Лучшая серия в группе ${data.course} — можно похвалить`,
+      }),
+    ],
+  },
+  teacher_unit_open: {
+    category: 'teacher_students',
+    priority: 4,
+    transactional: true,
+    minIntervalDays: 0,
+    bellOnly: true,
+    link: teacherLinkOr(teacherLink.course),
+    variants: [
+      ({ data }) => ({
+        title: `${data.unit} открыт 2 дня`,
+        body: `Начали ${data.started} из ${data.total} · ${data.course}. Задать срок?`,
+      }),
+    ],
+  },
   // Ответ команды на обращение (plan/new/support_threads.md, Support 3). Отправляет админка, не арбитр
   support_reply: {
     category: 'support',

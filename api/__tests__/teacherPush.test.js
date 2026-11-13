@@ -67,13 +67,20 @@ const token = (version = TEACHER_PUSH_MIN_APP_VERSION) => [
   () => [{ token: 't1', permission: 'granted', app_version: version }],
 ];
 const logged = () => mockQueries.find((q) => /^INSERT INTO push_log/.test(q.text));
-const loggedStatus = () =>
-  logged().values.find(
-    (v) =>
-      typeof v === 'string' &&
-      /^[a-z_]+$/.test(v) &&
-      !['teacher_lesson_soon', 'teacher_lesson'].includes(v)
-  );
+const STATUSES = [
+  'sent',
+  'failed',
+  'bell_only',
+  'teacher_off',
+  'teacher_limit',
+  'teacher_quiet',
+  'category_off',
+  'disabled',
+  'no_token',
+  'old_app',
+  'not_allowlisted',
+];
+const loggedStatus = () => logged().values.find((v) => STATUSES.includes(v));
 const loggedPayload = () =>
   JSON.parse(logged().values.find((v) => typeof v === 'string' && v.startsWith('{')));
 
@@ -260,5 +267,116 @@ describe('П1 «Урок через 2 часа» (Teacher 46)', () => {
     const { teacherRecipientAllowed } = require('../push/_teacher.js');
     expect(teacherRecipientAllowed(TEACHER, { VERCEL_ENV: 'preview' })).toBe(false);
     expect(teacherRecipientAllowed(TEACHER, { VERCEL_ENV: 'production' })).toBe(true);
+  });
+});
+
+describe('итоги недели, ученики и задания (Teacher 47)', () => {
+  const {
+    weekSummaryData,
+    homeworkEvent,
+    praiseStep,
+    sendHomeworkEvents,
+    writeBellNotes,
+  } = require('../push/_teacherCron.js');
+  const HW = '66666666-6666-4666-8666-666666666666';
+  const STUDENT = '22222222-2222-4222-8222-222222222222';
+  const text = (type, data) => buildPush(type, { userId: TEACHER, data });
+
+  it('итоги недели: данные и текст', () => {
+    expect(weekSummaryData({ total: 0 })).toBeNull();
+    const data = weekSummaryData({
+      total: 22,
+      active: 18,
+      answers: 1240,
+      correct: 1042,
+      inactive: 3,
+    });
+    expect(data).toEqual({ active: 18, total: 22, answers: 1240, correctPct: 84, inactive: 3 });
+    const push = text('teacher_week_summary', data);
+    expect(push.title).toBe('Итоги недели: занимались 18 из 22');
+    expect(push.body).toBe('1240 ответов · 84% верных · 3 не заходят неделю');
+    expect(push.link).toBe('flashly://teacher/home?from=push');
+  });
+
+  it('«не заходят»: два имени и «ещё N», ссылка — на учеников курса', () => {
+    const push = text('teacher_inactive', {
+      courseId: COURSE,
+      course: 'A1-B',
+      count: 5,
+      names: ['Бекжан', 'Batyr', 'Fatima'],
+    });
+    expect(push.title).toBe('A1-B: 5 не заходят 7+ дней');
+    expect(push.body).toBe('Бекжан, Batyr и ещё 3');
+    expect(push.link).toBe(`flashly://teacher/students/${COURSE}?from=push`);
+  });
+
+  it('задание: что сообщить', () => {
+    expect(homeworkEvent({ assigned: 22, submitted: 22, due_passed: false })).toBe('done');
+    expect(homeworkEvent({ assigned: 22, submitted: 7, due_passed: true })).toBe('due');
+    expect(homeworkEvent({ assigned: 22, submitted: 7, due_passed: false })).toBeNull();
+    expect(homeworkEvent({ assigned: 0, submitted: 0, due_passed: true })).toBeNull();
+    expect(
+      text('teacher_homework_due', { submitted: 7, total: 22, title: 'Ünite 4', course: 'A1-B' })
+        .title
+    ).toBe('Срок задания прошёл: сдали 7 из 22');
+  });
+
+  it('«Срок прошёл» уходит один раз на задание и ведёт на экран сдачи', async () => {
+    mockRules = [
+      [
+        /FROM homework h JOIN courses c/,
+        () => [
+          {
+            id: HW,
+            title: 'Ünite 4',
+            course_id: COURSE,
+            course: 'A1-B',
+            teacher_id: TEACHER,
+            tz: 'Asia/Bishkek',
+            due_passed: true,
+            assigned: 22,
+            submitted: 7,
+          },
+        ],
+      ],
+      user(),
+      token(),
+    ];
+    expect(await sendHomeworkEvents(mockSql)).toEqual({ homeworkNotes: 1 });
+    const dedupe = mockQueries.find((q) => /payload->>'dedupe'/.test(q.text));
+    expect(dedupe.values).toContain(`hw:${HW}:due`);
+    expect(mockMulticast.mock.calls[0][0].data.link).toBe(
+      `flashly://teacher/homework/${COURSE}/${HW}?from=push`
+    );
+  });
+
+  it('похвала ученику — только колокольчик, одна запись на ступень серии', async () => {
+    expect(praiseStep(11)).toBe(7);
+    expect(praiseStep(14)).toBe(14);
+    mockRules = [
+      [
+        /us\.current_streak AS streak/,
+        () => [
+          {
+            course_id: COURSE,
+            teacher_id: TEACHER,
+            course: 'A1-B',
+            student_id: STUDENT,
+            student: 'Аяна',
+            streak: 11,
+          },
+        ],
+      ],
+      user(),
+      token(),
+    ];
+    expect(await writeBellNotes(mockSql)).toEqual({ bellNotes: 1 });
+    expect(mockMulticast).not.toHaveBeenCalled();
+    expect(loggedStatus()).toBe('bell_only');
+    expect(loggedPayload()).toMatchObject({
+      title: 'Аяна: 11 дней подряд',
+      link: `flashly://teacher/student/${COURSE}/${STUDENT}?from=push`,
+      dedupe: `streak:${STUDENT}:7`,
+    });
   });
 });
