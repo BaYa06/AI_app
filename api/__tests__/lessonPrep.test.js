@@ -352,3 +352,34 @@ describe('remind-review выбранным (Teacher 36)', () => {
     expect(text.body).toBe('Открой курс и позанимайся перед уроком');
   });
 });
+
+describe('course-set-students (Teacher 37)', () => {
+  const { setStudentStatus } = require('../_handlers/teacher/stats.js');
+
+  it('статус ученика по набору', () => {
+    expect(setStudentStatus({ seen: 48, total: 48 })).toBe('completed');
+    expect(setStudentStatus({ seen: 3, total: 48 })).toBe('started');
+    expect(setStudentStatus({ seen: 0, total: 48 })).toBe('not_opened');
+    expect(setStudentStatus({ seen: 0, total: 0 })).toBe('not_opened');
+  });
+
+  it('чужой курс — 403; набор не из курса — 404', async () => {
+    const q = { courseId: COURSE, setId: SET };
+    expect((await call('GET', 'course-set-students', {}, q)).statusCode).toBe(403);
+    mockRules = [ownCourse];
+    expect((await call('GET', 'course-set-students', {}, q)).statusCode).toBe(404);
+  });
+
+  it('список учеников со статусами', async () => {
+    mockRules = [
+      ownCourse,
+      [/^SELECT 1 WHERE/, () => [{}]],
+      [/FROM course_members cm/, () => [{ id: 'u1', name: 'Бекжан', seen: 0, total: 5 }]],
+    ];
+    const res = await call('GET', 'course-set-students', {}, { courseId: COURSE, setId: SET });
+    expect(res.body).toEqual({
+      ok: true,
+      students: [{ id: 'u1', name: 'Бекжан', status: 'not_opened' }],
+    });
+  });
+});

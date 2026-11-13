@@ -577,7 +577,12 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
 
 **Клиент**
 
-- [ ] **Teacher 37. Данные подготовки.** `services/lessonPrep.ts` + хук `useLessonPrep(courseId)`:
+- [x] **Teacher 37. Данные подготовки.** ✅ `services/lessonPrep.ts` (правила + `loadLessonPrep`, тесты),
+  `services/neon/lessonPrep.ts` (`loadCourseHardCards`, `loadCourseSetStudents`, `remindStudents`),
+  хук `components/teacher/useLessonPrep.ts`. Разминка — до 6 слов, меньше 3 трудных слов — разминки нет.
+  **Отступление:** `course-set-stats` отдаёт только числа, поэтому добавлено серверное действие
+  `course-set-students` (`?courseId=&setId=` → ученики со статусом `completed` / `started` /
+  `not_opened`) — без него «Не открывали» поимённо не собрать. Задание: `services/lessonPrep.ts` + хук `useLessonPrep(courseId)`:
   трудные слова (Teacher 33), готовность (решение 5), кто не открывал набор / не начал задание,
   состав разминки — 6 самых трудных слов, «~5 минут». Кэш по курсу, обновление по свайпу. Тесты.
 - [ ] **Teacher 38. Экран 10 «Перед уроком».** `TeacherLessonPrepScreen` (маршрут `TeacherLessonPrep`):

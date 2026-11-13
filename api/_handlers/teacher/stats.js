@@ -240,6 +240,45 @@ export async function courseHardCards(req, res, sql, userId) {
   });
 }
 
+/**
+ * Ученики курса по одному набору (Teacher 37, готовность к уроку без задания): кто прошёл все
+ * карточки, кто начал, кто не открывал. GET ?courseId=&setId=
+ */
+export async function courseSetStudents(req, res, sql, userId) {
+  const { courseId, setId } = req.query;
+  if (!courseId || !setId) return res.status(400).json({ error: 'courseId and setId required' });
+
+  const course = await sql`
+    SELECT id FROM courses WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid
+  `;
+  if (course.length === 0) return res.status(403).json({ error: 'Not the owner' });
+  const set = await sql`
+    SELECT 1 WHERE ${setId}::uuid IN (${courseSetIdsSql(sql, courseId)})
+  `;
+  if (set.length === 0) return res.status(404).json({ error: 'Set not found in this course' });
+
+  const rows = await sql`
+    SELECT cm.user_id AS id, COALESCE(u.display_name, u.user_name, 'Ученик') AS name,
+      (SELECT COUNT(DISTINCT cp.card_id)::int FROM card_progress cp
+        JOIN cards c ON c.id = cp.card_id
+        WHERE cp.user_id = cm.user_id AND c.set_id = ${setId}::uuid) AS seen,
+      (SELECT COUNT(*)::int FROM cards WHERE set_id = ${setId}::uuid) AS total
+    FROM course_members cm
+    JOIN users u ON u.id = cm.user_id
+    WHERE cm.course_id = ${courseId}::uuid AND cm.role = 'student'
+    ORDER BY name
+  `;
+  return res.status(200).json({
+    ok: true,
+    students: rows.map((r) => ({ id: r.id, name: r.name, status: setStudentStatus(r) })),
+  });
+}
+
+export function setStudentStatus({ seen, total }) {
+  if (total > 0 && seen >= total) return 'completed';
+  return seen > 0 ? 'started' : 'not_opened';
+}
+
 // ─── Наборы курса (ученик) ────────────────────────────────────
 
 export async function courseSetsByMembership(req, res, sql, userId) {
