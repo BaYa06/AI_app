@@ -54,3 +54,12 @@ describe('карточка задания ученика', () => {
     expect(teacherInitials('Ильяз агай')).toBe('ИА');
   });
 });
+
+describe('карточка задания «Повторить трудные» (Teacher 43)', () => {
+  it('«Повторить N трудных слов» вместо «Выучить»', () => {
+    expect(homeworkCardTexts(hw({ kind: 'review', words: 3 })).title).toBe(
+      'Повторить 3 трудных слова'
+    );
+    expect(homeworkCardTexts(hw({ words: 3 })).title).toBe('Выучить Ünite 4');
+  });
+});

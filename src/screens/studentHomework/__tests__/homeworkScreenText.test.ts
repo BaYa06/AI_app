@@ -63,3 +63,14 @@ describe('экран задания', () => {
     expect(t.primary).toBeNull();
   });
 });
+
+describe('экран задания «Повторить трудные» (Teacher 43)', () => {
+  it('заголовок и кнопка — «Повторить N трудных слов», сессия — «Повторить»', () => {
+    const t = homeworkScreenTexts(
+      hw({ kind: 'review', cardIds: ids(6), words: 6, creditedCardIds: ids(2), wrongCardIds: [] })
+    );
+    expect(t.title).toBe('Повторить 6 трудных слов');
+    expect(t.primary).toEqual({ title: 'Повторить 4 трудных слова', prefer: 'review' });
+    expect(t.secondary).toBeNull();
+  });
+});

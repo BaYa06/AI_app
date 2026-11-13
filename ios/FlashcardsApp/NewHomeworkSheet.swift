@@ -52,6 +52,14 @@ class NewHomeworkSheetModule: RCTEventEmitter, UISheetPresentationControllerDele
     }
   }
 
+  /// Трудные слова группы — для типа «Повторить трудные» (Teacher 43)
+  @objc(setHardCards:)
+  func setHardCards(_ cardIds: NSArray) {
+    DispatchQueue.main.async {
+      self.model?.setHardCards(Set(cardIds as? [String] ?? []))
+    }
+  }
+
   @objc(setBusy:)
   func setBusy(_ busy: Bool) {
     DispatchQueue.main.async {
@@ -255,6 +263,8 @@ final class HwModel: ObservableObject {
   @Published var expanded: String?
 
   private var initialCardIds: Set<String>
+  /// Трудные слова группы; nil — ещё не пришли
+  private var hardCardIds: Set<String>?
 
   var onCreate: () -> Void = {}
   var onCancel: () -> Void = {}
@@ -309,6 +319,29 @@ final class HwModel: ObservableObject {
     for s in list { sel[s.id] = Set(s.words.map(\.id).filter { initialCardIds.contains($0) }) }
     selection = sel
     expanded = list.first(where: { !(sel[$0.id]?.isEmpty ?? true) })?.id
+  }
+
+  // MARK: Тип задания
+
+  func setHardCards(_ ids: Set<String>) {
+    hardCardIds = ids
+    // Тип уже выбран, а слова пришли позже — отмечаем их сейчас (если учитель ещё ничего не менял сам)
+    if task == "hard", selectedCount == 0 || Set(selectedCardIds) == initialCardIds { applyHardCards() }
+  }
+
+  /// «Повторить трудные»: слова по умолчанию — трудные слова группы
+  func pickTask(_ id: String) {
+    UISelectionFeedbackGenerator().selectionChanged()
+    task = id
+    if id == "hard" { applyHardCards() }
+  }
+
+  private func applyHardCards() {
+    guard let hard = hardCardIds, !hard.isEmpty, let list = sets else { return }
+    var sel: [String: Set<String>] = [:]
+    for s in list { sel[s.id] = Set(s.words.map(\.id).filter { hard.contains($0) }) }
+    guard sel.values.contains(where: { !$0.isEmpty }) else { return }
+    selection = sel
   }
 
   var selectedCount: Int { selection.values.reduce(0) { $0 + $1.count } }
@@ -625,10 +658,10 @@ struct HwFormView: View {
         HwRow(
           symbol: nil,
           title: task.label,
-          subtitle: task.id == "learn" ? model.wordsSummary : task.sub,
+          subtitle: model.task == task.id ? model.wordsSummary : (task.id == "learn" ? "" : task.sub),
           selected: model.task == task.id,
           palette: p
-        ) { model.task = task.id }
+        ) { model.pickTask(task.id) }
       }
     }
   }

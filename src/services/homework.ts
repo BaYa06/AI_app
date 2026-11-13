@@ -11,8 +11,12 @@ import { SESSION_NEW_WORDS, SESSION_REVIEW_MAX } from './LessonService';
 import { pluralize } from '@/utils';
 
 /** Задание глазами ученика (api/progress.js?action=my-homework) */
+/** Тип задания: выучить слова или повторить трудные (Teacher 43); нет поля — 'learn' */
+export type HomeworkKind = 'learn' | 'review';
+
 export interface StudentHomework {
   id: string;
+  kind?: HomeworkKind;
   courseId: string;
   courseTitle: string;
   title: string;
@@ -38,6 +42,7 @@ export interface StudentHomework {
 export interface TeacherHomeworkSummary {
   id: string;
   title: string;
+  kind?: 'learn' | 'review';
   words: number;
   dueAt: string;
   minScore: number | null;
@@ -76,6 +81,7 @@ export interface HomeworkStatusData {
     minScore: number | null;
     createdAt: string;
     canceled: boolean;
+    kind?: 'learn' | 'review';
     /** Слова задания (Teacher 39); старый сервер поле не отдаёт */
     cardIds?: string[];
   };
@@ -88,6 +94,11 @@ export interface HomeworkSubmission {
   late: boolean;
   score: number;
   diamonds: number;
+}
+
+/** «3 трудных слова» */
+export function hardWordsText(n: number): string {
+  return `${n} ${pluralize(n, 'трудное слово', 'трудных слова', 'трудных слов')}`;
 }
 
 /** Порог по умолчанию и варианты в окне «Новое задание» (решение 4) */
@@ -179,7 +190,7 @@ export interface HomeworkSessionPlan {
  * Пусто — всё засчитано и трудных нет.
  */
 export function buildHomeworkSessionPlan(
-  hw: Pick<StudentHomework, 'cardIds' | 'creditedCardIds' | 'wrongCardIds'>,
+  hw: Pick<StudentHomework, 'cardIds' | 'creditedCardIds' | 'wrongCardIds' | 'kind'>,
   cards: Record<string, Card | undefined>,
   options: { prefer?: 'learn' | 'review'; now?: number } = {}
 ): HomeworkSessionPlan {
@@ -201,6 +212,11 @@ export function buildHomeworkSessionPlan(
     kind: 'review',
     cardIds: review.slice(0, SESSION_REVIEW_MAX),
   });
+  // «Повторить трудные» (Teacher 43): незасчитанные слова тоже идут сессией «Повторить»
+  if (hw.kind === 'review') {
+    const pool = [...left, ...review.filter((id) => credited.has(id))];
+    return { kind: 'review', cardIds: pool.slice(0, SESSION_REVIEW_MAX) };
+  }
   if (options.prefer === 'learn' && left.length > 0) return learn();
   if (review.length > 0) return rev();
   if (left.length > 0) return learn();

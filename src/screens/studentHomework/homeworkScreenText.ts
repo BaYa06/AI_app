@@ -5,6 +5,7 @@
 import {
   dueRelative,
   formatDue,
+  hardWordsText,
   homeworkLeft,
   homeworkVolume,
   needsScoreRetry,
@@ -42,7 +43,14 @@ export function homeworkScreenTexts(
 
   let primary: HomeworkScreenTexts['primary'] = null;
   let secondary: HomeworkScreenTexts['secondary'] = null;
-  if (!hw.submitted) {
+  if (!hw.submitted && hw.kind === 'review') {
+    // «Повторить трудные» (Teacher 43): незасчитанные слова тоже идут сессией «Повторить»
+    if (left > 0) {
+      primary = { title: `Повторить ${hardWordsText(left)}`, prefer: 'review' };
+    } else if (retry || wrong > 0) {
+      primary = { title: reviewTitle, prefer: 'review' };
+    }
+  } else if (!hw.submitted) {
     if (left > 0) {
       primary = { title: learnTitle, prefer: 'learn' };
       if (wrong > 0) {
@@ -54,7 +62,7 @@ export function homeworkScreenTexts(
   }
 
   return {
-    title: `Задание: ${hw.title}`,
+    title: hw.kind === 'review' ? `Повторить ${hardWordsText(hw.words)}` : `Задание: ${hw.title}`,
     subtitle: [hw.teacher ? `от: ${hw.teacher}` : null, hw.courseTitle].filter(Boolean).join(' · '),
     due: `до: ${formatDue(hw.dueAt)}`,
     dueHint: overdue

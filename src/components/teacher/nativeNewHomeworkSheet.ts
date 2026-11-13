@@ -16,6 +16,7 @@ import {
   MINUTES_PER_SESSION,
   WORDS_PER_SESSION,
 } from '@/services/homework';
+import { NeonService } from '@/services/NeonService';
 import { pluralize } from '@/utils';
 import {
   DEFAULT_MIN_SCORE,
@@ -35,6 +36,8 @@ import type { NewHomeworkSheetProps } from './NewHomeworkSheet';
 interface NewHomeworkSheetModule {
   present(options: object): void;
   setSets(sets: object[]): void;
+  /** Трудные слова группы для типа «Повторить трудные» (Teacher 43); в старой сборке метода нет */
+  setHardCards?(cardIds: string[]): void;
   setBusy(busy: boolean): void;
   setError(message: string | null): void;
   finish(): void;
@@ -142,6 +145,7 @@ export function useNativeNewHomeworkSheet(props: NewHomeworkSheetProps) {
             due: new Date(event.due),
             minScore: event.minScore < 0 ? null : event.minScore,
             userIds: event.userIds,
+            task: event.task === 'hard' ? 'hard' : 'learn',
           });
           if (res.ok) {
             created.current = {
@@ -248,4 +252,16 @@ export function useNativeNewHomeworkSheet(props: NewHomeworkSheetProps) {
     if (!native || !shown.current || !sets) return;
     native.setSets(sets.map((s) => ({ id: s.id, title: s.title, words: s.words })));
   }, [sets, props.visible]);
+
+  // Трудные слова группы — для типа «Повторить трудные» (Teacher 43): Swift отметит их при выборе типа
+  useEffect(() => {
+    if (!native?.setHardCards || !props.visible || !TEACHER_LESSON_PREP_ENABLED) return;
+    let cancelled = false;
+    NeonService.loadCourseHardCards(props.courseId).then((hard) => {
+      if (!cancelled && shown.current && hard) native.setHardCards?.(hard.map((c) => c.cardId));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [props.visible, props.courseId]);
 }

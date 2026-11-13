@@ -628,7 +628,12 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
   принимает `cardIds`, `userIds`, `dueAt`. Из П4: «Задать трудные» — трудные слова разминки,
   вся группа, срок — к следующему уроку; «Отправить домой» — все слова разминки, только
   не бывшие. Swift — `swiftc -parse`, в одной сборке с JS.
-- [ ] **Teacher 43. Тип задания «Повторить трудные».** Сервер: `homework.kind` принимает `review`
+- [x] **Teacher 43. Тип задания «Повторить трудные».** ✅ Сервер: `parseHomeworkKind`, `kind` в
+  `homework-create` / `homework-list` / `homework-status` / `my-homework` (миграция не нужна — колонка
+  `homework.kind` есть с 041). Клиент: `hardCardsToWords`, выбор типа в RN-окне грузит трудные слова;
+  Swift — `setHardCards` + `pickTask` (`.m` обновлён, `swiftc -parse` чисто); ученик — `hardWordsText`,
+  подписи карточки и экрана, `buildHomeworkSessionPlan` для `review`. Неизвестный `kind` → 400.
+  Задание: Сервер: `homework.kind` принимает `review`
   (`homework-create`, проверка как у `learn`); зачёт — тот же (вариант Б), сессия ученика — «Повторить»
   по словам задания. Окно 11: тип «Повторить трудные» виден (за `TEACHER_LESSON_PREP_ENABLED`), при
   выборе слова по умолчанию — трудные слова группы (Teacher 33). «Задать трудные» из П4 создаёт

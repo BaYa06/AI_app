@@ -14,6 +14,7 @@ import { Button, Chip, ListRow, Sheet, toast } from '@/components/ui';
 import { borderRadius, spacing } from '@/constants';
 import { TEACHER_LESSON_PREP_ENABLED } from '@/config/features';
 import { MIN_SCORE_OPTIONS, dueRelative, homeworkVolumeText } from '@/services/homework';
+import { NeonService } from '@/services/NeonService';
 import type { ScheduleItem } from '@/utils/nextLesson';
 import { pluralize } from '@/utils';
 import { DueWheelPicker } from './DueWheelPicker';
@@ -24,6 +25,7 @@ import {
   NEW_HOMEWORK_TEXTS as T,
   assignButtonText,
   createHomework,
+  hardCardsToWords,
   defaultDue,
   dueCardText,
   duePresets,
@@ -137,6 +139,7 @@ export function NewHomeworkSheetRN({
       due,
       minScore,
       userIds: pickAll ? null : [...picked],
+      task,
     });
     setSaving(false);
     if (!res.ok) {
@@ -149,13 +152,33 @@ export function NewHomeworkSheetRN({
     onCreated(res.id);
   };
 
+  /** «Повторить трудные»: слова по умолчанию — трудные слова группы (Teacher 43) */
+  const pickTask = async (key: Task) => {
+    setTask(key);
+    if (key !== 'hard') return;
+    setError(null);
+    const hard = await NeonService.loadCourseHardCards(courseId);
+    if (hard && hard.length > 0) setWords(hardCardsToWords(hard));
+    else if (hard) setError(T.taskHardEmpty);
+  };
+
   const check = <Check size={20} color={colors.primary} />;
   const space = <View style={st.checkSpace} />;
   const tasks: Array<{ key: Task; title: string; sub: string }> = [
-    { key: 'learn', title: T.taskLearn, sub: words ? wordsSummary(words) : T.wordsPick },
+    {
+      key: 'learn',
+      title: T.taskLearn,
+      sub: task === 'hard' ? '' : words ? wordsSummary(words) : T.wordsPick,
+    },
     // «Пройти тест» отложен (решение 9 этапа 3) — в списке только то, что отдаёт homeworkTasks
     ...(taskKeys.includes('hard')
-      ? [{ key: 'hard' as Task, title: T.taskHard, sub: T.taskHardHint }]
+      ? [
+          {
+            key: 'hard' as Task,
+            title: T.taskHard,
+            sub: task === 'hard' && words ? wordsSummary(words) : T.taskHardHint,
+          },
+        ]
       : []),
   ];
 
@@ -246,7 +269,7 @@ export function NewHomeworkSheetRN({
               key={t.key}
               title={t.title}
               subtitle={t.sub}
-              onPress={() => setTask(t.key)}
+              onPress={() => pickTask(t.key)}
               right={task === t.key ? check : space}
             />
           ))}

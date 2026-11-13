@@ -13,6 +13,8 @@ RCT_EXTERN_METHOD(present:(NSDictionary *)options)
 
 RCT_EXTERN_METHOD(setSets:(NSArray *)sets)
 
+RCT_EXTERN_METHOD(setHardCards:(NSArray *)cardIds)
+
 RCT_EXTERN_METHOD(setBusy:(BOOL)busy)
 
 RCT_EXTERN_METHOD(setError:(NSString *)message)

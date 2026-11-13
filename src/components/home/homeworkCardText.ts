@@ -2,6 +2,7 @@
 import {
   dueRelative,
   formatDue,
+  hardWordsText,
   homeworkLeft,
   homeworkVolume,
   needsScoreRetry,
@@ -25,7 +26,7 @@ export function homeworkCardTexts(hw: StudentHomework, now: number = Date.now())
   const { minutes } = homeworkVolume(left);
   return {
     from: `Задание от: ${hw.teacher || 'учителя'}`,
-    title: `Выучить ${hw.title}`,
+    title: hw.kind === 'review' ? `Повторить ${hardWordsText(hw.words)}` : `Выучить ${hw.title}`,
     due: `до: ${formatDue(hw.dueAt)} · ${dueRelative(hw.dueAt, now)}`,
     progress: retry
       ? `Все ${hw.words} ${pluralize(hw.words, 'слово', 'слова', 'слов')} пройдены · верно ${hw.score}%, нужно ${hw.minScore}%`

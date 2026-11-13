@@ -17,6 +17,8 @@ export interface CreateHomeworkInput {
   minScore: number | null;
   /** null — вся группа */
   userIds: string[] | null;
+  /** 'review' — «Повторить трудные» (Teacher 43); нет — 'learn' */
+  kind?: 'learn' | 'review';
 }
 
 export const homeworkApi = {

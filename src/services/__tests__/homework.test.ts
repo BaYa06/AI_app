@@ -140,3 +140,25 @@ describe('план сессии по словам задания', () => {
     expect(plan.cardIds).toEqual([]);
   });
 });
+
+describe('задание «Повторить трудные» (Teacher 43)', () => {
+  const cards = { a: card('a', 2), b: card('b', 0), c: card('c', 3) };
+
+  it('незасчитанные слова идут сессией «Повторить», потом — засчитанные с ошибкой', () => {
+    const plan = buildHomeworkSessionPlan(
+      hw({ kind: 'review', cardIds: ['a', 'b', 'c'], creditedCardIds: ['c'], wrongCardIds: ['c'] }),
+      cards,
+      { now: NOW }
+    );
+    expect(plan).toEqual({ kind: 'review', cardIds: ['a', 'b', 'c'] });
+  });
+
+  it('всё засчитано без ошибок — запускать нечего', () => {
+    const plan = buildHomeworkSessionPlan(
+      hw({ kind: 'review', cardIds: ['a', 'b'], creditedCardIds: ['a', 'b'] }),
+      cards,
+      { now: NOW }
+    );
+    expect(plan.cardIds).toEqual([]);
+  });
+});

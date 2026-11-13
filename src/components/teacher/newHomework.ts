@@ -38,6 +38,20 @@ export interface NewHomeworkInput {
   minScore: number | null;
   /** null — вся группа */
   userIds: string[] | null;
+  /** 'hard' — задание типа «Повторить трудные» (kind = review) */
+  task?: HomeworkTask;
+}
+
+/** Трудные слова группы (Teacher 33) → слова задания: порядок сервера, наборы — для названия */
+export function hardCardsToWords(
+  hard: Array<{ cardId: string; setId: string; setTitle: string }>
+): HomeworkWords {
+  const sets = new Map<string, string>();
+  for (const c of hard) if (!sets.has(c.setId)) sets.set(c.setId, c.setTitle);
+  return {
+    cardIds: hard.map((c) => c.cardId),
+    sets: [...sets].map(([id, title]) => ({ id, title })),
+  };
 }
 
 /** Срок по умолчанию и у быстрых вариантов — в 20:00 (как в макете) */
@@ -59,6 +73,7 @@ export const NEW_HOMEWORK_TEXTS = {
   taskTestHint: '20 вопросов, одна попытка',
   taskHard: 'Повторить трудные',
   taskHardHint: 'Трудные слова группы',
+  taskHardEmpty: 'Пока мало ответов — трудных слов нет. Выбери слова сам',
   dueLabel: 'Срок',
   duePrefix: 'до:',
   dueTomorrow: 'Завтра',
@@ -250,6 +265,7 @@ export async function createHomework(
     dueAt: input.due.toISOString(),
     minScore: input.minScore,
     userIds: input.userIds,
+    ...(input.task === 'hard' ? { kind: 'review' as const } : {}),
   });
   Analytics.teacherHomeworkCreated({
     words: input.words.cardIds.length,

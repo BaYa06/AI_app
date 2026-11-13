@@ -29,11 +29,19 @@ async function ownedHomework(sql, homeworkId, userId) {
   return rows[0] || null;
 }
 
-/** POST { courseId, title, cardIds, dueAt, minScore?, userIds? } → { homework: { id } } */
+/** Тип задания (Teacher 43): нет поля — 'learn' (старый клиент), неизвестное значение — null */
+export function parseHomeworkKind(value) {
+  if (value === undefined || value === null) return 'learn';
+  return value === 'learn' || value === 'review' ? value : null;
+}
+
+/** POST { courseId, title, cardIds, dueAt, minScore?, userIds?, kind? } → { homework: { id } } */
 export async function homeworkCreate(req, res, sql, userId) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { courseId, title, cardIds, dueAt, minScore = null, userIds = null } = req.body || {};
   if (!isUuid(courseId)) return res.status(400).json({ error: 'courseId required' });
+  const kind = parseHomeworkKind((req.body || {}).kind);
+  if (!kind) return res.status(400).json({ error: 'invalid kind', reason: 'kind' });
   const bad = validateHomeworkInput({ title, cardIds, dueAt, minScore });
   if (bad) return res.status(400).json({ error: `invalid ${bad}`, reason: bad });
   const ids = [...new Set(cardIds)];
@@ -71,9 +79,9 @@ export async function homeworkCreate(req, res, sql, userId) {
   }
 
   const created = await sql`
-    INSERT INTO homework (course_id, created_by, title, card_ids, due_at, min_score, assign_all)
+    INSERT INTO homework (course_id, created_by, title, card_ids, due_at, min_score, assign_all, kind)
     VALUES (${courseId}::uuid, ${userId}::uuid, ${title.trim()}, ${ids}::uuid[],
-      ${new Date(dueAt).toISOString()}::timestamptz, ${minScore}, ${pick === null})
+      ${new Date(dueAt).toISOString()}::timestamptz, ${minScore}, ${pick === null}, ${kind})
     RETURNING id, due_at, created_at
   `;
   const homeworkId = created[0].id;
@@ -121,7 +129,7 @@ export async function homeworkList(req, res, sql, userId) {
   if (course.length === 0) return res.status(403).json({ error: 'Not the owner' });
 
   const rows = await sql`
-    SELECT h.id, h.title, h.due_at, h.min_score, h.assign_all, h.created_at,
+    SELECT h.id, h.title, h.due_at, h.min_score, h.assign_all, h.created_at, h.kind,
       (SELECT COUNT(*)::int FROM cards WHERE id = ANY(h.card_ids)) AS words,
       CASE WHEN h.assign_all
         THEN (SELECT COUNT(*)::int FROM course_members cm
@@ -143,6 +151,7 @@ export async function homeworkList(req, res, sql, userId) {
     homework: rows.map((r) => ({
       id: r.id,
       title: r.title,
+      kind: r.kind || 'learn',
       words: r.words,
       dueAt: r.due_at,
       minScore: r.min_score,
@@ -207,6 +216,7 @@ async function loadHomeworkStatus(sql, hw) {
       minScore: hw.min_score,
       createdAt: hw.created_at,
       canceled: !!hw.canceled_at,
+      kind: hw.kind || 'learn',
       // Слова задания — для «Проверить на уроке» (Teacher 39)
       cardIds: hw.card_ids,
     },

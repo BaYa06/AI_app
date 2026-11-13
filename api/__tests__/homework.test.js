@@ -298,3 +298,26 @@ describe('homework-status / list / cancel', () => {
     expect(writes()).toEqual([]);
   });
 });
+
+describe('тип задания (Teacher 43)', () => {
+  const { parseHomeworkKind } = require('../_handlers/teacher/homework.js');
+
+  it('нет поля — learn; review проходит; неизвестное — null', () => {
+    expect(parseHomeworkKind(undefined)).toBe('learn');
+    expect(parseHomeworkKind('review')).toBe('review');
+    expect(parseHomeworkKind('test')).toBeNull();
+  });
+
+  it('неизвестный kind — 400 и ничего не пишется', async () => {
+    const res = await call('POST', 'homework-create', {
+      courseId: COURSE,
+      title: 'Ünite 4',
+      cardIds: [CARD_A],
+      dueAt: tomorrow(),
+      kind: 'exam',
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.body.reason).toBe('kind');
+    expect(writes()).toEqual([]);
+  });
+});

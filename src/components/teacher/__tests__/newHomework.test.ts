@@ -152,3 +152,23 @@ describe('homeworkFormStart (Teacher 42)', () => {
     expect(homeworkTasks(true)).toEqual(['learn', 'hard']);
   });
 });
+
+describe('«Повторить трудные» (Teacher 43)', () => {
+  const { hardCardsToWords } = require('../newHomework');
+
+  it('трудные слова → слова задания: порядок сервера, наборы без повторов', () => {
+    expect(
+      hardCardsToWords([
+        { cardId: 'a', setId: 's1', setTitle: 'Ünite 1' },
+        { cardId: 'b', setId: 's3', setTitle: 'Ünite 3' },
+        { cardId: 'c', setId: 's1', setTitle: 'Ünite 1' },
+      ])
+    ).toEqual({
+      cardIds: ['a', 'b', 'c'],
+      sets: [
+        { id: 's1', title: 'Ünite 1' },
+        { id: 's3', title: 'Ünite 3' },
+      ],
+    });
+  });
+});

@@ -31,7 +31,7 @@ function myHomeworkSql(sql, me) {
 export async function myHomework(sql, me) {
   const rows = await sql`
     SELECT h.id, h.course_id, c.title AS course_title, h.title, h.card_ids, h.due_at, h.min_score,
-      h.created_at, COALESCE(u.display_name, u.user_name) AS teacher,
+      h.kind, h.created_at, COALESCE(u.display_name, u.user_name) AS teacher,
       (SELECT COUNT(*)::int FROM cards WHERE id = ANY(h.card_ids)) AS words,
       (SELECT COALESCE(array_agg(DISTINCT set_id), '{}') FROM cards WHERE id = ANY(h.card_ids)) AS set_ids,
       (SELECT COALESCE(array_agg(hc.card_id), '{}') FROM homework_credits hc
@@ -65,6 +65,8 @@ export async function myHomework(sql, me) {
         courseId: r.course_id,
         courseTitle: r.course_title,
         title: r.title,
+        // 'review' — «Повторить трудные» (Teacher 43); старый клиент поле не читает
+        kind: r.kind || 'learn',
         teacher: r.teacher,
         cardIds: r.card_ids,
         setIds: r.set_ids || [],
