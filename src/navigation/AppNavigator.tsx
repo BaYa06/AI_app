@@ -84,13 +84,20 @@ import { LibrarySetDetailScreen } from '@/screens/LibrarySetDetailScreen';
 import { BookDetailScreen } from '@/screens/BookDetailScreen';
 import { CourseBooksScreen } from '@/screens/CourseBooksScreen';
 import { MyPublicationsScreen } from '@/screens/MyPublicationsScreen';
-import { COMMUNITY_LIBRARY_ENABLED, LIBRARY_CATALOG_ENABLED } from '@/config/features';
+import {
+  COMMUNITY_LIBRARY_ENABLED,
+  LIBRARY_CATALOG_ENABLED,
+  TEACHER_INSIGHTS_ENABLED,
+  TEACHER_LESSON_PREP_ENABLED,
+} from '@/config/features';
+import { rewriteTeacherLink } from '@/services/teacherNotifications';
 import { PersonalInfoScreen } from '@/screens/PersonalInfoScreen';
 import { SecurityScreen } from '@/screens/SecurityScreen';
 import { TeacherCourseStatsScreen } from '@/screens/TeacherCourseStatsScreen';
 import { TeacherStudentsScreen } from '@/screens/TeacherStudentsScreen';
 import { TeacherHomeworkScreen } from '@/screens/TeacherHomeworkScreen';
 import { TeacherLessonPrepScreen } from '@/screens/TeacherLessonPrepScreen';
+import { TeacherNotificationsScreen } from '@/screens/TeacherNotificationsScreen';
 import { StudentHomeworkScreen } from '@/screens/StudentHomeworkScreen';
 import { HomeworkDoneScreen } from '@/screens/HomeworkDoneScreen';
 import { StudentDetailScreen } from '@/screens/StudentDetailScreen';
@@ -263,6 +270,16 @@ function MainTabs() {
 // Из flashly:// пропускаем только ссылки виджета (plan/new/widgets.md, 0.3): lesson и set/<setId>.
 // Вход (flashly://auth-callback) и приглашения по-прежнему разбирает App.tsx.
 // Тап по пушу (plan/new/push_notifications.md, 0.5) идёт сюда же: data.link пуша — та же flashly:// ссылка.
+/** Ссылка пуша учителя на экран этапа, выключенного флагом, — на ближайший работающий экран */
+function teacherPushLink(link: string | null): string | null {
+  return link
+    ? rewriteTeacherLink(link, {
+        lessonPrep: TEACHER_LESSON_PREP_ENABLED,
+        insights: TEACHER_INSIGHTS_ENABLED,
+      })
+    : null;
+}
+
 const NATIVE_LINKING: LinkingOptions<RootStackParamList> = {
   prefixes: ['flashly://'],
   filter: isNavigationUrl,
@@ -270,12 +287,12 @@ const NATIVE_LINKING: LinkingOptions<RootStackParamList> = {
   async getInitialURL() {
     const url = await Linking.getInitialURL();
     if (url) return url;
-    return handlePushOpen(await getInitialPushData());
+    return teacherPushLink(handlePushOpen(await getInitialPushData()));
   },
   subscribe(listener) {
     const linkSubscription = Linking.addEventListener('url', ({ url }) => listener(url));
     const unsubscribePush = onPushOpened((data) => {
-      const link = handlePushOpen(data);
+      const link = teacherPushLink(handlePushOpen(data));
       if (link) listener(link);
     });
     return () => {
@@ -323,6 +340,16 @@ const NATIVE_LINKING: LinkingOptions<RootStackParamList> = {
       TeacherCourseStats: 'teacher/:courseId',
       TeacherStudents: 'teacher/:courseId/students',
       StudentHomework: 'homework/:homeworkId',
+      // Пуши и колокольчик учителя (plan/new/teacher_cabinet.md, этап 4). Экран выключенного этапа
+      // в ссылке заменяет teacherPushLink.
+      ...(TEACHER_LESSON_PREP_ENABLED ? { TeacherLessonPrep: 'lesson-prep/:courseId' } : null),
+      TeacherHomework: 'teacher-homework/:courseId/:homeworkId',
+      ...(TEACHER_INSIGHTS_ENABLED
+        ? {
+            StudentDetail: 'teacher-student/:courseId/:studentId',
+            TeacherNotifications: 'teacher-notifications',
+          }
+        : null),
     },
   },
 };
@@ -590,6 +617,11 @@ export function AppNavigator() {
         <Stack.Screen
           name="TeacherHomework"
           component={TeacherHomeworkScreen}
+          options={{ headerShown: false, gestureEnabled: true }}
+        />
+        <Stack.Screen
+          name="TeacherNotifications"
+          component={TeacherNotificationsScreen}
           options={{ headerShown: false, gestureEnabled: true }}
         />
         <Stack.Screen

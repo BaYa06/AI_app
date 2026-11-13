@@ -49,6 +49,22 @@ function sampleData(n) {
     rival: SAMPLE_NAME,
     setId: 's1',
     courseId: 'c1',
+    // Пуши учителю (plan/new/teacher_cabinet.md, этап 4)
+    time: '10:30',
+    ready: n,
+    total: n + 10,
+    readyLabel: 'Сдали задание',
+    hardWords: ['görüşmek üzere', 'tekrar etmek', 'vedalaşmak'],
+    active: n,
+    answers: n * 40,
+    correctPct: 84,
+    inactive: n,
+    names: ['Бекжан', 'Batyr', 'Fatima'],
+    submitted: n,
+    student: 'Аяна',
+    studentId: 'u1',
+    unit: 'Ünite 4',
+    started: n,
   };
 }
 

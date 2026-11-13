@@ -25,6 +25,7 @@ import { NeonService } from '@/services/NeonService';
 import { Analytics } from '@/services/analytics';
 import { dueRelative, formatDue, type HomeworkStatusData } from '@/services/homework';
 import type { RootStackParamList } from '@/types/navigation';
+import { useCourseTitle } from '@/components/teacher/useCourseTitle';
 import { formatLastActivity, getInitials } from './teacherStudents/helpers';
 import {
   fixedText,
@@ -107,7 +108,9 @@ function StatusRing({
 }
 
 export function TeacherHomeworkScreen({ navigation, route }: Props) {
-  const { homeworkId, courseId, courseTitle } = route.params;
+  const { homeworkId, courseId } = route.params;
+  // По ссылке из пуша названия курса в параметрах нет — берём из списка курсов
+  const courseTitle = useCourseTitle(courseId, route.params.courseTitle);
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const [data, setData] = useState<HomeworkStatusData | null>(null);

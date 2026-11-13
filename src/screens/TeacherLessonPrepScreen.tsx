@@ -27,6 +27,7 @@ import {
   type PrepReadiness,
 } from '@/services/lessonPrep';
 import { useLessonPrep } from '@/components/teacher/useLessonPrep';
+import { useCourseTitle } from '@/components/teacher/useCourseTitle';
 import { pluralize } from '@/utils';
 import type { RootStackParamList } from '@/types/navigation';
 
@@ -34,7 +35,9 @@ type Props = NativeStackScreenProps<RootStackParamList, 'TeacherLessonPrep'>;
 type Colors = ReturnType<typeof useThemeColors>;
 
 export function TeacherLessonPrepScreen({ navigation, route }: Props) {
-  const { courseId, courseTitle } = route.params;
+  const { courseId } = route.params;
+  // По ссылке из пуша названия курса в параметрах нет — берём из списка курсов
+  const courseTitle = useCourseTitle(courseId, route.params.courseTitle);
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const { data, warmup, nextLesson, loading, refreshing, refresh } = useLessonPrep(courseId);

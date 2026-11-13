@@ -38,6 +38,7 @@ import {
 } from '@/components/study/StudyModeSheet';
 import { CoursesDrawer } from '@/components/home/CoursesDrawer';
 import { TEACHER_CABINET_ENABLED, TEACHER_HOMEWORK_ENABLED } from '@/config/features';
+import { useTeacherBell } from '@/components/teacher/useTeacherBell';
 import { NewCourseSheet } from '@/components/teacher/NewCourseSheet';
 import { CourseJoinCodeDialog } from '@/components/CourseJoinCodeDialog';
 import {
@@ -1180,6 +1181,9 @@ export function HomeScreen({ navigation, route }: any) {
     return course.title || 'Курс';
   }, [isTeacher, activeCourseId, courses]);
 
+  // Колокольчик учителя (Teacher 49): непросмотренные уведомления; без флага этапа 4 не грузится
+  const teacherBell = useTeacherBell(teacherCourseTitle !== null);
+
   // Ученики и прогресс группы по наборам — для карточки урока и строк наборов (Teacher 4–5)
   const teacherCourse = useTeacherCourseData(
     teacherCourseTitle !== null ? activeCourseId : null,
@@ -1742,6 +1746,15 @@ export function HomeScreen({ navigation, route }: any) {
           ratingTeaser={ratingTeaser}
           openLeaderboard={openLeaderboard}
           teacherCourseTitle={teacherCourseTitle}
+          teacherBell={
+            teacherBell.enabled
+              ? {
+                  unseen: teacherBell.unseen,
+                  onPress: () =>
+                    (navigation?.getParent?.() ?? navigation)?.navigate('TeacherNotifications'),
+                }
+              : null
+          }
         />
 
         <View style={styles.body}>

@@ -73,24 +73,26 @@ function excerpt(text, max) {
  */
 export const TEACHER_PUSH_MIN_APP_VERSION = '1.8.10';
 const enc = encodeURIComponent;
-/** Ссылки пушей учителя: клиент сам решает, какой экран открыть (флаги этапов) */
+/**
+ * Ссылки пушей учителя — пути из NATIVE_LINKING приложения (src/navigation/AppNavigator.tsx).
+ * «Перед уроком» при выключенном этапе 3 клиент сам заменяет на страницу курса.
+ */
 const teacherLink = {
-  prep: (data) =>
-    data?.courseId ? `flashly://teacher/prep/${enc(data.courseId)}?from=push` : null,
-  course: (data) =>
-    data?.courseId ? `flashly://teacher/course/${enc(data.courseId)}?from=push` : null,
+  prep: (data) => (data?.courseId ? `flashly://lesson-prep/${enc(data.courseId)}?from=push` : null),
+  course: (data) => (data?.courseId ? `flashly://teacher/${enc(data.courseId)}?from=push` : null),
   students: (data) =>
-    data?.courseId ? `flashly://teacher/students/${enc(data.courseId)}?from=push` : null,
+    data?.courseId ? `flashly://teacher/${enc(data.courseId)}/students?from=push` : null,
   homework: (data) =>
     data?.homeworkId && data?.courseId
-      ? `flashly://teacher/homework/${enc(data.courseId)}/${enc(data.homeworkId)}?from=push`
+      ? `flashly://teacher-homework/${enc(data.courseId)}/${enc(data.homeworkId)}?from=push`
       : null,
   student: (data) =>
     data?.courseId && data?.studentId
-      ? `flashly://teacher/student/${enc(data.courseId)}/${enc(data.studentId)}?from=push`
+      ? `flashly://teacher-student/${enc(data.courseId)}/${enc(data.studentId)}?from=push`
       : null,
 };
-const TEACHER_HOME_LINK = 'flashly://teacher/home?from=push';
+/** Нет курса в данных и «Итоги недели» — список уведомлений учителя */
+const TEACHER_HOME_LINK = 'flashly://teacher-notifications?from=push';
 const teacherLinkOr = (make) => (data) => make(data) || TEACHER_HOME_LINK;
 
 /** '1.6.10' >= '1.6.9' — по числам, а не по строке */

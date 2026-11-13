@@ -55,6 +55,15 @@ export const styles = StyleSheet.create({
     letterSpacing: 0,
   },
   // Ширина как у кнопки меню слева — серия и алмазы по центру, даже когда справа пусто
+  bellDot: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 10,
+    height: 10,
+    borderRadius: borderRadius.full,
+    borderWidth: 2,
+  },
   headerRight: {
     minWidth: heights.touch,
     flexDirection: 'row',

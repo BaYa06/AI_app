@@ -1,6 +1,7 @@
 /** Подготовка к уроку (plan/new/teacher_cabinet.md, этап 3): запросы api/teacher.js. */
 import { callTeacherApi } from './core';
 import type { HardCard, SetStudent } from '../lessonPrep';
+import type { TeacherNotification } from '../teacherNotifications';
 
 export const lessonPrepApi = {
   /** Трудные слова группы за 14 дней; null — нет сети или ошибка. */
@@ -29,5 +30,20 @@ export const lessonPrepApi = {
       { method: 'POST', body: { courseId, studentIds } }
     );
     return res.ok ? res.data : null;
+  },
+
+  /** Колокольчик учителя (Teacher 49): записи за 30 дней; null — нет сети или старый сервер. */
+  async loadTeacherNotifications(): Promise<{
+    notifications: TeacherNotification[];
+    unseen: number;
+  } | null> {
+    const res = await callTeacherApi<{ notifications: TeacherNotification[]; unseen: number }>(
+      'teacher-notifications'
+    );
+    return res.ok ? { notifications: res.data.notifications, unseen: res.data.unseen } : null;
+  },
+
+  async markTeacherNotificationsSeen(): Promise<boolean> {
+    return (await callTeacherApi('teacher-notifications-seen', { method: 'POST' })).ok;
   },
 };

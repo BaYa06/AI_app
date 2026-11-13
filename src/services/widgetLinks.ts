@@ -28,9 +28,25 @@ const RATING_URL_RE = /^flashly:\/\/rating\/[^/?#]+\/?(\?.*)?$/;
 /** Ответ команды из пуша (plan/new/support_threads.md): flashly://support/<id>?from=push */
 const SUPPORT_URL_RE = /^flashly:\/\/support\/[^/?#]+\/?(\?.*)?$/;
 
+/** Задание ученика из пуша (plan/new/teacher_cabinet.md, Teacher 29): flashly://homework/<id>?from=push */
+const HOMEWORK_URL_RE = /^flashly:\/\/homework\/[^/?#]+\/?(\?.*)?$/;
+
+/**
+ * Пуши учителя (plan/new/teacher_cabinet.md, этап 4): курс, ученики курса, «Перед уроком»,
+ * экран сдачи, ученик, список уведомлений.
+ */
+const TEACHER_URL_RE =
+  /^flashly:\/\/(teacher\/[^/?#]+(\/students)?|lesson-prep\/[^/?#]+|teacher-homework\/[^/?#]+\/[^/?#]+|teacher-student\/[^/?#]+\/[^/?#]+|teacher-notifications)\/?(\?.*)?$/;
+
 /** Что пропускаем в React Navigation: ссылки виджета и ссылки из пушей (урок — та же flashly://lesson) */
 export function isNavigationUrl(url: string): boolean {
-  return isWidgetUrl(url) || RATING_URL_RE.test(url) || SUPPORT_URL_RE.test(url);
+  return (
+    isWidgetUrl(url) ||
+    RATING_URL_RE.test(url) ||
+    SUPPORT_URL_RE.test(url) ||
+    HOMEWORK_URL_RE.test(url) ||
+    TEACHER_URL_RE.test(url)
+  );
 }
 
 export function parseWidgetUrl(url: string): WidgetLink | null {

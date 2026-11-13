@@ -12,7 +12,7 @@ import { Text } from '@/components/common';
 import ReanimatedAnimated, { useAnimatedStyle } from 'react-native-reanimated';
 import { iconSize } from '@/constants';
 import { Button } from '@/components/ui';
-import { Menu, Flame, Gem, Trophy } from 'lucide-react-native';
+import { Bell, Menu, Flame, Gem, Trophy } from 'lucide-react-native';
 import { styles } from '../styles';
 
 type Props = {
@@ -36,6 +36,8 @@ type Props = {
   openLeaderboard: (week: 'current' | 'previous') => void;
   /** Учитель в своём курсе — название курса вместо серии, алмазов и рейтинга; иначе null */
   teacherCourseTitle: string | null;
+  /** Колокольчик учителя (Teacher 49): null — не показывать; unseen > 0 — точка */
+  teacherBell?: { unseen: number; onPress: () => void } | null;
 };
 
 export function HomeHeader({
@@ -52,6 +54,7 @@ export function HomeHeader({
   ratingTeaser,
   openLeaderboard,
   teacherCourseTitle,
+  teacherBell,
 }: Props) {
   if (teacherCourseTitle !== null) {
     return (
@@ -80,8 +83,33 @@ export function HomeHeader({
             </Text>
           </Pressable>
         </View>
-        {/* Пустое место справа — чтобы название стояло ровно по центру */}
-        <View style={styles.headerRight} />
+        {/* Колокольчик (этап 4) или пустое место справа — чтобы название стояло ровно по центру */}
+        <View style={styles.headerRight}>
+          {teacherBell ? (
+            <View>
+              <Button
+                variant="icon"
+                icon={Bell}
+                background="none"
+                accessibilityLabel={
+                  teacherBell.unseen > 0
+                    ? `Уведомления, новых: ${teacherBell.unseen}`
+                    : 'Уведомления'
+                }
+                onPress={teacherBell.onPress}
+              />
+              {teacherBell.unseen > 0 && (
+                <View
+                  pointerEvents="none"
+                  style={[
+                    styles.bellDot,
+                    { backgroundColor: colors.error, borderColor: colors.background },
+                  ]}
+                />
+              )}
+            </View>
+          ) : null}
+        </View>
       </View>
     );
   }

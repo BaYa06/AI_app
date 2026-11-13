@@ -19,7 +19,13 @@ export type TeacherAction =
   | 'warmup_start'
   | 'lesson_check'
   | 'prep_remind'
-  | 'warmup_homework';
+  | 'warmup_homework'
+  // Этап 4 (Teacher 56)
+  | 'notifications'
+  | 'student_remind'
+  | 'report'
+  | 'report_share'
+  | 'report_pdf';
 
 export const teacherEvents = {
   // ═══════════════════════════════════════════════════════════════════════════

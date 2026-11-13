@@ -130,7 +130,7 @@ describe('текст П1 (Teacher 46)', () => {
     expect(push.body).toBe(
       'Готовы 7 из 22 · Трудные слова: görüşmek üzere, tekrar etmek, vedalaşmak'
     );
-    expect(push.link).toBe(`flashly://teacher/prep/${COURSE}?from=push`);
+    expect(push.link).toBe(`flashly://lesson-prep/${COURSE}?from=push`);
   });
 });
 
@@ -146,7 +146,7 @@ describe('notifyTeacher (Teacher 45)', () => {
     expect(loggedStatus()).toBe('sent');
     expect(loggedPayload()).toMatchObject({
       title: 'Урок A1-B в 10:30',
-      link: `flashly://teacher/prep/${COURSE}?from=push`,
+      link: `flashly://lesson-prep/${COURSE}?from=push`,
       dedupe: 'lesson:1',
       courseId: COURSE,
     });
@@ -295,7 +295,7 @@ describe('итоги недели, ученики и задания (Teacher 47)
     const push = text('teacher_week_summary', data);
     expect(push.title).toBe('Итоги недели: занимались 18 из 22');
     expect(push.body).toBe('1240 ответов · 84% верных · 3 не заходят неделю');
-    expect(push.link).toBe('flashly://teacher/home?from=push');
+    expect(push.link).toBe('flashly://teacher-notifications?from=push');
   });
 
   it('«не заходят»: два имени и «ещё N», ссылка — на учеников курса', () => {
@@ -307,7 +307,7 @@ describe('итоги недели, ученики и задания (Teacher 47)
     });
     expect(push.title).toBe('A1-B: 5 не заходят 7+ дней');
     expect(push.body).toBe('Бекжан, Batyr и ещё 3');
-    expect(push.link).toBe(`flashly://teacher/students/${COURSE}?from=push`);
+    expect(push.link).toBe(`flashly://teacher/${COURSE}/students?from=push`);
   });
 
   it('задание: что сообщить', () => {
@@ -346,7 +346,7 @@ describe('итоги недели, ученики и задания (Teacher 47)
     const dedupe = mockQueries.find((q) => /payload->>'dedupe'/.test(q.text));
     expect(dedupe.values).toContain(`hw:${HW}:due`);
     expect(mockMulticast.mock.calls[0][0].data.link).toBe(
-      `flashly://teacher/homework/${COURSE}/${HW}?from=push`
+      `flashly://teacher-homework/${COURSE}/${HW}?from=push`
     );
   });
 
@@ -375,7 +375,7 @@ describe('итоги недели, ученики и задания (Teacher 47)
     expect(loggedStatus()).toBe('bell_only');
     expect(loggedPayload()).toMatchObject({
       title: 'Аяна: 11 дней подряд',
-      link: `flashly://teacher/student/${COURSE}/${STUDENT}?from=push`,
+      link: `flashly://teacher-student/${COURSE}/${STUDENT}?from=push`,
       dedupe: `streak:${STUDENT}:7`,
     });
   });

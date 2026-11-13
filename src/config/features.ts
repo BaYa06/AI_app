@@ -32,3 +32,9 @@ export const TEACHER_HOMEWORK_ENABLED = true;
 
 /** «Подготовка к уроку» у учителя (этап 3). До этапа 3 — false. */
 export const TEACHER_LESSON_PREP_ENABLED = false;
+
+/**
+ * Этап 4 кабинета учителя: колокольчик с уведомлениями, новый экран ученика, отчёты.
+ * false — экран ученика прежний, колокольчика и отчётов нет.
+ */
+export const TEACHER_INSIGHTS_ENABLED = false;

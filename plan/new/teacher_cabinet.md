@@ -742,7 +742,16 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
   считается просмотренным. Задание: `teacher-notifications` — записи за 30 дней
   (новые сверху), `teacher-notifications-seen` — отметить просмотренными (новое поле
   `push_log.seen_at`). Тесты.
-- [ ] **Teacher 49. Колокольчик и список.** В шапке главной учителя (справа) — колокольчик с
+- [x] **Teacher 49. Колокольчик и список.** ✅ Флаг `TEACHER_INSIGHTS_ENABLED = false` в `features.ts`;
+  `services/teacherNotifications.ts` (+ тесты: куда ведёт ссылка, подпись времени), экран
+  `TeacherNotificationsScreen.tsx`, колокольчик в `HomeHeader` (`useTeacherBell`), запросы — в
+  `services/neon/lessonPrep.ts`. Ссылки пушей учителя приведены к путям навигации приложения
+  (`lesson-prep/…`, `teacher/…`, `teacher-homework/…`, `teacher-student/…`, `teacher-notifications`);
+  экран выключенного этапа заменяется работающим (`rewriteTeacherLink`). Экраны, открытые ссылкой,
+  берут название курса из списка курсов (`useCourseTitle`).
+  **Исправлено попутно:** фильтр ссылок навигации (`isNavigationUrl`) не пропускал
+  `flashly://homework/<id>` — тап по пушу задания у ученика (этап 2) не открывал экран задания.
+  Задание: В шапке главной учителя (справа) — колокольчик с
   точкой `error`, если есть непросмотренные. Экран `TeacherNotificationsScreen`: строки как
   в макете 15 (заголовок, текст, время), тап → ссылка записи. Пустой список — «Здесь появятся
   напоминания об уроках и итоги недели». Обе темы.

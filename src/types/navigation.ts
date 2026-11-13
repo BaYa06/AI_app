@@ -190,7 +190,8 @@ export type RootStackParamList = {
   /** Экран задания ученика (plan/new/teacher_cabinet.md, Teacher 27) */
   StudentHomework: { homeworkId: string; from?: string };
   /** Сдача задания учителем (plan/new/teacher_cabinet.md, Teacher 21) */
-  TeacherHomework: { homeworkId: string; courseId: string; courseTitle: string };
+  /** courseTitle нет, когда экран открыт ссылкой из пуша учителю */
+  TeacherHomework: { homeworkId: string; courseId: string; courseTitle?: string };
   StudentDetail: {
     courseId: string;
     courseTitle: string;
@@ -212,8 +213,10 @@ export type RootStackParamList = {
     purpose?: 'warmup';
     title?: string;
   };
+  /** Колокольчик учителя — список уведомлений (Teacher 49) */
+  TeacherNotifications: undefined;
   /** Экран 10 «Перед уроком» (Teacher 38) */
-  TeacherLessonPrep: { courseId: string; courseTitle: string };
+  TeacherLessonPrep: { courseId: string; courseTitle?: string };
   TestHistory: { courseId: string; courseTitle: string };
   /** Рейтинг курса за неделю (week: 'previous' — сразу итоги прошлой недели) */
   CourseLeaderboard: { courseId: string; courseTitle?: string; week?: 'current' | 'previous' };

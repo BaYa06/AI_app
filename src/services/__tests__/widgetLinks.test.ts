@@ -19,6 +19,15 @@ describe('widgetLinks', () => {
     expect(isNavigationUrl('flashly://support/3f2a-11?from=push')).toBe(true);
     expect(isNavigationUrl('flashly://support/')).toBe(false);
     expect(isNavigationUrl('flashly://auth-callback?code=abc')).toBe(false);
+    // Задание ученика и пуши учителя (plan/new/teacher_cabinet.md)
+    expect(isNavigationUrl('flashly://homework/h1?from=push')).toBe(true);
+    expect(isNavigationUrl('flashly://lesson-prep/c1?from=push')).toBe(true);
+    expect(isNavigationUrl('flashly://teacher/c1?from=push')).toBe(true);
+    expect(isNavigationUrl('flashly://teacher/c1/students?from=push')).toBe(true);
+    expect(isNavigationUrl('flashly://teacher-homework/c1/h1?from=push')).toBe(true);
+    expect(isNavigationUrl('flashly://teacher-student/c1/u1?from=push')).toBe(true);
+    expect(isNavigationUrl('flashly://teacher-notifications?from=push')).toBe(true);
+    expect(isNavigationUrl('flashly://teacher-homework/c1')).toBe(false);
   });
 
   it('разбирает цель, состояние и размер виджета', () => {
