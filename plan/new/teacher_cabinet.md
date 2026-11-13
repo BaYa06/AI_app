@@ -441,12 +441,15 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
 
 **Финал**
 
-### Где остановились (13.11.2026)
+### Где остановились (13.11.2026, после этапа 3)
 
-- Teacher 13–29 ✅ закоммичены и отправлены в dev (последний — `5b8989a`). Локально остался коммит
-  хука `84d23a3 chore: bump version to 1.8.9` — отправить `git push --no-verify origin dev`.
-- Флаг `TEACHER_HOMEWORK_ENABLED` всё ещё `false` (решение пользователя ждёт Teacher 30). Флаг — константа
-  в JS-бандле: для iOS/Android после `true` нужна новая сборка, вебу — только деплой.
+- Сделано и отправлено в dev: исправление очереди, Teacher 31–32, этап 3 целиком (Teacher 33–44).
+  Последний коммит этапа 3 — «Teacher 44: проверка этапа 3».
+- Сервер этапа 3 есть только на staging (`schema_044`). В прод — после команды, раньше клиента.
+- Флаги: `TEACHER_HOMEWORK_ENABLED = true` (тестовая сборка), `TEACHER_LESSON_PREP_ENABLED = false`.
+- **Ждёт пользователя:** сборка iOS (Swift: `NewHomeworkSheet` изменён, `TestTypeSheet` удалён — проверено
+  только `swiftc -parse` и правкой project.pbxproj), скриншоты, включение `TEACHER_LESSON_PREP_ENABLED`,
+  выкладка сервера в прод.
 - **Ошибка очереди — исправлена ✅ (13.11.2026, «Teacher 30: очередь session-complete»):**
   `homeworkStore.reportSession` при `TEACHER_HOMEWORK_ENABLED = false` ничего не ставит в очередь;
   ответ 400 «Unknown action» на `session-complete` — пустой итог (`callProgressApi`, параметр
@@ -459,7 +462,10 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
   `exceljs` в devDependencies.
 - Миграция 041 применится на staging сама при первом запросе после деплоя dev.
 
-- [ ] **Teacher 30. Проверка.** type-check 0, тесты, eslint по файлам этапа. Скриншоты всех новых
+- [x] **Teacher 30. Проверка.** ✅ (автоматическая часть) type-check 0, тесты, eslint; ошибка очереди
+  исправлена; флаг `TEACHER_HOMEWORK_ENABLED = true` стоит для staging (`d33bd56`).
+  **Осталось вручную:** скриншоты экранов и окон этапа 2 (обе темы, iOS и Android), проверка на
+  TestFlight, первая сборка со Swift этапов 1–2. Задание: type-check 0, тесты, eslint по файлам этапа. Скриншоты всех новых
   экранов и окон в светлой и тёмной теме, iOS и Android. Аналитика: создание задания,
   «Напомнить», «Оценки в Excel», открытие задания учеником, сдача. Флаг
   `TEACHER_HOMEWORK_ENABLED = true` — только по команде, нативные шаги 20 и 23 — в одной сборке
@@ -639,7 +645,13 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
   выборе слова по умолчанию — трудные слова группы (Teacher 33). «Задать трудные» из П4 создаёт
   задание этого типа. Ученик: на карточке и экране задания «Повторить N трудных слов» вместо
   «Выучить». Старый клиент ученика видит `review` как обычное задание «Выучить» — работает. Тесты.
-- [ ] **Teacher 44. Проверка и флаг.** type-check 0, тесты, eslint по файлам этапа. Скриншоты
+- [x] **Teacher 44. Проверка и флаг.** ✅ (автоматическая часть, 13.11.2026) `npm test` — 561 тест,
+  type-check 0, eslint по файлам этапа без ошибок. Staging: `schema_044` применена (`card_sets.origin`,
+  `test_sessions.card_ids` / `purpose`, `review_reminders`), запрос трудных слов на самом большом курсе
+  возвращает разумный список (başarılı 10/22, görüşmek üzere 16/40…). Аналитика добавлена в Teacher 38–41.
+  **Осталось вручную:** скриншоты 10, П3, П4 и окна 11 с готовыми словами (светлая и тёмная тема, iOS
+  и Android); сборка iOS (Swift `NewHomeworkSheet` — только `swiftc -parse`); пройти разминку на двух
+  устройствах; `TEACHER_LESSON_PREP_ENABLED = true` — по команде. Задание: type-check 0, тесты, eslint по файлам этапа. Скриншоты
   10, П3, П4 и окна 11 с готовыми словами в светлой и тёмной теме, iOS и Android. Аналитика:
   `teacher_lesson_prep_viewed`, `teacher_action` (`warmup_start`, `lesson_check`, `prep_remind`,
   `warmup_homework`). `TEACHER_LESSON_PREP_ENABLED = true` — только по команде.
