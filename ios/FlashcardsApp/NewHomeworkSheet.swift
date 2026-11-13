@@ -112,6 +112,7 @@ class NewHomeworkSheetModule: RCTEventEmitter, UISheetPresentationControllerDele
         "due": model.due.timeIntervalSince1970 * 1000,
         "minScore": model.minScore ?? -1,
         "userIds": model.pickAll ? (NSNull() as Any) : (Array(model.picked) as Any),
+        "task": model.task,
       ])
     }
 
@@ -286,6 +287,18 @@ final class HwModel: ObservableObject {
     manyWords = Int(num("manyWords", 30))
     partWords = Int(num("partWords", 25))
     initialCardIds = Set(options["cardIds"] as? [String] ?? [])
+    // Готовые ученики и тип задания (Teacher 42): JS уже отфильтровал их по курсу и по списку типов
+    if let wanted = options["task"] as? String, tasks.contains(where: { $0.id == wanted }) {
+      task = wanted
+    }
+    if let ids = options["userIds"] as? [String], !ids.isEmpty {
+      let known = Set(students.map(\.id))
+      let chosen = Set(ids).intersection(known)
+      if !chosen.isEmpty {
+        pickAll = false
+        picked = chosen
+      }
+    }
   }
 
   // MARK: Слова

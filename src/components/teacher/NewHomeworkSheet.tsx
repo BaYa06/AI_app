@@ -29,7 +29,10 @@ import {
   duePresets,
   scoreChipLabel,
   wordsSummary,
+  homeworkFormStart,
+  homeworkTasks,
   type HomeworkPreset,
+  type HomeworkTask,
   type HomeworkWords,
 } from './newHomework';
 
@@ -52,7 +55,7 @@ export interface NewHomeworkSheetProps {
   onCreated: (homeworkId: string) => void;
 }
 
-type Task = 'learn' | 'test' | 'hard';
+type Task = HomeworkTask;
 
 /** iOS — Swift-окно (nativeNewHomeworkSheet.ts), Android, веб и сборки без модуля — RN-окно */
 export function NewHomeworkSheet(props: NewHomeworkSheetProps) {
@@ -69,9 +72,11 @@ export function NewHomeworkSheetRN({
   students,
   schedule,
   initialWords,
+  preset,
   onCreated,
 }: NewHomeworkSheetProps) {
   const colors = useThemeColors();
+  const taskKeys = homeworkTasks(TEACHER_LESSON_PREP_ENABLED);
   const [now, setNow] = useState(() => new Date());
   const [words, setWords] = useState<HomeworkWords | null>(initialWords);
   const [pickAll, setPickAll] = useState(true);
@@ -88,12 +93,21 @@ export function NewHomeworkSheetRN({
   useEffect(() => {
     if (!visible) return;
     const at = new Date();
+    // Готовые слова, ученики и срок (Teacher 42) — учитель может всё поменять
+    const start = homeworkFormStart({
+      now: at,
+      schedule,
+      initialWords,
+      preset,
+      studentIds: students.map((s) => s.id),
+      tasks: taskKeys,
+    });
     setNow(at);
-    setWords(initialWords);
-    setPickAll(true);
-    setPicked(new Set());
-    setTask('learn');
-    setDue(defaultDue(at, schedule));
+    setWords(start.words);
+    setPickAll(start.userIds === null);
+    setPicked(new Set(start.userIds ?? []));
+    setTask(start.task);
+    setDue(start.due);
     setDueOpen(false);
     setMinScore(DEFAULT_MIN_SCORE);
     setError(null);
@@ -139,11 +153,9 @@ export function NewHomeworkSheetRN({
   const space = <View style={st.checkSpace} />;
   const tasks: Array<{ key: Task; title: string; sub: string }> = [
     { key: 'learn', title: T.taskLearn, sub: words ? wordsSummary(words) : T.wordsPick },
-    ...(TEACHER_LESSON_PREP_ENABLED
-      ? [
-          { key: 'test' as Task, title: T.taskTest, sub: T.taskTestHint },
-          { key: 'hard' as Task, title: T.taskHard, sub: T.taskHardHint },
-        ]
+    // «Пройти тест» отложен (решение 9 этапа 3) — в списке только то, что отдаёт homeworkTasks
+    ...(taskKeys.includes('hard')
+      ? [{ key: 'hard' as Task, title: T.taskHard, sub: T.taskHardHint }]
       : []),
   ];
 

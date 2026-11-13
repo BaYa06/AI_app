@@ -23,8 +23,9 @@ import {
   NEW_HOMEWORK_TEXTS as T,
   createHomework,
   dayAt,
-  defaultDue,
   duePresets,
+  homeworkFormStart,
+  homeworkTasks,
   type HomeworkWords,
 } from './newHomework';
 import { WORD_PICKER_TEXTS as W, type PickerSet } from './wordPicker';
@@ -41,7 +42,15 @@ interface NewHomeworkSheetModule {
 }
 
 type SheetEvent =
-  | { type: 'create'; cardIds: string[]; due: number; minScore: number; userIds: string[] | null }
+  | {
+      type: 'create';
+      cardIds: string[];
+      due: number;
+      minScore: number;
+      userIds: string[] | null;
+      /** Тип задания; сборка со старым Swift поле не шлёт */
+      task?: string;
+    }
   | { type: 'finished' }
   | { type: 'dismiss' };
 
@@ -183,9 +192,20 @@ export function useNativeNewHomeworkSheet(props: NewHomeworkSheetProps) {
         schedule,
         students,
         initialWords,
+        preset,
         courseTitle,
       } = latest.current;
       const now = new Date();
+      const taskKeys = homeworkTasks(TEACHER_LESSON_PREP_ENABLED);
+      // Готовые слова, ученики и срок (Teacher 42)
+      const start = homeworkFormStart({
+        now,
+        schedule,
+        initialWords,
+        preset,
+        studentIds: students.map((s) => s.id),
+        tasks: taskKeys,
+      });
       native.present({
         texts: NATIVE_HOMEWORK_TEXTS,
         colors: Object.fromEntries(COLOR_KEYS.map((key) => [key, processColor(theme[key])])),
@@ -194,13 +214,12 @@ export function useNativeNewHomeworkSheet(props: NewHomeworkSheetProps) {
         students: students.map((s) => ({ id: s.id, name: s.displayName })),
         tasks: [
           { key: 'learn', title: T.taskLearn, sub: '' },
-          ...(TEACHER_LESSON_PREP_ENABLED
-            ? [
-                { key: 'test', title: T.taskTest, sub: T.taskTestHint },
-                { key: 'hard', title: T.taskHard, sub: T.taskHardHint },
-              ]
+          ...(taskKeys.includes('hard')
+            ? [{ key: 'hard', title: T.taskHard, sub: T.taskHardHint }]
             : []),
         ],
+        task: start.task,
+        userIds: start.userIds,
         scores: MIN_SCORE_OPTIONS.map((s) => s ?? -1),
         minScore: DEFAULT_MIN_SCORE,
         presets: duePresets(now, schedule).map((p) => ({
@@ -209,10 +228,10 @@ export function useNativeNewHomeworkSheet(props: NewHomeworkSheetProps) {
           date: p.date.getTime(),
         })),
         hasSchedule: !!schedule?.length,
-        due: defaultDue(now, schedule).getTime(),
+        due: start.due.getTime(),
         minDate: now.getTime(),
         maxDate: dayAt(now, DUE_MAX_DAYS, 23, 55).getTime(),
-        cardIds: initialWords?.cardIds ?? [],
+        cardIds: start.words?.cardIds ?? [],
         wordsPerSession: WORDS_PER_SESSION,
         minutesPerSession: MINUTES_PER_SESSION,
         manyWords: HOMEWORK_MANY_WORDS,

@@ -620,7 +620,11 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
   верных», «N учеников · 6 слов · M минут», слова со статусом «усвоили» (≥ 80 %, `successText`) /
   «трудное» (`warningText`), «Лучшие» и «Нужна помощь» (по 3), «N не были на разминке» →
   «Отправить домой». Внизу «Задать N трудных слов к <день урока>» и «К курсу».
-- [ ] **Teacher 42. «Новое задание» с готовыми словами.** Окно 11 (RN и Swift, `nativeNewHomeworkSheet`)
+- [x] **Teacher 42. «Новое задание» с готовыми словами.** ✅ Проп `preset` (`HomeworkPreset`: слова,
+  ученики, срок, тип) у `NewHomeworkSheet`; общее правило — `homeworkFormStart` в `newHomework.ts`
+  (+ тесты), им пользуются RN-окно и `nativeNewHomeworkSheet.ts`. Swift: опции `userIds` и `task`,
+  событие `create` отдаёт `task` (`swiftc -parse` чисто). «Пройти тест» убран из списка типов
+  (`homeworkTasks`, решение 9). Задание: Окно 11 (RN и Swift, `nativeNewHomeworkSheet`)
   принимает `cardIds`, `userIds`, `dueAt`. Из П4: «Задать трудные» — трудные слова разминки,
   вся группа, срок — к следующему уроку; «Отправить домой» — все слова разминки, только
   не бывшие. Swift — `swiftc -parse`, в одной сборке с JS.

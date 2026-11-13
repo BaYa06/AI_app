@@ -110,3 +110,45 @@ describe('createHomework', () => {
     expect(mockEvents[0]).toMatchObject({ result: 'network' });
   });
 });
+
+describe('homeworkFormStart (Teacher 42)', () => {
+  const { homeworkFormStart, homeworkTasks } = require('../newHomework');
+  const now = new Date(2026, 10, 13, 12, 0);
+  const words = { cardIds: ['a', 'b'], sets: [{ id: 's', title: 'Ünite 4' }] };
+  const base = { now, schedule: null, initialWords: words, studentIds: ['u1', 'u2'] };
+
+  it('без готовых значений — обычная форма', () => {
+    const start = homeworkFormStart({ ...base, tasks: ['learn'] });
+    expect(start.words).toBe(words);
+    expect(start.userIds).toBeNull();
+    expect(start.task).toBe('learn');
+    expect(start.due.getTime()).toBeGreaterThan(now.getTime());
+  });
+
+  it('готовые слова, ученики, срок и тип', () => {
+    const due = new Date(2026, 10, 16, 10, 30);
+    const hard = { cardIds: ['x'], sets: [{ id: 'w', title: 'Трудные слова' }] };
+    const start = homeworkFormStart({
+      ...base,
+      tasks: ['learn', 'hard'],
+      preset: { words: hard, userIds: ['u2', 'gone'], due, task: 'hard' },
+    });
+    expect(start).toEqual({ words: hard, userIds: ['u2'], due, task: 'hard' });
+  });
+
+  it('учеников не осталось — вся группа; срок в прошлом — по умолчанию; типа нет — «Выучить»', () => {
+    const start = homeworkFormStart({
+      ...base,
+      tasks: ['learn'],
+      preset: { words, userIds: ['gone'], due: new Date(2026, 10, 1), task: 'hard' },
+    });
+    expect(start.userIds).toBeNull();
+    expect(start.due.getTime()).toBeGreaterThan(now.getTime());
+    expect(start.task).toBe('learn');
+  });
+
+  it('«Пройти тест» не показываем; «Повторить трудные» — за флагом', () => {
+    expect(homeworkTasks(false)).toEqual(['learn']);
+    expect(homeworkTasks(true)).toEqual(['learn', 'hard']);
+  });
+});

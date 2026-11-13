@@ -111,6 +111,45 @@ export function defaultDue(now: Date, schedule: ScheduleItem[] | null): Date {
   return dayAt(now, 3, DEFAULT_DUE_HOUR);
 }
 
+/** Начальное состояние формы «Новое задание» — общее для RN- и Swift-окна */
+export interface HomeworkFormStart {
+  words: HomeworkWords | null;
+  /** null — вся группа */
+  userIds: string[] | null;
+  due: Date;
+  task: HomeworkTask;
+}
+
+/**
+ * С чем открыть окно (Teacher 42): готовые значения важнее обычных. Учеников, которых уже нет
+ * в курсе, пропускаем (никого не осталось — вся группа); срок в прошлом — срок по умолчанию;
+ * тип задания, которого нет в окне, — «Выучить».
+ */
+export function homeworkFormStart(params: {
+  now: Date;
+  schedule: ScheduleItem[] | null;
+  initialWords: HomeworkWords | null;
+  preset?: HomeworkPreset | null;
+  studentIds: string[];
+  tasks: HomeworkTask[];
+}): HomeworkFormStart {
+  const { now, schedule, initialWords, preset, studentIds, tasks } = params;
+  const known = new Set(studentIds);
+  const users = preset?.userIds?.filter((id) => known.has(id)) ?? null;
+  return {
+    words: preset?.words ?? initialWords,
+    userIds: users && users.length > 0 ? users : null,
+    due:
+      preset?.due && preset.due.getTime() > now.getTime() ? preset.due : defaultDue(now, schedule),
+    task: preset?.task && tasks.includes(preset.task) ? preset.task : 'learn',
+  };
+}
+
+/** Типы задания, которые видит учитель: «Пройти тест» отложен, «Повторить трудные» — за флагом этапа 3 */
+export function homeworkTasks(lessonPrepEnabled: boolean): HomeworkTask[] {
+  return lessonPrepEnabled ? ['learn', 'hard'] : ['learn'];
+}
+
 export interface DuePreset {
   key: 'tomorrow' | 'in3' | 'week' | 'lesson';
   label: string;
