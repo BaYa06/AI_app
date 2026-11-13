@@ -61,13 +61,15 @@ export function LiveTestScreen({ navigation, route }: Props) {
   const [reinstating, setReinstating] = useState<string | null>(null);
   // Тест по списку слов (разминка, «Проверить на уроке»): слова — из monitor (Teacher 40)
   const [byCard, setByCard] = useState<CardStat[] | null>(null);
+  const purposeRef = useRef<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hasNavigated = useRef(false);
 
   const goToResults = useCallback(() => {
     if (hasNavigated.current) return;
     hasNavigated.current = true;
-    navigation.replace('TestResultsTeacher', {
+    // Разминка заканчивается своим экраном итогов (П4, Teacher 41)
+    navigation.replace(purposeRef.current === 'warmup' ? 'WarmupResults' : 'TestResultsTeacher', {
       courseId: route.params.courseId,
       courseTitle: route.params.courseTitle,
       sessionId,
@@ -89,6 +91,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
         const data = await resp.json();
         if (!mountedRef.current) return;
 
+        if (data.purpose) purposeRef.current = data.purpose;
         if (data.status === 'finished') {
           goToResults();
           return;

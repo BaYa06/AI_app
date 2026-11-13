@@ -231,6 +231,12 @@ export type RootStackParamList = {
     courseTitle: string;
     sessionId: string;
   };
+  /** Итоги разминки (П4, Teacher 41) */
+  WarmupResults: {
+    courseId: string;
+    courseTitle: string;
+    sessionId: string;
+  };
   TestResultsTeacher: {
     courseId: string;
     courseTitle: string;

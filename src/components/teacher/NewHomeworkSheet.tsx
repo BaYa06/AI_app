@@ -29,6 +29,7 @@ import {
   duePresets,
   scoreChipLabel,
   wordsSummary,
+  type HomeworkPreset,
   type HomeworkWords,
 } from './newHomework';
 
@@ -46,6 +47,8 @@ export interface NewHomeworkSheetProps {
   schedule: ScheduleItem[] | null;
   /** Слова при открытии (обычно весь набор, из которого открыли окно) */
   initialWords: HomeworkWords | null;
+  /** Готовые слова, ученики и срок (Teacher 42); без него — обычная чистая форма */
+  preset?: HomeworkPreset | null;
   onCreated: (homeworkId: string) => void;
 }
 

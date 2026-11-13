@@ -14,6 +14,22 @@ export interface HomeworkWords {
   sets: Array<{ id: string; title: string }>;
 }
 
+/** Тип задания: выучить / тест дома (отложен) / повторить трудные (Teacher 43) */
+export type HomeworkTask = 'learn' | 'test' | 'hard';
+
+/**
+ * Готовые значения окна «Новое задание» (Teacher 42): слова, ученики и срок — например, из итогов
+ * разминки. Учитель может всё поменять перед «Задать».
+ */
+export interface HomeworkPreset {
+  words: HomeworkWords;
+  /** null — вся группа */
+  userIds: string[] | null;
+  /** null — срок по умолчанию (к уроку или через 3 дня) */
+  due: Date | null;
+  task?: HomeworkTask;
+}
+
 export interface NewHomeworkInput {
   courseId: string;
   words: HomeworkWords;

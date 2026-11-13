@@ -172,11 +172,14 @@ export function TestHistoryScreen({ navigation, route }: Props) {
               accessibilityRole="button"
               key={item.sessionId}
               onPress={() =>
-                navigation.navigate('TestResultsTeacher', {
-                  courseId,
-                  courseTitle,
-                  sessionId: item.sessionId,
-                })
+                navigation.navigate(
+                  item.purpose === 'warmup' ? 'WarmupResults' : 'TestResultsTeacher',
+                  {
+                    courseId,
+                    courseTitle,
+                    sessionId: item.sessionId,
+                  }
+                )
               }
               style={({ pressed }) => [
                 styles.historyCard,

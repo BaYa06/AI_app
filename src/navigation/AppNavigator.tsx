@@ -100,6 +100,7 @@ import { CourseLeaderboardScreen } from '@/screens/CourseLeaderboardScreen';
 import { TestLobbyScreen } from '@/screens/TestLobbyScreen';
 import { LiveTestScreen } from '@/screens/LiveTestScreen';
 import { TestResultsTeacherScreen } from '@/screens/TestResultsTeacherScreen';
+import { WarmupResultsScreen } from '@/screens/WarmupResultsScreen';
 import { TestJoinScreen } from '@/screens/TestJoinScreen';
 import { TestWaitingScreen } from '@/screens/TestWaitingScreen';
 import { TestExamScreen } from '@/screens/TestExamScreen';
@@ -629,6 +630,11 @@ export function AppNavigator() {
         <Stack.Screen
           name="TestResultsTeacher"
           component={TestResultsTeacherScreen}
+          options={{ headerShown: false, gestureEnabled: false }}
+        />
+        <Stack.Screen
+          name="WarmupResults"
+          component={WarmupResultsScreen}
           options={{ headerShown: false, gestureEnabled: false }}
         />
         <Stack.Screen
