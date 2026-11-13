@@ -41,6 +41,11 @@ import {
   homeworkExport,
 } from './_handlers/teacher/homework.js';
 
+import {
+  teacherNotifications,
+  teacherNotificationsSeen,
+} from './_handlers/teacher/notifications.js';
+
 /**
  * API для учительских мутаций (курсы, приглашения, ростер, видимость наборов)
  *
@@ -80,6 +85,9 @@ import {
  * POST /api/teacher?action=homework-cancel  { homeworkId }
  * POST /api/teacher?action=homework-remind  { homeworkId, userIds } — каждому не чаще раза в 20 ч
  * GET  /api/teacher?action=homework-export  ?homeworkId= → { filename, base64 } (xlsx)
+ * Колокольчик учителя (этап 4):
+ * GET  /api/teacher?action=teacher-notifications       → { notifications, unseen } за 30 дней
+ * POST /api/teacher?action=teacher-notifications-seen  → отметить просмотренными
  */
 
 export default async function handler(req, res) {
@@ -132,6 +140,13 @@ export default async function handler(req, res) {
     if (action === 'homework-cancel') return await homeworkCancel(req, res, sql, userId);
     if (action === 'homework-remind') return await homeworkRemind(req, res, sql, userId);
     if (action === 'homework-export') return await homeworkExport(req, res, sql, userId);
+
+    if (action === 'teacher-notifications') {
+      return await teacherNotifications(req, res, sql, userId);
+    }
+    if (action === 'teacher-notifications-seen') {
+      return await teacherNotificationsSeen(req, res, sql, userId);
+    }
 
     return res.status(400).json({ error: 'Unknown action' });
   } catch (error) {

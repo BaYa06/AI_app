@@ -380,3 +380,75 @@ describe('итоги недели, ученики и задания (Teacher 47)
     });
   });
 });
+
+describe('журнал уведомлений (Teacher 48)', () => {
+  const {
+    notificationRow,
+    teacherNotifications,
+    teacherNotificationsSeen,
+  } = require('../_handlers/teacher/notifications.js');
+  const mockRes = () => ({
+    statusCode: 200,
+    body: undefined,
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(body) {
+      this.body = body;
+      return this;
+    },
+  });
+  const row = (over = {}) => ({
+    id: 'p1',
+    type: 'teacher_lesson_soon',
+    status: 'sent',
+    payload: { title: 'Урок A1-B в 10:30', body: 'Готовы 7 из 22', link: 'flashly://teacher/home' },
+    created_at: '2026-11-13T04:30:00Z',
+    seen_at: null,
+    opened_at: null,
+    ...over,
+  });
+
+  it('строка журнала → запись: текст и ссылка из payload; открытый пуш — просмотрен', () => {
+    expect(notificationRow(row())).toEqual({
+      id: 'p1',
+      type: 'teacher_lesson_soon',
+      title: 'Урок A1-B в 10:30',
+      body: 'Готовы 7 из 22',
+      link: 'flashly://teacher/home',
+      createdAt: '2026-11-13T04:30:00Z',
+      seen: false,
+      pushed: true,
+    });
+    expect(notificationRow(row({ opened_at: 'x' })).seen).toBe(true);
+    expect(notificationRow(row({ status: 'teacher_limit' })).pushed).toBe(false);
+    expect(notificationRow(row({ payload: {} }))).toBeNull();
+  });
+
+  it('список: только свои записи категорий учителя, счётчик непросмотренных', async () => {
+    mockRules = [[/FROM push_log/, () => [row(), row({ id: 'p2', seen_at: 'x' })]]];
+    const res = mockRes();
+    await teacherNotifications({ method: 'GET', query: {} }, res, mockSql, TEACHER);
+    expect(res.body.notifications).toHaveLength(2);
+    expect(res.body.unseen).toBe(1);
+    const q = mockQueries[0];
+    expect(q.values[0]).toBe(TEACHER);
+    expect(q.values[1]).toEqual(['teacher_lesson', 'teacher_week', 'teacher_students']);
+    expect(q.values[2]).toBe(30);
+  });
+
+  it('просмотрено: только POST, только свои записи', async () => {
+    const get = mockRes();
+    await teacherNotificationsSeen({ method: 'GET' }, get, mockSql, TEACHER);
+    expect(get.statusCode).toBe(405);
+    expect(mockQueries).toEqual([]);
+
+    mockRules = [[/^UPDATE push_log SET seen_at/, () => [{ id: 'p1' }]]];
+    const res = mockRes();
+    await teacherNotificationsSeen({ method: 'POST' }, res, mockSql, TEACHER);
+    expect(res.body).toEqual({ ok: true, seen: 1 });
+    expect(mockQueries[0].text).toMatch(/user_id = \?::uuid/);
+    expect(mockQueries[0].values[0]).toBe(TEACHER);
+  });
+});

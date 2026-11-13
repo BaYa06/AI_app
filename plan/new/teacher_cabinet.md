@@ -736,7 +736,10 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
   «N не заходят 7+ дней» — по курсу, сводно. «Все сдали» / «Срок прошёл» — из заданий (этап 2).
   Записи без пуша (решение 2): «серия ученика ≥ 7 дней — лучшая в группах», «юнит открыт 2 дня,
   начали N из M». Тап — на нужный экран (ученик, курс, экран сдачи). Тесты.
-- [ ] **Teacher 48. Журнал уведомлений (API).** `teacher-notifications` — записи за 30 дней
+- [x] **Teacher 48. Журнал уведомлений (API).** ✅ `_handlers/teacher/notifications.js` в `api/teacher.js`,
+  миграция 045 (`push_log.seen_at`, `schema_045`). Ответ: `{ notifications: [{ id, type, title, body,
+  link, createdAt, seen, pushed }], unseen }`, до 100 записей. Открытый тапом пуш (`opened_at`) тоже
+  считается просмотренным. Задание: `teacher-notifications` — записи за 30 дней
   (новые сверху), `teacher-notifications-seen` — отметить просмотренными (новое поле
   `push_log.seen_at`). Тесты.
 - [ ] **Teacher 49. Колокольчик и список.** В шапке главной учителя (справа) — колокольчик с

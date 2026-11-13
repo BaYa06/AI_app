@@ -8,7 +8,7 @@ import { log } from './_log.js';
  */
 // schema_039: в 038 (official_sets_guard) и 039 (set_kind) версию не подняли — миграции не выполнились,
 // и запросы с card_sets.kind падали на тестовом сервере (plan/new/set_kind.md, слабые места)
-const SCHEMA_VERSION = 'schema_044';
+const SCHEMA_VERSION = 'schema_045';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -899,6 +899,14 @@ async function applyMigrations(sql) {
     `;
   } catch (e) {
     log.error('db-init', 'Migration 044_review_reminders failed', e);
+  }
+
+  // Migration 045: колокольчик учителя (plan/new/teacher_cabinet.md, Teacher 48) — когда запись
+  // журнала уведомлений просмотрена в списке.
+  try {
+    await sql`ALTER TABLE push_log ADD COLUMN IF NOT EXISTS seen_at TIMESTAMPTZ`;
+  } catch (e) {
+    log.error('db-init', 'Migration 045_push_seen failed', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)
