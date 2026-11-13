@@ -29,6 +29,7 @@ import {
   isSessionWordWeak,
 } from '@/services/lessonFlow';
 import { useHomeworkStore } from '@/store/homeworkStore';
+import { useHomeworkDoneRedirect } from '@/components/study/useHomeworkDoneRedirect';
 import { useCardsStore } from '@/store/cardsStore';
 import { Badge, Button, Card, ScreenHeader, Sheet, useScreenBottomInset } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
@@ -124,6 +125,8 @@ export function StudyResultsScreen({ navigation, route }: Props) {
     const weak = ids.filter((id) => cards[id] && isSessionWordWeak(cards[id], now));
     useHomeworkStore.getState().reportSession(ids, weak);
   }, []);
+  // Задание сдано этой сессией — «Задание сдано!» (Teacher 28)
+  useHomeworkDoneRedirect(navigation, !!session && !sessionStep);
   // Итоги сессии: серия могла вырасти на любом этапе
   const streakCount = newStreakCount ?? session?.streakCount;
   const streakGrew = streakIncreased === true || (!sessionStep && !!session?.streakCount);

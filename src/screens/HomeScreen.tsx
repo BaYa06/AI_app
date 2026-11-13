@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import {
   useSetsStore,
   useSettingsStore,
@@ -106,6 +106,7 @@ import { StudentHomeworkCard } from '@/components/home/StudentHomeworkCard';
 import { useHomeworkStore } from '@/store/homeworkStore';
 import { nearestActiveHomework } from '@/services/homework';
 import { startHomeworkSession } from '@/components/study/homeworkSession';
+import { useHomeworkDoneRedirect } from '@/components/study/useHomeworkDoneRedirect';
 import { syncWidget, checkWidgetUsage } from '@/services/WidgetService';
 import type { WidgetPlanInput } from '@/services/WidgetPlanner';
 import { FocusSetSheet } from '@/components/home/FocusSetSheet';
@@ -585,6 +586,8 @@ export function HomeScreen({ navigation, route }: any) {
     [homeworkItems, isTeacher, activeCourseId]
   );
   const activeHomework = useMemo(() => nearestActiveHomework(courseHomework), [courseHomework]);
+  const homeFocused = useIsFocused();
+  useHomeworkDoneRedirect(navigation, isTeacher === false && homeFocused);
   /** setId → срок ближайшего задания с этим набором */
   const homeworkDueBySet = useMemo(() => {
     const out: Record<string, string> = {};
