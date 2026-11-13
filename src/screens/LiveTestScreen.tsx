@@ -21,6 +21,9 @@ import { rawApiFetch } from '@/services/api/client';
 // Цвета аватаров участников — имена токенов, значения берутся из темы
 const AVATAR_TOKENS: ColorToken[] = ['primaryFill', 'warning', 'like', 'success', 'streak'];
 
+import { WarmupWordsBlock } from './liveTest/WarmupWordsBlock';
+import { notAnswered, type CardStat } from './liveTest/warmup';
+
 type Props = NativeStackScreenProps<RootStackParamList, 'LiveTest'>;
 
 interface StudentProgress {
@@ -56,6 +59,8 @@ export function LiveTestScreen({ navigation, route }: Props) {
   const [questionCount, setQuestionCount] = useState(0);
   const [exitControl, setExitControl] = useState(false);
   const [reinstating, setReinstating] = useState<string | null>(null);
+  // Тест по списку слов (разминка, «Проверить на уроке»): слова — из monitor (Teacher 40)
+  const [byCard, setByCard] = useState<CardStat[] | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hasNavigated = useRef(false);
 
@@ -88,6 +93,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
           goToResults();
           return;
         }
+        if (Array.isArray(data.byCard)) setByCard(data.byCard);
 
         setQuestionCount(data.questionCount || 0);
         setExitControl(data.exitControl === true);
@@ -420,6 +426,14 @@ export function LiveTestScreen({ navigation, route }: Props) {
             </View>
           </View>
         </View>
+
+        {byCard && byCard.length > 0 && (
+          <WarmupWordsBlock
+            cards={byCard}
+            students={students.length}
+            waiting={notAnswered(students).map((s) => s.name)}
+          />
+        )}
 
         {/* Student Progress */}
         <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Ученики</Text>
