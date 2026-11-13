@@ -67,6 +67,32 @@ function excerpt(text, max) {
   return t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t;
 }
 
+/**
+ * Первая версия приложения с экранами учителя, куда ведут его пуши (plan/new/teacher_cabinet.md,
+ * этап 4): «Перед уроком», колокольчик, экран ученика. Поднять, если этап 4 выйдет позже.
+ */
+export const TEACHER_PUSH_MIN_APP_VERSION = '1.8.10';
+const enc = encodeURIComponent;
+/** Ссылки пушей учителя: клиент сам решает, какой экран открыть (флаги этапов) */
+const teacherLink = {
+  prep: (data) =>
+    data?.courseId ? `flashly://teacher/prep/${enc(data.courseId)}?from=push` : null,
+  course: (data) =>
+    data?.courseId ? `flashly://teacher/course/${enc(data.courseId)}?from=push` : null,
+  students: (data) =>
+    data?.courseId ? `flashly://teacher/students/${enc(data.courseId)}?from=push` : null,
+  homework: (data) =>
+    data?.homeworkId && data?.courseId
+      ? `flashly://teacher/homework/${enc(data.courseId)}/${enc(data.homeworkId)}?from=push`
+      : null,
+  student: (data) =>
+    data?.courseId && data?.studentId
+      ? `flashly://teacher/student/${enc(data.courseId)}/${enc(data.studentId)}?from=push`
+      : null,
+};
+const TEACHER_HOME_LINK = 'flashly://teacher/home?from=push';
+const teacherLinkOr = (make) => (data) => make(data) || TEACHER_HOME_LINK;
+
 /** '1.6.10' >= '1.6.9' — по числам, а не по строке */
 export function versionAtLeast(version, min) {
   const a = String(version || '')
@@ -468,6 +494,30 @@ export const PUSH_TYPES = {
       ({ name, data }) => ({
         title: `${data.days} ${plural(data.days, 'день', 'дня', 'дней')} подряд!`,
         body: `${name}, это твой личный рекорд. Так держать`,
+      }),
+    ],
+  },
+  // ── Пуши учителю (plan/new/teacher_cabinet.md, этап 4). Отправляет api/push/_teacher.js, не арбитр:
+  // свой лимит (2 в день), тихие часы по поясу курса, запись в журнал остаётся для колокольчика.
+  // П1 «Урок через 2 часа» (Teacher 46): цифры задания или готовности + 2–3 трудных слова.
+  teacher_lesson_soon: {
+    category: 'teacher_lesson',
+    priority: 1,
+    transactional: true,
+    minIntervalDays: 0,
+    minAppVersion: TEACHER_PUSH_MIN_APP_VERSION,
+    link: teacherLinkOr(teacherLink.prep),
+    variants: [
+      ({ data }) => ({
+        title: `Урок ${data.course} в ${data.time}`,
+        body: [
+          data.total > 0 ? `${data.readyLabel || 'Готовы'} ${data.ready} из ${data.total}` : null,
+          Array.isArray(data.hardWords) && data.hardWords.length > 0
+            ? `Трудные слова: ${data.hardWords.slice(0, 3).join(', ')}`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(' · '),
       }),
     ],
   },

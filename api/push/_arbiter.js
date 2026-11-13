@@ -395,6 +395,7 @@ async function sendStreakRisk(sql, { dryRun }) {
       AND NOT EXISTS (
         SELECT 1 FROM push_log p
         WHERE p.user_id = c.user_id AND p.status IN ('sent', 'sending') AND p.category <> 'course'
+          AND p.category NOT LIKE 'teacher%'
           AND p.created_at > NOW() - INTERVAL '3 hours'
       )
       AND (
@@ -482,6 +483,7 @@ async function loadCandidates(sql) {
                ))::int AS ignored
       FROM push_log p
       WHERE p.user_id = b.user_id AND p.status = 'sent' AND p.category <> 'course'
+        AND p.category NOT LIKE 'teacher%'
         AND p.created_at > NOW() - INTERVAL '60 days'
     ) pl ON true
     LEFT JOIN LATERAL (

@@ -702,7 +702,14 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
 
 **Пуши учителю**
 
-- [ ] **Teacher 45. Пуши учителю: основа.** Категория `teacher` в реестре и арбитре: отбор учителей
+- [x] **Teacher 45. Пуши учителю: основа.** ✅ `api/push/_teacher.js` (`notifyTeacher`,
+  `teacherPushDecision`), `TEACHER_PUSH_MIN_APP_VERSION = '1.8.10'`, ссылки `flashly://teacher/…`,
+  первый тип `teacher_lesson_soon` в реестре; тесты — `api/__tests__/teacherPush.test.js`.
+  **Отступление:** вместо одной категории `teacher` — три (`teacher_lesson`, `teacher_week`,
+  `teacher_students`): это же переключатели Teacher 50, лимит 2 в день общий на все три. Арбитр
+  учеников пуши учителя в свои лимиты не считает. Статусы строк журнала: `sent`, `teacher_off`,
+  `teacher_limit`, `teacher_quiet`, `bell_only`, `category_off`, `disabled`, `no_token`, `old_app`.
+  Отложенной отправки после тихих часов нет — запись остаётся в колокольчике. Задание: Категория `teacher` в реестре и арбитре: отбор учителей
   (`users.teacher`, есть свой курс с учениками), лимит 2 в день, тихие часы, `minAppVersion`,
   env `TEACHER_PUSH_ENABLED`. Текст, ссылка и курс — в `push_log.payload`; запись остаётся и когда
   пуш не ушёл (лимит, тихие часы, выключено) — для колокольчика. Тесты.
