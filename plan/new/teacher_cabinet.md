@@ -755,7 +755,11 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
   точкой `error`, если есть непросмотренные. Экран `TeacherNotificationsScreen`: строки как
   в макете 15 (заголовок, текст, время), тап → ссылка записи. Пустой список — «Здесь появятся
   напоминания об уроках и итоги недели». Обе темы.
-- [ ] **Teacher 50. Настройки пушей учителя.** В [NotificationSettingsScreen](src/screens/NotificationSettingsScreen.tsx)
+- [x] **Teacher 50. Настройки пушей учителя.** ✅ Раздел «Учителю» (три переключателя) в
+  `NotificationSettingsScreen` — виден учителю при `TEACHER_INSIGHTS_ENABLED`. Сервер: группы
+  `teacher_lesson` / `teacher_week` / `teacher_students` в `SETTING_GROUPS` (добавлены в Teacher 45),
+  `settings` их сохраняет, `notifyTeacher` учитывает (тест). Выключенный вид пуша остаётся записью
+  в колокольчике. Задание: В [NotificationSettingsScreen](src/screens/NotificationSettingsScreen.tsx)
   у учителя — раздел «Учителю»: «Перед уроком», «Итоги недели», «Ученики и задания». Сервер
   учитывает переключатели (как категории ученика).
 

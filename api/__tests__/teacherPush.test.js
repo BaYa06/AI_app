@@ -452,3 +452,30 @@ describe('журнал уведомлений (Teacher 48)', () => {
     expect(mockQueries[0].values[0]).toBe(TEACHER);
   });
 });
+
+describe('настройки пушей учителя (Teacher 50)', () => {
+  const { SETTING_GROUPS, disabledCategories } = require('../push/_decide.js');
+
+  it('три переключателя учителя — группы настроек; ученические не затронуты', () => {
+    expect(Object.keys(SETTING_GROUPS)).toEqual(
+      expect.arrayContaining(['teacher_lesson', 'teacher_week', 'teacher_students'])
+    );
+    const off = disabledCategories(['teacher_week']);
+    expect(off.has('teacher_week')).toBe(true);
+    expect(off.has('teacher_lesson')).toBe(false);
+    expect(off.has('course')).toBe(false);
+  });
+
+  it('выключенный переключатель оставляет запись только в колокольчике', async () => {
+    mockRules = [user({ notif_categories_off: ['teacher_week'] }), token()];
+    const res = await notifyTeacher(mockSql, TEACHER, 'teacher_week_summary', {
+      active: 18,
+      total: 22,
+      answers: 1240,
+      correctPct: 84,
+      inactive: 3,
+    });
+    expect(res.status).toBe('category_off');
+    expect(mockMulticast).not.toHaveBeenCalled();
+  });
+});

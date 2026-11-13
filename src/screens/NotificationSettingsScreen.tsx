@@ -18,11 +18,13 @@ import {
   BookOpen,
   ChevronDown,
   ChevronUp,
+  BarChart3,
   Flame,
+  GraduationCap,
   Trophy,
   Users,
 } from 'lucide-react-native';
-import { useThemeColors } from '@/store';
+import { useSettingsStore, useThemeColors } from '@/store';
 import { Text } from '@/components/common';
 import { spacing, borderRadius, alpha, iconSize } from '@/constants';
 import {
@@ -46,15 +48,38 @@ import { log } from '@/utils/logger';
 import { getAccessToken, getSession } from '@/services/auth/session';
 import { rawApiFetch } from '@/services/api/client';
 import type { RootStackScreenProps } from '@/types/navigation';
+import { TEACHER_INSIGHTS_ENABLED } from '@/config/features';
 
 /** «Что присылать» (plan/new/push_notifications.md, 2.4) — ключи как SETTING_GROUPS в api/push/_decide.js */
-type PushGroup = 'lesson' | 'streak' | 'course' | 'rating';
+type PushGroup =
+  | 'lesson'
+  | 'streak'
+  | 'course'
+  | 'rating'
+  | 'teacher_lesson'
+  | 'teacher_week'
+  | 'teacher_students';
 const PUSH_GROUPS: { key: PushGroup; title: string; hint: string }[] = [
   { key: 'lesson', title: 'Урок дня', hint: 'Слова ждут повторения, напоминание вернуться' },
   { key: 'streak', title: 'Серия', hint: 'Серия под угрозой' },
   { key: 'course', title: 'Курс и учитель', hint: 'Учитель просит повторить' },
   { key: 'rating', title: 'Рейтинг', hint: 'Место в рейтинге курса, итоги недели' },
 ];
+/** Раздел «Учителю» (plan/new/teacher_cabinet.md, Teacher 50) — ключи как SETTING_GROUPS на сервере */
+const TEACHER_PUSH_GROUPS: { key: PushGroup; title: string; hint: string }[] = [
+  { key: 'teacher_lesson', title: 'Перед уроком', hint: 'За 2 часа: кто готов и трудные слова' },
+  { key: 'teacher_week', title: 'Итоги недели', hint: 'По понедельникам: кто занимался' },
+  {
+    key: 'teacher_students',
+    title: 'Ученики и задания',
+    hint: 'Кто не заходит, все сдали, срок прошёл',
+  },
+];
+const TEACHER_PUSH_ICONS: Record<string, typeof BookOpen> = {
+  teacher_lesson: GraduationCap,
+  teacher_week: BarChart3,
+  teacher_students: Users,
+};
 const PUSH_GROUP_ICONS = {
   lesson: BookOpen,
   streak: Flame,
@@ -84,6 +109,7 @@ export function NotificationSettingsScreen({
   navigation,
 }: RootStackScreenProps<'NotificationSettings'>) {
   const colors = useThemeColors();
+  const isTeacher = useSettingsStore((s) => s.isTeacher);
 
   // ---- State ----
   const [reminderEnabled, setReminderEnabled] = useState(true);
@@ -401,7 +427,7 @@ export function NotificationSettingsScreen({
         {PUSH_GROUPS.map((group) => (
           <ListRow
             key={group.key}
-            icon={PUSH_GROUP_ICONS[group.key]}
+            icon={PUSH_GROUP_ICONS[group.key as keyof typeof PUSH_GROUP_ICONS]}
             iconColor={group.key === 'streak' ? colors.streak : undefined}
             title={group.title}
             subtitle={group.hint}
@@ -419,6 +445,31 @@ export function NotificationSettingsScreen({
           />
         ))}
       </ListGroup>
+
+      {/* ======== Учителю (Teacher 50): пуши о его курсах; не больше двух в день ======== */}
+      {TEACHER_INSIGHTS_ENABLED && isTeacher === true && (
+        <ListGroup title="Учителю" style={st.group}>
+          {TEACHER_PUSH_GROUPS.map((group) => (
+            <ListRow
+              key={group.key}
+              icon={TEACHER_PUSH_ICONS[group.key]}
+              title={group.title}
+              subtitle={group.hint}
+              right={
+                <Switch
+                  value={!groupsOff.includes(group.key)}
+                  onValueChange={(on) =>
+                    setGroupsOff((prev) =>
+                      on ? prev.filter((g) => g !== group.key) : [...prev, group.key]
+                    )
+                  }
+                  accessibilityLabel={group.title}
+                />
+              }
+            />
+          ))}
+        </ListGroup>
+      )}
 
       {/* ======== Save Button ======== */}
       <Button
