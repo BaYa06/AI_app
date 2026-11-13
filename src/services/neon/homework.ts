@@ -77,10 +77,17 @@ export const homeworkApi = {
     return res ? res.homework : null;
   },
 
-  /** Итог законченной сессии. null — не дошло (очередь повторит). */
+  /**
+   * Итог законченной сессии. null — не дошло (очередь повторит). Сервер без заданий
+   * (400 «Unknown action») — пустой итог: задача очереди выполнена, повторять нечего.
+   */
   async reportHomeworkSession(
     cards: Array<{ cardId: string; firstTry: boolean }>
   ): Promise<{ credited: number; submitted: HomeworkSubmission[] } | null> {
-    return callProgressApi('session-complete', { method: 'POST', body: { cards } });
+    return callProgressApi('session-complete', {
+      method: 'POST',
+      body: { cards },
+      unknownAction: { credited: 0, submitted: [] },
+    });
   },
 };

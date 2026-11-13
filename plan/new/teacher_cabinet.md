@@ -447,11 +447,11 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
   хука `84d23a3 chore: bump version to 1.8.9` — отправить `git push --no-verify origin dev`.
 - Флаг `TEACHER_HOMEWORK_ENABLED` всё ещё `false` (решение пользователя ждёт Teacher 30). Флаг — константа
   в JS-бандле: для iOS/Android после `true` нужна новая сборка, вебу — только деплой.
-- **Ошибка — исправить до следующей сборки (ждёт команды):** `homeworkStore.reportSession` не стоит за
-  флагом и при выключенном флаге шлёт `session-complete` после каждой сессии. Очередь синхронизации
-  (`SyncQueueService`) идёт строго по одной задаче: если на сервере нет `session-complete` (прод без
-  этапа 2), задача повторяется 21 раз (~3 мин) и держит ответы учеников. Исправление: не отправлять при
-  `TEACHER_HOMEWORK_ENABLED = false` и считать ответ 400 «Unknown action» выполненной задачей.
+- **Ошибка очереди — исправлена ✅ (13.11.2026, «Teacher 30: очередь session-complete»):**
+  `homeworkStore.reportSession` при `TEACHER_HOMEWORK_ENABLED = false` ничего не ставит в очередь;
+  ответ 400 «Unknown action» на `session-complete` — пустой итог (`callProgressApi`, параметр
+  `unknownAction`), задача очереди считается выполненной. Тесты: `homeworkStore.test.ts`,
+  `neonApiCalls.test.ts`.
 - Swift этапов 1–2 (NewCourse, JoinCode, TestType, Schedule, NewHomework, NotSubmitted) проверен только
   `swiftc -parse` — первая сборка Codemagic покажет ошибки компиляции.
 - `HOMEWORK_MIN_APP_VERSION = '1.8.9'` (api/push/_registry.js) — пуши заданий только этой версии и новее.

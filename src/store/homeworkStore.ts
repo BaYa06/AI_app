@@ -9,6 +9,7 @@ import { SyncQueueService } from '@/services/SyncQueueService';
 import { readCache, writeCache } from '@/services/localCache';
 import type { HomeworkSubmission, StudentHomework } from '@/services/homework';
 import { useDiamondStore } from './diamondStore';
+import { TEACHER_HOMEWORK_ENABLED } from '@/config/features';
 import { log } from '@/utils/logger';
 
 const CACHE_KEY = 'my_homework';
@@ -44,7 +45,8 @@ export const useHomeworkStore = create<HomeworkState>((set, get) => ({
   },
 
   reportSession: (cardIds, weakIds) => {
-    if (cardIds.length === 0) return;
+    // Без флага заданий сервер может не знать session-complete — очередь не занимаем
+    if (!TEACHER_HOMEWORK_ENABLED || cardIds.length === 0) return;
     const { items, loaded } = get();
     // Известно, что ни одно слово не из несданного задания, — не шлём (список свежий или из кэша).
     // Список ещё не загружался — шлём: сервер сам пересечёт со словами заданий.

@@ -215,6 +215,11 @@ export type CourseLeaderboard =
       } | null;
     };
 
+/** Сервер старше клиента: действия ещё нет (ответ 400 «Unknown action») — повтор не поможет */
+export function isUnknownAction(status: number, error: unknown): boolean {
+  return status === 400 && typeof error === 'string' && error.startsWith('Unknown action');
+}
+
 /** Вызов api/progress.js (рейтинг курса). null — нет сессии, сети или ошибка сервера. */
 export async function callProgressApi<T = any>(
   action: string,
@@ -222,7 +227,14 @@ export async function callProgressApi<T = any>(
     method,
     params,
     body,
-  }: { method: 'GET' | 'POST'; params?: Record<string, string>; body?: object }
+    unknownAction,
+  }: {
+    method: 'GET' | 'POST';
+    params?: Record<string, string>;
+    body?: object;
+    /** Что вернуть, если сервер ещё не знает это действие (400 «Unknown action»), — вместо null */
+    unknownAction?: T;
+  }
 ): Promise<T | null> {
   const token = await getAccessToken();
   if (!token) return null;
@@ -241,6 +253,9 @@ export async function callProgressApi<T = any>(
     }
     const json = res.json;
     if (!res.ok) {
+      if (unknownAction !== undefined && isUnknownAction(res.status, json?.error)) {
+        return unknownAction;
+      }
       (res.status >= 500 ? log.error : log.warn)(
         'Neon',
         `Progress API ${action} failed`,
