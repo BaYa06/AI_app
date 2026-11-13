@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { ensureDatabaseInitialized } from './_db-init.js';
 import { getAuthedUserId } from './_auth.js';
 import { renderSharePage, renderShareErrorPage } from './_share-page.js';
+import { renderReportPage, renderReportErrorPage } from './_report-page.js';
 import { log } from './_log.js';
 
 /**
@@ -51,7 +52,8 @@ const MAX_CARDS = 2000;
 const IMPORTS_PER_HOUR = 30;
 const REPORT_REASONS = new Set(['offensive', 'spam', 'inappropriate', 'copyright', 'other']);
 
-const PUBLIC_ACTIONS = new Set(['preview', 'page', 'cards']);
+// report-page — публичная страница отчёта учителя `/r/<код>` (plan/new/teacher_cabinet.md, Teacher 53)
+const PUBLIC_ACTIONS = new Set(['preview', 'page', 'cards', 'report-page']);
 
 const shareUrl = (origin, code) => `${origin}/s/${code}`;
 
@@ -90,6 +92,10 @@ export default async function handler(req, res) {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       return res.status(404).send(renderShareErrorPage('not_found', origin));
     }
+    if (action === 'report-page') {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      return res.status(404).send(renderReportErrorPage());
+    }
     return res.status(400).json({ error: 'invalid_code' });
   }
 
@@ -100,6 +106,7 @@ export default async function handler(req, res) {
     const isGet = req.method === 'GET';
     if (action === 'preview' && isGet) return await preview(res, sql, userId, code, origin);
     if (action === 'page' && isGet) return await page(res, sql, code, origin);
+    if (action === 'report-page' && isGet) return await reportPage(res, sql, code);
     if (action === 'cards' && isGet) return await allCards(res, sql, code);
     if (action === 'status' && isGet) return await status(res, sql, userId, setId, origin);
     if (action === 'blocks' && isGet) return await listBlocks(res, sql, userId);
@@ -275,6 +282,25 @@ async function loadContent(sql, share, origin) {
       wordForm: c.word_form || null,
     })),
   };
+}
+
+// ── action=report-page ────────────────────────────────────────────────────────
+// HTML для /r/<code>: сохранённый снимок отчёта учителя. Без входа; не кэшируем — учитель может
+// отозвать ссылку. Просрочено, отозвано или нет такой — «Ссылка больше не действует».
+export async function reportPage(res, sql, code) {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  res.setHeader('Cache-Control', 'private, no-store');
+  const rows = code
+    ? await sql`
+        SELECT data FROM teacher_reports
+        WHERE code = ${code} AND revoked_at IS NULL AND expires_at > NOW()
+      `
+    : [];
+  if (rows.length === 0 || !rows[0].data) {
+    return res.status(404).send(renderReportErrorPage());
+  }
+  return res.status(200).send(renderReportPage(rows[0].data));
 }
 
 // ── action=page ───────────────────────────────────────────────────────────────

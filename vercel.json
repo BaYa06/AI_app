@@ -147,6 +147,7 @@
     { "source": "/ai/:path*", "destination": "/api/ai?fn=:path*" },
     { "source": "/join/:token", "destination": "/api/join?token=:token" },
     { "source": "/s/:code", "destination": "/api/share?action=page&code=:code" },
+    { "source": "/r/:code", "destination": "/api/share?action=report-page&code=:code" },
     { "source": "/admin", "destination": "/admin.html" },
     { "source": "/privacy", "destination": "/privacy.html" },
     { "source": "/terms", "destination": "/terms.html" },

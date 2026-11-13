@@ -46,6 +46,8 @@ import {
   teacherNotificationsSeen,
 } from './_handlers/teacher/notifications.js';
 
+import { reportData, reportCreate, reportRevoke } from './_handlers/teacher/reports.js';
+
 /**
  * API для учительских мутаций (курсы, приглашения, ростер, видимость наборов)
  *
@@ -88,6 +90,10 @@ import {
  * Колокольчик учителя (этап 4):
  * GET  /api/teacher?action=teacher-notifications       → { notifications, unseen } за 30 дней
  * POST /api/teacher?action=teacher-notifications-seen  → отметить просмотренными
+ * Отчёты (этап 4): родителям — по ученику, группе — по курсу
+ * GET  /api/teacher?action=report-data    ?courseId=&kind=parent|group&studentId=&period=all|month|week
+ * POST /api/teacher?action=report-create  { courseId, kind, studentId?, period, comment } → { code, url }
+ * POST /api/teacher?action=report-revoke  { code }
  */
 
 export default async function handler(req, res) {
@@ -141,6 +147,9 @@ export default async function handler(req, res) {
     if (action === 'homework-remind') return await homeworkRemind(req, res, sql, userId);
     if (action === 'homework-export') return await homeworkExport(req, res, sql, userId);
 
+    if (action === 'report-data') return await reportData(req, res, sql, userId);
+    if (action === 'report-create') return await reportCreate(req, res, sql, userId);
+    if (action === 'report-revoke') return await reportRevoke(req, res, sql, userId);
     if (action === 'teacher-notifications') {
       return await teacherNotifications(req, res, sql, userId);
     }

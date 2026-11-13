@@ -786,7 +786,15 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
 
 **Отчёты (экран 14)**
 
-- [ ] **Teacher 53. Отчёт: данные и ссылка.** Миграция `teacher_reports` (`id`, `code`, `course_id`,
+- [x] **Teacher 53. Отчёт: данные и ссылка.** ✅ Миграция 046 (`teacher_reports`, `schema_046`),
+  `api/_report.js` (`buildReport`, `composeReport`), страница — `api/_report-page.js`, действия
+  `report-data` (превью), `report-create`, `report-revoke` в `api/teacher.js`, тесты —
+  `api/__tests__/teacherReport.test.js`. **Отступления:** (1) публичная страница `/r/<код>` отдаётся
+  существующей функцией `api/share.js` (`action=report-page`, правило в `vercel.json`) — новая функция
+  упёрлась бы в лимит числа функций Vercel; (2) в таблице вместо колонок периода хранится `period`
+  (`all` / `month` / `week`) и **снимок отчёта** `data`: страница показывает то, что учитель видел в
+  превью, а не живые цифры; (3) страница не кэшируется — отзыв действует сразу.
+  Задание: Миграция `teacher_reports` (`id`, `code`, `course_id`,
   `student_id NULL`, `kind` parent/group, период, `comment`, `created_by`, `expires_at`,
   `revoked_at`). `report-create` → код, `report-revoke`. Публичная страница `/r/<код>` по образцу
   `_share-page.js`: светлая и тёмная тема, логотип Flashly, цифры периода, недели столбиками,

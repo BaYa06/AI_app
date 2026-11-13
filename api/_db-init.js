@@ -8,7 +8,7 @@ import { log } from './_log.js';
  */
 // schema_039: в 038 (official_sets_guard) и 039 (set_kind) версию не подняли — миграции не выполнились,
 // и запросы с card_sets.kind падали на тестовом сервере (plan/new/set_kind.md, слабые места)
-const SCHEMA_VERSION = 'schema_045';
+const SCHEMA_VERSION = 'schema_046';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -907,6 +907,30 @@ async function applyMigrations(sql) {
     await sql`ALTER TABLE push_log ADD COLUMN IF NOT EXISTS seen_at TIMESTAMPTZ`;
   } catch (e) {
     log.error('db-init', 'Migration 045_push_seen failed', e);
+  }
+
+  // Migration 046: отчёты учителя (plan/new/teacher_cabinet.md, Teacher 53). Ссылка /r/<code>
+  // показывает сохранённый снимок (data); живёт до expires_at или пока учитель не отзовёт.
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS teacher_reports (
+        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        code       VARCHAR(16) NOT NULL UNIQUE,
+        course_id  UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        student_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        kind       VARCHAR(10) NOT NULL,
+        period     VARCHAR(10) NOT NULL,
+        comment    TEXT NOT NULL DEFAULT '',
+        data       JSONB NOT NULL,
+        created_by UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        expires_at TIMESTAMPTZ NOT NULL,
+        revoked_at TIMESTAMPTZ
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_teacher_reports_creator ON teacher_reports(created_by, created_at DESC)`;
+  } catch (e) {
+    log.error('db-init', 'Migration 046_teacher_reports failed', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)
