@@ -84,6 +84,8 @@ export function TeacherLessonCard({
     navigation,
   });
 
+  const notStartedNames = TEACHER_HOMEWORK_ENABLED ? hw.notStarted : [];
+
   const loadSchedule = useCallback(() => {
     NeonService.getCourseSchedule(courseId).then(setSchedule);
   }, [courseId]);
@@ -293,7 +295,7 @@ export function TeacherLessonCard({
       </View>
 
       {/* Кому уделить внимание (Teacher 4): кто не заходит 7+ дней + «Напомнить» */}
-      {members && members.inactive.length > 0 && (
+      {members && (members.inactive.length > 0 || notStartedNames.length > 0) && (
         <View style={styles.attention}>
           <Text variant="h3" style={{ color: colors.textPrimary }}>
             Кому уделить внимание
@@ -304,38 +306,82 @@ export function TeacherLessonCard({
               { backgroundColor: colors.surface, borderColor: colors.border },
             ]}
           >
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => openStudents('away7d')}
-              style={({ pressed }) => [styles.attentionRow, pressed && styles.pressed]}
-            >
-              <View style={[styles.attentionBadge, { backgroundColor: alpha(colors.error, 10) }]}>
-                <Text variant="label" style={{ color: colors.errorText }}>
-                  {members.inactive.length}
-                </Text>
-              </View>
-              <View style={styles.shrink}>
-                <Text variant="label" style={{ color: colors.textPrimary }}>
-                  {`${pluralize(members.inactive.length, 'Не заходит', 'Не заходят', 'Не заходят')} 7+ дней`}
-                </Text>
-                <Text variant="bodySmall" numberOfLines={2} style={{ color: colors.textSecondary }}>
-                  {members.inactive
-                    .slice(0, 3)
-                    .map((m) => shortName(m.name))
-                    .join(', ') +
-                    (members.inactive.length > 3 ? ` и ещё ${members.inactive.length - 3}` : '')}
-                </Text>
-              </View>
-              <ChevronRight size={iconSize.s} color={colors.textTertiary} />
-            </Pressable>
-            <Button
-              variant="secondary"
-              size="s"
-              title={remindedToday ? 'Напомнили сегодня' : 'Напомнить повторить слова'}
-              onPress={remind}
-              loading={reminding}
-              disabled={remindedToday}
-            />
+            {hw.current && notStartedNames.length > 0 && (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  track('homework');
+                  if (hw.current) hw.openNotSubmitted(hw.current.id, 'not_started');
+                }}
+                style={({ pressed }) => [styles.attentionRow, pressed && styles.pressed]}
+              >
+                <View
+                  style={[styles.attentionBadge, { backgroundColor: alpha(colors.homework, 10) }]}
+                >
+                  <Text variant="label" style={{ color: colors.homeworkText }}>
+                    {notStartedNames.length}
+                  </Text>
+                </View>
+                <View style={styles.shrink}>
+                  <Text variant="label" style={{ color: colors.textPrimary }}>
+                    {`${pluralize(notStartedNames.length, 'Не начал', 'Не начали', 'Не начали')} ${hw.current.title}`}
+                  </Text>
+                  <Text
+                    variant="bodySmall"
+                    numberOfLines={2}
+                    style={{ color: colors.textSecondary }}
+                  >
+                    {notStartedNames.slice(0, 3).map(shortName).join(', ') +
+                      (notStartedNames.length > 3 ? ` и ещё ${notStartedNames.length - 3}` : '')}
+                  </Text>
+                </View>
+                <ChevronRight size={iconSize.s} color={colors.textTertiary} />
+              </Pressable>
+            )}
+            {members.inactive.length > 0 && (
+              <>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => openStudents('away7d')}
+                  style={({ pressed }) => [styles.attentionRow, pressed && styles.pressed]}
+                >
+                  <View
+                    style={[styles.attentionBadge, { backgroundColor: alpha(colors.error, 10) }]}
+                  >
+                    <Text variant="label" style={{ color: colors.errorText }}>
+                      {members.inactive.length}
+                    </Text>
+                  </View>
+                  <View style={styles.shrink}>
+                    <Text variant="label" style={{ color: colors.textPrimary }}>
+                      {`${pluralize(members.inactive.length, 'Не заходит', 'Не заходят', 'Не заходят')} 7+ дней`}
+                    </Text>
+                    <Text
+                      variant="bodySmall"
+                      numberOfLines={2}
+                      style={{ color: colors.textSecondary }}
+                    >
+                      {members.inactive
+                        .slice(0, 3)
+                        .map((m) => shortName(m.name))
+                        .join(', ') +
+                        (members.inactive.length > 3
+                          ? ` и ещё ${members.inactive.length - 3}`
+                          : '')}
+                    </Text>
+                  </View>
+                  <ChevronRight size={iconSize.s} color={colors.textTertiary} />
+                </Pressable>
+                <Button
+                  variant="secondary"
+                  size="s"
+                  title={remindedToday ? 'Напомнили сегодня' : 'Напомнить повторить слова'}
+                  onPress={remind}
+                  loading={reminding}
+                  disabled={remindedToday}
+                />
+              </>
+            )}
           </View>
         </View>
       )}

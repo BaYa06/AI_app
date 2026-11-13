@@ -76,6 +76,28 @@ export function useTeacherHomework({
 
   const current = useMemo(() => (list ? currentHomework(list) : null), [list]);
 
+  // Кто не начал текущее задание — для «Кому уделить внимание» (Teacher 25)
+  const [notStarted, setNotStarted] = useState<string[]>([]);
+  useEffect(() => {
+    setNotStarted([]);
+    if (
+      !TEACHER_HOMEWORK_ENABLED ||
+      !current ||
+      current.assigned - current.submitted - current.started <= 0
+    )
+      return;
+    let cancelled = false;
+    NeonService.loadHomeworkStatus(current.id).then((res) => {
+      if (cancelled || !res) return;
+      setNotStarted(
+        res.students.filter((s) => s.status === 'not_started').map((s) => s.displayName)
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [current?.id, current?.started, current?.submitted]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const rootNav = navigation?.getParent?.() ?? navigation;
   const openStatus = useCallback(
     (homeworkId: string) =>
@@ -141,5 +163,15 @@ export function useTeacherHomework({
     </>
   ) : null;
 
-  return { list, current, reload, openNew, openHomework, openStatus, openNotSubmitted, sheets };
+  return {
+    list,
+    current,
+    notStarted,
+    reload,
+    openNew,
+    openHomework,
+    openStatus,
+    openNotSubmitted,
+    sheets,
+  };
 }

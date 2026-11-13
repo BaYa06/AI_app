@@ -52,15 +52,6 @@ export function homeworkTileCaption(h: HomeworkRow | null): string {
   return `сдали ${Math.min(h.submitted, h.assigned)} из ${h.assigned}`;
 }
 
-/** «Не начали Ünite 4: Бекжан, Batyr и ещё 5» — для «Кому уделить внимание» (Teacher 25) */
-export function notStartedLine(title: string, names: string[]): string {
-  const shown = names.slice(0, 2).join(', ');
-  const more = names.length - 2;
-  return more > 0
-    ? `Не начали ${title}: ${shown} и ещё ${more}`
-    : `Не ${names.length === 1 ? 'начал(а)' : 'начали'} ${title}: ${shown}`;
-}
-
 /** Слова по умолчанию в окне «Новое задание»: весь последний набор курса (обычно — свежий юнит) */
 export function defaultHomeworkWords(sets: PickerSet[]): HomeworkWords | null {
   const last = sets[sets.length - 1];

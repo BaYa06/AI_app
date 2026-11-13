@@ -5,7 +5,6 @@ import {
   defaultHomeworkWords,
   homeworkCardSummary,
   homeworkTileCaption,
-  notStartedLine,
 } from '../teacherHomework';
 
 const DAY = 86400000;
@@ -40,13 +39,6 @@ describe('задание на главной и в курсе', () => {
     });
     expect(homeworkTileCaption(hw('4', 3))).toBe('сдали 7 из 22');
     expect(homeworkTileCaption(null)).toBe('с дедлайном');
-  });
-
-  it('«не начали» с именами', () => {
-    expect(notStartedLine('Ünite 4', ['Бекжан', 'Batyr', 'A', 'B'])).toBe(
-      'Не начали Ünite 4: Бекжан, Batyr и ещё 2'
-    );
-    expect(notStartedLine('Ünite 4', ['Бекжан'])).toBe('Не начал(а) Ünite 4: Бекжан');
   });
 
   it('слова по умолчанию — последний набор курса', () => {
