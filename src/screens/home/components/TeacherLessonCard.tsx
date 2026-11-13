@@ -237,6 +237,29 @@ export function TeacherLessonCard({
           />
         )}
 
+        {/* Вход в экран 10 «Перед уроком» (Teacher 38) */}
+        {TEACHER_LESSON_PREP_ENABLED && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Подготовка к уроку: трудные слова группы"
+            onPress={() => {
+              track('lesson_prep');
+              const rootNav = navigation?.getParent?.() ?? navigation;
+              rootNav?.navigate('TeacherLessonPrep', { courseId, courseTitle });
+            }}
+            style={({ pressed }) => [
+              styles.studentsRow,
+              { backgroundColor: softFill },
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text variant="bodySmall" style={[styles.shrink, { color: onFill }]}>
+              Подготовка к уроку: трудные слова группы
+            </Text>
+            <ChevronRight size={iconSize.s} color={onFill} />
+          </Pressable>
+        )}
+
         {/* Учеников нет — предлагаем код курса */}
         {members && members.total === 0 && (
           <View style={[styles.studentsRow, { backgroundColor: softFill }]}>

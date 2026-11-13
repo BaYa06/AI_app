@@ -13,7 +13,13 @@ export type TeacherAction =
   | 'course'
   | 'books'
   | 'homework'
-  | 'homework_export';
+  | 'homework_export'
+  // Этап 3 «Подготовка к уроку» (Teacher 44)
+  | 'lesson_prep'
+  | 'warmup_start'
+  | 'lesson_check'
+  | 'prep_remind'
+  | 'warmup_homework';
 
 export const teacherEvents = {
   // ═══════════════════════════════════════════════════════════════════════════
@@ -31,6 +37,12 @@ export const teacherEvents = {
       students: params.students,
       inactive: params.inactive,
     }),
+
+  /**
+   * Учитель открыл экран «Перед уроком» (10).
+   * Зачем: пользуются ли подготовкой к уроку вообще.
+   */
+  teacherLessonPrepViewed: () => log('teacher_lesson_prep_viewed', {}),
 
   /**
    * Нажатие в кабинете учителя.

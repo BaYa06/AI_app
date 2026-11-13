@@ -15,12 +15,13 @@ import {
   GraduationCap,
   Trophy,
   UserPlus,
+  Zap,
 } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import type { IconComponent } from '@/components/ui';
 import { useThemeColors } from '@/store';
 import { alpha, borderRadius, heights, iconSize, spacing } from '@/constants';
-import { TEACHER_HOMEWORK_ENABLED } from '@/config/features';
+import { TEACHER_HOMEWORK_ENABLED, TEACHER_LESSON_PREP_ENABLED } from '@/config/features';
 import type { RootStackParamList } from '@/types/navigation';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { pluralize } from '@/utils';
@@ -130,9 +131,21 @@ export function CourseActions({
       </View>
 
       <View style={[st.list, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        {TEACHER_LESSON_PREP_ENABLED && (
+          <Row
+            colors={colors}
+            icon={Zap}
+            title="Подготовка к уроку"
+            value="трудные слова"
+            onPress={tap('lesson_prep', () =>
+              navigation.navigate('TeacherLessonPrep', { courseId, courseTitle })
+            )}
+          />
+        )}
         <Row
           colors={colors}
           icon={Clock}
+          divider={TEACHER_LESSON_PREP_ENABLED}
           title="История тестов"
           value={tests ? String(tests.count) : undefined}
           onPress={() => navigation.navigate('TestHistory', { courseId, courseTitle })}

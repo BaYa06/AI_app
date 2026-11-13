@@ -90,6 +90,7 @@ import { SecurityScreen } from '@/screens/SecurityScreen';
 import { TeacherCourseStatsScreen } from '@/screens/TeacherCourseStatsScreen';
 import { TeacherStudentsScreen } from '@/screens/TeacherStudentsScreen';
 import { TeacherHomeworkScreen } from '@/screens/TeacherHomeworkScreen';
+import { TeacherLessonPrepScreen } from '@/screens/TeacherLessonPrepScreen';
 import { StudentHomeworkScreen } from '@/screens/StudentHomeworkScreen';
 import { HomeworkDoneScreen } from '@/screens/HomeworkDoneScreen';
 import { StudentDetailScreen } from '@/screens/StudentDetailScreen';
@@ -588,6 +589,11 @@ export function AppNavigator() {
         <Stack.Screen
           name="TeacherHomework"
           component={TeacherHomeworkScreen}
+          options={{ headerShown: false, gestureEnabled: true }}
+        />
+        <Stack.Screen
+          name="TeacherLessonPrep"
+          component={TeacherLessonPrepScreen}
           options={{ headerShown: false, gestureEnabled: true }}
         />
         <Stack.Screen

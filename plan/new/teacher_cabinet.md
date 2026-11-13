@@ -585,7 +585,10 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
   `not_opened`) — без него «Не открывали» поимённо не собрать. Задание: `services/lessonPrep.ts` + хук `useLessonPrep(courseId)`:
   трудные слова (Teacher 33), готовность (решение 5), кто не открывал набор / не начал задание,
   состав разминки — 6 самых трудных слов, «~5 минут». Кэш по курсу, обновление по свайпу. Тесты.
-- [ ] **Teacher 38. Экран 10 «Перед уроком».** `TeacherLessonPrepScreen` (маршрут `TeacherLessonPrep`):
+- [x] **Teacher 38. Экран 10 «Перед уроком».** ✅ `TeacherLessonPrepScreen.tsx`, маршрут в `AppNavigator`
+  и `navigation.ts`; входы — строка в `TeacherLessonCard` и строка «Подготовка к уроку» в `CourseActions`
+  (обе за флагом). Подтверждение «Напомнить N» — `confirmDialog` (работает и на вебе). Аналитика
+  (`teacher_lesson_prep_viewed`, действия этапа) добавлена сразу. Задание: `TeacherLessonPrepScreen` (маршрут `TeacherLessonPrep`):
   шапка «Урок завтра, пт 10:30 · учебник · Ünite 4» (`nextLesson`), карточка готовности с полоской
   `success` / `warning` / трек, «Где группа ошибается» (слово — перевод, %, набор, «ошибались N
   учеников»; ≥ 32 % — `errorText`, иначе `warningText`), карточка «Разминка уже собрана» с кнопкой

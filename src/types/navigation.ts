@@ -201,7 +201,19 @@ export type RootStackParamList = {
     todayCards: number;
     lastActivity: string;
   };
-  ExamLobby: { courseId: string; courseTitle: string };
+  /**
+   * Настройка живого теста. cardIds — тест по списку слов вместо набора, purpose = 'warmup' —
+   * разминка перед уроком, title — заголовок («Ünite 4 · проверка задания») (Teacher 39).
+   */
+  ExamLobby: {
+    courseId: string;
+    courseTitle: string;
+    cardIds?: string[];
+    purpose?: 'warmup';
+    title?: string;
+  };
+  /** Экран 10 «Перед уроком» (Teacher 38) */
+  TeacherLessonPrep: { courseId: string; courseTitle: string };
   TestHistory: { courseId: string; courseTitle: string };
   /** Рейтинг курса за неделю (week: 'previous' — сразу итоги прошлой недели) */
   CourseLeaderboard: { courseId: string; courseTitle?: string; week?: 'current' | 'previous' };
