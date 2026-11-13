@@ -8,7 +8,7 @@ import { log } from './_log.js';
  */
 // schema_039: в 038 (official_sets_guard) и 039 (set_kind) версию не подняли — миграции не выполнились,
 // и запросы с card_sets.kind падали на тестовом сервере (plan/new/set_kind.md, слабые места)
-const SCHEMA_VERSION = 'schema_043';
+const SCHEMA_VERSION = 'schema_044';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -884,6 +884,21 @@ async function applyMigrations(sql) {
     await sql`ALTER TABLE test_sessions ADD COLUMN IF NOT EXISTS purpose VARCHAR(10)`;
   } catch (e) {
     log.error('db-init', 'Migration 043_test_card_ids failed', e);
+  }
+
+  // Migration 044: «Напомнить» выбранным ученикам (plan/new/teacher_cabinet.md, Teacher 36) —
+  // лимит «раз в 20 часов» на каждого ученика курса, а не на курс.
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS review_reminders (
+        course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        user_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        sent_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (course_id, user_id)
+      )
+    `;
+  } catch (e) {
+    log.error('db-init', 'Migration 044_review_reminders failed', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)

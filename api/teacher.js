@@ -68,8 +68,9 @@ import {
  * GET  /api/teacher?action=set-hard-cards        ?setId=&courseId=
  * GET  /api/teacher?action=course-hard-cards     ?courseId=&days=14&limit=20 — трудные слова группы
  * GET  /api/teacher?action=course-sets-by-membership ?courseId= (ученик — курс, в котором состоит)
- * POST /api/teacher?action=remind-review       { courseId, studentId? } — пуш «повтори слова»
- *                                               (всему классу — не чаще раза в сутки)
+ * POST /api/teacher?action=remind-review       { courseId, studentId?, studentIds? } — пуш «повтори
+ *                                               слова» (всему классу — не чаще раза в сутки;
+ *                                               studentIds — каждому не чаще раза в 20 ч)
  * Задания (plan/new/teacher_cabinet.md, этап 2):
  * POST /api/teacher?action=homework-create  { courseId, title, cardIds, dueAt, minScore?, userIds? }
  * GET  /api/teacher?action=homework-list    ?courseId=

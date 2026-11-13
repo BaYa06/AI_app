@@ -298,3 +298,57 @@ describe('итоги по словам (Teacher 35)', () => {
     expect(student.body.purpose).toBeUndefined();
   });
 });
+
+describe('remind-review выбранным (Teacher 36)', () => {
+  const STUDENT = '22222222-2222-4222-8222-222222222222';
+  const STUDENT_B = '77777777-7777-4777-8777-777777777777';
+  const writes = () => mockQueries.filter((q) => /^(INSERT|UPDATE|DELETE)\b/i.test(q.text));
+
+  it('кривой studentIds — 400; чужой курс — 403 и ни одного пуша', async () => {
+    expect(
+      (await call('POST', 'remind-review', { courseId: COURSE, studentIds: ['x'] })).statusCode
+    ).toBe(400);
+    expect(
+      (await call('POST', 'remind-review', { courseId: COURSE, studentIds: [] })).statusCode
+    ).toBe(400);
+    const res = await call('POST', 'remind-review', { courseId: COURSE, studentIds: [STUDENT] });
+    expect(res.statusCode).toBe(403);
+    expect(mockSent).toEqual([]);
+  });
+
+  it('напоминает тем, кого вернул запрос, и записывает лимит на каждого; лимит курса не трогает', async () => {
+    mockRules = [
+      [/FROM courses/, () => [{ id: COURSE, teacher: 'Айгуль', recent: true }]],
+      [/FROM course_members cm/, () => [{ user_id: STUDENT, waiting: 0 }]],
+    ];
+    const res = await call('POST', 'remind-review', {
+      courseId: COURSE,
+      studentIds: [STUDENT, STUDENT_B, STUDENT],
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ ok: true, students: 1, sent: 1, skipped: 1 });
+    expect(mockSent).toEqual([
+      { userId: STUDENT, type: 'teacher_review', data: { teacher: 'Айгуль', count: 0 } },
+    ]);
+    const w = writes();
+    expect(w).toHaveLength(1);
+    expect(w[0].text).toMatch(/^INSERT INTO review_reminders/);
+    const q = mockQueries.find((x) => /FROM course_members cm/.test(x.text));
+    expect(q.text).toMatch(/review_reminders rr/);
+  });
+
+  it('без studentIds — как раньше: лимит курса 429', async () => {
+    mockRules = [[/FROM courses/, () => [{ id: COURSE, teacher: 'Айгуль', recent: true }]]];
+    const res = await call('POST', 'remind-review', { courseId: COURSE });
+    expect(res.statusCode).toBe(429);
+  });
+
+  it('текст пуша без слов на повторении — без «0 слов»', () => {
+    const { PUSH_TYPES } = require('../push/_registry.js');
+    const text = PUSH_TYPES.teacher_review.variants[0]({
+      data: { teacher: 'Айгуль', count: 0 },
+      secPerAnswer: 6,
+    });
+    expect(text.body).toBe('Открой курс и позанимайся перед уроком');
+  });
+});

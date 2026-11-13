@@ -206,10 +206,61 @@ export async function toggleSetHidden(req, res, sql, userId) {
  * Учитель просит повторить слова (план §3.8): пуш ученикам курса, у которых есть слова курса
  * к повторению. Всему классу — не чаще раза в сутки; одному ученику — в любой момент.
  */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** studentIds из тела: нет поля — null (старое поведение), кривое — 'invalid' */
+export function parseStudentIds(value) {
+  if (value === undefined || value === null) return null;
+  if (!Array.isArray(value) || value.length === 0 || value.length > 500) return 'invalid';
+  if (!value.every((id) => typeof id === 'string' && UUID_RE.test(id))) return 'invalid';
+  return [...new Set(value)];
+}
+
+/**
+ * «Напомнить» выбранным ученикам (plan/new/teacher_cabinet.md, Teacher 36): каждому не чаще раза
+ * в 20 часов (review_reminders), лимит курса не трогаем. Пуш уходит и тем, у кого слов на
+ * повторении нет (ученик ещё не открывал набор) — текст для них свой.
+ */
+async function remindSelected(res, sql, courseId, teacher, studentIds) {
+  const targets = await sql`
+    SELECT cm.user_id,
+      (SELECT COUNT(*)::int FROM card_progress cp
+        JOIN cards c ON c.id = cp.card_id AND c.set_id IN (${courseSetIdsSql(sql, courseId)})
+        WHERE cp.user_id = cm.user_id AND cp.learning_step >= 1 AND cp.next_review <= NOW()) AS waiting
+    FROM course_members cm
+    WHERE cm.course_id = ${courseId}::uuid AND cm.role = 'student'
+      AND cm.user_id = ANY(${studentIds}::uuid[])
+      AND NOT EXISTS (SELECT 1 FROM review_reminders rr
+        WHERE rr.course_id = ${courseId}::uuid AND rr.user_id = cm.user_id
+          AND rr.sent_at > NOW() - INTERVAL '20 hours')
+  `;
+  let sent = 0;
+  for (const t of targets) {
+    const result = await sendNotification(sql, t.user_id, 'teacher_review', {
+      teacher,
+      count: t.waiting,
+    });
+    if (result.ok) sent++;
+    await sql`
+      INSERT INTO review_reminders (course_id, user_id, sent_at)
+      VALUES (${courseId}::uuid, ${t.user_id}::uuid, NOW())
+      ON CONFLICT (course_id, user_id) DO UPDATE SET sent_at = NOW()
+    `;
+  }
+  return res.status(200).json({
+    ok: true,
+    students: targets.length,
+    sent,
+    skipped: studentIds.length - targets.length,
+  });
+}
+
 export async function remindReview(req, res, sql, userId) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { courseId, studentId = null } = req.body || {};
   if (!courseId) return res.status(400).json({ error: 'courseId required' });
+  const studentIds = parseStudentIds((req.body || {}).studentIds);
+  if (studentIds === 'invalid') return res.status(400).json({ error: 'studentIds is invalid' });
 
   const course = await sql`
     SELECT c.id, COALESCE(u.display_name, u.user_name) AS teacher, c.last_review_reminder_at > NOW() - INTERVAL '20 hours' AS recent
@@ -217,6 +268,7 @@ export async function remindReview(req, res, sql, userId) {
     WHERE c.id = ${courseId}::uuid AND c.user_id = ${userId}::uuid
   `;
   if (course.length === 0) return res.status(403).json({ error: 'Not the owner' });
+  if (studentIds) return remindSelected(res, sql, courseId, course[0].teacher, studentIds);
   if (!studentId && course[0].recent) {
     return res.status(429).json({ error: 'Already reminded today', reason: 'rate_limited' });
   }

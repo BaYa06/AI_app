@@ -99,7 +99,11 @@ export const PUSH_TYPES = {
     variants: [
       ({ data, secPerAnswer }) => ({
         title: `${data.teacher || 'Учитель'} просит повторить слова`,
-        body: `${data.count} ${plural(data.count, 'слово ждёт', 'слова ждут', 'слов ждут')} повторения · ~${minutesFor(data.count, secPerAnswer)} мин`,
+        // count = 0 — «Напомнить» выбранным (Teacher 36): ученик ещё не открывал слова курса
+        body:
+          data.count > 0
+            ? `${data.count} ${plural(data.count, 'слово ждёт', 'слова ждут', 'слов ждут')} повторения · ~${minutesFor(data.count, secPerAnswer)} мин`
+            : 'Открой курс и позанимайся перед уроком',
       }),
     ],
   },
