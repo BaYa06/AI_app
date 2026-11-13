@@ -441,15 +441,15 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
 
 **Финал**
 
-### Где остановились (13.11.2026, после этапа 3)
+### Где остановились (13.11.2026, после этапа 4)
 
-- Сделано и отправлено в dev: исправление очереди, Teacher 31–32, этап 3 целиком (Teacher 33–44).
-  Последний коммит этапа 3 — «Teacher 44: проверка этапа 3».
-- Сервер этапа 3 есть только на staging (`schema_044`). В прод — после команды, раньше клиента.
-- Флаги: `TEACHER_HOMEWORK_ENABLED = true` (тестовая сборка), `TEACHER_LESSON_PREP_ENABLED = false`.
-- **Ждёт пользователя:** сборка iOS (Swift: `NewHomeworkSheet` изменён, `TestTypeSheet` удалён — проверено
-  только `swiftc -parse` и правкой project.pbxproj), скриншоты, включение `TEACHER_LESSON_PREP_ENABLED`,
-  выкладка сервера в прод.
+- Сделано и отправлено в dev: очередь, Teacher 31–32, этап 3 (33–44), этап 4 (45–56).
+- Сервер этапов 3–4 есть только на staging (до `schema_046`). В прод — по команде, раньше клиента.
+- Флаги: `TEACHER_HOMEWORK_ENABLED = true` (тестовая сборка), `TEACHER_LESSON_PREP_ENABLED = false`,
+  `TEACHER_INSIGHTS_ENABLED = false`. Env `TEACHER_PUSH_ENABLED` не выставлен (403 у коннектора) —
+  записи колокольчика пишутся со статусом `teacher_off`.
+- **Ждёт пользователя:** сборка iOS (Swift `NewHomeworkSheet` изменён, `TestTypeSheet` удалён — только
+  `swiftc -parse`), скриншоты, env на Vercel Preview, включение флагов, выкладка сервера в прод.
 - **Ошибка очереди — исправлена ✅ (13.11.2026, «Teacher 30: очередь session-complete»):**
   `homeworkStore.reportSession` при `TEACHER_HOMEWORK_ENABLED = false` ничего не ставит в очередь;
   ответ 400 «Unknown action» на `session-complete` — пустой итог (`callProgressApi`, параметр
@@ -814,7 +814,13 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
   «Группе» (весь курс: кто занимался, лучшие, кто не заходит), выбор ученика и периода («С начала
   курса» / «Месяц» / «Неделя»), превью отчёта, поле «Комментарий учителя», «Отправить ссылкой»
   (системное «Поделиться») и «PDF». Вход: экран ученика, страница курса (строка «Отчёт по группе»).
-- [ ] **Teacher 56. Проверка и флаги.** type-check 0, тесты, eslint. Скриншоты 13, 14, списка
+- [x] **Teacher 56. Проверка и флаги.** ✅ (автоматическая часть, 13.11.2026) `npm test` — 625 тестов,
+  type-check 0, eslint по файлам этапа без ошибок. Staging: `schema_045` применена (`push_log.seen_at`);
+  миграция 046 (`teacher_reports`) применится при первом запросе к деплою с Teacher 53+.
+  **Осталось вручную:** скриншоты 13, 14, колокольчика и настроек (обе темы, iOS и Android);
+  `TEACHER_PUSH_ENABLED=true` и `PUSH_ALLOWLIST` для Preview/dev в Vercel (у коннектора нет прав — 403);
+  проверить `/r/<код>` и PDF на staging; `TEACHER_INSIGHTS_ENABLED = true` — по команде.
+  Задание: type-check 0, тесты, eslint. Скриншоты 13, 14, списка
   уведомлений и страницы `/r/<код>` в светлой и тёмной теме, iOS и Android. Пуши на staging:
   П1, итоги недели, «не заходят», лимит 2 в день, тихие часы. Аналитика: `teacher_notifications_opened`,
   `teacher_report_created` (kind, способ: ссылка/PDF), `teacher_action` (`student_remind`).
