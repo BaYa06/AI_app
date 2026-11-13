@@ -117,3 +117,43 @@ export async function finishParticipantEarly(sql, participantId, reason) {
   });
   return p;
 }
+
+/**
+ * Ответы сессии по словам (plan/new/teacher_cabinet.md, Teacher 35): сколько ответов и сколько
+ * верных. У теста по списку слов (cardIds) в ответе все слова списка, даже без ответов.
+ */
+export async function sessionCardStats(sql, sessionId, cardIds) {
+  const list = Array.isArray(cardIds) && cardIds.length > 0 ? cardIds : null;
+  const rows = await sql`
+    SELECT c.id AS card_id, c.front, c.back,
+           COUNT(ta.id)::int AS answers,
+           (COUNT(ta.id) FILTER (WHERE ta.is_correct))::int AS correct
+    FROM cards c
+    LEFT JOIN test_answers ta ON ta.card_id = c.id AND ta.participant_id IN (
+      SELECT id FROM test_participants WHERE session_id = ${sessionId}::uuid
+    )
+    WHERE (${list}::uuid[] IS NOT NULL AND c.id = ANY(${list}::uuid[]))
+       OR c.id IN (
+         SELECT ta2.card_id FROM test_answers ta2
+         JOIN test_participants tp2 ON tp2.id = ta2.participant_id
+         WHERE tp2.session_id = ${sessionId}::uuid
+       )
+    GROUP BY c.id, c.front, c.back
+    ORDER BY c.front
+  `;
+  return rows.map(cardStat);
+}
+
+/** Строка слова: доля верных 0..100, null — ответов ещё нет */
+export function cardStat(row) {
+  const answers = Number(row.answers) || 0;
+  const correct = Number(row.correct) || 0;
+  return {
+    cardId: row.card_id,
+    word: row.front,
+    hint: row.back,
+    answers,
+    correct,
+    correctRate: answers > 0 ? Math.round((correct / answers) * 100) : null,
+  };
+}

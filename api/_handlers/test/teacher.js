@@ -1,7 +1,7 @@
 /**
  * api/test.js — живой тест — сторона учителя: создать, начать, монитор, завершить, результаты, история, восстановить (Clean 10 — перенесено без изменений).
  */
-import { broadcast, broadcastTestFinished, AWAY_GRACE_SEC } from './_shared.js';
+import { broadcast, broadcastTestFinished, AWAY_GRACE_SEC, sessionCardStats } from './_shared.js';
 import { courseSetIdsSql } from '../../_course.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -189,7 +189,8 @@ export async function monitorTest(req, res, sql, userId) {
   }
 
   const session = await sql`
-    SELECT status, started_at, time_per_question, question_count, teacher_id, exit_control
+    SELECT status, started_at, time_per_question, question_count, teacher_id, exit_control,
+           card_ids, purpose
     FROM test_sessions
     WHERE id = ${sessionId}::uuid
   `;
@@ -197,6 +198,8 @@ export async function monitorTest(req, res, sql, userId) {
     return res.status(404).json({ error: 'Session not found' });
   }
   const isTeacher = session[0].teacher_id === userId;
+  // autoFinishIfStale ниже может заменить строку сессии — список слов запоминаем сразу
+  const { card_ids: cardIds, purpose } = session[0];
   const exitControl = session[0].exit_control;
 
   // Разрешено учителю — владельцу сессии, либо ученику, который уже подключился к ней
@@ -239,12 +242,21 @@ export async function monitorTest(req, res, sql, userId) {
     ORDER BY joined_at ASC
   `;
 
+  // Блок «Слова» в мониторе (Teacher 40): только учителю и только у теста по списку слов —
+  // обычный тест лишним запросом на каждый опрос не нагружаем.
+  const byCard =
+    isTeacher && Array.isArray(cardIds) && cardIds.length > 0
+      ? await sessionCardStats(sql, sessionId, cardIds)
+      : undefined;
+
   return res.status(200).json({
     status: session[0].status,
     startedAt: session[0].started_at,
     timePerQuestion: session[0].time_per_question,
     questionCount: session[0].question_count,
     exitControl,
+    ...(isTeacher ? { purpose: purpose || null } : {}),
+    ...(byCard ? { byCard } : {}),
     participants: participants.map((p) => {
       const initials = (p.display_name || 'S')
         .split(' ')
@@ -342,6 +354,7 @@ export async function getResults(req, res, sql, userId) {
   // Данные сессии
   const session = await sql`
     SELECT ts.question_count, ts.created_at, ts.teacher_id,
+           ts.course_id, ts.card_ids, ts.purpose, ts.started_at, ts.finished_at,
            cs.title AS set_title
     FROM test_sessions ts
     JOIN card_sets cs ON cs.id = ts.set_id
@@ -386,7 +399,28 @@ export async function getResults(req, res, sql, userId) {
     LIMIT 5
   `;
 
+  // Итоги по словам и кто не подключился (Teacher 35) — новые поля, старые не меняются
+  const byCard = await sessionCardStats(sql, sessionId, session[0].card_ids);
+  const absent = session[0].course_id
+    ? await sql`
+        SELECT cm.user_id, COALESCE(u.display_name, u.user_name, 'Ученик') AS name
+        FROM course_members cm
+        JOIN users u ON u.id = cm.user_id
+        WHERE cm.course_id = ${session[0].course_id}::uuid AND cm.role = 'student'
+          AND cm.user_id NOT IN (
+            SELECT user_id FROM test_participants WHERE session_id = ${sessionId}::uuid
+          )
+        ORDER BY name
+      `
+    : [];
+
   return res.status(200).json({
+    byCard,
+    absent: absent.map((a) => ({ userId: a.user_id, name: a.name })),
+    purpose: session[0].purpose || null,
+    courseId: session[0].course_id || null,
+    startedAt: session[0].started_at || null,
+    finishedAt: session[0].finished_at || null,
     setTitle: session[0].set_title,
     date: session[0].created_at,
     totalQuestions: session[0].question_count,

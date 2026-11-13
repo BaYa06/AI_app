@@ -221,3 +221,80 @@ describe('живой тест по списку слов (Teacher 34)', () => {
     expect(res.body).toMatchObject({ questionCount: 2, purpose: null });
   });
 });
+
+describe('итоги по словам (Teacher 35)', () => {
+  const { getResults, monitorTest } = require('../_handlers/test/teacher.js');
+  const { cardStat } = require('../_handlers/test/_shared.js');
+  const SESSION = '99999999-9999-4999-8999-999999999999';
+  const STUDENT = '22222222-2222-4222-8222-222222222222';
+  const session = (extra = {}) => [
+    /FROM test_sessions/,
+    () => [{ teacher_id: ME, course_id: COURSE, question_count: 2, status: 'active', ...extra }],
+  ];
+  const stats = [
+    /LEFT JOIN test_answers/,
+    () => [{ card_id: CARD_A, front: 'kahvaltı', back: 'завтрак', answers: 4, correct: 3 }],
+  ];
+  const run = async (fn, me = ME) => {
+    const res = mockRes();
+    await fn({ method: 'GET', query: { sessionId: SESSION } }, res, mockSql, me);
+    return res;
+  };
+
+  it('cardStat: доля верных; без ответов — null', () => {
+    expect(cardStat({ card_id: CARD_A, front: 'a', back: 'b', answers: 4, correct: 3 })).toEqual({
+      cardId: CARD_A,
+      word: 'a',
+      hint: 'b',
+      answers: 4,
+      correct: 3,
+      correctRate: 75,
+    });
+    expect(cardStat({ answers: 0, correct: 0 }).correctRate).toBeNull();
+  });
+
+  it('results: byCard и absent добавлены, старые поля на месте', async () => {
+    mockRules = [
+      session({ purpose: 'warmup', set_title: 'Ünite 4' }),
+      stats,
+      [/FROM course_members cm/, () => [{ user_id: STUDENT, name: 'Бекжан' }]],
+    ];
+    const res = await run(getResults);
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({
+      setTitle: 'Ünite 4',
+      totalQuestions: 2,
+      avgScore: 0,
+      participants: [],
+      hardestCards: [],
+      purpose: 'warmup',
+      courseId: COURSE,
+      absent: [{ userId: STUDENT, name: 'Бекжан' }],
+    });
+    expect(res.body.byCard[0]).toMatchObject({ cardId: CARD_A, correctRate: 75 });
+  });
+
+  it('monitor: слова — только учителю и только у теста по списку', async () => {
+    mockRules = [session({ card_ids: [CARD_A], purpose: 'warmup' }), stats];
+    const res = await run(monitorTest);
+    expect(res.body.purpose).toBe('warmup');
+    expect(res.body.byCard).toHaveLength(1);
+
+    mockQueries = [];
+    mockRules = [session(), stats];
+    const plain = await run(monitorTest);
+    expect(plain.body.byCard).toBeUndefined();
+    expect(mockQueries.some((q) => /LEFT JOIN test_answers/.test(q.text))).toBe(false);
+
+    mockQueries = [];
+    mockRules = [
+      [/FROM test_sessions/, () => [{ teacher_id: ME, card_ids: [CARD_A], status: 'active' }]],
+      [/FROM test_participants WHERE session_id/, () => [{ id: 'p1' }]],
+      stats,
+    ];
+    const student = await run(monitorTest, STUDENT);
+    expect(student.statusCode).toBe(200);
+    expect(student.body.byCard).toBeUndefined();
+    expect(student.body.purpose).toBeUndefined();
+  });
+});
