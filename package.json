@@ -49,6 +49,7 @@
     "js-sha256": "^0.11.1",
     "lottie-react-native": "^7.3.6",
     "lucide-react-native": "^0.344.0",
+    "pdfkit": "^0.20.2",
     "process": "^0.11.10",
     "react": "18.2.0",
     "react-dom": "^18.2.0",

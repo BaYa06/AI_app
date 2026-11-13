@@ -307,3 +307,55 @@ describe('API отчётов (Teacher 53)', () => {
     expect(upd.values).toEqual(['abcdefghij', ME]);
   });
 });
+
+describe('PDF отчёта (Teacher 54)', () => {
+  const { buildReportPdf, reportFilename } = require('../_reportPdf.js');
+
+  it('имя файла без запрещённых символов', () => {
+    expect(reportFilename(parent())).toBe('Отчёт Aiperi Toktogulova.pdf');
+    expect(reportFilename({ kind: 'group', course: 'A1/B: утро' })).toBe(
+      'Отчёт группа A1 B утро.pdf'
+    );
+    expect(reportFilename({ kind: 'parent', student: '' })).toBe('Отчёт Flashly.pdf');
+  });
+
+  it('собирается настоящий PDF со встроенным шрифтом (кириллица и турецкие буквы)', async () => {
+    const pdf = await buildReportPdf(parent());
+    expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
+    expect(pdf.length).toBeGreaterThan(5000);
+    expect(pdf.toString('latin1')).toContain('DejaVuSans');
+  });
+
+  it('отчёт по группе и пустой отчёт тоже собираются', async () => {
+    const group = composeReport({
+      kind: 'group',
+      period: 'week',
+      range,
+      tz: 'Asia/Bishkek',
+      head: { course: 'A1-B', teacher: 'Айгуль', students: 22 },
+      totals: { answers: 0, correct: 0, active_users: 0 },
+      weeks: [],
+      best: [],
+      inactive: [{ name: 'Бекжан' }],
+    });
+    expect((await buildReportPdf(group)).subarray(0, 5).toString()).toBe('%PDF-');
+  });
+
+  it('report-pdf: чужой курс — 403; свой — имя файла и base64', async () => {
+    const body = { courseId: COURSE, kind: 'group', period: 'week', comment: '' };
+    expect((await call('POST', 'report-pdf', body)).statusCode).toBe(403);
+    expect((await call('GET', 'report-pdf', {}, body)).statusCode).toBe(405);
+    mockRules = [
+      [/FROM courses WHERE id/, () => [{ id: COURSE }]],
+      [
+        /FROM courses c JOIN users tu/,
+        () => [{ course: 'A1-B', teacher: 'Айгуль', tz: 'Asia/Bishkek', students: 22 }],
+      ],
+    ];
+    const res = await call('POST', 'report-pdf', body);
+    expect(res.body.error).toBeUndefined();
+    expect(res.statusCode).toBe(200);
+    expect(res.body.filename).toBe('Отчёт группа A1-B.pdf');
+    expect(Buffer.from(res.body.base64, 'base64').subarray(0, 5).toString()).toBe('%PDF-');
+  });
+});

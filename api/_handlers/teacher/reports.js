@@ -10,6 +10,7 @@ import {
   buildReport,
   generateReportCode,
 } from '../../_report.js';
+import { buildReportPdf, reportFilename } from '../../_reportPdf.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const isUuid = (v) => typeof v === 'string' && UUID_RE.test(v);
@@ -106,4 +107,20 @@ export async function reportRevoke(req, res, sql, userId) {
   `;
   if (rows.length === 0) return res.status(404).json({ error: 'Report not found' });
   return res.status(200).json({ ok: true });
+}
+
+/**
+ * POST { courseId, kind, studentId?, period, comment } → { filename, base64 } — PDF отчёта.
+ * Файл отдаётся так же, как «Оценки в Excel» (Teacher 22): клиент открывает системное «Поделиться».
+ */
+export async function reportPdf(req, res, sql, userId) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const owned = await ownedReport(res, sql, userId, req.body);
+  if (!owned) return;
+  const buffer = await buildReportPdf(owned.report);
+  return res.status(200).json({
+    ok: true,
+    filename: reportFilename(owned.report),
+    base64: buffer.toString('base64'),
+  });
 }

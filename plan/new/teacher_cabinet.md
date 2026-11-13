@@ -799,7 +799,11 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
   `revoked_at`). `report-create` → код, `report-revoke`. Публичная страница `/r/<код>` по образцу
   `_share-page.js`: светлая и тёмная тема, логотип Flashly, цифры периода, недели столбиками,
   юниты, комментарий. Просрочено/отозвано — «Ссылка больше не действует». Тесты.
-- [ ] **Teacher 54. PDF.** `report-pdf` → `{ filename, base64 }` (`pdfkit`, шрифт с кириллицей);
+- [x] **Teacher 54. PDF.** ✅ `api/_reportPdf.js` (`buildReportPdf`, `reportFilename`), действие
+  `report-pdf` (POST — в теле комментарий учителя). `pdfkit` в `dependencies`; шрифт DejaVu Sans
+  (кириллица и турецкие буквы) — `api/_fonts/` с лицензией, в функцию попадает через `includeFiles`
+  в `vercel.json`. Образец отчёта собран и проверен глазами. Клиентская часть (кнопка «PDF»,
+  Android — ссылка) — в Teacher 55. Задание: `report-pdf` → `{ filename, base64 }` (`pdfkit`, шрифт с кириллицей);
   та же раскладка, что у страницы. Клиент — как «Оценки в Excel»; Android — ссылка (решение 5). Тесты.
 - [ ] **Teacher 55. Экран отчёта.** `TeacherReportScreen`: вкладки «Родителям» (один ученик) и
   «Группе» (весь курс: кто занимался, лучшие, кто не заходит), выбор ученика и периода («С начала

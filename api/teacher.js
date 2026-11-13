@@ -46,7 +46,7 @@ import {
   teacherNotificationsSeen,
 } from './_handlers/teacher/notifications.js';
 
-import { reportData, reportCreate, reportRevoke } from './_handlers/teacher/reports.js';
+import { reportData, reportCreate, reportRevoke, reportPdf } from './_handlers/teacher/reports.js';
 
 /**
  * API для учительских мутаций (курсы, приглашения, ростер, видимость наборов)
@@ -94,6 +94,7 @@ import { reportData, reportCreate, reportRevoke } from './_handlers/teacher/repo
  * GET  /api/teacher?action=report-data    ?courseId=&kind=parent|group&studentId=&period=all|month|week
  * POST /api/teacher?action=report-create  { courseId, kind, studentId?, period, comment } → { code, url }
  * POST /api/teacher?action=report-revoke  { code }
+ * POST /api/teacher?action=report-pdf     { courseId, kind, studentId?, period, comment } → { filename, base64 }
  */
 
 export default async function handler(req, res) {
@@ -150,6 +151,7 @@ export default async function handler(req, res) {
     if (action === 'report-data') return await reportData(req, res, sql, userId);
     if (action === 'report-create') return await reportCreate(req, res, sql, userId);
     if (action === 'report-revoke') return await reportRevoke(req, res, sql, userId);
+    if (action === 'report-pdf') return await reportPdf(req, res, sql, userId);
     if (action === 'teacher-notifications') {
       return await teacherNotifications(req, res, sql, userId);
     }
