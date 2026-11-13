@@ -486,7 +486,11 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
     staging, обратно совместимо. Клиент передаёт `origin` при создании в каждом пути импорта.
     Старые наборы без `origin`: из `library_imports` — `library`, иначе общий значок «набор».
   - Дата создания остаётся в экране набора и в сортировке «Недавние». Обе темы, цвета из токенов.
-- [ ] **Teacher 32. Убрать устный тест.** Только клиент: на сервере устного теста нет.
+- [x] **Teacher 32. Убрать устный тест.** ✅ Удалены три экрана `OralTest*`, маршруты, строки в
+  `AppUpdateGuard`, `TestLobbySheet.tsx`, `testType.ts`, `nativeTestTypeSheet.ts`, `TestTypeSheet.swift`
+  + `.m` (и из project.pbxproj). «Живой тест» на главной и странице курса сразу открывает `ExamLobby`
+  (`CourseActions` — проп `onLiveTest`). В «Что нового» и аналитике устного теста не было.
+  Только клиент: на сервере устного теста нет.
   - Удалить `OralTestLobbyScreen`, `OralTestSessionScreen`, `OralTestResultsScreen`, маршруты
     в `AppNavigator` / `navigation.ts`, строки в `AppUpdateGuard`, экспорт в `screens/index.ts`.
   - Выбор типа теста больше не нужен: «Живой тест» (главная, страница курса) сразу открывает

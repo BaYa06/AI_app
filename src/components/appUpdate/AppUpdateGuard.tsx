@@ -31,8 +31,6 @@ export const TEST_ROUTES = new Set([
   'TestWaiting',
   'TestExam',
   'ExamLobby',
-  'OralTestLobby',
-  'OralTestSession',
 ]);
 
 const enabled = Platform.OS === 'ios';

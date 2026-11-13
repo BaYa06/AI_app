@@ -43,7 +43,8 @@ type Props = {
   navigation: NativeStackScreenProps<RootStackParamList, 'TeacherCourseStats'>['navigation'];
   route: NativeStackScreenProps<RootStackParamList, 'TeacherCourseStats'>['route'];
   setJoinCodeDialog: React.Dispatch<React.SetStateAction<boolean>>;
-  setLobbyModal: React.Dispatch<React.SetStateAction<boolean>>;
+  /** «Живой тест» — сразу настройка теста (Teacher 32) */
+  onLiveTest: () => void;
   setScheduleSheet: React.Dispatch<React.SetStateAction<boolean>>;
   overview: CourseOverview;
   /** Этап 2: «Задание» */
@@ -57,7 +58,7 @@ export function CourseActions({
   navigation,
   route,
   setJoinCodeDialog,
-  setLobbyModal,
+  onLiveTest,
   setScheduleSheet,
   overview,
   onAssignHomework,
@@ -99,7 +100,7 @@ export function CourseActions({
           icon={GraduationCap}
           title="Живой тест"
           caption={testCaption}
-          onPress={tap('live_test', () => setLobbyModal(true))}
+          onPress={tap('live_test', onLiveTest)}
         />
         {TEACHER_HOMEWORK_ENABLED && (
           <Tile

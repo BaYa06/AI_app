@@ -96,9 +96,6 @@ import { StudentDetailScreen } from '@/screens/StudentDetailScreen';
 import { ExamLobbyScreen } from '@/screens/ExamLobbyScreen';
 import { TestHistoryScreen } from '@/screens/TestHistoryScreen';
 import { CourseLeaderboardScreen } from '@/screens/CourseLeaderboardScreen';
-import { OralTestLobbyScreen } from '@/screens/OralTestLobbyScreen';
-import { OralTestSessionScreen } from '@/screens/OralTestSessionScreen';
-import { OralTestResultsScreen } from '@/screens/OralTestResultsScreen';
 import { TestLobbyScreen } from '@/screens/TestLobbyScreen';
 import { LiveTestScreen } from '@/screens/LiveTestScreen';
 import { TestResultsTeacherScreen } from '@/screens/TestResultsTeacherScreen';
@@ -612,21 +609,6 @@ export function AppNavigator() {
           name="CourseLeaderboard"
           component={CourseLeaderboardScreen}
           options={{ headerShown: false, gestureEnabled: true }}
-        />
-        <Stack.Screen
-          name="OralTestLobby"
-          component={OralTestLobbyScreen}
-          options={{ headerShown: false, gestureEnabled: true }}
-        />
-        <Stack.Screen
-          name="OralTestSession"
-          component={OralTestSessionScreen}
-          options={{ headerShown: false, gestureEnabled: false }}
-        />
-        <Stack.Screen
-          name="OralTestResults"
-          component={OralTestResultsScreen}
-          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="TestLobby"

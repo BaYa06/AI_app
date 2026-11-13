@@ -29,7 +29,6 @@ import {
   buildChartDays,
   AvatarPlaceholder,
 } from './teacherCourseStats/helpers';
-import { TestLobbySheet } from './teacherCourseStats/TestLobbySheet';
 import { StudentListModal } from './teacherCourseStats/StudentListModal';
 import { CourseSetsList } from './teacherCourseStats/CourseSetsList';
 import { ActivityChart } from './teacherCourseStats/ActivityChart';
@@ -48,7 +47,6 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
 
   const [chartPeriod, setChartPeriod] = useState<'7d' | '30d'>('7d');
-  const [lobbyModal, setLobbyModal] = useState(false);
   const [scheduleSheet, setScheduleSheet] = useState(false);
   const [joinCodeDialog, setJoinCodeDialog] = useState(false);
   const [studentModal, setStudentModal] = useState<'active' | 'inactive' | null>(null);
@@ -297,7 +295,12 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
           navigation={navigation}
           route={route}
           setJoinCodeDialog={setJoinCodeDialog}
-          setLobbyModal={setLobbyModal}
+          onLiveTest={() =>
+            navigation.navigate('ExamLobby', {
+              courseId: route.params.courseId,
+              courseTitle: route.params.courseTitle,
+            })
+          }
           setScheduleSheet={setScheduleSheet}
           overview={{
             ...overview,
@@ -482,20 +485,6 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
         courseId={route.params.courseId}
         courseTitle={courseTitle}
         onClose={() => setJoinCodeDialog(false)}
-      />
-
-      {/* Test Lobby Bottom Sheet */}
-      <TestLobbySheet
-        colors={colors}
-        insets={insets}
-        lobbyModal={lobbyModal}
-        setLobbyModal={setLobbyModal}
-        onSelect={(kind) =>
-          navigation.navigate(kind === 'exam' ? 'ExamLobby' : 'OralTestLobby', {
-            courseId: route.params.courseId,
-            courseTitle: route.params.courseTitle,
-          })
-        }
       />
     </View>
   );

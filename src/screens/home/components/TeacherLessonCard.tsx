@@ -10,7 +10,6 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   CalendarClock,
   ChevronRight,
@@ -39,7 +38,6 @@ import {
 import { getNextLesson, type ScheduleItem } from '@/utils/nextLesson';
 import { pluralize } from '@/utils';
 import { getStudentStatus } from '@/screens/teacherCourseStats/helpers';
-import { TestLobbySheet } from '@/screens/teacherCourseStats/TestLobbySheet';
 import type { TeacherCourseMember } from '../useTeacherCourseData';
 
 type Props = {
@@ -67,8 +65,11 @@ export function TeacherLessonCard({
   const [schedule, setSchedule] = useState<ScheduleItem[] | null | undefined>(undefined);
   const [scheduleSheet, setScheduleSheet] = useState(false);
   const [codeDialog, setCodeDialog] = useState(false);
-  const [testSheet, setTestSheet] = useState(false);
-  const insets = useSafeAreaInsets();
+  /** «Живой тест» сразу открывает настройку теста: выбора типа больше нет (Teacher 32) */
+  const openLiveTest = () => {
+    const rootNav = navigation?.getParent?.() ?? navigation;
+    rootNav?.navigate('ExamLobby', { courseId, courseTitle });
+  };
   const [reminding, setReminding] = useState(false);
   const [remindedToday, setRemindedToday] = useState(false);
 
@@ -227,7 +228,7 @@ export function TeacherLessonCard({
             }}
             onCheck={() => {
               track('live_test');
-              setTestSheet(true);
+              openLiveTest();
             }}
             onStatus={(id) => {
               track('homework');
@@ -263,7 +264,7 @@ export function TeacherLessonCard({
           title="Живой тест"
           onPress={() => {
             track('live_test');
-            setTestSheet(true);
+            openLiveTest();
           }}
         />
         {TEACHER_HOMEWORK_ENABLED && (
@@ -386,19 +387,6 @@ export function TeacherLessonCard({
         </View>
       )}
 
-      <TestLobbySheet
-        colors={colors}
-        insets={insets}
-        lobbyModal={testSheet}
-        setLobbyModal={setTestSheet}
-        onSelect={(kind) => {
-          const rootNav = navigation?.getParent?.() ?? navigation;
-          rootNav?.navigate(kind === 'exam' ? 'ExamLobby' : 'OralTestLobby', {
-            courseId,
-            courseTitle,
-          });
-        }}
-      />
       <CourseScheduleSheet
         visible={scheduleSheet}
         courseId={courseId}

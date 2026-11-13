@@ -205,22 +205,6 @@ export type RootStackParamList = {
   TestHistory: { courseId: string; courseTitle: string };
   /** Рейтинг курса за неделю (week: 'previous' — сразу итоги прошлой недели) */
   CourseLeaderboard: { courseId: string; courseTitle?: string; week?: 'current' | 'previous' };
-  OralTestLobby: { courseId: string; courseTitle: string };
-  OralTestSession: {
-    courseId: string;
-    courseTitle: string;
-    setId: string;
-    setTitle: string;
-    cardIds: string[];
-  };
-  OralTestResults: {
-    courseId: string;
-    courseTitle: string;
-    setTitle: string;
-    total: number;
-    known: number;
-    unknown: number;
-  };
   TestLobby: {
     courseId: string;
     courseTitle: string;
