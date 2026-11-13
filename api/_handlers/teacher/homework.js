@@ -207,6 +207,8 @@ async function loadHomeworkStatus(sql, hw) {
       minScore: hw.min_score,
       createdAt: hw.created_at,
       canceled: !!hw.canceled_at,
+      // Слова задания — для «Проверить на уроке» (Teacher 39)
+      cardIds: hw.card_ids,
     },
     students: rows.map((r) => ({
       id: r.id,

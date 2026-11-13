@@ -23,6 +23,8 @@ import { describeError } from '@/utils/userErrors';
 import { getAccessToken } from '@/services/auth/session';
 import { rawApiFetch } from '@/services/api/client';
 
+import { historyTitle } from './examLobby/examLobbyText';
+
 type Props = NativeStackScreenProps<RootStackParamList, 'TestHistory'>;
 
 type HistoryItem = {
@@ -33,6 +35,8 @@ type HistoryItem = {
   avgScore: number;
   questionCount: number;
   testMode: string;
+  /** 'warmup' — разминка перед уроком (Teacher 39) */
+  purpose?: string | null;
 };
 
 function scoreColor(score: number, colors: ReturnType<typeof useThemeColors>): string {
@@ -191,7 +195,7 @@ export function TestHistoryScreen({ navigation, route }: Props) {
               <View style={{ flex: 1, gap: 4 }}>
                 <View style={styles.historyCardRow}>
                   <Text style={[styles.cardTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-                    {item.setTitle}
+                    {historyTitle(item)}
                   </Text>
                   <Text style={[styles.cardScore, { color: scoreColor(item.avgScore, colors) }]}>
                     {item.avgScore}%

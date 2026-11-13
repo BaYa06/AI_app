@@ -76,6 +76,8 @@ export interface HomeworkStatusData {
     minScore: number | null;
     createdAt: string;
     canceled: boolean;
+    /** Слова задания (Teacher 39); старый сервер поле не отдаёт */
+    cardIds?: string[];
   };
   students: HomeworkStudentRow[];
 }

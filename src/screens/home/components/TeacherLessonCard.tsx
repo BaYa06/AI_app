@@ -36,6 +36,7 @@ import {
   type HomeworkCardSummary,
 } from '@/components/teacher/teacherHomework';
 import { getNextLesson, type ScheduleItem } from '@/utils/nextLesson';
+import { lessonCheckTitle } from '@/screens/examLobby/examLobbyText';
 import { pluralize } from '@/utils';
 import { getStudentStatus } from '@/screens/teacherCourseStats/helpers';
 import type { TeacherCourseMember } from '../useTeacherCourseData';
@@ -69,6 +70,23 @@ export function TeacherLessonCard({
   const openLiveTest = () => {
     const rootNav = navigation?.getParent?.() ?? navigation;
     rootNav?.navigate('ExamLobby', { courseId, courseTitle });
+  };
+  /**
+   * «Проверить на уроке» (Teacher 39): живой тест по словам текущего задания. Слова не пришли
+   * (нет сети, старый сервер) — обычная настройка теста.
+   */
+  const checkOnLesson = async () => {
+    track('lesson_check');
+    const status = hw.current ? await NeonService.loadHomeworkStatus(hw.current.id) : null;
+    const cardIds = status?.homework.cardIds;
+    const rootNav = navigation?.getParent?.() ?? navigation;
+    rootNav?.navigate('ExamLobby', {
+      courseId,
+      courseTitle,
+      ...(status && cardIds && cardIds.length > 0
+        ? { cardIds, title: lessonCheckTitle(status.homework.title) }
+        : {}),
+    });
   };
   const [reminding, setReminding] = useState(false);
   const [remindedToday, setRemindedToday] = useState(false);
@@ -226,10 +244,7 @@ export function TeacherLessonCard({
               track('homework');
               hw.openStatus(id);
             }}
-            onCheck={() => {
-              track('live_test');
-              openLiveTest();
-            }}
+            onCheck={checkOnLesson}
             onStatus={(id) => {
               track('homework');
               hw.openNotSubmitted(id);
