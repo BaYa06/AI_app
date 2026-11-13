@@ -383,3 +383,132 @@ describe('course-set-students (Teacher 37)', () => {
     });
   });
 });
+
+describe('student-stats: данные экрана ученика (Teacher 51)', () => {
+  const { setAccuracy, studentHomeworkStatus } = require('../_handlers/teacher/roster.js');
+  const STUDENT = '22222222-2222-4222-8222-222222222222';
+  const query = { courseId: COURSE, studentId: STUDENT };
+  const member = [/^SELECT 1 FROM course_members/, () => [{}]];
+
+  it('% верных ученика и группы; без ответов — null', () => {
+    expect(setAccuracy({ answers: 10, correct: 7, group_answers: 100, group_correct: 87 })).toEqual(
+      {
+        answers: 10,
+        correctPct: 70,
+        groupCorrectPct: 87,
+      }
+    );
+    expect(setAccuracy({ answers: 0, correct: 0, group_answers: 0, group_correct: 0 })).toEqual({
+      answers: 0,
+      correctPct: null,
+      groupCorrectPct: null,
+    });
+  });
+
+  it('статус задания у ученика', () => {
+    expect(studentHomeworkStatus({ submitted_at: 'x', credited: 5 })).toBe('submitted');
+    expect(studentHomeworkStatus({ submitted_at: null, credited: 2 })).toBe('in_progress');
+    expect(studentHomeworkStatus({ submitted_at: null, credited: 0 })).toBe('not_started');
+  });
+
+  it('чужой курс — 403; ученик не из курса — 404', async () => {
+    expect((await call('GET', 'student-stats', {}, query)).statusCode).toBe(403);
+    mockRules = [ownCourse];
+    expect((await call('GET', 'student-stats', {}, query)).statusCode).toBe(404);
+  });
+
+  it('старые поля на месте, новые добавлены', async () => {
+    mockRules = [
+      ownCourse,
+      member,
+      [
+        /WITH course_sets AS/,
+        () => [
+          { set_id: SET, title: 'Ünite 4', total_cards: 48, cards_seen: 48, cards_learned: 20 },
+        ],
+      ],
+      [/AS current_streak/, () => [{ current_streak: 3, last_active_date: '2026-11-05' }]],
+      [
+        /AS total_answers/,
+        () => [
+          {
+            name: 'Кубат',
+            joined_at: '2026-10-30T00:00:00Z',
+            tz: 'Asia/Bishkek',
+            total_answers: 601,
+          },
+        ],
+      ],
+      [/GROUP BY 1 ORDER BY 1/, () => [{ date: '2026-11-05', answers: 80 }]],
+      [
+        /GROUP BY c\.set_id/,
+        () => [{ set_id: SET, answers: 100, correct: 70, group_answers: 1000, group_correct: 870 }],
+      ],
+      [/FROM test_participants tp/, () => []],
+      [
+        /FROM homework h/,
+        () => [
+          {
+            id: 'h1',
+            title: 'Ünite 4',
+            min_score: 80,
+            due_at: 'd',
+            kind: 'learn',
+            submitted_at: null,
+            credited: 48,
+            score: 70,
+          },
+        ],
+      ],
+    ];
+    const res = await call('GET', 'student-stats', {}, query);
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({
+      ok: true,
+      seenCards: 48,
+      learnedCards: 20,
+      unlearnedCards: 0,
+      streak: 3,
+      lastActiveDate: '2026-11-05',
+      name: 'Кубат',
+      totalAnswers: 601,
+      days: [{ date: '2026-11-05', answers: 80 }],
+      tests: [],
+      homework: { id: 'h1', status: 'in_progress', score: 70, minScore: 80 },
+    });
+    expect(res.body.sets[0]).toMatchObject({
+      setId: SET,
+      totalCards: 48,
+      seenCards: 48,
+      learnedCards: 20,
+      correctPct: 70,
+      groupCorrectPct: 87,
+    });
+  });
+
+  it('сбой новых запросов не ломает старый ответ', async () => {
+    mockRules = [
+      ownCourse,
+      member,
+      [/WITH course_sets AS/, () => []],
+      [/AS current_streak/, () => [{ current_streak: 0, last_active_date: null }]],
+      [
+        /AS total_answers/,
+        () => {
+          throw new Error('boom');
+        },
+      ],
+    ];
+    const res = await call('GET', 'student-stats', {}, query);
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({
+      ok: true,
+      seenCards: 0,
+      learnedCards: 0,
+      unlearnedCards: 0,
+      sets: [],
+      streak: 0,
+      lastActiveDate: null,
+    });
+  });
+});

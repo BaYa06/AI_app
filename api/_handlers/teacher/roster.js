@@ -4,6 +4,7 @@
 import { courseSetIdsSql } from '../../_course.js';
 import { sendNotification } from '../../push.js';
 import { notifyCoursesChanged } from '../../_realtime.js';
+import { log } from '../../_log.js';
 
 export async function listMembers(req, res, sql, userId) {
   const { courseId, limit, offset } = req.query;
@@ -158,15 +159,143 @@ export async function studentStats(req, res, sql, userId) {
       (SELECT MAX(reviewed_at)::date FROM review_log WHERE user_id = ${studentId}::uuid) AS last_active_date
   `;
 
+  // Экран ученика 13 (plan/new/teacher_cabinet.md, Teacher 51) — только новые поля; их сбой
+  // не должен ломать старый экран, поэтому отдельно и под try.
+  let detail = null;
+  try {
+    detail = await studentDetail(sql, courseId, studentId);
+  } catch (e) {
+    log.error('teacher', 'student-stats detail failed', e);
+  }
+
   return res.status(200).json({
     ok: true,
     seenCards,
     learnedCards,
     unlearnedCards: Math.max(0, totalCards - seenCards),
-    sets,
+    sets: detail ? sets.map((s) => ({ ...s, ...(detail.bySet.get(s.setId) || {}) })) : sets,
     streak: activity[0]?.current_streak || 0,
     lastActiveDate: activity[0]?.last_active_date || null,
+    ...(detail ? detail.fields : {}),
   });
+}
+
+const pct = (part, whole) => (whole > 0 ? Math.round((part / whole) * 100) : null);
+
+/** Строка ответов по набору → % верных ученика и группы (null — ответов нет) */
+export function setAccuracy(row) {
+  return {
+    answers: Number(row.answers) || 0,
+    correctPct: pct(Number(row.correct) || 0, Number(row.answers) || 0),
+    groupCorrectPct: pct(Number(row.group_correct) || 0, Number(row.group_answers) || 0),
+  };
+}
+
+/** Статус задания у ученика — как в homework-status */
+export function studentHomeworkStatus(row) {
+  if (row.submitted_at) return 'submitted';
+  return row.credited > 0 ? 'in_progress' : 'not_started';
+}
+
+/**
+ * Новые поля student-stats: имя и дата вступления, дни занятий за 28 дней, % верных по наборам
+ * (ученик и группа), живые тесты в курсе, текущее задание.
+ */
+async function studentDetail(sql, courseId, studentId) {
+  const [who] = await sql`
+    SELECT COALESCE(u.display_name, u.user_name, 'Ученик') AS name, cm.joined_at,
+      COALESCE(c.timezone, ts.timezone, 'Asia/Bishkek') AS tz,
+      (SELECT COUNT(*)::int FROM answers a
+        WHERE a.user_id = cm.user_id AND a.rejected_reason IS NULL) AS total_answers
+    FROM course_members cm
+    JOIN users u ON u.id = cm.user_id
+    JOIN courses c ON c.id = cm.course_id
+    LEFT JOIN user_stats ts ON ts.user_id = c.user_id
+    WHERE cm.course_id = ${courseId}::uuid AND cm.user_id = ${studentId}::uuid
+  `;
+  const tz = who?.tz || 'Asia/Bishkek';
+  const [days, accuracy, tests, homework] = await Promise.all([
+    sql`
+      SELECT (a.answered_at AT TIME ZONE ${tz})::date::text AS date, COUNT(*)::int AS answers
+      FROM answers a
+      WHERE a.user_id = ${studentId}::uuid AND a.rejected_reason IS NULL
+        AND a.answered_at > NOW() - INTERVAL '28 days'
+      GROUP BY 1 ORDER BY 1
+    `,
+    sql`
+      SELECT c.set_id,
+        (COUNT(*) FILTER (WHERE a.user_id = ${studentId}::uuid))::int AS answers,
+        (COUNT(*) FILTER (WHERE a.user_id = ${studentId}::uuid AND a.correct))::int AS correct,
+        COUNT(*)::int AS group_answers,
+        (COUNT(*) FILTER (WHERE a.correct))::int AS group_correct
+      FROM answers a
+      JOIN cards c ON c.id = a.card_id
+      WHERE c.set_id IN (${courseSetIdsSql(sql, courseId)}) AND a.rejected_reason IS NULL
+        AND a.user_id IN (
+          SELECT user_id FROM course_members WHERE course_id = ${courseId}::uuid AND role = 'student'
+        )
+      GROUP BY c.set_id
+    `,
+    sql`
+      SELECT ts.id AS session_id, cs.title, ts.finished_at, ts.purpose, tp.score,
+        tp.correct_count, COALESCE(jsonb_array_length(tp.question_order), 0) AS total
+      FROM test_participants tp
+      JOIN test_sessions ts ON ts.id = tp.session_id
+      LEFT JOIN card_sets cs ON cs.id = ts.set_id
+      WHERE ts.course_id = ${courseId}::uuid AND tp.user_id = ${studentId}::uuid
+        AND ts.status = 'finished'
+      ORDER BY ts.finished_at DESC
+      LIMIT 5
+    `,
+    sql`
+      SELECT h.id, h.title, h.min_score, h.due_at, h.kind, r.submitted_at, r.score AS result_score,
+        (SELECT COUNT(*)::int FROM homework_credits hc
+          WHERE hc.homework_id = h.id AND hc.user_id = ${studentId}::uuid) AS credited,
+        (SELECT ROUND(100.0 * COUNT(*) FILTER (WHERE hc.first_try_correct) / NULLIF(COUNT(*), 0))::int
+          FROM homework_credits hc
+          WHERE hc.homework_id = h.id AND hc.user_id = ${studentId}::uuid) AS score
+      FROM homework h
+      LEFT JOIN homework_results r ON r.homework_id = h.id AND r.user_id = ${studentId}::uuid
+      WHERE h.course_id = ${courseId}::uuid AND h.canceled_at IS NULL
+        AND h.due_at > NOW() - INTERVAL '2 days'
+        AND (h.assign_all OR EXISTS (
+          SELECT 1 FROM homework_assignees ha
+          WHERE ha.homework_id = h.id AND ha.user_id = ${studentId}::uuid))
+      ORDER BY h.due_at ASC
+      LIMIT 1
+    `,
+  ]);
+  const hw = homework[0];
+  return {
+    bySet: new Map(accuracy.map((r) => [r.set_id, setAccuracy(r)])),
+    fields: {
+      name: who?.name || 'Ученик',
+      joinedAt: who?.joined_at || null,
+      timezone: tz,
+      totalAnswers: who?.total_answers || 0,
+      days: days.map((d) => ({ date: d.date, answers: d.answers })),
+      tests: tests.map((t) => ({
+        sessionId: t.session_id,
+        title: t.title || 'Тест',
+        finishedAt: t.finished_at,
+        purpose: t.purpose || null,
+        score: t.score || 0,
+        correct: t.correct_count || 0,
+        total: Number(t.total) || 0,
+      })),
+      homework: hw
+        ? {
+            id: hw.id,
+            title: hw.title,
+            kind: hw.kind || 'learn',
+            minScore: hw.min_score,
+            dueAt: hw.due_at,
+            status: studentHomeworkStatus(hw),
+            score: hw.submitted_at ? hw.result_score : hw.score,
+          }
+        : null,
+    },
+  };
 }
 
 export async function checkOwner(req, res, sql, userId) {
