@@ -30,6 +30,7 @@ import {
   sendNotification,
 } from './_send.js';
 import { log } from '../_log.js';
+import { formatInZone } from '../_homeworkExcel.js';
 
 const FCM_BATCH = 500;
 const DAILY_SLOT = 'daily';
@@ -151,6 +152,81 @@ async function sendClassPrep(sql, { dryRun }) {
     classCandidates: rows.length,
     classSent: sent,
     ...(dryRun ? { classReport: report } : null),
+  };
+}
+
+/** С этого часа (по поясу ученика) — «Завтра срок» по заданию */
+const HOMEWORK_DUE_FROM_HOUR = 19;
+
+/**
+ * «Завтра срок» по заданию учителя (plan/new/teacher_cabinet.md, Teacher 29): вечером накануне срока
+ * (с 19:00 до тихих часов по поясу ученика), только кому задание выдано и кто ещё не сдал. Один такой
+ * пуш на задание (push_log.payload.homeworkId). Засчитаны все слова, но не хватает оценки — тоже шлём.
+ */
+async function sendHomeworkDue(sql, { dryRun }) {
+  const rows = await sql`
+    WITH cand AS (
+      SELECT h.id AS homework_id, h.title, h.due_at, h.card_ids, cm.user_id,
+             COALESCE(us.timezone, ${DEFAULT_TZ}) AS tz, COALESCE(c.timezone, ${DEFAULT_TZ}) AS course_tz,
+             (SELECT u.age_range IN ('under13', '13-17') FROM users u WHERE u.id = cm.user_id) AS minor
+      FROM homework h
+      JOIN courses c ON c.id = h.course_id
+      JOIN course_members cm ON cm.course_id = h.course_id AND cm.role = 'student'
+      JOIN user_stats us ON us.user_id = cm.user_id AND us.notif_enabled = true
+      WHERE h.canceled_at IS NULL
+        AND h.due_at > NOW() AND h.due_at < NOW() + INTERVAL '36 hours'
+        AND (h.assign_all OR EXISTS (
+          SELECT 1 FROM homework_assignees ha WHERE ha.homework_id = h.id AND ha.user_id = cm.user_id
+        ))
+        AND NOT EXISTS (
+          SELECT 1 FROM homework_results r WHERE r.homework_id = h.id AND r.user_id = cm.user_id
+        )
+    )
+    SELECT cand.homework_id, cand.title, cand.user_id, cand.course_tz, cand.due_at,
+      (SELECT COUNT(*)::int FROM cards WHERE id = ANY(cand.card_ids)) -
+      (SELECT COUNT(*)::int FROM homework_credits hc
+        WHERE hc.homework_id = cand.homework_id AND hc.user_id = cand.user_id
+          AND hc.card_id IN (SELECT id FROM cards WHERE id = ANY(cand.card_ids))) AS left_words
+    FROM cand
+    WHERE (cand.due_at AT TIME ZONE cand.tz)::date = (NOW() AT TIME ZONE cand.tz)::date + 1
+      AND (NOW() AT TIME ZONE cand.tz)::time >= make_time(${HOMEWORK_DUE_FROM_HOUR}, 0, 0)
+      AND (NOW() AT TIME ZONE cand.tz)::time < make_time(CASE WHEN cand.minor THEN ${MINOR_QUIET_FROM_HOUR}::int ELSE ${QUIET_FROM_HOUR}::int END, 0, 0)
+      AND EXISTS (SELECT 1 FROM push_tokens pt WHERE pt.user_id = cand.user_id AND pt.permission IS DISTINCT FROM 'denied')
+      AND NOT EXISTS (
+        SELECT 1 FROM push_log p
+        WHERE p.user_id = cand.user_id AND p.type = 'homework_due'
+          AND p.payload->>'homeworkId' = cand.homework_id::text
+          AND p.status NOT IN ('dry_run', 'paused', 'failed')
+      )
+  `;
+  let sent = 0;
+  const report = [];
+  for (const r of rows) {
+    const data = {
+      title: r.title,
+      count: Math.max(1, r.left_words),
+      dueText: formatInZone(r.due_at, r.course_tz),
+      homeworkId: r.homework_id,
+    };
+    try {
+      const result = await sendNotification(sql, r.user_id, 'homework_due', data, { dryRun });
+      if (result.ok) sent++;
+      if (dryRun) {
+        report.push({
+          user_id: r.user_id,
+          type: 'homework_due',
+          status: result.reason || 'send',
+          data,
+        });
+      }
+    } catch (e) {
+      log.error('arbiter', `homework_due for ${r.user_id} failed`, e);
+    }
+  }
+  return {
+    homeworkCandidates: rows.length,
+    homeworkSent: sent,
+    ...(dryRun ? { homeworkReport: report } : null),
   };
 }
 
@@ -626,6 +702,7 @@ export async function runArbiter(sql, { dryRun = false } = {}) {
   const startedAt = Date.now();
   const deferred = dryRun ? { deferred: 0, deferredSent: 0 } : await sendDeferred(sql);
   const classPrep = await sendClassPrep(sql, { dryRun });
+  const homeworkDue = await sendHomeworkDue(sql, { dryRun });
   const newSets = await sendNewCourseSets(sql, { dryRun });
   // Новичков — до основной рассылки: их пуш дня важнее общего напоминания
   const onboarding = await sendOnboarding(sql, { dryRun });
@@ -836,6 +913,7 @@ export async function runArbiter(sql, { dryRun = false } = {}) {
     skipped: logRows.length,
     ...deferred,
     ...classPrep,
+    ...homeworkDue,
     ...newSets,
     ...onboarding,
     ...streakRisk,

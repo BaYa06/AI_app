@@ -39,6 +39,8 @@ function sampleData(n) {
     days: n + 2,
     course: 'English A2',
     title: 'Unit 4',
+    dueText: '15.11.2026 20:00',
+    homeworkId: 'h1',
     set: 'Travel',
     inHours: n % 2 ? 1 : 2,
     streak: n + 2,

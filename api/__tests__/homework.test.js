@@ -117,16 +117,14 @@ describe('homework-create', () => {
   it('чужой курс — 403, проверка по текущему пользователю, ничего не записано', async () => {
     const res = await call('POST', 'homework-create', body());
     expect(res.statusCode).toBe(403);
-    const check = mockQueries.find((q) =>
-      /FROM courses WHERE id = \?::uuid AND user_id/.test(q.text)
-    );
+    const check = mockQueries.find((q) => /FROM courses c JOIN users u/.test(q.text));
     expect(check.values).toEqual([COURSE, ME]);
     expect(writes()).toEqual([]);
   });
 
   it('слово не из курса — 400, задание не создаётся', async () => {
     mockRules = [
-      [/FROM courses WHERE id = \?::uuid AND user_id/, () => [{ id: COURSE }]],
+      [/FROM courses c JOIN users u/, () => [{ id: COURSE }]],
       [/SELECT COUNT\(\*\)::int AS n FROM cards/, () => [{ n: 1 }]],
     ];
     const res = await call('POST', 'homework-create', body());
@@ -143,7 +141,7 @@ describe('homework-create', () => {
 
   it('создаётся: задание, «Знаю» засчитаны сразу, снимок без алмазов', async () => {
     mockRules = [
-      [/FROM courses WHERE id = \?::uuid AND user_id/, () => [{ id: COURSE }]],
+      [/FROM courses c JOIN users u/, () => [{ id: COURSE }]],
       [/SELECT COUNT\(\*\)::int AS n FROM cards/, () => [{ n: 2 }]],
       [/^INSERT INTO homework \(/, () => [{ id: HW, due_at: tomorrow() }]],
     ];
@@ -155,6 +153,30 @@ describe('homework-create', () => {
     expect(texts.some((t) => /INSERT INTO homework_credits/.test(t))).toBe(true);
     const settle = writes().find((q) => /INSERT INTO homework_results/.test(q.text));
     expect(settle.values).toContain(0); // reward = false: алмазы 0
+  });
+
+  it('после создания — пуш «Новое задание» каждому ученику задания', async () => {
+    mockRules = [
+      [
+        /FROM courses c JOIN users u/,
+        () => [{ id: COURSE, timezone: 'Asia/Bishkek', teacher: 'Ильяз агай' }],
+      ],
+      [/SELECT COUNT\(\*\)::int AS n FROM cards/, () => [{ n: 2 }]],
+      [/^INSERT INTO homework \(/, () => [{ id: HW, due_at: '2026-11-15T14:00:00Z' }]],
+      [/^SELECT user_id FROM \(/, () => [{ user_id: STUDENT }, { user_id: 'other' }]],
+    ];
+    const res = await call('POST', 'homework-create', body());
+    expect(res.statusCode).toBe(200);
+    expect(mockSent.map((m) => [m.userId, m.type])).toEqual([
+      [STUDENT, 'homework_assigned'],
+      ['other', 'homework_assigned'],
+    ]);
+    expect(mockSent[0].data).toMatchObject({
+      teacher: 'Ильяз агай',
+      count: 2,
+      dueText: '15.11.2026 20:00',
+      homeworkId: HW,
+    });
   });
 });
 

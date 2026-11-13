@@ -50,6 +50,16 @@ const LESSON_LINK = () => 'flashly://lesson?from=push';
 export const SUPPORT_MIN_APP_VERSION = '1.6.10';
 const SUPPORT_BODY_MAX = 120;
 
+/**
+ * Первая версия приложения с экраном задания (plan/new/teacher_cabinet.md, Teacher 27) — тап по пушу
+ * задания ведёт туда; на старые версии такие пуши не шлём. Поднять, если этап 2 выйдет позже.
+ */
+export const HOMEWORK_MIN_APP_VERSION = '1.8.9';
+const homeworkLink = (data) =>
+  data?.homeworkId
+    ? `flashly://homework/${encodeURIComponent(data.homeworkId)}?from=push`
+    : LESSON_LINK();
+
 function excerpt(text, max) {
   const t = String(text ?? '')
     .replace(/\s+/g, ' ')
@@ -93,14 +103,43 @@ export const PUSH_TYPES = {
       }),
     ],
   },
-  // «Напомнить» учителя по заданию (plan/new/teacher_cabinet.md, Teacher 15). Ссылка на экран
-  // задания и пуши «выдано» / «завтра срок» — Teacher 29.
+  // Задания учителя (plan/new/teacher_cabinet.md, Teacher 15 и 29): при выдаче, вечером накануне
+  // срока (если не сдано) и «Напомнить» учителя. Тап — экран задания.
+  homework_assigned: {
+    category: 'course',
+    priority: 1,
+    transactional: true,
+    minIntervalDays: 0,
+    minAppVersion: HOMEWORK_MIN_APP_VERSION,
+    link: homeworkLink,
+    variants: [
+      ({ data }) => ({
+        title: data.teacher ? `Новое задание от: ${data.teacher}` : 'Новое задание',
+        body: `${data.title ? `«${data.title}» · ` : ''}${data.count} ${plural(data.count, 'слово', 'слова', 'слов')}${data.dueText ? ` · до: ${data.dueText}` : ''}`,
+      }),
+    ],
+  },
+  homework_due: {
+    category: 'course',
+    priority: 1,
+    transactional: true,
+    minIntervalDays: 0,
+    minAppVersion: HOMEWORK_MIN_APP_VERSION,
+    link: homeworkLink,
+    variants: [
+      ({ data }) => ({
+        title: `Завтра срок${data.title ? `: ${data.title}` : ''}`,
+        body: `Осталось ${data.count} ${plural(data.count, 'слово', 'слова', 'слов')} · ~${newWordsMinutes(data.count)} мин${data.dueText ? `. Сдать до: ${data.dueText}` : ''}`,
+      }),
+    ],
+  },
   homework_reminder: {
     category: 'course',
     priority: 1,
     transactional: true,
     minIntervalDays: 0,
-    link: LESSON_LINK,
+    minAppVersion: HOMEWORK_MIN_APP_VERSION,
+    link: homeworkLink,
     variants: [
       ({ data }) => ({
         title: `${data.teacher || 'Учитель'} напоминает о задании`,

@@ -12,7 +12,7 @@ import {
   KNOWN_STEP,
   FIXED_AFTER_DAYS,
 } from '../../_homework.js';
-import { buildHomeworkWorkbook, DEFAULT_TIMEZONE } from '../../_homeworkExcel.js';
+import { buildHomeworkWorkbook, DEFAULT_TIMEZONE, formatInZone } from '../../_homeworkExcel.js';
 
 const isUuid = (v) => typeof v === 'string' && UUID_RE.test(v);
 
@@ -46,7 +46,9 @@ export async function homeworkCreate(req, res, sql, userId) {
   }
 
   const course = await sql`
-    SELECT id FROM courses WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid
+    SELECT c.id, c.timezone, COALESCE(u.display_name, u.user_name) AS teacher
+    FROM courses c JOIN users u ON u.id = c.user_id
+    WHERE c.id = ${courseId}::uuid AND c.user_id = ${userId}::uuid
   `;
   if (course.length === 0) return res.status(403).json({ error: 'Not the owner' });
 
@@ -92,6 +94,19 @@ export async function homeworkCreate(req, res, sql, userId) {
     ON CONFLICT DO NOTHING
   `;
   await settleHomework(sql, homeworkId, null, false);
+
+  // Пуш «Новое задание» каждому ученику (Teacher 29); тихие часы и выключенные уведомления — в sendNotification
+  const students = await sql`SELECT user_id FROM (${assignedStudentsSql(sql, homeworkId)}) a`;
+  const data = {
+    teacher: course[0].teacher,
+    title: title.trim(),
+    count: ids.length,
+    dueText: formatInZone(created[0].due_at, course[0].timezone || DEFAULT_TIMEZONE),
+    homeworkId,
+  };
+  await Promise.allSettled(
+    students.map((s) => sendNotification(sql, s.user_id, 'homework_assigned', data))
+  );
 
   return res.status(200).json({ homework: { id: homeworkId, dueAt: created[0].due_at } });
 }
