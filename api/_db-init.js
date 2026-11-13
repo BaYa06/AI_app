@@ -8,7 +8,7 @@ import { log } from './_log.js';
  */
 // schema_039: в 038 (official_sets_guard) и 039 (set_kind) версию не подняли — миграции не выполнились,
 // и запросы с card_sets.kind падали на тестовом сервере (plan/new/set_kind.md, слабые места)
-const SCHEMA_VERSION = 'schema_042';
+const SCHEMA_VERSION = 'schema_043';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -875,6 +875,15 @@ async function applyMigrations(sql) {
     await sql`ALTER TABLE card_sets ADD COLUMN IF NOT EXISTS origin TEXT`;
   } catch (e) {
     log.error('db-init', 'Migration 042_set_origin failed', e);
+  }
+
+  // Migration 043: живой тест по списку слов и разминка (plan/new/teacher_cabinet.md, Teacher 34).
+  // card_ids NULL — обычный тест по набору; purpose 'warmup' — разминка (в оценки не идёт).
+  try {
+    await sql`ALTER TABLE test_sessions ADD COLUMN IF NOT EXISTS card_ids UUID[]`;
+    await sql`ALTER TABLE test_sessions ADD COLUMN IF NOT EXISTS purpose VARCHAR(10)`;
+  } catch (e) {
+    log.error('db-init', 'Migration 043_test_card_ids failed', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)

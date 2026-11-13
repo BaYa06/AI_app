@@ -2,6 +2,33 @@
  * api/test.js — живой тест — сторона учителя: создать, начать, монитор, завершить, результаты, история, восстановить (Clean 10 — перенесено без изменений).
  */
 import { broadcast, broadcastTestFinished, AWAY_GRACE_SEC } from './_shared.js';
+import { courseSetIdsSql } from '../../_course.js';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+/** Больше слов в одном тесте не бывает (защита от случайно огромного списка) */
+export const TEST_MAX_CARDS = 200;
+
+/**
+ * Список слов теста (plan/new/teacher_cabinet.md, Teacher 34): массив uuid без повторов.
+ * undefined / пустой — обычный тест по набору (null); кривой — 'invalid'.
+ */
+export function parseTestCardIds(value) {
+  if (value === undefined || value === null) return null;
+  if (!Array.isArray(value)) return 'invalid';
+  if (value.length === 0) return null;
+  if (value.length > TEST_MAX_CARDS) return 'invalid';
+  if (!value.every((id) => typeof id === 'string' && UUID_RE.test(id))) return 'invalid';
+  return [...new Set(value)];
+}
+
+/** Набор, в котором больше всего слов списка: старый клиент видит его в истории и итогах */
+export function mainSetId(rows) {
+  const counts = new Map();
+  for (const r of rows) counts.set(r.set_id, (counts.get(r.set_id) || 0) + 1);
+  let best = null;
+  for (const [setId, n] of counts) if (!best || n > best[1]) best = [setId, n];
+  return best ? best[0] : null;
+}
 
 /** Генерация уникального 4-значного кода */
 export async function generateUniqueCode(sql) {
@@ -59,15 +86,21 @@ export async function autoFinishIfStale(sql, sessionId, session) {
 
 /**
  * POST ?action=create
- * Body: { setId, courseId, testMode, questionCount, timePerQuestion, exitControl? }
+ * Body: { setId, courseId, testMode, questionCount, timePerQuestion, exitControl?, cardIds?, purpose? }
  * exitControl — контроль выхода из приложения (plan/done/exam_lockdown.md). Необязательный: старые
  * версии приложения учителя его не шлют, и их тесты работают как раньше.
+ * cardIds — тест по списку слов курса вместо набора (Teacher 34); setId тогда не нужен.
+ * purpose = 'warmup' — разминка: в истории с пометкой, в оценки не идёт.
  */
 export async function createTest(req, res, sql, userId) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { setId, courseId, testMode, questionCount, timePerQuestion, exitControl } = req.body;
-  if (!setId || !courseId || !questionCount) {
+  const { courseId, testMode, timePerQuestion, exitControl } = req.body;
+  let { setId, questionCount } = req.body;
+  const cardIds = parseTestCardIds(req.body.cardIds);
+  if (cardIds === 'invalid') return res.status(400).json({ error: 'cardIds is invalid' });
+  const purpose = req.body.purpose === 'warmup' ? 'warmup' : null;
+  if (!courseId || (!cardIds && (!setId || !questionCount))) {
     return res.status(400).json({ error: 'setId, courseId, questionCount are required' });
   }
 
@@ -80,11 +113,25 @@ export async function createTest(req, res, sql, userId) {
     return res.status(403).json({ error: 'Access denied: not course owner' });
   }
 
+  if (cardIds) {
+    // Слова — только из наборов этого курса (свои и юниты учебников)
+    const owned = await sql`
+      SELECT id, set_id FROM cards
+      WHERE id = ANY(${cardIds}::uuid[]) AND set_id IN (${courseSetIdsSql(sql, courseId)})
+    `;
+    if (owned.length !== cardIds.length) {
+      return res.status(400).json({ error: 'cardIds must belong to the course' });
+    }
+    setId = mainSetId(owned);
+    const wanted = parseInt(questionCount, 10);
+    questionCount = wanted > 0 ? Math.min(wanted, cardIds.length) : cardIds.length;
+  }
+
   const code = await generateUniqueCode(sql);
 
   const result = await sql`
-    INSERT INTO test_sessions (teacher_id, set_id, course_id, code, test_mode, question_count, time_per_question, exit_control)
-    VALUES (${userId}::uuid, ${setId}::uuid, ${courseId}::uuid, ${code}, ${testMode || 'multiple'}, ${questionCount}, ${timePerQuestion || 0}, ${exitControl === true})
+    INSERT INTO test_sessions (teacher_id, set_id, course_id, code, test_mode, question_count, time_per_question, exit_control, card_ids, purpose)
+    VALUES (${userId}::uuid, ${setId}::uuid, ${courseId}::uuid, ${code}, ${testMode || 'multiple'}, ${questionCount}, ${timePerQuestion || 0}, ${exitControl === true}, ${cardIds}::uuid[], ${purpose})
     RETURNING id
   `;
 
@@ -92,6 +139,8 @@ export async function createTest(req, res, sql, userId) {
     sessionId: result[0].id,
     code,
     exitControl: exitControl === true,
+    questionCount,
+    purpose,
   });
 }
 
@@ -379,6 +428,7 @@ export async function getHistory(req, res, sql, userId) {
       ts.finished_at   AS "finishedAt",
       ts.question_count AS "questionCount",
       ts.test_mode     AS "testMode",
+      ts.purpose       AS "purpose",
       COUNT(tp.id)::int                                   AS "participantCount",
       COALESCE(ROUND(AVG(tp.score))::int, 0)              AS "avgScore"
     FROM test_sessions ts

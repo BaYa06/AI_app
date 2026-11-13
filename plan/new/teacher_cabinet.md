@@ -552,7 +552,11 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
   учеников курса, правило — решение 4. Ответ: `cardId`, `front`, `back`, `setId`, название набора,
   `errorRate`, `wrongUsers`, `answers`. `set-hard-cards` не трогаем (им пользуется старый клиент).
   Тесты.
-- [ ] **Teacher 34. Живой тест по списку слов.** Миграция: `test_sessions.card_ids UUID[] NULL`,
+- [x] **Teacher 34. Живой тест по списку слов.** ✅ Миграция 043 (`schema_043`), `createTest`
+  (`parseTestCardIds`, `mainSetId`; с `cardIds` поле `setId` не нужно, `questionCount` ≤ длины списка),
+  `joinTest` берёт вопросы из `card_ids`, `history` отдаёт `purpose`. Рейтинг недели и выгрузка
+  живые тесты не читают вообще — исключать разминку там не из чего. Тесты — `lessonPrep.test.js`.
+  Задание: Миграция: `test_sessions.card_ids UUID[] NULL`,
   `purpose VARCHAR(10) NULL` (`warmup` / NULL). `create` принимает `cardIds?` и `purpose?`:
   слова проверяются на принадлежность курсу; `set_id` = набор, в котором больше всего слов
   (старый клиент в истории и итогах видит обычный набор). `join` берёт вопросы из `card_ids`, если

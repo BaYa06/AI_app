@@ -141,3 +141,83 @@ describe('course-hard-cards (Teacher 33)', () => {
     });
   });
 });
+
+describe('живой тест по списку слов (Teacher 34)', () => {
+  const { createTest, parseTestCardIds, mainSetId } = require('../_handlers/test/teacher.js');
+  const CARD_B = '55555555-5555-4555-8555-555555555555';
+  const SET_B = '88888888-8888-4888-8888-888888888888';
+  const create = async (body) => {
+    const res = mockRes();
+    await createTest({ method: 'POST', body }, res, mockSql, ME);
+    return res;
+  };
+  const insert = () => mockQueries.find((q) => /^INSERT INTO test_sessions/.test(q.text));
+  const ownedCards = [
+    /FROM cards WHERE id = ANY/,
+    () => [
+      { id: CARD_A, set_id: SET },
+      { id: CARD_B, set_id: SET },
+    ],
+  ];
+  const inserted = [/^INSERT INTO test_sessions/, () => [{ id: 's1' }]];
+
+  it('parseTestCardIds: нет списка — null, кривой — invalid, повторы убираются', () => {
+    expect(parseTestCardIds(undefined)).toBeNull();
+    expect(parseTestCardIds([])).toBeNull();
+    expect(parseTestCardIds('x')).toBe('invalid');
+    expect(parseTestCardIds(['not-a-uuid'])).toBe('invalid');
+    expect(parseTestCardIds([CARD_A, CARD_A])).toEqual([CARD_A]);
+  });
+
+  it('mainSetId: набор, в котором больше всего слов', () => {
+    expect(mainSetId([{ set_id: SET }, { set_id: SET_B }, { set_id: SET_B }])).toBe(SET_B);
+    expect(mainSetId([])).toBeNull();
+  });
+
+  it('старый клиент: тест по набору — card_ids и purpose NULL', async () => {
+    mockRules = [ownCourse, inserted];
+    const res = await create({ setId: SET, courseId: COURSE, questionCount: 10 });
+    expect(res.statusCode).toBe(201);
+    expect(res.body).toMatchObject({ sessionId: 's1', exitControl: false });
+    expect(insert().values.slice(-2)).toEqual([null, null]);
+    expect(insert().values[1]).toBe(SET);
+  });
+
+  it('без setId и без cardIds — 400', async () => {
+    expect((await create({ courseId: COURSE, questionCount: 5 })).statusCode).toBe(400);
+  });
+
+  it('чужой курс — 403, тест не создаётся', async () => {
+    const res = await create({ courseId: COURSE, cardIds: [CARD_A] });
+    expect(res.statusCode).toBe(403);
+    expect(insert()).toBeUndefined();
+  });
+
+  it('слово не из курса — 400, тест не создаётся', async () => {
+    mockRules = [ownCourse, [/FROM cards WHERE id = ANY/, () => [{ id: CARD_A, set_id: SET }]]];
+    const res = await create({ courseId: COURSE, cardIds: [CARD_A, CARD_B] });
+    expect(res.statusCode).toBe(400);
+    expect(insert()).toBeUndefined();
+  });
+
+  it('разминка: слова, набор и число вопросов — из списка, purpose = warmup', async () => {
+    mockRules = [ownCourse, ownedCards, inserted];
+    const res = await create({ courseId: COURSE, cardIds: [CARD_A, CARD_B], purpose: 'warmup' });
+    expect(res.statusCode).toBe(201);
+    expect(res.body).toMatchObject({ questionCount: 2, purpose: 'warmup' });
+    const v = insert().values;
+    expect(v[1]).toBe(SET);
+    expect(v.slice(-2)).toEqual([[CARD_A, CARD_B], 'warmup']);
+  });
+
+  it('неизвестный purpose не пишется; questionCount не больше списка', async () => {
+    mockRules = [ownCourse, ownedCards, inserted];
+    const res = await create({
+      courseId: COURSE,
+      cardIds: [CARD_A, CARD_B],
+      purpose: 'exam',
+      questionCount: 50,
+    });
+    expect(res.body).toMatchObject({ questionCount: 2, purpose: null });
+  });
+});

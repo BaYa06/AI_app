@@ -67,7 +67,7 @@ export async function joinTest(req, res, sql, userId) {
   // Найти активную сессию по коду
   const sessions = await sql`
     SELECT ts.id, ts.course_id, ts.set_id, ts.test_mode, ts.question_count, ts.time_per_question, ts.status,
-           ts.exit_control,
+           ts.exit_control, ts.card_ids,
            cs.title AS set_title,
            COALESCE(u.display_name, u.email) AS teacher_name
     FROM test_sessions ts
@@ -143,8 +143,12 @@ export async function joinTest(req, res, sql, userId) {
     });
   }
 
-  // Получить карточки набора
-  const cards = await sql`
+  // Вопросы — слова из списка теста (Teacher 34), иначе все карточки набора.
+  // Удалённое после создания теста слово просто выпадает.
+  const byList = Array.isArray(session.card_ids) && session.card_ids.length > 0;
+  const cards = byList
+    ? await sql`SELECT id FROM cards WHERE id = ANY(${session.card_ids}::uuid[])`
+    : await sql`
     SELECT id FROM cards WHERE set_id = ${session.set_id}::uuid
   `;
   if (cards.length === 0) {
