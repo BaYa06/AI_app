@@ -90,6 +90,7 @@ import { SecurityScreen } from '@/screens/SecurityScreen';
 import { TeacherCourseStatsScreen } from '@/screens/TeacherCourseStatsScreen';
 import { TeacherStudentsScreen } from '@/screens/TeacherStudentsScreen';
 import { TeacherHomeworkScreen } from '@/screens/TeacherHomeworkScreen';
+import { StudentHomeworkScreen } from '@/screens/StudentHomeworkScreen';
 import { StudentDetailScreen } from '@/screens/StudentDetailScreen';
 import { ExamLobbyScreen } from '@/screens/ExamLobbyScreen';
 import { TestHistoryScreen } from '@/screens/TestHistoryScreen';
@@ -321,6 +322,7 @@ const NATIVE_LINKING: LinkingOptions<RootStackParamList> = {
       CourseLeaderboard: 'rating/:courseId',
       TeacherCourseStats: 'teacher/:courseId',
       TeacherStudents: 'teacher/:courseId/students',
+      StudentHomework: 'homework/:homeworkId',
     },
   },
 };
@@ -573,6 +575,11 @@ export function AppNavigator() {
         <Stack.Screen
           name="TeacherStudents"
           component={TeacherStudentsScreen}
+          options={{ headerShown: false, gestureEnabled: true }}
+        />
+        <Stack.Screen
+          name="StudentHomework"
+          component={StudentHomeworkScreen}
           options={{ headerShown: false, gestureEnabled: true }}
         />
         <Stack.Screen

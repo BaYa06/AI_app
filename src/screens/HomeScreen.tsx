@@ -1796,7 +1796,9 @@ export function HomeScreen({ navigation, route }: any) {
                     {activeHomework ? (
                       <StudentHomeworkCard
                         homework={activeHomework}
-                        onOpen={() => startHomeworkSession(navigation, activeHomework)}
+                        onOpen={() =>
+                          navigation.navigate('StudentHomework', { homeworkId: activeHomework.id })
+                        }
                         onContinue={() => startHomeworkSession(navigation, activeHomework)}
                         style={styles.lessonCard}
                       />
