@@ -143,6 +143,9 @@ import { isFreezeNoticeSeen, pickFreezeNotice, type FreezeNotice } from '@/servi
 import { HomeEmptyState } from './home/components/HomeEmptyState';
 import { SetsSectionHeader } from './home/components/SetsSectionHeader';
 import { HomeHeader } from './home/components/HomeHeader';
+import { useStartTasks } from './home/useStartTasks';
+import { StartTasksStack } from '@/components/home/StartTasksStack';
+import { WidgetHowToSheet } from '@/components/widget/WidgetHowToSheet';
 import { TeacherBanner } from './home/components/TeacherBanner';
 import { TeacherLessonCard } from './home/components/TeacherLessonCard';
 import { useTeacherCourseData } from './home/useTeacherCourseData';
@@ -1186,6 +1189,20 @@ export function HomeScreen({ navigation, route }: any) {
     };
   }, [activeCourseId, leaderboard, lastWeekBoard]);
 
+  // «Начало пути» — только у ученика (plan/new/new_user_activation.md, Start 3.2)
+  const playStartTaskReward = useCallback((from: { x: number; y: number }) => {
+    diamondRewardRef.current?.collect(from);
+  }, []);
+  const startTasks = useStartTasks({
+    navigation,
+    enabled: isTeacher === false,
+    fallbackSetId: filteredSets[0]?.id ?? null,
+    onCourse: () => setDrawerOpen(true),
+    onPhoto: () => {},
+    onLibrary: () => {},
+    playReward: playStartTaskReward,
+  });
+
   // Поиск и сортировка по текущему списку наборов
   const visibleSets = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -1884,6 +1901,14 @@ export function HomeScreen({ navigation, route }: any) {
                         />
                       </View>
                     )}
+                    {isTeacher === false && (
+                      <View ref={startTasks.stackRef} collapsable={false} style={styles.startTasks}>
+                        <StartTasksStack
+                          hidden={['photo', 'library', 'course']}
+                          onAction={startTasks.handleStartTask}
+                        />
+                      </View>
+                    )}
                     {/* Challenges Section */}
                     <View style={styles.challengesSection}>
                       <ChallengeTiles
@@ -2242,6 +2267,7 @@ export function HomeScreen({ navigation, route }: any) {
           moveTargetCourses={moveTargetCourses}
           navigation={navigation}
         />
+        <WidgetHowToSheet visible={startTasks.widgetSheet} onClose={startTasks.closeWidgetSheet} />
         <DiamondReward
           ref={diamondRewardRef}
           targetPosition={diamondTargetPos}

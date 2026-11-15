@@ -40,7 +40,7 @@ import {
   syncPushPermission,
   requestProvisionalPermission,
 } from '@/services/pushNotifications';
-import { useCatalogStore, useCoursesStore, useSettingsStore } from '@/store';
+import { useCatalogStore, useCoursesStore, useSettingsStore, useStartTasksStore } from '@/store';
 import { NEW_PER_DAY_OPTIONS } from '@/services/LessonService';
 import type { AboutMeAnswers } from '@/screens/AboutMeOnboardingScreen';
 
@@ -600,10 +600,11 @@ export default function App() {
     if (authStep === 'first_results') Analytics.firstLessonCompleted(secSinceSignIn());
   }, [authStep, needsOnboarding]); // eslint-disable-line react-hooks/exhaustive-deps
   const handleFirstMatchDone = useCallback(() => setAuthStep('first_results'), []);
-  const handleFirstResultsDone = useCallback(
-    () => setAuthStep(afterLessonStep()),
-    [afterLessonStep]
-  );
+  const handleFirstResultsDone = useCallback(() => {
+    // Первое задание «Начала пути» выполнено — первые 10 алмазов (Start 3.9)
+    useStartTasksStore.getState().complete('first_lesson');
+    setAuthStep(afterLessonStep());
+  }, [afterLessonStep]);
 
   // «Перепутал? Поменять местами» (Start 2.3): бывший изучаемый — родной, бывший родной — изучаемый
   const handleSwapLanguages = useCallback((newNative: string) => {
