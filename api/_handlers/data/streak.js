@@ -1,5 +1,5 @@
 /**
- * api/data.js — дневная активность, серия, заморозка, статистика (Clean 10 — перенесено без изменений).
+ * api/data.js — дневная активность, серия, заморозка, статистика.
  */
 import { HttpError } from '../../_access.js';
 import { log } from '../../_log.js';
@@ -95,6 +95,19 @@ export async function dayCountsForStreak(sql, me, today, tz) {
   };
 }
 
+/**
+ * День засчитан в серию — отметка для недели (plan/new/streak_freeze_display.md, Freeze 1).
+ * Строки дня может ещё не быть: итоги клиента приходят позже ответов.
+ */
+export async function markDayCounted(sql, me, day) {
+  await sql`
+    INSERT INTO daily_activity (user_id, local_date, streak_counted)
+    VALUES (${me}::uuid, ${day}::date, true)
+    ON CONFLICT (user_id, local_date) DO UPDATE SET streak_counted = true, updated_at = NOW()
+    WHERE daily_activity.streak_counted = false
+  `;
+}
+
 export async function updateUserStatsStreak(sql, me, p) {
   const today = localDay(p.localDate);
   const yesterday = localDay(p.yesterdayDate);
@@ -157,6 +170,7 @@ export async function updateUserStatsStreak(sql, me, p) {
       total_cards_studied = user_stats.total_cards_studied + ${d.cardsDelta},
       updated_at = NOW()
   `;
+  await markDayCounted(sql, me, today);
   const increased = lastActive !== today;
   // Раньше этот пуш слал клиент с секретом, которого в сборке не было, — он не работал
   if (increased && STREAK_MILESTONES.includes(currentStreak)) {
@@ -197,7 +211,8 @@ export async function logStreakEvent(sql, me, p) {
 export async function getWeekActivity(sql, me, p) {
   const days = Math.max(1, Math.min(366, Math.trunc(Number(p.days) || 7)));
   return sql`
-    SELECT local_date::text AS local_date, words_learned, minutes_learned, cards_studied
+    SELECT local_date::text AS local_date, words_learned, minutes_learned, cards_studied,
+           streak_counted, frozen
     FROM daily_activity
     WHERE user_id = ${me}::uuid AND local_date >= CURRENT_DATE - ${days}::int
     ORDER BY local_date DESC
@@ -241,10 +256,15 @@ export async function getUserStats(sql, me) {
       const yesterday = new Date(Date.parse(`${todayKey}T12:00:00Z`) - 86_400_000)
         .toISOString()
         .slice(0, 10);
+      // В том же запросе вчерашний день помечается замороженным — для снежинки в неделе (Freeze 1)
       const used = await sql`
         WITH f AS (
           UPDATE users SET streak_freezes = streak_freezes - 1
           WHERE id = ${me}::uuid AND streak_freezes > 0 RETURNING streak_freezes
+        ), d AS (
+          INSERT INTO daily_activity (user_id, local_date, frozen)
+          SELECT ${me}::uuid, ${yesterday}::date, true WHERE EXISTS (SELECT 1 FROM f)
+          ON CONFLICT (user_id, local_date) DO UPDATE SET frozen = true, updated_at = NOW()
         )
         UPDATE user_stats SET last_active_date = ${yesterday}::date, updated_at = NOW()
         WHERE user_id = ${me}::uuid AND EXISTS (SELECT 1 FROM f)
@@ -266,7 +286,8 @@ export async function getUserStats(sql, me) {
 export async function getDailyActivity(sql, me, p) {
   const day = localDay(p.localDate);
   const rows = await sql`
-    SELECT local_date::text AS local_date, words_learned, minutes_learned, cards_studied
+    SELECT local_date::text AS local_date, words_learned, minutes_learned, cards_studied,
+           streak_counted, frozen
     FROM daily_activity WHERE user_id = ${me}::uuid AND local_date = ${day}::date
   `;
   return rows[0] ?? null;

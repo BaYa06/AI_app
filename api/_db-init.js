@@ -8,7 +8,7 @@ import { log } from './_log.js';
  */
 // schema_039: в 038 (official_sets_guard) и 039 (set_kind) версию не подняли — миграции не выполнились,
 // и запросы с card_sets.kind падали на тестовом сервере (plan/new/set_kind.md, слабые места)
-const SCHEMA_VERSION = 'schema_046';
+const SCHEMA_VERSION = 'schema_047';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -931,6 +931,37 @@ async function applyMigrations(sql) {
     await sql`CREATE INDEX IF NOT EXISTS idx_teacher_reports_creator ON teacher_reports(created_by, created_at DESC)`;
   } catch (e) {
     log.error('db-init', 'Migration 046_teacher_reports failed', e);
+  }
+
+  // Migration 047: какой день засчитан в серию и какой спасён заморозкой
+  // (plan/new/streak_freeze_display.md, Freeze 1). Заполнение прошлого — строго один раз:
+  // миграции повторяются при каждой новой SCHEMA_VERSION, а повтор засчитал бы по старому правилу
+  // дни, которые сервер уже честно не засчитал.
+  try {
+    await sql`ALTER TABLE daily_activity ADD COLUMN IF NOT EXISTS streak_counted BOOLEAN NOT NULL DEFAULT false`;
+    await sql`ALTER TABLE daily_activity ADD COLUMN IF NOT EXISTS frozen BOOLEAN NOT NULL DEFAULT false`;
+    const done = await sql`SELECT 1 FROM app_migrations WHERE name = 'backfill_047_streak_counted'`;
+    if (done.length === 0) {
+      await sql`
+        UPDATE daily_activity da SET streak_counted = true
+        FROM user_stats us
+        WHERE us.user_id = da.user_id
+          AND da.streak_counted = false
+          AND us.last_active_date IS NOT NULL
+          AND da.local_date <= us.last_active_date
+          AND (
+            da.cards_studied >= 10
+            OR (us.current_streak > 0 AND da.cards_studied > 0
+                AND da.local_date > us.last_active_date - us.current_streak)
+          )
+      `;
+      await sql`
+        INSERT INTO app_migrations (name) VALUES ('backfill_047_streak_counted')
+        ON CONFLICT (name) DO NOTHING
+      `;
+    }
+  } catch (e) {
+    log.error('db-init', 'Migration 047_streak_day_flags failed', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)
