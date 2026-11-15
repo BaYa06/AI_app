@@ -4,7 +4,8 @@
  */
 import React from 'react';
 import { View } from 'react-native';
-import { useThemeColors } from '@/store';
+import { useStartTasksStore, useThemeColors } from '@/store';
+import { isStartTasksVisible } from '@/store/startTasksStore';
 import { Text } from '@/components/common';
 import { iconSize, alpha, getDeckAccentColor } from '@/constants';
 import { triggerHaptic } from '@/utils/haptic';
@@ -72,7 +73,12 @@ export function SetListItem({
   const showHidden = !!(set.isHiddenFromStudents && set.courseId && isTeacher);
   // Набор, из которого урок дня берёт новые слова (5.2) — связывает список с карточкой урока
   const isFocus = isTeacher !== true && lessonPlan.focusSetId === set.id;
-  const hasBadges = !!homeworkDue || isFocus || waitingCount > 0 || !!set.isOfficial || showHidden;
+  // Стартовый набор нового ученика (plan/new/new_user_activation.md, Start 3.3): пометка и,
+  // пока видна стопка «Начало пути», подпись, что набор свой — его можно менять
+  const isStarter = useStartTasksStore((s) => s.starterSetId === set.id);
+  const starterHint = useStartTasksStore((s) => isStarter && isStartTasksVisible(s));
+  const hasBadges =
+    !!homeworkDue || isFocus || waitingCount > 0 || !!set.isOfficial || showHidden || isStarter;
 
   return (
     <StaggerCard key={set.id} index={index}>
@@ -128,6 +134,7 @@ export function SetListItem({
                     <Badge label={`${waitingCount} ждут`} tone="warning" icon={RotateCcw} />
                   )}
                   {set.isOfficial && <Badge label="По учебнику" tone="neutral" icon={BookOpen} />}
+                  {isStarter && <Badge label="Стартовый" tone="neutral" />}
                   {showHidden && <Badge label="Скрыто" tone="neutral" icon={EyeOff} />}
                 </View>
               )}
@@ -208,6 +215,11 @@ export function SetListItem({
           </View>
         )}
       </SurfaceCard>
+      {starterHint && (
+        <Text variant="caption" style={[styles.starterHint, { color: colors.textTertiary }]}>
+          Твой первый набор. Его можно менять, удалить или добавить свои слова.
+        </Text>
+      )}
     </StaggerCard>
   );
 }

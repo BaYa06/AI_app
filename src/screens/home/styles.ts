@@ -106,6 +106,11 @@ export const styles = StyleSheet.create({
     marginHorizontal: screenPadding,
     marginBottom: spacing.xs,
   },
+  // Подпись под стартовым набором (Start 3.3)
+  starterHint: {
+    marginTop: spacing.xxs,
+    marginHorizontal: spacing.xs,
+  },
   // Стопка «Начало пути» (plan/new/new_user_activation.md, Start 3.2) — между уроком и мини-играми
   startTasks: {
     marginHorizontal: screenPadding,
