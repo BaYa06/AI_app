@@ -133,6 +133,7 @@ export async function insertCards(sql, me, cards) {
     front: optString(c.frontText, 2000) ?? '',
     back: optString(c.backText, 2000) ?? '',
     example: optString(c.example, 4000),
+    word_form: optString(c.wordForm, 100),
     word_type: optString(c.wordType, 20),
     image_url: optString(c.frontImage, 2000),
     audio_url: optString(c.frontAudio, 2000),
@@ -147,12 +148,12 @@ export async function insertCards(sql, me, cards) {
   if (own.length !== setIds.length) throw new HttpError(403, 'Not your set');
 
   const inserted = await sql`
-    INSERT INTO cards (id, set_id, front, back, example, word_type, image_url, audio_url,
+    INSERT INTO cards (id, set_id, front, back, example, word_form, word_type, image_url, audio_url,
                        created_at, next_review, last_reviewed, status)
-    SELECT id, set_id, front, back, example, word_type, image_url, audio_url,
+    SELECT id, set_id, front, back, example, word_form, word_type, image_url, audio_url,
            created_at, next_review, last_reviewed, status
     FROM json_to_recordset(${JSON.stringify(rows)}::json) AS r(
-      id uuid, set_id uuid, front text, back text, example text, word_type varchar, image_url text,
+      id uuid, set_id uuid, front text, back text, example text, word_form varchar, word_type varchar, image_url text,
       audio_url text, created_at timestamptz, next_review timestamptz, last_reviewed timestamptz, status varchar
     )
     ON CONFLICT (id) DO NOTHING
