@@ -619,7 +619,10 @@ export function HomeScreen({ navigation, route }: any) {
       }),
     []
   );
+  // Серию считает сервер (plan/new/streak_freeze_display.md): свой подсчёт по «≥ 10 карточек» —
+  // только для старого сервера без streak_counted, иначе он рисовал серию из незасчитанных дней
   const computedStreak = useMemo(() => {
+    if (weekActivity.some((a) => typeof a.streak_counted === 'boolean')) return 0;
     const activeDates = new Set(
       weekActivity.filter((a) => a.cards_studied >= 10).map((a) => a.local_date)
     );
