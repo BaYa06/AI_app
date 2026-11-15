@@ -530,7 +530,7 @@ footer a:hover { color: var(--text); }
 })();
 
 // Пока flashlycards.app смотрел на приложение, браузер мог поставить его Service Worker.
-// На сайте он не нужен: приложение живёт на app.flashlycards.app (plan/new/official_site.md, Site 3).
+// На сайте он не нужен: приложение живёт на app.flashlycards.app (plan/done/official_site.md, Site 3).
 if (location.hostname === 'flashlycards.app' && 'serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then(function (regs) {
     regs.forEach(function (r) { r.unregister(); });

@@ -1,6 +1,6 @@
 /**
  * Каталог библиотеки: предмет → (язык / раздел) → (уровень) → подборка → набор
- * (plan/new/library_catalog.md, Catalog 3). Только чтение; маршруты — в api/library.js:
+ * (plan/done/library_catalog.md, Catalog 3). Только чтение; маршруты — в api/library.js:
  *
  * GET /api/library?action=catalog[&lang=en]       предметы, «Продолжить» или «С чего начать», полка учебников
  * GET /api/library?action=subject&subject=<slug>   разделы, уровни и подборки предмета

@@ -1,5 +1,5 @@
 /**
- * GlassView — подложка Liquid Glass (plan/new/liquid_glass.md, Glass 1). iOS.
+ * GlassView — подложка Liquid Glass (plan/done/liquid_glass.md, Glass 1). iOS.
  *
  * На iOS 26 — системное стекло под детьми (ios/FlashcardsApp/GlassView.swift).
  * На iOS < 26 и в сборке без модуля — обычный View с `fallbackColor`, как на Android (GlassView.tsx).

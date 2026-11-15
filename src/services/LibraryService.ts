@@ -184,7 +184,7 @@ class LibraryServiceClass {
     return json.canPublish === true;
   }
 
-  // ── Каталог (plan/new/library_catalog.md, Catalog 3–5). Токен необязателен ──
+  // ── Каталог (plan/done/library_catalog.md, Catalog 3–5). Токен необязателен ──
 
   /** Предметы, «Продолжить» / «С чего начать», полка учебников. lang — язык для «С чего начать». */
   async getCatalog(lang?: string | null): Promise<CatalogResponse> {

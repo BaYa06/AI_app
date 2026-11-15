@@ -3,7 +3,7 @@
 Когда в App Store есть версия новее установленной, приложение при каждом заходе предлагает
 обновиться. Если версия слишком старая и сервер её уже не поддерживает (`minVersion`), окно
 становится обязательным: без обновления дальше не пройти. Это закрывает Release 5 из
-plan/new/release_safety.md.
+plan/done/release_safety.md.
 
 Макет: plan/ideas/Flashly new version.html, экран «Доступно обновление». Ниже он переведён на
 брендбук (plan/done/brandbook.md); что изменилось и почему — в разделе «Внешний вид».
@@ -173,7 +173,7 @@ JS-обёртка src/components/appUpdate/nativeAppUpdateSheet.ts (`useNativeAp
 - События: `update_prompt_shown { variant }`, `update_prompt_update`, `update_prompt_later`.
 - Метрика: доля активных за неделю на последней версии (`push_tokens.app_version`) до и после.
   Сейчас переход на новую версию идёт только через автообновление.
-- Отметить Release 5 в plan/new/release_safety.md ссылкой на этот план.
+- Отметить Release 5 в plan/done/release_safety.md ссылкой на этот план.
 
 ---
 

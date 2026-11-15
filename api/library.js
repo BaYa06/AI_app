@@ -30,7 +30,7 @@ import {
  * POST /api/library?action=import-collection – вся подборка в свой курс { collectionId, courseId } (JWT)
  * GET  /api/library?action=cards&id=xxx      – все карточки опубликованного набора
  *
- * Каталог (plan/new/library_catalog.md, Catalog 3; api/_handlers/library/catalog.js), токен необязателен:
+ * Каталог (plan/done/library_catalog.md, Catalog 3; api/_handlers/library/catalog.js), токен необязателен:
  * GET  /api/library?action=catalog[&lang=en]  – предметы, «Продолжить» / «С чего начать», полка учебников
  * GET  /api/library?action=subject&subject=slug – разделы, уровни, подборки предмета
  * GET  /api/library?action=collection&id=xxx – наборы подборки по порядку
@@ -405,7 +405,7 @@ async function checkPublished(req, res, sql) {
 }
 
 // ── action=like / action=rate ─────────────────────────────────────────────────
-// Лайки и оценки убраны (plan/new/library_catalog.md, решение 8): каталог ведёт команда.
+// Лайки и оценки убраны (plan/done/library_catalog.md, решение 8): каталог ведёт команда.
 // Старые версии приложения ещё вызывают эти action — отвечаем в прежнем формате текущим
 // состоянием и ничего не записываем. Таблицы удаляются, когда сменится минимальная версия.
 async function toggleLike(req, res, sql) {

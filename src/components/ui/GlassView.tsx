@@ -1,5 +1,5 @@
 /**
- * GlassView — подложка Liquid Glass (plan/new/liquid_glass.md, Glass 1). Android и веб.
+ * GlassView — подложка Liquid Glass (plan/done/liquid_glass.md, Glass 1). Android и веб.
  *
  * Стекло есть только на iOS 26 (GlassView.ios.tsx). Здесь — обычный View с `fallbackColor`:
  * элемент выглядит как раньше. Стекло — только для навигации и управления, не для контента.

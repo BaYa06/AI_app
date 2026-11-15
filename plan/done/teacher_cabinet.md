@@ -290,7 +290,7 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
 ### Шаги этапа 2
 
 Сервер — только staging. Каждый серверный шаг обратно совместим: старый клиент без заданий
-работает как раньше (plan/new/release_safety.md). Всё, что видит пользователь, — за флагом
+работает как раньше (plan/done/release_safety.md). Всё, что видит пользователь, — за флагом
 `TEACHER_HOMEWORK_ENABLED` до Teacher 30.
 
 **Сервер**

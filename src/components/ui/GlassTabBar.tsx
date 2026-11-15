@@ -1,5 +1,5 @@
 /**
- * GlassTabBar — стеклянная панель вкладок (plan/new/liquid_glass.md, Glass 4.1). Android и веб.
+ * GlassTabBar — стеклянная панель вкладок (plan/done/liquid_glass.md, Glass 4.1). Android и веб.
  *
  * Своя панель есть только на iOS (GlassTabBar.ios.tsx). Здесь — обычная панель навигатора,
  * контент под неё не заезжает.

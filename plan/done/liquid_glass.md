@@ -8,7 +8,7 @@ Apple: таб-бар, кнопки шапки, FAB, нижние панели, �
 а элементы остаются в RN — меняем только их фон. Разметка, логика и анимации не переписываются.
 
 Шаг = коммит «Glass N». Каждый шаг проверяется сборкой «iOS TestFlight Staging» из `dev` на iPhone
-с iOS 26 (см. plan/new/release_safety.md). Локально не собрать: здесь Xcode 15.2 / macOS 13,
+с iOS 26 (см. plan/done/release_safety.md). Локально не собрать: здесь Xcode 15.2 / macOS 13,
 а SDK iOS 26 есть только в Xcode 26 (Codemagic собирает на `xcode: latest`).
 
 ## Что уже даёт SDK iOS 26 без нашего кода

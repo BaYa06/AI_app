@@ -1,6 +1,6 @@
 //
 //  GlassView.swift
-//  Подложка Liquid Glass для RN (plan/new/liquid_glass.md, шаги Glass 1–2).
+//  Подложка Liquid Glass для RN (plan/done/liquid_glass.md, шаги Glass 1–2).
 //
 //  GlassView — RCTView со стеклом iOS 26 под детьми: UIVisualEffectView + UIGlassEffect.
 //  На iOS < 26 (или в сборке старым Xcode) стекла нет — JS туда GlassView не ставит

@@ -21,7 +21,7 @@
    Имя файла = имя в `log.error('db-init', 'Migration … failed', e)`.
 
 Только добавляющие изменения: `IF NOT EXISTS`, новые колонки nullable или с `DEFAULT`
-(совместимость со старыми версиями приложения — `plan/new/release_safety.md`, Release 2).
+(совместимость со старыми версиями приложения — `plan/done/release_safety.md`, Release 2).
 
 Проверка: `npm run db:check-migrations`. Запускается сама в pre-commit, если в коммите
 `api/_db-init.js` или эта папка.

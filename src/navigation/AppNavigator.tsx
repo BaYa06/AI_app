@@ -150,7 +150,7 @@ function MainTabs() {
     <Tab.Navigator
       // Без этого фона экран-вкладка сидит на нативном (белом по умолчанию) фоне окна.
       sceneContainerStyle={{ backgroundColor: colors.background }}
-      // iOS: плавающая стеклянная капсула на Swift (plan/new/liquid_glass.md, Glass 4.1) —
+      // iOS: плавающая стеклянная капсула на Swift (plan/done/liquid_glass.md, Glass 4.1) —
       // контент вкладок уходит под неё (отступ — useTabBarOverlayInset). Android и веб — обычная панель.
       tabBar={isGlassTabBarSupported ? (props) => <GlassTabBar {...props} /> : undefined}
       screenOptions={{

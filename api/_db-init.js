@@ -720,7 +720,7 @@ async function applyMigrations(sql) {
     log.error('db-init', 'Migration 039_set_kind failed', e);
   }
 
-  // Migration 040: библиотека-каталог (plan/new/library_catalog.md, Catalog 1) — предметы, разделы,
+  // Migration 040: библиотека-каталог (plan/done/library_catalog.md, Catalog 1) — предметы, разделы,
   // подборки, порядок наборов, курс и копия в library_imports, юниты учебника у ученика.
   // Подробные комментарии — database/migrations/040_library_catalog.sql.
   try {

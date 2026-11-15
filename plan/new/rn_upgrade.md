@@ -6,7 +6,7 @@ iOS SDK, Android targetSdk) и снова получать обновления 
 (Fabric + TurboModules).
 
 Шаг = коммит «Upgrade N». Каждый шаг проверяется сборкой «iOS TestFlight Staging» из `dev`
-(см. plan/new/release_safety.md), а не долгими локальными сборками. В `main` — только после проверки.
+(см. plan/done/release_safety.md), а не долгими локальными сборками. В `main` — только после проверки.
 
 ## Что ожидаем получить
 - Приложение собирается на свежем Xcode и проходит требования App Store / Google Play без заплаток.
@@ -88,5 +88,5 @@ Firebase (`@react-native-firebase/*`) обновить до версии, сов
 - Каждый скачок версии может сломать нативную сборку — поэтому по одной минорной версии за раз
   и проверка в TestFlight Staging.
 - Релиз в App Store из `main` — только после полной проверки staging-сборки и с поэтапным
-  выпуском (Phased Release), см. plan/new/release_safety.md.
+  выпуском (Phased Release), см. plan/done/release_safety.md.
 - Старые версии приложения у пользователей это не затрагивает: меняется только клиент, API тот же.

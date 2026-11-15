@@ -46,7 +46,7 @@ import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-c
 import { log } from '@/utils/logger';
 import { type AuthStep, AppRoot } from './app/AppRoot';
 
-// Метка сервера для отчётов о падениях (plan/new/release_safety.md, Release 4)
+// Метка сервера для отчётов о падениях (plan/done/release_safety.md, Release 4)
 initCrashReporting();
 
 export default function App() {

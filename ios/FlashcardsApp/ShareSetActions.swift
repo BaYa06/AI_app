@@ -2,7 +2,7 @@
 //  ShareSetActions.swift
 //  Набор по ссылке: меню «…» и лист жалобы (plan/new/share_set.md, Share 6).
 //
-//  Как в последних версиях (plan/new/liquid_glass.md, Glass 0 и 7): на iOS 26 меню и лист
+//  Как в последних версиях (plan/done/liquid_glass.md, Glass 0 и 7): на iOS 26 меню и лист
 //  системные — со стеклом и плавной пружиной.
 //  - ShareMenuButton — кнопка «…» с UIMenu (showsMenuAsPrimaryAction). Пункты приходят из JS,
 //    выбор — событием onSelect { id }.

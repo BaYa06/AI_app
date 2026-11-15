@@ -1,6 +1,6 @@
 /**
  * Каталог библиотеки: предмет → (язык / раздел) → (уровень) → подборка → набор
- * (plan/new/library_catalog.md, Catalog 5). Отдельно от libraryStore: тот держит старые полки
+ * (plan/done/library_catalog.md, Catalog 5). Отдельно от libraryStore: тот держит старые полки
  * и фильтры, которые уходят целиком (Catalog 6, 10).
  *
  * Кэш: каталог и предметы — 5 минут, подборки — 2 минуты. Повторный заход на экран рисуется из кэша
@@ -254,7 +254,7 @@ export const useCatalogStore = create<CatalogState & CatalogActions>()(
 /**
  * Пользователь удалил набор (или курс вместе с наборами): копия могла быть из библиотеки, на сервере её
  * отметка «добавлено» снимается каскадом — каталог перечитаем при следующем заходе
- * (plan/new/library_catalog.md, слабые места, п. 4). Подписка здесь, а не в setsStore: так setsStore
+ * (plan/done/library_catalog.md, слабые места, п. 4). Подписка здесь, а не в setsStore: так setsStore
  * не зависит от библиотеки.
  */
 useSetsStore.subscribe((state, prev) => {

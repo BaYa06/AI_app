@@ -149,7 +149,7 @@ module.exports = (env, argv) => {
           // Политика конфиденциальности и условия (/privacy, /terms): ссылки в приложении и в App Store Connect
           { from: 'public/privacy.html', to: 'privacy.html' },
           { from: 'public/terms.html', to: 'terms.html' },
-          // Официальный сайт flashlycards.app (plan/new/official_site.md): лендинг, маршрут по адресу — Site 3
+          // Официальный сайт flashlycards.app (plan/done/official_site.md): лендинг, маршрут по адресу — Site 3
           { from: 'public/site', to: 'site' },
           // Страница «не найдено» для адресов с точкой (Vercel отдаёт 404.html из корня) и favicon — plan/new/seo_launch.md
           { from: 'public/site/404.html', to: '404.html' },

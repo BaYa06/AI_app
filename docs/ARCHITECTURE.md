@@ -24,7 +24,7 @@
 - Приложение **не ходит в базу напрямую**: все данные — через `api/`. Пользователя сервер берёт
   из JWT, а не из тела запроса; права на набор/карточку/курс проверяет SQL на сервере.
 - Ветки: `dev` → тестовый сервер (Vercel Preview + ветка Neon `staging`), `main` → рабочий.
-  Подробно — `plan/new/release_safety.md`.
+  Подробно — `plan/done/release_safety.md`.
 
 ## Приложение (`src/`)
 
@@ -48,7 +48,7 @@
 - Файл `api/x.js` = эндпоинт `/api/x`. Файлы и папки с `_` Vercel не публикует.
 - `api/x.js` — роутер: `action` → функция. Сами функции — в `api/_handlers/x/*.js`.
 - **Контракт с приложением не меняется**: URL, имена `action`, поля запросов и ответов —
-  старые версии приложения из App Store ходят на тот же сервер (`plan/new/release_safety.md`).
+  старые версии приложения из App Store ходят на тот же сервер (`plan/done/release_safety.md`).
 - Миграция = блок в `api/_db-init.js` + `SCHEMA_VERSION` + файл в `database/migrations/`
   (`database/migrations/MIGRATION_GUIDE.md`).
 

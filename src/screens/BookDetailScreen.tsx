@@ -1,5 +1,5 @@
 /**
- * Учебник (plan/book_catalog_plan.md, часть 4; plan/new/library_catalog.md, Catalog 9).
+ * Учебник (plan/book_catalog_plan.md, часть 4; plan/done/library_catalog.md, Catalog 9).
  *
  * Устроен как подборка: юниты по порядку книги, «добавлено k из N».
  *  - «Добавить» кладёт юнит в «Мои наборы» без копии — это сам официальный набор книги (решение
