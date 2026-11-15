@@ -434,6 +434,8 @@ export interface CoursesDrawerProps {
   editInputRef: React.RefObject<TextInput>;
 
   isCreatingCourse: boolean;
+  /** Над полем нового курса — объяснение, зачем курс (задание «Создай свой курс», Start 3.7) */
+  showCourseHint?: boolean;
   newCourseTitle: string;
   onChangeNewCourseTitle: (text: string) => void;
   onStartCreatingCourse: () => void;
@@ -473,6 +475,7 @@ export const CoursesDrawer = memo(function CoursesDrawer(props: CoursesDrawerPro
     onCancelEditingTitle,
     editInputRef,
     isCreatingCourse,
+    showCourseHint = false,
     newCourseTitle,
     onChangeNewCourseTitle,
     onStartCreatingCourse,
@@ -565,6 +568,17 @@ export const CoursesDrawer = memo(function CoursesDrawer(props: CoursesDrawerPro
 
   const listHeader = (
     <View style={styles.listHeader}>
+      {isCreatingCourse && showCourseHint ? (
+        <View style={[styles.courseHint, { backgroundColor: colors.surfaceVariant }]}>
+          <Text variant="bodySmall" style={{ color: colors.textPrimary }}>
+            <Text variant="bodySmall" style={styles.courseHintTitle}>
+              Зачем курс?{' '}
+            </Text>
+            Это папка для наборов. Например, «Школа» и «IELTS»: наборы разных тем не смешиваются.
+            Повторения на главной всё равно идут из всех курсов.
+          </Text>
+        </View>
+      ) : null}
       {isCreatingCourse ? (
         <View
           style={[
@@ -620,7 +634,7 @@ export const CoursesDrawer = memo(function CoursesDrawer(props: CoursesDrawerPro
           >
             <UserPlus size={iconSize.s} color={colors.primary} />
             <Text style={[typography.button, styles.noLetterSpacing, { color: colors.primary }]}>
-              Войти по коду
+              Подключиться к учителю
             </Text>
           </Pressable>
         </View>
@@ -739,6 +753,14 @@ const styles = StyleSheet.create({
   },
   semibold: {
     fontWeight: '600',
+  },
+  courseHint: {
+    borderRadius: borderRadius.m,
+    padding: spacing.s,
+    marginBottom: spacing.s,
+  },
+  courseHintTitle: {
+    fontWeight: '700',
   },
   noLetterSpacing: {
     letterSpacing: 0,

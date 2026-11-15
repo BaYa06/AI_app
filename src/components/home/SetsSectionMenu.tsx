@@ -29,7 +29,7 @@ interface Props {
   onCreateFromPhoto: () => void;
   /** «Добавить набор по ссылке» (plan/new/share_set.md, Share 5) */
   onAddByLink: () => void;
-  /** «Подключиться к курсу» — null для учителя */
+  /** «Подключиться к учителю» — null для учителя */
   onJoinCourse: (() => void) | null;
 }
 
@@ -92,8 +92,8 @@ export function SetsSectionMenu({
         <ListRow
           icon={Users}
           iconColor={icon}
-          title="Подключиться к курсу"
-          subtitle="По коду от учителя"
+          title="Подключиться к учителю"
+          subtitle="По коду курса"
           onPress={onJoinCourse}
         />
       ) : null}

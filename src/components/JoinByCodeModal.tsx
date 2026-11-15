@@ -89,7 +89,7 @@ export function JoinByCodeModal({ visible, userId, onAccepted, onDismiss }: Join
     <Dialog
       visible={visible}
       onClose={handleDismiss}
-      title="Войти по коду"
+      title="Подключиться к учителю"
       headerRight={
         <Button
           variant="icon"

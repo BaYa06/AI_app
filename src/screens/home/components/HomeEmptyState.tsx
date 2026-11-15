@@ -98,7 +98,7 @@ export function HomeEmptyState({
             secondaryAction={
               isTeacher !== true
                 ? {
-                    label: 'Подключиться к курсу',
+                    label: 'Подключиться к учителю',
                     icon: Users,
                     onPress: () => {
                       triggerHaptic('selection');

@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import {
   useSetsStore,
+  useStartTasksStore,
   useSettingsStore,
   useThemeColors,
   useCardsStore,
@@ -1208,6 +1209,8 @@ export function HomeScreen({ navigation, route }: any) {
     [navigation, filteredSets]
   );
 
+  const [courseHint, setCourseHint] = useState(false);
+
   // «Подключиться к учителю» (Start 3.6): ответил «Да» на онбординге и ещё не в курсе учителя
   const [joinCardClosed, setJoinCardClosed] = useState(false);
   const showJoinTeacher =
@@ -1223,7 +1226,12 @@ export function HomeScreen({ navigation, route }: any) {
     navigation,
     enabled: isTeacher === false,
     fallbackSetId: filteredSets[0]?.id ?? null,
-    onCourse: () => setDrawerOpen(true),
+    onCourse: () => {
+      // Боковое меню с раскрытой формой нового курса и объяснением (Start 3.7)
+      setCourseHint(true);
+      setDrawerOpen(true);
+      setTimeout(() => setIsCreatingCourse(true), 350);
+    },
     onPhoto: (starterId) => openPhotoImport(starterId),
     onLibrary: () => {},
     playReward: playStartTaskReward,
@@ -1556,6 +1564,9 @@ export function HomeScreen({ navigation, route }: any) {
     createCourse(title);
     setIsCreatingCourse(false);
     setNewCourseTitle('');
+    setCourseHint(false);
+    // Задание «Создай свой курс» (plan/new/new_user_activation.md, Start 3.7)
+    useStartTasksStore.getState().complete('course');
   }, [newCourseTitle, createCourse]);
 
   const {
@@ -1941,7 +1952,7 @@ export function HomeScreen({ navigation, route }: any) {
                     {isTeacher === false && (
                       <View ref={startTasks.stackRef} collapsable={false} style={styles.startTasks}>
                         <StartTasksStack
-                          hidden={['library', 'course']}
+                          hidden={['library']}
                           onAction={startTasks.handleStartTask}
                         />
                       </View>
@@ -2069,6 +2080,7 @@ export function HomeScreen({ navigation, route }: any) {
           onCancelEditingTitle={cancelCourseEdit}
           editInputRef={editInputRef}
           isCreatingCourse={isCreatingCourse}
+          showCourseHint={courseHint}
           newCourseTitle={newCourseTitle}
           onChangeNewCourseTitle={setNewCourseTitle}
           onStartCreatingCourse={handleStartCreatingCourse}
