@@ -11,7 +11,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { ChevronRight, Clock, Target, X, Zap } from 'lucide-react-native';
-import { useCardsStore, useSettingsStore, useThemeColors } from '@/store';
+import { useCardsStore, useSettingsStore, useStartTasksStore, useThemeColors } from '@/store';
 import { StreakCelebration, Text } from '@/components/common';
 import { Badge, Button, Sheet, useScreenBottomInset } from '@/components/ui';
 import type { IconComponent } from '@/components/ui';
@@ -71,6 +71,8 @@ export function SessionSummary({
   }, []);
 
   useEffect(() => {
+    // Задание «Пройди первую сессию» (plan/new/new_user_activation.md, Start 3.4)
+    useStartTasksStore.getState().complete('session');
     Analytics.setSessionCompleted({
       words: list.length,
       weak: weakIds.size,

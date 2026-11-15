@@ -12,7 +12,7 @@ import { spacing, borderRadius, iconSize, alpha } from '@/constants';
 import { NeonService } from '@/services/NeonService';
 import { apiService } from '@/services/ApiService';
 import { getDistractors } from '@/utils/distractors';
-import { StageLayout, AnswerPanel } from '@/components/study/StageLayout';
+import { StageLayout, AnswerPanel, useAutoAdvance } from '@/components/study/StageLayout';
 import type { RootStackScreenProps } from '@/types/navigation';
 import { exitSessionToSet } from '@/components/study/setSession';
 import type { Card } from '@/types';
@@ -260,6 +260,8 @@ export function ContextFillScreen({ navigation, route }: Props) {
     setSelectedOption(null);
     setOptionState('neutral');
   }, [currentIndex, questions.length, recordSession, session, finishSessionStage]);
+  // Верно — дальше само (Start 3.4)
+  const autoNext = useAutoAdvance(selectedOption !== null && optionState === 'correct', handleNext);
 
   const handleExit = useCallback(() => {
     if (session) exitSessionToSet(navigation, session.setId);
@@ -365,6 +367,7 @@ export function ContextFillScreen({ navigation, route }: Props) {
               back: currentCard.backText,
               example: currentCard.example || undefined,
             }}
+            autoAdvance={autoNext}
             onNext={handleNext}
           />
         ) : null
