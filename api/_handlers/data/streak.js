@@ -96,6 +96,24 @@ export async function dayCountsForStreak(sql, me, today, tz) {
 }
 
 /**
+ * Сколько ещё до зачёта дня (Freeze 6) — по тем же числам, что dayCountsForStreak.
+ * need: 'review' — повторить слова, которые ждут; 'any' — ждать нечего, нужны любые ответы.
+ * newOnly — учил только новые, ждущие не трогал (случай 04.11 из обращения).
+ * Та же формула нужна прогрессу Live Activity («3 из 10») — брать отсюда.
+ */
+export function dayProgress(day) {
+  if (day.counted) return { left: 0, need: null, newOnly: false };
+  if (day.waiting === 0 && day.reviewed === 0) {
+    return { left: Math.max(1, DAILY_REVIEW_TARGET - day.active), need: 'any', newOnly: false };
+  }
+  return {
+    left: Math.max(1, Math.min(DAILY_REVIEW_TARGET, day.reviewed + day.waiting) - day.reviewed),
+    need: 'review',
+    newOnly: day.reviewed === 0 && day.active > 0,
+  };
+}
+
+/**
  * День засчитан в серию — отметка для недели (plan/new/streak_freeze_display.md, Freeze 1).
  * Строки дня может ещё не быть: итоги клиента приходят позже ответов.
  */
@@ -190,6 +208,7 @@ export async function updateUserStatsStreak(sql, me, p) {
     // при каждом выходе с экрана — им по-прежнему только в засчитанный день (plan/done/card_rating.md, Cards 6)
     if (p.incremental === true) await addTotals(sql, me, d);
     return {
+      ...dayProgress(day),
       counted: false,
       currentStreak: existing[0]?.current_streak || 0,
       longestStreak: existing[0]?.longest_streak || 0,
@@ -199,7 +218,7 @@ export async function updateUserStatsStreak(sql, me, p) {
   // После Freeze 2 день обычно уже засчитан ответами — здесь серия не меняется, только итоги
   const s = await advanceStreak(sql, me, today, yesterday, existing[0]);
   await addTotals(sql, me, d);
-  return { counted: true, ...s, ...day };
+  return { counted: true, ...s, ...day, ...dayProgress(day) };
 }
 
 /** Сегодня и вчера (YYYY-MM-DD) в часовом поясе пользователя. */
@@ -341,6 +360,16 @@ export async function getUserStats(sql, me) {
   const row = rows[0];
   if (!row) return null;
   await applyFreezeIfNeeded(sql, me, row);
+  // Засчитан ли сегодня и сколько ещё (Freeze 6). Новые поля — старые клиенты их не читают
+  const tz = row.timezone || DEFAULT_TIMEZONE;
+  const { today } = localToday(tz);
+  row.today_counted = row.last_active_date === today;
+  const left = row.today_counted
+    ? dayProgress({ counted: true })
+    : dayProgress(await dayCountsForStreak(sql, me, today, tz));
+  row.today_left = left.left;
+  row.today_need = left.need;
+  row.today_new_only = left.newOnly;
   return row;
 }
 

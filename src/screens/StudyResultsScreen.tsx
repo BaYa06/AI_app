@@ -35,6 +35,7 @@ import { Badge, Button, Card, ScreenHeader, Sheet, useScreenBottomInset } from '
 import type { RootStackScreenProps } from '@/types/navigation';
 import { WidgetPromptCard } from '@/components/widget/WidgetPromptCard';
 import { SessionSummary } from '@/components/study/SessionSummary';
+import { useDayHint } from '@/components/study/useDayHint';
 import { SUMMARY_ANIMATION_MS } from '@/components/study/useSummaryChoreography';
 import { WidgetHowToSheet } from '@/components/widget/WidgetHowToSheet';
 import {
@@ -131,6 +132,8 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   const streakCount = newStreakCount ?? session?.streakCount;
   const streakGrew = streakIncreased === true || (!sessionStep && !!session?.streakCount);
   const bottomInset = useScreenBottomInset();
+  // День не засчитан, хотя занимался: учил только новые слова (Freeze 6)
+  const dayHint = useDayHint(!sessionStep);
   const [showErrorsModal, setShowErrorsModal] = React.useState(false);
   // Итоги сессии празднуют серию сами — по нажатию кнопки, после анимации (plan/new/session_results.md, решение 14)
   const [showStreakModal, setShowStreakModal] = React.useState(
@@ -450,7 +453,11 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   if (session) {
     return (
       <>
-        <SessionSummary session={session} streakCount={streakGrew ? streakCount : undefined} />
+        <SessionSummary
+          session={session}
+          streakCount={streakGrew ? streakCount : undefined}
+          dayHint={dayHint}
+        />
         <RatingPromptModal visible={showRatingPrompt} onClose={() => setShowRatingPrompt(false)} />
       </>
     );
@@ -513,6 +520,11 @@ export function StudyResultsScreen({ navigation, route }: Props) {
               ? 'Все карточки фазы выучены! Так держать!'
               : 'Отличная работа — продолжай серию!'}
           </Text>
+          {dayHint ? (
+            <Text variant="bodySmall" align="center" style={{ color: colors.warningText }}>
+              {dayHint}
+            </Text>
+          ) : null}
         </View>
 
         {/* Statistics Card */}

@@ -111,7 +111,7 @@ describe('getUserStats — заморозка помечает вчерашни�
   ];
 
   it('пропущен один день и есть заморозка → frozen за вчера в том же запросе', async () => {
-    mockRules = [row(), [/WITH f AS/, () => [{ left: 0 }]]];
+    mockRules = [day(NOT_COUNTED), row(), [/WITH f AS/, () => [{ left: 0 }]]];
     const res = await getUserStats(mockSql, ME);
     expect(res).toMatchObject({
       freeze_used: true,
@@ -125,14 +125,14 @@ describe('getUserStats — заморозка помечает вчерашни�
   });
 
   it('заморозки нет → серия сброшена, frozen не пишется', async () => {
-    mockRules = [row({ streak_freezes: 0 })];
+    mockRules = [day(NOT_COUNTED), row({ streak_freezes: 0 })];
     const res = await getUserStats(mockSql, ME);
     expect(res).toMatchObject({ freeze_used: false, current_streak: 0 });
     expect(mockQueries.some((x) => /frozen/.test(x.text))).toBe(false);
   });
 
   it('пропущено два дня → заморозка не тратится', async () => {
-    mockRules = [row({ last_active_date: dayKey(-3) })];
+    mockRules = [day(NOT_COUNTED), row({ last_active_date: dayKey(-3) })];
     const res = await getUserStats(mockSql, ME);
     expect(res).toMatchObject({ freeze_used: false, current_streak: 0, streak_freezes: 1 });
     expect(mockQueries.some((x) => /WITH f AS/.test(x.text))).toBe(false);
@@ -236,5 +236,64 @@ describe('countDayFromAnswers — сервер засчитывает день �
       false
     );
     expect(mockQueries.some((q) => /total_cards_studied/.test(q.text))).toBe(true);
+  });
+});
+
+describe('dayProgress — сколько ещё до зачёта (Freeze 6)', () => {
+  const { dayProgress } = require('../_handlers/data/streak.js');
+  it('засчитан → 0', () => {
+    expect(dayProgress({ counted: true })).toEqual({ left: 0, need: null, newOnly: false });
+  });
+  it('ждут 40, повторено 3 → ещё 7 на повторение', () => {
+    expect(dayProgress({ counted: false, active: 3, reviewed: 3, waiting: 40 })).toEqual({
+      left: 7,
+      need: 'review',
+      newOnly: false,
+    });
+  });
+  it('ждут 4, ничего не повторено → ещё 4 (повторить всё, что ждёт)', () => {
+    expect(dayProgress({ counted: false, active: 0, reviewed: 0, waiting: 4 }).left).toBe(4);
+  });
+  it('случай 04.11: 277 новых, ждущие не тронуты → newOnly', () => {
+    expect(dayProgress({ counted: false, active: 277, reviewed: 0, waiting: 40 })).toEqual({
+      left: 10,
+      need: 'review',
+      newOnly: true,
+    });
+  });
+  it('ждать нечего → нужны любые 10 ответов', () => {
+    expect(dayProgress({ counted: false, active: 6, reviewed: 0, waiting: 0 })).toEqual({
+      left: 4,
+      need: 'any',
+      newOnly: false,
+    });
+  });
+});
+
+describe('getUserStats — сегодня засчитан? (Freeze 6)', () => {
+  const statsRow = (over = {}) => [
+    /FROM user_stats us JOIN users u/,
+    () => [
+      { current_streak: 5, last_active_date: TODAY, timezone: 'UTC', streak_freezes: 1, ...over },
+    ],
+  ];
+  it('засчитан → today_counted, ответы не считает', async () => {
+    mockRules = [statsRow()];
+    const res = await getUserStats(mockSql, ME);
+    expect(res).toMatchObject({ today_counted: true, today_left: 0, today_need: null });
+    expect(mockQueries.some((q) => /FROM answers/.test(q.text))).toBe(false);
+  });
+  it('не засчитан → today_left по ответам', async () => {
+    mockRules = [
+      statsRow({ last_active_date: YESTERDAY }),
+      day({ active: 3, reviewed: 3, waiting: 40 }),
+    ];
+    const res = await getUserStats(mockSql, ME);
+    expect(res).toMatchObject({
+      today_counted: false,
+      today_left: 7,
+      today_need: 'review',
+      today_new_only: false,
+    });
   });
 });

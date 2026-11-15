@@ -463,6 +463,13 @@ export type UserStatsData = {
   streak_freezes: number;
   /** Сегодня заморозка спасла серию (вчера был пропуск) */
   freeze_used: boolean;
+  /** Засчитан ли сегодня и сколько ещё (сервер, Freeze 6). Нет полей — старый сервер. */
+  today_counted?: boolean;
+  today_left?: number;
+  /** review — повторить слова, которые ждут; any — ждать нечего, нужны любые ответы */
+  today_need?: 'review' | 'any' | null;
+  /** Учил только новые слова, а ждущие не трогал — день не засчитан (Freeze 6) */
+  today_new_only?: boolean;
   /** Сегмент активности из профиля привычек (plan/new/push_notifications.md, 2.6): new / daily / regular / casual / sleeping / lost */
   activity_segment?: string;
 };
@@ -485,6 +492,15 @@ export function mapUserStatsRow(row: any): UserStatsData {
     streak_freezes: row.streak_freezes || 0,
     freeze_used: row.freeze_used === true,
     activity_segment: row.activity_segment || undefined,
+    ...(typeof row.today_counted === 'boolean'
+      ? {
+          today_counted: row.today_counted,
+          today_left: Number(row.today_left) || 0,
+          today_need:
+            row.today_need === 'review' || row.today_need === 'any' ? row.today_need : null,
+          today_new_only: row.today_new_only === true,
+        }
+      : {}),
   };
 }
 

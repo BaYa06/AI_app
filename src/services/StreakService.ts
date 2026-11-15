@@ -33,6 +33,13 @@ export interface UserStats {
   streak_freezes: number;
   /** Сегодня заморозка спасла серию */
   freeze_used: boolean;
+  /** Засчитан ли сегодня и сколько ещё (сервер, Freeze 6). Нет полей — старый сервер. */
+  today_counted?: boolean;
+  today_left?: number;
+  /** review — повторить слова, которые ждут; any — ждать нечего, нужны любые ответы */
+  today_need?: 'review' | 'any' | null;
+  /** Учил только новые слова, а ждущие не трогал — день не засчитан (Freeze 6) */
+  today_new_only?: boolean;
 }
 
 /**

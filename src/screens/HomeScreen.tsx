@@ -73,7 +73,7 @@ import { NeonService, type CourseLeaderboard } from '@/services/NeonService';
 import { leaderboardSeenKey, type LeaderboardSeen } from '@/screens/CourseLeaderboardScreen';
 import { DatabaseService } from '@/services/DatabaseService';
 import { JoinByCodeModal } from '@/components/JoinByCodeModal';
-import type { DailyActivity } from '@/services/StreakService';
+import type { DailyActivity, UserStats } from '@/services/StreakService';
 import type { Card, CardSet } from '@/types';
 import { isCardWaitingReview } from '@/services/SRSService';
 import { StorageService, STORAGE_KEYS } from '@/services/StorageService';
@@ -147,6 +147,16 @@ import { TeacherBanner } from './home/components/TeacherBanner';
 import { TeacherLessonCard } from './home/components/TeacherLessonCard';
 import { useTeacherCourseData } from './home/useTeacherCourseData';
 
+/** «Сегодня» из ответа сервера; старый сервер полей не отдаёт — null, остаётся прежний текст */
+function todayDayOf(stats: UserStats) {
+  if (typeof stats.today_counted !== 'boolean') return null;
+  return {
+    counted: stats.today_counted,
+    left: stats.today_left ?? 0,
+    need: stats.today_need ?? null,
+  };
+}
+
 export function HomeScreen({ navigation, route }: any) {
   const colors = useThemeColors();
   const [searchVisible, setSearchVisible] = useState(false);
@@ -189,6 +199,12 @@ export function HomeScreen({ navigation, route }: any) {
   const [streakFreezes, setStreakFreezes] = useState<number | null>(null);
   // «Заморозка спасла серию» (plan/new/streak_freeze_display.md, Freeze 4)
   const [freezeCandidate, setFreezeCandidate] = useState<FreezeNotice | null>(null);
+  // Засчитан ли сегодня и сколько ещё — по серверу (Freeze 6); null — старый сервер или нет сети
+  const [todayDay, setTodayDay] = useState<{
+    counted: boolean;
+    left: number;
+    need: 'review' | 'any' | null;
+  } | null>(null);
   const [buyingFreeze, setBuyingFreeze] = useState(false);
   // Сразу — сохранённое с прошлого раза; свежее с сервера подменит в useFocusEffect ниже
   const [todayBackendCards, setTodayBackendCards] = useState<number | null>(
@@ -555,6 +571,7 @@ export function HomeScreen({ navigation, route }: any) {
                 lastActiveDate: stats.last_active_date,
               });
               setStreakFreezes(stats.streak_freezes);
+              setTodayDay(todayDayOf(stats));
             }
           }
         })
@@ -651,6 +668,14 @@ export function HomeScreen({ navigation, route }: any) {
     return Math.min(100, Math.round((cardsLearned / dailyGoal) * 100));
   }, [dailyGoal, cardsLearned]);
   const streakSupportText = useMemo(() => {
+    // Сервер сказал, засчитан ли сегодня (Freeze 6): без «серия продлена», пока это не так
+    if (todayDay) {
+      if (todayDay.counted) return `День засчитан. Серия ${formatDays(streakValue)}`;
+      const cards = `${todayDay.left} ${pluralize(todayDay.left, 'карточка', 'карточки', 'карточек')}`;
+      return todayDay.need === 'review'
+        ? `Ещё ${cards} на повторение — и день засчитан`
+        : `Ещё ${cards} — и день засчитан`;
+    }
     const remaining = Math.max(dailyGoal - cardsLearned, 0);
     if (goalProgress >= 10) {
       return `Отлично! Цель на сегодня выполнена — ${cardsLearned} из ${dailyGoal}. Серия продлена!`;
@@ -662,7 +687,7 @@ export function HomeScreen({ navigation, route }: any) {
       return `Осталось всего ${remaining} — ты почти у цели! Ещё чуть-чуть и серия продлена.`;
     }
     return `Хорошее начало! Осталось ${remaining} ${pluralize(remaining, 'слово', 'слова', 'слов')} до цели. Продолжай в том же духе!`;
-  }, [goalProgress, dailyGoal, cardsLearned]);
+  }, [todayDay, formatDays, streakValue, goalProgress, dailyGoal, cardsLearned]);
 
   // Id известных курсов: набор, чей курс пропал, показываем в «Моих наборах» (isSetInMySets)
   const courseIdSet = useMemo(() => new Set(courses.map((c) => c.id)), [courses]);
@@ -1364,6 +1389,7 @@ export function HomeScreen({ navigation, route }: any) {
                 longestStreak: stats.longest_streak,
                 lastActiveDate: stats.last_active_date,
               });
+              setTodayDay(todayDayOf(stats));
               setFreezeCandidate(
                 pickFreezeNotice({
                   todayKey: StreakService.getLocalDateKey(),

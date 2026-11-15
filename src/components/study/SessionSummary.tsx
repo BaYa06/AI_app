@@ -35,9 +35,12 @@ const COMPACT_HEIGHT = 700;
 export function SessionSummary({
   session,
   streakCount,
+  dayHint,
 }: {
   session: SessionRouteParams;
   streakCount?: number;
+  /** День не засчитан: учил только новые слова (Freeze 6) */
+  dayHint?: string | null;
 }) {
   const colors = useThemeColors();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -189,6 +192,12 @@ export function SessionSummary({
             <StatTile key={s.label} {...s} />
           ))}
         </View>
+
+        {dayHint ? (
+          <Text variant="bodySmall" align="center" style={{ color: colors.warningText }}>
+            {dayHint}
+          </Text>
+        ) : null}
 
         <Animated.View style={tailStyle}>
           <Pressable

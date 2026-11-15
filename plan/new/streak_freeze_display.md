@@ -206,7 +206,7 @@ src/screens/home/useFreezeNoticeOnHome.ts, событие `freeze_notice_shown {
 Сделано (15.11.2026) в StreakDialog.tsx. Для экранного диктора значки читаются одной фразой
 «Заморозки: 1 из 2».
 
-## Freeze 6 — «сегодня засчитан?» ⬜
+## Freeze 6 — «сегодня засчитан?» ✅ (код) / ⬜ (проверка в TestFlight)
 
 - Сервер: `getUserStats` возвращает `today_counted` и `today_left` (сколько ещё повторить до
   зачёта, по `dayCountsForStreak`: `max(0, min(10, повторено + ждёт) − повторено)`; ждать нечего —
@@ -218,6 +218,19 @@ src/screens/home/useFreezeNoticeOnHome.ts, событие `freeze_notice_shown {
   (Ровно случай 04.11.)
 - Совпадает с прогрессом Live Activity (plan/new/live_activity.md, «3 из 10») — та же формула,
   одна функция на сервере.
+
+Сделано (15.11.2026):
+- Сервер: `dayProgress(day)` в streak.js → `{ left, need, newOnly }`. `getUserStats` отдаёт
+  `today_counted`, `today_left`, `today_need` (`review`/`any`), `today_new_only`; ответ
+  `updateUserStatsStreak` — те же `left`/`need`/`newOnly`. Если день уже засчитан, ответы не
+  считаются (лишнего запроса нет). Тесты: +7 в api/__tests__/streak.test.js.
+- Окно серии: текст «сегодня» на главной — по серверу. Прежний текст («…Серия продлена!» по
+  процентам дневной цели) остаётся только для старого сервера.
+- **Без эмодзи:** «День засчитан. Серия 6 дней» — проверка брендбука запрещает эмодзи в интерфейсе.
+- Итоги: `useDayHint` (src/components/study/useDayHint.ts) спрашивает `getUserStats` через 1,5 с —
+  последние ответы сессии уходят в фоне. Строка `warningText` в обычных итогах и в итогах сессии
+  (`SessionSummary`, проп `dayHint`). Показывается только при `today_new_only`.
+- ⬜ Итоги сессии на iPhone SE: строка подсказки влезает без прокрутки?
 
 ## Freeze 7 — те же дни у учителя и в статистике ⬜
 
