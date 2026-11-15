@@ -9,6 +9,7 @@ import { create } from 'zustand';
 import { callDataApi } from '@/services/neon/core';
 import { readCache, writeCache } from '@/services/localCache';
 import { log } from '@/utils/logger';
+import { Analytics } from '@/services/analytics';
 import { useDiamondStore } from './diamondStore';
 
 export type StartTaskId =
@@ -75,6 +76,16 @@ function readLocal(): LocalState {
   return { order, closed: cached?.closed === true };
 }
 
+/** Все задания выполнены, а стопку ещё не убрали — показываем «Начало пути пройдено» (Start 3.10) */
+export function isStartTasksFinished(
+  s: Pick<StartTasksState, 'loaded' | 'startedAt' | 'closed' | 'done'>,
+  now: number = Date.now()
+): boolean {
+  if (!s.loaded || !s.startedAt || s.closed) return false;
+  if (now - s.startedAt > START_TASKS_DAYS * DAY_MS) return false;
+  return START_TASK_ORDER.every((t) => s.done.includes(t));
+}
+
 /** Стопка ещё показывается: новый ученик, не закрыл, не прошло 14 дней, есть невыполненное */
 export function isStartTasksVisible(
   s: Pick<StartTasksState, 'loaded' | 'startedAt' | 'closed' | 'done'>,
@@ -119,19 +130,24 @@ export const useStartTasksStore = create<StartTasksState>((set, get) => ({
       );
       if (!res) return;
       useDiamondStore.getState().setDiamonds(res.diamonds);
-      if (res.awarded > 0) set({ pendingReward: get().pendingReward + res.awarded });
+      if (res.awarded > 0) {
+        set({ pendingReward: get().pendingReward + res.awarded });
+        Analytics.startTaskCompleted(task, res.awarded);
+      }
     } catch (e) {
       log.warn('StartTasks', 'Задание не отмечено', e);
     }
   },
 
   later: (task) => {
+    Analytics.startTaskLater(task);
     const order = [...get().order.filter((t) => t !== task), task];
     set({ order });
     writeCache(LOCAL_CACHE, { order, closed: get().closed });
   },
 
   close: () => {
+    Analytics.startTasksClosed(new Set(get().done).size);
     set({ closed: true });
     writeCache(LOCAL_CACHE, { order: get().order, closed: true });
   },

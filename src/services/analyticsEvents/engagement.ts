@@ -34,6 +34,15 @@ export const engagementEvents = {
   /**
    * Юзер дал разрешение на push-уведомления.
    */
+  // «Начало пути» (plan/new/new_user_activation.md, Start 3.10): какие задания нажимают,
+  // откладывают и выполняют. Доля закрывших всю стопку — цель > 25%
+  startTaskAction: (task: string) => log('start_task_action', { task }),
+  startTaskLater: (task: string) => log('start_task_later', { task }),
+  startTaskCompleted: (task: string, awarded: number) =>
+    log('start_task_completed', { task, awarded }),
+  startTasksClosed: (done: number) => log('start_tasks_closed', { done }),
+  startTasksFinished: () => log('start_tasks_finished'),
+
   pushPermissionGranted: () => log('push_permission_granted'),
 
   /**

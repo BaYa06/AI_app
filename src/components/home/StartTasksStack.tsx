@@ -5,7 +5,7 @@
  * кнопка задания ведёт к действию (выполненным оно станет само, по событию). Награда «+10»
  * алмазов — на каждой карточке. Кнопки не залиты: стопка не спорит с «Уроком дня».
  */
-import React, { memo, useMemo } from 'react';
+import React, { memo, useEffect, useMemo } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, FadeOutLeft, useReducedMotion } from 'react-native-reanimated';
 import {
@@ -17,12 +17,20 @@ import {
   Layers,
   Library,
   Mic,
+  PartyPopper,
   X,
 } from 'lucide-react-native';
 import { Text } from '@/components/common/Text';
 import { Button, type IconComponent } from '@/components/ui';
 import { useStartTasksStore, useThemeColors } from '@/store';
-import { START_TASKS_TOTAL, isStartTasksVisible, type StartTaskId } from '@/store/startTasksStore';
+import {
+  START_TASKS_TOTAL,
+  isStartTasksFinished,
+  isStartTasksVisible,
+  type StartTaskId,
+} from '@/store/startTasksStore';
+import { Analytics } from '@/services/analytics';
+import { triggerHaptic } from '@/utils/haptic';
 import { alpha, borderRadius, iconSize, spacing } from '@/constants';
 
 interface TaskMeta {
@@ -100,6 +108,33 @@ export const StartTasksStack = memo(function StartTasksStack({ hidden = [], onAc
       ),
     [order, done, hidden]
   );
+
+  const finished = isStartTasksFinished(state);
+  useEffect(() => {
+    if (!finished) return;
+    triggerHaptic('notificationSuccess');
+    Analytics.startTasksFinished();
+  }, [finished]);
+
+  if (finished) {
+    return (
+      <View
+        style={[styles.finished, { backgroundColor: alpha(colors.success, 10) }]}
+        accessibilityLiveRegion="polite"
+      >
+        <PartyPopper size={iconSize.m} color={colors.successText} />
+        <View style={styles.text}>
+          <Text variant="body" style={[styles.title, { color: colors.successText }]}>
+            Начало пути пройдено
+          </Text>
+          <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
+            Достижение «Хорошее начало» — ты попробовал всё главное во Flashly
+          </Text>
+        </View>
+        <Button title="Отлично" variant="quiet" size="s" onPress={close} />
+      </View>
+    );
+  }
 
   if (!isStartTasksVisible(state) || tasks.length === 0) return null;
 
@@ -185,7 +220,10 @@ export const StartTasksStack = memo(function StartTasksStack({ hidden = [], onAc
               variant="secondary"
               size="s"
               style={styles.flex}
-              onPress={() => onAction(top)}
+              onPress={() => {
+                Analytics.startTaskAction(top);
+                onAction(top);
+              }}
             />
             <Button title="Позже" variant="quiet" size="s" onPress={() => later(top)} />
           </View>
@@ -196,6 +234,13 @@ export const StartTasksStack = memo(function StartTasksStack({ hidden = [], onAc
 });
 
 const styles = StyleSheet.create({
+  finished: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+    borderRadius: borderRadius.l,
+    padding: spacing.m,
+  },
   section: {
     gap: spacing.xs,
   },
