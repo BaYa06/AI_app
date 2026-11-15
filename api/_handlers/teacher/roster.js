@@ -1,10 +1,35 @@
 /**
- * api/teacher.js — ростер, статистика ученика, владелец, видимость набора, напоминание (Clean 10 — перенесено без изменений).
+ * api/teacher.js — ростер, статистика ученика, владелец, видимость набора, напоминание.
  */
 import { courseSetIdsSql } from '../../_course.js';
 import { sendNotification } from '../../push.js';
 import { notifyCoursesChanged } from '../../_realtime.js';
 import { log } from '../../_log.js';
+
+/**
+ * Серия ученика — та же, что он видит у себя (plan/new/streak_freeze_display.md, Freeze 7).
+ * user_stats.current_streak сбрасывает только getUserStats, когда ученик открывает приложение,
+ * поэтому здесь те же правила по его поясу: последний засчитанный день — сегодня или вчера;
+ * позавчера и есть заморозка — серия ещё жива (заморозка потратится при следующем входе).
+ * Раньше брали GREATEST(сохранённая, дни подряд с любой активностью) — у учителя серия выходила
+ * длиннее, чем у ученика. Неизвестный пояс — Asia/Bishkek, как на сервере серии.
+ */
+function liveStreakSql(sql) {
+  // Псевдонимы us (user_stats) и u (users) — у обоих вызовов
+  return sql`(
+    WITH d AS (
+      SELECT (NOW() AT TIME ZONE COALESCE(
+        (SELECT name FROM pg_timezone_names WHERE name = us.timezone LIMIT 1), 'Asia/Bishkek'
+      ))::date AS today
+    )
+    SELECT CASE
+      WHEN us.last_active_date >= d.today - 1 THEN COALESCE(us.current_streak, 0)
+      WHEN us.last_active_date = d.today - 2 AND u.streak_freezes > 0
+        THEN COALESCE(us.current_streak, 0)
+      ELSE 0
+    END FROM d
+  )`;
+}
 
 export async function listMembers(req, res, sql, userId) {
   const { courseId, limit, offset } = req.query;
@@ -31,20 +56,7 @@ export async function listMembers(req, res, sql, userId) {
       cm.joined_at,
       cr.last_active_date,
       COALESCE(cr.today_cards, 0) AS today_cards,
-      GREATEST(
-        COALESCE(us.current_streak, 0),
-        COALESCE((
-          SELECT COUNT(*)::int
-          FROM (
-            SELECT
-              local_date,
-              (CURRENT_DATE - local_date)::int - (ROW_NUMBER() OVER (ORDER BY local_date DESC))::int AS grp
-            FROM daily_activity da2
-            WHERE da2.user_id = cm.user_id AND da2.local_date >= CURRENT_DATE - 365
-          ) t
-          WHERE grp = 0
-        ), 0)
-      ) AS current_streak,
+      ${liveStreakSql(sql)} AS current_streak,
       (
         SELECT COUNT(*)::int FROM card_progress cp JOIN cards c ON c.id = cp.card_id
         WHERE cp.user_id = cm.user_id AND cp.learning_step >= 1 AND cp.next_review <= NOW()
@@ -142,20 +154,11 @@ export async function studentStats(req, res, sql, userId) {
   // выше). См. план, пункт 34.
   const activity = await sql`
     SELECT
-      GREATEST(
-        COALESCE((SELECT current_streak FROM user_stats WHERE user_id = ${studentId}::uuid), 0),
-        COALESCE((
-          SELECT COUNT(*)::int
-          FROM (
-            SELECT
-              local_date,
-              (CURRENT_DATE - local_date)::int - (ROW_NUMBER() OVER (ORDER BY local_date DESC))::int AS grp
-            FROM daily_activity
-            WHERE user_id = ${studentId}::uuid AND local_date >= CURRENT_DATE - 365
-          ) t
-          WHERE grp = 0
-        ), 0)
-      ) AS current_streak,
+      COALESCE((
+        SELECT ${liveStreakSql(sql)}
+        FROM user_stats us JOIN users u ON u.id = us.user_id
+        WHERE us.user_id = ${studentId}::uuid
+      ), 0) AS current_streak,
       (SELECT MAX(reviewed_at)::date FROM review_log WHERE user_id = ${studentId}::uuid) AS last_active_date
   `;
 
