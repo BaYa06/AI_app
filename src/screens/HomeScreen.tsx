@@ -137,6 +137,9 @@ import { LeaveCourseDialog } from './home/components/LeaveCourseDialog';
 import { DeleteCourseDialog } from './home/components/DeleteCourseDialog';
 import { EditCourseDialog } from './home/components/EditCourseDialog';
 import { StreakDialog } from './home/components/StreakDialog';
+import { FreezeNoticeDialog } from './home/components/FreezeNoticeDialog';
+import { useFreezeNoticeOnHome } from './home/useFreezeNoticeOnHome';
+import { isFreezeNoticeSeen, pickFreezeNotice, type FreezeNotice } from '@/services/freezeNotice';
 import { HomeEmptyState } from './home/components/HomeEmptyState';
 import { SetsSectionHeader } from './home/components/SetsSectionHeader';
 import { HomeHeader } from './home/components/HomeHeader';
@@ -184,6 +187,8 @@ export function HomeScreen({ navigation, route }: any) {
   const [streakModalVisible, setStreakModalVisible] = useState(false);
   // Заморозки серии в запасе (план §3.5); null — ещё не загружено
   const [streakFreezes, setStreakFreezes] = useState<number | null>(null);
+  // «Заморозка спасла серию» (plan/new/streak_freeze_display.md, Freeze 4)
+  const [freezeCandidate, setFreezeCandidate] = useState<FreezeNotice | null>(null);
   const [buyingFreeze, setBuyingFreeze] = useState(false);
   // Сразу — сохранённое с прошлого раза; свежее с сервера подменит в useFocusEffect ниже
   const [todayBackendCards, setTodayBackendCards] = useState<number | null>(
@@ -956,6 +961,10 @@ export function HomeScreen({ navigation, route }: any) {
   // «Вышла новая версия» (plan/done/app_update_prompt.md, Update 4) — до «Что нового»: его эффект
   // занимает очередь первым, и «Что нового» не откроется раньше
   useAppUpdateOnHome({ ready: isTeacher !== null, blocked: homeOverlayOpen });
+  const freezeNotice = useFreezeNoticeOnHome({
+    candidate: isTeacher !== null ? freezeCandidate : null,
+    blocked: homeOverlayOpen,
+  });
 
   // «Что нового» после обновления (plan/new/whats_new.md, News 3) — ждёт, пока на главной закрыты свои окна
   const whatsNew = useWhatsNewOnHome({
@@ -1355,6 +1364,16 @@ export function HomeScreen({ navigation, route }: any) {
                 longestStreak: stats.longest_streak,
                 lastActiveDate: stats.last_active_date,
               });
+              setFreezeCandidate(
+                pickFreezeNotice({
+                  todayKey: StreakService.getLocalDateKey(),
+                  freezeUsed: stats.freeze_used,
+                  week,
+                  streak: stats.current_streak,
+                  freezesLeft: stats.streak_freezes,
+                  isSeen: isFreezeNoticeSeen,
+                })
+              );
             }
           }
         } catch {
@@ -2148,6 +2167,7 @@ export function HomeScreen({ navigation, route }: any) {
         />
 
         {/* Streak Modal */}
+        <FreezeNoticeDialog {...freezeNotice} />
         <StreakDialog
           streakModalVisible={streakModalVisible}
           closeStreakModal={closeStreakModal}

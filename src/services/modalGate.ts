@@ -2,7 +2,8 @@
  * Одно окно за раз (plan/new/whats_new.md, шаг News 3, слабое место 6)
  * @description Сами, без нажатия, поверх главной открываются приглашение в курс, набор по ссылке,
  * «Вышла новая версия» и «Что нового». Порядок важности (plan/done/app_update_prompt.md, Update 4):
- * обязательное обновление → приглашение → набор по ссылке → мягкое обновление → «Что нового».
+ * обязательное обновление → приглашение → набор по ссылке → мягкое обновление → заморозка →
+ * «Что нового».
  * Пока открыто окно важнее, остальные ждут; если оно пришло, когда «Что нового» уже открыто, —
  * то закрывается. Мягкое обновление занимает очередь ещё и пока решает (ждёт ответ сервера),
  * чтобы «Что нового» не успело открыться раньше.
@@ -12,7 +13,13 @@
  * человек уходит с главной: при следующем заходе на неё окно покажется.
  */
 
-export type GateOwner = 'appUpdateForce' | 'courseInvite' | 'shareLink' | 'appUpdate' | 'whatsNew';
+export type GateOwner =
+  | 'appUpdateForce'
+  | 'courseInvite'
+  | 'shareLink'
+  | 'appUpdate'
+  | 'freezeNotice'
+  | 'whatsNew';
 
 /** Чем меньше, тем важнее */
 const PRIORITY: Record<GateOwner, number> = {
@@ -20,7 +27,10 @@ const PRIORITY: Record<GateOwner, number> = {
   courseInvite: 0,
   shareLink: 1,
   appUpdate: 2,
-  whatsNew: 3,
+  // «Заморозка спасла серию» (plan/new/streak_freeze_display.md, Freeze 4): «Что нового» ждёт его,
+  // а само оно никого не вытесняет — ждёт, пока очередь свободна (isGateBusy)
+  freezeNotice: 3,
+  whatsNew: 4,
 };
 
 const open = new Set<GateOwner>();
@@ -40,6 +50,12 @@ export function setGateOpen(owner: GateOwner, isOpen: boolean): void {
 /** Открыто ли окно важнее, чем `owner` */
 export function isBlockedFor(owner: GateOwner): boolean {
   for (const other of open) if (PRIORITY[other] < PRIORITY[owner]) return true;
+  return false;
+}
+
+/** Открыто ли любое другое окно, кроме `owner` */
+export function isGateBusy(owner: GateOwner): boolean {
+  for (const other of open) if (other !== owner) return true;
   return false;
 }
 

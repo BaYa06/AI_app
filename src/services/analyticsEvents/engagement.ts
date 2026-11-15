@@ -114,6 +114,16 @@ export const engagementEvents = {
     log('widget_word_reviewed', { in_widget: params.inWidget, correct: params.correct }),
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // ЗАМОРОЗКА СЕРИИ
+  // Зачем: видят ли, что заморозка сработала (plan/new/streak_freeze_display.md, Freeze 4).
+  // Цель: обращений «заморозка не сработала» — 0.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /** Показано «Заморозка спасла серию». streak — сохранённая серия, freezes_left — осталось заморозок. */
+  freezeNoticeShown: (params: { streak: number; freezesLeft: number }) =>
+    log('freeze_notice_shown', { streak: params.streak, freezes_left: params.freezesLeft }),
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // «ЧТО НОВОГО»
   // Зачем: дочитывают ли новости и какие интересны (plan/new/whats_new.md, News 6).
   // place — home (само после обновления) / history (Профиль → Что нового). id — новость или more («И ещё»).
