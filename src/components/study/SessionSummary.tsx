@@ -22,7 +22,7 @@ import { Analytics } from '@/services/analytics';
 import { isSessionWordWeak, sessionCardIds } from '@/services/lessonFlow';
 import type { RootStackParamList, SessionRouteParams } from '@/types/navigation';
 import type { Card } from '@/types';
-import { currentSetSessionPlan, startSetSession } from './setSession';
+import { currentSetSessionPlan, exitSessionToSet, startSetSession } from './setSession';
 import { SessionSummaryArt } from './SessionSummaryArt';
 import { useSummaryChoreography, type TileMotion } from './useSummaryChoreography';
 
@@ -96,7 +96,7 @@ export function SessionSummary({
   const plan = info?.plan;
   const canContinue =
     !!plan && (plan.mode === 'review' || plan.mode === 'learn' || plan.mode === 'more');
-  const goToSet = () => navigation.navigate('SetDetail', { setId: session.setId });
+  const goToSet = () => exitSessionToSet(navigation, session.setId);
   // Серия выросла — празднуем после итогов, по нажатию кнопки, и уже потом уходим с экрана (решение 14)
   const leave = (go: () => void) => {
     motion.stop();

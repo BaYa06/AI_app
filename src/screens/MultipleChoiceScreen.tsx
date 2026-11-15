@@ -40,6 +40,7 @@ import { useChallengeStore } from '@/store';
 import { StageLayout, AnswerPanel, sessionStageProgress } from '@/components/study/StageLayout';
 import { isSubjectSet } from '@/utils/setKind';
 import type { RootStackScreenProps } from '@/types/navigation';
+import { exitSessionToSet } from '@/components/study/setSession';
 import type { Card, Rating } from '@/types';
 import { pluralize } from '@/utils';
 import { log } from '@/utils/logger';
@@ -861,7 +862,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
   if (isPlainTest) {
     const exitTest = () => {
       finishStudySession();
-      if (session) navigation.navigate('SetDetail', { setId: session.setId });
+      if (session) exitSessionToSet(navigation, session.setId);
       else navigation.goBack();
     };
     // «Не могу слушать»: этап пропускается целиком, итоги сессии решают, что дальше

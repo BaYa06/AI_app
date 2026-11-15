@@ -14,6 +14,7 @@ import { apiService } from '@/services/ApiService';
 import { getDistractors } from '@/utils/distractors';
 import { StageLayout, AnswerPanel } from '@/components/study/StageLayout';
 import type { RootStackScreenProps } from '@/types/navigation';
+import { exitSessionToSet } from '@/components/study/setSession';
 import type { Card } from '@/types';
 import { ensureAiConsent } from '@/services/aiConsent';
 import { playSessionSfx, preloadSessionSfx } from '@/utils/sound';
@@ -261,7 +262,7 @@ export function ContextFillScreen({ navigation, route }: Props) {
   }, [currentIndex, questions.length, recordSession, session, finishSessionStage]);
 
   const handleExit = useCallback(() => {
-    if (session) navigation.navigate('SetDetail', { setId: session.setId });
+    if (session) exitSessionToSet(navigation, session.setId);
     else navigation.goBack();
   }, [session, navigation]);
 

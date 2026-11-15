@@ -64,6 +64,29 @@ export function currentSetSessionPlan(
 }
 
 /**
+ * Выйти из сессии (или её итогов) в набор так, чтобы экран сессии не остался в стеке.
+ * Набор уже есть ниже (сессию начали из него) — возвращаемся к нему; иначе (начали с главной,
+ * из задания) — заменяем текущий экран набором. Раньше navigate клал набор поверх сессии,
+ * и «назад» из набора снова открывал сессию.
+ */
+export function exitSessionToSet(
+  navigation: NativeStackNavigationProp<RootStackParamList>,
+  setId: string
+): void {
+  const { routes, index } = navigation.getState();
+  let target = -1;
+  for (let i = index - 1; i >= 0; i--) {
+    const r = routes[i];
+    if (r.name === 'SetDetail' && (r.params as { setId?: string } | undefined)?.setId === setId) {
+      target = i;
+      break;
+    }
+  }
+  if (target >= 0) navigation.pop(index - target);
+  else navigation.replace('SetDetail', { setId });
+}
+
+/**
  * Запустить сессию по плану: push — из набора (этап поверх него), replace — с итогов прошлой сессии.
  * false — запускать нечего (пустой набор, ни одному этапу слова не подошли).
  */

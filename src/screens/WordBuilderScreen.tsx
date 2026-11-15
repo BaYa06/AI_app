@@ -15,6 +15,7 @@ import {
 import { Text, Loading } from '@/components/common';
 import { StageLayout, AnswerPanel, sessionStageProgress } from '@/components/study/StageLayout';
 import type { RootStackScreenProps } from '@/types/navigation';
+import { exitSessionToSet } from '@/components/study/setSession';
 import type { Card, Rating } from '@/types';
 import { spacing, borderRadius, iconSize, alpha } from '@/constants';
 import { ProgressService } from '@/services/ProgressService';
@@ -548,7 +549,7 @@ export function WordBuilderScreen({ navigation, route }: Props) {
 
   const handleExit = () => {
     finishStudySession();
-    if (session) navigation.navigate('SetDetail', { setId: session.setId });
+    if (session) exitSessionToSet(navigation, session.setId);
     else navigation.goBack();
   };
 

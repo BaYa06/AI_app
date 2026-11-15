@@ -21,6 +21,7 @@ import {
   preloadSound,
 } from '@/utils/sound';
 import type { RootStackScreenProps } from '@/types/navigation';
+import { exitSessionToSet } from '@/components/study/setSession';
 import type { Card } from '@/types';
 import { cardFront, cardBack } from '@/utils/cardText';
 
@@ -304,7 +305,7 @@ export function MatchScreen({ navigation, route }: Props) {
 
   const emptyState = totalPairs === 0;
   const handleExit = () => {
-    if (session) navigation.navigate('SetDetail', { setId: session.setId });
+    if (session) exitSessionToSet(navigation, session.setId);
     else navigation.goBack();
   };
 
