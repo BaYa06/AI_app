@@ -10,12 +10,21 @@ import { OnboardingStep } from '@/components/onboarding/OnboardingStep';
 import { spacing, TOP_LANGUAGES, MAX_TARGET_LANGUAGES } from '@/constants';
 
 type Props = {
+  /** Номер шага и сколько всего — считает AppRoot по роли и пути */
+  step?: number;
+  total?: number;
   nativeLanguage?: string;
   onContinue?: (codes: string[]) => void;
   onBack?: () => void;
 };
 
-export function TargetLanguagesScreen({ nativeLanguage, onContinue, onBack }: Props) {
+export function TargetLanguagesScreen({
+  nativeLanguage,
+  onContinue,
+  onBack,
+  step = 4,
+  total,
+}: Props) {
   const [selected, setSelected] = useState<string[]>(['en']);
 
   // Изучать свой же родной язык бессмысленно — убираем его из списка выбора.
@@ -42,7 +51,8 @@ export function TargetLanguagesScreen({ nativeLanguage, onContinue, onBack }: Pr
     <OnboardingStep
       onBack={onBack}
       title="Flashly"
-      step={4}
+      step={step}
+      total={total}
       headline="Какие языки хочешь учить?"
       description="Выбери от 1 до 3 языков — можно изменить позже в настройках."
       footer={

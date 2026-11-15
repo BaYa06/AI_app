@@ -95,6 +95,10 @@ type AppRootProps = {
   onSubmitTeacherSubject: (subjectId: string) => void;
   onSubmitTeacherSize: (sizeId: string) => void;
   authStep: AuthStep;
+  /** Роль из онбординга: у учителя другой путь и другой счёт шагов */
+  onboardingRole?: 'student' | 'teacher';
+  /** Имя пришло из Sign in with Apple — экран имени пропускается */
+  nameSkipped: boolean;
   authLoading: boolean;
   nativeLanguage?: string;
 };
@@ -131,6 +135,8 @@ export function AppRoot({
   onSubmitTeacherSubject,
   onSubmitTeacherSize,
   authStep,
+  onboardingRole,
+  nameSkipped,
   authLoading,
   nativeLanguage,
 }: AppRootProps) {
@@ -138,6 +144,15 @@ export function AppRoot({
   const resolvedTheme = useSettingsStore((s) => s.resolvedTheme);
   const insets = useSafeAreaInsets();
   const signedIn = isReady && isAuthenticated && !needsOnboarding;
+
+  // Счёт шагов (plan/new/new_user_activation.md, Start 2.1). Ученик: до урока роль → родной →
+  // изучаемый (из 3), после урока имя → цель → норма (из 3, без имени — из 2).
+  // Учитель: роль → имя → родной → изучаемый → предмет → группа (из 6, без имени — из 5).
+  const isTeacher = onboardingRole === 'teacher';
+  const teacherTotal = isTeacher ? (nameSkipped ? 5 : 6) : undefined;
+  const teacherStep = (studentStep: number) =>
+    isTeacher ? studentStep + (nameSkipped ? 0 : 1) : studentStep;
+  const afterLessonTotal = nameSkipped ? 2 : 3;
   const inviteOpen = isAuthenticated && !!pendingInviteToken;
   const shareOpen =
     isReady && !!pendingShareCode && (signedIn || (!isAuthenticated && !shareDeferred));
@@ -204,33 +219,64 @@ export function AppRoot({
         <WelcomeScreen isLoading={authLoading} />
       ) : authStep === 'name' ? (
         <NameOnboardingScreen
-          onBack={onBackToWelcome}
+          onBack={isTeacher ? onBackToRole : undefined}
           onContinue={onSubmitName}
           onSkip={onSubmitName}
+          step={isTeacher ? 2 : 1}
+          total={isTeacher ? 6 : 3}
         />
       ) : authStep === 'role' ? (
-        <RoleSelectionScreen onBack={onBackToName} onContinue={onSubmitRole} />
+        <RoleSelectionScreen
+          onBack={onBackToWelcome}
+          onContinue={onSubmitRole}
+          step={1}
+          total={3}
+        />
       ) : authStep === 'native_language' ? (
-        <NativeLanguageScreen onBack={onBackToRole} onContinue={onSubmitNativeLanguage} />
+        <NativeLanguageScreen
+          onBack={isTeacher && !nameSkipped ? onBackToName : onBackToRole}
+          onContinue={onSubmitNativeLanguage}
+          step={teacherStep(2)}
+          total={teacherTotal ?? 3}
+        />
       ) : authStep === 'target_languages' ? (
         <TargetLanguagesScreen
           nativeLanguage={nativeLanguage}
           onBack={onBackToNativeLanguage}
           onContinue={onSubmitTargetLanguages}
+          step={teacherStep(3)}
+          total={teacherTotal ?? 3}
         />
       ) : authStep === 'goal' ? (
-        <LearningGoalScreen onBack={onBackToTargetLanguages} onContinue={onSubmitGoal} />
+        <LearningGoalScreen
+          onBack={nameSkipped ? undefined : onBackToName}
+          onContinue={onSubmitGoal}
+          step={nameSkipped ? 1 : 2}
+          total={afterLessonTotal}
+        />
       ) : authStep === 'daily' ? (
-        <DailyGoalScreen onBack={onBackToGoal} onContinue={onSubmitDaily} />
+        <DailyGoalScreen
+          onBack={onBackToGoal}
+          onContinue={onSubmitDaily}
+          step={nameSkipped ? 2 : 3}
+          total={afterLessonTotal}
+        />
       ) : authStep === 'about' ? (
         <AboutMeOnboardingScreen onBack={onBackToDaily} onContinue={onSubmitAboutMe} />
       ) : authStep === 'teacher_subject' ? (
         <TeacherSubjectScreen
           onBack={onBackToTargetLanguages}
           onContinue={onSubmitTeacherSubject}
+          step={teacherStep(4)}
+          total={teacherTotal}
         />
       ) : authStep === 'teacher_size' ? (
-        <TeacherGroupSizeScreen onBack={onBackToTeacherSubject} onContinue={onSubmitTeacherSize} />
+        <TeacherGroupSizeScreen
+          onBack={onBackToTeacherSubject}
+          onContinue={onSubmitTeacherSize}
+          step={teacherStep(5)}
+          total={teacherTotal}
+        />
       ) : (
         <WelcomeScreen isLoading={authLoading} />
       )}

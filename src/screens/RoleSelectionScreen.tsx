@@ -18,6 +18,9 @@ type RoleOption = {
 };
 
 type Props = {
+  /** Номер шага и сколько всего — считает AppRoot по роли и пути */
+  step?: number;
+  total?: number;
   onContinue?: (roleId: string) => void;
   onBack?: () => void;
 };
@@ -32,14 +35,15 @@ const OPTIONS: RoleOption[] = [
   { id: 'teacher', title: 'Я преподаю', description: 'Создавай курсы для учеников', icon: Users },
 ];
 
-export function RoleSelectionScreen({ onContinue, onBack }: Props) {
+export function RoleSelectionScreen({ onContinue, onBack, step = 2, total }: Props) {
   const [selected, setSelected] = useState<string>('student');
 
   return (
     <OnboardingStep
       onBack={onBack}
       title="Flashly"
-      step={2}
+      step={step}
+      total={total}
       headline="Кто ты?"
       description="Это поможет нам настроить приложение под тебя."
       footer={<Button title="Продолжить" onPress={() => onContinue?.(selected)} fullWidth />}

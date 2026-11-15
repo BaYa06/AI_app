@@ -25,6 +25,9 @@ type SubjectOption = {
 };
 
 type Props = {
+  /** Номер шага и сколько всего — считает AppRoot по роли и пути */
+  step?: number;
+  total?: number;
   onContinue?: (subjectId: string) => void;
   onBack?: () => void;
 };
@@ -63,14 +66,15 @@ const OPTIONS: SubjectOption[] = [
   },
 ];
 
-export function TeacherSubjectScreen({ onContinue, onBack }: Props) {
+export function TeacherSubjectScreen({ onContinue, onBack, step = 5, total }: Props) {
   const [selected, setSelected] = useState<string>('languages');
 
   return (
     <OnboardingStep
       onBack={onBack}
       title="Flashly"
-      step={5}
+      step={step}
+      total={total}
       headline="Что ты преподаёшь?"
       description="Мы подберём шаблоны и инструменты для твоего предмета."
       footer={<Button title="Продолжить" onPress={() => onContinue?.(selected)} fullWidth />}

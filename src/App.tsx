@@ -252,12 +252,9 @@ export default function App() {
         // Новый пользователь — начинаем онбординг
         setIsAuthenticated(true);
         setNeedsOnboarding(true);
-        if (signedInWithApple) {
-          setOnboardingData((prev) => ({ ...prev, displayName }));
-          setAuthStep('role');
-        } else {
-          setAuthStep('name');
-        }
+        // Первый шаг — роль; имя ученик вводит после первого урока (Start 2.1)
+        if (signedInWithApple) setOnboardingData((prev) => ({ ...prev, displayName }));
+        setAuthStep('role');
       }
     },
     []
@@ -490,12 +487,8 @@ export default function App() {
   }, []);
 
   const handleBackToName = useCallback(() => {
-    if (skipNameStepRef.current) {
-      handleBackToWelcome();
-      return;
-    }
     setAuthStep('name');
-  }, [handleBackToWelcome]);
+  }, []);
 
   const handleBackToRole = useCallback(() => {
     setAuthStep('role');
@@ -517,15 +510,21 @@ export default function App() {
     setAuthStep('teacher_subject');
   }, []);
 
-  const handleSubmitName = useCallback((name?: string) => {
-    setOnboardingData((prev) => ({ ...prev, displayName: name }));
-    setAuthStep('role');
-  }, []);
+  // Порядок (plan/new/new_user_activation.md, Start 2.1): ученик — роль → родной → изучаемый →
+  // имя → цель → норма; учитель — роль → имя → родной → изучаемый → предмет → группа.
+  // Имя из Sign in with Apple не спрашиваем.
+  const handleSubmitName = useCallback(
+    (name?: string) => {
+      setOnboardingData((prev) => ({ ...prev, displayName: name || prev.displayName }));
+      setAuthStep(onboardingData.role === 'teacher' ? 'native_language' : 'goal');
+    },
+    [onboardingData.role]
+  );
 
   const handleSubmitRole = useCallback((role: string) => {
     const r = role as 'student' | 'teacher';
     setOnboardingData((prev) => ({ ...prev, role: r }));
-    setAuthStep('native_language');
+    setAuthStep(r === 'teacher' && !skipNameStepRef.current ? 'name' : 'native_language');
   }, []);
 
   const handleSubmitNativeLanguage = useCallback((code: string) => {
@@ -536,7 +535,8 @@ export default function App() {
   const handleSubmitTargetLanguages = useCallback(
     (codes: string[]) => {
       setOnboardingData((prev) => ({ ...prev, targetLanguages: codes }));
-      setAuthStep(onboardingData.role === 'teacher' ? 'teacher_subject' : 'goal');
+      if (onboardingData.role === 'teacher') setAuthStep('teacher_subject');
+      else setAuthStep(skipNameStepRef.current ? 'goal' : 'name');
     },
     [onboardingData.role]
   );
@@ -734,6 +734,8 @@ export default function App() {
           onSubmitTeacherSubject={handleSubmitTeacherSubject}
           onSubmitTeacherSize={handleSubmitTeacherSize}
           authStep={authStep}
+          onboardingRole={onboardingData.role}
+          nameSkipped={skipNameStepRef.current}
           authLoading={authLoading}
           nativeLanguage={onboardingData.nativeLanguage}
         />

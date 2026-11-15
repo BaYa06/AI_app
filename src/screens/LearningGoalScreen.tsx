@@ -20,6 +20,9 @@ type GoalOption = {
 };
 
 type Props = {
+  /** Номер шага и сколько всего — считает AppRoot по роли и пути */
+  step?: number;
+  total?: number;
   onContinue?: (goalId: string) => void;
   onBack?: () => void;
 };
@@ -41,7 +44,7 @@ const OPTIONS: GoalOption[] = [
   { id: 'self', title: 'Для себя', description: 'Личное развитие и новые хобби', icon: Leaf },
 ];
 
-export function LearningGoalScreen({ onContinue, onBack }: Props) {
+export function LearningGoalScreen({ onContinue, onBack, step = 5, total }: Props) {
   const colors = useThemeColors();
   const [selected, setSelected] = useState<string>('studies');
 
@@ -49,7 +52,8 @@ export function LearningGoalScreen({ onContinue, onBack }: Props) {
     <OnboardingStep
       onBack={onBack}
       title="Flashly"
-      step={5}
+      step={step}
+      total={total}
       headline="Зачем ты учишь?"
       description="Мы персонализируем карточки под твои цели."
       footer={

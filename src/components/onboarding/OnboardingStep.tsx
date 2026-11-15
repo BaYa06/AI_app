@@ -18,9 +18,11 @@ export interface OnboardingStepProps {
   onBack?: () => void;
   /** Заголовок шапки («Flashly»). */
   title?: string;
-  /** Номер шага 1…ONBOARDING_STEPS — по нему считаются подпись «Шаг N из 6» и процент.
-   *  Нет — необязательный экран после основных шагов, прогресс не показываем. */
+  /** Номер шага — по нему считаются подпись «Шаг N из M» и процент.
+   *  Нет — необязательный экран, прогресс не показываем. */
   step?: number;
+  /** Сколько шагов в этом отрезке онбординга (до урока, после урока, путь учителя) */
+  total?: number;
   headline: string;
   description?: string;
   /** Выравнивание заголовка и пояснения. */
@@ -33,8 +35,9 @@ export interface OnboardingStepProps {
 }
 
 /**
- * Шагов у ученика и учителя одинаково: имя → роль → родной язык → изучаемые языки →
- * (ученик: цель → дневная норма | учитель: предмет → размер группы).
+ * Шагов по умолчанию — путь учителя: роль → имя → родной язык → изучаемые → предмет → группа.
+ * У ученика два отрезка (plan/new/new_user_activation.md, Start 2.1): до первого урока
+ * (роль → родной → изучаемый) и после него (имя → цель → норма); их считает AppRoot.
  */
 export const ONBOARDING_STEPS = 6;
 
@@ -42,6 +45,7 @@ export function OnboardingStep({
   onBack,
   title,
   step,
+  total = ONBOARDING_STEPS,
   headline,
   description,
   align = 'left',
@@ -52,8 +56,8 @@ export function OnboardingStep({
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const hasHeader = !!onBack || !!title;
-  const progress = step ? Math.round((step / ONBOARDING_STEPS) * 100) : 100;
-  const progressLabel = `Шаг ${step} из ${ONBOARDING_STEPS}`;
+  const progress = step ? Math.round((step / total) * 100) : 100;
+  const progressLabel = `Шаг ${step} из ${total}`;
 
   const body = (
     <>
