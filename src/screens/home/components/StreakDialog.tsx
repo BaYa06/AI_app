@@ -194,13 +194,33 @@ export function StreakDialog({
 
       {streakFreezes !== null && (
         <View style={[styles.freezeRow, { borderColor: colors.border }]}>
+          {/* Сколько заморозок в запасе — значками (Freeze 5) */}
+          <View
+            style={styles.freezeIcons}
+            accessible
+            accessibilityLabel={`Заморозки: ${streakFreezes} из ${MAX_STREAK_FREEZES}`}
+          >
+            {Array.from({ length: MAX_STREAK_FREEZES }, (_, i) => (
+              <Snowflake
+                key={i}
+                size={iconSize.s}
+                color={i < streakFreezes ? colors.info : colors.textTertiary}
+              />
+            ))}
+          </View>
           <View style={styles.flex1}>
             <Text variant="body" style={[styles.semibold, { color: colors.textPrimary }]}>
-              Заморозка серии: {streakFreezes} из {MAX_STREAK_FREEZES}
+              Заморозки: {streakFreezes} из {MAX_STREAK_FREEZES}
             </Text>
-            <Text variant="caption" style={{ color: colors.textSecondary }}>
-              Спасёт серию, если пропустишь один день
-            </Text>
+            {streakFreezes === 0 && streakValue >= 3 ? (
+              <Text variant="caption" style={{ color: colors.warningText }}>
+                Без заморозки пропуск сбросит серию
+              </Text>
+            ) : (
+              <Text variant="caption" style={{ color: colors.textSecondary }}>
+                Спасает один пропущенный день. Два пропуска подряд — серия начнётся заново
+              </Text>
+            )}
           </View>
           {streakFreezes < MAX_STREAK_FREEZES && (
             <Button

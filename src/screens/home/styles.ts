@@ -127,6 +127,10 @@ export const styles = StyleSheet.create({
     paddingTop: spacing.m,
     borderTopWidth: 1,
   },
+  freezeIcons: {
+    flexDirection: 'row',
+    gap: 2,
+  },
 
   // Teacher Mode Banner
   teacherBannerWrap: {
