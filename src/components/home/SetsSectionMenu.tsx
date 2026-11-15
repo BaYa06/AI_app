@@ -3,7 +3,15 @@
  * @description Третий уровень главной: редкие действия с наборами живут у самих наборов, а не в шапке.
  */
 import React from 'react';
-import { ArrowUpDown, GraduationCap, Link2, Plus, Search, Users } from 'lucide-react-native';
+import {
+  ArrowUpDown,
+  Camera,
+  GraduationCap,
+  Link2,
+  Plus,
+  Search,
+  Users,
+} from 'lucide-react-native';
 import { useThemeColors } from '@/store';
 import { ListRow, Sheet } from '@/components/ui';
 
@@ -17,6 +25,8 @@ interface Props {
   /** «Учить все карточки» — null, если карточек нет */
   onStudyAll: (() => void) | null;
   onCreateSet: () => void;
+  /** Новый набор из фото или файла — набор создастся на проверке (Start 3.5) */
+  onCreateFromPhoto: () => void;
   /** «Добавить набор по ссылке» (plan/new/share_set.md, Share 5) */
   onAddByLink: () => void;
   /** «Подключиться к курсу» — null для учителя */
@@ -31,6 +41,7 @@ export function SetsSectionMenu({
   onSearch,
   onStudyAll,
   onCreateSet,
+  onCreateFromPhoto,
   onAddByLink,
   onJoinCourse,
 }: Props) {
@@ -63,6 +74,13 @@ export function SetsSectionMenu({
         />
       ) : null}
       <ListRow icon={Plus} iconColor={icon} title="Новый набор" onPress={onCreateSet} />
+      <ListRow
+        icon={Camera}
+        iconColor={icon}
+        title="Набор из фото или файла"
+        subtitle="Сфоткай страницу — ИИ сделает карточки"
+        onPress={onCreateFromPhoto}
+      />
       <ListRow
         icon={Link2}
         iconColor={icon}

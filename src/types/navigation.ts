@@ -313,7 +313,12 @@ export type RootStackParamList = {
     session?: SessionRouteParams;
   };
   /** append — пришли с проверки по «+ Фото»: новые карточки дописать к черновику */
-  ImportFiles: { setId: string; append?: boolean };
+  /** newSet — набор ещё не создан (задание «Набор из фото», Start 3.5): setId '' */
+  ImportFiles: {
+    setId: string;
+    append?: boolean;
+    newSet?: { languageFrom: string; languageTo: string };
+  };
   PreviewImport: {
     /** example/wordForm/wordType — у «незнакомых слов» из текста, confidence — неуверенно распознано */
     cards: Array<{

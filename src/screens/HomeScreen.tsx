@@ -1189,6 +1189,23 @@ export function HomeScreen({ navigation, route }: any) {
     };
   }, [activeCourseId, leaderboard, lastWeekBoard]);
 
+  // Новый набор из фото (Start 3.5): набора ещё нет, он создастся на проверке. Языки — как у
+  // стартового набора или первого своего набора
+  const openPhotoImport = useCallback(
+    (fromSetId?: string | null) => {
+      const source =
+        (fromSetId ? useSetsStore.getState().getSet(fromSetId) : undefined) ?? filteredSets[0];
+      navigation.navigate('ImportFiles', {
+        setId: '',
+        newSet: {
+          languageFrom: source?.languageFrom ?? 'en',
+          languageTo: source?.languageTo ?? 'ru',
+        },
+      });
+    },
+    [navigation, filteredSets]
+  );
+
   // «Начало пути» — только у ученика (plan/new/new_user_activation.md, Start 3.2)
   const playStartTaskReward = useCallback((from: { x: number; y: number }) => {
     diamondRewardRef.current?.collect(from);
@@ -1198,7 +1215,7 @@ export function HomeScreen({ navigation, route }: any) {
     enabled: isTeacher === false,
     fallbackSetId: filteredSets[0]?.id ?? null,
     onCourse: () => setDrawerOpen(true),
-    onPhoto: () => {},
+    onPhoto: (starterId) => openPhotoImport(starterId),
     onLibrary: () => {},
     playReward: playStartTaskReward,
   });
@@ -1904,7 +1921,7 @@ export function HomeScreen({ navigation, route }: any) {
                     {isTeacher === false && (
                       <View ref={startTasks.stackRef} collapsable={false} style={styles.startTasks}>
                         <StartTasksStack
-                          hidden={['photo', 'library', 'course']}
+                          hidden={['library', 'course']}
                           onAction={startTasks.handleStartTask}
                         />
                       </View>
@@ -2152,6 +2169,10 @@ export function HomeScreen({ navigation, route }: any) {
             setSetsMenuVisible(false);
             Analytics.homeAction('create_set');
             navigation?.navigate('SetEditor', {});
+          }}
+          onCreateFromPhoto={() => {
+            setSetsMenuVisible(false);
+            openPhotoImport();
           }}
           onAddByLink={() =>
             afterSetsMenu(() => {
