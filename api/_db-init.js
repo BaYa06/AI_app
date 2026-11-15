@@ -8,7 +8,7 @@ import { log } from './_log.js';
  */
 // schema_039: в 038 (official_sets_guard) и 039 (set_kind) версию не подняли — миграции не выполнились,
 // и запросы с card_sets.kind падали на тестовом сервере (plan/new/set_kind.md, слабые места)
-const SCHEMA_VERSION = 'schema_048';
+const SCHEMA_VERSION = 'schema_049';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -972,6 +972,21 @@ async function applyMigrations(sql) {
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS starter_set_issued_at TIMESTAMPTZ`;
   } catch (e) {
     log.error('db-init', 'Migration 048_starter_set failed', e);
+  }
+
+  // Migration 049: выполненные задания «Начало пути» — по 10 алмазов один раз на задание
+  // (plan/new/new_user_activation.md, Start 3.1, 3.9)
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS onboarding_tasks (
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        task VARCHAR(32) NOT NULL,
+        done_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (user_id, task)
+      )
+    `;
+  } catch (e) {
+    log.error('db-init', 'Migration 049_onboarding_tasks failed', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)
