@@ -30,11 +30,15 @@ export const TEACHER_CABINET_ENABLED = true;
  */
 export const TEACHER_HOMEWORK_ENABLED = true;
 
-/** «Подготовка к уроку» у учителя (этап 3). До этапа 3 — false. */
-export const TEACHER_LESSON_PREP_ENABLED = false;
+/**
+ * «Подготовка к уроку» у учителя (этап 3). true — для проверки на TestFlight/staging: сервер этапа 3
+ * есть только на staging, в прод-сборку с true не выпускать, пока сервер не выкатан на прод.
+ */
+export const TEACHER_LESSON_PREP_ENABLED = true;
 
 /**
  * Этап 4 кабинета учителя: колокольчик с уведомлениями, новый экран ученика, отчёты.
- * false — экран ученика прежний, колокольчика и отчётов нет.
+ * false — экран ученика прежний, колокольчика и отчётов нет. true — для проверки на TestFlight/staging:
+ * в прод-сборку с true не выпускать, пока сервер этапа 4 не выкатан на прод.
  */
-export const TEACHER_INSIGHTS_ENABLED = false;
+export const TEACHER_INSIGHTS_ENABLED = true;
