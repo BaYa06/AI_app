@@ -52,7 +52,7 @@ const MAX_CARDS = 2000;
 const IMPORTS_PER_HOUR = 30;
 const REPORT_REASONS = new Set(['offensive', 'spam', 'inappropriate', 'copyright', 'other']);
 
-// report-page — публичная страница отчёта учителя `/r/<код>` (plan/new/teacher_cabinet.md, Teacher 53)
+// report-page — публичная страница отчёта учителя `/r/<код>` (plan/done/teacher_cabinet.md, Teacher 53)
 const PUBLIC_ACTIONS = new Set(['preview', 'page', 'cards', 'report-page']);
 
 const shareUrl = (origin, code) => `${origin}/s/${code}`;

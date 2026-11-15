@@ -18,7 +18,7 @@ export const COMMUNITY_LIBRARY_ENABLED = true;
 export const LIBRARY_CATALOG_ENABLED = true;
 
 /**
- * Кабинет учителя, этап 1 (plan/new/teacher_cabinet.md): главная и страница курса учителя.
+ * Кабинет учителя, этап 1 (plan/done/teacher_cabinet.md): главная и страница курса учителя.
  * false — всё как раньше, откат одной строкой.
  */
 export const TEACHER_CABINET_ENABLED = true;

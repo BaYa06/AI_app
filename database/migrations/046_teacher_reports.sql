@@ -1,4 +1,4 @@
--- Migration 046: отчёты учителя (plan/new/teacher_cabinet.md, Teacher 53).
+-- Migration 046: отчёты учителя (plan/done/teacher_cabinet.md, Teacher 53).
 -- Применяется автоматически в api/_db-init.js; файл — для истории и ручного применения.
 --
 -- kind: parent (один ученик, student_id) / group (весь курс, student_id NULL).

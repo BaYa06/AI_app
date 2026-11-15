@@ -28,11 +28,11 @@ const RATING_URL_RE = /^flashly:\/\/rating\/[^/?#]+\/?(\?.*)?$/;
 /** Ответ команды из пуша (plan/new/support_threads.md): flashly://support/<id>?from=push */
 const SUPPORT_URL_RE = /^flashly:\/\/support\/[^/?#]+\/?(\?.*)?$/;
 
-/** Задание ученика из пуша (plan/new/teacher_cabinet.md, Teacher 29): flashly://homework/<id>?from=push */
+/** Задание ученика из пуша (plan/done/teacher_cabinet.md, Teacher 29): flashly://homework/<id>?from=push */
 const HOMEWORK_URL_RE = /^flashly:\/\/homework\/[^/?#]+\/?(\?.*)?$/;
 
 /**
- * Пуши учителя (plan/new/teacher_cabinet.md, этап 4): курс, ученики курса, «Перед уроком»,
+ * Пуши учителя (plan/done/teacher_cabinet.md, этап 4): курс, ученики курса, «Перед уроком»,
  * экран сдачи, ученик, список уведомлений.
  */
 const TEACHER_URL_RE =

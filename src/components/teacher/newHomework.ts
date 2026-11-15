@@ -1,5 +1,5 @@
 /**
- * Окно «Новое задание» (plan/new/teacher_cabinet.md, Teacher 18–20): правила и тексты — общие для
+ * Окно «Новое задание» (plan/done/teacher_cabinet.md, Teacher 18–20): правила и тексты — общие для
  * RN-окна (Android, веб) и Swift-окна (iOS). В Swift строк нет — всё из NEW_HOMEWORK_TEXTS.
  */
 import { NeonService, type TeacherApiReason } from '@/services/NeonService';

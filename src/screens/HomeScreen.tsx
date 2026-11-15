@@ -566,7 +566,7 @@ export function HomeScreen({ navigation, route }: any) {
   const courses = useCoursesStore((s) => s.courses);
   const activeCourseId = useCoursesStore((s) => s.activeCourseId);
 
-  // Задания учителя у ученика (plan/new/teacher_cabinet.md, Teacher 26): есть задание в этом курсе —
+  // Задания учителя у ученика (plan/done/teacher_cabinet.md, Teacher 26): есть задание в этом курсе —
   // карточка задания вместо «Урока дня», набор задания в списке — янтарный с «до: …»
   const homeworkItems = useHomeworkStore((s) => s.items);
   useFocusEffect(
@@ -1172,7 +1172,7 @@ export function HomeScreen({ navigation, route }: any) {
     return course?.title || 'этот курс';
   }, [activeCourseId, courses]);
 
-  // Учитель в своём курсе (plan/new/teacher_cabinet.md, Teacher 1): в шапке название курса вместо
+  // Учитель в своём курсе (plan/done/teacher_cabinet.md, Teacher 1): в шапке название курса вместо
   // серии, алмазов и рейтинга. «Мои наборы» и чужой курс, где учитель сам ученик, — как у ученика.
   const teacherCourseTitle = useMemo(() => {
     if (!TEACHER_CABINET_ENABLED || isTeacher !== true || activeCourseId === null) return null;
@@ -1408,7 +1408,7 @@ export function HomeScreen({ navigation, route }: any) {
     [setActiveCourse]
   );
 
-  // «Новый курс»: у учителя — окно с учебником и расписанием (plan/new/teacher_cabinet.md, Teacher 6),
+  // «Новый курс»: у учителя — окно с учебником и расписанием (plan/done/teacher_cabinet.md, Teacher 6),
   // у ученика курс — просто папка, поле ввода в шторке, как раньше
   const [newCourseSheetVisible, setNewCourseSheetVisible] = useState(false);
   const [joinCodeCourse, setJoinCodeCourse] = useState<{ id: string; title: string } | null>(null);
@@ -1646,7 +1646,7 @@ export function HomeScreen({ navigation, route }: any) {
 
   // Баннер учителя — вход в курс (ученики, приглашения, тесты, «Учебники курса»). Показывается и
   // когда в курсе ещё нет наборов: иначе в новом пустом курсе до него было не добраться.
-  // Учитель в своём курсе — карточка урока (plan/new/teacher_cabinet.md, Teacher 2); в «Мои наборы»
+  // Учитель в своём курсе — карточка урока (plan/done/teacher_cabinet.md, Teacher 2); в «Мои наборы»
   // и без курсов — прежний баннер.
   const teacherBanner =
     teacherCourseTitle !== null && activeCourseId !== null ? (

@@ -24,7 +24,7 @@ export const colors = {
     warningText: '#B45309',
     errorText: '#DC2626',
 
-    // Задание учителя (plan/new/teacher_cabinet.md, этап 2): рамка, полоска, фон alpha 10
+    // Задание учителя (plan/done/teacher_cabinet.md, этап 2): рамка, полоска, фон alpha 10
     homework: '#F59E0B',
     homeworkText: '#B45309', // «до: …», подписи задания (контраст ≥ 4,5)
     homeworkFill: '#B45309', // заливка под белый текст и иконку (аватар учителя, значок набора)

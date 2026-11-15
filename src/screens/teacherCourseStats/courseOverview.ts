@@ -1,5 +1,5 @@
 /**
- * Сводка страницы курса (plan/new/teacher_cabinet.md, Teacher 8): подписи плиток, строка
+ * Сводка страницы курса (plan/done/teacher_cabinet.md, Teacher 8): подписи плиток, строка
  * «учебник · расписание» в шапке и вывод под графиком активности.
  */
 import { rawApiFetch } from '@/services/api/client';

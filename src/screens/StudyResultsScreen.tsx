@@ -116,7 +116,7 @@ export function StudyResultsScreen({ navigation, route }: Props) {
     if (sessionStep) navigation.replace(sessionStep.screen, sessionStep.params);
   }, []);
   // Сессия закончена (все этапы) — итог уходит на сервер: засчитываем слова заданий учителя
-  // (plan/new/teacher_cabinet.md, решение 1, вариант Б). Брошенная сессия сюда не доходит.
+  // (plan/done/teacher_cabinet.md, решение 1, вариант Б). Брошенная сессия сюда не доходит.
   React.useEffect(() => {
     if (!session || sessionStep) return;
     const ids = sessionCardIds(session);

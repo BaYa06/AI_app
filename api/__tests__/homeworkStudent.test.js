@@ -1,5 +1,5 @@
 /**
- * Задания ученика (plan/new/teacher_cabinet.md, Teacher 16): my-homework и session-complete.
+ * Задания ученика (plan/done/teacher_cabinet.md, Teacher 16): my-homework и session-complete.
  * SQL подставной (как в access.test.js): проверяем вход, права через текущего пользователя
  * и что снимок сдачи считается только по тронутым заданиям.
  */

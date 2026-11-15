@@ -1,6 +1,6 @@
 //
 //  NotSubmittedSheet.swift
-//  Нативный лист «Кто не сдал» (plan/new/teacher_cabinet.md, Teacher 23; макет 12а).
+//  Нативный лист «Кто не сдал» (plan/done/teacher_cabinet.md, Teacher 23; макет 12а).
 //
 //  Повторяет RN-окно src/screens/teacherHomework/NotSubmittedSheet.tsx. Лист показывает
 //  UISheetPresentationController, как шторку режимов (StudyModeSheet.swift). Состояние (фильтр,

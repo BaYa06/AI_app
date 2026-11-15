@@ -1,5 +1,5 @@
 /**
- * Нативный лист «Кто не сдал» на iOS (plan/new/teacher_cabinet.md, Teacher 23) —
+ * Нативный лист «Кто не сдал» на iOS (plan/done/teacher_cabinet.md, Teacher 23) —
  * ios/FlashcardsApp/NotSubmittedSheet.swift. Состояние (фильтр, галочки, подписи) — здесь, Swift
  * только рисует его и присылает нажатия (как nativeJoinCodeSheet.ts). Android и веб — RN-окно.
  */

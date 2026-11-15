@@ -65,7 +65,7 @@ const PUSH_GROUPS: { key: PushGroup; title: string; hint: string }[] = [
   { key: 'course', title: 'Курс и учитель', hint: 'Учитель просит повторить' },
   { key: 'rating', title: 'Рейтинг', hint: 'Место в рейтинге курса, итоги недели' },
 ];
-/** Раздел «Учителю» (plan/new/teacher_cabinet.md, Teacher 50) — ключи как SETTING_GROUPS на сервере */
+/** Раздел «Учителю» (plan/done/teacher_cabinet.md, Teacher 50) — ключи как SETTING_GROUPS на сервере */
 const TEACHER_PUSH_GROUPS: { key: PushGroup; title: string; hint: string }[] = [
   { key: 'teacher_lesson', title: 'Перед уроком', hint: 'За 2 часа: кто готов и трудные слова' },
   { key: 'teacher_week', title: 'Итоги недели', hint: 'По понедельникам: кто занимался' },

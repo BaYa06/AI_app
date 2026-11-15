@@ -1,5 +1,5 @@
 /**
- * Нативные окна «Новое задание» и «Слова для задания» на iOS (plan/new/teacher_cabinet.md, Teacher 20) —
+ * Нативные окна «Новое задание» и «Слова для задания» на iOS (plan/done/teacher_cabinet.md, Teacher 20) —
  * ios/FlashcardsApp/NewHomeworkSheet.swift. Лист показывает система, как шторку режимов
  * (nativeStudyModeSheet.ts). Swift показывает форму и присылает «create»; задание создаёт
  * createHomework — та же логика, что у RN-окна. Android, веб и сборки без модуля — RN-окна.

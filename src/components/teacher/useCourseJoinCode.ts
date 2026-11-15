@@ -1,5 +1,5 @@
 /**
- * Код подключения к курсу (plan/new/teacher_cabinet.md, Teacher 9–10): логика одна для RN-окна
+ * Код подключения к курсу (plan/done/teacher_cabinet.md, Teacher 9–10): логика одна для RN-окна
  * (CourseJoinCodeDialog) и Swift-окна (JoinCodeSheet.swift).
  *
  * Код — тем же способом, что в «Пригласить учеников» (createCourseInvite / regenerateCourseInvite).

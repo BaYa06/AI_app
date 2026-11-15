@@ -1,5 +1,5 @@
 /**
- * PDF отчёта учителя (plan/new/teacher_cabinet.md, Teacher 54): та же раскладка, что у страницы
+ * PDF отчёта учителя (plan/done/teacher_cabinet.md, Teacher 54): та же раскладка, что у страницы
  * `/r/<код>` (api/_report-page.js). Собирает сервер (pdfkit, чистый JS); шрифт DejaVu Sans с
  * кириллицей и турецкими буквами лежит в api/_fonts (лицензия рядом) и попадает в функцию через
  * includeFiles в vercel.json. Файл начинается с «_», поэтому Vercel не публикует его как роут.

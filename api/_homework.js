@@ -1,5 +1,5 @@
 /**
- * Общие запросы заданий (plan/new/teacher_cabinet.md, этап 2) для api/teacher.js и api/progress.js.
+ * Общие запросы заданий (plan/done/teacher_cabinet.md, этап 2) для api/teacher.js и api/progress.js.
  * Файл начинается с "_", поэтому Vercel не публикует его как отдельный роут.
  *
  * «Сдано» — вариант Б: слово засчитано, когда ученик прошёл его в законченной сессии

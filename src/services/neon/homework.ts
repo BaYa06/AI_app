@@ -1,4 +1,4 @@
-/** Задания учителя (plan/new/teacher_cabinet.md, этап 2): api/teacher.js и api/progress.js. */
+/** Задания учителя (plan/done/teacher_cabinet.md, этап 2): api/teacher.js и api/progress.js. */
 import { callProgressApi, callTeacherApi, type TeacherApiReason } from './core';
 import type {
   HomeworkStatusData,

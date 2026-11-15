@@ -807,7 +807,7 @@ async function applyMigrations(sql) {
     log.error('db-init', 'Migration 040_library_catalog failed', e);
   }
 
-  // Migration 041: задания учителя (plan/new/teacher_cabinet.md, Teacher 14). Задание — снимок списка
+  // Migration 041: задания учителя (plan/done/teacher_cabinet.md, Teacher 14). Задание — снимок списка
   // слов; «сдано» — вариант Б (слово засчитано после законченной сессии). Только новые таблицы —
   // старые версии приложения их не замечают. Комментарии — database/migrations/041_homework.sql.
   try {
@@ -869,7 +869,7 @@ async function applyMigrations(sql) {
     log.error('db-init', 'Migration 041_homework failed', e);
   }
 
-  // Migration 042: откуда набор (plan/new/teacher_cabinet.md, Teacher 31): manual / ai / file /
+  // Migration 042: откуда набор (plan/done/teacher_cabinet.md, Teacher 31): manual / ai / file /
   // library / share, NULL у старых наборов. Только новая колонка — старые клиенты её не замечают.
   try {
     await sql`ALTER TABLE card_sets ADD COLUMN IF NOT EXISTS origin TEXT`;
@@ -877,7 +877,7 @@ async function applyMigrations(sql) {
     log.error('db-init', 'Migration 042_set_origin failed', e);
   }
 
-  // Migration 043: живой тест по списку слов и разминка (plan/new/teacher_cabinet.md, Teacher 34).
+  // Migration 043: живой тест по списку слов и разминка (plan/done/teacher_cabinet.md, Teacher 34).
   // card_ids NULL — обычный тест по набору; purpose 'warmup' — разминка (в оценки не идёт).
   try {
     await sql`ALTER TABLE test_sessions ADD COLUMN IF NOT EXISTS card_ids UUID[]`;
@@ -886,7 +886,7 @@ async function applyMigrations(sql) {
     log.error('db-init', 'Migration 043_test_card_ids failed', e);
   }
 
-  // Migration 044: «Напомнить» выбранным ученикам (plan/new/teacher_cabinet.md, Teacher 36) —
+  // Migration 044: «Напомнить» выбранным ученикам (plan/done/teacher_cabinet.md, Teacher 36) —
   // лимит «раз в 20 часов» на каждого ученика курса, а не на курс.
   try {
     await sql`
@@ -901,7 +901,7 @@ async function applyMigrations(sql) {
     log.error('db-init', 'Migration 044_review_reminders failed', e);
   }
 
-  // Migration 045: колокольчик учителя (plan/new/teacher_cabinet.md, Teacher 48) — когда запись
+  // Migration 045: колокольчик учителя (plan/done/teacher_cabinet.md, Teacher 48) — когда запись
   // журнала уведомлений просмотрена в списке.
   try {
     await sql`ALTER TABLE push_log ADD COLUMN IF NOT EXISTS seen_at TIMESTAMPTZ`;
@@ -909,7 +909,7 @@ async function applyMigrations(sql) {
     log.error('db-init', 'Migration 045_push_seen failed', e);
   }
 
-  // Migration 046: отчёты учителя (plan/new/teacher_cabinet.md, Teacher 53). Ссылка /r/<code>
+  // Migration 046: отчёты учителя (plan/done/teacher_cabinet.md, Teacher 53). Ссылка /r/<code>
   // показывает сохранённый снимок (data); живёт до expires_at или пока учитель не отзовёт.
   try {
     await sql`

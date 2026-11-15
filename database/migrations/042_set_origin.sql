@@ -1,4 +1,4 @@
--- Migration 042: откуда взялся набор (plan/new/teacher_cabinet.md, Teacher 31).
+-- Migration 042: откуда взялся набор (plan/done/teacher_cabinet.md, Teacher 31).
 -- Применяется автоматически в api/_db-init.js; файл — для истории и ручного применения.
 --
 -- manual / ai / file / library / share; NULL — старый набор (клиент показывает общий значок,

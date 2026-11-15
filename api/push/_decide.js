@@ -11,7 +11,7 @@ export const SETTING_GROUPS = {
   streak: ['streak'],
   course: ['course'],
   rating: ['rating'],
-  // Пуши учителю (plan/new/teacher_cabinet.md, Teacher 50): «Перед уроком», «Итоги недели»,
+  // Пуши учителю (plan/done/teacher_cabinet.md, Teacher 50): «Перед уроком», «Итоги недели»,
   // «Ученики и задания»
   teacher_lesson: ['teacher_lesson'],
   teacher_week: ['teacher_week'],

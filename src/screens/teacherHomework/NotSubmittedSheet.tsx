@@ -1,5 +1,5 @@
 /**
- * Окно «Кто не сдал» (plan/new/teacher_cabinet.md, Teacher 23; макет 12а).
+ * Окно «Кто не сдал» (plan/done/teacher_cabinet.md, Teacher 23; макет 12а).
  * RN — Android и веб; iOS — Swift (NotSubmittedSheet.swift через nativeNotSubmittedSheet.ts).
  * Фильтр «Все / В процессе / Не начали», галочки, «Выбрать всех», «Напомнить N ученикам».
  * Кому уже напоминали за 20 часов — галочка недоступна. Нажатие на имя — карточка ученика.

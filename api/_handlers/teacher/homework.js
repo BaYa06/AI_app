@@ -1,5 +1,5 @@
 /**
- * api/teacher.js — задания учителя (plan/new/teacher_cabinet.md, Teacher 15).
+ * api/teacher.js — задания учителя (plan/done/teacher_cabinet.md, Teacher 15).
  * Права: только учитель — владелец курса (courses.user_id). Ученики — api/progress.js (Teacher 16).
  */
 import { UUID_RE } from '../../_access.js';

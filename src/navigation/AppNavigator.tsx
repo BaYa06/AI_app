@@ -342,7 +342,7 @@ const NATIVE_LINKING: LinkingOptions<RootStackParamList> = {
       TeacherCourseStats: 'teacher/:courseId',
       TeacherStudents: 'teacher/:courseId/students',
       StudentHomework: 'homework/:homeworkId',
-      // Пуши и колокольчик учителя (plan/new/teacher_cabinet.md, этап 4). Экран выключенного этапа
+      // Пуши и колокольчик учителя (plan/done/teacher_cabinet.md, этап 4). Экран выключенного этапа
       // в ссылке заменяет teacherPushLink.
       ...(TEACHER_LESSON_PREP_ENABLED ? { TeacherLessonPrep: 'lesson-prep/:courseId' } : null),
       TeacherHomework: 'teacher-homework/:courseId/:homeworkId',

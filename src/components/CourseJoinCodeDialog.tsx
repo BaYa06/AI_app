@@ -3,7 +3,7 @@
  * Код берётся тем же способом, что в «Пригласить учеников» на главной
  * (createCourseInvite / regenerateCourseInvite).
  *
- * plan/new/teacher_cabinet.md, Teacher 9–10: логика — useCourseJoinCode (общая), плюс «В курсе
+ * plan/done/teacher_cabinet.md, Teacher 9–10: логика — useCourseJoinCode (общая), плюс «В курсе
  * N учеников» и последние подключившиеся. iOS — нативный лист (JoinCodeSheet.swift), Android
  * и веб — этот RN-диалог.
  */

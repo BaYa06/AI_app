@@ -1,6 +1,6 @@
 //
 //  JoinCodeSheet.swift
-//  Нативный лист «Код подключения к курсу» (plan/new/teacher_cabinet.md, Teacher 10).
+//  Нативный лист «Код подключения к курсу» (plan/done/teacher_cabinet.md, Teacher 10).
 //
 //  Повторяет RN-диалог src/components/CourseJoinCodeDialog.tsx: код крупно, «Копировать»,
 //  «Поделиться», «Обновить код подключения», «В курсе N учеников» и последние подключившиеся.

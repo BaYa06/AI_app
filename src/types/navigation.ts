@@ -185,11 +185,11 @@ export type RootStackParamList = {
     /** С какого фильтра открыть список (главная учителя → «Не заходят 7+ дней») */
     filter?: 'all' | 'active' | 'away3d' | 'away7d';
   };
-  /** «Задание сдано!» (plan/new/teacher_cabinet.md, Teacher 28) */
+  /** «Задание сдано!» (plan/done/teacher_cabinet.md, Teacher 28) */
   HomeworkDone: { homeworkId: string; late: boolean; score: number; diamonds: number };
-  /** Экран задания ученика (plan/new/teacher_cabinet.md, Teacher 27) */
+  /** Экран задания ученика (plan/done/teacher_cabinet.md, Teacher 27) */
   StudentHomework: { homeworkId: string; from?: string };
-  /** Сдача задания учителем (plan/new/teacher_cabinet.md, Teacher 21) */
+  /** Сдача задания учителем (plan/done/teacher_cabinet.md, Teacher 21) */
   /** courseTitle нет, когда экран открыт ссылкой из пуша учителю */
   TeacherHomework: { homeworkId: string; courseId: string; courseTitle?: string };
   /**

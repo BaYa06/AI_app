@@ -1,5 +1,5 @@
 /**
- * Откуда набор (plan/new/teacher_cabinet.md, Teacher 31): createSet пишет только известный origin,
+ * Откуда набор (plan/done/teacher_cabinet.md, Teacher 31): createSet пишет только известный origin,
  * старый клиент (без поля) — NULL.
  */
 import { describe, expect, it } from '@jest/globals';

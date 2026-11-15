@@ -1,5 +1,5 @@
 /**
- * Нативное окно «Новый курс» на iOS (plan/new/teacher_cabinet.md, Teacher 7) —
+ * Нативное окно «Новый курс» на iOS (plan/done/teacher_cabinet.md, Teacher 7) —
  * ios/FlashcardsApp/NewCourseSheet.swift. Лист показывает система, как шторку режимов
  * (nativeStudyModeSheet.ts). Swift только показывает форму и присылает «create»; курс, учебник
  * и расписание сохраняет createCourseWithSetup — та же логика, что у RN-окна.

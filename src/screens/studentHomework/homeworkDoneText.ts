@@ -1,5 +1,5 @@
 /**
- * «Задание сдано!» (plan/new/teacher_cabinet.md, Teacher 28; макет У4) — подписи без RN.
+ * «Задание сдано!» (plan/done/teacher_cabinet.md, Teacher 28; макет У4) — подписи без RN.
  */
 import { formatDue, type HomeworkSubmission, type StudentHomework } from '@/services/homework';
 import { pluralize } from '@/utils';

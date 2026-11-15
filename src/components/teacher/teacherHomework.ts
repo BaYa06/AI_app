@@ -1,5 +1,5 @@
 /**
- * Задание курса для главной и страницы курса учителя (plan/new/teacher_cabinet.md, Teacher 24).
+ * Задание курса для главной и страницы курса учителя (plan/done/teacher_cabinet.md, Teacher 24).
  * Чистые правила: какое задание «текущее», сводка для карточки, слова по умолчанию.
  */
 import type { TeacherHomeworkSummary as HomeworkRow } from '@/services/homework';

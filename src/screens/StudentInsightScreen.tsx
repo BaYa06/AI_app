@@ -1,5 +1,5 @@
 /**
- * Экран ученика 13 (plan/new/teacher_cabinet.md, Teacher 52) — за флагом TEACHER_INSIGHTS_ENABLED
+ * Экран ученика 13 (plan/done/teacher_cabinet.md, Teacher 52) — за флагом TEACHER_INSIGHTS_ENABLED
  * вместо прежнего StudentDetailScreen: шапка со статусом, карточка-вывод, три цифры, календарь
  * за 4 недели, юниты и тесты, «Попросить повторить» и «Отчёт для родителей».
  * Правила и подписи — studentDetail/studentInsight.ts. Цвета — только токены (обе темы).

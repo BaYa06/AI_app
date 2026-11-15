@@ -174,7 +174,7 @@ export async function setHardCards(req, res, sql, userId) {
   });
 }
 
-// ─── Трудные слова курса (plan/new/teacher_cabinet.md, Teacher 33) ────────────
+// ─── Трудные слова курса (plan/done/teacher_cabinet.md, Teacher 33) ────────────
 
 /** Трудное слово: за срок не меньше стольких ответов и стольких учеников (решение 4 этапа 3) */
 export const HARD_MIN_ANSWERS = 5;

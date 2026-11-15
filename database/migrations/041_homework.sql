@@ -1,4 +1,4 @@
--- Migration 041: задания учителя (plan/new/teacher_cabinet.md, этап 2, Teacher 14).
+-- Migration 041: задания учителя (plan/done/teacher_cabinet.md, этап 2, Teacher 14).
 -- Применяется автоматически в api/_db-init.js; файл — для истории и ручного применения.
 --
 -- Только новые таблицы: старые версии приложения их не замечают (Release 2).

@@ -80,7 +80,7 @@ import { reportData, reportCreate, reportRevoke, reportPdf } from './_handlers/t
  * POST /api/teacher?action=remind-review       { courseId, studentId?, studentIds? } — пуш «повтори
  *                                               слова» (всему классу — не чаще раза в сутки;
  *                                               studentIds — каждому не чаще раза в 20 ч)
- * Задания (plan/new/teacher_cabinet.md, этап 2):
+ * Задания (plan/done/teacher_cabinet.md, этап 2):
  * POST /api/teacher?action=homework-create  { courseId, title, cardIds, dueAt, minScore?, userIds? }
  * GET  /api/teacher?action=homework-list    ?courseId=
  * GET  /api/teacher?action=homework-status  ?homeworkId=

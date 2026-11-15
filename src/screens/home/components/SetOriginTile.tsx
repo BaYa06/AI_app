@@ -1,5 +1,5 @@
 /**
- * Плитка слева в строке набора: значок, откуда набор (plan/new/teacher_cabinet.md, Teacher 31).
+ * Плитка слева в строке набора: значок, откуда набор (plan/done/teacher_cabinet.md, Teacher 31).
  * Фон — цвет набора 10 %, значок — textSecondary: обе темы из токенов.
  */
 import React from 'react';

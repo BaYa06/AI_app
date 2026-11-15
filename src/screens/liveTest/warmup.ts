@@ -1,5 +1,5 @@
 /**
- * Разминка — живой тест по трудным словам (plan/new/teacher_cabinet.md, Teacher 40–41).
+ * Разминка — живой тест по трудным словам (plan/done/teacher_cabinet.md, Teacher 40–41).
  * Чистые правила монитора (П3) и итогов (П4): слова, «усвоили / трудное», лучшие, не были.
  */
 import { pluralize } from '@/utils';

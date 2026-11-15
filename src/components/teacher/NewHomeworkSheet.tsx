@@ -1,5 +1,5 @@
 /**
- * Окно «Новое задание» (plan/new/teacher_cabinet.md, Teacher 18; макет 11).
+ * Окно «Новое задание» (plan/done/teacher_cabinet.md, Teacher 18; макет 11).
  * RN-окно — Android и веб; iOS — Swift (Teacher 20). Логика и тексты — newHomework.ts.
  *
  * Кому → слова → что сделать → срок (карточка «до: …», по нажатию — барабан) → порог → «Задать N ученикам».

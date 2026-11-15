@@ -1,5 +1,5 @@
 /**
- * Пуши учителю (plan/new/teacher_cabinet.md, этап 4). SQL и Firebase подставные: проверяем
+ * Пуши учителю (plan/done/teacher_cabinet.md, этап 4). SQL и Firebase подставные: проверяем
  * решение «пуш или только колокольчик», запись журнала с текстом и ссылкой, защиту от повторов.
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';

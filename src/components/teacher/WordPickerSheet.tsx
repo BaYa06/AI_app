@@ -1,5 +1,5 @@
 /**
- * Окно «Слова для задания» (plan/new/teacher_cabinet.md, Teacher 19; макет 11а). RN — Android и веб;
+ * Окно «Слова для задания» (plan/done/teacher_cabinet.md, Teacher 19; макет 11а). RN — Android и веб;
  * iOS — Swift (Teacher 20). Правила — wordPicker.ts.
  *
  * Поиск, наборы курса с галочкой (все / часть / ни одного), раскрытие набора со словами,

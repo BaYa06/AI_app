@@ -37,7 +37,7 @@ type Props = {
   setSetMenuTarget: React.Dispatch<React.SetStateAction<CardSet | null>>;
   navigation: any;
   /**
-   * Учитель в своём курсе (plan/new/teacher_cabinet.md, Teacher 5): прогресс группы вместо личного —
+   * Учитель в своём курсе (plan/done/teacher_cabinet.md, Teacher 5): прогресс группы вместо личного —
    * сколько учеников прошли все карточки, начали и не открывали. null/нет — личная полоска, как раньше.
    */
   groupProgress?: { total: number; started: number; completed: number } | null;

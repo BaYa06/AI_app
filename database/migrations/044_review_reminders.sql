@@ -1,4 +1,4 @@
--- Migration 044: «Напомнить» выбранным ученикам (plan/new/teacher_cabinet.md, Teacher 36).
+-- Migration 044: «Напомнить» выбранным ученикам (plan/done/teacher_cabinet.md, Teacher 36).
 -- Применяется автоматически в api/_db-init.js; файл — для истории и ручного применения.
 --
 -- Лимит «раз в 20 часов» на каждого ученика курса (как homework_reminders), а не на курс.

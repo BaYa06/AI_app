@@ -1,6 +1,6 @@
 /**
  * Задания курса у учителя: список с сервера + окна «Новое задание» и «Кто не сдал»
- * (plan/new/teacher_cabinet.md, Teacher 24). Один хук для главной (TeacherLessonCard) и страницы курса.
+ * (plan/done/teacher_cabinet.md, Teacher 24). Один хук для главной (TeacherLessonCard) и страницы курса.
  * Без флага TEACHER_HOMEWORK_ENABLED ничего не грузит и ничего не рисует.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';

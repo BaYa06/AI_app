@@ -159,7 +159,7 @@ export async function studentStats(req, res, sql, userId) {
       (SELECT MAX(reviewed_at)::date FROM review_log WHERE user_id = ${studentId}::uuid) AS last_active_date
   `;
 
-  // Экран ученика 13 (plan/new/teacher_cabinet.md, Teacher 51) — только новые поля; их сбой
+  // Экран ученика 13 (plan/done/teacher_cabinet.md, Teacher 51) — только новые поля; их сбой
   // не должен ломать старый экран, поэтому отдельно и под try.
   let detail = null;
   try {
@@ -346,7 +346,7 @@ export function parseStudentIds(value) {
 }
 
 /**
- * «Напомнить» выбранным ученикам (plan/new/teacher_cabinet.md, Teacher 36): каждому не чаще раза
+ * «Напомнить» выбранным ученикам (plan/done/teacher_cabinet.md, Teacher 36): каждому не чаще раза
  * в 20 часов (review_reminders), лимит курса не трогаем. Пуш уходит и тем, у кого слов на
  * повторении нет (ученик ещё не открывал набор) — текст для них свой.
  */

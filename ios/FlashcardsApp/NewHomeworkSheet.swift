@@ -1,6 +1,6 @@
 //
 //  NewHomeworkSheet.swift
-//  Нативные окна «Новое задание» и «Слова для задания» (plan/new/teacher_cabinet.md, Teacher 20;
+//  Нативные окна «Новое задание» и «Слова для задания» (plan/done/teacher_cabinet.md, Teacher 20;
 //  макеты 11 и 11а).
 //
 //  Повторяет RN-окна src/components/teacher/NewHomeworkSheet.tsx и WordPickerSheet.tsx.

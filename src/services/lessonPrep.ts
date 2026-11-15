@@ -1,5 +1,5 @@
 /**
- * Подготовка к уроку у учителя (plan/new/teacher_cabinet.md, этап 3, Teacher 37): типы и чистые
+ * Подготовка к уроку у учителя (plan/done/teacher_cabinet.md, этап 3, Teacher 37): типы и чистые
  * правила экрана 10 — трудные слова, готовность группы, состав разминки. Запросы — services/neon/lessonPrep.
  */
 import { pluralize } from '@/utils';

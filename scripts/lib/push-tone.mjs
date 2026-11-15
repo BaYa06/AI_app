@@ -49,7 +49,7 @@ function sampleData(n) {
     rival: SAMPLE_NAME,
     setId: 's1',
     courseId: 'c1',
-    // Пуши учителю (plan/new/teacher_cabinet.md, этап 4)
+    // Пуши учителю (plan/done/teacher_cabinet.md, этап 4)
     time: '10:30',
     ready: n,
     total: n + 10,

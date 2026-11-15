@@ -1,5 +1,5 @@
 /**
- * Окно «Кто не сдал» (plan/new/teacher_cabinet.md, Teacher 23; макет 12а) — правила и тексты,
+ * Окно «Кто не сдал» (plan/done/teacher_cabinet.md, Teacher 23; макет 12а) — правила и тексты,
  * общие для RN-окна и Swift-окна (NotSubmittedSheet.swift).
  */
 import type { HomeworkStatusData, HomeworkStudentRow } from '@/services/homework';

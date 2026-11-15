@@ -119,7 +119,7 @@ export async function finishParticipantEarly(sql, participantId, reason) {
 }
 
 /**
- * Ответы сессии по словам (plan/new/teacher_cabinet.md, Teacher 35): сколько ответов и сколько
+ * Ответы сессии по словам (plan/done/teacher_cabinet.md, Teacher 35): сколько ответов и сколько
  * верных. У теста по списку слов (cardIds) в ответе все слова списка, даже без ответов.
  */
 export async function sessionCardStats(sql, sessionId, cardIds) {

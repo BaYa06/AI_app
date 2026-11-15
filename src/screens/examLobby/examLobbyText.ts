@@ -1,5 +1,5 @@
 /**
- * Подписи настройки живого теста (plan/new/teacher_cabinet.md, Teacher 39): обычный тест,
+ * Подписи настройки живого теста (plan/done/teacher_cabinet.md, Teacher 39): обычный тест,
  * разминка по трудным словам и «Проверить на уроке» по словам задания.
  */
 import { pluralize } from '@/utils';

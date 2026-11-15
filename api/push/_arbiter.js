@@ -159,7 +159,7 @@ async function sendClassPrep(sql, { dryRun }) {
 const HOMEWORK_DUE_FROM_HOUR = 19;
 
 /**
- * «Завтра срок» по заданию учителя (plan/new/teacher_cabinet.md, Teacher 29): вечером накануне срока
+ * «Завтра срок» по заданию учителя (plan/done/teacher_cabinet.md, Teacher 29): вечером накануне срока
  * (с 19:00 до тихих часов по поясу ученика), только кому задание выдано и кто ещё не сдал. Один такой
  * пуш на задание (push_log.payload.homeworkId). Засчитаны все слова, но не хватает оценки — тоже шлём.
  */

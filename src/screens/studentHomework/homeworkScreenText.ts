@@ -1,5 +1,5 @@
 /**
- * Экран задания ученика (plan/new/teacher_cabinet.md, Teacher 27; макет У3) — подписи и кнопки.
+ * Экран задания ученика (plan/done/teacher_cabinet.md, Teacher 27; макет У3) — подписи и кнопки.
  * Без RN, чтобы проверять тестами.
  */
 import {

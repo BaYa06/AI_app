@@ -1,4 +1,4 @@
-/** Подготовка к уроку (plan/new/teacher_cabinet.md, этап 3): запросы api/teacher.js. */
+/** Подготовка к уроку (plan/done/teacher_cabinet.md, этап 3): запросы api/teacher.js. */
 import { callTeacherApi } from './core';
 import type { HardCard, SetStudent } from '../lessonPrep';
 import type { TeacherNotification } from '../teacherNotifications';

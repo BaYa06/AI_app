@@ -1,5 +1,5 @@
 /**
- * Окно «Новый курс» учителя (plan/new/teacher_cabinet.md, Teacher 6–7).
+ * Окно «Новый курс» учителя (plan/done/teacher_cabinet.md, Teacher 6–7).
  * iOS — нативное окно на Swift (nativeNewCourseSheet.ts), Android и веб — RN-окно ниже.
  * Оба вызывают одну логику createCourseWithSetup и берут тексты из NEW_COURSE_TEXTS.
  *

@@ -1,5 +1,5 @@
 /**
- * homeworkStore.reportSession (plan/new/teacher_cabinet.md, Teacher 30): без флага заданий
+ * homeworkStore.reportSession (plan/done/teacher_cabinet.md, Teacher 30): без флага заданий
  * итог сессии в очередь не ставится — старый сервер не знает session-complete.
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';

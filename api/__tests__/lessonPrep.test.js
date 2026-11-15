@@ -1,5 +1,5 @@
 /**
- * Подготовка к уроку, сервер (plan/new/teacher_cabinet.md, этап 3). SQL не выполняется (подставной
+ * Подготовка к уроку, сервер (plan/done/teacher_cabinet.md, этап 3). SQL не выполняется (подставной
  * `sql`, как в homework.test.js) — проверяем код вокруг: права, границы параметров, форму ответа.
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';

@@ -2,7 +2,7 @@
  * CourseScheduleSheet — «Расписание занятий» курса для учителя (plan/new/push_notifications.md, 2.8)
  * @description Учитель указывает дни и время один раз — ученики курса получают «Скоро занятие:
  * повтори N слов курса» за 1–2 часа до начала. Одно время на все выбранные дни (так у большинства групп).
- * Teacher 11 (plan/new/teacher_cabinet.md): на iOS — нативный лист (ScheduleSheet.swift,
+ * Teacher 11 (plan/done/teacher_cabinet.md): на iOS — нативный лист (ScheduleSheet.swift,
  * nativeScheduleSheet.ts), здесь — Android и веб. Время, тексты и сохранение — courseSchedule.ts.
  */
 import React, { useEffect, useState } from 'react';

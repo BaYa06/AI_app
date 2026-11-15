@@ -51,7 +51,7 @@ export const SUPPORT_MIN_APP_VERSION = '1.6.10';
 const SUPPORT_BODY_MAX = 120;
 
 /**
- * Первая версия приложения с экраном задания (plan/new/teacher_cabinet.md, Teacher 27) — тап по пушу
+ * Первая версия приложения с экраном задания (plan/done/teacher_cabinet.md, Teacher 27) — тап по пушу
  * задания ведёт туда; на старые версии такие пуши не шлём. Поднять, если этап 2 выйдет позже.
  */
 export const HOMEWORK_MIN_APP_VERSION = '1.8.9';
@@ -68,7 +68,7 @@ function excerpt(text, max) {
 }
 
 /**
- * Первая версия приложения с экранами учителя, куда ведут его пуши (plan/new/teacher_cabinet.md,
+ * Первая версия приложения с экранами учителя, куда ведут его пуши (plan/done/teacher_cabinet.md,
  * этап 4): «Перед уроком», колокольчик, экран ученика. Поднять, если этап 4 выйдет позже.
  */
 export const TEACHER_PUSH_MIN_APP_VERSION = '1.8.10';
@@ -135,7 +135,7 @@ export const PUSH_TYPES = {
       }),
     ],
   },
-  // Задания учителя (plan/new/teacher_cabinet.md, Teacher 15 и 29): при выдаче, вечером накануне
+  // Задания учителя (plan/done/teacher_cabinet.md, Teacher 15 и 29): при выдаче, вечером накануне
   // срока (если не сдано) и «Напомнить» учителя. Тап — экран задания.
   homework_assigned: {
     category: 'course',
@@ -499,7 +499,7 @@ export const PUSH_TYPES = {
       }),
     ],
   },
-  // ── Пуши учителю (plan/new/teacher_cabinet.md, этап 4). Отправляет api/push/_teacher.js, не арбитр:
+  // ── Пуши учителю (plan/done/teacher_cabinet.md, этап 4). Отправляет api/push/_teacher.js, не арбитр:
   // свой лимит (2 в день), тихие часы по поясу курса, запись в журнал остаётся для колокольчика.
   // П1 «Урок через 2 часа» (Teacher 46): цифры задания или готовности + 2–3 трудных слова.
   teacher_lesson_soon: {

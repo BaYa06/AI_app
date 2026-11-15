@@ -1,6 +1,6 @@
 //
 //  NewCourseSheet.swift
-//  Нативное окно «Новый курс» учителя (plan/new/teacher_cabinet.md, Teacher 7).
+//  Нативное окно «Новый курс» учителя (plan/done/teacher_cabinet.md, Teacher 7).
 //
 //  Повторяет RN-окно src/components/teacher/NewCourseSheet.tsx: название, учебник, дни уроков и время.
 //  Лист показывает UISheetPresentationController, как шторку режимов (StudyModeSheet.swift).

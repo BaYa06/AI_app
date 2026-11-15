@@ -1,5 +1,5 @@
 /**
- * Экран сдачи задания (plan/new/teacher_cabinet.md, Teacher 21; макет 12) — чистые правила.
+ * Экран сдачи задания (plan/done/teacher_cabinet.md, Teacher 21; макет 12) — чистые правила.
  * Статусы считает сервер (homework-status); здесь — порядок, подписи и кому напомнить.
  */
 import type { HomeworkStatusData, HomeworkStudentRow } from '@/services/homework';

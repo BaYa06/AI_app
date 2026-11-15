@@ -1,5 +1,5 @@
 /**
- * Экран сдачи задания учителя (plan/new/teacher_cabinet.md, Teacher 21; макет 12).
+ * Экран сдачи задания учителя (plan/done/teacher_cabinet.md, Teacher 21; макет 12).
  * Кольцо «сдали / в процессе / не начали», срок, список учеников со статусами и оценкой,
  * «закреплено» (через 7 дней), «Напомнить N». Нажатие на ученика → StudentDetail.
  * Правила — teacherHomework/homeworkStatus.ts.

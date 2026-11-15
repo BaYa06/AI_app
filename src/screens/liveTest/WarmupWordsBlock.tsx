@@ -1,5 +1,5 @@
 /**
- * Блок «Слова» в мониторе живого теста по списку слов (plan/new/teacher_cabinet.md, Teacher 40):
+ * Блок «Слова» в мониторе живого теста по списку слов (plan/done/teacher_cabinet.md, Teacher 40):
  * доля верных по каждому слову по мере ответов и «Ещё не ответил». Данные — monitor.byCard.
  */
 import React from 'react';

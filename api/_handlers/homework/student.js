@@ -1,5 +1,5 @@
 /**
- * api/progress.js — задания глазами ученика (plan/new/teacher_cabinet.md, Teacher 16).
+ * api/progress.js — задания глазами ученика (plan/done/teacher_cabinet.md, Teacher 16).
  *
  * GET  my-homework       — задания ученика: несданные (в т.ч. просроченные — сдать можно позже)
  *                          и сданные за последние 3 дня; ближайшие по сроку первыми.

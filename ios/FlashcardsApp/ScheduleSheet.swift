@@ -1,6 +1,6 @@
 //
 //  ScheduleSheet.swift
-//  Нативный лист «Расписание занятий» курса (plan/new/teacher_cabinet.md, Teacher 11).
+//  Нативный лист «Расписание занятий» курса (plan/done/teacher_cabinet.md, Teacher 11).
 //
 //  Повторяет RN-окно src/components/push/CourseScheduleSheet.tsx: дни занятий, время начала
 //  со стрелками ±15 минут, «Сохранить». Лист — UISheetPresentationController, как шторка режимов.

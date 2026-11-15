@@ -1,5 +1,5 @@
 /**
- * api/teacher.js — отчёты учителя (plan/new/teacher_cabinet.md, Teacher 53–54): превью, ссылка
+ * api/teacher.js — отчёты учителя (plan/done/teacher_cabinet.md, Teacher 53–54): превью, ссылка
  * `/r/<код>` на сохранённый снимок, отзыв ссылки, PDF.
  */
 import {

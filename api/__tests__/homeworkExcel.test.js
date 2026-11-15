@@ -1,5 +1,5 @@
 /**
- * «Оценки в Excel» (plan/new/teacher_cabinet.md, Teacher 22): файл собирается настоящим exceljs,
+ * «Оценки в Excel» (plan/done/teacher_cabinet.md, Teacher 22): файл собирается настоящим exceljs,
  * даты — в поясе курса, порядок строк как на экране сдачи.
  */
 import { describe, expect, it } from '@jest/globals';

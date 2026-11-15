@@ -1,5 +1,5 @@
 /**
- * Барабан срока задания «день · часы · минуты» (plan/new/teacher_cabinet.md, решение 3 этапа 2)
+ * Барабан срока задания «день · часы · минуты» (plan/done/teacher_cabinet.md, решение 3 этапа 2)
  * для Android и веба. На iOS — системный SwiftUI DatePicker(.wheel) в Swift-окне (Teacher 20).
  *
  * Колонка — ScrollView с привязкой к строке; строки вокруг центра наклоняются (rotateX), бледнеют

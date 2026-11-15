@@ -1,5 +1,5 @@
 /**
- * Нативный лист «Код подключения к курсу» на iOS (plan/new/teacher_cabinet.md, Teacher 10) —
+ * Нативный лист «Код подключения к курсу» на iOS (plan/done/teacher_cabinet.md, Teacher 10) —
  * ios/FlashcardsApp/JoinCodeSheet.swift. Данные и действия — useCourseJoinCode (общие с RN-окном):
  * JS присылает состояние в update(), Swift — нажатия событиями copy / share / regenerate / dismiss.
  * «Обновить код?» Swift подтверждает системным алертом — RN-окно под нативным листом не видно.

@@ -1,5 +1,5 @@
 /**
- * Сессия по словам задания учителя (plan/new/teacher_cabinet.md, Teacher 26–27).
+ * Сессия по словам задания учителя (plan/done/teacher_cabinet.md, Teacher 26–27).
  * План — buildHomeworkSessionPlan (без дневного лимита новых, решение 1), этапы — как у сессии
  * набора («Изучить» / «Повторить»). Законченная сессия засчитывает слова сама (StudyResults →
  * homeworkStore.reportSession), отдельной логики сдачи здесь нет.

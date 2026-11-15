@@ -1,5 +1,5 @@
 /**
- * Нативный лист «Расписание занятий» на iOS (plan/new/teacher_cabinet.md, Teacher 11) —
+ * Нативный лист «Расписание занятий» на iOS (plan/done/teacher_cabinet.md, Teacher 11) —
  * ios/FlashcardsApp/ScheduleSheet.swift. Лист открывается сразу, расписание приходит в него
  * через setLoaded. «Сохранить» → JS сохраняет → finish → тост, когда лист уже закрылся.
  * Ошибку сохранения показывает сам лист (тост под ним не виден).

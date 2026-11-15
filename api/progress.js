@@ -25,7 +25,7 @@ import { myHomework, sessionComplete } from './_handlers/homework/student.js';
  * GET  /api/progress?action=leaderboard&courseId=…&week=current|previous — рейтинг курса (этап 2)
  * POST /api/progress?action=rating-enabled  { courseId, enabled }  — учитель включает/выключает рейтинг
  * POST /api/progress?action=hide-me         { courseId, hidden }   — только вернуться в рейтинг (скрываться нельзя)
- * GET  /api/progress?action=my-homework       — задания ученика (plan/new/teacher_cabinet.md, Teacher 16)
+ * GET  /api/progress?action=my-homework       — задания ученика (plan/done/teacher_cabinet.md, Teacher 16)
  * POST /api/progress?action=session-complete  { cards: [{ cardId, firstTry }] } — после законченной
  *                                              сессии: зачёт слов заданий, снимок сдачи, +20 алмазов
  * GET  /api/progress?action=close-week      — Vercel Cron (Authorization: Bearer CRON_SECRET):

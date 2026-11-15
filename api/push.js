@@ -264,7 +264,7 @@ export default async function handler(req, res) {
       const daily = !dryRun && now.getUTCHours() === 0 && now.getUTCMinutes() < 15;
       const habits = daily || req.query.habits === '1' ? await recomputeHabits(sql) : undefined;
       const result = await runArbiter(sql, { dryRun });
-      // Уведомления учителям (plan/new/teacher_cabinet.md, этап 4) — после учеников и отдельно:
+      // Уведомления учителям (plan/done/teacher_cabinet.md, этап 4) — после учеников и отдельно:
       // их сбой не должен ронять основную рассылку. В пробном прогоне не запускаем.
       if (!dryRun) {
         try {

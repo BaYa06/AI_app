@@ -1,5 +1,5 @@
 /**
- * Колокольчик учителя (plan/new/teacher_cabinet.md, Teacher 49): записи журнала уведомлений,
+ * Колокольчик учителя (plan/done/teacher_cabinet.md, Teacher 49): записи журнала уведомлений,
  * куда ведёт тап и подпись времени. Без RN — проверяется тестами.
  * Ссылки — те же flashly://, что уходят в пушах (api/push/_registry.js, teacherLink).
  */

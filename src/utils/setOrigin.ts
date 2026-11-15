@@ -1,5 +1,5 @@
 /**
- * Откуда набор (plan/new/teacher_cabinet.md, Teacher 31): значок в строке набора вместо даты.
+ * Откуда набор (plan/done/teacher_cabinet.md, Teacher 31): значок в строке набора вместо даты.
  * Учебник — по isOfficial; остальное — поле origin; старые наборы без origin — общий значок.
  */
 import type { CardSet, SetOrigin } from '@/types';
