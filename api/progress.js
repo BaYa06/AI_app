@@ -5,6 +5,7 @@ import { HttpError, UUID_RE, uuid, assertReadableSet } from './_access.js';
 import { courseSetIdsSql } from './_course.js';
 import { log } from './_log.js';
 import { myHomework, sessionComplete } from './_handlers/homework/student.js';
+import { countDayFromAnswers } from './_handlers/data/streak.js';
 
 /**
  * Прогресс по карточкам — единственное место, где меняется уровень карточки.
@@ -333,6 +334,15 @@ async function submitAnswers(sql, me, body) {
       lastReviewed: state?.lastReviewed ?? null,
       points: outcome.points ?? 0,
     });
+  }
+  // День в серию засчитывает сервер, как только ответов хватает (plan/new/streak_freeze_display.md,
+  // Freeze 2): итоги клиента при закрытии вкладки не доходят. Сбой серии не отменяет ответы.
+  if (results.some((r) => r.status === 'ok')) {
+    try {
+      await countDayFromAnswers(sql, me);
+    } catch (e) {
+      log.error('progress', 'count streak day failed', e);
+    }
   }
   return { results };
 }

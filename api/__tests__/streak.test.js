@@ -16,10 +16,17 @@ function mockSql(strings, ...values) {
 }
 
 jest.mock('../_log.js', () => ({
-  log: { error: () => {}, warn: () => {}, info: () => {}, debug: () => {} },
+  log: {
+    error: (_scope, msg) => mockLogErrors.push(msg),
+    warn: () => {},
+    info: () => {},
+    debug: () => {},
+  },
 }));
-const mockPush = jest.fn(async () => {});
-jest.mock('../push.js', () => ({ sendNotification: (...a) => mockPush(...a) }));
+// push.js грузится через import(): в jest без --experimental-vm-modules он падает, и sendPush
+// пишет «push <type> failed». По этим строкам и считаем, какие пуши сервер пытался отправить.
+let mockLogErrors = [];
+const pushes = () => mockLogErrors.map((m) => /^push (\w+) failed$/.exec(m)?.[1]).filter(Boolean);
 
 const {
   updateUserStatsStreak,
@@ -50,7 +57,7 @@ const markQueries = () =>
 beforeEach(() => {
   mockQueries = [];
   mockRules = [];
-  mockPush.mockClear();
+  mockLogErrors = [];
 });
 
 describe('updateUserStatsStreak — отметка засчитанного дня', () => {
@@ -58,7 +65,11 @@ describe('updateUserStatsStreak — отметка засчитанного дн
     updateUserStatsStreak(mockSql, ME, { localDate: TODAY, yesterdayDate: YESTERDAY, deltas: {} });
 
   it('день засчитан → streak_counted за сегодня', async () => {
-    mockRules = [stats(), day(COUNTED)];
+    mockRules = [
+      stats(),
+      day(COUNTED),
+      [/UPDATE user_stats SET current_streak/, () => [{ current_streak: 5 }]],
+    ];
     const res = await call();
     expect(res).toMatchObject({ counted: true, increased: true, currentStreak: 5 });
     const marks = markQueries();
@@ -80,7 +91,7 @@ describe('updateUserStatsStreak — отметка засчитанного дн
     const res = await call();
     expect(res).toMatchObject({ counted: true, increased: false, currentStreak: 5 });
     expect(markQueries()).toHaveLength(1);
-    expect(mockPush).not.toHaveBeenCalled();
+    expect(pushes()).toEqual([]);
   });
 });
 
@@ -132,5 +143,98 @@ describe('getWeekActivity', () => {
   it('отдаёт streak_counted и frozen', async () => {
     await getWeekActivity(mockSql, ME, { days: 7 });
     expect(mockQueries[0].text).toMatch(/streak_counted, frozen/);
+  });
+});
+
+describe('countDayFromAnswers — сервер засчитывает день сам (Freeze 2)', () => {
+  const { countDayFromAnswers } = require('../_handlers/data/streak.js');
+  const me = (over = {}) => [
+    /FROM users u LEFT JOIN user_stats us/,
+    () => [
+      {
+        has_stats: true,
+        current_streak: 4,
+        longest_streak: 9,
+        last_active_date: YESTERDAY,
+        timezone: 'UTC',
+        streak_freezes: 1,
+        ...over,
+      },
+    ],
+  ];
+  const advance = (ok = true) => [
+    /UPDATE user_stats SET current_streak/,
+    () => (ok ? [{ current_streak: 5 }] : []),
+  ];
+
+  it('ответов хватает, итогов клиента нет → день засчитан, серия +1', async () => {
+    mockRules = [me(), day(COUNTED), advance()];
+    const res = await countDayFromAnswers(mockSql, ME);
+    expect(res).toMatchObject({ counted: true, increased: true, currentStreak: 5 });
+    const upd = mockQueries.find((q) => /UPDATE user_stats SET current_streak/.test(q.text));
+    // Сравнить-и-заменить: только если last_active_date всё ещё вчерашний
+    expect(upd.text).toMatch(/last_active_date IS NOT DISTINCT FROM/);
+    expect(upd.values).toContain(YESTERDAY);
+    expect(markQueries()).toHaveLength(1);
+  });
+
+  it('день уже засчитан → один запрос, ничего не меняется', async () => {
+    mockRules = [me({ last_active_date: TODAY })];
+    expect(await countDayFromAnswers(mockSql, ME)).toBeNull();
+    expect(mockQueries).toHaveLength(1);
+  });
+
+  it('ответов мало → серия не трогается', async () => {
+    mockRules = [me(), day(NOT_COUNTED)];
+    expect(await countDayFromAnswers(mockSql, ME)).toEqual({ counted: false });
+    expect(mockQueries.some((q) => /UPDATE user_stats/.test(q.text))).toBe(false);
+  });
+
+  it('разрыв в день и есть заморозка → она тратится, серия продолжается', async () => {
+    mockRules = [
+      me({ last_active_date: dayKey(-2) }),
+      day(COUNTED),
+      [/WITH f AS/, () => [{ left: 0 }]],
+      advance(),
+    ];
+    const res = await countDayFromAnswers(mockSql, ME);
+    expect(res).toMatchObject({ counted: true, freezeUsed: true, currentStreak: 5 });
+    const upd = mockQueries.find((q) => /UPDATE user_stats SET current_streak/.test(q.text));
+    expect(upd.values).toContain(YESTERDAY); // после заморозки последний день — вчера
+  });
+
+  it('гонка: итоги клиента успели первыми → серия не растёт второй раз, пуша нет', async () => {
+    mockRules = [
+      me({ current_streak: 6, last_active_date: YESTERDAY }),
+      day(COUNTED),
+      advance(false),
+      [
+        /SELECT current_streak, longest_streak FROM user_stats/,
+        () => [{ current_streak: 7, longest_streak: 9 }],
+      ],
+    ];
+    const res = await countDayFromAnswers(mockSql, ME);
+    expect(res).toMatchObject({ counted: true, increased: false, currentStreak: 7 });
+    expect(pushes()).toEqual([]);
+  });
+
+  it('серия дошла до 7 → пуш streak_milestone один раз', async () => {
+    mockRules = [me({ current_streak: 6 }), day(COUNTED), advance()];
+    await countDayFromAnswers(mockSql, ME);
+    expect(pushes()).toEqual(['streak_milestone']);
+  });
+
+  it('затем итоги клиента: серия та же, только итоги', async () => {
+    mockRules = [stats({ current_streak: 5, last_active_date: TODAY }), day(COUNTED)];
+    const res = await updateUserStatsStreak(mockSql, ME, {
+      localDate: TODAY,
+      yesterdayDate: YESTERDAY,
+      deltas: { cardsDelta: 20 },
+    });
+    expect(res).toMatchObject({ counted: true, increased: false, currentStreak: 5 });
+    expect(mockQueries.some((q) => /UPDATE user_stats SET current_streak/.test(q.text))).toBe(
+      false
+    );
+    expect(mockQueries.some((q) => /total_cards_studied/.test(q.text))).toBe(true);
   });
 });
