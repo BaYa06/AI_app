@@ -1,5 +1,5 @@
 /**
- * Какая версия приложения последняя (plan/new/app_update_prompt.md, Update 1).
+ * Какая версия приложения последняя (plan/done/app_update_prompt.md, Update 1).
  *
  * Читает приложение — GET /api/data?action=app-version&platform=ios, без входа и с кэшем на CDN:
  * ответ одинаков для всех. Решает, показывать ли окно «Вышла новая версия», само приложение

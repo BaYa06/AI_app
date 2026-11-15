@@ -1,5 +1,5 @@
 /**
- * Нативная шторка «Вышла новая версия» на iOS (plan/new/app_update_prompt.md, шаг Update 3).
+ * Нативная шторка «Вышла новая версия» на iOS (plan/done/app_update_prompt.md, шаг Update 3).
  *
  * Лист показывает система (UISheetPresentationController) — ios/FlashcardsApp/AppUpdateSheet.swift.
  * Какое окно и когда, решает JS (src/services/appUpdate.ts), Swift только рисует.

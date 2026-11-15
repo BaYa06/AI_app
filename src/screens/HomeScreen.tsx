@@ -950,7 +950,7 @@ export function HomeScreen({ navigation, route }: any) {
     leaveModalCourseId !== null ||
     inviteModalCourseId !== null;
 
-  // «Вышла новая версия» (plan/new/app_update_prompt.md, Update 4) — до «Что нового»: его эффект
+  // «Вышла новая версия» (plan/done/app_update_prompt.md, Update 4) — до «Что нового»: его эффект
   // занимает очередь первым, и «Что нового» не откроется раньше
   useAppUpdateOnHome({ ready: isTeacher !== null, blocked: homeOverlayOpen });
 

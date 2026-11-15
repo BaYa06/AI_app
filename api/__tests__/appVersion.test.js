@@ -1,5 +1,5 @@
 /**
- * Последняя версия в магазине (plan/new/app_update_prompt.md, Update 1).
+ * Последняя версия в магазине (plan/done/app_update_prompt.md, Update 1).
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { getAppVersion, normVersion, parseLookup, resetAppVersionCache } from '../_appVersion.js';

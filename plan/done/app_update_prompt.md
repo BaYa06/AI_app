@@ -86,7 +86,7 @@ plan/new/release_safety.md.
 
 ---
 
-## Update 1 — сервер: какая версия последняя ✅ (код) / ⬜ (проверка на staging)
+## Update 1 — сервер: какая версия последняя ✅
 - `api/data.js?action=app-version&platform=ios` (новым файлом не делаем: функций Vercel и так
   много). Ответ: `{ latest, releasedAt, minVersion, storeUrl }`.
 - `latest`, `releasedAt` — из iTunes lookup, кэш в памяти функции на 1 час
@@ -104,7 +104,7 @@ plan/new/release_safety.md.
 - Apple не ответил (тайм-аут 5 с) и запасного ответа нет → `latest: null`, CDN кэширует это на
   60 с, а не на час. Повторно спрашиваем Apple не раньше чем через 5 минут.
 - Android и веб → все поля `null`, Apple не спрашиваем. Другая платформа → 400.
-- ⬜ После push в `dev`: `curl "https://ai-app-git-dev-baya06s-projects.vercel.app/api/data?action=app-version&platform=ios"`.
+- ✅ (15.11.2026) staging отдаёт `latest: 1.8.6` от 10.11.2026: `curl "https://ai-app-git-dev-baya06s-projects.vercel.app/api/data?action=app-version&platform=ios"`.
 
 ## Update 2 — правила в JS ✅
 - `src/services/appUpdate.ts`: `decideUpdatePrompt(ctx) → 'none' | 'soft' | 'force'`.
@@ -125,7 +125,7 @@ plan/new/release_safety.md.
 - **Кривые версии** (в ответе или у самого приложения) — окна нет: лучше не показать, чем запереть
   приложение. Ссылка на магазин принимается только `https://apps.apple.com/…`.
 
-## Update 3 — Swift-шторка ✅ (код) / ⬜ (проверка в TestFlight)
+## Update 3 — Swift-шторка ✅
 - `ios/FlashcardsApp/AppUpdateSheet.swift` + `.m` по образцу `WhatsNewSheet`. Вход:
   `{ variant, current, latest }`. События в JS: `update`, `later`, `dismiss`.
 - Внешний вид — по таблице выше, обе темы.
@@ -144,7 +144,7 @@ JS-обёртка src/components/appUpdate/nativeAppUpdateSheet.ts (`useNativeAp
 - Проверено без сборки: `swiftc -parse` и `-typecheck` против iOS SDK 15.1 и 16.0 с заглушками
   React Native; `xcodebuild -list` читает проект. Как выглядит на устройстве — только TestFlight.
 
-## Update 4 — подключение ✅ (код) / ⬜ (проверка в TestFlight Staging)
+## Update 4 — подключение ✅
 - Проверка при запуске и при возврате из фона (`AppState`), владелец `appUpdate` в `modalGate`
   с приоритетами из пункта 6.
 - «Что нового» не открывается в запуске, где показано мягкое окно.
@@ -169,7 +169,7 @@ JS-обёртка src/components/appUpdate/nativeAppUpdateSheet.ts (`useNativeAp
   неизвестна, поэтому 3 дня тишины не действуют — окно сразу. Для обязательного —
   `APP_MIN_VERSION_IOS=9.9.9`. После проверки обе переменные убрать.
 
-## Update 5 — замеры и Release 5 ⬜
+## Update 5 — замеры и Release 5 ⬜ (не делали: план закрыт 15.11.2026 без замеров)
 - События: `update_prompt_shown { variant }`, `update_prompt_update`, `update_prompt_later`.
 - Метрика: доля активных за неделю на последней версии (`push_tokens.app_version`) до и после.
   Сейчас переход на новую версию идёт только через автообновление.

@@ -184,7 +184,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
-  // Последняя версия в магазине (plan/new/app_update_prompt.md, Update 1) — тоже без входа и без БД:
+  // Последняя версия в магазине (plan/done/app_update_prompt.md, Update 1) — тоже без входа и без БД:
   // окно «Обязательно обновить» должно работать даже тогда, когда вход сломан
   if (action === 'app-version') {
     if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
