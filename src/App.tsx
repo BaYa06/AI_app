@@ -32,6 +32,7 @@ import { useCourseRealtime } from '@/hooks/useCourseRealtime';
 import { StorageService } from '@/services/StorageService';
 import { CACHE_OWNER_KEY } from '@/services/DatabaseService';
 import { issueStarterSet, putStarterSetInStores } from '@/services/starterSetIssue';
+import { setWantsTeacher } from '@/services/joinTeacherCard';
 import type { StarterSet } from '@/services/StarterSetService';
 import { initCrashReporting, setCrashUserId } from '@/services/crashReporting';
 import {
@@ -685,9 +686,19 @@ export default function App() {
       useSettingsStore.getState().updateSettings({ lessonNewPerDay: perDay });
       DatabaseService.saveSettings();
     }
-    // Дальше — необязательные «Ещё два вопроса» для напоминаний (plan/new/push_notifications.md, 2.7)
+    // Дальше — «Ты учишься с учителем?» (Start 3.6), потом необязательные «Ещё два вопроса»
+    // для напоминаний (plan/new/push_notifications.md, 2.7)
     setOnboardingData((prev) => ({ ...prev, dailyGoal: dailyId }));
+    setAuthStep('with_teacher');
+  }, []);
+
+  const handleSubmitWithTeacher = useCallback((withTeacher?: boolean) => {
+    if (withTeacher !== undefined) setWantsTeacher(withTeacher);
     setAuthStep('about');
+  }, []);
+
+  const handleBackToWithTeacher = useCallback(() => {
+    setAuthStep('with_teacher');
   }, []);
 
   const handleBackToDaily = useCallback(() => {
@@ -811,6 +822,8 @@ export default function App() {
           onFirstCardsDone={handleFirstCardsDone}
           onFirstMatchDone={handleFirstMatchDone}
           onFirstResultsDone={handleFirstResultsDone}
+          onSubmitWithTeacher={handleSubmitWithTeacher}
+          onBackToWithTeacher={handleBackToWithTeacher}
           targetLanguages={onboardingData.targetLanguages}
           onSubmitGoal={handleSubmitGoal}
           onSubmitDaily={handleSubmitDaily}

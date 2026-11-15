@@ -145,6 +145,8 @@ import { SetsSectionHeader } from './home/components/SetsSectionHeader';
 import { HomeHeader } from './home/components/HomeHeader';
 import { useStartTasks } from './home/useStartTasks';
 import { StartTasksStack } from '@/components/home/StartTasksStack';
+import { JoinTeacherCard } from '@/components/home/JoinTeacherCard';
+import { closeJoinTeacherCard, shouldShowJoinTeacherCard } from '@/services/joinTeacherCard';
 import { WidgetHowToSheet } from '@/components/widget/WidgetHowToSheet';
 import { TeacherBanner } from './home/components/TeacherBanner';
 import { TeacherLessonCard } from './home/components/TeacherLessonCard';
@@ -1206,6 +1208,13 @@ export function HomeScreen({ navigation, route }: any) {
     [navigation, filteredSets]
   );
 
+  // «Подключиться к учителю» (Start 3.6): ответил «Да» на онбординге и ещё не в курсе учителя
+  const [joinCardClosed, setJoinCardClosed] = useState(false);
+  const showJoinTeacher =
+    isTeacher === false &&
+    !joinCardClosed &&
+    shouldShowJoinTeacherCard(courses.some((c) => c.isStudentCourse));
+
   // «Начало пути» — только у ученика (plan/new/new_user_activation.md, Start 3.2)
   const playStartTaskReward = useCallback((from: { x: number; y: number }) => {
     diamondRewardRef.current?.collect(from);
@@ -1915,6 +1924,17 @@ export function HomeScreen({ navigation, route }: any) {
                         <PushStreakNudge
                           permission={pushNudgePermission}
                           onClose={() => setPushNudgeClosed(true)}
+                        />
+                      </View>
+                    )}
+                    {showJoinTeacher && (
+                      <View style={styles.startTasks}>
+                        <JoinTeacherCard
+                          onJoin={() => setJoinByCodeVisible(true)}
+                          onClose={() => {
+                            closeJoinTeacherCard();
+                            setJoinCardClosed(true);
+                          }}
                         />
                       </View>
                     )}

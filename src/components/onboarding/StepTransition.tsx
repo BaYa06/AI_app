@@ -28,6 +28,7 @@ const ORDER = [
   'teacher_size',
   'goal',
   'daily',
+  'with_teacher',
   'about',
 ];
 

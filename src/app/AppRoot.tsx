@@ -21,6 +21,7 @@ import { SharedSetPreviewModal } from '@/components/share/SharedSetPreviewModal'
 import { WelcomeScreen } from '@/screens/WelcomeScreen';
 import { StepTransition } from '@/components/onboarding/StepTransition';
 import { StarterBuildScreen } from '@/screens/firstLesson/StarterBuildScreen';
+import { WithTeacherScreen } from '@/screens/WithTeacherScreen';
 import { FirstCardsScreen } from '@/screens/firstLesson/FirstCardsScreen';
 import { FirstMatchScreen } from '@/screens/firstLesson/FirstMatchScreen';
 import { FirstResultsScreen } from '@/screens/firstLesson/FirstResultsScreen';
@@ -68,6 +69,7 @@ export type AuthStep =
   | 'first_results'
   | 'goal'
   | 'daily'
+  | 'with_teacher'
   | 'about'
   | 'teacher_subject'
   | 'teacher_size';
@@ -107,6 +109,9 @@ type AppRootProps = {
   onFirstCardsDone: () => void;
   onFirstMatchDone: () => void;
   onFirstResultsDone: () => void;
+  /** «Ты учишься с учителем?» (Start 3.6) */
+  onSubmitWithTeacher: (withTeacher?: boolean) => void;
+  onBackToWithTeacher: () => void;
   targetLanguages?: string[];
   onSubmitGoal: (goalId?: string) => void;
   onSubmitDaily: (dailyId: string) => void;
@@ -155,6 +160,8 @@ export function AppRoot({
   onFirstCardsDone,
   onFirstMatchDone,
   onFirstResultsDone,
+  onSubmitWithTeacher,
+  onBackToWithTeacher,
   targetLanguages,
   onSubmitGoal,
   onSubmitDaily,
@@ -180,7 +187,8 @@ export function AppRoot({
   const teacherTotal = isTeacher ? (nameSkipped ? 5 : 6) : undefined;
   const teacherStep = (studentStep: number) =>
     isTeacher ? studentStep + (nameSkipped ? 0 : 1) : studentStep;
-  const afterLessonTotal = nameSkipped ? 2 : 3;
+  // После урока: имя → цель → норма → «С учителем?» (из 4, без имени — из 3)
+  const afterLessonTotal = nameSkipped ? 3 : 4;
   const inviteOpen = isAuthenticated && !!pendingInviteToken;
   const shareOpen =
     isReady && !!pendingShareCode && (signedIn || (!isAuthenticated && !shareDeferred));
@@ -316,8 +324,15 @@ export function AppRoot({
               step={nameSkipped ? 2 : 3}
               total={afterLessonTotal}
             />
+          ) : authStep === 'with_teacher' ? (
+            <WithTeacherScreen
+              onBack={onBackToDaily}
+              onContinue={onSubmitWithTeacher}
+              step={nameSkipped ? 3 : 4}
+              total={afterLessonTotal}
+            />
           ) : authStep === 'about' ? (
-            <AboutMeOnboardingScreen onBack={onBackToDaily} onContinue={onSubmitAboutMe} />
+            <AboutMeOnboardingScreen onBack={onBackToWithTeacher} onContinue={onSubmitAboutMe} />
           ) : authStep === 'teacher_subject' ? (
             <TeacherSubjectScreen
               onBack={onBackToTargetLanguages}
