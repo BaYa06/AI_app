@@ -27,6 +27,23 @@ export const authEvents = {
   onboardingComplete: () => log('onboarding_complete'),
 
   /**
+   * Новому ученику выдан стартовый набор (plan/new/new_user_activation.md, Start 1.5).
+   * Сколько учеников с набором начали его учить — starter_set_first_answer.
+   */
+  starterSetCreated: (params: { target: string; native: string; theme: string }) =>
+    log('starter_set_created', {
+      target_language: params.target,
+      native_language: params.native,
+      theme: params.theme,
+    }),
+
+  /**
+   * Первый ответ по карточке стартового набора — один раз на устройство.
+   * Funnel: starter_set_created → starter_set_first_answer.
+   */
+  starterSetFirstAnswer: (mode: string) => log('starter_set_first_answer', { mode }),
+
+  /**
    * Юзер вышел из аккаунта.
    */
   logout: () => log('logout'),

@@ -8,6 +8,7 @@ import { v4 as uuid } from 'uuid';
 import type { Card, Rating } from '@/types';
 import { applyAnswer, type AnswerMode } from './SRSService';
 import { SyncQueueService } from './SyncQueueService';
+import { noteStarterSetAnswer } from './starterSetTracking';
 import { useCardsStore, type SubmitAnswerPayload } from '@/store/cardsStore';
 
 /** Сколько раз пробовать отправить ответ — ответы без сети не должны теряться */
@@ -45,5 +46,6 @@ export const ProgressService = {
       timeSpentMs: answer.timeSpentMs,
     };
     SyncQueueService.enqueue('submitAnswer', payload, ANSWER_MAX_RETRIES);
+    noteStarterSetAnswer(card, answer.mode);
   },
 };
