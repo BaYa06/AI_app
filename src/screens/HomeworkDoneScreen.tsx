@@ -37,12 +37,7 @@ export function HomeworkDoneScreen({ navigation, route }: Props) {
   ].filter((x): x is { value: string; label: string; color: string } => !!x);
 
   return (
-    <View
-      style={[
-        st.screen,
-        { backgroundColor: colors.background, paddingTop: insets.top + spacing.xxl },
-      ]}
-    >
+    <View style={[st.screen, { backgroundColor: colors.background, paddingTop: spacing.xxl }]}>
       <ScrollView contentContainerStyle={st.content}>
         <View style={[st.halo, { backgroundColor: alpha(colors.success, 10) }]}>
           <View style={[st.circle, { backgroundColor: colors.gameGreen }]}>

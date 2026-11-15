@@ -9,7 +9,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { ChevronRight, Clock, Target, X, Zap } from 'lucide-react-native';
 import { useCardsStore, useSettingsStore, useThemeColors } from '@/store';
@@ -44,7 +43,6 @@ export function SessionSummary({
 }) {
   const colors = useThemeColors();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const insets = useSafeAreaInsets();
   const bottomInset = useScreenBottomInset();
   const { height } = useWindowDimensions();
   const compact = height < COMPACT_HEIGHT;
@@ -157,10 +155,7 @@ export function SessionSummary({
 
   return (
     <View
-      style={[
-        styles.container,
-        { backgroundColor: colors.background, paddingTop: insets.top + spacing.xs },
-      ]}
+      style={[styles.container, { backgroundColor: colors.background, paddingTop: spacing.xs }]}
     >
       <View style={styles.top}>
         {canContinue ? (

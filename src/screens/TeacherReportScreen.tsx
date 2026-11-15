@@ -115,7 +115,7 @@ export function TeacherReportScreen({ navigation, route }: Props) {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={[st.screen, { backgroundColor: colors.background, paddingTop: insets.top }]}
+      style={[st.screen, { backgroundColor: colors.background }]}
     >
       <ScreenHeader title="Отчёт" onBack={() => navigation.goBack()} />
       <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">

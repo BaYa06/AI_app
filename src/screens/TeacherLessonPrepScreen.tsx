@@ -88,7 +88,7 @@ export function TeacherLessonPrepScreen({ navigation, route }: Props) {
   }, [readiness, courseId]);
 
   return (
-    <View style={[st.screen, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+    <View style={[st.screen, { backgroundColor: colors.background }]}>
       <ScreenHeader
         onBack={() => navigation.goBack()}
         center={

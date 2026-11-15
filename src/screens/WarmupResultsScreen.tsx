@@ -128,7 +128,7 @@ export function WarmupResultsScreen({ navigation, route }: Props) {
   const needHelp = needHelpStudents(data.participants);
 
   return (
-    <View style={[st.screen, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+    <View style={[st.screen, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={st.content}>
         <View style={st.head}>
           <Text variant="caption" color="secondary" style={st.overline}>

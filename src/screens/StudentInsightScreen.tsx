@@ -93,7 +93,7 @@ export function StudentInsightScreen({ navigation, route }: Props) {
   };
 
   return (
-    <View style={[st.screen, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+    <View style={[st.screen, { backgroundColor: colors.background }]}>
       <ScreenHeader onBack={() => navigation.goBack()} title="" />
       {!data ? (
         <View style={st.center}>

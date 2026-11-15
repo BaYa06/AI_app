@@ -169,7 +169,7 @@ export function TeacherHomeworkScreen({ navigation, route }: Props) {
     });
 
   return (
-    <View style={[st.screen, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+    <View style={[st.screen, { backgroundColor: colors.background }]}>
       <ScreenHeader
         onBack={() => navigation.goBack()}
         center={

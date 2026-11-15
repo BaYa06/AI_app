@@ -68,7 +68,7 @@ export function TeacherNotificationsScreen({ navigation }: Props) {
   };
 
   return (
-    <View style={[st.screen, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+    <View style={[st.screen, { backgroundColor: colors.background }]}>
       <ScreenHeader title="Уведомления" onBack={() => navigation.goBack()} />
       {items === null ? (
         <View style={st.center}>

@@ -54,7 +54,7 @@ export function StudentHomeworkScreen({ navigation, route }: Props) {
 
   if (!hw || !lists) {
     return (
-      <View style={[st.screen, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+      <View style={[st.screen, { backgroundColor: colors.background }]}>
         <ScreenHeader title="Задание" onBack={() => navigation.goBack()} />
         <View style={st.center}>
           <Text color="secondary">Задание не найдено — возможно, учитель его отменил</Text>
@@ -93,7 +93,7 @@ export function StudentHomeworkScreen({ navigation, route }: Props) {
   );
 
   return (
-    <View style={[st.screen, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+    <View style={[st.screen, { backgroundColor: colors.background }]}>
       <ScreenHeader
         onBack={() => navigation.goBack()}
         center={
