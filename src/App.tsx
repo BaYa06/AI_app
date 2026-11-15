@@ -599,7 +599,7 @@ export default function App() {
     }));
   }, []);
 
-  const handleSubmitGoal = useCallback((goalId: string) => {
+  const handleSubmitGoal = useCallback((goalId?: string) => {
     setOnboardingData((prev) => ({ ...prev, learningGoal: goalId }));
     setAuthStep('daily');
   }, []);

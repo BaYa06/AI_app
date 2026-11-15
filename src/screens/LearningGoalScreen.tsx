@@ -1,6 +1,7 @@
 /**
  * LearningGoalScreen
- * @description Шаг 4: выбор цели обучения. Только UI, без сохранения.
+ * @description Цель обучения — вопрос после первого урока, можно пропустить
+ * (plan/new/new_user_activation.md, Start 2.6).
  */
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -10,7 +11,7 @@ import { Button, type IconComponent } from '@/components/ui';
 import { OnboardingOption } from '@/components/onboarding/OnboardingOption';
 import { OnboardingStep } from '@/components/onboarding/OnboardingStep';
 import { useThemeColors } from '@/store';
-import { spacing } from '@/constants';
+import { languageAccusative, spacing } from '@/constants';
 
 type GoalOption = {
   id: string;
@@ -23,7 +24,10 @@ type Props = {
   /** Номер шага и сколько всего — считает AppRoot по роли и пути */
   step?: number;
   total?: number;
-  onContinue?: (goalId: string) => void;
+  /** Изучаемый язык — для вопроса «Зачем учишь английский?» */
+  targetLanguage?: string;
+  /** undefined — «Пропустить» */
+  onContinue?: (goalId?: string) => void;
   onBack?: () => void;
 };
 
@@ -44,9 +48,9 @@ const OPTIONS: GoalOption[] = [
   { id: 'self', title: 'Для себя', description: 'Личное развитие и новые хобби', icon: Leaf },
 ];
 
-export function LearningGoalScreen({ onContinue, onBack, step = 5, total }: Props) {
+export function LearningGoalScreen({ onContinue, onBack, step = 5, total, targetLanguage }: Props) {
   const colors = useThemeColors();
-  const [selected, setSelected] = useState<string>('studies');
+  const [selected, setSelected] = useState<string | null>(null);
 
   return (
     <OnboardingStep
@@ -54,11 +58,19 @@ export function LearningGoalScreen({ onContinue, onBack, step = 5, total }: Prop
       title="Flashly"
       step={step}
       total={total}
-      headline="Зачем ты учишь?"
-      description="Мы персонализируем карточки под твои цели."
+      headline={
+        targetLanguage ? `Зачем учишь ${languageAccusative(targetLanguage)}?` : 'Зачем ты учишь?'
+      }
+      description="Подберём следующий набор под цель."
       footer={
         <>
-          <Button title="Продолжить" onPress={() => onContinue?.(selected)} fullWidth />
+          <Button
+            title="Продолжить"
+            onPress={() => selected && onContinue?.(selected)}
+            disabled={!selected}
+            fullWidth
+          />
+          <Button title="Пропустить" variant="quiet" onPress={() => onContinue?.()} fullWidth />
           <Text variant="caption" align="center" style={{ color: colors.textTertiary }}>
             Цель можно поменять в настройках в любой момент
           </Text>

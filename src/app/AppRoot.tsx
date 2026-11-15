@@ -108,7 +108,7 @@ type AppRootProps = {
   onFirstMatchDone: () => void;
   onFirstResultsDone: () => void;
   targetLanguages?: string[];
-  onSubmitGoal: (goalId: string) => void;
+  onSubmitGoal: (goalId?: string) => void;
   onSubmitDaily: (dailyId: string) => void;
   onBackToDaily: () => void;
   onSubmitAboutMe: (answers: AboutMeAnswers) => void;
