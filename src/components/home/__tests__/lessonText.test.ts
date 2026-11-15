@@ -41,6 +41,30 @@ function plan(extra: Partial<LessonPlan>): LessonPlan {
   };
 }
 
+describe('урок дня после первого урока (Start 2.7)', () => {
+  it('часть новых сделана — «5 из 10 · ещё 5 до нормы»', () => {
+    const c = lessonCardContent(
+      plan({ newIds: ids(5, 'n'), doneToday: 5, focusSetTitle: 'Первые слова', minutes: 3 }),
+      opts
+    );
+    expect(c).toMatchObject({
+      overline: 'Урок дня · 5 из 10',
+      title: 'Ещё 5 слов до нормы',
+      meta: 'Следующие слова из набора «Первые слова» · ~3 мин',
+      action: 'Продолжить урок',
+      progress: { done: 5, total: 10 },
+    });
+  });
+
+  it('есть повторение — обычная карточка урока', () => {
+    const c = lessonCardContent(
+      plan({ reviewIds: ids(3), newIds: ids(5, 'n'), doneToday: 5 }),
+      opts
+    );
+    expect(c?.title).toBe('Урок дня');
+  });
+});
+
 describe('тексты урока', () => {
   it('обычный день', () => {
     const p = plan({ reviewIds: ids(10), newIds: ids(10, 'n'), waitingTotal: 10 });

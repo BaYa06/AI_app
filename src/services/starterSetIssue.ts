@@ -9,6 +9,8 @@ import { useCardsStore, useSetsStore } from '@/store';
 import { log } from '@/utils/logger';
 import { Analytics } from './analytics';
 import { DatabaseService } from './DatabaseService';
+import { CACHE_OWNER_KEY } from './localCache';
+import { StorageService } from './StorageService';
 import { NeonService } from './NeonService';
 import { buildStarterSet, type StarterSet } from './StarterSetService';
 import { rememberStarterSet } from './starterSetTracking';
@@ -40,9 +42,14 @@ export async function issueStarterSet(input: IssueStarterSetInput): Promise<Star
   }
 }
 
-/** Положить выданный набор в store (как гостевой импорт, shareImport.ts): на сервере он уже есть */
+/**
+ * Положить выданный набор в store (как гостевой импорт, shareImport.ts): на сервере он уже есть.
+ * Владелец кэша на устройстве — этот пользователь: у нового его ещё нет (ставится после первой
+ * загрузки данных), и без него урок дня не запомнил бы слова первого урока (Start 2.7).
+ */
 export function putStarterSetInStores(starter: StarterSet): void {
   const { set, cards } = starter;
+  StorageService.setString(CACHE_OWNER_KEY, set.userId);
   const setsState = useSetsStore.getState();
   useSetsStore.setState({
     sets: { ...setsState.sets, [set.id]: set },
