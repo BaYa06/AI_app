@@ -89,9 +89,10 @@
   поездки»), по 20 понятий, 10 языков, примеры, чтения для zh/ja/ko, `form` там, где слово
   в примере стоит в другой форме. Тест: все языки заполнены, чтение ровно у zh/ja/ko, пример
   содержит слово или его форму. **Переводы — черновик, до релиза проверить носителем.**
-- ⬜ **Start 1.2** — `src/services/StarterSetService.ts`: `buildStarterSet(native, target, goal)`
-  собирает набор и карточки (название, иконка, `languageFrom`/`languageTo`). Тесты: пары языков,
-  выбор темы по цели, первый язык из нескольких.
+- ✅ **Start 1.2** — `src/services/StarterSetService.ts`: `buildStarterSet({ userId,
+  nativeLanguage, targetLanguages, learningGoal })` собирает набор и карточки (`languageFrom` —
+  изучаемый, `languageTo` — родной, `kind: 'language'`, порядок через `createdAt`); `null`, если
+  собрать не из чего. Тесты: пары языков, тема по цели, первый язык из нескольких, чтение zh/ja/ko.
 - ⬜ **Start 1.3** — создание после онбординга в `finishOnboarding` (App.tsx). Проверить порядок
   с `DatabaseService.reloadRemoteDataForUser`: перезагрузка с сервера не должна затереть только
   что созданный набор (создавать до перезагрузки и дождаться синхронизации, либо создавать на
