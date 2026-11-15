@@ -1,5 +1,5 @@
 /** Профиль, онбординг, обратная связь, удаление аккаунта, стартовая загрузка (Clean 9 — методы NeonService без изменений). */
-import type { CardSet } from '@/types';
+import type { Card, CardSet } from '@/types';
 import {
   type EnsureUserArgs,
   callDataApi,
@@ -197,6 +197,17 @@ export const profileApi = {
     }
   ): Promise<void> {
     await callDataApi('saveOnboardingData', data);
+  },
+
+  /**
+   * Стартовый набор нового ученика (plan/new/new_user_activation.md, Start 1.3). Сервер создаёт его
+   * один раз в жизни аккаунта и не создаёт учителю. null — сеть или ошибка сервера.
+   */
+  async createStarterSet(data: {
+    set: CardSet;
+    cards: Card[];
+  }): Promise<{ created: boolean; setId?: string; reason?: string } | null> {
+    return callDataApi('createStarterSet', data);
   },
 
   /**

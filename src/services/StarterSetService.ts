@@ -22,9 +22,9 @@ export interface StarterSet {
 
 export interface BuildStarterSetInput {
   userId: string;
-  nativeLanguage: string | null | undefined;
+  nativeLanguage?: string | null;
   /** Изучаемые языки из онбординга; набор — только на первом (он же основной) */
-  targetLanguages: readonly string[] | null | undefined;
+  targetLanguages?: readonly string[] | null;
   learningGoal?: string | null;
   now?: number;
   newId?: () => string;

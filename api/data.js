@@ -40,6 +40,7 @@ import {
   bootstrap,
 } from './_handlers/data/profile.js';
 import { loadCourses, createCourse, loadStudentCourses } from './_handlers/data/courses.js';
+import { createStarterSet } from './_handlers/data/starter.js';
 import {
   submitFeedback,
   myFeedback,
@@ -81,6 +82,7 @@ const ACTIONS = {
   updateUserName,
   updateLanguagePreferences,
   saveOnboardingData,
+  createStarterSet,
   getAboutMe,
   saveAboutMe,
   loadSets,

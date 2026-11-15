@@ -31,6 +31,7 @@ import { isAppleUser, takeAppleSignInName } from '@/services/appleSignInName';
 import { useCourseRealtime } from '@/hooks/useCourseRealtime';
 import { StorageService } from '@/services/StorageService';
 import { CACHE_OWNER_KEY } from '@/services/DatabaseService';
+import { issueStarterSet } from '@/services/starterSetIssue';
 import { initCrashReporting, setCrashUserId } from '@/services/crashReporting';
 import {
   refreshPushToken,
@@ -561,6 +562,15 @@ export default function App() {
         classDays: finalData.classDays,
         classHour: finalData.classHour,
       });
+      // Стартовый набор — до перезагрузки данных, иначе она его сотрёт (plan/new/new_user_activation.md, 1.3)
+      if (finalData.role !== 'teacher') {
+        await issueStarterSet({
+          userId: currentUserId,
+          nativeLanguage: finalData.nativeLanguage,
+          targetLanguages: finalData.targetLanguages,
+          learningGoal: finalData.learningGoal,
+        });
+      }
       setNeedsOnboarding(false);
       DatabaseService.reloadRemoteDataForUser(currentUserId);
       setAnalyticsUserId(currentUserId);

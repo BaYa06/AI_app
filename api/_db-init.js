@@ -8,7 +8,7 @@ import { log } from './_log.js';
  */
 // schema_039: в 038 (official_sets_guard) и 039 (set_kind) версию не подняли — миграции не выполнились,
 // и запросы с card_sets.kind падали на тестовом сервере (plan/new/set_kind.md, слабые места)
-const SCHEMA_VERSION = 'schema_047';
+const SCHEMA_VERSION = 'schema_048';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -962,6 +962,16 @@ async function applyMigrations(sql) {
     }
   } catch (e) {
     log.error('db-init', 'Migration 047_streak_day_flags failed', e);
+  }
+
+  // Migration 048: стартовый набор нового ученика выдаётся один раз в жизни аккаунта
+  // (plan/new/new_user_activation.md, Start 1.3). Отметка на сервере: удаление набора,
+  // переустановка и второе устройство второй набор не дают.
+  try {
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS starter_set_id UUID`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS starter_set_issued_at TIMESTAMPTZ`;
+  } catch (e) {
+    log.error('db-init', 'Migration 048_starter_set failed', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)
