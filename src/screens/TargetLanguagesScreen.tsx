@@ -4,12 +4,13 @@
  * Заранее ничего не выбрано; родной язык в списке есть, но неактивен. Первый выбранный —
  * «Основной», на нём будет стартовый набор. Внизу строка-проверка и «Поменять местами».
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Info } from 'lucide-react-native';
 import { Text } from '@/components/common/Text';
 import { Button, toast } from '@/components/ui';
 import { CardPreview } from '@/components/onboarding/CardPreview';
+import { useFlagFlight } from '@/components/onboarding/FlagFlight';
 import { LanguageBridge } from '@/components/onboarding/LanguageBridge';
 import { OnboardingOption } from '@/components/onboarding/OnboardingOption';
 import { OnboardingStep } from '@/components/onboarding/OnboardingStep';
@@ -53,6 +54,17 @@ export function TargetLanguagesScreen({
   );
   const main = selected[0];
 
+  // Место «Хочу выучить» меняется, когда флаг первого выбранного долетит (Start 2.4);
+  // снятие галочки и «Поменять местами» обновляют его сразу
+  const [bridgeTarget, setBridgeTarget] = useState(main);
+  const flying = useRef(false);
+  useEffect(() => {
+    if (!flying.current) setBridgeTarget(main);
+  }, [main]);
+  const tiles = useRef<Record<string, View | null>>({});
+  const slotRef = useRef<View>(null);
+  const { fly, layer } = useFlagFlight();
+
   // Родной — в конце списка и неактивен: видно, куда он делся
   const options = useMemo(
     () => [
@@ -74,6 +86,14 @@ export function TargetLanguagesScreen({
       return;
     }
     setSelected([...selected, code]);
+    if (selected.length === 0) {
+      const flag = TOP_LANGUAGES.find((l) => l.code === code)?.flag ?? '';
+      flying.current = true;
+      fly(tiles.current[code], slotRef.current, flag, () => {
+        flying.current = false;
+        setBridgeTarget(code);
+      });
+    }
   };
 
   const swap = () => {
@@ -89,7 +109,15 @@ export function TargetLanguagesScreen({
       title="Flashly"
       step={step}
       total={total}
-      top={<LanguageBridge native={nativeLanguage} target={main} active="target" />}
+      top={
+        <LanguageBridge
+          native={nativeLanguage}
+          target={bridgeTarget}
+          active="target"
+          targetFlagRef={slotRef}
+        />
+      }
+      overlay={layer}
       headline="Какой язык хочешь выучить?"
       description="Слова в карточках будут на этом языке. Можно выбрать до 3, первый станет основным."
       footer={
@@ -153,6 +181,9 @@ export function TargetLanguagesScreen({
               title={lang.label}
               flag={lang.flag}
               mode="multiple"
+              tileRef={(v) => {
+                tiles.current[lang.code] = v;
+              }}
               badge={main === lang.code ? { text: 'Основной', tone: 'primary' } : undefined}
               selected={selected.includes(lang.code)}
               onPress={() => toggle(lang.code)}

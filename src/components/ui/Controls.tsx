@@ -118,6 +118,9 @@ export interface ProgressBarProps {
   /** Цвет заливки (по умолчанию primary): success, streak и т.п. */
   color?: string;
   animated?: boolean;
+  /** С какого значения расти при animated (по умолчанию 0): полоска шагов онбординга растёт
+   *  от прошлого шага, хотя экран каждого шага новый */
+  from?: number;
   accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
 }
@@ -126,12 +129,13 @@ export const ProgressBar = memo(function ProgressBar({
   progress,
   color,
   animated = true,
+  from = 0,
   accessibilityLabel,
   style,
 }: ProgressBarProps) {
   const colors = useThemeColors();
   const clamped = Math.min(100, Math.max(0, progress));
-  const value = useRef(new Animated.Value(animated ? 0 : clamped)).current;
+  const value = useRef(new Animated.Value(animated ? from : clamped)).current;
 
   useEffect(() => {
     if (!animated) {

@@ -19,6 +19,7 @@ import { borderRadius, iconSize, screenPadding, spacing } from '@/constants';
 import { CourseInviteModal } from '@/components/CourseInviteModal';
 import { SharedSetPreviewModal } from '@/components/share/SharedSetPreviewModal';
 import { WelcomeScreen } from '@/screens/WelcomeScreen';
+import { StepTransition } from '@/components/onboarding/StepTransition';
 import { NameOnboardingScreen } from '@/screens/NameOnboardingScreen';
 import { RoleSelectionScreen } from '@/screens/RoleSelectionScreen';
 import { NativeLanguageScreen } from '@/screens/NativeLanguageScreen';
@@ -220,73 +221,77 @@ export function AppRoot({
         <LoadingSplash />
       ) : isAuthenticated && !needsOnboarding ? (
         <AppNavigator />
-      ) : authStep === 'welcome' ? (
-        <WelcomeScreen isLoading={authLoading} />
-      ) : authStep === 'name' ? (
-        <NameOnboardingScreen
-          onBack={isTeacher ? onBackToRole : undefined}
-          onContinue={onSubmitName}
-          onSkip={onSubmitName}
-          step={isTeacher ? 2 : 1}
-          total={isTeacher ? 6 : 3}
-        />
-      ) : authStep === 'role' ? (
-        <RoleSelectionScreen
-          onBack={onBackToWelcome}
-          onContinue={onSubmitRole}
-          step={1}
-          total={3}
-        />
-      ) : authStep === 'native_language' ? (
-        <NativeLanguageScreen
-          initial={nativeLanguage}
-          onBack={isTeacher && !nameSkipped ? onBackToName : onBackToRole}
-          onContinue={onSubmitNativeLanguage}
-          step={teacherStep(2)}
-          total={teacherTotal ?? 3}
-        />
-      ) : authStep === 'target_languages' ? (
-        <TargetLanguagesScreen
-          nativeLanguage={nativeLanguage}
-          initial={targetLanguages}
-          onSwap={onSwapLanguages}
-          onBack={onBackToNativeLanguage}
-          onContinue={onSubmitTargetLanguages}
-          step={teacherStep(3)}
-          total={teacherTotal ?? 3}
-        />
-      ) : authStep === 'goal' ? (
-        <LearningGoalScreen
-          onBack={nameSkipped ? undefined : onBackToName}
-          onContinue={onSubmitGoal}
-          step={nameSkipped ? 1 : 2}
-          total={afterLessonTotal}
-        />
-      ) : authStep === 'daily' ? (
-        <DailyGoalScreen
-          onBack={onBackToGoal}
-          onContinue={onSubmitDaily}
-          step={nameSkipped ? 2 : 3}
-          total={afterLessonTotal}
-        />
-      ) : authStep === 'about' ? (
-        <AboutMeOnboardingScreen onBack={onBackToDaily} onContinue={onSubmitAboutMe} />
-      ) : authStep === 'teacher_subject' ? (
-        <TeacherSubjectScreen
-          onBack={onBackToTargetLanguages}
-          onContinue={onSubmitTeacherSubject}
-          step={teacherStep(4)}
-          total={teacherTotal}
-        />
-      ) : authStep === 'teacher_size' ? (
-        <TeacherGroupSizeScreen
-          onBack={onBackToTeacherSubject}
-          onContinue={onSubmitTeacherSize}
-          step={teacherStep(5)}
-          total={teacherTotal}
-        />
       ) : (
-        <WelcomeScreen isLoading={authLoading} />
+        <StepTransition step={authStep}>
+          {authStep === 'welcome' ? (
+            <WelcomeScreen isLoading={authLoading} />
+          ) : authStep === 'name' ? (
+            <NameOnboardingScreen
+              onBack={isTeacher ? onBackToRole : undefined}
+              onContinue={onSubmitName}
+              onSkip={onSubmitName}
+              step={isTeacher ? 2 : 1}
+              total={isTeacher ? 6 : 3}
+            />
+          ) : authStep === 'role' ? (
+            <RoleSelectionScreen
+              onBack={onBackToWelcome}
+              onContinue={onSubmitRole}
+              step={1}
+              total={3}
+            />
+          ) : authStep === 'native_language' ? (
+            <NativeLanguageScreen
+              initial={nativeLanguage}
+              onBack={isTeacher && !nameSkipped ? onBackToName : onBackToRole}
+              onContinue={onSubmitNativeLanguage}
+              step={teacherStep(2)}
+              total={teacherTotal ?? 3}
+            />
+          ) : authStep === 'target_languages' ? (
+            <TargetLanguagesScreen
+              nativeLanguage={nativeLanguage}
+              initial={targetLanguages}
+              onSwap={onSwapLanguages}
+              onBack={onBackToNativeLanguage}
+              onContinue={onSubmitTargetLanguages}
+              step={teacherStep(3)}
+              total={teacherTotal ?? 3}
+            />
+          ) : authStep === 'goal' ? (
+            <LearningGoalScreen
+              onBack={nameSkipped ? undefined : onBackToName}
+              onContinue={onSubmitGoal}
+              step={nameSkipped ? 1 : 2}
+              total={afterLessonTotal}
+            />
+          ) : authStep === 'daily' ? (
+            <DailyGoalScreen
+              onBack={onBackToGoal}
+              onContinue={onSubmitDaily}
+              step={nameSkipped ? 2 : 3}
+              total={afterLessonTotal}
+            />
+          ) : authStep === 'about' ? (
+            <AboutMeOnboardingScreen onBack={onBackToDaily} onContinue={onSubmitAboutMe} />
+          ) : authStep === 'teacher_subject' ? (
+            <TeacherSubjectScreen
+              onBack={onBackToTargetLanguages}
+              onContinue={onSubmitTeacherSubject}
+              step={teacherStep(4)}
+              total={teacherTotal}
+            />
+          ) : authStep === 'teacher_size' ? (
+            <TeacherGroupSizeScreen
+              onBack={onBackToTeacherSubject}
+              onContinue={onSubmitTeacherSize}
+              step={teacherStep(5)}
+              total={teacherTotal}
+            />
+          ) : (
+            <WelcomeScreen isLoading={authLoading} />
+          )}
+        </StepTransition>
       )}
     </>
   );

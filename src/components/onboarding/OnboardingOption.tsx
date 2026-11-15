@@ -30,6 +30,8 @@ export interface OnboardingOptionProps {
   tone?: 'primary' | 'native';
   /** Пометка справа: «язык телефона», «Основной», «Твой родной» */
   badge?: { text: string; tone: 'primary' | 'native' | 'neutral' };
+  /** Плитка флага/иконки — источник перелёта флага на мост (Start 2.4) */
+  tileRef?: React.Ref<View>;
   /** Неактивный вариант (родной язык в списке изучаемых) — без индикатора выбора */
   disabled?: boolean;
   onPress: () => void;
@@ -46,6 +48,7 @@ export const OnboardingOption = memo(function OnboardingOption({
   tone = 'primary',
   badge,
   disabled = false,
+  tileRef,
   onPress,
 }: OnboardingOptionProps) {
   const colors = useThemeColors();
@@ -73,6 +76,7 @@ export const OnboardingOption = memo(function OnboardingOption({
     >
       {Glyph || flag ? (
         <View
+          ref={tileRef}
           style={[
             styles.tile,
             { backgroundColor: selected && Glyph ? accentFill : colors.surfaceMuted },
