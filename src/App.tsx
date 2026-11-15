@@ -98,6 +98,12 @@ export default function App() {
   // создаётся сразу после выбора языков; null в starterReady — ещё создаётся
   const [firstLesson, setFirstLesson] = useState<StarterSet | null>(null);
   const [starterReady, setStarterReady] = useState<boolean | null>(null);
+  // Воронка онбординга (Start 2.8): время от входа нового пользователя
+  const onboardingStartedAtRef = useRef<number | null>(null);
+  const secSinceSignIn = () =>
+    onboardingStartedAtRef.current
+      ? Math.round((Date.now() - onboardingStartedAtRef.current) / 1000)
+      : 0;
   const loadedUserIdRef = useRef<string | null>(null);
   const processedOAuthCodeRef = useRef<string | null>(null);
   // Guard: не отправляем push токен повторно для того же userId
@@ -265,6 +271,7 @@ export default function App() {
         // Новый пользователь — начинаем онбординг
         setIsAuthenticated(true);
         setNeedsOnboarding(true);
+        onboardingStartedAtRef.current = Date.now();
         // Первый шаг — роль; имя ученик вводит после первого урока (Start 2.1)
         if (signedInWithApple) setOnboardingData((prev) => ({ ...prev, displayName }));
         setAuthStep('role');
@@ -584,6 +591,14 @@ export default function App() {
     [afterLessonStep]
   );
   const handleFirstCardsDone = useCallback(() => setAuthStep('first_match'), []);
+
+  // Каждый показанный шаг онбординга и начало/конец первого урока
+  useEffect(() => {
+    if (!needsOnboarding || authStep === 'welcome') return;
+    Analytics.onboardingStepViewed(authStep, secSinceSignIn());
+    if (authStep === 'first_cards') Analytics.firstLessonStarted(secSinceSignIn());
+    if (authStep === 'first_results') Analytics.firstLessonCompleted(secSinceSignIn());
+  }, [authStep, needsOnboarding]); // eslint-disable-line react-hooks/exhaustive-deps
   const handleFirstMatchDone = useCallback(() => setAuthStep('first_results'), []);
   const handleFirstResultsDone = useCallback(
     () => setAuthStep(afterLessonStep()),

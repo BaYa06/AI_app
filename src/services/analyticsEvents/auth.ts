@@ -33,6 +33,19 @@ export const authEvents = {
   onboardingLanguagesSwapped: () => log('onboarding_languages_swapped'),
 
   /**
+   * Показан шаг онбординга (Start 2.8): воронка по шагам — где уходят.
+   * sec_since_sign_in — сколько прошло от входа.
+   */
+  onboardingStepViewed: (step: string, secSinceSignIn: number) =>
+    log('onboarding_step_viewed', { step, sec_since_sign_in: secSinceSignIn }),
+
+  /** Первый урок в онбординге начат / закончен; цель — закончить меньше чем за 2 минуты от входа */
+  firstLessonStarted: (secSinceSignIn: number) =>
+    log('first_lesson_started', { sec_since_sign_in: secSinceSignIn }),
+  firstLessonCompleted: (secSinceSignIn: number) =>
+    log('first_lesson_completed', { sec_since_sign_in: secSinceSignIn }),
+
+  /**
    * Новому ученику выдан стартовый набор (plan/new/new_user_activation.md, Start 1.5).
    * Сколько учеников с набором начали его учить — starter_set_first_answer.
    */
