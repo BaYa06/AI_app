@@ -14,6 +14,10 @@ const mockService = {
   importSet: jest.fn<(u: string, id: string, c: string | null) => Promise<{ newSetId: string }>>(),
   importCollection: jest.fn<() => Promise<unknown>>(),
 };
+// Задание «Начало пути» за добавленный набор — не про каталог (Start 3.8)
+jest.mock('../startTasksStore', () => ({
+  useStartTasksStore: { getState: () => ({ complete: () => Promise.resolve() }) },
+}));
 // Лениво: фабрика jest.mock поднимается выше объявления mockService.
 jest.mock('@/services/LibraryService', () => ({
   LibraryService: new Proxy(

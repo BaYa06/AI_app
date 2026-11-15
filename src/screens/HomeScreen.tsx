@@ -27,6 +27,7 @@ import {
   useChallengeStore,
   isSetInCourse,
   isSetInMySets,
+  useCatalogStore,
 } from '@/store';
 import type { ChallengeId } from '@/store';
 import { selectSetStats } from '@/store/cardsStore';
@@ -162,6 +163,9 @@ function todayDayOf(stats: UserStats) {
     need: stats.today_need ?? null,
   };
 }
+
+/** Предмет «Языки» в каталоге библиотеки (database/migrations/040_library_catalog.sql) */
+const LIBRARY_LANGUAGES_SLUG = 'languages';
 
 export function HomeScreen({ navigation, route }: any) {
   const colors = useThemeColors();
@@ -1211,6 +1215,35 @@ export function HomeScreen({ navigation, route }: any) {
 
   const [courseHint, setCourseHint] = useState(false);
 
+  // Задание «Добавь набор из библиотеки» (Start 3.8): сразу изучаемый язык и уровень A1.
+  // Языка нет в библиотеке — задание не показываем (пока не знаем — тоже)
+  const starterSetIdForTasks = useStartTasksStore((st) => st.starterSetId);
+  const studiedLanguage =
+    (starterSetIdForTasks
+      ? useSetsStore.getState().getSet(starterSetIdForTasks)?.languageFrom
+      : undefined) ?? filteredSets[0]?.languageFrom;
+  const librarySubject = useCatalogStore((st) => st.subjects[LIBRARY_LANGUAGES_SLUG]);
+  const libraryHasLanguage =
+    !!studiedLanguage && !!librarySubject?.data.tracks.some((t) => t.key === studiedLanguage);
+  useEffect(() => {
+    if (isTeacher === false) useCatalogStore.getState().fetchSubject(LIBRARY_LANGUAGES_SLUG);
+  }, [isTeacher]);
+  const openLibraryForTask = useCallback(() => {
+    if (studiedLanguage) {
+      const all =
+        StorageService.getObject<
+          Record<string, { track: string | null; levels: Record<string, string> }>
+        >(STORAGE_KEYS.LIBRARY_SELECTION) ?? {};
+      const entry = all[LIBRARY_LANGUAGES_SLUG] ?? { track: null, levels: {} };
+      all[LIBRARY_LANGUAGES_SLUG] = {
+        track: studiedLanguage,
+        levels: { ...entry.levels, [studiedLanguage]: entry.levels[studiedLanguage] ?? 'A1' },
+      };
+      StorageService.setObject(STORAGE_KEYS.LIBRARY_SELECTION, all);
+    }
+    navigation.navigate('LibrarySubject', { slug: LIBRARY_LANGUAGES_SLUG, title: 'Языки' });
+  }, [navigation, studiedLanguage]);
+
   // «Подключиться к учителю» (Start 3.6): ответил «Да» на онбординге и ещё не в курсе учителя
   const [joinCardClosed, setJoinCardClosed] = useState(false);
   const showJoinTeacher =
@@ -1233,7 +1266,7 @@ export function HomeScreen({ navigation, route }: any) {
       setTimeout(() => setIsCreatingCourse(true), 350);
     },
     onPhoto: (starterId) => openPhotoImport(starterId),
-    onLibrary: () => {},
+    onLibrary: () => openLibraryForTask(),
     playReward: playStartTaskReward,
   });
 
@@ -1952,7 +1985,7 @@ export function HomeScreen({ navigation, route }: any) {
                     {isTeacher === false && (
                       <View ref={startTasks.stackRef} collapsable={false} style={styles.startTasks}>
                         <StartTasksStack
-                          hidden={['library']}
+                          hidden={libraryHasLanguage ? [] : ['library']}
                           onAction={startTasks.handleStartTask}
                         />
                       </View>

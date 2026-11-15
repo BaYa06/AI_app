@@ -11,6 +11,7 @@
  * поиске — без перезагрузки дерева (план, «Слабые места», п. 8). Импорт в курс «добавлено» не меняет.
  */
 import { create } from 'zustand';
+import { useStartTasksStore } from './startTasksStore';
 import { immer } from 'zustand/middleware/immer';
 import { LibraryService } from '@/services/LibraryService';
 import { useSetsStore } from '@/store/setsStore';
@@ -233,11 +234,16 @@ export const useCatalogStore = create<CatalogState & CatalogActions>()(
         // userId сервер берёт из токена — первый аргумент в LibraryService не используется.
         const result = await LibraryService.importSet('', librarySetId, courseId);
         if (!courseId) markImported(librarySetId);
+        // Задание «Добавь набор из библиотеки» (plan/new/new_user_activation.md, Start 3.8)
+        useStartTasksStore.getState().complete('library');
         return result.newSetId;
       },
 
-      importCollection: (collectionId, courseId) =>
-        LibraryService.importCollection(collectionId, courseId),
+      importCollection: async (collectionId, courseId) => {
+        const result = await LibraryService.importCollection(collectionId, courseId);
+        useStartTasksStore.getState().complete('library');
+        return result;
+      },
 
       invalidate: () =>
         set((s) => {
