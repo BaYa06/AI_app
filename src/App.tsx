@@ -541,6 +541,15 @@ export default function App() {
     [onboardingData.role]
   );
 
+  // «Перепутал? Поменять местами» (Start 2.3): бывший изучаемый — родной, бывший родной — изучаемый
+  const handleSwapLanguages = useCallback((newNative: string) => {
+    setOnboardingData((prev) => ({
+      ...prev,
+      nativeLanguage: newNative,
+      targetLanguages: prev.nativeLanguage ? [prev.nativeLanguage] : prev.targetLanguages,
+    }));
+  }, []);
+
   const handleSubmitGoal = useCallback((goalId: string) => {
     setOnboardingData((prev) => ({ ...prev, learningGoal: goalId }));
     setAuthStep('daily');
@@ -727,6 +736,8 @@ export default function App() {
           onSubmitRole={handleSubmitRole}
           onSubmitNativeLanguage={handleSubmitNativeLanguage}
           onSubmitTargetLanguages={handleSubmitTargetLanguages}
+          onSwapLanguages={handleSwapLanguages}
+          targetLanguages={onboardingData.targetLanguages}
           onSubmitGoal={handleSubmitGoal}
           onSubmitDaily={handleSubmitDaily}
           onBackToDaily={handleBackToDaily}

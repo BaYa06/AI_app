@@ -88,6 +88,9 @@ type AppRootProps = {
   onSubmitRole: (role: string) => void;
   onSubmitNativeLanguage: (code: string) => void;
   onSubmitTargetLanguages: (codes: string[]) => void;
+  /** «Поменять местами»: новый родной язык (бывший изучаемый) */
+  onSwapLanguages: (newNative: string) => void;
+  targetLanguages?: string[];
   onSubmitGoal: (goalId: string) => void;
   onSubmitDaily: (dailyId: string) => void;
   onBackToDaily: () => void;
@@ -128,6 +131,8 @@ export function AppRoot({
   onSubmitRole,
   onSubmitNativeLanguage,
   onSubmitTargetLanguages,
+  onSwapLanguages,
+  targetLanguages,
   onSubmitGoal,
   onSubmitDaily,
   onBackToDaily,
@@ -234,6 +239,7 @@ export function AppRoot({
         />
       ) : authStep === 'native_language' ? (
         <NativeLanguageScreen
+          initial={nativeLanguage}
           onBack={isTeacher && !nameSkipped ? onBackToName : onBackToRole}
           onContinue={onSubmitNativeLanguage}
           step={teacherStep(2)}
@@ -242,6 +248,8 @@ export function AppRoot({
       ) : authStep === 'target_languages' ? (
         <TargetLanguagesScreen
           nativeLanguage={nativeLanguage}
+          initial={targetLanguages}
+          onSwap={onSwapLanguages}
           onBack={onBackToNativeLanguage}
           onContinue={onSubmitTargetLanguages}
           step={teacherStep(3)}

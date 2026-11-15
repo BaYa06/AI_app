@@ -23,6 +23,8 @@ export interface OnboardingStepProps {
   step?: number;
   /** Сколько шагов в этом отрезке онбординга (до урока, после урока, путь учителя) */
   total?: number;
+  /** Над заголовком: мост языков на экранах родного и изучаемого (Start 2.2) */
+  top?: React.ReactNode;
   headline: string;
   description?: string;
   /** Выравнивание заголовка и пояснения. */
@@ -46,6 +48,7 @@ export function OnboardingStep({
   title,
   step,
   total = ONBOARDING_STEPS,
+  top,
   headline,
   description,
   align = 'left',
@@ -67,6 +70,7 @@ export function OnboardingStep({
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        {top}
         <View style={[styles.headlineBlock, align === 'center' && styles.centered]}>
           <Text
             variant="h1"

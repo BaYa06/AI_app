@@ -27,6 +27,12 @@ export const authEvents = {
   onboardingComplete: () => log('onboarding_complete'),
 
   /**
+   * «Перепутал? Поменять местами» на экране изучаемого языка (Start 2.3).
+   * Доля от onboarding_complete больше 5% — экраны языков всё ещё путают.
+   */
+  onboardingLanguagesSwapped: () => log('onboarding_languages_swapped'),
+
+  /**
    * Новому ученику выдан стартовый набор (plan/new/new_user_activation.md, Start 1.5).
    * Сколько учеников с набором начали его учить — starter_set_first_answer.
    */
