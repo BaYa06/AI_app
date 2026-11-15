@@ -92,6 +92,8 @@ export const streakApi = {
       words_learned: number;
       minutes_learned: number;
       cards_studied: number;
+      streak_counted?: boolean;
+      frozen?: boolean;
     }[]
   > {
     const rows = await callDataApi<any[]>(
@@ -105,6 +107,10 @@ export const streakApi = {
       words_learned: row.words_learned || 0,
       minutes_learned: row.minutes_learned || 0,
       cards_studied: row.cards_studied || 0,
+      // Есть только у нового сервера (Freeze 1); нет поля — неделя по старому правилу
+      ...(typeof row.streak_counted === 'boolean'
+        ? { streak_counted: row.streak_counted, frozen: row.frozen === true }
+        : {}),
     }));
   },
 

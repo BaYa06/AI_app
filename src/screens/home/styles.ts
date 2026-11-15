@@ -374,6 +374,15 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 2,
   },
+  weekNotes: {
+    gap: spacing.xs,
+    marginBottom: spacing.s,
+  },
+  weekNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   goalCard: {
     padding: spacing.m,
     marginBottom: spacing.xs,
