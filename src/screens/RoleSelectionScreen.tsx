@@ -29,10 +29,15 @@ const OPTIONS: RoleOption[] = [
   {
     id: 'student',
     title: 'Я учусь',
-    description: 'Создавай карточки и учи новое',
+    description: 'Сразу первый урок на 5 слов',
     icon: GraduationCap,
   },
-  { id: 'teacher', title: 'Я преподаю', description: 'Создавай курсы для учеников', icon: Users },
+  {
+    id: 'teacher',
+    title: 'Я учитель',
+    description: 'Курс для учеников, тесты и задания',
+    icon: Users,
+  },
 ];
 
 export function RoleSelectionScreen({ onContinue, onBack, step = 2, total }: Props) {

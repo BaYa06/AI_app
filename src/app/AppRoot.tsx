@@ -20,6 +20,11 @@ import { CourseInviteModal } from '@/components/CourseInviteModal';
 import { SharedSetPreviewModal } from '@/components/share/SharedSetPreviewModal';
 import { WelcomeScreen } from '@/screens/WelcomeScreen';
 import { StepTransition } from '@/components/onboarding/StepTransition';
+import { StarterBuildScreen } from '@/screens/firstLesson/StarterBuildScreen';
+import { FirstCardsScreen } from '@/screens/firstLesson/FirstCardsScreen';
+import { FirstMatchScreen } from '@/screens/firstLesson/FirstMatchScreen';
+import { FirstResultsScreen } from '@/screens/firstLesson/FirstResultsScreen';
+import type { StarterSet } from '@/services/StarterSetService';
 import { NameOnboardingScreen } from '@/screens/NameOnboardingScreen';
 import { RoleSelectionScreen } from '@/screens/RoleSelectionScreen';
 import { NativeLanguageScreen } from '@/screens/NativeLanguageScreen';
@@ -57,6 +62,10 @@ export type AuthStep =
   | 'role'
   | 'native_language'
   | 'target_languages'
+  | 'starter_build'
+  | 'first_cards'
+  | 'first_match'
+  | 'first_results'
   | 'goal'
   | 'daily'
   | 'about'
@@ -91,6 +100,13 @@ type AppRootProps = {
   onSubmitTargetLanguages: (codes: string[]) => void;
   /** «Поменять местами»: новый родной язык (бывший изучаемый) */
   onSwapLanguages: (newNative: string) => void;
+  /** Первый урок (Start 2.5): выданный стартовый набор и шаги урока */
+  firstLesson: StarterSet | null;
+  starterReady: boolean | null;
+  onStarterBuilt: (ok: boolean) => void;
+  onFirstCardsDone: () => void;
+  onFirstMatchDone: () => void;
+  onFirstResultsDone: () => void;
   targetLanguages?: string[];
   onSubmitGoal: (goalId: string) => void;
   onSubmitDaily: (dailyId: string) => void;
@@ -133,6 +149,12 @@ export function AppRoot({
   onSubmitNativeLanguage,
   onSubmitTargetLanguages,
   onSwapLanguages,
+  firstLesson,
+  starterReady,
+  onStarterBuilt,
+  onFirstCardsDone,
+  onFirstMatchDone,
+  onFirstResultsDone,
   targetLanguages,
   onSubmitGoal,
   onSubmitDaily,
@@ -257,6 +279,28 @@ export function AppRoot({
               onContinue={onSubmitTargetLanguages}
               step={teacherStep(3)}
               total={teacherTotal ?? 3}
+            />
+          ) : authStep === 'starter_build' ? (
+            <StarterBuildScreen
+              native={nativeLanguage ?? 'ru'}
+              target={targetLanguages?.[0] ?? 'en'}
+              ready={starterReady}
+              onDone={onStarterBuilt}
+            />
+          ) : authStep === 'first_cards' && firstLesson ? (
+            <FirstCardsScreen
+              cards={firstLesson.cards}
+              target={firstLesson.set.languageFrom ?? 'en'}
+              native={firstLesson.set.languageTo ?? 'ru'}
+              onDone={onFirstCardsDone}
+            />
+          ) : authStep === 'first_match' && firstLesson ? (
+            <FirstMatchScreen cards={firstLesson.cards} onDone={onFirstMatchDone} />
+          ) : authStep === 'first_results' && firstLesson ? (
+            <FirstResultsScreen
+              cards={firstLesson.cards}
+              questionsLeft={afterLessonTotal}
+              onContinue={onFirstResultsDone}
             />
           ) : authStep === 'goal' ? (
             <LearningGoalScreen

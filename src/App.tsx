@@ -31,7 +31,8 @@ import { isAppleUser, takeAppleSignInName } from '@/services/appleSignInName';
 import { useCourseRealtime } from '@/hooks/useCourseRealtime';
 import { StorageService } from '@/services/StorageService';
 import { CACHE_OWNER_KEY } from '@/services/DatabaseService';
-import { issueStarterSet } from '@/services/starterSetIssue';
+import { issueStarterSet, putStarterSetInStores } from '@/services/starterSetIssue';
+import type { StarterSet } from '@/services/StarterSetService';
 import { initCrashReporting, setCrashUserId } from '@/services/crashReporting';
 import {
   refreshPushToken,
@@ -49,6 +50,14 @@ import { type AuthStep, AppRoot } from './app/AppRoot';
 
 // Метка сервера для отчётов о падениях (plan/done/release_safety.md, Release 4)
 initCrashReporting();
+
+/** Дождаться, пока очередь отправит ответы (не дольше timeoutMs) */
+async function waitForSyncQueue(timeoutMs: number): Promise<void> {
+  const started = Date.now();
+  while (SyncQueueService.pendingCount > 0 && Date.now() - started < timeoutMs) {
+    await new Promise((r) => setTimeout(r, 150));
+  }
+}
 
 export default function App() {
   const [isReady, setIsReady] = useState(false);
@@ -85,6 +94,10 @@ export default function App() {
   const ensuredUserIdRef = useRef<string | null>(null);
   // Вход через Apple: шага «Как к тебе обращаться?» нет, «назад» с выбора роли — на приветствие
   const skipNameStepRef = useRef(false);
+  // Первый урок в онбординге (plan/new/new_user_activation.md, Start 2.5): стартовый набор
+  // создаётся сразу после выбора языков; null в starterReady — ещё создаётся
+  const [firstLesson, setFirstLesson] = useState<StarterSet | null>(null);
+  const [starterReady, setStarterReady] = useState<boolean | null>(null);
   const loadedUserIdRef = useRef<string | null>(null);
   const processedOAuthCodeRef = useRef<string | null>(null);
   // Guard: не отправляем push токен повторно для того же userId
@@ -535,10 +548,46 @@ export default function App() {
   const handleSubmitTargetLanguages = useCallback(
     (codes: string[]) => {
       setOnboardingData((prev) => ({ ...prev, targetLanguages: codes }));
-      if (onboardingData.role === 'teacher') setAuthStep('teacher_subject');
-      else setAuthStep(skipNameStepRef.current ? 'goal' : 'name');
+      if (onboardingData.role === 'teacher') {
+        setAuthStep('teacher_subject');
+        return;
+      }
+      // Ученик: «Собираем твой первый набор», пока набор создаётся на сервере
+      setStarterReady(null);
+      setAuthStep('starter_build');
+      if (!currentUserId) {
+        setStarterReady(false);
+        return;
+      }
+      issueStarterSet({
+        userId: currentUserId,
+        nativeLanguage: onboardingData.nativeLanguage,
+        targetLanguages: codes,
+      }).then((starter) => {
+        if (starter) {
+          putStarterSetInStores(starter);
+          setFirstLesson(starter);
+        }
+        setStarterReady(!!starter);
+      });
     },
-    [onboardingData.role]
+    [onboardingData.role, onboardingData.nativeLanguage, currentUserId]
+  );
+
+  // После первого урока — вопросы: имя (если не пришло из Apple), цель, норма
+  const afterLessonStep = useCallback(
+    (): AuthStep => (skipNameStepRef.current ? 'goal' : 'name'),
+    []
+  );
+  const handleStarterBuilt = useCallback(
+    (ok: boolean) => setAuthStep(ok ? 'first_cards' : afterLessonStep()),
+    [afterLessonStep]
+  );
+  const handleFirstCardsDone = useCallback(() => setAuthStep('first_match'), []);
+  const handleFirstMatchDone = useCallback(() => setAuthStep('first_results'), []);
+  const handleFirstResultsDone = useCallback(
+    () => setAuthStep(afterLessonStep()),
+    [afterLessonStep]
   );
 
   // «Перепутал? Поменять местами» (Start 2.3): бывший изучаемый — родной, бывший родной — изучаемый
@@ -571,8 +620,9 @@ export default function App() {
         classDays: finalData.classDays,
         classHour: finalData.classHour,
       });
-      // Стартовый набор — до перезагрузки данных, иначе она его сотрёт (plan/new/new_user_activation.md, 1.3)
-      if (finalData.role !== 'teacher') {
+      // Стартовый набор — до перезагрузки данных, иначе она его сотрёт (plan/new/new_user_activation.md, 1.3).
+      // Обычно он уже выдан перед первым уроком; здесь — если тогда не было сети
+      if (finalData.role !== 'teacher' && !firstLesson) {
         await issueStarterSet({
           userId: currentUserId,
           nativeLanguage: finalData.nativeLanguage,
@@ -580,6 +630,8 @@ export default function App() {
           learningGoal: finalData.learningGoal,
         });
       }
+      // Ответы первого урока должны дойти до сервера, иначе перезагрузка покажет слова невыученными
+      await waitForSyncQueue(3000);
       setNeedsOnboarding(false);
       DatabaseService.reloadRemoteDataForUser(currentUserId);
       setAnalyticsUserId(currentUserId);
@@ -607,7 +659,7 @@ export default function App() {
         refreshPushToken(currentUserId).catch(() => {});
       }
     },
-    [currentUserId]
+    [currentUserId, firstLesson]
   );
 
   const handleSubmitDaily = useCallback((dailyId: string) => {
@@ -737,6 +789,12 @@ export default function App() {
           onSubmitNativeLanguage={handleSubmitNativeLanguage}
           onSubmitTargetLanguages={handleSubmitTargetLanguages}
           onSwapLanguages={handleSwapLanguages}
+          firstLesson={firstLesson}
+          starterReady={starterReady}
+          onStarterBuilt={handleStarterBuilt}
+          onFirstCardsDone={handleFirstCardsDone}
+          onFirstMatchDone={handleFirstMatchDone}
+          onFirstResultsDone={handleFirstResultsDone}
           targetLanguages={onboardingData.targetLanguages}
           onSubmitGoal={handleSubmitGoal}
           onSubmitDaily={handleSubmitDaily}
