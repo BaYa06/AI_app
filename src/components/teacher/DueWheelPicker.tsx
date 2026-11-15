@@ -35,7 +35,7 @@ const MINUTES = Array.from({ length: 60 / DUE_MINUTE_STEP }, (_, i) =>
   String(i * DUE_MINUTE_STEP).padStart(2, '0')
 );
 
-interface ColumnProps {
+export interface ColumnProps {
   labels: string[];
   index: number;
   onIndex: (i: number) => void;
@@ -44,7 +44,15 @@ interface ColumnProps {
   accessibilityLabel: string;
 }
 
-function WheelColumn({ labels, index, onIndex, align, flex, accessibilityLabel }: ColumnProps) {
+/** Колонка барабана; её же берёт время занятия (push/LessonTimeWheel.tsx) */
+export function WheelColumn({
+  labels,
+  index,
+  onIndex,
+  align,
+  flex,
+  accessibilityLabel,
+}: ColumnProps) {
   const colors = useThemeColors();
   const scrollY = useRef(new Animated.Value(index * ROW)).current;
   const ref = useRef<ScrollViewRef>(null);
@@ -142,8 +150,21 @@ interface Props {
   now: Date;
 }
 
-export function DueWheelPicker({ value, onChange, now }: Props) {
+/** Рамка барабана: высота на 5 строк и подсветка выбранной строки посередине */
+export function WheelFrame({ children }: { children: React.ReactNode }) {
   const colors = useThemeColors();
+  return (
+    <View style={st.wrap}>
+      <View
+        pointerEvents="none"
+        style={[st.band, { backgroundColor: colors.surfaceMuted, borderRadius: borderRadius.m }]}
+      />
+      {children}
+    </View>
+  );
+}
+
+export function DueWheelPicker({ value, onChange, now }: Props) {
   const days = useMemo(() => dueDayLabels(now), [now]);
   const dayIndex = Math.max(0, Math.min(days.length - 1, dueDayIndex(now, value)));
   const hour = value.getHours();
@@ -153,11 +174,7 @@ export function DueWheelPicker({ value, onChange, now }: Props) {
     onChange(dayAt(now, d, h, mi * DUE_MINUTE_STEP));
 
   return (
-    <View style={st.wrap}>
-      <View
-        pointerEvents="none"
-        style={[st.band, { backgroundColor: colors.surfaceMuted, borderRadius: borderRadius.m }]}
-      />
+    <WheelFrame>
       <WheelColumn
         labels={days}
         index={dayIndex}
@@ -182,7 +199,7 @@ export function DueWheelPicker({ value, onChange, now }: Props) {
         flex={0.7}
         accessibilityLabel={T.minuteColumn}
       />
-    </View>
+    </WheelFrame>
   );
 }
 

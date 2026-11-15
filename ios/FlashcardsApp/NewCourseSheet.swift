@@ -96,7 +96,7 @@ class NewCourseSheetModule: RCTEventEmitter, UISheetPresentationControllerDelega
       minutes: int(time["default"], 18 * 60),
       minMinutes: int(time["min"], 7 * 60),
       maxMinutes: int(time["max"], 22 * 60),
-      step: int(time["step"], 15),
+      step: int(time["step"], 5),
       searchFrom: int(options["searchFrom"], 6),
       palette: palette
     )
@@ -169,7 +169,7 @@ struct NewCourseDay: Identifiable {
 struct NewCourseTexts {
   let title, close, nameLabel, namePlaceholder: String
   let bookLabel, noBook, noBookHint, bookSearch, bookHint: String
-  let daysLabel, daysHint, earlier, later, startsAt, create: String
+  let daysLabel, daysHint, startsAt, create: String
 
   init(_ dict: NSDictionary) {
     func text(_ key: String, _ fallback: String) -> String { dict[key] as? String ?? fallback }
@@ -184,8 +184,6 @@ struct NewCourseTexts {
     bookHint = text("bookHint", "")
     daysLabel = text("daysLabel", "Дни уроков")
     daysHint = text("daysHint", "")
-    earlier = text("earlier", "Раньше на 15 минут")
-    later = text("later", "Позже на 15 минут")
     startsAt = text("startsAt", "Начало в")
     create = text("create", "Создать курс")
   }
@@ -276,10 +274,6 @@ final class NewCourseModel: ObservableObject {
   func toggle(_ day: String) {
     UISelectionFeedbackGenerator().selectionChanged()
     if selected.contains(day) { selected.remove(day) } else { selected.insert(day) }
-  }
-
-  func shift(_ delta: Int) {
-    minutes = min(maxMinutes, max(minMinutes, minutes + delta))
   }
 
   func pickBook(_ id: String?) {
@@ -432,15 +426,19 @@ struct NewCourseView: View {
       if model.selected.isEmpty {
         if !t.daysHint.isEmpty { caption(t.daysHint) }
       } else {
-        HStack(spacing: Metrics.m) {
-          stepButton("chevron.down", label: t.earlier) { model.shift(-model.step) }
-          Text(model.timeText)
-            .font(.system(size: 24, weight: .bold).monospacedDigit())
-            .foregroundColor(Color(p.textPrimary))
-            .accessibilityLabel("\(t.startsAt) \(model.timeText)")
-          stepButton("chevron.up", label: t.later) { model.shift(model.step) }
-        }
+        LessonTimeWheel(
+          minutes: $model.minutes,
+          minMinutes: model.minMinutes,
+          maxMinutes: model.maxMinutes,
+          step: model.step,
+          tint: p.primary
+        )
+        .frame(height: LessonTimeWheel.height)
         .frame(maxWidth: .infinity)
+        .background(RoundedRectangle(cornerRadius: Metrics.radiusL).fill(Color(p.surface)))
+        .overlay(RoundedRectangle(cornerRadius: Metrics.radiusL).strokeBorder(Color(p.border), lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: Metrics.radiusL))
+        .accessibilityLabel("\(t.startsAt) \(model.timeText)")
       }
     }
   }
@@ -483,18 +481,6 @@ struct NewCourseView: View {
       .font(.system(size: 12))
       .foregroundColor(Color(p.textSecondary))
       .fixedSize(horizontal: false, vertical: true)
-  }
-
-  private func stepButton(_ symbol: String, label: String, action: @escaping () -> Void) -> some View {
-    Button(action: action) {
-      Image(systemName: symbol)
-        .font(.system(size: 18, weight: .semibold))
-        .foregroundColor(Color(p.textSecondary))
-        .frame(width: Metrics.touch, height: Metrics.touch)
-        .contentShape(Rectangle())
-    }
-    .buttonStyle(PressableStyle())
-    .accessibilityLabel(label)
   }
 }
 

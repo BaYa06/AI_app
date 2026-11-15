@@ -7,7 +7,6 @@
  */
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import { ChevronDown, ChevronUp } from 'lucide-react-native';
 import { useThemeColors } from '@/store';
 import { Text } from '@/components/common';
 import { Button, Chip, Sheet, toast } from '@/components/ui';
@@ -15,14 +14,11 @@ import { spacing } from '@/constants';
 import { WEEK_DAYS } from './AboutMeForm';
 import {
   DEFAULT_MINUTES,
-  MAX_MINUTES,
-  MIN_MINUTES,
   SCHEDULE_TEXTS as T,
-  STEP_MIN,
   loadScheduleForm,
   saveSchedule,
-  toTime,
 } from './courseSchedule';
+import { LessonTimeWheel } from './LessonTimeWheel';
 import { isNativeScheduleSheet, useNativeScheduleSheet } from './nativeScheduleSheet';
 
 // Прежние экспорты — для тех, кто брал время отсюда
@@ -60,8 +56,6 @@ function CourseScheduleSheetRN({ visible, courseId, onClose }: Props) {
 
   const toggleDay = (day: string) =>
     setDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
-  const shift = (delta: number) =>
-    setMinutes((m) => Math.min(MAX_MINUTES, Math.max(MIN_MINUTES, m + delta)));
 
   const handleSave = async () => {
     if (saving) return;
@@ -115,29 +109,7 @@ function CourseScheduleSheetRN({ visible, courseId, onClose }: Props) {
           <Text variant="label" color="secondary">
             {T.timeLabel}
           </Text>
-          <View style={st.timeRow}>
-            <Button
-              variant="icon"
-              icon={ChevronDown}
-              background="none"
-              accessibilityLabel={T.earlier}
-              onPress={() => shift(-STEP_MIN)}
-            />
-            <Text
-              variant="h2"
-              accessibilityLabel={`${T.startsAt} ${toTime(minutes)}`}
-              style={{ color: colors.textPrimary }}
-            >
-              {toTime(minutes)}
-            </Text>
-            <Button
-              variant="icon"
-              icon={ChevronUp}
-              background="none"
-              accessibilityLabel={T.later}
-              onPress={() => shift(STEP_MIN)}
-            />
-          </View>
+          <LessonTimeWheel value={minutes} onChange={setMinutes} />
           <Text variant="caption" color="secondary">
             {T.timeHint}
           </Text>
@@ -159,10 +131,5 @@ const st = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.xxs,
-  },
-  timeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.m,
   },
 });

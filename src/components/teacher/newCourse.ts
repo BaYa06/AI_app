@@ -88,8 +88,6 @@ export const NEW_COURSE_TEXTS = {
   bookHint: 'Юниты откроешь ученикам по ходу курса в «Учебниках курса»',
   daysLabel: 'Дни уроков',
   daysHint: 'Можно пропустить и указать позже в курсе',
-  earlier: 'Раньше на 15 минут',
-  later: 'Позже на 15 минут',
   startsAt: 'Начало в',
   create: 'Создать курс',
 } as const;

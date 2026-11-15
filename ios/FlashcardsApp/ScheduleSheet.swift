@@ -3,7 +3,7 @@
 //  Нативный лист «Расписание занятий» курса (plan/done/teacher_cabinet.md, Teacher 11).
 //
 //  Повторяет RN-окно src/components/push/CourseScheduleSheet.tsx: дни занятий, время начала
-//  со стрелками ±15 минут, «Сохранить». Лист — UISheetPresentationController, как шторка режимов.
+//  системным барабаном (часы · минуты, шаг из JS — 5 минут, как срок задания), «Сохранить». Лист — UISheetPresentationController, как шторка режимов.
 //  Расписание грузит и сохраняет JS; тексты и цвета тоже из JS.
 //
 //  JS → present(options), setLoaded(days, minutes), setBusy(Bool), setError(String?), finish(), dismiss().
@@ -105,7 +105,7 @@ class ScheduleSheetModule: RCTEventEmitter, UISheetPresentationControllerDelegat
       minutes: int(time["default"], 18 * 60),
       minMinutes: int(time["min"], 7 * 60),
       maxMinutes: int(time["max"], 22 * 60),
-      step: int(time["step"], 15),
+      step: int(time["step"], 5),
       palette: palette
     )
 
@@ -173,7 +173,7 @@ struct ScheduleDay: Identifiable {
 /// Тексты листа — из JS; здесь только запасные
 struct ScheduleTexts {
   let title, close, description, daysLabel, timeLabel, timeHint: String
-  let earlier, later, startsAt, save, saving: String
+  let startsAt, save, saving: String
 
   init(_ dict: NSDictionary) {
     func text(_ key: String, _ fallback: String) -> String { dict[key] as? String ?? fallback }
@@ -183,8 +183,6 @@ struct ScheduleTexts {
     daysLabel = text("daysLabel", "Дни занятий")
     timeLabel = text("timeLabel", "Начало занятия")
     timeHint = text("timeHint", "")
-    earlier = text("earlier", "Раньше на 15 минут")
-    later = text("later", "Позже на 15 минут")
     startsAt = text("startsAt", "Начало в")
     save = text("save", "Сохранить")
     saving = text("saving", "Сохранение…")
@@ -261,10 +259,6 @@ final class ScheduleModel: ObservableObject {
   func toggle(_ day: String) {
     UISelectionFeedbackGenerator().selectionChanged()
     if selected.contains(day) { selected.remove(day) } else { selected.insert(day) }
-  }
-
-  func shift(_ delta: Int) {
-    minutes = min(maxMinutes, max(minMinutes, minutes + delta))
   }
 }
 
@@ -343,15 +337,19 @@ struct ScheduleContent: View {
           }
         }
         label(t.timeLabel)
-        HStack(spacing: 16) {
-          stepButton("chevron.down", label: t.earlier) { model.shift(-model.step) }
-          Text(model.timeText)
-            .font(.system(size: 24, weight: .bold).monospacedDigit())
-            .foregroundColor(Color(p.textPrimary))
-            .accessibilityLabel("\(t.startsAt) \(model.timeText)")
-          stepButton("chevron.up", label: t.later) { model.shift(model.step) }
-        }
+        LessonTimeWheel(
+          minutes: $model.minutes,
+          minMinutes: model.minMinutes,
+          maxMinutes: model.maxMinutes,
+          step: model.step,
+          tint: p.primary
+        )
+        .frame(height: LessonTimeWheel.height)
         .frame(maxWidth: .infinity)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color(p.surface)))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color(p.border), lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .accessibilityLabel("\(t.startsAt) \(model.timeText)")
         if !t.timeHint.isEmpty {
           Text(t.timeHint)
             .font(.system(size: 12))
@@ -391,23 +389,64 @@ struct ScheduleContent: View {
       .font(.system(size: 14, weight: .semibold))
       .foregroundColor(Color(p.textSecondary))
   }
-
-  private func stepButton(_ symbol: String, label: String, action: @escaping () -> Void) -> some View {
-    Button(action: action) {
-      Image(systemName: symbol)
-        .font(.system(size: 18, weight: .semibold))
-        .foregroundColor(Color(p.textSecondary))
-        .frame(width: 44, height: 44)
-        .contentShape(Rectangle())
-    }
-    .buttonStyle(SchedulePressable())
-    .accessibilityLabel(label)
-  }
 }
 
 /// Нажатие — прозрачность 0.85, как у Pressable в RN
 private struct SchedulePressable: ButtonStyle {
   func makeBody(configuration: Configuration) -> some View {
     configuration.label.opacity(configuration.isPressed ? 0.85 : 1)
+  }
+}
+
+/// Время занятия системным барабаном «часы · минуты», как срок задания (HwWheelPicker в
+/// NewHomeworkSheet.swift). Минуты от полуночи ↔ время сегодняшнего дня; границы и шаг — из JS.
+/// Берёт и окно «Новый курс» (NewCourseSheet.swift).
+struct LessonTimeWheel: UIViewRepresentable {
+  static let height: CGFloat = 216
+
+  @Binding var minutes: Int
+  let minMinutes: Int
+  let maxMinutes: Int
+  let step: Int
+  let tint: UIColor
+
+  static func date(_ minutes: Int) -> Date {
+    let day = Calendar.current.startOfDay(for: Date())
+    return Calendar.current.date(bySettingHour: minutes / 60, minute: minutes % 60, second: 0, of: day) ?? day
+  }
+
+  static func minutes(_ date: Date) -> Int {
+    let c = Calendar.current.dateComponents([.hour, .minute], from: date)
+    return (c.hour ?? 0) * 60 + (c.minute ?? 0)
+  }
+
+  func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+  func makeUIView(context: Context) -> UIDatePicker {
+    let picker = UIDatePicker()
+    picker.datePickerMode = .time
+    picker.preferredDatePickerStyle = .wheels
+    picker.minuteInterval = max(1, min(30, step))
+    picker.locale = Locale(identifier: "ru_RU")
+    picker.tintColor = tint
+    picker.addTarget(context.coordinator, action: #selector(Coordinator.changed(_:)), for: .valueChanged)
+    return picker
+  }
+
+  func updateUIView(_ picker: UIDatePicker, context: Context) {
+    context.coordinator.parent = self
+    picker.minimumDate = Self.date(minMinutes)
+    picker.maximumDate = Self.date(maxMinutes)
+    if Self.minutes(picker.date) != minutes { picker.setDate(Self.date(minutes), animated: true) }
+  }
+
+  final class Coordinator: NSObject {
+    var parent: LessonTimeWheel
+    init(_ parent: LessonTimeWheel) { self.parent = parent }
+    @objc func changed(_ picker: UIDatePicker) {
+      UISelectionFeedbackGenerator().selectionChanged()
+      let value = LessonTimeWheel.minutes(picker.date)
+      parent.minutes = min(parent.maxMinutes, max(parent.minMinutes, value))
+    }
   }
 }

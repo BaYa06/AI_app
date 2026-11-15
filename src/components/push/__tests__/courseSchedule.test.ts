@@ -14,6 +14,9 @@ jest.mock('@/services/NeonService', () => ({
 
 import {
   DEFAULT_MINUTES,
+  MAX_MINUTES,
+  MIN_MINUTES,
+  clampLessonMinutes,
   fromTime,
   loadScheduleForm,
   saveSchedule,
@@ -25,6 +28,17 @@ describe('время занятия', () => {
     expect(toTime(630)).toBe('10:30');
     expect(toTime(9 * 60)).toBe('09:00');
     expect(fromTime('10:30')).toBe(630);
+  });
+});
+
+describe('барабан времени занятия', () => {
+  it('шаг 5 минут: 18:05 остаётся, 18:07 → 18:05', () => {
+    expect(clampLessonMinutes(18 * 60 + 5)).toBe(18 * 60 + 5);
+    expect(clampLessonMinutes(18 * 60 + 7)).toBe(18 * 60 + 5);
+  });
+  it('за границами — к ближайшей границе', () => {
+    expect(clampLessonMinutes(22 * 60 + 30)).toBe(MAX_MINUTES);
+    expect(clampLessonMinutes(6 * 60)).toBe(MIN_MINUTES);
   });
 });
 

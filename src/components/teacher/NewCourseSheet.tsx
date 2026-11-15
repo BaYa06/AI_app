@@ -8,19 +8,14 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import { BookOpen, Check, ChevronDown, ChevronUp, CircleOff } from 'lucide-react-native';
+import { BookOpen, Check, CircleOff } from 'lucide-react-native';
 import { useThemeColors } from '@/store';
 import { Text } from '@/components/common';
 import { Button, Chip, ListRow, Sheet, TextField, toast } from '@/components/ui';
 import { spacing } from '@/constants';
 import { WEEK_DAYS } from '@/components/push/AboutMeForm';
-import {
-  DEFAULT_MINUTES,
-  MAX_MINUTES,
-  MIN_MINUTES,
-  STEP_MIN,
-  toTime,
-} from '@/components/push/courseSchedule';
+import { DEFAULT_MINUTES, toTime } from '@/components/push/courseSchedule';
+import { LessonTimeWheel } from '@/components/push/LessonTimeWheel';
 import type { Course } from '@/types';
 import type { BookListItem } from '@/types/books';
 import {
@@ -82,8 +77,6 @@ function NewCourseSheetRN({ visible, onClose, onCreated }: Props) {
 
   const toggleDay = (day: string) =>
     setDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
-  const shift = (delta: number) =>
-    setMinutes((m) => Math.min(MAX_MINUTES, Math.max(MIN_MINUTES, m + delta)));
 
   const canCreate = title.trim().length > 0 && !saving;
 
@@ -187,29 +180,7 @@ function NewCourseSheetRN({ visible, onClose, onCreated }: Props) {
             ))}
           </View>
           {days.length > 0 ? (
-            <View style={st.timeRow}>
-              <Button
-                variant="icon"
-                icon={ChevronDown}
-                background="none"
-                accessibilityLabel={T.earlier}
-                onPress={() => shift(-STEP_MIN)}
-              />
-              <Text
-                variant="h2"
-                accessibilityLabel={`${T.startsAt} ${toTime(minutes)}`}
-                style={{ color: colors.textPrimary }}
-              >
-                {toTime(minutes)}
-              </Text>
-              <Button
-                variant="icon"
-                icon={ChevronUp}
-                background="none"
-                accessibilityLabel={T.later}
-                onPress={() => shift(STEP_MIN)}
-              />
-            </View>
+            <LessonTimeWheel value={minutes} onChange={setMinutes} />
           ) : (
             <Text variant="caption" color="secondary">
               {T.daysHint}
@@ -232,12 +203,6 @@ const st = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.xs,
-  },
-  timeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.m,
   },
   loading: {
     marginVertical: spacing.s,

@@ -4,11 +4,18 @@
  */
 import { NeonService } from '@/services/NeonService';
 
-// Шаг и границы времени занятия
-export const STEP_MIN = 15;
+// Шаг барабана минут (как у срока задания) и границы времени занятия.
+// Сервер (api/_handlers/teacher/courses.js, parseSchedule) принимает время, кратное 5 минутам.
+export const STEP_MIN = 5;
 export const DEFAULT_MINUTES = 18 * 60;
 export const MIN_MINUTES = 7 * 60;
 export const MAX_MINUTES = 22 * 60;
+
+/** Минуты от полуночи → в границы занятия и на шаг барабана */
+export function clampLessonMinutes(minutes: number): number {
+  const snapped = Math.round(minutes / STEP_MIN) * STEP_MIN;
+  return Math.min(MAX_MINUTES, Math.max(MIN_MINUTES, snapped));
+}
 
 const pad = (n: number) => String(n).padStart(2, '0');
 export const toTime = (minutes: number) => `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
@@ -24,8 +31,8 @@ export const SCHEDULE_TEXTS = {
   daysLabel: 'Дни занятий',
   timeLabel: 'Начало занятия',
   timeHint: 'Время — по часовому поясу курса',
-  earlier: 'Раньше на 15 минут',
-  later: 'Позже на 15 минут',
+  hourColumn: 'Часы',
+  minuteColumn: 'Минуты',
   startsAt: 'Начало в',
   save: 'Сохранить',
   saving: 'Сохранение…',
