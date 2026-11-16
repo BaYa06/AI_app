@@ -7,6 +7,7 @@ import { View, StyleSheet, Pressable, ScrollView, Platform } from 'react-native'
 import { useThemeColors } from '@/store';
 import { Text, StreakCelebration } from '@/components/common';
 import { recordHighlightLessonDay } from '@/services/dailyHighlight';
+import { markHintShown, noteStudyMode } from '@/services/momentHints';
 import { Analytics } from '@/services/analytics';
 import { currentPushOrigin, reportPushLesson } from '@/services/pushOpens';
 import { recordSessionForRatingPrompt, markRatingPromptShown } from '@/services/feedback';
@@ -238,6 +239,19 @@ export function StudyResultsScreen({ navigation, route }: Props) {
       cancelled = true;
     };
   }, [isLessonEnd]);
+
+  // «Попробуй другую игру» (plan/new/new_user_activation.md, Start 4.3): 3 дня подряд — одним
+  // режимом. Сессия «Изучить» и урок дня и так из разных этапов — их не считаем
+  const [sameMode, setSameMode] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (session || lesson) return;
+    const mode = noteStudyMode(localDay(), modeTitle);
+    if (!mode) return;
+    markHintShown('another_game');
+    Analytics.momentHintShown('another_game');
+    setSameMode(mode);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const otherGame = sameMode === 'Пары' ? 'MultipleChoice' : 'Match';
 
   // Осталось = карточки которые еще не просмотрены + ошибочные карточки
   const remainingNewCards =
@@ -588,6 +602,28 @@ export function StudyResultsScreen({ navigation, route }: Props) {
           </Pressable>
         )}
 
+        {sameMode && (
+          <View style={[styles.otherGame, { backgroundColor: alpha(colors.primary, 10) }]}>
+            <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '600' }}>
+              Попробуй другую игру
+            </Text>
+            <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
+              Ты третий день учишь режимом «{sameMode}». Разные игры — слова запоминаются лучше.
+            </Text>
+            <Button
+              title={otherGame === 'Match' ? 'Сыграть в «Пары»' : 'Пройти тест'}
+              variant="secondary"
+              size="s"
+              style={styles.otherGameButton}
+              onPress={() => {
+                Analytics.momentHintTapped('another_game');
+                setSameMode(null);
+                navigation.replace(otherGame, { setId });
+              }}
+            />
+          </View>
+        )}
+
         {showWidgetPrompt && (
           <WidgetPromptCard
             onHowTo={() => {
@@ -730,6 +766,16 @@ export function StudyResultsScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
+  // «Попробуй другую игру» (Start 4.3)
+  otherGame: {
+    borderRadius: borderRadius.l,
+    padding: spacing.m,
+    gap: spacing.xxs,
+  },
+  otherGameButton: {
+    alignSelf: 'flex-start',
+    marginTop: spacing.xs,
+  },
   container: {
     flex: 1,
   },
