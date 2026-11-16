@@ -628,9 +628,15 @@ const speakWithCloud = async (
   return true;
 };
 
+// Очередь предзагрузки: по одному слову, а не все разом (plan/new/vercel_cpu.md, CPU 4).
+// Параллельные запросы к api/ai поднимали на Vercel по процессу на каждый (холодный старт = CPU),
+// а следующий запрос после завершения предыдущего попадает в уже прогретый процесс.
+let prefetchChain: Promise<unknown> = Promise.resolve();
+
 /**
  * Заранее озвучить слова, которые вероятно нажмут (текущая и следующая карточка) — тогда кнопка
  * динамика играет мгновенно. Тихо: ошибки (нет сети, нет ключа) игнорируются.
+ * Слова синтезируются по очереди; нажатие на динамик (speak) очередь не ждёт.
  */
 export function prefetchSpeech(
   items: Array<{ text: string; counterpart?: string; lang?: string }>
@@ -639,7 +645,8 @@ export function prefetchSpeech(
     const normalized = (item.text || '').trim().split(/\r?\n/)[0].trim();
     if (!normalized) continue;
     const lang = item.lang || detectLanguage(normalized, item.counterpart);
-    ensureCached(ttsKey(normalized, lang), normalized, lang).catch(() => {});
+    const key = ttsKey(normalized, lang);
+    prefetchChain = prefetchChain.then(() => ensureCached(key, normalized, lang)).catch(() => {});
   }
 }
 
