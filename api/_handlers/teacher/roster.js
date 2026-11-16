@@ -2,9 +2,13 @@
  * api/teacher.js — ростер, статистика ученика, владелец, видимость набора, напоминание.
  */
 import { courseSetIdsSql } from '../../_course.js';
-import { sendNotification } from '../../push.js';
 import { notifyCoursesChanged } from '../../_realtime.js';
 import { log } from '../../_log.js';
+
+// push.js тянет firebase-admin (~180 мс CPU на холодный старт) — грузим только когда шлём пуш
+// (plan/new/vercel_cpu.md, CPU 2)
+const sendNotification = async (...args) =>
+  (await import('../../push.js')).sendNotification(...args);
 
 /**
  * Серия ученика — та же, что он видит у себя (plan/new/streak_freeze_display.md, Freeze 7).

@@ -30,7 +30,7 @@ import {
   sendNotification,
 } from './_send.js';
 import { log } from '../_log.js';
-import { formatInZone } from '../_homeworkExcel.js';
+import { formatInZone } from '../_timezone.js';
 
 const FCM_BATCH = 500;
 const DAILY_SLOT = 'daily';

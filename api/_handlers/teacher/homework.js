@@ -4,7 +4,6 @@
  */
 import { UUID_RE } from '../../_access.js';
 import { courseSetIdsSql } from '../../_course.js';
-import { sendNotification } from '../../push.js';
 import {
   assignedStudentsSql,
   isValidDue,
@@ -13,7 +12,12 @@ import {
   KNOWN_STEP,
   FIXED_AFTER_DAYS,
 } from '../../_homework.js';
-import { buildHomeworkWorkbook, DEFAULT_TIMEZONE, formatInZone } from '../../_homeworkExcel.js';
+import { DEFAULT_TIMEZONE, formatInZone } from '../../_timezone.js';
+
+// push.js тянет firebase-admin (~180 мс CPU на холодный старт) — грузим только когда шлём пуш
+// (plan/new/vercel_cpu.md, CPU 2)
+const sendNotification = async (...args) =>
+  (await import('../../push.js')).sendNotification(...args);
 
 const isUuid = (v) => typeof v === 'string' && UUID_RE.test(v);
 
@@ -252,6 +256,8 @@ export async function homeworkExport(req, res, sql, userId) {
   const hw = await ownedHomework(sql, homeworkId, userId);
   if (!hw) return res.status(403).json({ error: 'Not the owner' });
   const data = await loadHomeworkStatus(sql, hw);
+  // exceljs (~280 мс CPU) — только здесь, а не при каждом холодном старте api/teacher.js (CPU 2)
+  const { buildHomeworkWorkbook } = await import('../../_homeworkExcel.js');
   const file = await buildHomeworkWorkbook(data, {
     courseTitle: hw.course_title,
     timeZone: hw.course_timezone || DEFAULT_TIMEZONE,

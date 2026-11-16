@@ -10,7 +10,6 @@ import {
   buildReport,
   generateReportCode,
 } from '../../_report.js';
-import { buildReportPdf, reportFilename } from '../../_reportPdf.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const isUuid = (v) => typeof v === 'string' && UUID_RE.test(v);
@@ -117,6 +116,8 @@ export async function reportPdf(req, res, sql, userId) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const owned = await ownedReport(res, sql, userId, req.body);
   if (!owned) return;
+  // pdfkit (~200 мс CPU) — только здесь, а не при каждом холодном старте api/teacher.js (CPU 2)
+  const { buildReportPdf, reportFilename } = await import('../../_reportPdf.js');
   const buffer = await buildReportPdf(owned.report);
   return res.status(200).json({
     ok: true,

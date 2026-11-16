@@ -23,10 +23,17 @@ jest.mock('../_log.js', () => ({
     debug: () => {},
   },
 }));
-// push.js грузится через import(): в jest без --experimental-vm-modules он падает, и sendPush
-// пишет «push <type> failed». По этим строкам и считаем, какие пуши сервер пытался отправить.
+// push.js грузится через import() (в jest его превращает в require плагин из babel.config.cjs).
+// Заглушка записывает, какие пуши сервер отправил.
 let mockLogErrors = [];
-const pushes = () => mockLogErrors.map((m) => /^push (\w+) failed$/.exec(m)?.[1]).filter(Boolean);
+let mockPushes = [];
+jest.mock('../push.js', () => ({
+  sendNotification: async (_sql, _userId, type) => {
+    mockPushes.push(type);
+    return { ok: true };
+  },
+}));
+const pushes = () => mockPushes;
 
 const {
   updateUserStatsStreak,
@@ -58,6 +65,7 @@ beforeEach(() => {
   mockQueries = [];
   mockRules = [];
   mockLogErrors = [];
+  mockPushes = [];
 });
 
 describe('updateUserStatsStreak — отметка засчитанного дня', () => {
