@@ -284,6 +284,15 @@ export function Sheet({
 export interface DialogProps extends OverlayProps {
   /** center — по центру (по умолчанию); top — у верхнего края (окно серии). */
   placement?: 'center' | 'top';
+  /**
+   * Слоем внутри экрана, а не системным окном (<Modal>). Нужно, когда кнопка окна сразу уводит
+   * с экрана (replace / pop): закрытие <Modal> в одном кадре с переходом роняет iOS —
+   * NSInvalidArgumentException «already being presented» (Crashlytics 1.9.3, выход из сессии;
+   * то же было с праздником серии, коммит a12afa6). Слой исчезает вместе с экраном.
+   * Окно должно быть последним ребёнком корневого View экрана на весь экран; Android «назад»
+   * экран обрабатывает сам (BackHandler).
+   */
+  inScreen?: boolean;
 }
 
 export function Dialog({
@@ -296,6 +305,7 @@ export function Dialog({
   footer,
   placement = 'center',
   style,
+  inScreen = false,
 }: DialogProps) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
@@ -305,42 +315,50 @@ export function Dialog({
 
   const scale = progress.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] });
 
+  const content = (
+    <KeyboardAvoidingView
+      style={[
+        styles.fill,
+        styles.dialogWrapper,
+        placement === 'top' && {
+          justifyContent: 'flex-start',
+          paddingTop: insets.top + spacing.xl,
+        },
+      ]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <Animated.View
+        style={[StyleSheet.absoluteFill, { backgroundColor: colors.overlay, opacity: progress }]}
+      >
+        <Pressable
+          style={styles.fill}
+          onPress={dismissOnBackdrop ? onClose : undefined}
+          accessibilityLabel="Закрыть"
+          accessible={dismissOnBackdrop}
+        />
+      </Animated.View>
+      <Animated.View
+        accessibilityViewIsModal
+        style={[
+          styles.dialog,
+          { backgroundColor: colors.surface, opacity: progress, transform: [{ scale }] },
+          style,
+        ]}
+      >
+        <OverlayHeader title={title} headerRight={headerRight} inset={false} />
+        {children}
+        {footer ? <View style={styles.dialogFooter}>{footer}</View> : null}
+      </Animated.View>
+    </KeyboardAvoidingView>
+  );
+
+  if (inScreen) {
+    return <View style={styles.inScreen}>{content}</View>;
+  }
+
   return (
     <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        style={[
-          styles.fill,
-          styles.dialogWrapper,
-          placement === 'top' && {
-            justifyContent: 'flex-start',
-            paddingTop: insets.top + spacing.xl,
-          },
-        ]}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <Animated.View
-          style={[StyleSheet.absoluteFill, { backgroundColor: colors.overlay, opacity: progress }]}
-        >
-          <Pressable
-            style={styles.fill}
-            onPress={dismissOnBackdrop ? onClose : undefined}
-            accessibilityLabel="Закрыть"
-            accessible={dismissOnBackdrop}
-          />
-        </Animated.View>
-        <Animated.View
-          accessibilityViewIsModal
-          style={[
-            styles.dialog,
-            { backgroundColor: colors.surface, opacity: progress, transform: [{ scale }] },
-            style,
-          ]}
-        >
-          <OverlayHeader title={title} headerRight={headerRight} inset={false} />
-          {children}
-          {footer ? <View style={styles.dialogFooter}>{footer}</View> : null}
-        </Animated.View>
-      </KeyboardAvoidingView>
+      {content}
       <ToastHost offset={insets.bottom + spacing.xl} />
     </Modal>
   );
@@ -398,6 +416,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: screenPadding,
     paddingTop: spacing.s,
     gap: spacing.s,
+  },
+  // Dialog inScreen: поверх всего на экране, касания под слой не проходят
+  inScreen: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1000,
+    elevation: 1000,
   },
   dialogWrapper: {
     alignItems: 'center',

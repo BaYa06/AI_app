@@ -99,11 +99,13 @@ export const StageLayout = memo(function StageLayout({
   }, [navigation, session]);
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      requestExit();
+      // Окно выхода — слой внутри экрана: «Назад» при нём его закрывает, как закрывал бы <Modal>
+      if (confirmExit) setConfirmExit(false);
+      else requestExit();
       return true;
     });
     return () => sub.remove();
-  }, [requestExit]);
+  }, [requestExit, confirmExit]);
 
   useEffect(() => {
     if (!introVisible) {
@@ -210,7 +212,10 @@ export const StageLayout = memo(function StageLayout({
         />
       ) : null}
 
+      {/* Слоем, не <Modal>: «Выйти» сразу уводит с экрана (replace/pop), а закрытие системного
+          окна в том же кадре роняло iOS (Crashlytics 1.9.3, NSInvalidArgumentException) */}
       <Dialog
+        inScreen
         visible={confirmExit}
         onClose={() => setConfirmExit(false)}
         title="Выйти из сессии?"
