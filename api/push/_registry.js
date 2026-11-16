@@ -465,9 +465,10 @@ export const PUSH_TYPES = {
     minIntervalDays: 0,
     link: LESSON_LINK,
     variants: [
-      ({ data }) => ({
+      // «Второй день решает» (plan/new/new_user_activation.md, Start 5.1): число слов и время
+      ({ data, secPerAnswer }) => ({
         title: 'Повтори вчерашние слова',
-        body: `${data.count} ${plural(data.count, 'слово', 'слова', 'слов')} со вчерашнего урока пора повторить — так ${data.count === 1 ? 'оно запомнится' : 'они запомнятся'}`,
+        body: `${data.count} ${plural(data.count, 'слово ждёт', 'слова ждут', 'слов ждут')} повторения · ~${minutesFor(data.count, secPerAnswer)} мин — так ${data.count === 1 ? 'оно запомнится' : 'они запомнятся'}`,
       }),
     ],
   },
