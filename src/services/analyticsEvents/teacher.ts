@@ -32,6 +32,13 @@ export type TeacherAction =
   | 'report_pdf';
 
 export const teacherEvents = {
+  // Первые шаги учителя (plan/new/new_user_activation.md, этап 6)
+  teacherDemoStarted: () => log('teacher_demo_started'),
+  teacherDemoFinished: () => log('teacher_demo_finished'),
+  teacherStartTaskAction: (task: string) => log('teacher_start_task_action', { task }),
+  teacherStarterCourseCreated: (subject: string) =>
+    log('teacher_starter_course_created', { subject }),
+
   // ═══════════════════════════════════════════════════════════════════════════
   // КАБИНЕТ УЧИТЕЛЯ (plan/done/teacher_cabinet.md, Teacher 12)
   // Зачем: учителя заходили один раз и бросали. Смотрим, возвращаются ли они и что делают.

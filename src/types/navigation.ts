@@ -245,6 +245,8 @@ export type RootStackParamList = {
     questionCount: number;
     timePerQuestion: number;
   };
+  /** Демо живого теста с ботами — только на устройстве (Start 6.2) */
+  TeacherDemoTest: undefined;
   LiveTest: {
     courseId: string;
     courseTitle: string;
