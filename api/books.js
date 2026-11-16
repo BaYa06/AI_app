@@ -99,11 +99,18 @@ async function catalogAccess(sql, userId) {
   return { admin, allBooks: admin || rows[0]?.teacher === true };
 }
 
-/** Книга, видимая вызывающему: опубликованная, либо любая — для админа. */
-async function findVisibleBook(sql, bookId, admin) {
+/**
+ * Книга, видимая вызывающему: опубликованная, либо любая — для админа. Книга учебного центра — только
+ * с доступом к центру (flashly_org_access: ученик по коду, участник центра, админ Flashly).
+ * Без доступа — как будто книги нет (404): не раскрываем, что она существует.
+ */
+async function findVisibleBook(sql, bookId, admin, userId) {
   const rows = await sql`
-    SELECT id, title, edition, level, subject, language_from, language_to, publisher, is_published, student_visible
-    FROM books WHERE id = ${bookId}::uuid AND (is_published = true OR ${admin}::boolean)
+    SELECT id, title, edition, level, subject, language_from, language_to, publisher, is_published,
+           student_visible, organization_id
+    FROM books
+    WHERE id = ${bookId}::uuid AND (is_published = true OR ${admin}::boolean)
+      AND (organization_id IS NULL OR flashly_org_access(organization_id, ${userId}::uuid))
   `;
   return rows[0] || null;
 }
@@ -141,6 +148,8 @@ async function listBooks(req, res, sql, userId) {
     FROM books b
     WHERE (b.is_published = true OR ${admin}::boolean)
       AND (${allBooks}::boolean OR b.student_visible = true)
+      -- Книги учебных центров в общем каталоге не показываем (у учителя центра — своя полка, Center 14)
+      AND (b.organization_id IS NULL OR ${admin}::boolean)
       AND (${subject}::text IS NULL OR lower(b.subject) = lower(${subject}::text))
       AND (${level}::text IS NULL OR lower(b.level) = lower(${level}::text))
       AND (${q}::text IS NULL OR b.title ILIKE '%' || ${q}::text || '%' OR b.publisher ILIKE '%' || ${q}::text || '%')
@@ -163,8 +172,9 @@ async function bookDetail(req, res, sql, userId) {
   if (!isUuid(bookId)) return res.status(400).json({ error: 'bookId required' });
 
   const { admin, allBooks } = await catalogAccess(sql, userId);
-  const book = await findVisibleBook(sql, bookId, admin);
-  if (!book || !(allBooks || book.student_visible))
+  const book = await findVisibleBook(sql, bookId, admin, userId);
+  // Книгу центра findVisibleBook уже отдал только тому, у кого доступ к центру
+  if (!book || !(allBooks || book.student_visible || book.organization_id))
     return res.status(404).json({ error: 'Book not found' });
 
   // На старте 1 юнит = 1 набор, но отдаём массив — схема допускает несколько наборов в юните.
@@ -222,8 +232,11 @@ async function attachToCourses(req, res, sql, userId) {
   const uniqueIds = [...new Set(courseIds)];
 
   const admin = await isAdmin(sql, userId);
-  const book = await findVisibleBook(sql, bookId, admin);
+  const book = await findVisibleBook(sql, bookId, admin, userId);
   if (!book) return res.status(404).json({ error: 'Book not found' });
+  // Книгу центра к группе подключает только учитель центра, с проверкой мест (Center 14).
+  // До него — никто, кроме админа Flashly.
+  if (book.organization_id && !admin) return res.status(404).json({ error: 'Book not found' });
 
   // Все курсы должны принадлежать вызывающему — иначе не подключаем ни один.
   const owned = await sql`
@@ -312,6 +325,8 @@ async function coursePlan(req, res, sql, userId) {
     ) cs ON true
     WHERE cb.course_id = ${courseId}::uuid
       AND (${isOwner}::boolean OR (b.is_published = true AND cu.is_open = true))
+      -- Книга центра: у учителя — пока он в центре, у ученика — открытый юнит группы центра
+      AND (b.organization_id IS NULL OR flashly_unit_access(u.id, ${userId}::uuid))
     ORDER BY cb.created_at, b.title, u.sort_order, u.number
   `;
 
@@ -406,6 +421,8 @@ async function forkSet(req, res, sql, userId) {
     JOIN book_units u ON u.id = cs.unit_id
     JOIN books b ON b.id = u.book_id
     WHERE cs.id = ${setId}::uuid AND cs.is_official AND (b.is_published = true OR ${admin}::boolean)
+      -- Книги учебных центров не копируются: копию можно было бы поделить и опубликовать
+      AND b.organization_id IS NULL
   `;
   if (source.length === 0) return res.status(404).json({ error: 'Official set not found' });
 
@@ -485,8 +502,12 @@ async function officialSets(req, res, sql, userId) {
     JOIN book_units u ON u.id = cs.unit_id
     JOIN books b ON b.id = u.book_id AND (b.is_published = true OR ${admin}::boolean)
     WHERE cs.is_official = true
+      -- Книга центра: только при доступе (по коду, в центре, открытый юнит группы центра). Начатые
+      -- юниты закрытой книги больше не приходят — прогресс в card_progress остаётся
+      AND (b.organization_id IS NULL OR flashly_unit_access(u.id, ${userId}::uuid))
       AND (
-        (cs.id = ANY(${requested}::uuid[]) AND (${allBooks}::boolean OR b.student_visible = true))
+        (cs.id = ANY(${requested}::uuid[])
+          AND (${allBooks}::boolean OR b.student_visible = true OR b.organization_id IS NOT NULL))
         OR u.id IN (SELECT unit_id FROM my_open_units)
         OR EXISTS (
           SELECT 1 FROM cards c JOIN card_progress p ON p.card_id = c.id AND p.user_id = ${userId}::uuid

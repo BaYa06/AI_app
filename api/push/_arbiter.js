@@ -114,10 +114,13 @@ async function sendClassPrep(sql, { dryRun }) {
             SELECT COUNT(*)::int AS n FROM card_progress cp JOIN cards ca ON ca.id = cp.card_id
             WHERE cp.user_id = ${r.user_id} AND cp.learning_step >= 1 AND cp.next_review <= NOW() + INTERVAL '2 hours'
               AND ca.set_id IN (${courseSetIdsSql(sql, r.course_id)})
+              AND flashly_card_access(cp.card_id, ${r.user_id}::uuid)
           `
         : await sql`
             SELECT COUNT(*)::int AS n FROM card_progress
             WHERE user_id = ${r.user_id} AND learning_step >= 1 AND next_review <= NOW() + INTERVAL '2 hours'
+              -- без слов закрытой книги учебного центра (plan/new/center_books.md, Center 2)
+              AND flashly_card_access(card_id, ${r.user_id}::uuid)
           `;
       if (n === 0) {
         if (dryRun)
@@ -470,7 +473,9 @@ async function loadCandidates(sql) {
              COUNT(*) FILTER (WHERE NOW() - next_review > make_interval(days =>
                CASE LEAST(learning_step, 6) WHEN 1 THEN 1 WHEN 2 THEN 3 WHEN 3 THEN 7 WHEN 4 THEN 14 WHEN 5 THEN 30 ELSE 60 END
              ))::int AS fading
-      FROM card_progress WHERE user_id = b.user_id AND learning_step >= 1
+      -- Обе цифры — только по наступившим словам; проверка доступа к книге центра — только для них
+      FROM card_progress WHERE user_id = b.user_id AND learning_step >= 1 AND next_review <= NOW()
+        AND flashly_card_access(card_id, b.user_id)
     ) cp ON true
     LEFT JOIN LATERAL (
       -- Режим игнора (2.3): отправленные маркетинговые пуши без открытия за сутки — после последнего

@@ -82,7 +82,9 @@ export async function dayCountsForStreak(sql, me, today, tz) {
         WHERE user_id = ${me}::uuid AND rejected_reason IS NULL AND was_due AND step_before >= 1
           AND (answered_at AT TIME ZONE ${tz})::date = ${today}::date)::int AS reviewed,
       (SELECT COUNT(*) FROM card_progress
-        WHERE user_id = ${me}::uuid AND learning_step >= 1 AND next_review <= NOW())::int AS waiting
+        WHERE user_id = ${me}::uuid AND learning_step >= 1 AND next_review <= NOW()
+          -- без слов закрытой книги центра: повторить их нельзя, иначе день не закрыть
+          AND flashly_card_access(card_id, ${me}::uuid))::int AS waiting
   `;
   const { active, reviewed, waiting } = rows[0];
   return {

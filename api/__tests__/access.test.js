@@ -133,8 +133,19 @@ describe('api/data', () => {
     await data()({ method: 'GET', query: { action: 'loadCardsBySet', setId: SET } }, res);
     expect(res.statusCode).toBe(403);
     const check = mockQueries.find((q) => /FROM card_sets s WHERE/.test(q.text));
-    expect(check.values).toEqual([SET, ME, ME, ME]);
+    expect(check.values).toEqual([SET, ME, ME, ME, ME]);
     expect(mockQueries.some((q) => /FROM cards WHERE set_id/.test(q.text))).toBe(false);
+  });
+
+  it('официальный набор — только с проверкой доступа к книге центра (Center 2)', async () => {
+    mockRules = [[/^SELECT 1 FROM card_sets s WHERE s.id = \?::uuid/, () => []]];
+    await data()({ method: 'GET', query: { action: 'loadCardsBySet', setId: SET } }, mockRes());
+    const check = mockQueries.find((q) => /FROM card_sets s WHERE/.test(q.text));
+    // Раньше было голое «OR s.is_official» — любой официальный набор читался по setId
+    expect(check.text).toMatch(
+      /s\.is_official AND \(s\.unit_id IS NULL OR flashly_unit_access\(s\.unit_id, \?::uuid\)\)/
+    );
+    expect(check.text).not.toMatch(/OR s\.is_official\s+OR/);
   });
 
   it('удалить чужую карточку нельзя: DELETE только с условием «набор мой», ответ 403', async () => {
