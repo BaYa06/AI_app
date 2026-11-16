@@ -248,7 +248,7 @@ user_books              user_id, book_id, current_unit_id, is_active, updated_at
   видна в библиотеке и поиске.
 
 ### Этап 2 — вход по коду и ссылке
-- **Center 5** — экран кода принимает код центра; «Центр найден»; ошибки по `reason`;
+- ✅ **Center 5** (5.1–5.4: `CenterService`, `utils/centerCode`, `CenterFoundScreen`, `CenterInviteModal`, `api/join.js`) — экран кода принимает код центра; «Центр найден»; ошибки по `reason`;
   `/join/<код>` в `App.tsx` (вторая регулярка рядом с 64-hex токеном) и в `api/join.js`
   (лендинг для кода центра). Онбординг: ветка центра пропускает языки, цель, норму, имя и
   стартовый набор.

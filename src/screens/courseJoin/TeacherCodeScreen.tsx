@@ -77,7 +77,8 @@ export function TeacherCodeScreen({ onFound, onCenterFound, onBack }: Props) {
       onBack={onBack}
       title="Flashly"
       step={1}
-      total={2}
+      // Код центра: код → «Центр найден» → книга → юнит (Center 6); код курса: код → курс
+      total={center ? 4 : 2}
       headline="Введи код"
       description="От учителя — 6 символов. От учебного центра — с дефисом, например ALFA-DEC-7K."
       keyboard
