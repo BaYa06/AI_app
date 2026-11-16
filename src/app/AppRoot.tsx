@@ -25,6 +25,8 @@ import { WithTeacherScreen } from '@/screens/WithTeacherScreen';
 import { TeacherCodeScreen } from '@/screens/courseJoin/TeacherCodeScreen';
 import { CourseFoundScreen } from '@/screens/courseJoin/CourseFoundScreen';
 import { CourseNameScreen } from '@/screens/courseJoin/CourseNameScreen';
+import { CenterFoundScreen } from '@/screens/courseJoin/CenterFoundScreen';
+import type { CenterActivateAction, CenterCodeResult } from '@/services/CenterService';
 import type { CourseInviteInfo, JoinCourseAction } from '@/services/neon/courses';
 import { FirstCardsScreen } from '@/screens/firstLesson/FirstCardsScreen';
 import { FirstMatchScreen } from '@/screens/firstLesson/FirstMatchScreen';
@@ -68,6 +70,7 @@ export type AuthStep =
   | 'teacher_code'
   | 'course_found'
   | 'course_name'
+  | 'center_found'
   | 'native_language'
   | 'target_languages'
   | 'starter_build'
@@ -116,6 +119,11 @@ type AppRootProps = {
   onCourseJoin: JoinCourseAction;
   onCourseNotMine: () => void;
   onCourseName: (name: string) => void;
+  /** Ученик с кодом или ссылкой учебного центра (plan/new/center_books.md, Center 5) */
+  centerJoin: { via: 'code' | 'link'; info: Extract<CenterCodeResult, { ok: true }> } | null;
+  onCenterFound: (code: string, info: Extract<CenterCodeResult, { ok: true }>) => void;
+  onCenterActivate: CenterActivateAction;
+  onCenterNotMine: () => void;
   /** Первый урок (Start 2.5): выданный стартовый набор и шаги урока */
   firstLesson: StarterSet | null;
   starterReady: boolean | null;
@@ -174,6 +182,10 @@ export function AppRoot({
   onCourseJoin,
   onCourseNotMine,
   onCourseName,
+  centerJoin,
+  onCenterFound,
+  onCenterActivate,
+  onCenterNotMine,
   firstLesson,
   starterReady,
   onStarterBuilt,
@@ -293,13 +305,24 @@ export function AppRoot({
               total={3}
             />
           ) : authStep === 'teacher_code' ? (
-            <TeacherCodeScreen onFound={onCodeFound} onBack={onBackToRole} />
+            <TeacherCodeScreen
+              onFound={onCodeFound}
+              onCenterFound={onCenterFound}
+              onBack={onBackToRole}
+            />
           ) : authStep === 'course_found' && courseJoin ? (
             <CourseFoundScreen
               info={courseJoin.info}
               viaLink={courseJoin.via === 'link'}
               onJoin={onCourseJoin}
               onNotMine={onCourseNotMine}
+            />
+          ) : authStep === 'center_found' && centerJoin ? (
+            <CenterFoundScreen
+              info={centerJoin.info}
+              viaLink={centerJoin.via === 'link'}
+              onActivate={onCenterActivate}
+              onNotMine={onCenterNotMine}
             />
           ) : authStep === 'course_name' ? (
             <CourseNameScreen onContinue={onCourseName} />

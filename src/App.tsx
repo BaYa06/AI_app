@@ -37,6 +37,8 @@ import { markTeacherStarted } from '@/services/teacherStart';
 import type { CourseInviteInfo } from '@/services/neon/courses';
 import { callDataApi } from '@/services/neon/core';
 import { describeTeacherApiReason } from '@/utils/teacherApiErrors';
+import { CenterService, type CenterCodeResult } from '@/services/CenterService';
+import { describeCenterReason } from '@/utils/centerCode';
 import { recordHighlightLessonDay } from '@/services/dailyHighlight';
 import { localDay } from '@/store/challengeStore';
 import type { StarterSet } from '@/services/StarterSetService';
@@ -96,6 +98,12 @@ export default function App() {
     token?: string;
     info: CourseInviteInfo;
     joined?: boolean;
+  } | null>(null);
+  // Ученик с кодом или ссылкой учебного центра (plan/new/center_books.md, Center 5)
+  const [centerJoin, setCenterJoin] = useState<{
+    via: 'code' | 'link';
+    code: string;
+    info: Extract<CenterCodeResult, { ok: true }>;
   } | null>(null);
   // Набор по ссылке: код, «ждём входа» (человек нажал «Войти и добавить») и «добавить сразу после входа»
   const [pendingShareCode, setPendingShareCode] = useState<string | null>(null);
@@ -651,7 +659,10 @@ export default function App() {
   }, []);
 
   const finishOnboarding = useCallback(
-    async (finalData: typeof onboardingData, opts: { joinedCourseId?: string } = {}) => {
+    async (
+      finalData: typeof onboardingData,
+      opts: { joinedCourseId?: string; joinedCenter?: boolean } = {}
+    ) => {
       if (!currentUserId) return;
       await NeonService.saveOnboardingData(currentUserId, {
         displayName: finalData.displayName,
@@ -668,7 +679,12 @@ export default function App() {
       });
       // Стартовый набор — до перезагрузки данных, иначе она его сотрёт (plan/new/new_user_activation.md, 1.3).
       // Обычно он уже выдан перед первым уроком; здесь — если тогда не было сети
-      if (finalData.role !== 'teacher' && !firstLesson && !opts.joinedCourseId) {
+      if (
+        finalData.role !== 'teacher' &&
+        !firstLesson &&
+        !opts.joinedCourseId &&
+        !opts.joinedCenter
+      ) {
         await issueStarterSet({
           userId: currentUserId,
           nativeLanguage: finalData.nativeLanguage,
@@ -694,6 +710,8 @@ export default function App() {
         callDataApi('startCourseStudentTasks').catch(() => {});
         reloaded.then(() => useCoursesStore.getState().setActiveCourse(courseId)).catch(() => {});
       }
+      // Ученик учебного центра: те же 3 задания «Начала пути», что у ученика курса (Center 5)
+      if (opts.joinedCenter) callDataApi('startCourseStudentTasks').catch(() => {});
       setAnalyticsUserId(currentUserId);
       setCrashUserId(currentUserId);
       Analytics.onboardingComplete();
@@ -772,6 +790,44 @@ export default function App() {
     }
     return null;
   }, [courseJoin, currentUserId, onboardingData.displayName, finishCourseJoin]);
+
+  // ── Ученик с кодом или ссылкой учебного центра (plan/new/center_books.md, Center 5) ──
+  const handleCenterFound = useCallback(
+    (code: string, info: Extract<CenterCodeResult, { ok: true }>) => {
+      setCenterJoin({ via: 'code', code, info });
+      setAuthStep('center_found');
+    },
+    []
+  );
+  const handleCenterNotMine = useCallback(() => {
+    Analytics.orgNotMine(centerJoin?.via ?? 'code');
+    if (centerJoin?.via === 'link') {
+      setCenterJoin(null);
+      setAuthStep('role');
+      return;
+    }
+    setAuthStep('teacher_code');
+  }, [centerJoin]);
+  const handleCenterActivate = useCallback(async (): Promise<string | null> => {
+    if (!centerJoin || !currentUserId) return describeCenterReason('network');
+    const result = await CenterService.activate(centerJoin.code);
+    if (!result.ok) return describeCenterReason(result.reason);
+    Analytics.orgJoined(centerJoin.via);
+    // Языки карточек — из книги центра: экраны языков, цели, нормы и имени ученик центра пропускает.
+    // Выбор книги и юнита — Center 6
+    const mine = await CenterService.loadMine();
+    const book = mine?.organizations.find((o) => o.id === result.organization.id)?.books[0];
+    const finalData = {
+      ...onboardingData,
+      role: 'student' as const,
+      nativeLanguage: book?.languageTo ?? onboardingData.nativeLanguage,
+      targetLanguages: book ? [book.languageFrom] : onboardingData.targetLanguages,
+    };
+    setOnboardingData(finalData);
+    setCenterJoin(null);
+    finishOnboarding(finalData, { joinedCenter: true });
+    return null;
+  }, [centerJoin, currentUserId, onboardingData, finishOnboarding]);
 
   const handleSubmitDaily = useCallback((dailyId: string) => {
     // Выбор «5 / 10 / 20 слов в день» — квота новых слов урока дня (plan/done/home_redesign.md, 1.5)
@@ -916,6 +972,10 @@ export default function App() {
           onCourseJoin={handleCourseJoin}
           onCourseNotMine={handleCourseNotMine}
           onCourseName={finishCourseJoin}
+          centerJoin={centerJoin}
+          onCenterFound={handleCenterFound}
+          onCenterActivate={handleCenterActivate}
+          onCenterNotMine={handleCenterNotMine}
           firstLesson={firstLesson}
           starterReady={starterReady}
           onStarterBuilt={handleStarterBuilt}

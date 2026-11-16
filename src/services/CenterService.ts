@@ -30,6 +30,9 @@ export type CenterCodeResult =
     }
   | { ok: false; reason: CenterCodeReason };
 
+/** Открыть доступ по коду: текст ошибки для экрана или null */
+export type CenterActivateAction = () => Promise<string | null>;
+
 export type CenterBook = {
   id: string;
   title: string;
