@@ -66,3 +66,38 @@ export function putStarterSetInStores(starter: StarterSet): void {
   });
   DatabaseService.saveCards();
 }
+
+/**
+ * Стартовый набор ещё одного изучаемого языка — «Хочешь начать и немецкий?» (Start 4.3).
+ * Сервер выдаёт по одному на язык из онбординга, кроме основного.
+ */
+export async function issueExtraStarterSet(input: {
+  userId: string;
+  nativeLanguage: string;
+  language: string;
+}): Promise<StarterSet | null> {
+  const built = buildStarterSet({
+    userId: input.userId,
+    nativeLanguage: input.nativeLanguage,
+    targetLanguages: [input.language],
+  });
+  if (!built) return null;
+  try {
+    const res = await NeonService.createStarterSet({
+      set: built.set,
+      cards: built.cards,
+      extra: true,
+    });
+    if (res?.created !== true) return null;
+    putStarterSetInStores(built);
+    Analytics.starterSetCreated({
+      target: input.language,
+      native: input.nativeLanguage,
+      theme: `${built.theme}_extra`,
+    });
+    return built;
+  } catch (e) {
+    log.warn('StarterSet', 'Набор второго языка не создан', e);
+    return null;
+  }
+}

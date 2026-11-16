@@ -49,7 +49,15 @@ describe('getOnboardingTasks', () => {
     const f = fakeSql([
       {
         match: /SELECT starter_set_id/,
-        rows: [{ starter_set_id: 'set-1', starter_set_issued_at: issued, diamond: 20 }],
+        rows: [
+          {
+            starter_set_id: 'set-1',
+            starter_set_issued_at: issued,
+            diamond: 20,
+            target_languages: ['en', 'de'],
+            starter_extra: {},
+          },
+        ],
       },
       { match: /SELECT task FROM onboarding_tasks/, rows: [{ task: 'first_lesson' }] },
     ]);
@@ -60,6 +68,8 @@ describe('getOnboardingTasks', () => {
       done: ['first_lesson'],
       diamonds: 20,
       reward: 10,
+      targetLanguages: ['en', 'de'],
+      extraStarterLanguages: [],
     });
   });
 });

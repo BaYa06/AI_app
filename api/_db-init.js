@@ -8,7 +8,7 @@ import { log } from './_log.js';
  */
 // schema_039: в 038 (official_sets_guard) и 039 (set_kind) версию не подняли — миграции не выполнились,
 // и запросы с card_sets.kind падали на тестовом сервере (plan/new/set_kind.md, слабые места)
-const SCHEMA_VERSION = 'schema_049';
+const SCHEMA_VERSION = 'schema_050';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -987,6 +987,14 @@ async function applyMigrations(sql) {
     `;
   } catch (e) {
     log.error('db-init', 'Migration 049_onboarding_tasks failed', e);
+  }
+
+  // Migration 050: стартовые наборы второго и третьего изучаемого языка — по одному на язык
+  // (plan/new/new_user_activation.md, Start 4.3): { язык: id набора }
+  try {
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS starter_extra JSONB`;
+  } catch (e) {
+    log.error('db-init', 'Migration 050_starter_extra failed', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)

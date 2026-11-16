@@ -5,7 +5,13 @@ import { describe, expect, it, jest } from '@jest/globals';
 
 jest.mock('../localCache', () => ({ readCache: () => undefined, writeCache: jest.fn() }));
 
-import { addHighlightLessonDay, dismissHighlight, pickHighlight } from '../dailyHighlight';
+import {
+  addHighlightLessonDay,
+  dismissExtraLanguage,
+  dismissHighlight,
+  pickExtraLanguage,
+  pickHighlight,
+} from '../dailyHighlight';
 
 const opts = { isNewStudent: true, doneTasks: [], widgetAvailable: true };
 const days = (n: number) => Array.from({ length: n }, (_, i) => `2026-11-${String(i + 10)}`);
@@ -62,5 +68,33 @@ describe('addHighlightLessonDay', () => {
     expect(addHighlightLessonDay(s, '2026-11-30')).toBe(s);
     const one = addHighlightLessonDay({ lessonDays: [], dismissed: [] }, '2026-11-10');
     expect(addHighlightLessonDay(one, '2026-11-10')).toBe(one);
+  });
+});
+
+describe('pickExtraLanguage', () => {
+  const o = { isNewStudent: true, targetLanguages: ['en', 'de', 'es'], issued: [] as string[] };
+  it('3-й день с уроком — второй язык', () => {
+    expect(pickExtraLanguage({ lessonDays: days(3), dismissed: [] }, '2026-11-12', o)).toBe('de');
+  });
+  it('раньше 3-го дня — нет', () => {
+    expect(pickExtraLanguage({ lessonDays: days(2), dismissed: [] }, '2026-11-11', o)).toBeNull();
+  });
+  it('выдан или закрыт — следующий язык', () => {
+    const s = dismissExtraLanguage({ lessonDays: days(3), dismissed: [] }, 'de');
+    expect(pickExtraLanguage(s, '2026-11-12', o)).toBe('es');
+    expect(
+      pickExtraLanguage({ lessonDays: days(3), dismissed: [] }, '2026-11-12', {
+        ...o,
+        issued: ['de', 'es'],
+      })
+    ).toBeNull();
+  });
+  it('один язык — нет', () => {
+    expect(
+      pickExtraLanguage({ lessonDays: days(3), dismissed: [] }, '2026-11-12', {
+        ...o,
+        targetLanguages: ['en'],
+      })
+    ).toBeNull();
   });
 });

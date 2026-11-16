@@ -149,6 +149,8 @@ import { useStartTasks } from './home/useStartTasks';
 import { StartTasksStack } from '@/components/home/StartTasksStack';
 import { JoinTeacherCard } from '@/components/home/JoinTeacherCard';
 import { NewFeatureCard } from '@/components/home/NewFeatureCard';
+import { ExtraLanguageCard } from '@/components/home/ExtraLanguageCard';
+import { issueExtraStarterSet } from '@/services/starterSetIssue';
 import { useDailyHighlight } from './home/useDailyHighlight';
 import type { HighlightId } from '@/services/dailyHighlight';
 import { closeJoinTeacherCard, shouldShowJoinTeacherCard } from '@/services/joinTeacherCard';
@@ -2017,6 +2019,36 @@ export function HomeScreen({ navigation, route }: any) {
                           onAction={() => daily.highlight && handleHighlight(daily.highlight.id)}
                           onClose={() =>
                             daily.highlight && daily.dismiss(daily.highlight.id, false)
+                          }
+                        />
+                      </View>
+                    )}
+                    {daily.extraLanguage && (
+                      <View style={styles.startTasks}>
+                        <ExtraLanguageCard
+                          language={daily.extraLanguage}
+                          onAdd={async () => {
+                            const language = daily.extraLanguage;
+                            const starter = starterSetIdForTasks
+                              ? useSetsStore.getState().getSet(starterSetIdForTasks)
+                              : undefined;
+                            if (!language || !currentUserId) return;
+                            Analytics.momentHintTapped('extra_language');
+                            const created = await issueExtraStarterSet({
+                              userId: currentUserId,
+                              nativeLanguage: starter?.languageTo ?? 'ru',
+                              language,
+                            });
+                            daily.dismissLanguage(language);
+                            if (created) {
+                              useStartTasksStore.getState().load();
+                              toast.success('Набор «Первые слова» добавлен');
+                            } else {
+                              toast.error('Не получилось добавить набор — попробуй позже');
+                            }
+                          }}
+                          onClose={() =>
+                            daily.extraLanguage && daily.dismissLanguage(daily.extraLanguage)
                           }
                         />
                       </View>

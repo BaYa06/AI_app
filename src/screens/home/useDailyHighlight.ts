@@ -5,8 +5,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
+  dismissExtraLanguage,
   dismissHighlight,
   loadHighlightState,
+  pickExtraLanguage,
   pickHighlight,
   saveHighlightState,
   type HighlightId,
@@ -20,6 +22,8 @@ export function useDailyHighlight(enabled: boolean) {
   const [state, setState] = useState(loadHighlightState);
   const startedAt = useStartTasksStore((s) => s.startedAt);
   const done = useStartTasksStore((s) => s.done);
+  const targetLanguages = useStartTasksStore((s) => s.targetLanguages);
+  const issued = useStartTasksStore((s) => s.extraStarterLanguages);
 
   // Итоги урока записали день — подхватываем, когда главная снова видна
   useFocusEffect(
@@ -49,5 +53,18 @@ export function useDailyHighlight(enabled: boolean) {
     else Analytics.newFeatureDismissed(id);
   }, []);
 
-  return { highlight: picked, dismiss };
+  // «Хочешь начать и <язык>?» (Start 4.3)
+  const extraLanguage = enabled
+    ? pickExtraLanguage(state, localDay(), { isNewStudent: !!startedAt, targetLanguages, issued })
+    : null;
+  useEffect(() => {
+    if (extraLanguage) Analytics.momentHintShown('extra_language');
+  }, [extraLanguage]);
+  const dismissLanguage = useCallback((language: string) => {
+    const next = dismissExtraLanguage(loadHighlightState(), language);
+    saveHighlightState(next);
+    setState(next);
+  }, []);
+
+  return { highlight: picked, dismiss, extraLanguage, dismissLanguage };
 }

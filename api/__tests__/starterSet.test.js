@@ -88,3 +88,59 @@ describe('createStarterSet', () => {
     await expect(createStarterSet(f.sql, ME, { ...payload, cards: many })).rejects.toThrow();
   });
 });
+
+describe('createStarterSet extra (второй язык, Start 4.3)', () => {
+  const extra = { ...payload, extra: true, set: { ...payload.set, languageFrom: 'de' } };
+
+  it('язык из изучаемых, не основной — набор и отметка одной транзакцией', async () => {
+    const f = fakeSql({
+      user: {
+        starter_set_id: SET,
+        teacher: false,
+        target_languages: ['en', 'de'],
+        starter_extra: {},
+      },
+      afterId: SET,
+    });
+    // после транзакции SELECT starter_extra ->> 'de'
+    const orig = f.sql;
+    const sql = (strings, ...values) => {
+      const text = strings.join('?');
+      if (/starter_extra ->>/.test(text) && /AS id/.test(text))
+        return Promise.resolve([{ id: SET }]);
+      return orig(strings, ...values);
+    };
+    sql.transaction = orig.transaction;
+    const res = await createStarterSet(sql, ME, extra);
+    expect(res).toEqual({ created: true, setId: SET });
+    expect(f.getTxn()[0].text).toMatch(/starter_extra/);
+  });
+
+  it('основной язык или не из онбординга — 400', async () => {
+    const f = fakeSql({
+      user: {
+        starter_set_id: SET,
+        teacher: false,
+        target_languages: ['de', 'en'],
+        starter_extra: {},
+      },
+      afterId: SET,
+    });
+    await expect(createStarterSet(f.sql, ME, extra)).rejects.toThrow();
+  });
+
+  it('уже выдан для этого языка — второй раз нет', async () => {
+    const f = fakeSql({
+      user: {
+        starter_set_id: SET,
+        teacher: false,
+        target_languages: ['en', 'de'],
+        starter_extra: { de: SET },
+      },
+      afterId: SET,
+    });
+    const res = await createStarterSet(f.sql, ME, extra);
+    expect(res).toEqual({ created: false, reason: 'already_issued' });
+    expect(f.getTxn()).toBeNull();
+  });
+});

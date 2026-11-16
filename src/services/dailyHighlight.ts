@@ -33,6 +33,8 @@ export interface HighlightState {
   lessonDays: string[];
   /** Плашки, которые нажали или закрыли */
   dismissed: HighlightId[];
+  /** «Хочешь начать и <язык>?» — закрытые языки (Start 4.3) */
+  dismissedLanguages?: string[];
 }
 
 const CACHE_NAME = 'daily_highlight';
@@ -88,4 +90,31 @@ export function recordHighlightLessonDay(date: string): void {
   const prev = loadHighlightState();
   const next = addHighlightLessonDay(prev, date);
   if (next !== prev) saveHighlightState(next);
+}
+
+/** С какого дня с уроком предлагаем начать ещё один изучаемый язык */
+export const EXTRA_LANGUAGE_FROM_DAY = 3;
+
+/**
+ * «Хочешь начать и <язык>?» (Start 4.3): в онбординге выбрано 2–3 языка, набор — только на первом.
+ * С 3-го дня с уроком, в день урока; язык, для которого набор уже выдан или карточку закрыли, — нет.
+ */
+export function pickExtraLanguage(
+  state: HighlightState,
+  today: string,
+  opts: { isNewStudent: boolean; targetLanguages: readonly string[]; issued: readonly string[] }
+): string | null {
+  if (!opts.isNewStudent || !state.lessonDays.includes(today)) return null;
+  if (state.lessonDays.length < EXTRA_LANGUAGE_FROM_DAY) return null;
+  const closed = state.dismissedLanguages ?? [];
+  return (
+    opts.targetLanguages.slice(1).find((l) => !opts.issued.includes(l) && !closed.includes(l)) ??
+    null
+  );
+}
+
+export function dismissExtraLanguage(state: HighlightState, language: string): HighlightState {
+  const closed = state.dismissedLanguages ?? [];
+  if (closed.includes(language)) return state;
+  return { ...state, dismissedLanguages: [...closed, language] };
 }

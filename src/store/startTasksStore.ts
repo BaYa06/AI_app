@@ -44,6 +44,8 @@ interface LocalState {
 }
 
 interface ServerState {
+  targetLanguages?: string[];
+  extraStarterLanguages?: string[];
   starterSetId: string | null;
   startedAt: number | null;
   done: StartTaskId[];
@@ -53,6 +55,9 @@ interface ServerState {
 
 interface StartTasksState {
   loaded: boolean;
+  /** Изучаемые языки из онбординга и языки, для которых уже выдан доп. стартовый набор (Start 4.3) */
+  targetLanguages: string[];
+  extraStarterLanguages: string[];
   starterSetId: string | null;
   startedAt: number | null;
   done: StartTaskId[];
@@ -98,6 +103,8 @@ export function isStartTasksVisible(
 
 export const useStartTasksStore = create<StartTasksState>((set, get) => ({
   loaded: false,
+  targetLanguages: [],
+  extraStarterLanguages: [],
   starterSetId: null,
   startedAt: null,
   done: [],
@@ -109,6 +116,8 @@ export const useStartTasksStore = create<StartTasksState>((set, get) => ({
     if (!data) return;
     set({
       loaded: true,
+      targetLanguages: data.targetLanguages ?? [],
+      extraStarterLanguages: data.extraStarterLanguages ?? [],
       starterSetId: data.starterSetId,
       startedAt: data.startedAt,
       done: data.done,

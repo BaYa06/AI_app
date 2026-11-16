@@ -206,6 +206,8 @@ export const profileApi = {
   async createStarterSet(data: {
     set: CardSet;
     cards: Card[];
+    /** Набор ещё одного изучаемого языка (Start 4.3) */
+    extra?: boolean;
   }): Promise<{ created: boolean; setId?: string; reason?: string } | null> {
     return callDataApi('createStarterSet', data);
   },
