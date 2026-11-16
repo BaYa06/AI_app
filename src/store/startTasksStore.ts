@@ -33,6 +33,18 @@ export const START_TASK_ORDER: StartTaskId[] = [
   'voice',
 ];
 export const START_TASKS_TOTAL = START_TASK_ORDER.length + 1;
+/** Ученик курса (пришёл по коду учителя, Start 7.4): слова даёт учитель — три задания */
+export const COURSE_STUDENT_TASKS: StartTaskId[] = ['push', 'widget', 'voice'];
+
+/** Какие задания у этого ученика и сколько их в счётчике «N из M» */
+export function startTaskUniverse(s: { courseStudent?: boolean }): {
+  tasks: StartTaskId[];
+  total: number;
+} {
+  return s.courseStudent
+    ? { tasks: COURSE_STUDENT_TASKS, total: COURSE_STUDENT_TASKS.length }
+    : { tasks: START_TASK_ORDER, total: START_TASKS_TOTAL };
+}
 /** Через сколько дней стопка исчезает сама */
 export const START_TASKS_DAYS = 14;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -44,6 +56,7 @@ interface LocalState {
 }
 
 interface ServerState {
+  courseStudent?: boolean;
   learningGoal?: string | null;
   nativeLanguage?: string | null;
   targetLanguages?: string[];
@@ -57,6 +70,8 @@ interface ServerState {
 
 interface StartTasksState {
   loaded: boolean;
+  /** Пришёл по коду учителя, без стартового набора (Start 7.4) */
+  courseStudent: boolean;
   /** Изучаемые языки из онбординга и языки, для которых уже выдан доп. стартовый набор (Start 4.3) */
   nativeLanguage: string | null;
   /** Цель из онбординга (studies / courses / travel / self) — подпись прогресса, Start 5.4 */
@@ -88,26 +103,31 @@ function readLocal(): LocalState {
 
 /** Все задания выполнены, а стопку ещё не убрали — показываем «Начало пути пройдено» (Start 3.10) */
 export function isStartTasksFinished(
-  s: Pick<StartTasksState, 'loaded' | 'startedAt' | 'closed' | 'done'>,
+  s: Pick<StartTasksState, 'loaded' | 'startedAt' | 'closed' | 'done'> & {
+    courseStudent?: boolean;
+  },
   now: number = Date.now()
 ): boolean {
   if (!s.loaded || !s.startedAt || s.closed) return false;
   if (now - s.startedAt > START_TASKS_DAYS * DAY_MS) return false;
-  return START_TASK_ORDER.every((t) => s.done.includes(t));
+  return startTaskUniverse(s).tasks.every((t) => s.done.includes(t));
 }
 
 /** Стопка ещё показывается: новый ученик, не закрыл, не прошло 14 дней, есть невыполненное */
 export function isStartTasksVisible(
-  s: Pick<StartTasksState, 'loaded' | 'startedAt' | 'closed' | 'done'>,
+  s: Pick<StartTasksState, 'loaded' | 'startedAt' | 'closed' | 'done'> & {
+    courseStudent?: boolean;
+  },
   now: number = Date.now()
 ): boolean {
   if (!s.loaded || !s.startedAt || s.closed) return false;
   if (now - s.startedAt > START_TASKS_DAYS * DAY_MS) return false;
-  return START_TASK_ORDER.some((t) => !s.done.includes(t));
+  return startTaskUniverse(s).tasks.some((t) => !s.done.includes(t));
 }
 
 export const useStartTasksStore = create<StartTasksState>((set, get) => ({
   loaded: false,
+  courseStudent: false,
   nativeLanguage: null,
   learningGoal: null,
   targetLanguages: [],
@@ -123,6 +143,7 @@ export const useStartTasksStore = create<StartTasksState>((set, get) => ({
     if (!data) return;
     set({
       loaded: true,
+      courseStudent: data.courseStudent === true,
       nativeLanguage: data.nativeLanguage ?? null,
       learningGoal: data.learningGoal ?? null,
       targetLanguages: data.targetLanguages ?? [],
@@ -140,6 +161,8 @@ export const useStartTasksStore = create<StartTasksState>((set, get) => ({
     if (s.done.includes(task)) return;
     // Стопка только у новых учеников; до загрузки не знаем — спросим сервер, он сам решит
     if (s.loaded && !s.startedAt && task !== 'first_lesson') return;
+    // У ученика курса свои три задания — остальные не отмечаем и не награждаем
+    if (s.loaded && s.courseStudent && !COURSE_STUDENT_TASKS.includes(task)) return;
     set({ done: [...s.done, task] });
     try {
       const res = await callDataApi<{ awarded: number; diamonds: number }>(

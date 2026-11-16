@@ -21,6 +21,8 @@ import { log } from '@/utils/logger';
 
 type Props = {
   isLoading?: boolean;
+  /** Открыта ссылка учителя — «Тебя пригласили в курс» (Start 7.3) */
+  invited?: boolean;
 };
 
 // Стопка из трёх карточек: нижние повёрнуты, верхняя залита фирменным цветом
@@ -39,7 +41,7 @@ const INSTALL_STEPS: { icon: IconComponent; text: string }[] = [
 // Кнопка Google берёт иконку по тем же пропсам size/color, что и lucide
 const GoogleIcon = GoogleLogo as unknown as IconComponent;
 
-export function WelcomeScreen({ isLoading: externalLoading }: Props) {
+export function WelcomeScreen({ isLoading: externalLoading, invited = false }: Props) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const { canInstall, promptInstall, isIosSafari } = usePwaInstall();
@@ -247,14 +249,16 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
               accessibilityRole="header"
               style={{ color: colors.textPrimary }}
             >
-              Первые слова за 2 минуты
+              {invited ? 'Тебя пригласили в курс' : 'Первые слова за 2 минуты'}
             </Text>
             <Text
               variant="bodyLarge"
               align="center"
               style={[styles.subtitle, { color: colors.textSecondary }]}
             >
-              Карточки, игры и повторение в нужный момент. Слова не забываются.
+              {invited
+                ? 'Войди, и курс учителя сразу откроется.'
+                : 'Карточки, игры и повторение в нужный момент. Слова не забываются.'}
             </Text>
           </View>
 

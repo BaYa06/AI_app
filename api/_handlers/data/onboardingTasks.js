@@ -22,7 +22,7 @@ export const ONBOARDING_TASK_REWARD = 10;
 
 export async function getOnboardingTasks(sql, me) {
   const [user] = await sql`
-    SELECT starter_set_id, starter_set_issued_at, COALESCE(diamond, 0) AS diamond,
+    SELECT starter_set_id, starter_set_issued_at, start_tasks_at, COALESCE(diamond, 0) AS diamond,
            native_language, target_languages, learning_goal, COALESCE(starter_extra, '{}'::jsonb) AS starter_extra
     FROM users WHERE id = ${me}::uuid
   `;
@@ -30,7 +30,12 @@ export async function getOnboardingTasks(sql, me) {
   const rows = await sql`SELECT task FROM onboarding_tasks WHERE user_id = ${me}::uuid`;
   return {
     starterSetId: user.starter_set_id,
-    startedAt: user.starter_set_issued_at ? new Date(user.starter_set_issued_at).getTime() : null,
+    // Новый ученик: выдан стартовый набор или пришёл по коду учителя (Start 7.4)
+    startedAt: (() => {
+      const at = user.starter_set_issued_at ?? user.start_tasks_at;
+      return at ? new Date(at).getTime() : null;
+    })(),
+    courseStudent: !user.starter_set_id && !!user.start_tasks_at,
     done: rows.map((r) => r.task),
     diamonds: user.diamond,
     reward: ONBOARDING_TASK_REWARD,
@@ -49,7 +54,10 @@ export async function completeOnboardingTask(sql, me, p) {
     WITH ins AS (
       INSERT INTO onboarding_tasks (user_id, task)
       SELECT ${me}::uuid, ${task}
-      WHERE EXISTS (SELECT 1 FROM users WHERE id = ${me}::uuid AND starter_set_id IS NOT NULL)
+      WHERE EXISTS (
+        SELECT 1 FROM users WHERE id = ${me}::uuid
+          AND (starter_set_id IS NOT NULL OR start_tasks_at IS NOT NULL)
+      )
       ON CONFLICT (user_id, task) DO NOTHING
       RETURNING 1
     )
@@ -63,4 +71,22 @@ export async function completeOnboardingTask(sql, me, p) {
   const [user] =
     await sql`SELECT COALESCE(diamond, 0) AS diamond FROM users WHERE id = ${me}::uuid`;
   return { awarded: 0, diamonds: user?.diamond ?? 0 };
+}
+
+/**
+ * Ученик пришёл по коду или ссылке учителя и закончил короткий онбординг (Start 7.4): его задания
+ * «Начала пути» (напоминания, виджет, произношение) тоже дают по 10 алмазов. Только ученику курса
+ * и один раз.
+ */
+export async function startCourseStudentTasks(sql, me) {
+  const rows = await sql`
+    UPDATE users SET start_tasks_at = NOW()
+    WHERE id = ${me}::uuid AND start_tasks_at IS NULL AND starter_set_id IS NULL
+      AND COALESCE(teacher, false) = false
+      AND EXISTS (
+        SELECT 1 FROM course_members cm WHERE cm.user_id = ${me}::uuid AND cm.role = 'student'
+      )
+    RETURNING start_tasks_at
+  `;
+  return { started: rows.length > 0 };
 }

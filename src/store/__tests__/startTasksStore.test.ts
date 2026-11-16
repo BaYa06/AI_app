@@ -10,7 +10,12 @@ jest.mock('../diamondStore', () => ({
   useDiamondStore: { getState: () => ({ setDiamonds: jest.fn() }) },
 }));
 
-import { START_TASK_ORDER, isStartTasksFinished, isStartTasksVisible } from '../startTasksStore';
+import {
+  COURSE_STUDENT_TASKS,
+  START_TASK_ORDER,
+  isStartTasksFinished,
+  isStartTasksVisible,
+} from '../startTasksStore';
 
 const NOW = Date.parse('2026-11-15T12:00:00Z');
 const DAY = 24 * 60 * 60 * 1000;
@@ -48,5 +53,13 @@ describe('isStartTasksFinished', () => {
     expect(isStartTasksFinished({ ...base, closed: true, done: [...START_TASK_ORDER] }, NOW)).toBe(
       false
     );
+  });
+});
+
+describe('ученик курса (Start 7.4)', () => {
+  it('три задания: выполнил их — «пройдено»', () => {
+    const s = { ...base, courseStudent: true, done: [...COURSE_STUDENT_TASKS] };
+    expect(isStartTasksVisible(s, NOW)).toBe(false);
+    expect(isStartTasksFinished(s, NOW)).toBe(true);
   });
 });

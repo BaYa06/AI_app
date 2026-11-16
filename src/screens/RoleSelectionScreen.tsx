@@ -23,6 +23,8 @@ type Props = {
   total?: number;
   onContinue?: (roleId: string) => void;
   onBack?: () => void;
+  /** «У меня есть код от учителя» (Start 7.1) */
+  onHaveCode?: () => void;
 };
 
 const OPTIONS: RoleOption[] = [
@@ -40,7 +42,7 @@ const OPTIONS: RoleOption[] = [
   },
 ];
 
-export function RoleSelectionScreen({ onContinue, onBack, step = 2, total }: Props) {
+export function RoleSelectionScreen({ onContinue, onBack, onHaveCode, step = 2, total }: Props) {
   const [selected, setSelected] = useState<string>('student');
 
   return (
@@ -51,7 +53,19 @@ export function RoleSelectionScreen({ onContinue, onBack, step = 2, total }: Pro
       total={total}
       headline="Кто ты?"
       description="Это поможет нам настроить приложение под тебя."
-      footer={<Button title="Продолжить" onPress={() => onContinue?.(selected)} fullWidth />}
+      footer={
+        <>
+          <Button title="Продолжить" onPress={() => onContinue?.(selected)} fullWidth />
+          {onHaveCode ? (
+            <Button
+              title="У меня есть код от учителя"
+              variant="quiet"
+              onPress={onHaveCode}
+              fullWidth
+            />
+          ) : null}
+        </>
+      }
     >
       <View accessibilityRole="radiogroup" style={styles.options}>
         {OPTIONS.map((option) => (

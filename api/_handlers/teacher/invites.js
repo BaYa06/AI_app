@@ -145,6 +145,34 @@ export async function lookupInviteByToken(sql, token) {
   return resolveInviteLookup(rows);
 }
 
+/**
+ * Что в курсе — для экрана «Курс найден» (plan/new/new_user_activation.md, Start 7.2): сколько
+ * наборов и слов видят ученики и на каких языках курс (по самому большому языковому набору).
+ * Новые поля ответа: старые клиенты их не читают.
+ */
+async function courseSummary(sql, courseId) {
+  const rows = await sql`
+    SELECT COUNT(*)::int AS sets, COALESCE(SUM(total_cards), 0)::int AS words,
+           (SELECT language_from FROM card_sets
+              WHERE course_id = ${courseId}::uuid AND COALESCE(is_hidden_from_students, false) = false
+                AND COALESCE(kind, 'language') = 'language'
+              ORDER BY total_cards DESC LIMIT 1) AS language_from,
+           (SELECT language_to FROM card_sets
+              WHERE course_id = ${courseId}::uuid AND COALESCE(is_hidden_from_students, false) = false
+                AND COALESCE(kind, 'language') = 'language'
+              ORDER BY total_cards DESC LIMIT 1) AS language_to
+    FROM card_sets
+    WHERE course_id = ${courseId}::uuid AND COALESCE(is_hidden_from_students, false) = false
+  `;
+  const r = rows[0] ?? {};
+  return {
+    setsCount: r.sets ?? 0,
+    wordsCount: r.words ?? 0,
+    languageFrom: r.language_from ?? null,
+    languageTo: r.language_to ?? null,
+  };
+}
+
 export async function inviteInfoByCode(req, res, sql, userId) {
   const { code } = req.query;
   if (!code) return res.status(400).json({ error: 'code required', reason: 'bad_request' });
@@ -165,6 +193,7 @@ export async function inviteInfoByCode(req, res, sql, userId) {
     courseId: lookup.courseId,
     courseTitle: lookup.courseTitle,
     teacherName: lookup.teacherName,
+    ...(await courseSummary(sql, lookup.courseId)),
   });
 }
 
@@ -182,6 +211,7 @@ export async function inviteInfoByToken(req, res, sql) {
     courseId: lookup.courseId,
     courseTitle: lookup.courseTitle,
     teacherName: lookup.teacherName,
+    ...(await courseSummary(sql, lookup.courseId)),
   });
 }
 

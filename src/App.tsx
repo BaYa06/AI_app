@@ -34,6 +34,9 @@ import { CACHE_OWNER_KEY } from '@/services/DatabaseService';
 import { issueStarterSet, putStarterSetInStores } from '@/services/starterSetIssue';
 import { setWantsTeacher } from '@/services/joinTeacherCard';
 import { markTeacherStarted } from '@/services/teacherStart';
+import type { CourseInviteInfo } from '@/services/neon/courses';
+import { callDataApi } from '@/services/neon/core';
+import { describeTeacherApiReason } from '@/utils/teacherApiErrors';
 import { recordHighlightLessonDay } from '@/services/dailyHighlight';
 import { localDay } from '@/store/challengeStore';
 import type { StarterSet } from '@/services/StarterSetService';
@@ -83,6 +86,17 @@ export default function App() {
     } & AboutMeAnswers
   >({});
   const [pendingInviteToken, setPendingInviteToken] = useState<string | null>(null);
+  // Ссылка учителя, открытая до входа: новый ученик идёт сразу в «Курс найден» (Start 7.3)
+  const pendingInviteTokenRef = useRef<string | null>(null);
+  pendingInviteTokenRef.current = pendingInviteToken;
+  // Ученик с кодом или ссылкой учителя (plan/new/new_user_activation.md, этап 7)
+  const [courseJoin, setCourseJoin] = useState<{
+    via: 'code' | 'link';
+    code?: string;
+    token?: string;
+    info: CourseInviteInfo;
+    joined?: boolean;
+  } | null>(null);
   // Набор по ссылке: код, «ждём входа» (человек нажал «Войти и добавить») и «добавить сразу после входа»
   const [pendingShareCode, setPendingShareCode] = useState<string | null>(null);
   const [shareDeferred, setShareDeferred] = useState(false);
@@ -278,6 +292,16 @@ export default function App() {
         onboardingStartedAtRef.current = Date.now();
         // Первый шаг — роль; имя ученик вводит после первого урока (Start 2.1)
         if (signedInWithApple) setOnboardingData((prev) => ({ ...prev, displayName }));
+        // Открыл ссылку учителя — без роли и языков, сразу «Курс найден» (Start 7.3)
+        const token = pendingInviteTokenRef.current;
+        if (token) {
+          const info = await NeonService.getCourseInviteInfo(token).catch(() => null);
+          if (info?.ok) {
+            setCourseJoin({ via: 'link', token, info });
+            setAuthStep('course_found');
+            return;
+          }
+        }
         setAuthStep('role');
       }
     },
@@ -627,7 +651,7 @@ export default function App() {
   }, []);
 
   const finishOnboarding = useCallback(
-    async (finalData: typeof onboardingData) => {
+    async (finalData: typeof onboardingData, opts: { joinedCourseId?: string } = {}) => {
       if (!currentUserId) return;
       await NeonService.saveOnboardingData(currentUserId, {
         displayName: finalData.displayName,
@@ -644,7 +668,7 @@ export default function App() {
       });
       // Стартовый набор — до перезагрузки данных, иначе она его сотрёт (plan/new/new_user_activation.md, 1.3).
       // Обычно он уже выдан перед первым уроком; здесь — если тогда не было сети
-      if (finalData.role !== 'teacher' && !firstLesson) {
+      if (finalData.role !== 'teacher' && !firstLesson && !opts.joinedCourseId) {
         await issueStarterSet({
           userId: currentUserId,
           nativeLanguage: finalData.nativeLanguage,
@@ -663,7 +687,13 @@ export default function App() {
       // Ответы первого урока должны дойти до сервера, иначе перезагрузка покажет слова невыученными
       await waitForSyncQueue(3000);
       setNeedsOnboarding(false);
-      DatabaseService.reloadRemoteDataForUser(currentUserId);
+      const reloaded = DatabaseService.reloadRemoteDataForUser(currentUserId);
+      // Ученик курса: открываем курс учителя и включаем его задания «Начала пути» (Start 7.4)
+      if (opts.joinedCourseId) {
+        const courseId = opts.joinedCourseId;
+        callDataApi('startCourseStudentTasks').catch(() => {});
+        reloaded.then(() => useCoursesStore.getState().setActiveCourse(courseId)).catch(() => {});
+      }
       setAnalyticsUserId(currentUserId);
       setCrashUserId(currentUserId);
       Analytics.onboardingComplete();
@@ -691,6 +721,57 @@ export default function App() {
     },
     [currentUserId, firstLesson]
   );
+
+  // ── Ученик с кодом или ссылкой учителя (plan/new/new_user_activation.md, этап 7) ──
+  const handleHaveCode = useCallback(() => setAuthStep('teacher_code'), []);
+  const handleCodeFound = useCallback((code: string, info: CourseInviteInfo) => {
+    setCourseJoin({ via: 'code', code, info });
+    setAuthStep('course_found');
+  }, []);
+  const handleCourseNotMine = useCallback(() => {
+    Analytics.courseJoinNotMine(courseJoin?.via ?? 'code');
+    if (courseJoin?.via === 'link') {
+      setPendingInviteToken(null);
+      setCourseJoin(null);
+      setAuthStep('role');
+      return;
+    }
+    setAuthStep('teacher_code');
+  }, [courseJoin]);
+  const finishCourseJoin = useCallback(
+    (name: string | undefined) => {
+      if (!courseJoin) return;
+      const { info } = courseJoin;
+      const finalData = {
+        ...onboardingData,
+        role: 'student' as const,
+        displayName: name ?? onboardingData.displayName,
+        nativeLanguage: info.languageTo ?? onboardingData.nativeLanguage,
+        targetLanguages: info.languageFrom ? [info.languageFrom] : onboardingData.targetLanguages,
+      };
+      setOnboardingData(finalData);
+      finishOnboarding(finalData, { joinedCourseId: info.courseId });
+    },
+    [courseJoin, onboardingData, finishOnboarding]
+  );
+  const handleCourseJoin = useCallback(async (): Promise<string | null> => {
+    if (!courseJoin || !currentUserId) return describeTeacherApiReason('network');
+    const result =
+      courseJoin.via === 'link' && courseJoin.token
+        ? await NeonService.joinCourseByToken(courseJoin.token, currentUserId)
+        : await NeonService.joinCourseByCode(courseJoin.code ?? '', currentUserId);
+    if (!result.ok) return describeTeacherApiReason(result.reason);
+    Analytics.courseJoinOnboarding(courseJoin.via);
+    setPendingInviteToken(null);
+    setCourseJoin({ ...courseJoin, joined: true });
+    // Имя из Apple уже есть — экран имени не нужен
+    if (skipNameStepRef.current && onboardingData.displayName) {
+      finishCourseJoin(onboardingData.displayName);
+    } else {
+      setAuthStep('course_name');
+    }
+    return null;
+  }, [courseJoin, currentUserId, onboardingData.displayName, finishCourseJoin]);
 
   const handleSubmitDaily = useCallback((dailyId: string) => {
     // Выбор «5 / 10 / 20 слов в день» — квота новых слов урока дня (plan/done/home_redesign.md, 1.5)
@@ -829,6 +910,12 @@ export default function App() {
           onSubmitNativeLanguage={handleSubmitNativeLanguage}
           onSubmitTargetLanguages={handleSubmitTargetLanguages}
           onSwapLanguages={handleSwapLanguages}
+          courseJoin={courseJoin}
+          onHaveCode={handleHaveCode}
+          onCodeFound={handleCodeFound}
+          onCourseJoin={handleCourseJoin}
+          onCourseNotMine={handleCourseNotMine}
+          onCourseName={finishCourseJoin}
           firstLesson={firstLesson}
           starterReady={starterReady}
           onStarterBuilt={handleStarterBuilt}

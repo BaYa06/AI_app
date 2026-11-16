@@ -32,6 +32,10 @@ export const authEvents = {
    */
   onboardingLanguagesSwapped: () => log('onboarding_languages_swapped'),
 
+  /** Ученик курса на онбординге (Start 7.5): присоединился по коду или ссылке / «Это не мой курс» */
+  courseJoinOnboarding: (via: 'code' | 'link') => log('course_join_onboarding', { via }),
+  courseJoinNotMine: (via: 'code' | 'link') => log('course_join_not_mine', { via }),
+
   /**
    * Показан шаг онбординга (Start 2.8): воронка по шагам — где уходят.
    * sec_since_sign_in — сколько прошло от входа.

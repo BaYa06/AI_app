@@ -22,6 +22,10 @@ import { WelcomeScreen } from '@/screens/WelcomeScreen';
 import { StepTransition } from '@/components/onboarding/StepTransition';
 import { StarterBuildScreen } from '@/screens/firstLesson/StarterBuildScreen';
 import { WithTeacherScreen } from '@/screens/WithTeacherScreen';
+import { TeacherCodeScreen } from '@/screens/courseJoin/TeacherCodeScreen';
+import { CourseFoundScreen } from '@/screens/courseJoin/CourseFoundScreen';
+import { CourseNameScreen } from '@/screens/courseJoin/CourseNameScreen';
+import type { CourseInviteInfo, JoinCourseAction } from '@/services/neon/courses';
 import { FirstCardsScreen } from '@/screens/firstLesson/FirstCardsScreen';
 import { FirstMatchScreen } from '@/screens/firstLesson/FirstMatchScreen';
 import { FirstResultsScreen } from '@/screens/firstLesson/FirstResultsScreen';
@@ -61,6 +65,9 @@ export type AuthStep =
   | 'welcome'
   | 'name'
   | 'role'
+  | 'teacher_code'
+  | 'course_found'
+  | 'course_name'
   | 'native_language'
   | 'target_languages'
   | 'starter_build'
@@ -102,6 +109,13 @@ type AppRootProps = {
   onSubmitTargetLanguages: (codes: string[]) => void;
   /** «Поменять местами»: новый родной язык (бывший изучаемый) */
   onSwapLanguages: (newNative: string) => void;
+  /** Ученик с кодом или ссылкой учителя (этап 7) */
+  courseJoin: { via: 'code' | 'link'; info: CourseInviteInfo; joined?: boolean } | null;
+  onHaveCode: () => void;
+  onCodeFound: (code: string, info: CourseInviteInfo) => void;
+  onCourseJoin: JoinCourseAction;
+  onCourseNotMine: () => void;
+  onCourseName: (name: string) => void;
   /** Первый урок (Start 2.5): выданный стартовый набор и шаги урока */
   firstLesson: StarterSet | null;
   starterReady: boolean | null;
@@ -154,6 +168,12 @@ export function AppRoot({
   onSubmitNativeLanguage,
   onSubmitTargetLanguages,
   onSwapLanguages,
+  courseJoin,
+  onHaveCode,
+  onCodeFound,
+  onCourseJoin,
+  onCourseNotMine,
+  onCourseName,
   firstLesson,
   starterReady,
   onStarterBuilt,
@@ -189,7 +209,8 @@ export function AppRoot({
     isTeacher ? studentStep + (nameSkipped ? 0 : 1) : studentStep;
   // После урока: имя → цель → норма → «С учителем?» (из 4, без имени — из 3)
   const afterLessonTotal = nameSkipped ? 3 : 4;
-  const inviteOpen = isAuthenticated && !!pendingInviteToken;
+  // Во время онбординга ссылку учителя ведёт сам онбординг («Курс найден», Start 7.3)
+  const inviteOpen = isAuthenticated && !needsOnboarding && !!pendingInviteToken;
   const shareOpen =
     isReady && !!pendingShareCode && (signedIn || (!isAuthenticated && !shareDeferred));
 
@@ -267,9 +288,21 @@ export function AppRoot({
             <RoleSelectionScreen
               onBack={onBackToWelcome}
               onContinue={onSubmitRole}
+              onHaveCode={onHaveCode}
               step={1}
               total={3}
             />
+          ) : authStep === 'teacher_code' ? (
+            <TeacherCodeScreen onFound={onCodeFound} onBack={onBackToRole} />
+          ) : authStep === 'course_found' && courseJoin ? (
+            <CourseFoundScreen
+              info={courseJoin.info}
+              viaLink={courseJoin.via === 'link'}
+              onJoin={onCourseJoin}
+              onNotMine={onCourseNotMine}
+            />
+          ) : authStep === 'course_name' ? (
+            <CourseNameScreen onContinue={onCourseName} />
           ) : authStep === 'native_language' ? (
             <NativeLanguageScreen
               initial={nativeLanguage}

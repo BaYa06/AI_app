@@ -2,7 +2,11 @@
  * Задания «Начало пути» и алмазы (plan/new/new_user_activation.md, Start 3.1, 3.9)
  */
 import { describe, expect, it } from '@jest/globals';
-import { completeOnboardingTask, getOnboardingTasks } from '../_handlers/data/onboardingTasks.js';
+import {
+  completeOnboardingTask,
+  getOnboardingTasks,
+  startCourseStudentTasks,
+} from '../_handlers/data/onboardingTasks.js';
 
 const ME = '11111111-1111-4111-8111-111111111111';
 
@@ -24,7 +28,7 @@ describe('completeOnboardingTask', () => {
     expect(res).toEqual({ awarded: 10, diamonds: 30 });
     expect(f.calls[0].text).toMatch(/ON CONFLICT \(user_id, task\) DO NOTHING/);
     expect(f.calls[0].text).toMatch(/EXISTS \(SELECT 1 FROM ins\)/);
-    expect(f.calls[0].text).toMatch(/starter_set_id IS NOT NULL/);
+    expect(f.calls[0].text).toMatch(/starter_set_id IS NOT NULL OR start_tasks_at IS NOT NULL/);
   });
 
   it('повтор: награды нет, баланс как есть', async () => {
@@ -53,6 +57,7 @@ describe('getOnboardingTasks', () => {
           {
             starter_set_id: 'set-1',
             starter_set_issued_at: issued,
+            start_tasks_at: null,
             diamond: 20,
             native_language: 'ru',
             learning_goal: 'travel',
@@ -67,6 +72,7 @@ describe('getOnboardingTasks', () => {
     expect(res).toEqual({
       starterSetId: 'set-1',
       startedAt: Date.parse(issued),
+      courseStudent: false,
       done: ['first_lesson'],
       diamonds: 20,
       reward: 10,
@@ -75,5 +81,16 @@ describe('getOnboardingTasks', () => {
       targetLanguages: ['en', 'de'],
       extraStarterLanguages: [],
     });
+  });
+});
+
+describe('startCourseStudentTasks', () => {
+  it('только ученик курса без стартового набора, один раз', async () => {
+    const f = fakeSql([
+      { match: /UPDATE users SET start_tasks_at/, rows: [{ start_tasks_at: 1 }] },
+    ]);
+    expect(await startCourseStudentTasks(f.sql, ME)).toEqual({ started: true });
+    expect(f.calls[0].text).toMatch(/start_tasks_at IS NULL AND starter_set_id IS NULL/);
+    expect(f.calls[0].text).toMatch(/cm.role = 'student'/);
   });
 });

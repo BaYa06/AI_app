@@ -24,8 +24,8 @@ import { Text } from '@/components/common/Text';
 import { Button, type IconComponent } from '@/components/ui';
 import { useStartTasksStore, useThemeColors } from '@/store';
 import {
-  START_TASKS_TOTAL,
   isStartTasksFinished,
+  startTaskUniverse,
   isStartTasksVisible,
   type StartTaskId,
 } from '@/store/startTasksStore';
@@ -101,12 +101,17 @@ export const StartTasksStack = memo(function StartTasksStack({ hidden = [], onAc
   const state = useStartTasksStore();
   const { done, order, later, close } = state;
 
+  const universe = startTaskUniverse(state);
   const tasks = useMemo(
     () =>
       order.filter(
-        (t) => !done.includes(t) && !hidden.includes(t) && (t !== 'widget' || WIDGET_SUPPORTED)
+        (t) =>
+          universe.tasks.includes(t) &&
+          !done.includes(t) &&
+          !hidden.includes(t) &&
+          (t !== 'widget' || WIDGET_SUPPORTED)
       ),
-    [order, done, hidden]
+    [order, done, hidden, universe.tasks]
   );
 
   const finished = isStartTasksFinished(state);
@@ -138,9 +143,13 @@ export const StartTasksStack = memo(function StartTasksStack({ hidden = [], onAc
 
   if (!isStartTasksVisible(state) || tasks.length === 0) return null;
 
-  const doneCount = Math.min(START_TASKS_TOTAL, new Set(done).size);
+  const doneCount =
+    universe.tasks.filter((t) => done.includes(t)).length + (state.courseStudent ? 0 : 1);
   const top = tasks[0] as Exclude<StartTaskId, 'first_lesson'>;
-  const meta = START_TASK_META[top];
+  const meta =
+    top === 'push' && state.courseStudent
+      ? { ...START_TASK_META.push, description: 'Напомним о заданиях учителя до срока' }
+      : START_TASK_META[top];
   const behind = Math.min(2, tasks.length - 1);
   const Icon = meta.icon;
   const animated = Platform.OS !== 'web' && !reduceMotion;
@@ -153,7 +162,7 @@ export const StartTasksStack = memo(function StartTasksStack({ hidden = [], onAc
         </Text>
         <View style={styles.headRight}>
           <Text variant="caption" style={[styles.count, { color: colors.textSecondary }]}>
-            {doneCount} из {START_TASKS_TOTAL}
+            {Math.min(doneCount, universe.total)} из {universe.total}
           </Text>
           <Button
             variant="icon"

@@ -41,7 +41,11 @@ import {
 } from './_handlers/data/profile.js';
 import { loadCourses, createCourse, loadStudentCourses } from './_handlers/data/courses.js';
 import { createStarterSet } from './_handlers/data/starter.js';
-import { getOnboardingTasks, completeOnboardingTask } from './_handlers/data/onboardingTasks.js';
+import {
+  getOnboardingTasks,
+  completeOnboardingTask,
+  startCourseStudentTasks,
+} from './_handlers/data/onboardingTasks.js';
 import {
   submitFeedback,
   myFeedback,
@@ -86,6 +90,7 @@ const ACTIONS = {
   createStarterSet,
   getOnboardingTasks,
   completeOnboardingTask,
+  startCourseStudentTasks,
   getAboutMe,
   saveAboutMe,
   loadSets,

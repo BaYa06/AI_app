@@ -17,6 +17,9 @@ import Animated, {
 const ORDER = [
   'welcome',
   'role',
+  'teacher_code',
+  'course_found',
+  'course_name',
   'name',
   'native_language',
   'target_languages',
