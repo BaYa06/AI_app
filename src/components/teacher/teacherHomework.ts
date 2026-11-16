@@ -63,3 +63,44 @@ export function defaultHomeworkWords(sets: PickerSet[]): HomeworkWords | null {
 export function studentsText(n: number): string {
   return `${n} ${pluralize(n, 'ученик', 'ученика', 'учеников')}`;
 }
+
+/** Экран «История заданий» (Teacher 57): идут сейчас, прошедшие, отменённые */
+export interface HomeworkHistory {
+  current: HomeworkRow[];
+  past: HomeworkRow[];
+  canceled: HomeworkRow[];
+}
+
+/**
+ * «Идут сейчас» — те же правила, что у текущего задания (срок не прошёл больше 2 дней назад),
+ * ближайшие первыми. Прошедшие и отменённые — свежие сверху.
+ */
+export function homeworkHistory(list: HomeworkRow[], now: number = Date.now()): HomeworkHistory {
+  const byDueDesc = (a: HomeworkRow, b: HomeworkRow) => Date.parse(b.dueAt) - Date.parse(a.dueAt);
+  const live = list.filter((h) => !h.canceledAt);
+  return {
+    current: live
+      .filter((h) => Date.parse(h.dueAt) > now - CURRENT_AFTER_DUE_MS)
+      .sort((a, b) => Date.parse(a.dueAt) - Date.parse(b.dueAt)),
+    past: live.filter((h) => Date.parse(h.dueAt) <= now - CURRENT_AFTER_DUE_MS).sort(byDueDesc),
+    canceled: list
+      .filter((h) => !!h.canceledAt)
+      .sort((a, b) => Date.parse(b.canceledAt!) - Date.parse(a.canceledAt!)),
+  };
+}
+
+/** Подпись строки истории: «до: 15.11.2026 20:00 · сдали 7 из 22» / «отменено 14.11.2026 · …» */
+export function historyRowSubtitle(h: HomeworkRow): string {
+  const submitted = `сдали ${Math.min(h.submitted, h.assigned)} из ${h.assigned}`;
+  if (h.canceledAt) return `отменено ${formatDue(h.canceledAt).slice(0, 10)} · ${submitted}`;
+  return `до: ${formatDue(h.dueAt)} · ${submitted}`;
+}
+
+/** Текст подтверждения отмены: что увидят ученики и что сохранится */
+export function cancelHomeworkMessage(submitted: number, total: number): string {
+  const kept =
+    submitted > 0
+      ? `Уже сдали ${submitted} из ${total} — их оценки сохранятся.`
+      : 'Задание останется в истории заданий курса.';
+  return `Ученики его больше не увидят, напоминаний не будет. ${kept}`;
+}

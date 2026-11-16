@@ -48,6 +48,8 @@ export interface TeacherHomeworkSummary {
   minScore: number | null;
   assignAll: boolean;
   createdAt: string;
+  /** Отменено (Teacher 57); приходит только в истории, старый сервер поле не отдаёт */
+  canceledAt?: string | null;
   assigned: number;
   submitted: number;
   /** В процессе: начали, но не сдали */

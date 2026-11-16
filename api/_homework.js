@@ -78,14 +78,19 @@ export async function settleHomework(sql, homeworkId, userIds = null, reward = t
   `;
 }
 
+/** Срок задания: в будущем и не дальше 180 дней (и при выдаче, и при переносе — Teacher 57). */
+export function isValidDue(dueAt, now = Date.now()) {
+  const due = Date.parse(dueAt);
+  return Number.isFinite(due) && due > now && due <= now + 180 * 24 * 3600 * 1000;
+}
+
 /** Проверка входных данных задания. Возвращает строку-ошибку или null. */
 export function validateHomeworkInput({ title, cardIds, dueAt, minScore }, now = Date.now()) {
   if (typeof title !== 'string' || !title.trim() || title.trim().length > 80) return 'title';
   if (!Array.isArray(cardIds) || cardIds.length === 0 || cardIds.length > MAX_HOMEWORK_WORDS) {
     return 'cardIds';
   }
-  const due = Date.parse(dueAt);
-  if (!Number.isFinite(due) || due <= now || due > now + 180 * 24 * 3600 * 1000) return 'dueAt';
+  if (!isValidDue(dueAt, now)) return 'dueAt';
   if (minScore !== null && minScore !== undefined) {
     if (!Number.isInteger(minScore) || minScore < 50 || minScore > 100) return 'minScore';
   }

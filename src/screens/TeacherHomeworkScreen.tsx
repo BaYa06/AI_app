@@ -2,6 +2,7 @@
  * Экран сдачи задания учителя (plan/done/teacher_cabinet.md, Teacher 21; макет 12).
  * Кольцо «сдали / в процессе / не начали», срок, список учеников со статусами и оценкой,
  * «закреплено» (через 7 дней), «Напомнить N». Нажатие на ученика → StudentDetail.
+ * «⋯» в шапке — изменить срок и отменить задание (Teacher 57); отменённое открывается из истории.
  * Правила — teacherHomework/homeworkStatus.ts.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -15,12 +16,12 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
-import { Clock, Download, Send } from 'lucide-react-native';
+import { Ban, Clock, Download, MoreHorizontal, Send } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useThemeColors } from '@/store';
 import { Text } from '@/components/common';
 import { Button, ScreenHeader, toast } from '@/components/ui';
-import { alpha, borderRadius, spacing } from '@/constants';
+import { alpha, borderRadius, iconSize, spacing } from '@/constants';
 import { NeonService } from '@/services/NeonService';
 import { Analytics } from '@/services/analytics';
 import { dueRelative, formatDue, type HomeworkStatusData } from '@/services/homework';
@@ -40,6 +41,11 @@ import {
 } from './teacherHomework/homeworkStatus';
 import { NotSubmittedSheet } from './teacherHomework/NotSubmittedSheet';
 import { exportHomeworkGrades } from './teacherHomework/exportHomework';
+import {
+  HomeworkActionsSheet,
+  type HomeworkActionsMode,
+} from './teacherHomework/HomeworkActionsSheet';
+import { forgetCachedHomework, setCachedHomeworkDue } from '@/components/teacher/homeworkCache';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TeacherHomework'>;
 
@@ -156,6 +162,38 @@ export function TeacherHomeworkScreen({ navigation, route }: Props) {
     if (!ok) toast.error('Не получилось выгрузить оценки. Проверь интернет');
   };
 
+  // «⋯» → изменить срок / отменить (Teacher 57)
+  const [actions, setActions] = useState<HomeworkActionsMode | null>(null);
+  const canceled = !!data?.homework.canceled;
+
+  const handleSaveDue = async (due: Date): Promise<boolean> => {
+    const res = await NeonService.updateHomeworkDue(homeworkId, due.toISOString());
+    if (!res.ok) {
+      toast.error('Не получилось перенести срок. Проверь интернет');
+      return false;
+    }
+    Analytics.teacherAction('homework_due', 'course');
+    setData((prev) =>
+      prev ? { ...prev, homework: { ...prev.homework, dueAt: res.dueAt } } : prev
+    );
+    setCachedHomeworkDue(courseId, homeworkId, res.dueAt);
+    toast.success(`Новый срок: ${formatDue(res.dueAt)}`);
+    return true;
+  };
+
+  const handleCancel = async (): Promise<boolean> => {
+    const ok = await NeonService.cancelHomework(homeworkId);
+    if (!ok) {
+      toast.error('Не получилось отменить задание. Проверь интернет');
+      return false;
+    }
+    Analytics.teacherAction('homework_cancel', 'course');
+    forgetCachedHomework(courseId, homeworkId);
+    toast.success('Задание отменено');
+    navigation.goBack();
+    return true;
+  };
+
   const openStudent = (id: string, name: string, lastActiveDate: string | null) =>
     navigation.navigate('StudentDetail', {
       courseId,
@@ -181,6 +219,19 @@ export function TeacherHomeworkScreen({ navigation, route }: Props) {
               {homeworkHeaderSubtitle(courseTitle, data?.homework.minScore ?? null)}
             </Text>
           </View>
+        }
+        right={
+          data && !canceled ? (
+            <Pressable
+              onPress={() => setActions('menu')}
+              hitSlop={10}
+              style={({ pressed }) => pressed && st.pressed}
+              accessibilityRole="button"
+              accessibilityLabel="Действия с заданием"
+            >
+              <MoreHorizontal size={iconSize.m} color={colors.textPrimary} />
+            </Pressable>
+          ) : undefined
         }
       />
       {!data ? (
@@ -210,6 +261,14 @@ export function TeacherHomeworkScreen({ navigation, route }: Props) {
               />
             }
           >
+            {canceled && (
+              <View style={[st.canceled, { backgroundColor: colors.surfaceMuted }]}>
+                <Ban size={16} color={colors.textSecondary} />
+                <Text variant="caption" color="secondary" style={st.name}>
+                  Задание отменено — ученики его не видят. Оценки сдавших сохранены.
+                </Text>
+              </View>
+            )}
             <View
               style={[st.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
             >
@@ -298,13 +357,17 @@ export function TeacherHomeworkScreen({ navigation, route }: Props) {
               },
             ]}
           >
-            <Button
-              title={toRemind.length > 0 ? remindButtonText(toRemind.length) : 'Всем уже напомнили'}
-              icon={Send}
-              onPress={() => setRemindOpen(true)}
-              disabled={toRemind.length === 0}
-              fullWidth
-            />
+            {!canceled && (
+              <Button
+                title={
+                  toRemind.length > 0 ? remindButtonText(toRemind.length) : 'Всем уже напомнили'
+                }
+                icon={Send}
+                onPress={() => setRemindOpen(true)}
+                disabled={toRemind.length === 0}
+                fullWidth
+              />
+            )}
             <Button
               title="Оценки в Excel"
               icon={Download}
@@ -315,6 +378,18 @@ export function TeacherHomeworkScreen({ navigation, route }: Props) {
             />
           </View>
         </>
+      )}
+      {data && (
+        <HomeworkActionsSheet
+          mode={actions}
+          onMode={setActions}
+          title={data.homework.title}
+          dueAt={data.homework.dueAt}
+          submitted={counts.submitted}
+          total={counts.total}
+          onSaveDue={handleSaveDue}
+          onCancelHomework={handleCancel}
+        />
       )}
       <NotSubmittedSheet
         visible={remindOpen}
@@ -359,6 +434,13 @@ const st = StyleSheet.create({
     minHeight: 56,
   },
   pressed: { opacity: 0.85 },
+  canceled: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    padding: spacing.s,
+    borderRadius: borderRadius.m,
+  },
   avatar: {
     width: 36,
     height: 36,

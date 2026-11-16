@@ -27,6 +27,7 @@ import {
   homeworkTitle,
   snapMinutes,
   wordsSummary,
+  rescheduleStart,
 } from '../newHomework';
 
 // Чт 12.11.2026 10:00
@@ -170,5 +171,22 @@ describe('«Повторить трудные» (Teacher 43)', () => {
         { id: 's3', title: 'Ünite 3' },
       ],
     });
+  });
+});
+
+describe('rescheduleStart (Teacher 57)', () => {
+  const now = new Date(2026, 10, 16, 12, 3);
+  it('срок впереди — с него', () => {
+    expect(rescheduleStart(new Date(2026, 10, 20, 20, 0).toISOString(), now)).toEqual(
+      new Date(2026, 10, 20, 20, 0)
+    );
+  });
+  it('минуты — на сетку барабана', () => {
+    expect(rescheduleStart(new Date(2026, 10, 20, 20, 7).toISOString(), now).getMinutes()).toBe(5);
+  });
+  it('срок прошёл или дальше барабана — завтра 20:00', () => {
+    const tomorrow = new Date(2026, 10, 17, 20, 0);
+    expect(rescheduleStart(new Date(2026, 10, 15, 20, 0).toISOString(), now)).toEqual(tomorrow);
+    expect(rescheduleStart(new Date(2027, 2, 1, 20, 0).toISOString(), now)).toEqual(tomorrow);
   });
 });

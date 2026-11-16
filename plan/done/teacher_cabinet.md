@@ -825,3 +825,22 @@ https://claude.ai/artifact/5dmhuEVHCHqSbmnBGPwo33
   П1, итоги недели, «не заходят», лимит 2 в день, тихие часы. Аналитика: `teacher_notifications_opened`,
   `teacher_report_created` (kind, способ: ссылка/PDF), `teacher_action` (`student_remind`).
   `TEACHER_INSIGHTS_ENABLED = true` и `TEACHER_PUSH_ENABLED` на проде — только по команде.
+
+## Доработка: отмена, перенос срока, история заданий (16.11.2026)
+
+Учитель не мог отменить задание: `homework-cancel` был на сервере и в `NeonService`, но кнопки не было.
+
+- [x] **Teacher 57. Отменить, изменить срок, история.** ✅ Сервер: `homework-due` `{ homeworkId, dueAt }`
+  (срок в будущем, ≤ 180 дней — общий `isValidDue`; отменённое — 409; снимки сдачи не меняются);
+  `homework-list?history=1` отдаёт и отменённые (`canceledAt`, до 200). Без параметра — как раньше,
+  старый клиент отменённых не видит. Клиент: «⋯» в шапке `TeacherHomeworkScreen` → одно окно
+  `teacherHomework/HomeworkActionsSheet.tsx` с режимами «меню / новый срок (варианты + барабан) /
+  подтверждение отмены» (без Alert и второго Modal — на iOS он может не открыться). После отмены — назад
+  и «Задание отменено»; кэш списка (`components/teacher/homeworkCache.ts`, с подписчиками) сразу
+  обновляет карточку урока и страницу курса. Отменённое задание: плашка «Задание отменено», без
+  «Напомнить» и «⋯», «Оценки в Excel» остаются. Экран `TeacherHomeworkHistoryScreen` («Идут сейчас /
+  Прошедшие / Отменённые»), вход — строка «История заданий» в `CourseActions` (за
+  `TEACHER_HOMEWORK_ENABLED`). Аналитика `teacher_action`: `homework_cancel`, `homework_due`,
+  `homework_history`. Тесты: `api/__tests__/homework.test.js`, `teacherHomework.test.ts`, `newHomework.test.ts`.
+  **Не делали:** пуш ученику «срок перенесён»; повторное «завтра срок» после переноса (`homework_due`
+  — один раз на задание), повторное «срок прошёл» учителю (`hw:<id>:due`).

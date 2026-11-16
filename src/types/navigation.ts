@@ -192,6 +192,8 @@ export type RootStackParamList = {
   /** Сдача задания учителем (plan/done/teacher_cabinet.md, Teacher 21) */
   /** courseTitle нет, когда экран открыт ссылкой из пуша учителю */
   TeacherHomework: { homeworkId: string; courseId: string; courseTitle?: string };
+  /** История заданий курса: идут сейчас, прошедшие, отменённые (Teacher 57) */
+  TeacherHomeworkHistory: { courseId: string; courseTitle?: string };
   /**
    * Ученик глазами учителя. По ссылке из пуша (этап 4) приходят только courseId и studentId —
    * новый экран (StudentInsightScreen) остальное загружает сам.

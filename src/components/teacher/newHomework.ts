@@ -203,6 +203,21 @@ export function snapMinutes(m: number): number {
   return Math.min(55, Math.round(m / DUE_MINUTE_STEP) * DUE_MINUTE_STEP);
 }
 
+/**
+ * «Изменить срок» (Teacher 57) — с чего начать барабан: текущий срок, если он ещё впереди и помещается в барабан,
+ * иначе «Завтра 20:00» — срок уже прошёл, учитель продлевает.
+ */
+export function rescheduleStart(dueAt: string, now: Date): Date {
+  const due = new Date(dueAt);
+  const index = dueDayIndex(now, due);
+  if (due.getTime() > now.getTime() && index < DUE_MAX_DAYS) {
+    const snapped = new Date(due);
+    snapped.setMinutes(snapMinutes(due.getMinutes()), 0, 0);
+    if (snapped.getTime() > now.getTime()) return snapped;
+  }
+  return duePresets(now, null)[0].date;
+}
+
 /** «Вс, 15.11.2026 20:00» — карточка «до: …» */
 export function dueCardText(due: Date): string {
   const p = (n: number) => String(n).padStart(2, '0');

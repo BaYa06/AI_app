@@ -1,7 +1,10 @@
 import { describe, expect, it } from '@jest/globals';
 import type { TeacherHomeworkSummary } from '@/services/homework';
 import {
+  cancelHomeworkMessage,
   currentHomework,
+  historyRowSubtitle,
+  homeworkHistory,
   defaultHomeworkWords,
   homeworkCardSummary,
   homeworkTileCaption,
@@ -51,5 +54,43 @@ describe('задание на главной и в курсе', () => {
       sets: [{ id: 'u5', title: 'Ünite 5' }],
     });
     expect(defaultHomeworkWords([])).toBeNull();
+  });
+});
+
+describe('история заданий (Teacher 57)', () => {
+  it('идут сейчас / прошедшие / отменённые', () => {
+    const canceledAt = new Date(NOW - DAY).toISOString();
+    const h = homeworkHistory(
+      [
+        hw('5', 5),
+        hw('4', 1),
+        hw('1', -10),
+        hw('2', -3),
+        hw('6', 4, { canceledAt }),
+        hw('7', -5, { canceledAt: new Date(NOW - 2 * DAY).toISOString() }),
+      ],
+      NOW
+    );
+    expect(h.current.map((x) => x.id)).toEqual(['4', '5']);
+    expect(h.past.map((x) => x.id)).toEqual(['2', '1']);
+    expect(h.canceled.map((x) => x.id)).toEqual(['6', '7']);
+  });
+
+  it('старый сервер без canceledAt — все живые', () => {
+    expect(homeworkHistory([hw('4', 1)], NOW).canceled).toEqual([]);
+  });
+
+  it('подписи строк', () => {
+    expect(historyRowSubtitle(hw('4', 1))).toMatch(
+      /^до: \d\d\.\d\d\.2026 \d\d:\d\d · сдали 7 из 22$/
+    );
+    expect(
+      historyRowSubtitle(hw('4', 1, { canceledAt: new Date(NOW).toISOString(), submitted: 30 }))
+    ).toMatch(/^отменено \d\d\.11\.2026 · сдали 22 из 22$/);
+  });
+
+  it('текст отмены: со сдавшими и без', () => {
+    expect(cancelHomeworkMessage(3, 22)).toContain('Уже сдали 3 из 22');
+    expect(cancelHomeworkMessage(0, 22)).toContain('останется в истории');
   });
 });

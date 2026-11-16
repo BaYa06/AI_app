@@ -7,6 +7,7 @@ import { courseSetIdsSql } from '../../_course.js';
 import { sendNotification } from '../../push.js';
 import {
   assignedStudentsSql,
+  isValidDue,
   settleHomework,
   validateHomeworkInput,
   KNOWN_STEP,
@@ -119,9 +120,14 @@ export async function homeworkCreate(req, res, sql, userId) {
   return res.status(200).json({ homework: { id: homeworkId, dueAt: created[0].due_at } });
 }
 
-/** GET ?courseId= → { homework: [...] } — активные задания курса, ближайшие по сроку первыми. */
+/**
+ * GET ?courseId= → { homework: [...] } — задания курса, ближайшие по сроку первыми.
+ * ?history=1 — история (Teacher 57): и отменённые, до 200 штук; без параметра — как раньше,
+ * только не отменённые (старый клиент считает каждую строку живым заданием).
+ */
 export async function homeworkList(req, res, sql, userId) {
   const { courseId } = req.query;
+  const history = req.query.history === '1';
   if (!isUuid(courseId)) return res.status(400).json({ error: 'courseId required' });
   const course = await sql`
     SELECT id FROM courses WHERE id = ${courseId}::uuid AND user_id = ${userId}::uuid
@@ -129,7 +135,7 @@ export async function homeworkList(req, res, sql, userId) {
   if (course.length === 0) return res.status(403).json({ error: 'Not the owner' });
 
   const rows = await sql`
-    SELECT h.id, h.title, h.due_at, h.min_score, h.assign_all, h.created_at, h.kind,
+    SELECT h.id, h.title, h.due_at, h.min_score, h.assign_all, h.created_at, h.kind, h.canceled_at,
       (SELECT COUNT(*)::int FROM cards WHERE id = ANY(h.card_ids)) AS words,
       CASE WHEN h.assign_all
         THEN (SELECT COUNT(*)::int FROM course_members cm
@@ -143,9 +149,9 @@ export async function homeworkList(req, res, sql, userId) {
       (SELECT COUNT(DISTINCT hc.user_id)::int FROM homework_credits hc
         WHERE hc.homework_id = h.id) AS started
     FROM homework h
-    WHERE h.course_id = ${courseId}::uuid AND h.canceled_at IS NULL
+    WHERE h.course_id = ${courseId}::uuid AND (${history}::boolean OR h.canceled_at IS NULL)
     ORDER BY h.due_at ASC
-    LIMIT 50
+    LIMIT ${history ? 200 : 50}
   `;
   return res.status(200).json({
     homework: rows.map((r) => ({
@@ -157,6 +163,7 @@ export async function homeworkList(req, res, sql, userId) {
       minScore: r.min_score,
       assignAll: r.assign_all,
       createdAt: r.created_at,
+      canceledAt: r.canceled_at || null,
       assigned: r.assigned,
       submitted: Math.min(r.submitted, r.assigned),
       started: Math.max(0, Math.min(r.started, r.assigned) - Math.min(r.submitted, r.assigned)),
@@ -264,6 +271,27 @@ export async function homeworkCancel(req, res, sql, userId) {
     WHERE id = ${homeworkId}::uuid AND canceled_at IS NULL
   `;
   return res.status(200).json({ ok: true });
+}
+
+/**
+ * POST { homeworkId, dueAt } — новый срок задания (Teacher 57). Срок — в будущем, не дальше 180 дней.
+ * Снимки сдачи не меняются: «с опозданием» остаётся как было на момент сдачи.
+ */
+export async function homeworkDue(req, res, sql, userId) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const { homeworkId, dueAt } = req.body || {};
+  if (!isUuid(homeworkId)) return res.status(400).json({ error: 'homeworkId required' });
+  if (!isValidDue(dueAt)) return res.status(400).json({ error: 'invalid dueAt', reason: 'dueAt' });
+  const hw = await ownedHomework(sql, homeworkId, userId);
+  if (!hw) return res.status(403).json({ error: 'Not the owner' });
+  if (hw.canceled_at) return res.status(409).json({ error: 'Canceled', reason: 'canceled' });
+  const rows = await sql`
+    UPDATE homework SET due_at = ${new Date(dueAt).toISOString()}::timestamptz
+    WHERE id = ${homeworkId}::uuid AND canceled_at IS NULL
+    RETURNING due_at
+  `;
+  if (rows.length === 0) return res.status(409).json({ error: 'Canceled', reason: 'canceled' });
+  return res.status(200).json({ ok: true, dueAt: rows[0].due_at });
 }
 
 /**

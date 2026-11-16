@@ -37,6 +37,7 @@ import {
   homeworkList,
   homeworkStatus,
   homeworkCancel,
+  homeworkDue,
   homeworkRemind,
   homeworkExport,
 } from './_handlers/teacher/homework.js';
@@ -84,7 +85,9 @@ import { reportData, reportCreate, reportRevoke, reportPdf } from './_handlers/t
  * POST /api/teacher?action=homework-create  { courseId, title, cardIds, dueAt, minScore?, userIds? }
  * GET  /api/teacher?action=homework-list    ?courseId=
  * GET  /api/teacher?action=homework-status  ?homeworkId=
+ * GET  /api/teacher?action=homework-list    ?courseId=&history=1 — с отменёнными (Teacher 57)
  * POST /api/teacher?action=homework-cancel  { homeworkId }
+ * POST /api/teacher?action=homework-due     { homeworkId, dueAt } — перенести срок (Teacher 57)
  * POST /api/teacher?action=homework-remind  { homeworkId, userIds } — каждому не чаще раза в 20 ч
  * GET  /api/teacher?action=homework-export  ?homeworkId= → { filename, base64 } (xlsx)
  * Колокольчик учителя (этап 4):
@@ -145,6 +148,7 @@ export default async function handler(req, res) {
     if (action === 'homework-list') return await homeworkList(req, res, sql, userId);
     if (action === 'homework-status') return await homeworkStatus(req, res, sql, userId);
     if (action === 'homework-cancel') return await homeworkCancel(req, res, sql, userId);
+    if (action === 'homework-due') return await homeworkDue(req, res, sql, userId);
     if (action === 'homework-remind') return await homeworkRemind(req, res, sql, userId);
     if (action === 'homework-export') return await homeworkExport(req, res, sql, userId);
 

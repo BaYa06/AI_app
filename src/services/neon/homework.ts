@@ -31,10 +31,16 @@ export const homeworkApi = {
     return res.ok ? { ok: true, id: res.data.homework.id } : { ok: false, reason: res.reason };
   },
 
-  /** Активные задания курса; null — нет сети или ошибка. */
-  async loadCourseHomework(courseId: string): Promise<TeacherHomeworkSummary[] | null> {
+  /**
+   * Задания курса; null — нет сети или ошибка. history — вместе с отменёнными (Teacher 57),
+   * для экрана «История заданий»; без него — только живые, как раньше.
+   */
+  async loadCourseHomework(
+    courseId: string,
+    opts: { history?: boolean } = {}
+  ): Promise<TeacherHomeworkSummary[] | null> {
     const res = await callTeacherApi<{ homework: TeacherHomeworkSummary[] }>('homework-list', {
-      params: { courseId },
+      params: opts.history ? { courseId, history: '1' } : { courseId },
     });
     return res.ok ? res.data.homework : null;
   },
@@ -49,6 +55,18 @@ export const homeworkApi = {
   async cancelHomework(homeworkId: string): Promise<boolean> {
     const res = await callTeacherApi('homework-cancel', { method: 'POST', body: { homeworkId } });
     return res.ok;
+  },
+
+  /** Перенести срок (Teacher 57). Ответ — срок, который сохранил сервер. */
+  async updateHomeworkDue(
+    homeworkId: string,
+    dueAt: string
+  ): Promise<{ ok: true; dueAt: string } | Fail> {
+    const res = await callTeacherApi<{ ok: true; dueAt: string }>('homework-due', {
+      method: 'POST',
+      body: { homeworkId, dueAt },
+    });
+    return res.ok ? { ok: true, dueAt: res.data.dueAt } : { ok: false, reason: res.reason };
   },
 
   /** «Напомнить» выбранным: reminded — кому ушло, skipped — уже напоминали сегодня или сдали. */

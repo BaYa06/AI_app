@@ -299,6 +299,81 @@ describe('homework-status / list / cancel', () => {
   });
 });
 
+describe('история и перенос срока (Teacher 57)', () => {
+  const owned = (extra = {}) => [
+    /FROM homework h JOIN courses c/,
+    () => [{ id: HW, course_id: COURSE, card_ids: [CARD_A], canceled_at: null, ...extra }],
+  ];
+
+  it('список без history — только не отменённые; с history=1 — все и canceledAt', async () => {
+    mockRules = [
+      [/FROM courses WHERE id = \?::uuid AND user_id/, () => [{ id: COURSE }]],
+      [
+        /FROM homework h WHERE h.course_id/,
+        () => [
+          {
+            id: HW,
+            title: 'Ünite 4',
+            assigned: 2,
+            submitted: 0,
+            started: 0,
+            canceled_at: new Date(),
+          },
+        ],
+      ],
+    ];
+    await call('GET', 'homework-list', {}, { courseId: COURSE });
+    const plain = mockQueries.find((q) => /FROM homework h WHERE h.course_id/.test(q.text));
+    expect(plain.values).toContain(false);
+    expect(plain.values).toContain(50);
+
+    mockQueries = [];
+    const res = await call('GET', 'homework-list', {}, { courseId: COURSE, history: '1' });
+    const hist = mockQueries.find((q) => /FROM homework h WHERE h.course_id/.test(q.text));
+    expect(hist.values).toContain(true);
+    expect(hist.values).toContain(200);
+    expect(res.body.homework[0].canceledAt).toBeInstanceOf(Date);
+  });
+
+  it('перенос чужого — 403, без UPDATE', async () => {
+    const res = await call('POST', 'homework-due', { homeworkId: HW, dueAt: tomorrow() });
+    expect(res.statusCode).toBe(403);
+    expect(writes()).toEqual([]);
+  });
+
+  it('срок в прошлом или дальше 180 дней — 400', async () => {
+    mockRules = [owned()];
+    const past = new Date(Date.now() - 60000).toISOString();
+    const far = new Date(Date.now() + 200 * 24 * 3600 * 1000).toISOString();
+    for (const dueAt of [past, far, 'abc', undefined]) {
+      const res = await call('POST', 'homework-due', { homeworkId: HW, dueAt });
+      expect(res.statusCode).toBe(400);
+    }
+    expect(writes()).toEqual([]);
+  });
+
+  it('отменённое — 409, без UPDATE', async () => {
+    mockRules = [owned({ canceled_at: new Date() })];
+    const res = await call('POST', 'homework-due', { homeworkId: HW, dueAt: tomorrow() });
+    expect(res.statusCode).toBe(409);
+    expect(writes()).toEqual([]);
+  });
+
+  it('новый срок сохраняется', async () => {
+    const due = tomorrow();
+    mockRules = [owned(), [/^UPDATE homework SET due_at/, () => [{ due_at: due }]]];
+    const res = await call('POST', 'homework-due', { homeworkId: HW, dueAt: due });
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ ok: true, dueAt: due });
+    expect(writes()).toHaveLength(1);
+  });
+
+  it('GET — 405', async () => {
+    const res = await call('GET', 'homework-due', {}, { homeworkId: HW });
+    expect(res.statusCode).toBe(405);
+  });
+});
+
 describe('тип задания (Teacher 43)', () => {
   const { parseHomeworkKind } = require('../_handlers/teacher/homework.js');
 

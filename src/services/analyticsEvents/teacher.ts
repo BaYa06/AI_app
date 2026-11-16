@@ -14,6 +14,10 @@ export type TeacherAction =
   | 'books'
   | 'homework'
   | 'homework_export'
+  // Отмена, перенос срока и история заданий (Teacher 57)
+  | 'homework_cancel'
+  | 'homework_due'
+  | 'homework_history'
   // Этап 3 «Подготовка к уроку» (Teacher 44)
   | 'lesson_prep'
   | 'warmup_start'

@@ -12,11 +12,9 @@ import { useCardsStore, useSetsStore, isSetInCourse } from '@/store';
 import { NewHomeworkSheet, type HomeworkStudent } from './NewHomeworkSheet';
 import { NotSubmittedSheet } from '@/screens/teacherHomework/NotSubmittedSheet';
 import { currentHomework, defaultHomeworkWords } from './teacherHomework';
+import { getCachedHomework, setCachedHomework, subscribeHomeworkCache } from './homeworkCache';
 import { sortPickerSets, type PickerSet } from './wordPicker';
 import type { HomeworkWords } from './newHomework';
-
-/** Последний известный список по курсу — карточка не мигает при возврате на главную */
-const cache = new Map<string, TeacherHomeworkSummary[]>();
 
 /** Слова наборов курса, которые уже есть на устройстве (без сети) */
 function localCourseSets(courseId: string): PickerSet[] {
@@ -53,7 +51,7 @@ export function useTeacherHomework({
   navigation,
 }: Params) {
   const [list, setList] = useState<TeacherHomeworkSummary[] | null>(
-    () => cache.get(courseId) ?? null
+    () => getCachedHomework(courseId) ?? null
   );
   const [newOpen, setNewOpen] = useState(false);
   const [initialWords, setInitialWords] = useState<HomeworkWords | null>(null);
@@ -65,13 +63,17 @@ export function useTeacherHomework({
     if (!TEACHER_HOMEWORK_ENABLED) return;
     const res = await NeonService.loadCourseHomework(courseId);
     if (!res) return;
-    cache.set(courseId, res);
-    setList(res);
+    setCachedHomework(courseId, res);
   }, [courseId]);
 
   useEffect(() => {
-    setList(cache.get(courseId) ?? null);
+    setList(getCachedHomework(courseId) ?? null);
+    // Отмена и перенос срока на экране задания (Teacher 57) приходят сюда же
+    const unsubscribe = subscribeHomeworkCache((id) => {
+      if (id === courseId) setList(getCachedHomework(courseId) ?? null);
+    });
     reload();
+    return unsubscribe;
   }, [courseId, reload]);
 
   const current = useMemo(() => (list ? currentHomework(list) : null), [list]);

@@ -2,7 +2,7 @@
  * Действия курса (plan/done/teacher_cabinet.md, Teacher 8): вместо шести одинаковых строк —
  * плитки главных действий (Живой тест, Задание, Код подключения, Учебники курса) с живыми
  * подписями и короткий список (История тестов, Рейтинг недели, Расписание).
- * Плитка «Задание» — только при TEACHER_HOMEWORK_ENABLED (этап 2).
+ * Плитка «Задание» и строка «История заданий» (Teacher 57) — только при TEACHER_HOMEWORK_ENABLED (этап 2).
  */
 import React from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
@@ -11,6 +11,7 @@ import {
   CalendarClock,
   ChevronRight,
   ClipboardCheck,
+  ClipboardList,
   Clock,
   FileText,
   GraduationCap,
@@ -155,6 +156,17 @@ export function CourseActions({
           value={tests ? String(tests.count) : undefined}
           onPress={() => navigation.navigate('TestHistory', { courseId, courseTitle })}
         />
+        {TEACHER_HOMEWORK_ENABLED && (
+          <Row
+            colors={colors}
+            icon={ClipboardList}
+            title="История заданий"
+            onPress={tap('homework_history', () =>
+              navigation.navigate('TeacherHomeworkHistory', { courseId, courseTitle })
+            )}
+            divider
+          />
+        )}
         <Row
           colors={colors}
           icon={Trophy}
