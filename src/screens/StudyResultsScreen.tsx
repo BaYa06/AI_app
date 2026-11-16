@@ -4,10 +4,12 @@
  */
 import React from 'react';
 import { View, StyleSheet, Pressable, ScrollView, Platform } from 'react-native';
-import { useThemeColors } from '@/store';
+import { useSetsStore, useThemeColors } from '@/store';
 import { Text, StreakCelebration } from '@/components/common';
 import { recordHighlightLessonDay } from '@/services/dailyHighlight';
-import { markHintShown, noteStudyMode } from '@/services/momentHints';
+import { isHintShown, markHintShown, noteStudyMode } from '@/services/momentHints';
+import { loadHighlightState } from '@/services/dailyHighlight';
+import { canShareSet, useShareSet } from '@/components/share/useShareSet';
 import { countKnownWords } from '@/utils/knownWords';
 import { Analytics } from '@/services/analytics';
 import { currentPushOrigin, reportPushLesson } from '@/services/pushOpens';
@@ -63,6 +65,9 @@ import {
 import { log } from '@/utils/logger';
 
 type Props = RootStackScreenProps<'StudyResults'>;
+
+/** С какого дня с уроком предлагаем пригласить друга (Start 5.5) */
+const INVITE_FROM_LESSON_DAY = 4;
 
 export function StudyResultsScreen({ navigation, route }: Props) {
   const {
@@ -242,6 +247,20 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   }, [isLessonEnd]);
 
   const [knownTotal] = React.useState(countKnownWords);
+
+  // «Учи вместе с другом» (plan/new/new_user_activation.md, Start 5.5): с 4-го дня с уроком, один раз,
+  // набор свой и не пустой — отправить ссылку на него (тот же «Поделиться», что в наборе)
+  const resultSet = useSetsStore((st) => st.getSet(setId));
+  const { share, isSharing } = useShareSet();
+  const [showInvite, setShowInvite] = React.useState(false);
+  React.useEffect(() => {
+    if (!isLessonEnd || session || !canShareSet(resultSet) || resultSet.cardCount === 0) return;
+    if (isHintShown('invite_friend')) return;
+    if (loadHighlightState().lessonDays.length < INVITE_FROM_LESSON_DAY) return;
+    markHintShown('invite_friend');
+    Analytics.momentHintShown('invite_friend');
+    setShowInvite(true);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // «Попробуй другую игру» (plan/new/new_user_activation.md, Start 4.3): 3 дня подряд — одним
   // режимом. Сессия «Изучить» и урок дня и так из разных этапов — их не считаем
@@ -610,6 +629,29 @@ export function StudyResultsScreen({ navigation, route }: Props) {
               Список слов, ответы и ошибки
             </Text>
           </Pressable>
+        )}
+
+        {showInvite && resultSet && (
+          <View style={[styles.otherGame, { backgroundColor: alpha(colors.primary, 10) }]}>
+            <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '600' }}>
+              Учи вместе с другом
+            </Text>
+            <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
+              Отправь другу набор «{resultSet.title}» — вдвоём заниматься каждый день проще.
+            </Text>
+            <Button
+              title="Пригласить друга"
+              variant="secondary"
+              size="s"
+              loading={isSharing}
+              style={styles.otherGameButton}
+              onPress={() => {
+                Analytics.momentHintTapped('invite_friend');
+                setShowInvite(false);
+                share(resultSet);
+              }}
+            />
+          </View>
         )}
 
         {sameMode && (

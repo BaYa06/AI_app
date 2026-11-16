@@ -4,7 +4,7 @@
  */
 import { readCache, writeCache } from './localCache';
 
-export type MomentHintId = 'photo_after_manual' | 'another_game';
+export type MomentHintId = 'photo_after_manual' | 'another_game' | 'invite_friend';
 
 interface HintsState {
   shown: MomentHintId[];
