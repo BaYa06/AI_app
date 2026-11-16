@@ -634,7 +634,7 @@ export const CoursesDrawer = memo(function CoursesDrawer(props: CoursesDrawerPro
           >
             <UserPlus size={iconSize.s} color={colors.primary} />
             <Text style={[typography.button, styles.noLetterSpacing, { color: colors.primary }]}>
-              Подключиться к учителю
+              Ввести код
             </Text>
           </Pressable>
         </View>

@@ -75,6 +75,7 @@ import { NeonService, type CourseLeaderboard } from '@/services/NeonService';
 import { leaderboardSeenKey, type LeaderboardSeen } from '@/screens/CourseLeaderboardScreen';
 import { DatabaseService } from '@/services/DatabaseService';
 import { JoinByCodeModal } from '@/components/JoinByCodeModal';
+import { CenterInviteModal } from '@/components/CenterInviteModal';
 import type { DailyActivity, UserStats } from '@/services/StreakService';
 import type { Card, CardSet } from '@/types';
 import { isCardWaitingReview } from '@/services/SRSService';
@@ -272,6 +273,8 @@ export function HomeScreen({ navigation, route }: any) {
   const isTeacher = useSettingsStore((s) => s.isTeacher);
   const fetchIsTeacher = useSettingsStore((s) => s.fetchIsTeacher);
   const [joinByCodeVisible, setJoinByCodeVisible] = useState(false);
+  // Код учебного центра из «Ввести код» (plan/new/center_books.md, Center 5)
+  const [centerCode, setCenterCode] = useState<string | null>(null);
   const [addByLinkVisible, setAddByLinkVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -1002,6 +1005,7 @@ export function HomeScreen({ navigation, route }: any) {
     courseMenuOpen !== null ||
     isEditModalVisible ||
     joinByCodeVisible ||
+    centerCode !== null ||
     addByLinkVisible ||
     setMenuTarget !== null ||
     focusSheetVisible ||
@@ -2444,7 +2448,18 @@ export function HomeScreen({ navigation, route }: any) {
             setActiveCourse(courseId);
             setDrawerOpen(false);
           }}
+          onCenterCode={(code) => {
+            // Окно центра — после того, как уедет окно ввода кода
+            setJoinByCodeVisible(false);
+            setTimeout(() => setCenterCode(code), animation.sheet);
+          }}
           onDismiss={() => setJoinByCodeVisible(false)}
+        />
+        <CenterInviteModal
+          code={centerCode}
+          via="menu"
+          onJoined={() => setCenterCode(null)}
+          onDismiss={() => setCenterCode(null)}
         />
 
         {/* Streak Modal */}
