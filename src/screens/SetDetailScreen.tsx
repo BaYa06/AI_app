@@ -24,6 +24,7 @@ import {
   type StudyMode,
 } from '@/components/study/StudyModeSheet';
 import { currentSetSessionPlan, startSetSession } from '@/components/study/setSession';
+import { afterManualCard } from '@/services/photoHint';
 import { isModeAllowedForSets } from '@/utils/setKind';
 import { spacing, iconSize, alpha } from '@/constants';
 import { BottomBar, EmptyState, ProgressBar, toast } from '@/components/ui';
@@ -430,10 +431,11 @@ export function SetDetailScreen({ navigation, route }: Props) {
       setNewFront('');
       setNewBack('');
       setNewExample('');
+      afterManualCard(() => navigation.navigate('ImportFiles', { setId }));
     } finally {
       setIsAdding(false);
     }
-  }, [addCard, newFront, newBack, newExample, setId, updateSetStats]);
+  }, [addCard, newFront, newBack, newExample, setId, updateSetStats, navigation]);
 
   const handleEditSet = useCallback(() => {
     navigation.navigate('SetEditor', { setId });

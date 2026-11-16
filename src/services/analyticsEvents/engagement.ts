@@ -48,6 +48,10 @@ export const engagementEvents = {
   newFeatureTapped: (feature: string) => log('new_feature_tapped', { feature }),
   newFeatureDismissed: (feature: string) => log('new_feature_dismissed', { feature }),
 
+  // Подсказки в момент нужды (Start 4.3): показали и нажали
+  momentHintShown: (hint: string) => log('moment_hint_shown', { hint }),
+  momentHintTapped: (hint: string) => log('moment_hint_tapped', { hint }),
+
   pushPermissionGranted: () => log('push_permission_granted'),
 
   /**
