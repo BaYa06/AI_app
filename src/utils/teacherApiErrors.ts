@@ -17,6 +17,8 @@ export function describeTeacherApiReason(reason: TeacherApiReason): string {
       return 'Нужно войти в аккаунт, чтобы это сделать.';
     case 'forbidden':
       return 'Недостаточно прав для этого действия.';
+    case 'org_seats_full':
+      return 'Места учебного центра в этой группе закончились. Скажи учителю — он обратится в центр.';
     case 'rate_limited':
       return 'Слишком много попыток. Подожди минуту и попробуй снова.';
     case 'network':

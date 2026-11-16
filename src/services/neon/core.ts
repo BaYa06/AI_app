@@ -31,6 +31,8 @@ export type TeacherApiReason =
   | 'unauthorized'
   | 'forbidden'
   | 'rate_limited'
+  /** Группа учителя учебного центра: места центра кончились (plan/new/center_books.md) */
+  | 'org_seats_full'
   | 'bad_request'
   | 'network'
   | 'unknown';

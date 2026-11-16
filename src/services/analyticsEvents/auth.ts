@@ -36,6 +36,11 @@ export const authEvents = {
   courseJoinOnboarding: (via: 'code' | 'link') => log('course_join_onboarding', { via }),
   courseJoinNotMine: (via: 'code' | 'link') => log('course_join_not_mine', { via }),
 
+  /** Код учебного центра (plan/new/center_books.md, Center 5): проверили код / вошли / «Это не мой центр» */
+  orgCodeEntered: (valid: boolean, reason: string) => log('org_code_entered', { valid, reason }),
+  orgJoined: (via: 'code' | 'link' | 'menu') => log('org_joined', { via }),
+  orgNotMine: (via: 'code' | 'link') => log('org_not_mine', { via }),
+
   /**
    * Показан шаг онбординга (Start 2.8): воронка по шагам — где уходят.
    * sec_since_sign_in — сколько прошло от входа.
