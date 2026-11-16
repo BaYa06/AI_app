@@ -55,6 +55,7 @@ describe('getOnboardingTasks', () => {
             starter_set_issued_at: issued,
             diamond: 20,
             native_language: 'ru',
+            learning_goal: 'travel',
             target_languages: ['en', 'de'],
             starter_extra: {},
           },
@@ -70,6 +71,7 @@ describe('getOnboardingTasks', () => {
       diamonds: 20,
       reward: 10,
       nativeLanguage: 'ru',
+      learningGoal: 'travel',
       targetLanguages: ['en', 'de'],
       extraStarterLanguages: [],
     });

@@ -150,7 +150,14 @@ import { StartTasksStack } from '@/components/home/StartTasksStack';
 import { JoinTeacherCard } from '@/components/home/JoinTeacherCard';
 import { NewFeatureCard } from '@/components/home/NewFeatureCard';
 import { KnownWordsRow } from '@/components/home/KnownWordsRow';
-import { MILESTONE_DAYS, chaptersComparison, countKnownWords, studyDay } from '@/utils/knownWords';
+import {
+  MILESTONE_DAYS,
+  chaptersComparison,
+  countKnownWords,
+  goalProgressLine,
+  knownCards,
+  studyDay,
+} from '@/utils/knownWords';
 import { ExtraLanguageCard } from '@/components/home/ExtraLanguageCard';
 import { issueExtraStarterSet } from '@/services/starterSetIssue';
 import { useDailyHighlight } from './home/useDailyHighlight';
@@ -1285,10 +1292,12 @@ export function HomeScreen({ navigation, route }: any) {
   const knownWords = isTeacher === false ? countKnownWords() : 0;
   const startedAtForWords = useStartTasksStore((st) => st.startedAt);
   const dayOfStudy = studyDay(startedAtForWords);
+  const learningGoal = useStartTasksStore((st) => st.learningGoal);
+  // На 7-й и 30-й день — сравнение с учебником, в остальные — подпись по цели (Start 5.4)
   const wordsComparison =
-    dayOfStudy !== null && MILESTONE_DAYS.includes(dayOfStudy)
+    (dayOfStudy !== null && MILESTONE_DAYS.includes(dayOfStudy)
       ? chaptersComparison(knownWords)
-      : null;
+      : null) ?? (knownWords > 0 ? goalProgressLine(learningGoal, knownWords, knownCards()) : null);
   const handleHighlight = useCallback(
     (id: HighlightId) => {
       daily.dismiss(id, true);

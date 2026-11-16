@@ -5,7 +5,7 @@ import { describe, expect, it, jest } from '@jest/globals';
 
 jest.mock('@/store', () => ({ useCardsStore: { getState: () => ({ cards: {} }) } }));
 
-import { chaptersComparison, studyDay } from '../knownWords';
+import { chaptersComparison, goalProgressLine, studyDay } from '../knownWords';
 
 describe('chaptersComparison', () => {
   it('меньше 20 слов — без сравнения', () => {
@@ -28,5 +28,24 @@ describe('studyDay', () => {
     expect(studyDay(0, 1000)).toBe(1);
     expect(studyDay(0, 7 * DAY + 1)).toBe(8);
     expect(studyDay(null)).toBeNull();
+  });
+});
+
+describe('goalProgressLine', () => {
+  it('путешествия — что уже можно сказать', () => {
+    const cards = [{ frontText: 'Hello' }, { frontText: 'Coffee' }, { frontText: 'Where' }];
+    expect(goalProgressLine('travel', 3, cards)).toBe(
+      'Ты уже можешь поздороваться, заказать кофе и спросить дорогу'
+    );
+  });
+  it('путешествия, но таких слов нет — ничего', () => {
+    expect(goalProgressLine('travel', 2, [{ frontText: 'Apple' }])).toBeNull();
+  });
+  it('учёба — ближайший рубеж', () => {
+    expect(goalProgressLine('studies', 47)).toBe('До 50 слов — ещё 3');
+    expect(goalProgressLine('courses', 120)).toBe('До 250 слов — ещё 130');
+  });
+  it('для себя — ничего', () => {
+    expect(goalProgressLine('self', 47)).toBeNull();
   });
 });
