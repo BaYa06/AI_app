@@ -148,6 +148,9 @@ import { HomeHeader } from './home/components/HomeHeader';
 import { useStartTasks } from './home/useStartTasks';
 import { StartTasksStack } from '@/components/home/StartTasksStack';
 import { JoinTeacherCard } from '@/components/home/JoinTeacherCard';
+import { NewFeatureCard } from '@/components/home/NewFeatureCard';
+import { useDailyHighlight } from './home/useDailyHighlight';
+import type { HighlightId } from '@/services/dailyHighlight';
 import { closeJoinTeacherCard, shouldShowJoinTeacherCard } from '@/services/joinTeacherCard';
 import { WidgetHowToSheet } from '@/components/widget/WidgetHowToSheet';
 import { TeacherBanner } from './home/components/TeacherBanner';
@@ -166,6 +169,12 @@ function todayDayOf(stats: UserStats) {
 
 /** Предмет «Языки» в каталоге библиотеки (database/migrations/040_library_catalog.sql) */
 const LIBRARY_LANGUAGES_SLUG = 'languages';
+
+/** Сколько слов уже учили хотя бы раз — для «Неделя! Ты знаешь N слов» (Start 4.2) */
+function countKnownWords(): number {
+  return Object.values(useCardsStore.getState().cards).filter((c) => (c.learningStep || 0) >= 1)
+    .length;
+}
 
 export function HomeScreen({ navigation, route }: any) {
   const colors = useThemeColors();
@@ -1270,6 +1279,35 @@ export function HomeScreen({ navigation, route }: any) {
     playReward: playStartTaskReward,
   });
 
+  // «Новое» — одна фича в день после урока (Start 4.2)
+  const daily = useDailyHighlight(isTeacher === false);
+  const highlightSetId =
+    lessonPlan.focusSetId ?? starterSetIdForTasks ?? filteredSets[0]?.id ?? null;
+  const knownWords = daily.highlight?.id === 'week' ? countKnownWords() : 0;
+  const handleHighlight = useCallback(
+    (id: HighlightId) => {
+      daily.dismiss(id, true);
+      if (id === 'photo') openPhotoImport(starterSetIdForTasks);
+      else if (id === 'widget') startTasks.openWidgetSheet();
+      else if (id === 'voice') startTasks.handleStartTask('voice');
+      else if (id === 'week') openLibraryForTask();
+      else if (highlightSetId) {
+        navigation.navigate(id === 'builder' ? 'WordBuilder' : 'ContextFill', {
+          setId: highlightSetId,
+        });
+      }
+    },
+    [
+      daily,
+      openPhotoImport,
+      starterSetIdForTasks,
+      startTasks,
+      openLibraryForTask,
+      highlightSetId,
+      navigation,
+    ]
+  );
+
   // Поиск и сортировка по текущему списку наборов
   const visibleSets = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -1968,6 +2006,18 @@ export function HomeScreen({ navigation, route }: any) {
                         <PushStreakNudge
                           permission={pushNudgePermission}
                           onClose={() => setPushNudgeClosed(true)}
+                        />
+                      </View>
+                    )}
+                    {daily.highlight && (
+                      <View style={styles.startTasks}>
+                        <NewFeatureCard
+                          id={daily.highlight.id}
+                          knownWords={knownWords}
+                          onAction={() => daily.highlight && handleHighlight(daily.highlight.id)}
+                          onClose={() =>
+                            daily.highlight && daily.dismiss(daily.highlight.id, false)
+                          }
                         />
                       </View>
                     )}

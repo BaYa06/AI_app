@@ -145,5 +145,7 @@ export function useStartTasks({
       .catch(() => {});
   }, [showPendingReward]);
 
-  return { stackRef, handleStartTask, widgetSheet, closeWidgetSheet };
+  const openWidgetSheet = useCallback(() => setWidgetSheet(true), []);
+
+  return { stackRef, handleStartTask, widgetSheet, openWidgetSheet, closeWidgetSheet };
 }

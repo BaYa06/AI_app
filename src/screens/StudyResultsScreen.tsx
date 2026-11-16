@@ -6,6 +6,7 @@ import React from 'react';
 import { View, StyleSheet, Pressable, ScrollView, Platform } from 'react-native';
 import { useThemeColors } from '@/store';
 import { Text, StreakCelebration } from '@/components/common';
+import { recordHighlightLessonDay } from '@/services/dailyHighlight';
 import { Analytics } from '@/services/analytics';
 import { currentPushOrigin, reportPushLesson } from '@/services/pushOpens';
 import { recordSessionForRatingPrompt, markRatingPromptShown } from '@/services/feedback';
@@ -214,6 +215,8 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   React.useEffect(() => {
     if (!isLessonEnd) return;
     const today = localDay();
+    // «Новое» — фича дня считает дни с уроком (plan/new/new_user_activation.md, Start 4.2)
+    recordHighlightLessonDay(today);
     const state = addLessonDay(loadPromptState(), today);
     savePromptState(state);
     const supported = isLockScreenWidgetAvailable();

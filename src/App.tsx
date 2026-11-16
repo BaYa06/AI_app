@@ -33,6 +33,8 @@ import { StorageService } from '@/services/StorageService';
 import { CACHE_OWNER_KEY } from '@/services/DatabaseService';
 import { issueStarterSet, putStarterSetInStores } from '@/services/starterSetIssue';
 import { setWantsTeacher } from '@/services/joinTeacherCard';
+import { recordHighlightLessonDay } from '@/services/dailyHighlight';
+import { localDay } from '@/store/challengeStore';
 import type { StarterSet } from '@/services/StarterSetService';
 import { initCrashReporting, setCrashUserId } from '@/services/crashReporting';
 import {
@@ -604,6 +606,8 @@ export default function App() {
   const handleFirstResultsDone = useCallback(() => {
     // Первое задание «Начала пути» выполнено — первые 10 алмазов (Start 3.9)
     useStartTasksStore.getState().complete('first_lesson');
+    // Первый урок — день 1 для «Нового» (Start 4.2)
+    recordHighlightLessonDay(localDay());
     setAuthStep(afterLessonStep());
   }, [afterLessonStep]);
 

@@ -43,6 +43,11 @@ export const engagementEvents = {
   startTasksClosed: (done: number) => log('start_tasks_closed', { done }),
   startTasksFinished: () => log('start_tasks_finished'),
 
+  // «Новое» — фича дня (Start 4.2): показали, нажали, закрыли
+  newFeatureShown: (feature: string, day: number) => log('new_feature_shown', { feature, day }),
+  newFeatureTapped: (feature: string) => log('new_feature_tapped', { feature }),
+  newFeatureDismissed: (feature: string) => log('new_feature_dismissed', { feature }),
+
   pushPermissionGranted: () => log('push_permission_granted'),
 
   /**
