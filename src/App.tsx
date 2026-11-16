@@ -33,6 +33,7 @@ import { StorageService } from '@/services/StorageService';
 import { CACHE_OWNER_KEY } from '@/services/DatabaseService';
 import { issueStarterSet, putStarterSetInStores } from '@/services/starterSetIssue';
 import { setWantsTeacher } from '@/services/joinTeacherCard';
+import { markTeacherStarted } from '@/services/teacherStart';
 import { recordHighlightLessonDay } from '@/services/dailyHighlight';
 import { localDay } from '@/store/challengeStore';
 import type { StarterSet } from '@/services/StarterSetService';
@@ -649,6 +650,14 @@ export default function App() {
           nativeLanguage: finalData.nativeLanguage,
           targetLanguages: finalData.targetLanguages,
           learningGoal: finalData.learningGoal,
+        });
+      }
+      // Первые шаги учителя на главной (Start 6.1, 6.3)
+      if (finalData.role === 'teacher') {
+        markTeacherStarted({
+          subject: finalData.teacherSubject ?? null,
+          nativeLanguage: finalData.nativeLanguage,
+          targetLanguage: finalData.targetLanguages?.[0],
         });
       }
       // Ответы первого урока должны дойти до сервера, иначе перезагрузка покажет слова невыученными

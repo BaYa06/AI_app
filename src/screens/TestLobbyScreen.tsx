@@ -27,6 +27,7 @@ import { BottomBar } from '@/components/ui';
 import { log } from '@/utils/logger';
 import { getAccessToken } from '@/services/auth/session';
 import { rawApiFetch } from '@/services/api/client';
+import { markTeacherTask } from '@/services/teacherStart';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TestLobby'>;
 
@@ -40,6 +41,8 @@ type Student = {
 const AVATAR_TOKENS: ColorToken[] = ['primaryFill', 'warning', 'like', 'success', 'streak'];
 
 export function TestLobbyScreen({ navigation, route }: Props) {
+  // Первые шаги учителя (plan/new/new_user_activation.md, Start 6.3)
+  React.useEffect(() => markTeacherTask('test'), []);
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
 

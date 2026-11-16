@@ -7,6 +7,7 @@ import { confirmDialog, toast } from '@/components/ui';
 import { getSession } from '@/services/auth/session';
 import { NeonService } from '@/services/NeonService';
 import { log } from '@/utils/logger';
+import { markTeacherTask } from '@/services/teacherStart';
 
 type Params = {
   /** Открыть окно после закрытия боковой панели (см. HomeScreen) */
@@ -25,6 +26,8 @@ export function useCourseInvite({ runAfterDrawerClosed, setCourseMenuOpen }: Par
   const openInviteModal = useCallback(
     async (courseId: string) => {
       setCourseMenuOpen(null);
+      // Первые шаги учителя: «Пригласи учеников» (Start 6.3)
+      markTeacherTask('invite');
       setInviteCopied(false);
       setInviteToken(null);
       setInviteJoinCode(null);

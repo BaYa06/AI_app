@@ -15,6 +15,9 @@ const CACHE_NAME = 'teacher_start';
 interface Saved {
   startedAt: number | null;
   subject: string | null;
+  /** Языки из онбординга — для набора учителя языка */
+  nativeLanguage?: string | null;
+  targetLanguage?: string | null;
   done: TeacherTaskId[];
   closed: boolean;
 }
@@ -38,8 +41,12 @@ function update(change: (s: Saved) => Saved) {
 }
 
 /** Учитель закончил онбординг — начинаем «Первые шаги» */
-export function markTeacherStarted(subject: string | null): void {
-  update((s) => (s.startedAt ? s : { ...s, startedAt: Date.now(), subject }));
+export function markTeacherStarted(info: {
+  subject: string | null;
+  nativeLanguage?: string | null;
+  targetLanguage?: string | null;
+}): void {
+  update((s) => (s.startedAt ? s : { ...s, startedAt: Date.now(), ...info }));
 }
 
 export function markTeacherTask(task: TeacherTaskId): void {

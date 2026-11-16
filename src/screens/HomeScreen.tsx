@@ -150,6 +150,9 @@ import { StartTasksStack } from '@/components/home/StartTasksStack';
 import { JoinTeacherCard } from '@/components/home/JoinTeacherCard';
 import { NewFeatureCard } from '@/components/home/NewFeatureCard';
 import { KnownWordsRow } from '@/components/home/KnownWordsRow';
+import { TeacherStartSection } from '@/components/home/TeacherStartSection';
+import { createTeacherStarterCourse } from '@/services/teacherStarterCourse';
+import { useTeacherStartStore, type TeacherTaskId } from '@/services/teacherStart';
 import {
   MILESTONE_DAYS,
   chaptersComparison,
@@ -1835,7 +1838,43 @@ export function HomeScreen({ navigation, route }: any) {
   // когда в курсе ещё нет наборов: иначе в новом пустом курсе до него было не добраться.
   // Учитель в своём курсе — карточка урока (plan/done/teacher_cabinet.md, Teacher 2); в «Мои наборы»
   // и без курсов — прежний баннер.
-  const teacherBanner =
+  // Первые шаги учителя (plan/new/new_user_activation.md, Start 6.1, 6.3)
+  const firstOwnCourse = courses.find((c) => !c.isStudentCourse) ?? null;
+  const handleTeacherTask = useCallback(
+    (task: TeacherTaskId) => {
+      if (task === 'demo') {
+        navigation.navigate('TeacherDemoTest');
+        return;
+      }
+      if (!firstOwnCourse) return;
+      const params = { courseId: firstOwnCourse.id, courseTitle: firstOwnCourse.title };
+      if (task === 'invite') openInviteModal(firstOwnCourse.id);
+      else if (task === 'test') navigation.navigate('ExamLobby', params);
+      else if (task === 'stats') navigation.navigate('TeacherCourseStats', params);
+    },
+    [navigation, firstOwnCourse, openInviteModal]
+  );
+  const handleCreateStarterCourse = useCallback(async () => {
+    const { subject, nativeLanguage, targetLanguage } = useTeacherStartStore.getState();
+    const course = await createTeacherStarterCourse({ subject, nativeLanguage, targetLanguage });
+    if (!course) {
+      toast.error('Не получилось создать курс — проверь интернет и попробуй ещё раз');
+      return;
+    }
+    useCoursesStore.getState().setActiveCourse(course.id);
+    toast.success('Курс готов — можно приглашать учеников и запускать тест');
+  }, []);
+  const teacherStart = (
+    <View style={styles.startTasks}>
+      <TeacherStartSection
+        hasCourse={!!firstOwnCourse}
+        onCreateStarterCourse={handleCreateStarterCourse}
+        onAction={handleTeacherTask}
+      />
+    </View>
+  );
+
+  const teacherBannerCard =
     teacherCourseTitle !== null && activeCourseId !== null ? (
       <TeacherLessonCard
         colors={colors}
@@ -1852,6 +1891,12 @@ export function HomeScreen({ navigation, route }: any) {
         navigation={navigation}
       />
     );
+  const teacherBanner = (
+    <>
+      {teacherStart}
+      {teacherBannerCard}
+    </>
+  );
 
   // Карточка ежедневного челленджа: играть → "Забрать" 10 алмазов → "Получено" до завтра
   // Мини-игра: «Играть» → «Выполнено, забрать +10» → «Получено, снова завтра»

@@ -3,6 +3,7 @@
  * @description Статистика курса для учителя
  */
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { markTeacherTask } from '@/services/teacherStart';
 import { View, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft } from 'lucide-react-native';
@@ -42,6 +43,8 @@ import {
 type Props = NativeStackScreenProps<RootStackParamList, 'TeacherCourseStats'>;
 
 export function TeacherCourseStatsScreen({ navigation, route }: Props) {
+  // Первые шаги учителя (plan/new/new_user_activation.md, Start 6.3)
+  React.useEffect(() => markTeacherTask('stats'), []);
   const { courseTitle } = route.params;
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
