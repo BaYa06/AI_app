@@ -220,14 +220,14 @@ user_books              user_id, book_id, current_unit_id, is_active, updated_at
 ## Шаги
 
 ### Этап 1 — база и активация (только сервер)
-- **Center 1** — миграция 052: `organizations` (+ `seat_limit`, `contract_until`, `city`,
+- ✅ **Center 1** — миграция 052: `organizations` (+ `seat_limit`, `contract_until`, `city`,
   `greeting`, `contact`, `code_prefix`), `organization_members`, `books.organization_id`,
   `books.org_position`, `courses.organization_id`, `org_codes`, `org_code_activations`,
   `org_students`, `user_books`, функции `flashly_activate_org_code` и `flashly_org_seats_used`.
   По правилам `MIGRATION_GUIDE.md`: блок в `api/_db-init.js` + `SCHEMA_VERSION = 'schema_052'` +
   файл `database/migrations/052_center_books.sql`; только добавляющие изменения (`IF NOT EXISTS`,
   nullable / `DEFAULT`), `npm run db:check-migrations`. Применится сам на staging после деплоя dev.
-- **Center 2** — правило доступа `bookAccessSql` и закрытие дыр 1–4: `assertReadableSet`,
+- ✅ **Center 2** — правило доступа (функции `flashly_org_access` / `flashly_unit_access` / `flashly_card_access` в SQL) и закрытие дыр 1–4: `assertReadableSet`,
   `official-sets`, `list-books`, `book-detail`, `course-plan`, `loadShelf` и поиск каталога,
   `fork-set` (книги центра не копируются), `attach-to-courses` (книгу центра — только учитель
   центра, с проверкой мест), `api/_course.js` (`courseSetsForStudent`, `courseSetIdsSql`).
@@ -235,10 +235,12 @@ user_books              user_id, book_id, current_unit_id, is_active, updated_at
   (`api/_handlers/data/streak.js`, `waiting` — иначе ученик с закончившимся доступом не закроет
   день: его слова «ждут», а повторить их нельзя) и push-арбитр (`api/push/_arbiter.js`,
   «пора повторить N слов» про закрытые слова).
-- **Center 3** — `org-activate`, `org-info`, `my-orgs`, `my-book`; лимиты на пользователя и IP
+- ✅ **Center 3** — `org-info` (проверка без записи, `p_dry_run`), `org-activate`, `my-orgs`,
+  `my-book` (`api/_handlers/center/student.js`; папка `books/` закрыта `.gitignore`); перебор —
+  только неудачные попытки: 10 за 10 мин на аккаунт, 30 за час на IP (класс на одном Wi-Fi)
   (`api_rate_limits` с ключом `md5(ip)::uuid`); вступление в группу центра (`join-by-code`,
   `join-by-token`) проверяет места — `reason: org_seats_full`.
-- **Center 4** — проверочный скрипт `scripts/check-center-access.ts` на staging: валидный код,
+- ✅ **Center 4** — проверочный скрипт (`npm run center:check`, 64 проверки, вызывает настоящие обработчики API с подменой входа Supabase) `scripts/check-center-access.ts` на staging: валидный код,
   истёкший, лимит, повторная активация, продление новым кодом, параллельные активации последнего
   места (10 запросов разом — проходит ровно один); два центра A и B: ученик и учитель B не видят
 книг A ни в каталоге, ни в поиске, ни по `bookId`/`setId`; чужой пользователь без доступа получает 404
@@ -292,7 +294,10 @@ user_books              user_id, book_id, current_unit_id, is_active, updated_at
 
 **Шаги**
 - **Center 8** — (таблицы уже в миграции 052, Center 1.) Вкладка «Центры» в Flashly Admin
-  (`public/admin.html` + `api/admin.js`, только localhost): создать центр и логин, временный пароль (при первом входе центр меняет его на свой;
+  (`public/admin.html` + `api/admin.js`, только localhost). **Внимание:** админка берёт
+  `POSTGRES_URL` из `.env.local`, а это **прод** (`ep-misty-scene`); staging — только
+  `.env.staging`. Вкладке нужен явный выбор базы и крупная пометка «прод / staging»; центры на
+  проде создаём только с разрешения. Сама вкладка: создать центр и логин, временный пароль (при первом входе центр меняет его на свой;
   мы пароль больше не видим, только «Новый пароль»), места, срок, начало кодов из названия. Флаг `--org` у `import-book.ts`.
   Там же привязка уже загруженной книги к центру (выбор «Общая / Alfa / …») и порядок уровней.
   **Привязка общей опубликованной книги** убирает её из библиотеки у всех: админка спрашивает
