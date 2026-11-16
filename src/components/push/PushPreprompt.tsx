@@ -92,7 +92,9 @@ export function PushPreprompt({ visible, wordCount, onClose }: Props) {
           {title}
         </Text>
         <Text variant="body" align="center" color="secondary" style={st.subtitle}>
-          Повторение на следующий день помогает словам запомниться. Одно напоминание в день.
+          {/* Честно, зачем напоминание (plan/new/new_user_activation.md, Start 5.2) */}
+          Слова забываются через 1–2 дня. Мы напомним, когда слово начнёт забываться — одно
+          напоминание в день.
         </Text>
 
         <Text variant="label" color="secondary" style={st.slotsLabel}>
