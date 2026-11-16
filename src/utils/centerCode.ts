@@ -24,6 +24,14 @@ export function isCourseCode(code: string): boolean {
   return /^[A-Z0-9]{6}$/.test(code);
 }
 
+/** Ссылка /join/<код центра> (https://… или flashly://) → код или null. Токен курса (64 hex) — null. */
+export function parseCenterJoin(url: string): string | null {
+  const m = url.match(/\/join\/([A-Za-z0-9]+-[A-Za-z0-9-]+)(?:[/?#]|$)/);
+  if (!m) return null;
+  const code = normalizeJoinCode(m[1]);
+  return isCenterCode(code) ? code : null;
+}
+
 /** Можно искать: полный код курса или код центра. */
 export function isJoinCodeReady(code: string): boolean {
   return isCourseCode(code) || isCenterCode(code);

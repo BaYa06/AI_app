@@ -7,6 +7,7 @@ import {
   isCourseCode,
   isJoinCodeReady,
   normalizeJoinCode,
+  parseCenterJoin,
 } from '../centerCode';
 
 describe('код учителя или центра в одном поле (Center 5)', () => {
@@ -46,5 +47,14 @@ describe('код учителя или центра в одном поле (Cent
     const now = Date.parse('2026-11-16T00:00:00Z');
     expect(daysLeft('2027-02-14T00:00:00Z', now)).toBe(90);
     expect(daysLeft('2026-11-01T00:00:00Z', now)).toBe(0);
+  });
+
+  it('ссылка /join/<код центра>: https и flashly://, токен курса — не центр', () => {
+    expect(parseCenterJoin('https://flashlycards.app/join/ALFA-DEC-7K')).toBe('ALFA-DEC-7K');
+    expect(parseCenterJoin('flashly://join/alfa-dec-7k')).toBe('ALFA-DEC-7K');
+    expect(parseCenterJoin('https://x.app/join/ALFA-DEC-7K?utm=qr')).toBe('ALFA-DEC-7K');
+    expect(parseCenterJoin(`https://x.app/join/${'a'.repeat(64)}`)).toBeNull();
+    expect(parseCenterJoin('https://x.app/join/K7M2QX')).toBeNull();
+    expect(parseCenterJoin('https://x.app/s/ABC-DEF')).toBeNull();
   });
 });

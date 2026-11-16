@@ -26,6 +26,7 @@ import { TeacherCodeScreen } from '@/screens/courseJoin/TeacherCodeScreen';
 import { CourseFoundScreen } from '@/screens/courseJoin/CourseFoundScreen';
 import { CourseNameScreen } from '@/screens/courseJoin/CourseNameScreen';
 import { CenterFoundScreen } from '@/screens/courseJoin/CenterFoundScreen';
+import { CenterInviteModal } from '@/components/CenterInviteModal';
 import type { CenterActivateAction, CenterCodeResult } from '@/services/CenterService';
 import type { CourseInviteInfo, JoinCourseAction } from '@/services/neon/courses';
 import { FirstCardsScreen } from '@/screens/firstLesson/FirstCardsScreen';
@@ -124,6 +125,10 @@ type AppRootProps = {
   onCenterFound: (code: string, info: Extract<CenterCodeResult, { ok: true }>) => void;
   onCenterActivate: CenterActivateAction;
   onCenterNotMine: () => void;
+  /** Ссылка центра /join/<код> (Center 5): у вошедшего — окно, у нового — онбординг */
+  pendingCenterCode: string | null;
+  onCenterInviteJoined: (info: Extract<CenterCodeResult, { ok: true }>) => void;
+  onCenterInviteDismiss: () => void;
   /** Первый урок (Start 2.5): выданный стартовый набор и шаги урока */
   firstLesson: StarterSet | null;
   starterReady: boolean | null;
@@ -186,6 +191,9 @@ export function AppRoot({
   onCenterFound,
   onCenterActivate,
   onCenterNotMine,
+  pendingCenterCode,
+  onCenterInviteJoined,
+  onCenterInviteDismiss,
   firstLesson,
   starterReady,
   onStarterBuilt,
@@ -223,6 +231,7 @@ export function AppRoot({
   const afterLessonTotal = nameSkipped ? 3 : 4;
   // Во время онбординга ссылку учителя ведёт сам онбординг («Курс найден», Start 7.3)
   const inviteOpen = isAuthenticated && !needsOnboarding && !!pendingInviteToken;
+  const centerInviteOpen = isAuthenticated && !needsOnboarding && !!pendingCenterCode;
   const shareOpen =
     isReady && !!pendingShareCode && (signedIn || (!isAuthenticated && !shareDeferred));
 
@@ -233,10 +242,11 @@ export function AppRoot({
     initWhatsNew({ hasSession: isAuthenticated, signedIn, allIds: currentNews().map((n) => n.id) });
   }, [isReady, isAuthenticated, signedIn]);
   useEffect(() => setGateOpen('courseInvite', inviteOpen), [inviteOpen]);
+  useEffect(() => setGateOpen('centerInvite', centerInviteOpen), [centerInviteOpen]);
   useEffect(() => setGateOpen('shareLink', shareOpen), [shareOpen]);
   useEffect(() => {
-    if (pendingInviteToken || pendingShareCode) markLaunchInterrupted();
-  }, [pendingInviteToken, pendingShareCode]);
+    if (pendingInviteToken || pendingShareCode || pendingCenterCode) markLaunchInterrupted();
+  }, [pendingInviteToken, pendingShareCode, pendingCenterCode]);
 
   const [showPushBanner, setShowPushBanner] = useState(false);
   const [pushBannerLoading, setPushBannerLoading] = useState(false);
@@ -287,7 +297,7 @@ export function AppRoot({
       ) : (
         <StepTransition step={authStep}>
           {authStep === 'welcome' ? (
-            <WelcomeScreen isLoading={authLoading} />
+            <WelcomeScreen isLoading={authLoading} centerInvited={!!pendingCenterCode} />
           ) : authStep === 'name' ? (
             <NameOnboardingScreen
               onBack={isTeacher ? onBackToRole : undefined}
@@ -404,7 +414,7 @@ export function AppRoot({
               total={teacherTotal}
             />
           ) : (
-            <WelcomeScreen isLoading={authLoading} />
+            <WelcomeScreen isLoading={authLoading} centerInvited={!!pendingCenterCode} />
           )}
         </StepTransition>
       )}
@@ -512,6 +522,15 @@ export function AppRoot({
           userId={currentUserId}
           onAccepted={onInviteAccepted}
           onDismiss={onInviteDismiss}
+        />
+      )}
+
+      {/* Ссылка учебного центра у вошедшего пользователя (plan/new/center_books.md, Center 5) */}
+      {centerInviteOpen && (
+        <CenterInviteModal
+          code={pendingCenterCode}
+          onJoined={onCenterInviteJoined}
+          onDismiss={onCenterInviteDismiss}
         />
       )}
 

@@ -38,7 +38,12 @@ import type { CourseInviteInfo } from '@/services/neon/courses';
 import { callDataApi } from '@/services/neon/core';
 import { describeTeacherApiReason } from '@/utils/teacherApiErrors';
 import { CenterService, type CenterCodeResult } from '@/services/CenterService';
-import { describeCenterReason } from '@/utils/centerCode';
+import {
+  describeCenterReason,
+  isCenterCode,
+  normalizeJoinCode,
+  parseCenterJoin,
+} from '@/utils/centerCode';
 import { recordHighlightLessonDay } from '@/services/dailyHighlight';
 import { localDay } from '@/store/challengeStore';
 import type { StarterSet } from '@/services/StarterSetService';
@@ -91,6 +96,11 @@ export default function App() {
   // Ссылка учителя, открытая до входа: новый ученик идёт сразу в «Курс найден» (Start 7.3)
   const pendingInviteTokenRef = useRef<string | null>(null);
   pendingInviteTokenRef.current = pendingInviteToken;
+  // Ссылка учебного центра /join/<код> (plan/new/center_books.md, Center 5): до входа — онбординг
+  // «Центр найден», у вошедшего — окно поверх приложения
+  const [pendingCenterCode, setPendingCenterCode] = useState<string | null>(null);
+  const pendingCenterCodeRef = useRef<string | null>(null);
+  pendingCenterCodeRef.current = pendingCenterCode;
   // Ученик с кодом или ссылкой учителя (plan/new/new_user_activation.md, этап 7)
   const [courseJoin, setCourseJoin] = useState<{
     via: 'code' | 'link';
@@ -310,6 +320,17 @@ export default function App() {
             return;
           }
         }
+        // Открыл ссылку учебного центра — сразу «Центр найден», без роли и языков (Center 5)
+        const centerCode = pendingCenterCodeRef.current;
+        if (centerCode) {
+          const info = await CenterService.getInfo(centerCode);
+          setPendingCenterCode(null);
+          if (info.ok) {
+            setCenterJoin({ via: 'link', code: centerCode, info });
+            setAuthStep('center_found');
+            return;
+          }
+        }
         setAuthStep('role');
       }
     },
@@ -423,6 +444,12 @@ export default function App() {
       setPendingInviteToken(joinMatch[1]);
       return;
     }
+    // Ссылка учебного центра: /join/ALFA-DEC-7K (Center 5)
+    const centerPath = parseCenterJoin(path);
+    if (centerPath) {
+      setPendingCenterCode(centerPath);
+      return;
+    }
 
     // Набор по ссылке: ?share=CODE — кнопка «Открыть в Flashly» на странице /s/CODE
     const shareParam = new URLSearchParams(window.location.search).get('share');
@@ -439,6 +466,10 @@ export default function App() {
       log.debug('Invite', 'Query param detected, token', joinParam.slice(0, 8) + '...');
       setPendingInviteToken(joinParam);
       // Очистить query из URL
+      window.history.replaceState({}, '', '/');
+    } else if (joinParam && isCenterCode(normalizeJoinCode(joinParam))) {
+      // Страница /join/<код центра> → «Открыть Flashly» (Center 5)
+      setPendingCenterCode(normalizeJoinCode(joinParam));
       window.history.replaceState({}, '', '/');
     }
   }, []);
@@ -488,6 +519,12 @@ export default function App() {
         if (joinMatch) {
           log.debug('Invite', 'Deep link detected, token', joinMatch[1].slice(0, 8) + '...');
           setPendingInviteToken(joinMatch[1]);
+          return;
+        }
+        // Ссылка учебного центра: https://…/join/ALFA-DEC-7K или flashly://join/ALFA-DEC-7K
+        const centerLink = parseCenterJoin(url);
+        if (centerLink) {
+          setPendingCenterCode(centerLink);
           return;
         }
 
@@ -976,6 +1013,9 @@ export default function App() {
           onCenterFound={handleCenterFound}
           onCenterActivate={handleCenterActivate}
           onCenterNotMine={handleCenterNotMine}
+          pendingCenterCode={pendingCenterCode}
+          onCenterInviteJoined={() => setPendingCenterCode(null)}
+          onCenterInviteDismiss={() => setPendingCenterCode(null)}
           firstLesson={firstLesson}
           starterReady={starterReady}
           onStarterBuilt={handleStarterBuilt}

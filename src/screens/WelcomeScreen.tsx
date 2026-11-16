@@ -23,6 +23,8 @@ type Props = {
   isLoading?: boolean;
   /** Открыта ссылка учителя — «Тебя пригласили в курс» (Start 7.3) */
   invited?: boolean;
+  /** Открыта ссылка учебного центра — «Тебе открыт доступ к книгам» (plan/new/center_books.md) */
+  centerInvited?: boolean;
 };
 
 // Стопка из трёх карточек: нижние повёрнуты, верхняя залита фирменным цветом
@@ -41,7 +43,11 @@ const INSTALL_STEPS: { icon: IconComponent; text: string }[] = [
 // Кнопка Google берёт иконку по тем же пропсам size/color, что и lucide
 const GoogleIcon = GoogleLogo as unknown as IconComponent;
 
-export function WelcomeScreen({ isLoading: externalLoading, invited = false }: Props) {
+export function WelcomeScreen({
+  isLoading: externalLoading,
+  invited = false,
+  centerInvited = false,
+}: Props) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const { canInstall, promptInstall, isIosSafari } = usePwaInstall();
@@ -249,16 +255,22 @@ export function WelcomeScreen({ isLoading: externalLoading, invited = false }: P
               accessibilityRole="header"
               style={{ color: colors.textPrimary }}
             >
-              {invited ? 'Тебя пригласили в курс' : 'Первые слова за 2 минуты'}
+              {centerInvited
+                ? 'Тебе открыт доступ к книгам'
+                : invited
+                  ? 'Тебя пригласили в курс'
+                  : 'Первые слова за 2 минуты'}
             </Text>
             <Text
               variant="bodyLarge"
               align="center"
               style={[styles.subtitle, { color: colors.textSecondary }]}
             >
-              {invited
-                ? 'Войди, и курс учителя сразу откроется.'
-                : 'Карточки, игры и повторение в нужный момент. Слова не забываются.'}
+              {centerInvited
+                ? 'Войди, и сразу выберешь свою книгу учебного центра.'
+                : invited
+                  ? 'Войди, и курс учителя сразу откроется.'
+                  : 'Карточки, игры и повторение в нужный момент. Слова не забываются.'}
             </Text>
           </View>
 
