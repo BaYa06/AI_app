@@ -8,6 +8,7 @@ import { useThemeColors } from '@/store';
 import { Text, StreakCelebration } from '@/components/common';
 import { recordHighlightLessonDay } from '@/services/dailyHighlight';
 import { markHintShown, noteStudyMode } from '@/services/momentHints';
+import { countKnownWords } from '@/utils/knownWords';
 import { Analytics } from '@/services/analytics';
 import { currentPushOrigin, reportPushLesson } from '@/services/pushOpens';
 import { recordSessionForRatingPrompt, markRatingPromptShown } from '@/services/feedback';
@@ -239,6 +240,8 @@ export function StudyResultsScreen({ navigation, route }: Props) {
       cancelled = true;
     };
   }, [isLessonEnd]);
+
+  const [knownTotal] = React.useState(countKnownWords);
 
   // «Попробуй другую игру» (plan/new/new_user_activation.md, Start 4.3): 3 дня подряд — одним
   // режимом. Сессия «Изучить» и урок дня и так из разных этапов — их не считаем
@@ -523,6 +526,13 @@ export function StudyResultsScreen({ navigation, route }: Props) {
             </Text>{' '}
             из {totalCards}
           </Text>
+
+          {/* Прогресс в словах (plan/new/new_user_activation.md, Start 5.3) */}
+          {knownTotal > 0 && (
+            <Text variant="body" color="secondary" align="center" style={styles.phaseProgress}>
+              Теперь ты знаешь {knownTotal} {pluralize(knownTotal, 'слово', 'слова', 'слов')}
+            </Text>
+          )}
 
           {/* Прогресс фазы */}
           {phaseId && totalPhaseCards > 0 && (

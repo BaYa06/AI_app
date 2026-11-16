@@ -149,6 +149,8 @@ import { useStartTasks } from './home/useStartTasks';
 import { StartTasksStack } from '@/components/home/StartTasksStack';
 import { JoinTeacherCard } from '@/components/home/JoinTeacherCard';
 import { NewFeatureCard } from '@/components/home/NewFeatureCard';
+import { KnownWordsRow } from '@/components/home/KnownWordsRow';
+import { MILESTONE_DAYS, chaptersComparison, countKnownWords, studyDay } from '@/utils/knownWords';
 import { ExtraLanguageCard } from '@/components/home/ExtraLanguageCard';
 import { issueExtraStarterSet } from '@/services/starterSetIssue';
 import { useDailyHighlight } from './home/useDailyHighlight';
@@ -171,12 +173,6 @@ function todayDayOf(stats: UserStats) {
 
 /** Предмет «Языки» в каталоге библиотеки (database/migrations/040_library_catalog.sql) */
 const LIBRARY_LANGUAGES_SLUG = 'languages';
-
-/** Сколько слов уже учили хотя бы раз — для «Неделя! Ты знаешь N слов» (Start 4.2) */
-function countKnownWords(): number {
-  return Object.values(useCardsStore.getState().cards).filter((c) => (c.learningStep || 0) >= 1)
-    .length;
-}
 
 export function HomeScreen({ navigation, route }: any) {
   const colors = useThemeColors();
@@ -1285,7 +1281,14 @@ export function HomeScreen({ navigation, route }: any) {
   const daily = useDailyHighlight(isTeacher === false);
   const highlightSetId =
     lessonPlan.focusSetId ?? starterSetIdForTasks ?? filteredSets[0]?.id ?? null;
-  const knownWords = daily.highlight?.id === 'week' ? countKnownWords() : 0;
+  // «Ты знаешь N слов» (Start 5.3): у ученика, когда есть хоть одно выученное слово
+  const knownWords = isTeacher === false ? countKnownWords() : 0;
+  const startedAtForWords = useStartTasksStore((st) => st.startedAt);
+  const dayOfStudy = studyDay(startedAtForWords);
+  const wordsComparison =
+    dayOfStudy !== null && MILESTONE_DAYS.includes(dayOfStudy)
+      ? chaptersComparison(knownWords)
+      : null;
   const handleHighlight = useCallback(
     (id: HighlightId) => {
       daily.dismiss(id, true);
@@ -2009,6 +2012,11 @@ export function HomeScreen({ navigation, route }: any) {
                           permission={pushNudgePermission}
                           onClose={() => setPushNudgeClosed(true)}
                         />
+                      </View>
+                    )}
+                    {knownWords > 0 && (
+                      <View style={styles.startTasks}>
+                        <KnownWordsRow words={knownWords} comparison={wordsComparison} />
                       </View>
                     )}
                     {daily.highlight && (
