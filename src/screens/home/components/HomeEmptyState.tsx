@@ -4,12 +4,12 @@
  */
 import React from 'react';
 import { View } from 'react-native';
-import { useThemeColors } from '@/store';
+import { useStartTasksStore, useThemeColors } from '@/store';
 import { Text } from '@/components/common';
 import { iconSize, alpha } from '@/constants';
 import { triggerHaptic } from '@/utils/haptic';
 import { Card as SurfaceCard, EmptyState } from '@/components/ui';
-import { Plus, Library, Lightbulb, Folder, Users } from 'lucide-react-native';
+import { Camera, Plus, Library, Lightbulb, Folder } from 'lucide-react-native';
 import { Analytics } from '@/services/analytics';
 import { lessonCardContent } from '@/components/home/lessonText';
 import { LessonCard } from '@/components/home/LessonCard';
@@ -39,7 +39,8 @@ export function HomeEmptyState({
   openFocusSheet,
   mySetsEmptyButCourses,
   setDrawerOpen,
-  setJoinByCodeVisible,
+  // Подключение к учителю — теперь в меню «Курсы» и карточке на главной (Start 3.6, 4.4)
+  setJoinByCodeVisible: _setJoinByCodeVisible,
   navigation,
 }: Props) {
   return (
@@ -84,26 +85,54 @@ export function HomeEmptyState({
             description={
               isTeacher
                 ? 'Создай первый набор, чтобы начать учиться и упорядочить материалы по курсам.'
-                : 'Создай свой набор слов или подключись к курсу учителя — его наборы появятся здесь.'
+                : 'Сфоткай страницу учебника, возьми готовый набор или создай свой. Учишься с учителем — подключись в меню «Курсы».'
             }
-            action={{
-              label: 'Создать набор',
-              icon: Plus,
-              onPress: () => {
-                Analytics.homeAction('create_set');
-                navigation?.navigate('SetEditor', {});
-              },
-            }}
-            // Новичку — второй путь: не создавать, а подключиться к курсу учителя по коду
+            // Ученику — три способа (plan/new/new_user_activation.md, Start 4.4): фото, библиотека, вручную
+            action={
+              isTeacher === true
+                ? {
+                    label: 'Создать набор',
+                    icon: Plus,
+                    onPress: () => {
+                      Analytics.homeAction('create_set');
+                      navigation?.navigate('SetEditor', {});
+                    },
+                  }
+                : {
+                    label: 'Из фото или файла',
+                    icon: Camera,
+                    onPress: () => {
+                      triggerHaptic('selection');
+                      const { nativeLanguage, targetLanguages } = useStartTasksStore.getState();
+                      navigation?.navigate('ImportFiles', {
+                        setId: '',
+                        newSet: {
+                          languageFrom: targetLanguages[0] ?? 'en',
+                          languageTo: nativeLanguage ?? 'ru',
+                        },
+                      });
+                    },
+                  }
+            }
             secondaryAction={
               isTeacher !== true
                 ? {
-                    label: 'Подключиться к учителю',
-                    icon: Users,
+                    label: 'Готовый набор из библиотеки',
+                    icon: Library,
                     onPress: () => {
                       triggerHaptic('selection');
-                      Analytics.homeAction('join_course');
-                      setJoinByCodeVisible(true);
+                      navigation?.navigate('Library');
+                    },
+                  }
+                : undefined
+            }
+            tertiaryAction={
+              isTeacher !== true
+                ? {
+                    label: 'Создать вручную',
+                    onPress: () => {
+                      Analytics.homeAction('create_set');
+                      navigation?.navigate('SetEditor', {});
                     },
                   }
                 : undefined

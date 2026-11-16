@@ -23,7 +23,7 @@ export const ONBOARDING_TASK_REWARD = 10;
 export async function getOnboardingTasks(sql, me) {
   const [user] = await sql`
     SELECT starter_set_id, starter_set_issued_at, COALESCE(diamond, 0) AS diamond,
-           target_languages, COALESCE(starter_extra, '{}'::jsonb) AS starter_extra
+           native_language, target_languages, COALESCE(starter_extra, '{}'::jsonb) AS starter_extra
     FROM users WHERE id = ${me}::uuid
   `;
   if (!user) throw new HttpError(404, 'User not found');
@@ -35,6 +35,7 @@ export async function getOnboardingTasks(sql, me) {
     diamonds: user.diamond,
     reward: ONBOARDING_TASK_REWARD,
     // «Хочешь начать и <язык>?» (Start 4.3): изучаемые из онбординга и уже выданные доп. наборы
+    nativeLanguage: user.native_language ?? null,
     targetLanguages: Array.isArray(user.target_languages) ? user.target_languages : [],
     extraStarterLanguages: Object.keys(user.starter_extra ?? {}),
   };

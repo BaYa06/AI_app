@@ -42,6 +42,7 @@ import {
   Camera,
   BookOpen,
   Layers,
+  Library,
 } from 'lucide-react-native';
 import { describeError } from '@/utils/userErrors';
 import { pluralize } from '@/utils';
@@ -819,12 +820,19 @@ export function SetDetailScreen({ navigation, route }: Props) {
           icon={Camera}
           compact
           title="Пока нет карточек"
-          description="Сфотографируй страницу учебника — карточки появятся сами"
+          description="Три способа: сфоткай страницу, возьми готовый набор или добавь слова сам"
           action={{
             label: 'Из фото или файла',
+            icon: Camera,
             onPress: () => navigation.navigate('ImportFiles', { setId }),
           }}
-          secondaryAction={{ label: 'Добавить вручную', onPress: openAddCardSheet }}
+          // Готовый набор из библиотеки — это отдельный набор, а не карточки в этот (Start 4.4)
+          secondaryAction={{
+            label: 'Готовый набор из библиотеки',
+            icon: Library,
+            onPress: () => navigation.navigate('Main', { screen: 'Library' }),
+          }}
+          tertiaryAction={{ label: 'Добавить вручную', onPress: openAddCardSheet }}
         />
       ),
     [openAddCardSheet, isReadOnly, navigation, setId]

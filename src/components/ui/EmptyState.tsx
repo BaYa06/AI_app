@@ -25,6 +25,8 @@ export interface EmptyStateProps {
   description?: string;
   action?: StateAction;
   secondaryAction?: StateAction;
+  /** Третий способ — тихая кнопка («Вручную», plan/new/new_user_activation.md, Start 4.4) */
+  tertiaryAction?: StateAction;
   /** Цвет иконки и круга (по умолчанию primary). */
   color?: string;
   /** Компактный вид внутри карточки или листа — без большого отступа сверху. */
@@ -38,6 +40,7 @@ export const EmptyState = memo(function EmptyState({
   description,
   action,
   secondaryAction,
+  tertiaryAction,
   color,
   compact = false,
   style,
@@ -67,7 +70,7 @@ export const EmptyState = memo(function EmptyState({
           {description}
         </Text>
       ) : null}
-      {action || secondaryAction ? (
+      {action || secondaryAction || tertiaryAction ? (
         <View style={styles.actions}>
           {action ? (
             <Button title={action.label} icon={action.icon} onPress={action.onPress} fullWidth />
@@ -78,6 +81,15 @@ export const EmptyState = memo(function EmptyState({
               title={secondaryAction.label}
               icon={secondaryAction.icon}
               onPress={secondaryAction.onPress}
+              fullWidth
+            />
+          ) : null}
+          {tertiaryAction ? (
+            <Button
+              variant="quiet"
+              title={tertiaryAction.label}
+              icon={tertiaryAction.icon}
+              onPress={tertiaryAction.onPress}
               fullWidth
             />
           ) : null}

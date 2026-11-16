@@ -54,6 +54,7 @@ describe('getOnboardingTasks', () => {
             starter_set_id: 'set-1',
             starter_set_issued_at: issued,
             diamond: 20,
+            native_language: 'ru',
             target_languages: ['en', 'de'],
             starter_extra: {},
           },
@@ -68,6 +69,7 @@ describe('getOnboardingTasks', () => {
       done: ['first_lesson'],
       diamonds: 20,
       reward: 10,
+      nativeLanguage: 'ru',
       targetLanguages: ['en', 'de'],
       extraStarterLanguages: [],
     });
