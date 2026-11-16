@@ -160,7 +160,10 @@ $fn$;
 -- Активация кода центра. Строка центра блокируется FOR UPDATE: активации одного центра идут по
 -- очереди, поэтому последнее место не займут двое. Ответ: reason = ok | not_found | expired |
 -- already_active | full | contract_ended. Лимиты и счётчики кода не возвращаются.
-CREATE OR REPLACE FUNCTION flashly_activate_org_code(p_user uuid, p_code text)
+-- p_dry_run = true — те же проверки без записи: экран «Центр найден» до нажатия «Выбрать книгу»
+-- (иначе «Это не мой центр» уже занял бы место).
+DROP FUNCTION IF EXISTS flashly_activate_org_code(uuid, text);
+CREATE OR REPLACE FUNCTION flashly_activate_org_code(p_user uuid, p_code text, p_dry_run boolean DEFAULT false)
 RETURNS TABLE (out_reason text, out_org uuid, out_until timestamptz)
 LANGUAGE plpgsql AS $fn$
 DECLARE
@@ -211,6 +214,11 @@ BEGIN
   new_until := GREATEST(COALESCE(cur, NOW()), NOW()) + make_interval(days => c.access_days);
   IF o.contract_until IS NOT NULL AND new_until > o.contract_until THEN
     new_until := o.contract_until;
+  END IF;
+
+  IF p_dry_run THEN
+    RETURN QUERY SELECT 'ok'::text, o.id, new_until;
+    RETURN;
   END IF;
 
   INSERT INTO org_code_activations (code_id, user_id) VALUES (c.id, p_user);

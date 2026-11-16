@@ -24,6 +24,10 @@ import { log } from './_log.js';
  * GET  /api/books?action=official-sets       ?setIds=a,b           официальные наборы + карточки с моим прогрессом:
  *                                                                   запрошенные + открытые в моих курсах (я учитель
  *                                                                   или ученик) + те, что я уже начинал учить
+ * GET  /api/books?action=org-info            ?code=                центр по коду без активации     ┐ книги учебного
+ * POST /api/books?action=org-activate        { code }              активация кода центра           │ центра,
+ * GET  /api/books?action=my-orgs                                   мои центры, их книги, мои книги │ _handlers/center/
+ * POST /api/books?action=my-book             { bookId, unitId?, active?, remove? }                 ┘ student.js
  *
  * План юнитов: строка в course_units есть только у юнитов, которые хоть раз переключали.
  * Нет строки = юнит закрыт. Поэтому юниты, добавленные в книгу позже, в уже подключённых
@@ -51,12 +55,21 @@ export default async function handler(req, res) {
   const sql = neon(process.env.POSTGRES_URL);
   const { action } = req.query;
 
-  const GET_ACTIONS = new Set(['list-books', 'book-detail', 'course-plan', 'official-sets']);
+  const GET_ACTIONS = new Set([
+    'list-books',
+    'book-detail',
+    'course-plan',
+    'official-sets',
+    'org-info',
+    'my-orgs',
+  ]);
   const POST_ACTIONS = new Set([
     'attach-to-courses',
     'detach-from-course',
     'set-unit-open',
     'fork-set',
+    'org-activate',
+    'my-book',
   ]);
   if (GET_ACTIONS.has(action) && req.method !== 'GET')
     return res.status(405).json({ error: 'Method not allowed' });
@@ -72,6 +85,15 @@ export default async function handler(req, res) {
     if (action === 'set-unit-open') return await setUnitOpen(req, res, sql, userId);
     if (action === 'fork-set') return await forkSet(req, res, sql, userId);
     if (action === 'official-sets') return await officialSets(req, res, sql, userId);
+
+    // Книги учебного центра по коду (plan/new/center_books.md, Center 3) — модуль грузится лениво
+    if (['org-info', 'org-activate', 'my-orgs', 'my-book'].includes(action)) {
+      const center = await import('./_handlers/center/student.js');
+      if (action === 'org-info') return await center.orgInfo(req, res, sql, userId);
+      if (action === 'org-activate') return await center.orgActivate(req, res, sql, userId);
+      if (action === 'my-orgs') return await center.myOrgs(req, res, sql, userId);
+      return await center.myBook(req, res, sql, userId);
+    }
 
     return res.status(400).json({ error: 'Unknown action' });
   } catch (error) {

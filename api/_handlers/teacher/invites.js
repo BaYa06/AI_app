@@ -215,6 +215,28 @@ export async function inviteInfoByToken(req, res, sql) {
   });
 }
 
+/**
+ * Группа учителя учебного центра (courses.organization_id) занимает места центра: новый для центра
+ * ученик не вступит, если места кончились (plan/new/center_books.md, решение 5). Уже состоящий в
+ * группе или уже занимающий место центра проходит. Без блокировки — при одновременном вступлении
+ * возможен перебор на одно-два места; активация кода центра блокируется строго.
+ */
+async function orgSeatsFull(sql, courseId, userId) {
+  const rows = await sql`
+    SELECT o.seat_limit, flashly_org_seats_used(o.id) AS used, flashly_org_has_seat(o.id, ${userId}::uuid) AS has
+      FROM courses c JOIN organizations o ON o.id = c.organization_id
+     WHERE c.id = ${courseId}::uuid
+       AND NOT EXISTS (SELECT 1 FROM course_members m WHERE m.course_id = c.id AND m.user_id = ${userId}::uuid)
+  `;
+  const r = rows[0];
+  return !!r && !r.has && r.used >= r.seat_limit;
+}
+
+const ORG_SEATS_FULL = {
+  error: 'Learning center seats are full',
+  reason: 'org_seats_full',
+};
+
 export async function joinByCode(req, res, sql, userId) {
   const { code } = req.body || {};
   if (!code) return res.status(400).json({ error: 'code required', reason: 'bad_request' });
@@ -232,6 +254,7 @@ export async function joinByCode(req, res, sql, userId) {
     return res.status(410).json({ error: 'Invite expired', reason: 'expired' });
   if (lookup.ownerId === userId)
     return res.status(400).json({ error: 'Cannot join your own course', reason: 'own_course' });
+  if (await orgSeatsFull(sql, lookup.courseId, userId)) return res.status(409).json(ORG_SEATS_FULL);
 
   await sql`
     INSERT INTO course_members (course_id, user_id, role)
@@ -254,6 +277,7 @@ export async function joinByToken(req, res, sql, userId) {
     return res.status(410).json({ error: 'Invite expired', reason: 'expired' });
   if (lookup.ownerId === userId)
     return res.status(400).json({ error: 'Cannot join your own course', reason: 'own_course' });
+  if (await orgSeatsFull(sql, lookup.courseId, userId)) return res.status(409).json(ORG_SEATS_FULL);
 
   await sql`
     INSERT INTO course_members (course_id, user_id, role)
