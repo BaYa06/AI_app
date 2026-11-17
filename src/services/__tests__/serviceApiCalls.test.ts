@@ -278,6 +278,19 @@ describe('BookService.callBooksApi', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
+  it('HTTP-ошибка с reason: причина и тело для понятного текста (места центра)', async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse(409, { error: 'x', reason: 'org_seats_full', need: 3, free: 2 })
+    );
+    expect(await BookService.attachToCourses('b', ['c'])).toEqual({
+      ok: false,
+      error: 'x',
+      status: 409,
+      reason: 'org_seats_full',
+      body: { error: 'x', reason: 'org_seats_full', need: 3, free: 2 },
+    });
+  });
+
   it('HTTP-ошибка: error из тела или HTTP N, статус ответа', async () => {
     mockFetch.mockResolvedValue(jsonResponse(403, { error: 'forbidden' }));
     expect(await BookService.detachFromCourse('b', 'c')).toEqual({

@@ -6,6 +6,7 @@
  *  - «Продолжить подборку» (последняя, куда добавлял, и следующий набор по порядку)
  *    или «С чего начать» — если ещё ничего не добавлял;
  *  - плитки предметов (только непустые; больше 8 — 6 плиток и «Все предметы»);
+ *  - полки «Книги <центр>» у учителя учебного центра (plan/new/center_books.md, Center 14);
  *  - полка учебников.
  * Без лайков, оценок, скачиваний, «Популярных» и баннера Premium. Алмазов и серии в шапке нет.
  * Данные — useCatalogStore (кэш), «добавлено» — только личные добавления.
@@ -33,7 +34,9 @@ import {
   TextField,
   type IconComponent,
 } from '@/components/ui';
-import { useCatalogStore, useThemeColors } from '@/store';
+import { useCatalogStore, useSettingsStore, useThemeColors } from '@/store';
+import { CenterService, type TeacherShelf } from '@/services/CenterService';
+import { CenterLogo } from '@/screens/courseJoin/CenterFoundScreen';
 import { MIN_SEARCH_LENGTH } from '@/store/catalogStore';
 import { alpha, borderRadius, iconSize, spacing } from '@/constants';
 import { getCatalogIcon } from '@/constants/catalogIcons';
@@ -254,12 +257,23 @@ export function LibraryCatalogScreen() {
   const [showAllSubjects, setShowAllSubjects] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Книги учебных центров, где я учитель: своя полка у каждого центра (Center 14)
+  const isTeacher = useSettingsStore((st) => st.isTeacher === true);
+  const [centerShelves, setCenterShelves] = useState<TeacherShelf[]>([]);
+  const loadCenterShelves = useCallback(async () => {
+    if (!isTeacher) {
+      setCenterShelves([]);
+      return;
+    }
+    setCenterShelves(await CenterService.teacherShelves());
+  }, [isTeacher]);
 
   // На каждом заходе на вкладку: из кэша сразу, с сервера — если устарело (вернулся после добавления).
   useFocusEffect(
     useCallback(() => {
       fetchCatalog();
-    }, [fetchCatalog])
+      loadCenterShelves();
+    }, [fetchCatalog, loadCenterShelves])
   );
 
   useEffect(
@@ -286,11 +300,11 @@ export function LibraryCatalogScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await fetchCatalog({ force: true });
+      await Promise.all([fetchCatalog({ force: true }), loadCenterShelves()]);
     } finally {
       setRefreshing(false);
     }
-  }, [fetchCatalog]);
+  }, [fetchCatalog, loadCenterShelves]);
 
   const openSubject = useCallback(
     (sub: { slug: string; title: string }) =>
@@ -530,6 +544,33 @@ export function LibraryCatalogScreen() {
           </View>
         )}
 
+        {centerShelves
+          .filter((shelf) => shelf.books.length > 0)
+          .map((shelf) => (
+            <View key={shelf.id} style={s.section}>
+              <View style={s.centerHead}>
+                <CenterLogo org={shelf} size={28} />
+                <Text
+                  variant="h3"
+                  style={[s.flex1, { color: colors.textPrimary }]}
+                  numberOfLines={1}
+                >
+                  Книги {shelf.name}
+                </Text>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={s.shelf}
+                style={s.shelfBleed}
+              >
+                {shelf.books.map((b) => (
+                  <ShelfBook key={b.id} book={b} onPress={() => openBook(b.id)} colors={colors} />
+                ))}
+              </ScrollView>
+            </View>
+          ))}
+
         {catalog.books.length > 0 && (
           <View style={s.section}>
             <View style={s.sectionHead}>
@@ -595,6 +636,7 @@ const s = StyleSheet.create({
   sections: { gap: spacing.l },
   section: { gap: spacing.s },
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  centerHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   flex1: { flex: 1 },
   semibold: { fontWeight: '600' },
   pressed: { opacity: 0.85 },

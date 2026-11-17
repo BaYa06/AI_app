@@ -42,6 +42,26 @@ type Colors = ReturnType<typeof useThemeColors>;
 type UnitState = 'none' | 'added' | 'course';
 
 /** Где юнит у пользователя: набор юнита уже в сторе — сам или открыт через курс. */
+/**
+ * Почему книгу не подключили: свои курсы, места учебного центра (Center 14), другой центр,
+ * остальное — общий текст.
+ */
+export function describeAttachError(result: {
+  status: number;
+  error: string;
+  reason?: string;
+  body?: Record<string, unknown>;
+}): string {
+  if (result.reason === 'org_seats_full') {
+    const need = Number(result.body?.need) || 0;
+    const free = Number(result.body?.free) || 0;
+    return `Не хватает мест учебного центра: нужно ${need}, свободно ${free}. Скажите менеджеру центра.`;
+  }
+  if (result.reason === 'other_org') return 'В курсе уже есть книги другого учебного центра.';
+  if (result.status === 403) return 'Можно подключать только к своим курсам.';
+  return describeError(result.error, 'Попробуйте ещё раз.');
+}
+
 function unitState(unit: BookUnit, sets: Record<string, CardSet>): UnitState {
   const set = unit.sets[0] ? sets[unit.sets[0].id] : undefined;
   if (!set) return 'none';
@@ -207,9 +227,7 @@ export function BookDetailScreen({ navigation, route }: Props) {
       const result = await BookService.attachToCourses(detail.book.id, courseIds);
       setAttaching(false);
       if (!result.ok) {
-        toast.error(
-          `Не удалось подключить. ${result.status === 403 ? 'Можно подключать только к своим курсам.' : describeError(result.error, 'Попробуйте ещё раз.')}`
-        );
+        toast.error(`Не удалось подключить. ${describeAttachError(result)}`);
         return;
       }
       const attached = [...result.data.attachedCourseIds, ...result.data.alreadyAttachedCourseIds];

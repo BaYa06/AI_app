@@ -19,7 +19,16 @@ const getStores = () => ({
     .useCardsStore as typeof import('../store/cardsStore').useCardsStore,
 });
 
-export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string; status: number };
+export type ApiResult<T> =
+  | { ok: true; data: T }
+  | {
+      ok: false;
+      error: string;
+      status: number;
+      /** reason из ответа сервера (например org_seats_full) и само тело — для понятного текста */
+      reason?: string;
+      body?: Record<string, unknown>;
+    };
 
 async function callBooksApi<T>(
   action: string,
@@ -49,7 +58,12 @@ async function callBooksApi<T>(
     if (!res.response) throw res.error.original;
     const json = res.json;
     if (!res.ok)
-      return { ok: false, error: json?.error || `HTTP ${res.status}`, status: res.status };
+      return {
+        ok: false,
+        error: json?.error || `HTTP ${res.status}`,
+        status: res.status,
+        ...(typeof json?.reason === 'string' ? { reason: json.reason, body: json } : {}),
+      };
     return { ok: true, data: json as T };
   } catch (error) {
     return {
