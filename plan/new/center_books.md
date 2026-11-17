@@ -410,7 +410,7 @@ user_books              user_id, book_id, current_unit_id, is_active, updated_at
   `book-course` → `loadCourses()` + `BookService.syncOfficialSets()` → `setActiveCourse(courseId)` →
   `navigation.reset` на главную. Экран юнита (`CenterUnitPickScreen`) из пути убрать. Нет сети —
   ошибка на экране, книга не добавлена.
-- **Center 18** — главная курса книги. Убрать `CenterBookCard` и строку «Мои книги». Наборы курса
+- ✅ **Center 18** (`components/home/CenterCourseCards.tsx`: `CenterCourseLocked` вместо урока дня, `CenterCourseNotes` — «осталось N дней» и «Другие книги · Посмотреть» (только если у центра есть недобавленные книги); `byUnitNumber` в `home/setsSort.ts`, кнопка сортировки в курсе книги скрыта; значок `Library` в боковом меню; параметр главной `openCourseId`) — главная курса книги. Убрать `CenterBookCard` и строку «Мои книги». Наборы курса
   книги и урок дня — по `unitNumber`. Строка «Другие книги <центр> · Посмотреть» с крестиком (ключ
   в `StorageService` на центр). Рейтинг курса не грузить. В боковом меню у курса книги — логотип
   центра. Доступ закончился — карточка «Книги центра закрыты · Ввести новый код» вместо урока дня

@@ -316,6 +316,9 @@ const CourseRow = memo(function CourseRow({
         <View style={styles.courseItemLeft}>
           {isStudent ? (
             <BookOpen size={iconSize.m} color={isActive ? courseAccent : colors.textPrimary} />
+          ) : course.sourceBookId ? (
+            // Курс книги учебного центра (plan/new/center_books.md, этап 7)
+            <Library size={iconSize.m} color={isActive ? courseAccent : colors.textPrimary} />
           ) : isActive ? (
             <FolderOpen size={iconSize.m} color={courseAccent} />
           ) : (

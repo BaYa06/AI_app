@@ -75,6 +75,18 @@ export function closedCenterBookIds(data: MyCenters | null, now: number = Date.n
 /** За сколько дней до конца показываем плашку «возьми новый код» */
 export const CENTER_WARN_DAYS = 7;
 
+/** Центр и книга по id книги — для главной на курсе книги (этап 7). null — не книга моих центров. */
+export function centerEntryOfBook(
+  data: MyCenters | null,
+  bookId: string
+): { center: MyCenter; book: CenterBook } | null {
+  for (const center of data?.organizations ?? []) {
+    const book = center.books.find((b) => b.id === bookId);
+    if (book) return { center, book };
+  }
+  return null;
+}
+
 /** Центр, к книгам которого сейчас есть доступ (первый по порядку) — для экрана выбора книги. */
 export function activeCenter(data: MyCenters | null, orgId?: string): MyCenter | null {
   if (!data) return null;

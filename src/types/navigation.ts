@@ -352,7 +352,11 @@ export type RootStackParamList = {
 
 export type MainTabParamList = {
   /** from: 'widget' — открыто ссылкой виджета, главная запускает урок дня (plan/new/widgets.md, 0.3) */
-  Home: { from?: string; state?: string; family?: string } | undefined;
+  /**
+   * openCourseId — главная на этом курсе, боковое меню открывается само (книга добавлена из
+   * «Библиотеки», plan/new/center_books.md, этап 7)
+   */
+  Home: { from?: string; state?: string; family?: string; openCourseId?: string } | undefined;
   Library: undefined;
   TestTab: undefined;
   Statistics: undefined;

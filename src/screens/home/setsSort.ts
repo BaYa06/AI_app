@@ -54,3 +54,11 @@ export const SETS_COMPARATORS: Record<SetsSortKey, (a: CardSet, b: CardSet) => n
     (a.title || '').localeCompare(b.title || '', 'ru', { sensitivity: 'base', numeric: true }),
   size: (a, b) => (b.cardCount || 0) - (a.cardCount || 0) || byRecent(a, b),
 };
+
+/**
+ * Курс книги учебного центра (plan/new/center_books.md, этап 7): юниты всегда по порядку книги —
+ * и в списке, и в уроке дня (новые слова идут Unit 1 → Unit 2 → …). Выбранная сортировка не действует.
+ */
+export const byUnitNumber = (a: CardSet, b: CardSet) =>
+  (a.unitNumber ?? Number.MAX_SAFE_INTEGER) - (b.unitNumber ?? Number.MAX_SAFE_INTEGER) ||
+  (a.title || '').localeCompare(b.title || '', 'ru', { numeric: true });

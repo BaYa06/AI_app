@@ -125,11 +125,15 @@ import { useAppUpdateOnHome } from '@/components/appUpdate/useAppUpdateOnHome';
 import { WhatsNewSheet } from '@/components/whatsNew/WhatsNewSheet';
 
 import {
+  DEFAULT_SETS_SORT,
   SETS_COMPARATORS,
   SETS_SORT_OPTIONS,
+  byUnitNumber,
   loadSetsSort,
   type SetsSortKey,
 } from './home/setsSort';
+import { CenterCourseLocked, CenterCourseNotes } from '@/components/home/CenterCourseCards';
+import { centerEntryOfBook, isCenterOpen } from '@/services/centerBooks';
 import { pickCardsForGame } from './home/pickCardsForGame';
 import { styles } from './home/styles';
 import { useCourseRemoval } from './home/useCourseRemoval';
@@ -652,6 +656,29 @@ export function HomeScreen({ navigation, route }: any) {
     return out;
   }, [courseHomework]);
   const setActiveCourse = useCoursesStore((s) => s.setActiveCourse);
+
+  // Курс книги учебного центра (plan/new/center_books.md, этап 7): та же главная, что у любого
+  // курса; юниты — по порядку книги, доступ центра — карточки CenterCourse*
+  const activeBookId = useMemo(
+    () => courses.find((c) => c.id === activeCourseId)?.sourceBookId ?? null,
+    [courses, activeCourseId]
+  );
+  const centerData = useCenterStore((s) => s.data);
+  const bookEntry = useMemo(
+    () => (activeBookId ? centerEntryOfBook(centerData, activeBookId) : null),
+    [centerData, activeBookId]
+  );
+  const bookClosed = !!bookEntry && !isCenterOpen(bookEntry.center);
+  const setsComparator = activeBookId ? byUnitNumber : SETS_COMPARATORS[setsSort];
+
+  // Книга добавлена из «Библиотеки»: главная на новом курсе, боковое меню открывается само
+  const openCourseId: string | undefined = route?.params?.openCourseId;
+  useEffect(() => {
+    if (!openCourseId) return;
+    setActiveCourse(openCourseId);
+    setDrawerOpen(true);
+    navigation.setParams({ openCourseId: undefined });
+  }, [openCourseId, setActiveCourse, navigation]);
   const createCourse = useCoursesStore((s) => s.createCourse);
   const renameCourse = useCoursesStore((s) => s.renameCourse);
   const deleteCourse = useCoursesStore((s) => s.deleteCourse);
@@ -764,8 +791,8 @@ export function HomeScreen({ navigation, route }: any) {
   // Урок дня: новые слова — из наборов открытого курса в порядке списка (без учёта поиска),
   // повторение — из всех наборов: иначе слова других курсов не повторялись бы, пока курс закрыт
   const lessonNewSets = useMemo(
-    () => [...filteredSets].sort(SETS_COMPARATORS[setsSort]),
-    [filteredSets, setsSort]
+    () => [...filteredSets].sort(setsComparator),
+    [filteredSets, setsComparator]
   );
   const lessonSets = useMemo(() => {
     const inCourse = new Set(lessonNewSets.map((set) => set.id));
@@ -1104,7 +1131,8 @@ export function HomeScreen({ navigation, route }: any) {
   const [lastWeekBoard, setLastWeekBoard] = useState<CourseLeaderboard | null>(null);
   useFocusEffect(
     useCallback(() => {
-      if (!activeCourseId || isTeacher !== false) {
+      // Курс книги центра — личный, участников нет: рейтинга нет
+      if (!activeCourseId || isTeacher !== false || activeBookId) {
         setLeaderboard(null);
         setLastWeekBoard(null);
         return;
@@ -1125,7 +1153,7 @@ export function HomeScreen({ navigation, route }: any) {
       return () => {
         active = false;
       };
-    }, [activeCourseId, isTeacher])
+    }, [activeCourseId, isTeacher, activeBookId])
   );
 
   const ratingTeaser = useMemo(() => {
@@ -1350,8 +1378,8 @@ export function HomeScreen({ navigation, route }: any) {
           const tags = (set.tags || []).join(' ').toLowerCase();
           return title.includes(query) || desc.includes(query) || tags.includes(query);
         });
-    return [...found].sort(SETS_COMPARATORS[setsSort]);
-  }, [filteredSets, searchQuery, setsSort]);
+    return [...found].sort(setsComparator);
+  }, [filteredSets, searchQuery, setsComparator]);
 
   const setsSortShortLabel = SETS_SORT_OPTIONS.find((o) => o.key === setsSort)?.short;
 
@@ -2021,7 +2049,16 @@ export function HomeScreen({ navigation, route }: any) {
               />
             }
           >
-            {filteredSets.length === 0 ? (
+            {/* Курс книги центра без доступа: наборы закрыты, вместо пустого курса — «Ввести новый код» */}
+            {bookEntry && bookClosed && isTeacher === false && (
+              <CenterCourseLocked
+                center={bookEntry.center}
+                bookTitle={bookEntry.book.title}
+                onEnterCode={() => setJoinByCodeVisible(true)}
+                style={styles.lessonCard}
+              />
+            )}
+            {filteredSets.length === 0 && !bookClosed ? (
               <HomeEmptyState
                 colors={colors}
                 teacherBanner={teacherBanner}
@@ -2065,7 +2102,8 @@ export function HomeScreen({ navigation, route }: any) {
                         style={styles.lessonCard}
                       />
                     ) : (
-                      lessonContent && (
+                      lessonContent &&
+                      !bookClosed && (
                         <LessonCard
                           content={lessonContent}
                           onPress={handleLessonPress}
@@ -2073,6 +2111,14 @@ export function HomeScreen({ navigation, route }: any) {
                           style={styles.lessonCard}
                         />
                       )
+                    )}
+                    {bookEntry && !bookClosed && (
+                      <CenterCourseNotes
+                        center={bookEntry.center}
+                        onEnterCode={() => setJoinByCodeVisible(true)}
+                        onOpenLibrary={() => navigation.navigate('Library')}
+                        style={styles.startTasks}
+                      />
                     )}
                     {pushNudgePermission && !pushNudgeClosed && (
                       <View style={styles.pushNudge}>
@@ -2168,7 +2214,7 @@ export function HomeScreen({ navigation, route }: any) {
                   activeCourseTitle={activeCourseTitle}
                   openSetsMenu={openSetsMenu}
                   setSortSheetVisible={setSortSheetVisible}
-                  setsSort={setsSort}
+                  setsSort={activeBookId ? DEFAULT_SETS_SORT : setsSort}
                   setsSortShortLabel={setsSortShortLabel}
                 />
 
