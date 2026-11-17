@@ -1,6 +1,6 @@
 /**
  * «Центр найден» (plan/new/center_books.md, Center 5): логотип и название центра, срок доступа,
- * «Книгу и юнит выбираешь сам». Доступ открывается только по «Выбрать книгу» — «Это не мой центр»
+ * «Выбери свою книгу — она откроется целиком» (этап 7). Доступ открывается только по «Выбрать книгу» — «Это не мой центр»
  * место не тратит (сервер проверил код без записи, org-info).
  */
 import React, { useState } from 'react';
@@ -142,9 +142,9 @@ export function CenterFoundScreen({ info, viaLink, onActivate, onNotMine }: Prop
         <Info size={iconSize.s} color={colors.primary} />
         <Text variant="bodySmall" style={[styles.flex, { color: colors.textPrimary }]}>
           <Text variant="bodySmall" style={styles.bold}>
-            Книгу и юнит выбираешь сам.{' '}
+            Выбери свою книгу — она откроется целиком, отдельным курсом.{' '}
           </Text>
-          Перевели в другую группу — просто смени книгу, менеджеру ничего делать не нужно.
+          Другие книги центра будут в «Библиотеке», менеджеру ничего делать не нужно.
         </Text>
       </View>
 

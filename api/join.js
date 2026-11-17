@@ -262,7 +262,7 @@ function renderCenterPage(code) {
     <a class="btn store" href="${APP_STORE_URL}">Скачать в App Store</a>
     <a class="btn open" href="${esc(deepLink)}">Flashly уже установлен? Открыть в приложении</a>
     <a class="btn open" href="${esc(pwaUrl)}">Открыть в браузере</a>
-    <p class="note">Код вводится один раз. Книгу и юнит выберешь сам.</p>
+    <p class="note">Код вводится один раз. Книгу выберешь сам — она откроется целиком.</p>
   </main>
   <script>
     document.getElementById('copy').addEventListener('click', function () {

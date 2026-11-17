@@ -420,7 +420,7 @@ user_books              user_id, book_id, current_unit_id, is_active, updated_at
   `BookDetailScreen` для ученика: «Добавить себе» / «Открыть курс»; после добавления — главная с
   `openCoursesDrawer`: меню открыто, новый курс подсвечен. Доступ закончился — полка серая, «Ввести
   код».
-- **Center 20** — убрать старое: `MyBooksScreen`, `CenterUnitPickScreen`, `studyCenterUnit` /
+- ✅ **Center 20** (экраны убраны ещё в Center 17; здесь — `centerStore.pickBook/removeBook`, `CenterService.setMyBook`, `myBookEntries/activeBookEntry/nextLevelBook` и их тесты, `MyCenterUnit`; тексты «Центр найден», окна кода и лендинга `/join` — без «юнита»; `docs/institutions.md`) — убрать старое: `MyBooksScreen`, `CenterUnitPickScreen`, `studyCenterUnit` /
   `openCenterBooks` (`centerSession.ts`), `centerStore.pickBook/removeBook`, маршруты в
   `AppNavigator` и `types/navigation.ts`. После кода, когда книги уже есть (продление), —
   главная, а не «Мои книги». Обновить `docs/institutions.md` (как ученик видит книги) и тексты

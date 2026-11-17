@@ -115,7 +115,8 @@ export function CenterInviteModal({ code, onJoined, onDismiss, via = 'link' }: P
               : `Тебе открыт доступ к книгам курса до ${formatAccessDate(info.accessUntil)} · ${days} ${pluralize(days, 'день', 'дня', 'дней')}.`}
           </Text>
           <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
-            Книгу и юнит выбираешь сам. Личные наборы и курсы учителя останутся как есть.
+            Выбери книгу — она откроется целиком, отдельным курсом. Личные наборы и курсы учителя
+            останутся как есть.
           </Text>
           {error ? (
             <Text variant="bodySmall" accessibilityRole="alert" style={{ color: colors.errorText }}>

@@ -1,13 +1,11 @@
 import { describe, expect, it } from '@jest/globals';
 import {
-  activeBookEntry,
   activeCenter,
   centerBooksOfLanguage,
+  centerEntryOfBook,
   centerLanguages,
   closedCenterBookIds,
   isCenterOpen,
-  myBookEntries,
-  nextLevelBook,
 } from '../centerBooks';
 import type { CenterBook, MyCenter, MyCenters } from '../CenterService';
 
@@ -50,18 +48,7 @@ const data: MyCenters = {
   ],
 };
 
-describe('«Мои книги» учебного центра (Center 6)', () => {
-  it('текущая книга — первой, остальные по последнему изменению', () => {
-    expect(myBookEntries(data).map((e) => e.book.id)).toEqual(['beginner', 'menschen']);
-    expect(activeBookEntry(data)?.book.id).toBe('beginner');
-  });
-
-  it('без отмеченной текущей — последняя изменённая', () => {
-    const noActive = { ...data, myBooks: data.myBooks.map((m) => ({ ...m, isActive: false })) };
-    expect(activeBookEntry(noActive)?.book.id).toBe('menschen');
-    expect(activeBookEntry(null)).toBeNull();
-  });
-
+describe('Книги учебного центра (Center 6–7, этап 7)', () => {
   it('книги языка — по порядку уровней', () => {
     expect(centerBooksOfLanguage(alfa, 'en').map((b) => b.id)).toEqual([
       'beginner',
@@ -70,10 +57,11 @@ describe('«Мои книги» учебного центра (Center 6)', () =>
     ]);
   });
 
-  it('следующий уровень того же языка, у последнего — нет', () => {
-    expect(nextLevelBook(alfa, alfa.books[1])?.id).toBe('elementary');
-    expect(nextLevelBook(alfa, alfa.books[2])).toBeNull();
-    expect(nextLevelBook(alfa, alfa.books[3])).toBeNull();
+  it('центр и книга по id книги — для главной на курсе книги', () => {
+    expect(centerEntryOfBook(data, 'menschen')?.center.id).toBe('alfa');
+    expect(centerEntryOfBook(data, 'menschen')?.book.languageFrom).toBe('de');
+    expect(centerEntryOfBook(data, 'nope')).toBeNull();
+    expect(centerEntryOfBook(null, 'menschen')).toBeNull();
   });
 
   it('языки центра и центр с доступом', () => {

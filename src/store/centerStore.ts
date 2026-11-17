@@ -1,14 +1,15 @@
 /**
- * «Мои центры» — учебные центры ученика, их книги и выбранные книги (plan/new/center_books.md, Center 6).
+ * «Мои центры» — учебные центры ученика, их книги и мои курсы книг (plan/new/center_books.md, Center 6,
+ * этап 7).
  *
- * Хранится на устройстве через localCache (ключ привязан к пользователю): карточка книги на главной
- * видна и без сети. Источник правды — сервер (my-orgs): refresh() при фокусе главной и после
+ * Хранится на устройстве через localCache (ключ привязан к пользователю): доступ центра и полка
+ * «Книги <центр>» видны и без сети. Источник правды — сервер (my-orgs): refresh() при фокусе главной и после
  * изменений. Слова книги без доступа сервер не отдаёт — кэш здесь только про названия и выбор.
  */
 import { create } from 'zustand';
 import { CACHE_OWNER_KEY, readCache, writeCache } from '@/services/localCache';
 import { StorageService } from '@/services/StorageService';
-import { CenterService, type MyCenters, type MyCenterBook } from '@/services/CenterService';
+import { CenterService, type MyCenters } from '@/services/CenterService';
 import { closedCenterBookIds } from '@/services/centerBooks';
 import { useCardsStore } from './cardsStore';
 import { useSetsStore } from './setsStore';
@@ -44,13 +45,6 @@ interface CenterStoreState {
   hydrate: () => void;
   /** Загрузить с сервера; без сети — остаётся кэш */
   refresh: () => Promise<MyCenters | null>;
-  /** Выбрать книгу / юнит / сделать текущей. false — не удалось (нет сети или доступа) */
-  pickBook: (
-    bookId: string,
-    opts?: { unitId?: string | null; active?: boolean }
-  ) => Promise<boolean>;
-  /** Убрать книгу из «Моих книг» (прогресс по словам остаётся) */
-  removeBook: (bookId: string) => Promise<boolean>;
 }
 
 export const useCenterStore = create<CenterStoreState>((set, get) => {
@@ -58,16 +52,6 @@ export const useCenterStore = create<CenterStoreState>((set, get) => {
     writeCache(CACHE_NAME, data);
     set({ data, loaded: true });
     closeExpiredCenterSets(data);
-  };
-
-  /** Ответ my-book — сразу в кэш, не дожидаясь полного my-orgs */
-  const applyMine = (mine: MyCenterBook, makeActive: boolean) => {
-    const data = get().data;
-    if (!data) return;
-    const others = data.myBooks
-      .filter((m) => m.bookId !== mine.bookId)
-      .map((m) => (makeActive ? { ...m, isActive: false } : m));
-    save({ ...data, myBooks: [mine, ...others] });
   };
 
   return {
@@ -91,27 +75,6 @@ export const useCenterStore = create<CenterStoreState>((set, get) => {
       const fresh = await CenterService.loadMine();
       if (fresh) save(fresh);
       return fresh ?? get().data;
-    },
-
-    pickBook: async (bookId, opts = {}) => {
-      const r = await CenterService.setMyBook({
-        bookId,
-        unitId: opts.unitId ?? undefined,
-        active: opts.active,
-      });
-      if (!r.ok) return false;
-      if (r.myBook) applyMine(r.myBook, opts.active === true);
-      // В ответе my-book нет названия и набора юнита — берём полный my-orgs
-      await get().refresh();
-      return true;
-    },
-
-    removeBook: async (bookId) => {
-      const r = await CenterService.setMyBook({ bookId, remove: true });
-      if (!r.ok) return false;
-      const data = get().data;
-      if (data) save({ ...data, myBooks: data.myBooks.filter((m) => m.bookId !== bookId) });
-      return true;
     },
   };
 });
