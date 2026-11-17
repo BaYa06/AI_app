@@ -26,6 +26,7 @@ import { ChevronRight, Library, Search } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import {
   Badge,
+  Button,
   Card,
   EmptyState,
   ErrorState,
@@ -36,6 +37,9 @@ import {
 } from '@/components/ui';
 import { useCatalogStore, useSettingsStore, useThemeColors } from '@/store';
 import { CenterService, type TeacherShelf } from '@/services/CenterService';
+import { useCenterStore } from '@/store/centerStore';
+import { isCenterOpen } from '@/services/centerBooks';
+import { useCoursesStore } from '@/store/coursesStore';
 import { CenterLogo } from '@/screens/courseJoin/CenterFoundScreen';
 import { MIN_SEARCH_LENGTH } from '@/store/catalogStore';
 import { alpha, borderRadius, iconSize, spacing } from '@/constants';
@@ -164,19 +168,25 @@ const ShelfBook = memo(function ShelfBook({
   book,
   onPress,
   colors,
+  note,
+  dim = false,
 }: {
   book: CatalogBook;
   onPress: () => void;
   colors: Colors;
+  /** Подпись вместо уровня и юнитов — «Добавлена» у книги центра, которая уже мой курс */
+  note?: string;
+  /** Доступ к книгам центра закончился */
+  dim?: boolean;
 }) {
   const cover = getBookCover(book.subject);
-  const meta = formatBookMeta(book);
+  const meta = note || formatBookMeta(book);
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`Учебник ${book.title}`}
-      style={({ pressed }) => [s.book, pressed && s.pressed]}
+      style={({ pressed }) => [s.book, pressed && s.pressed, dim && s.closedBook]}
     >
       <View style={[s.bookCover, { backgroundColor: alpha(cover.color, 10) }]}>
         <cover.icon size={iconSize.l} color={cover.color} />
@@ -263,10 +273,27 @@ export function LibraryCatalogScreen() {
   const loadCenterShelves = useCallback(async () => {
     if (!isTeacher) {
       setCenterShelves([]);
+      // Ученик по коду центра: полки из my-orgs (plan/new/center_books.md, этап 7, Center 19)
+      useCenterStore
+        .getState()
+        .refresh()
+        .catch(() => {});
       return;
     }
     setCenterShelves(await CenterService.teacherShelves());
   }, [isTeacher]);
+  // Полки ученика центра: книги его центров; добавленные — «Добавлена», без доступа — серые
+  const centerData = useCenterStore((st) => st.data);
+  const studentShelves = useMemo(
+    () =>
+      isTeacher
+        ? []
+        : (centerData?.organizations ?? [])
+            .filter((o) => o.books.length > 0)
+            .map((o) => ({ center: o, open: isCenterOpen(o) })),
+    [isTeacher, centerData]
+  );
+  const setActiveCourse = useCoursesStore((st) => st.setActiveCourse);
 
   // На каждом заходе на вкладку: из кэша сразу, с сервера — если устарело (вернулся после добавления).
   useFocusEffect(
@@ -571,6 +598,59 @@ export function LibraryCatalogScreen() {
             </View>
           ))}
 
+        {studentShelves.map(({ center, open }) => {
+          const closedCourse = center.books.find((b) => b.courseId)?.courseId ?? null;
+          return (
+            <View key={center.id} style={s.section}>
+              <View style={s.centerHead}>
+                <CenterLogo org={center} size={28} />
+                <Text
+                  variant="h3"
+                  style={[s.flex1, { color: colors.textPrimary }]}
+                  numberOfLines={1}
+                >
+                  Книги {center.name}
+                </Text>
+              </View>
+              {open ? null : (
+                <View style={s.centerClosed}>
+                  <Text variant="bodySmall" color="secondary" style={s.flex1}>
+                    Доступ закончился, прогресс сохранён. Возьми новый код у менеджера курса.
+                  </Text>
+                  <Button
+                    title="Ввести код"
+                    variant="secondary"
+                    size="s"
+                    onPress={() => {
+                      // Главная на курсе книги: там «Книги центра закрыты» и «Ввести новый код»
+                      if (closedCourse) setActiveCourse(closedCourse);
+                      navigation.navigate('Main', { screen: 'Home' });
+                    }}
+                  />
+                </View>
+              )}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={s.shelf}
+                style={s.shelfBleed}
+              >
+                {center.books.map((b) => (
+                  <ShelfBook
+                    key={b.id}
+                    book={{ ...b, subject: null, publisher: null }}
+                    note={b.courseId ? 'Добавлена' : undefined}
+                    dim={!open}
+                    // Без доступа книгу не открыть (сервер ответит 404) — только «Ввести код» выше
+                    onPress={() => open && openBook(b.id)}
+                    colors={colors}
+                  />
+                ))}
+              </ScrollView>
+            </View>
+          );
+        })}
+
         {catalog.books.length > 0 && (
           <View style={s.section}>
             <View style={s.sectionHead}>
@@ -637,6 +717,13 @@ const s = StyleSheet.create({
   section: { gap: spacing.s },
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   centerHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  centerClosed: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+    marginBottom: spacing.s,
+  },
+  closedBook: { opacity: 0.5 },
   flex1: { flex: 1 },
   semibold: { fontWeight: '600' },
   pressed: { opacity: 0.85 },
