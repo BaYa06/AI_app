@@ -1,6 +1,7 @@
 /**
- * Книги учебного центра по коду — клиент к api/books.js (org-info, org-activate, my-orgs, my-book).
- * План: plan/new/center_books.md, Center 3 (сервер) и Center 5–7 (приложение).
+ * Книги учебного центра по коду — клиент к api/books.js (org-info, org-activate, my-orgs, my-book)
+ * и учителя центра (org-teacher-info, org-teacher-join, teacher-orgs).
+ * План: plan/new/center_books.md, Center 3 (сервер), Center 5–7 и 13–14 (приложение).
  *
  * Ответ сервера несёт `reason` — по нему экран показывает понятный текст ошибки
  * (utils/centerCode.describeCenterReason). Лимиты и счётчики кода сервер не отдаёт.
@@ -119,6 +120,40 @@ function toCodeResult(res: { ok: boolean; status: number; json: any }): CenterCo
   return { ok: false, reason };
 }
 
+/** Центр в окне «приглашает тебя учителем» и на полке «Книги <центр>» */
+export type TeacherCenter = Pick<CenterOrganization, 'id' | 'name' | 'city' | 'logoUrl'>;
+
+export type TeacherInviteResult =
+  | { ok: true; organization: TeacherCenter; alreadyMember: boolean }
+  | { ok: false; reason: 'not_found' | 'contract_ended' | 'network' | 'unknown' };
+
+/** Книга центра на полке учителя — те же поля, что у книги общего каталога */
+export type TeacherCenterBook = {
+  id: string;
+  title: string;
+  edition: string;
+  level: string | null;
+  subject: string | null;
+  languageFrom: string;
+  languageTo: string;
+  publisher: string | null;
+  unitsCount: number;
+  cardsCount: number;
+};
+
+export type TeacherShelf = TeacherCenter & { books: TeacherCenterBook[] };
+
+function toInviteResult(res: { ok: boolean; status: number; json: any }): TeacherInviteResult {
+  if (res.status === 0) return { ok: false, reason: 'network' };
+  const json = res.json || {};
+  if (res.ok && json.ok && json.organization) {
+    return { ok: true, organization: json.organization, alreadyMember: !!json.alreadyMember };
+  }
+  const reason =
+    json.reason === 'not_found' || json.reason === 'contract_ended' ? json.reason : 'unknown';
+  return { ok: false, reason };
+}
+
 export const CenterService = {
   /** Центр по коду без активации — экран «Центр найден»; место не тратится. */
   async getInfo(code: string): Promise<CenterCodeResult> {
@@ -154,6 +189,38 @@ export const CenterService = {
       return { ok: true, myBook: res.json.myBook as MyCenterBook | undefined };
     } catch {
       return { ok: false };
+    }
+  },
+
+  /** Ссылка для учителей /t/<код>: какой центр приглашает и учитель ли я уже (Center 13). */
+  async getTeacherInvite(token: string): Promise<TeacherInviteResult> {
+    try {
+      return toInviteResult(await callCenter('org-teacher-info', { params: { token } }));
+    } catch {
+      return { ok: false, reason: 'network' };
+    }
+  },
+
+  /** «Стать учителем центра»: роль учителя центра и учителя в приложении. */
+  async joinAsTeacher(token: string): Promise<TeacherInviteResult> {
+    try {
+      const r = toInviteResult(
+        await callCenter('org-teacher-join', { method: 'POST', body: { token } })
+      );
+      return r.ok ? { ...r, alreadyMember: true } : r;
+    } catch {
+      return { ok: false, reason: 'network' };
+    }
+  },
+
+  /** Полки «Книги <центр>» в Библиотеке: центры, где я учитель (Center 14). [] — нет или нет сети. */
+  async teacherShelves(): Promise<TeacherShelf[]> {
+    try {
+      const res = await callCenter('teacher-orgs', {});
+      if (!res.ok || !res.json?.ok) return [];
+      return (res.json.organizations || []) as TeacherShelf[];
+    } catch {
+      return [];
     }
   },
 

@@ -316,7 +316,7 @@ user_books              user_id, book_id, current_unit_id, is_active, updated_at
 
 ### Этап 6 — учителя центра (идеи из organizations_plan, этапы 1.2 и 2)
 Ученикам по коду учителя не нужны. Этап для центров, где учителя ведут группы во Flashly.
-- **Center 13** — ссылка для учителей `flashlycards.app/t/<код>` (как `course_invites`).
+- ✅ **Center 13** (миграция 053: `organizations.teacher_invite` — код ссылки, 16 знаков; сервер учителей целиком — `api/_handlers/center/teacher.js`: ссылка, вступление, полка, проверка мест при подключении книги, «убрать учителя»; API кабинета `teachers`, `teacher-link`, `teacher-remove`, `groups`; без входа — экран входа «Тебя приглашают учителем» (без имени центра: до входа API не отвечает), окно — после входа и онбординга; лендинг `/t/<код>` без запроса к базе; `center:check` — 105 проверок) — ссылка для учителей `flashlycards.app/t/<код>` (как `course_invites`).
   - `/t/*` добавить в `public/.well-known/apple-app-site-association` (серверный файл, сборка
     ради него не нужна). Приложения нет — лендинг с App Store и кодом, как у учеников.
   - Не вошёл — экран входа «Тебя приглашают учителем в Alfa English Center», после входа — окно.

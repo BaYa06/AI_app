@@ -25,6 +25,8 @@ type Props = {
   invited?: boolean;
   /** Открыта ссылка учебного центра — «Тебе открыт доступ к книгам» (plan/new/center_books.md) */
   centerInvited?: boolean;
+  /** Открыли ссылку для учителей центра /t/<код> (Center 13) */
+  teacherInvited?: boolean;
 };
 
 // Стопка из трёх карточек: нижние повёрнуты, верхняя залита фирменным цветом
@@ -47,6 +49,7 @@ export function WelcomeScreen({
   isLoading: externalLoading,
   invited = false,
   centerInvited = false,
+  teacherInvited = false,
 }: Props) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
@@ -255,22 +258,26 @@ export function WelcomeScreen({
               accessibilityRole="header"
               style={{ color: colors.textPrimary }}
             >
-              {centerInvited
-                ? 'Тебе открыт доступ к книгам'
-                : invited
-                  ? 'Тебя пригласили в курс'
-                  : 'Первые слова за 2 минуты'}
+              {teacherInvited
+                ? 'Тебя приглашают учителем'
+                : centerInvited
+                  ? 'Тебе открыт доступ к книгам'
+                  : invited
+                    ? 'Тебя пригласили в курс'
+                    : 'Первые слова за 2 минуты'}
             </Text>
             <Text
               variant="bodyLarge"
               align="center"
               style={[styles.subtitle, { color: colors.textSecondary }]}
             >
-              {centerInvited
-                ? 'Войди, и сразу выберешь свою книгу учебного центра.'
-                : invited
-                  ? 'Войди, и курс учителя сразу откроется.'
-                  : 'Карточки, игры и повторение в нужный момент. Слова не забываются.'}
+              {teacherInvited
+                ? 'Войди, и подключишься к учебному центру: его книги появятся в Библиотеке.'
+                : centerInvited
+                  ? 'Войди, и сразу выберешь свою книгу учебного центра.'
+                  : invited
+                    ? 'Войди, и курс учителя сразу откроется.'
+                    : 'Карточки, игры и повторение в нужный момент. Слова не забываются.'}
             </Text>
           </View>
 

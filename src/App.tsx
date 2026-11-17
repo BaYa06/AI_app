@@ -44,6 +44,7 @@ import {
   isCenterCode,
   normalizeJoinCode,
   parseCenterJoin,
+  parseTeacherInvite,
 } from '@/utils/centerCode';
 import { recordHighlightLessonDay } from '@/services/dailyHighlight';
 import { localDay } from '@/store/challengeStore';
@@ -102,6 +103,8 @@ export default function App() {
   const [pendingCenterCode, setPendingCenterCode] = useState<string | null>(null);
   const pendingCenterCodeRef = useRef<string | null>(null);
   pendingCenterCodeRef.current = pendingCenterCode;
+  // Ссылка для учителей центра /t/<код> (Center 13): окно после входа и онбординга
+  const [pendingTeacherInvite, setPendingTeacherInvite] = useState<string | null>(null);
   // Ученик с кодом или ссылкой учителя (plan/new/new_user_activation.md, этап 7)
   const [courseJoin, setCourseJoin] = useState<{
     via: 'code' | 'link';
@@ -451,6 +454,12 @@ export default function App() {
       setPendingCenterCode(centerPath);
       return;
     }
+    // Ссылка для учителей центра: /t/<код> (Center 13)
+    const teacherPath = parseTeacherInvite(path);
+    if (teacherPath) {
+      setPendingTeacherInvite(teacherPath);
+      return;
+    }
 
     // Набор по ссылке: ?share=CODE — кнопка «Открыть в Flashly» на странице /s/CODE
     const shareParam = new URLSearchParams(window.location.search).get('share');
@@ -526,6 +535,12 @@ export default function App() {
         const centerLink = parseCenterJoin(url);
         if (centerLink) {
           setPendingCenterCode(centerLink);
+          return;
+        }
+        // Ссылка для учителей центра: https://flashlycards.app/t/<код> или flashly://t/<код>
+        const teacherLink = parseTeacherInvite(url);
+        if (teacherLink) {
+          setPendingTeacherInvite(teacherLink);
           return;
         }
 
@@ -852,6 +867,16 @@ export default function App() {
       }
     }, 100);
   }, []);
+  // Стал учителем центра (Center 13): роль учителя в приложении и полка центра в «Библиотеке»
+  const handleTeacherInviteJoined = useCallback(() => {
+    setPendingTeacherInvite(null);
+    if (currentUserId)
+      useSettingsStore
+        .getState()
+        .fetchIsTeacher(currentUserId)
+        .catch(() => {});
+    if (navigationRef.isReady()) navigationRef.navigate('Main', { screen: 'Library' });
+  }, [currentUserId]);
   const handleCenterFound = useCallback(
     (code: string, info: Extract<CenterCodeResult, { ok: true }>) => {
       setCenterJoin({ via: 'code', code, info });
@@ -1043,6 +1068,9 @@ export default function App() {
             openCenterBooksWhenReady(info.organization.id);
           }}
           onCenterInviteDismiss={() => setPendingCenterCode(null)}
+          pendingTeacherInvite={pendingTeacherInvite}
+          onTeacherInviteJoined={handleTeacherInviteJoined}
+          onTeacherInviteDismiss={() => setPendingTeacherInvite(null)}
           firstLesson={firstLesson}
           starterReady={starterReady}
           onStarterBuilt={handleStarterBuilt}

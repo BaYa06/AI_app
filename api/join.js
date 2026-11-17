@@ -9,8 +9,23 @@ const APP_STORE_URL = 'https://apps.apple.com/app/id6808731151';
 /** Код учебного центра: ALFA-DEC-7K (plan/new/center_books.md, Center 5) */
 const CENTER_CODE_RE = /^[A-Z0-9]+-[A-Z0-9-]*[A-Z0-9]$/;
 
+/** Ссылка для учителей центра flashlycards.app/t/<код> (plan/new/center_books.md, Center 13) */
+const TEACHER_TOKEN_RE = /^[A-Za-z0-9_-]{8,32}$/;
+
 export default async function handler(req, res) {
   const { token } = req.query;
+
+  // Приглашение учителем в учебный центр — страница для тех, у кого ещё нет приложения. В базу не
+  // ходим: имя центра покажет приложение после входа.
+  if (req.query.teacher !== undefined) {
+    const teacherToken = String(req.query.teacher || '');
+    if (!TEACHER_TOKEN_RE.test(teacherToken)) {
+      return res.status(400).send(renderPage({ error: 'Неверная ссылка приглашения' }));
+    }
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    return res.status(200).send(renderTeacherPage(teacherToken));
+  }
 
   // Ссылка учебного центра: страница для тех, у кого ещё нет приложения. iOS не передаёт ссылку в
   // только что установленное приложение — поэтому код крупно и «Скопировать код». В базу не ходим:
@@ -262,6 +277,52 @@ function renderCenterPage(code) {
       }
     });
   </script>
+</body>
+</html>`;
+}
+
+function renderTeacherPage(token) {
+  const deepLink = `flashly://t/${token}`;
+  const link = `https://flashlycards.app/t/${token}`;
+  return `<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#6467F2">
+  <meta name="robots" content="noindex">
+  <title>Приглашение учителем — Flashly</title>
+  <meta name="description" content="Учебный центр приглашает тебя учителем во Flashly">
+  <meta property="og:title" content="Приглашение учителем учебного центра во Flashly">
+  <meta property="og:description" content="Книги центра для твоих групп во Flashly">
+  <meta name="apple-itunes-app" content="app-id=6808731151, app-argument=${esc(deepLink)}">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #F3F4FA;
+      color: #111827; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; }
+    .card { background: #fff; border: 1px solid #E3E5EE; border-radius: 20px; padding: 28px 22px; max-width: 400px; width: 100%; }
+    h1 { font-size: 24px; line-height: 1.25; margin-bottom: 12px; }
+    p.lead { color: #4B5563; font-size: 15px; line-height: 1.5; margin-bottom: 20px; }
+    ol { padding-left: 20px; color: #374151; font-size: 15px; line-height: 1.6; margin-bottom: 22px; }
+    .btn { display: block; text-align: center; height: 52px; line-height: 52px; border-radius: 14px; font-weight: 600; font-size: 16px;
+      text-decoration: none; margin-bottom: 10px; }
+    .store { background: #111827; color: #fff; }
+    .open { background: #4F46E5; color: #fff; }
+    .note { font-size: 12px; color: #6B7280; text-align: center; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>Учебный центр приглашает тебя учителем во Flashly</h1>
+    <p class="lead">Книги центра появятся в «Библиотеке» отдельной полкой — подключай их к своим группам.</p>
+    <ol>
+      <li>Установи Flashly из App Store и войди.</li>
+      <li>Вернись сюда и открой ссылку ещё раз — приложение покажет приглашение.</li>
+    </ol>
+    <a class="btn open" href="${esc(deepLink)}">Открыть в приложении</a>
+    <a class="btn store" href="${APP_STORE_URL}">Скачать в App Store</a>
+    <p class="note">Ссылка: ${esc(link)}</p>
+  </main>
 </body>
 </html>`;
 }

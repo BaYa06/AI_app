@@ -6,6 +6,7 @@
  * Ученики — только числами; учителей (этап 6) центр видит по именам — это его сотрудники.
  */
 import { makeCenterCode, monthLabel, normalizeLabel } from './codes.js';
+import { makeTeacherToken, removeTeacher } from './teacher.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -43,6 +44,8 @@ export async function handle(action, req, res, sql, user) {
   if (action === 'codes') return codes(res, sql, center);
   if (action === 'books') return books(res, sql, center);
   if (action === 'book-units') return bookUnits(req, res, sql, center);
+  if (action === 'teachers') return teachers(res, sql, center);
+  if (action === 'groups') return groups(res, sql, center);
 
   // Запись — только пока действует договор
   if (center.contract_ended) {
@@ -51,6 +54,8 @@ export async function handle(action, req, res, sql, user) {
   if (action === 'code-create') return codeCreate(req, res, sql, center);
   if (action === 'code-off') return codeOff(req, res, sql, center);
   if (action === 'profile') return profile(req, res, sql, center);
+  if (action === 'teacher-link') return teacherLink(res, sql, center);
+  if (action === 'teacher-remove') return teacherRemove(req, res, sql, center);
   return send(res, 404, { error: 'Not found' });
 }
 
@@ -390,4 +395,124 @@ async function profile(req, res, sql, c) {
     UPDATE organizations SET greeting = ${greeting}, contact = ${contact}, logo_url = ${logo}
      WHERE id = ${c.id}`;
   return send(res, 200, { ok: true });
+}
+
+// ── Учителя и группы (Center 13, 15) ──────────────────────
+
+/**
+ * Учителя центра: имя и почта (это сотрудники центра — они согласились, что центр их видит),
+ * сколько групп с книгами центра и учеников в них. Ссылка для учителей — одна на центр.
+ */
+async function teachers(res, sql, c) {
+  const [org] = await sql`SELECT teacher_invite FROM organizations WHERE id = ${c.id}`;
+  const rows = await sql`
+    SELECT u.id, COALESCE(NULLIF(u.display_name, ''), u.user_name, u.email) AS name, u.email,
+           m.created_at,
+           (SELECT COUNT(*)::int FROM courses co
+             WHERE co.user_id = u.id AND co.organization_id = ${c.id}) AS groups,
+           (SELECT COUNT(DISTINCT cm.user_id)::int FROM courses co
+              JOIN course_members cm ON cm.course_id = co.id AND cm.role = 'student'
+             WHERE co.user_id = u.id AND co.organization_id = ${c.id}) AS students
+      FROM organization_members m JOIN users u ON u.id = m.user_id
+     WHERE m.organization_id = ${c.id} AND m.role = 'teacher'
+     ORDER BY m.created_at`;
+  return send(res, 200, {
+    linkToken: org?.teacher_invite || null,
+    teachers: rows.map((r) => ({
+      id: r.id,
+      name: r.name || 'Учитель',
+      email: r.email && !String(r.email).endsWith('@privaterelay.appleid.com') ? r.email : null,
+      joinedAt: r.created_at,
+      groups: r.groups,
+      students: r.students,
+    })),
+  });
+}
+
+/** Новая ссылка для учителей: старая перестаёт работать (её переслали не тому). */
+async function teacherLink(res, sql, c) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const token = makeTeacherToken();
+    try {
+      await sql`UPDATE organizations SET teacher_invite = ${token} WHERE id = ${c.id}`;
+      return send(res, 200, { linkToken: token });
+    } catch (e) {
+      if (!/unique|duplicate/i.test(String(e?.message))) throw e;
+    }
+  }
+  return send(res, 500, { error: 'Could not make a link' });
+}
+
+/**
+ * Убрать учителя. Без confirm возвращаем, что случится: «Отключим книги от N групп (M учеников)».
+ * С confirm — книги центра отключаются от его групп, группы остаются у учителя.
+ */
+async function teacherRemove(req, res, sql, c) {
+  const userId = req.body?.userId;
+  if (!isUuid(userId)) return send(res, 400, { error: 'Bad id' });
+  const [t] = await sql`
+    SELECT 1 FROM organization_members
+     WHERE organization_id = ${c.id} AND user_id = ${userId} AND role = 'teacher'`;
+  if (!t) return send(res, 404, { error: 'Not found' });
+  if (!req.body?.confirm) {
+    const [impact] = await sql`
+      SELECT COUNT(DISTINCT co.id)::int AS groups, COUNT(DISTINCT cm.user_id)::int AS students
+        FROM courses co
+        LEFT JOIN course_members cm ON cm.course_id = co.id AND cm.role = 'student'
+       WHERE co.user_id = ${userId} AND co.organization_id = ${c.id}`;
+    return send(res, 200, { needConfirm: true, groups: impact.groups, students: impact.students });
+  }
+  const detached = await removeTeacher(sql, c.id, userId);
+  if (detached.length) {
+    const { notifyCoursesChanged } = await import('../../_realtime.js');
+    await notifyCoursesChanged(detached).catch(() => {});
+  }
+  return send(res, 200, { ok: true, groups: detached.length });
+}
+
+/**
+ * Группы учителей с книгами центра: учитель, книги и до какого юнита открыто, учеников, сколько
+ * занимались за 7 дней (по словам книг центра). Имена учеников не отдаём.
+ */
+async function groups(res, sql, c) {
+  const rows = await sql`
+    SELECT co.id, co.title,
+           COALESCE(NULLIF(u.display_name, ''), u.user_name, u.email) AS teacher,
+           (SELECT COUNT(*)::int FROM course_members cm
+             WHERE cm.course_id = co.id AND cm.role = 'student') AS students,
+           (SELECT COALESCE(json_agg(json_build_object('title', b.title, 'level', b.level,
+                     'openTo', (SELECT MAX(bu.number) FROM course_units cu
+                                  JOIN book_units bu ON bu.id = cu.unit_id
+                                 WHERE cu.course_id = co.id AND cu.is_open AND bu.book_id = b.id),
+                     'units', (SELECT COUNT(*) FROM book_units bu WHERE bu.book_id = b.id))
+                   ORDER BY b.org_position NULLS LAST, b.title), '[]')
+              FROM course_books cb JOIN books b ON b.id = cb.book_id
+             WHERE cb.course_id = co.id AND b.organization_id = ${c.id}) AS books,
+           (SELECT COUNT(DISTINCT rl.user_id)::int
+              FROM course_members cm
+              JOIN review_log rl ON rl.user_id = cm.user_id
+              JOIN cards cd ON cd.id = rl.card_id
+              JOIN card_sets cs ON cs.id = cd.set_id
+              JOIN book_units bu ON bu.id = cs.unit_id
+              JOIN books b ON b.id = bu.book_id AND b.organization_id = ${c.id}
+             WHERE cm.course_id = co.id AND cm.role = 'student'
+               AND rl.reviewed_at >= (NOW() - INTERVAL '7 days') AT TIME ZONE 'UTC') AS active
+      FROM courses co JOIN users u ON u.id = co.user_id
+     WHERE co.organization_id = ${c.id}
+     ORDER BY teacher, co.title`;
+  return send(res, 200, {
+    groups: rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      teacher: r.teacher || 'Учитель',
+      students: r.students,
+      active: r.active,
+      books: r.books.map((b) => ({
+        title: b.title,
+        level: b.level,
+        openTo: b.openTo,
+        units: Number(b.units) || 0,
+      })),
+    })),
+  });
 }

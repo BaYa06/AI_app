@@ -44,6 +44,8 @@ export const authEvents = {
   orgAccessExpiredSeen: () => log('org_access_expired_seen'),
   /** Выбрал книгу центра (Center 6): first — сразу после кода */
   orgBookPicked: (mode: string) => log('org_book_picked', { mode }),
+  /** Стал учителем центра по ссылке /t/<код> (Center 13) */
+  orgTeacherJoined: () => log('org_teacher_joined'),
 
   /**
    * Показан шаг онбординга (Start 2.8): воронка по шагам — где уходят.

@@ -758,8 +758,8 @@ async function main() {
       { bookId: bookA.bookId, courseIds: [plainCourse] }
     );
     check(
-      'attach-to-courses: книгу центра к группе пока подключает только админ (404)',
-      attach.status === 404,
+      'attach-to-courses: к чужой группе книгу центра не подключить (403)',
+      attach.status === 403,
       attach.status
     );
 
@@ -989,6 +989,254 @@ async function main() {
         endedCreate.body?.reason === 'contract_ended' &&
         (await cab(ownerG, 'GET', { action: 'overview' })).status === 200,
       endedCreate
+    );
+
+    // ── 6. Учителя центра (Center 13–15) ─────────────────────
+    console.log('\nУчителя центра');
+    const orgT = await newOrg('Teachers', 2, 365);
+    const bookT = await newBook('Teacher Book', orgT);
+    const ownerT = await newUser('owner T');
+    await db.query(
+      `INSERT INTO organization_members (organization_id, user_id, role) VALUES ($1, $2, 'owner')`,
+      [orgT, ownerT]
+    );
+    const teacherT = await newUser('teacher T');
+    const linkRes = await cab(ownerT, 'POST', { action: 'teacher-link' }, {});
+    const token = linkRes.body?.linkToken as string;
+    check(
+      'кабинет: ссылка для учителей',
+      linkRes.status === 200 && /^[\w-]{16}$/.test(token),
+      linkRes
+    );
+    check(
+      'чужая ссылка — 404',
+      (await call(books, teacherT, 'GET', { action: 'org-teacher-info', token: 'nope-nope-nope' }))
+        .status === 404
+    );
+    const tInfo = await call(books, teacherT, 'GET', { action: 'org-teacher-info', token });
+    check(
+      'ссылка: центр и «ещё не учитель»',
+      tInfo.status === 200 &&
+        tInfo.body.organization.id === orgT &&
+        tInfo.body.alreadyMember === false,
+      tInfo.body
+    );
+    const tJoin = await call(books, teacherT, 'POST', { action: 'org-teacher-join' }, { token });
+    const tRow = (
+      await db.query<{ teacher: boolean; role: string }>(
+        `SELECT u.teacher, m.role FROM users u
+           JOIN organization_members m ON m.user_id = u.id AND m.organization_id = $2
+          WHERE u.id = $1`,
+        [teacherT, orgT]
+      )
+    ).rows[0];
+    check(
+      'стать учителем центра: роль teacher и роль учителя в приложении',
+      tJoin.status === 200 && tRow?.role === 'teacher' && tRow?.teacher === true,
+      tRow
+    );
+    const shelf = await call(books, teacherT, 'GET', { action: 'teacher-orgs' });
+    check(
+      'полка «Книги центра» у учителя',
+      shelf.status === 200 &&
+        shelf.body.organizations.length === 1 &&
+        shelf.body.organizations[0].books[0]?.id === bookT.bookId,
+      shelf.body
+    );
+    check(
+      'у ученика по коду полки учителя нет',
+      ((await call(books, student, 'GET', { action: 'teacher-orgs' })).body?.organizations || [])
+        .length === 0
+    );
+
+    const groupT = (
+      await db.query<{ id: string }>(
+        `INSERT INTO courses (user_id, title) VALUES ($1, $2) RETURNING id`,
+        [teacherT, `${TAG} T group`]
+      )
+    ).rows[0].id;
+    ids.courses.push(groupT);
+    const gs = [await newUser('T s1'), await newUser('T s2'), await newUser('T s3')];
+    for (const u of gs) {
+      await db.query(
+        `INSERT INTO course_members (course_id, user_id, role) VALUES ($1, $2, 'student')`,
+        [groupT, u]
+      );
+    }
+    const attachT = (courseIds: string[]) =>
+      call(
+        books,
+        teacherT,
+        'POST',
+        { action: 'attach-to-courses' },
+        { bookId: bookT.bookId, courseIds }
+      );
+    const full = await attachT([groupT]);
+    check(
+      'подключить книгу к группе: учеников 3, мест 2 — отказ с цифрами',
+      full.status === 409 &&
+        full.body?.reason === 'org_seats_full' &&
+        full.body?.need === 3 &&
+        full.body?.free === 2,
+      full.body
+    );
+    await db.query(`DELETE FROM course_members WHERE course_id = $1 AND user_id = $2`, [
+      groupT,
+      gs[2],
+    ]);
+    const ok = await attachT([groupT]);
+    const orgOfGroup = async () =>
+      (
+        await db.query<{ o: string | null }>(
+          `SELECT organization_id AS o FROM courses WHERE id = $1`,
+          [groupT]
+        )
+      ).rows[0].o;
+    check(
+      'мест хватает — книга подключена, группа стала группой центра',
+      ok.status === 200 && (await orgOfGroup()) === orgT,
+      ok.body
+    );
+    await call(
+      books,
+      teacherT,
+      'POST',
+      { action: 'set-unit-open' },
+      { courseId: groupT, unitId: bookT.unitId, isOpen: true }
+    );
+    check(
+      'ученик группы получает открытый юнит без кода',
+      (await officialSetIds(gs[0], [])).includes(bookT.setId)
+    );
+    const seatsT = (await db.query<{ n: number }>(`SELECT flashly_org_seats_used($1) AS n`, [orgT]))
+      .rows[0].n;
+    check('ученики группы занимают места центра', seatsT === 2, seatsT);
+    const late = await newUser('T late');
+    const joinCodeT = randomBytes(3).toString('hex').toUpperCase();
+    await db.query(
+      `INSERT INTO course_invites (course_id, token, created_by, join_code, expires_at) VALUES ($1, $2, $3, $4, NOW() + INTERVAL '1 day')`,
+      [groupT, randomBytes(32).toString('hex'), teacherT, joinCodeT]
+    );
+    const lateJoin = await call(
+      teacher,
+      late,
+      'POST',
+      { action: 'join-by-code' },
+      { code: joinCodeT }
+    );
+    check(
+      'мест нет — новый ученик в группу не вступает (org_seats_full)',
+      lateJoin.status === 409 && lateJoin.body?.reason === 'org_seats_full',
+      lateJoin
+    );
+
+    const myGroup = (
+      await db.query<{ id: string }>(
+        `INSERT INTO courses (user_id, title) VALUES ($1, $2) RETURNING id`,
+        [student, `${TAG} code student group`]
+      )
+    ).rows[0].id;
+    ids.courses.push(myGroup);
+    check(
+      'ученик по коду книгу центра к своей группе не подключит (404)',
+      (
+        await call(
+          books,
+          student,
+          'POST',
+          { action: 'attach-to-courses' },
+          { bookId: bookA.bookId, courseIds: [myGroup] }
+        )
+      ).status === 404
+    );
+    const foreignGroup = (
+      await db.query<{ id: string }>(
+        `INSERT INTO courses (user_id, title, organization_id) VALUES ($1, $2, $3) RETURNING id`,
+        [teacherT, `${TAG} other org group`, orgA]
+      )
+    ).rows[0].id;
+    ids.courses.push(foreignGroup);
+    const otherOrg = await attachT([foreignGroup]);
+    check(
+      'группа другого центра — отказ other_org',
+      otherOrg.status === 409 && otherOrg.body?.reason === 'other_org',
+      otherOrg.body
+    );
+
+    const tList = await cab(ownerT, 'GET', { action: 'teachers' });
+    check(
+      'кабинет: учитель, его группы и ученики',
+      tList.status === 200 &&
+        tList.body.teachers.length === 1 &&
+        tList.body.teachers[0].groups === 1 &&
+        tList.body.teachers[0].students === 2,
+      tList.body
+    );
+    const gList = await cab(ownerT, 'GET', { action: 'groups' });
+    const g0 = gList.body?.groups?.[0];
+    check(
+      'кабинет «Группы»: учитель, книга, открыто до Unit 1, ученики — без имён учеников',
+      gList.status === 200 &&
+        gList.body.groups.length === 1 &&
+        g0.books[0]?.openTo === 1 &&
+        g0.students === 2 &&
+        !JSON.stringify(gList.body).includes(gs[0]),
+      gList.body
+    );
+    check(
+      'кабинет другого центра учителей и группы чужого не видит',
+      !(await cab(ownerA, 'GET', { action: 'teachers' })).body?.teachers?.some(
+        (t: any) => t.id === teacherT
+      ) &&
+        (await cab(ownerA, 'GET', { action: 'groups' })).body?.groups?.every(
+          (g: any) => g.id !== groupT
+        )
+    );
+
+    const detach = await call(
+      books,
+      teacherT,
+      'POST',
+      { action: 'detach-from-course' },
+      { bookId: bookT.bookId, courseId: groupT }
+    );
+    check(
+      'отключили книгу — группа снова обычная, места свободны',
+      detach.status === 200 && (await orgOfGroup()) === null,
+      detach.body
+    );
+    await attachT([groupT]);
+    const ask = await cab(ownerT, 'POST', { action: 'teacher-remove' }, { userId: teacherT });
+    check(
+      'убрать учителя: сначала «отключим книги от 1 группы (2 ученика)»',
+      ask.body?.needConfirm === true && ask.body.groups === 1 && ask.body.students === 2,
+      ask.body
+    );
+    const removed = await cab(
+      ownerT,
+      'POST',
+      { action: 'teacher-remove' },
+      { userId: teacherT, confirm: true }
+    );
+    const left = (await db.query(`SELECT 1 FROM course_books WHERE course_id = $1`, [groupT])).rows
+      .length;
+    check(
+      'учителя убрали: книги центра отключены от группы, группа осталась у учителя',
+      removed.status === 200 &&
+        left === 0 &&
+        (await orgOfGroup()) === null &&
+        !(await officialSetIds(gs[0], [])).includes(bookT.setId),
+      { removed: removed.body, left }
+    );
+    check(
+      'убранный учитель полку центра больше не видит',
+      ((await call(books, teacherT, 'GET', { action: 'teacher-orgs' })).body?.organizations || [])
+        .length === 0
+    );
+    await cab(ownerT, 'POST', { action: 'teacher-link' }, {});
+    check(
+      'новая ссылка — старая перестаёт работать',
+      (await call(books, late, 'GET', { action: 'org-teacher-info', token })).status === 404
     );
   } finally {
     // ── Уборка ───────────────────────────────────────────────

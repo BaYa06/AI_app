@@ -25,7 +25,7 @@
       "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
     },
     {
-      "source": "/join/(.*)",
+      "source": "/(join|t)/(.*)",
       "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
     },
     {
@@ -134,7 +134,7 @@
   ],
   "redirects": [
     {
-      "source": "/:path((?!(?:api|ai|s|join|privacy|terms|support|delete-account|admin|site|icons|fonts|\\.well-known|en|learn|how-to-learn-words|spaced-repetition|teachers|center)(?:/|$))[^.]+)",
+      "source": "/:path((?!(?:api|ai|s|join|privacy|terms|support|delete-account|admin|site|icons|fonts|\\.well-known|en|learn|how-to-learn-words|spaced-repetition|teachers|center|t)(?:/|$))[^.]+)",
       "has": [{ "type": "host", "value": "flashlycards.app" }],
       "destination": "https://app.flashlycards.app/:path",
       "permanent": false
@@ -158,6 +158,7 @@
     { "source": "/api/library/import",             "destination": "/api/library?action=import" },
     { "source": "/ai/:path*", "destination": "/api/ai?fn=:path*" },
     { "source": "/join/:token", "destination": "/api/join?token=:token" },
+    { "source": "/t/:token", "destination": "/api/join?teacher=:token" },
     { "source": "/s/:code", "destination": "/api/share?action=page&code=:code" },
     { "source": "/r/:code", "destination": "/api/share?action=report-page&code=:code" },
     { "source": "/admin", "destination": "/admin.html" },

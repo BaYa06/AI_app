@@ -28,6 +28,9 @@ import { log } from './_log.js';
  * POST /api/books?action=org-activate        { code }              активация кода центра           │ центра,
  * GET  /api/books?action=my-orgs                                   мои центры, их книги, мои книги │ _handlers/center/
  * POST /api/books?action=my-book             { bookId, unitId?, active?, remove? }                 ┘ student.js
+ * GET  /api/books?action=org-teacher-info    ?token=               центр по ссылке учителей        ┐ учителя
+ * POST /api/books?action=org-teacher-join    { token }             стать учителем центра           │ центра,
+ * GET  /api/books?action=teacher-orgs                              полки «Книги <центр>»           ┘ teacher.js
  *
  * План юнитов: строка в course_units есть только у юнитов, которые хоть раз переключали.
  * Нет строки = юнит закрыт. Поэтому юниты, добавленные в книгу позже, в уже подключённых
@@ -62,6 +65,8 @@ export default async function handler(req, res) {
     'official-sets',
     'org-info',
     'my-orgs',
+    'org-teacher-info',
+    'teacher-orgs',
   ]);
   const POST_ACTIONS = new Set([
     'attach-to-courses',
@@ -70,6 +75,7 @@ export default async function handler(req, res) {
     'fork-set',
     'org-activate',
     'my-book',
+    'org-teacher-join',
   ]);
   if (GET_ACTIONS.has(action) && req.method !== 'GET')
     return res.status(405).json({ error: 'Method not allowed' });
@@ -85,6 +91,16 @@ export default async function handler(req, res) {
     if (action === 'set-unit-open') return await setUnitOpen(req, res, sql, userId);
     if (action === 'fork-set') return await forkSet(req, res, sql, userId);
     if (action === 'official-sets') return await officialSets(req, res, sql, userId);
+
+    // Учителя учебного центра (plan/new/center_books.md, Center 13–14) — модуль грузится лениво
+    if (['org-teacher-info', 'org-teacher-join', 'teacher-orgs'].includes(action)) {
+      const teacher = await import('./_handlers/center/teacher.js');
+      if (action === 'org-teacher-info')
+        return await teacher.teacherInviteInfo(req, res, sql, userId);
+      if (action === 'org-teacher-join')
+        return await teacher.teacherInviteJoin(req, res, sql, userId);
+      return await teacher.teacherOrgs(req, res, sql, userId);
+    }
 
     // Книги учебного центра по коду (plan/new/center_books.md, Center 3) — модуль грузится лениво
     if (['org-info', 'org-activate', 'my-orgs', 'my-book'].includes(action)) {
@@ -170,7 +186,8 @@ async function listBooks(req, res, sql, userId) {
     FROM books b
     WHERE (b.is_published = true OR ${admin}::boolean)
       AND (${allBooks}::boolean OR b.student_visible = true)
-      -- Книги учебных центров в общем каталоге не показываем (у учителя центра — своя полка, Center 14)
+      -- Книги учебных центров в общем каталоге не показываем (у учителя центра — своя полка,
+      -- teacher-orgs, Center 14)
       AND (b.organization_id IS NULL OR ${admin}::boolean)
       AND (${subject}::text IS NULL OR lower(b.subject) = lower(${subject}::text))
       AND (${level}::text IS NULL OR lower(b.level) = lower(${level}::text))
@@ -256,9 +273,6 @@ async function attachToCourses(req, res, sql, userId) {
   const admin = await isAdmin(sql, userId);
   const book = await findVisibleBook(sql, bookId, admin, userId);
   if (!book) return res.status(404).json({ error: 'Book not found' });
-  // Книгу центра к группе подключает только учитель центра, с проверкой мест (Center 14).
-  // До него — никто, кроме админа Flashly.
-  if (book.organization_id && !admin) return res.status(404).json({ error: 'Book not found' });
 
   // Все курсы должны принадлежать вызывающему — иначе не подключаем ни один.
   const owned = await sql`
@@ -268,12 +282,24 @@ async function attachToCourses(req, res, sql, userId) {
     return res.status(403).json({ error: 'Not the owner of all courses', reason: 'forbidden' });
   }
 
+  // Книгу центра — только участник центра, к группам не другого центра и при свободных местах
+  // для новых учеников (Center 14). Ученик центра по коду книгу к своим группам не подключит.
+  let orgTeacher = null;
+  if (book.organization_id) {
+    orgTeacher = await import('./_handlers/center/teacher.js');
+    const denied = await orgTeacher.checkOrgAttach(sql, book.organization_id, userId, uniqueIds, {
+      admin,
+    });
+    if (denied) return res.status(denied.status).json(denied.body);
+  }
+
   const inserted = await sql`
     INSERT INTO course_books (course_id, book_id)
     SELECT unnest(${uniqueIds}::uuid[]), ${bookId}::uuid
     ON CONFLICT (course_id, book_id) DO NOTHING
     RETURNING course_id
   `;
+  if (orgTeacher) await orgTeacher.markOrgCourses(sql, book.organization_id, uniqueIds);
 
   return res.status(200).json({
     ok: true,
@@ -305,6 +331,8 @@ async function detachFromCourse(req, res, sql, userId) {
   `;
   if (deleted.length === 0)
     return res.status(404).json({ error: 'Book is not attached to this course' });
+  // Последняя книга центра ушла из группы — группа снова обычная, места центра свободны
+  await (await import('./_handlers/center/teacher.js')).releaseOrgCourse(sql, courseId);
   await notifyCoursesChanged([courseId]);
   return res.status(200).json({ ok: true });
 }

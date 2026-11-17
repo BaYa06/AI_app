@@ -27,6 +27,7 @@ import { CourseFoundScreen } from '@/screens/courseJoin/CourseFoundScreen';
 import { CourseNameScreen } from '@/screens/courseJoin/CourseNameScreen';
 import { CenterFoundScreen } from '@/screens/courseJoin/CenterFoundScreen';
 import { CenterInviteModal } from '@/components/CenterInviteModal';
+import { TeacherInviteModal } from '@/components/TeacherInviteModal';
 import type { CenterActivateAction, CenterCodeResult } from '@/services/CenterService';
 import type { CourseInviteInfo, JoinCourseAction } from '@/services/neon/courses';
 import { FirstCardsScreen } from '@/screens/firstLesson/FirstCardsScreen';
@@ -129,6 +130,10 @@ type AppRootProps = {
   pendingCenterCode: string | null;
   onCenterInviteJoined: (info: Extract<CenterCodeResult, { ok: true }>) => void;
   onCenterInviteDismiss: () => void;
+  /** Ссылка для учителей центра /t/<код> (Center 13) */
+  pendingTeacherInvite: string | null;
+  onTeacherInviteJoined: () => void;
+  onTeacherInviteDismiss: () => void;
   /** Первый урок (Start 2.5): выданный стартовый набор и шаги урока */
   firstLesson: StarterSet | null;
   starterReady: boolean | null;
@@ -194,6 +199,9 @@ export function AppRoot({
   pendingCenterCode,
   onCenterInviteJoined,
   onCenterInviteDismiss,
+  pendingTeacherInvite,
+  onTeacherInviteJoined,
+  onTeacherInviteDismiss,
   firstLesson,
   starterReady,
   onStarterBuilt,
@@ -232,6 +240,8 @@ export function AppRoot({
   // Во время онбординга ссылку учителя ведёт сам онбординг («Курс найден», Start 7.3)
   const inviteOpen = isAuthenticated && !needsOnboarding && !!pendingInviteToken;
   const centerInviteOpen = isAuthenticated && !needsOnboarding && !!pendingCenterCode;
+  // Учитель по ссылке центра: окно после входа и онбординга (Center 13)
+  const teacherInviteOpen = isAuthenticated && !needsOnboarding && !!pendingTeacherInvite;
   const shareOpen =
     isReady && !!pendingShareCode && (signedIn || (!isAuthenticated && !shareDeferred));
 
@@ -243,10 +253,12 @@ export function AppRoot({
   }, [isReady, isAuthenticated, signedIn]);
   useEffect(() => setGateOpen('courseInvite', inviteOpen), [inviteOpen]);
   useEffect(() => setGateOpen('centerInvite', centerInviteOpen), [centerInviteOpen]);
+  useEffect(() => setGateOpen('teacherInvite', teacherInviteOpen), [teacherInviteOpen]);
   useEffect(() => setGateOpen('shareLink', shareOpen), [shareOpen]);
   useEffect(() => {
-    if (pendingInviteToken || pendingShareCode || pendingCenterCode) markLaunchInterrupted();
-  }, [pendingInviteToken, pendingShareCode, pendingCenterCode]);
+    if (pendingInviteToken || pendingShareCode || pendingCenterCode || pendingTeacherInvite)
+      markLaunchInterrupted();
+  }, [pendingInviteToken, pendingShareCode, pendingCenterCode, pendingTeacherInvite]);
 
   const [showPushBanner, setShowPushBanner] = useState(false);
   const [pushBannerLoading, setPushBannerLoading] = useState(false);
@@ -297,7 +309,11 @@ export function AppRoot({
       ) : (
         <StepTransition step={authStep}>
           {authStep === 'welcome' ? (
-            <WelcomeScreen isLoading={authLoading} centerInvited={!!pendingCenterCode} />
+            <WelcomeScreen
+              isLoading={authLoading}
+              centerInvited={!!pendingCenterCode}
+              teacherInvited={!!pendingTeacherInvite}
+            />
           ) : authStep === 'name' ? (
             <NameOnboardingScreen
               onBack={isTeacher ? onBackToRole : undefined}
@@ -414,7 +430,11 @@ export function AppRoot({
               total={teacherTotal}
             />
           ) : (
-            <WelcomeScreen isLoading={authLoading} centerInvited={!!pendingCenterCode} />
+            <WelcomeScreen
+              isLoading={authLoading}
+              centerInvited={!!pendingCenterCode}
+              teacherInvited={!!pendingTeacherInvite}
+            />
           )}
         </StepTransition>
       )}
@@ -531,6 +551,15 @@ export function AppRoot({
           code={pendingCenterCode}
           onJoined={onCenterInviteJoined}
           onDismiss={onCenterInviteDismiss}
+        />
+      )}
+
+      {/* Ссылка для учителей учебного центра (plan/new/center_books.md, Center 13) */}
+      {teacherInviteOpen && (
+        <TeacherInviteModal
+          token={pendingTeacherInvite}
+          onJoined={onTeacherInviteJoined}
+          onDismiss={onTeacherInviteDismiss}
         />
       )}
 

@@ -8,7 +8,7 @@ import { log } from './_log.js';
  */
 // schema_039: в 038 (official_sets_guard) и 039 (set_kind) версию не подняли — миграции не выполнились,
 // и запросы с card_sets.kind падали на тестовом сервере (plan/new/set_kind.md, слабые места)
-const SCHEMA_VERSION = 'schema_052';
+const SCHEMA_VERSION = 'schema_053';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -1247,6 +1247,18 @@ async function applyMigrations(sql) {
     `;
   } catch (e) {
     log.error('db-init', 'Migration 052_center_books failed', e);
+  }
+
+  // Migration 053: ссылка-приглашение учителей центра (plan/new/center_books.md, Center 13).
+  // Тексты — как в database/migrations/053_center_teachers.sql
+  try {
+    await sql`ALTER TABLE organizations ADD COLUMN IF NOT EXISTS teacher_invite VARCHAR(32)`;
+    await sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_organizations_teacher_invite
+        ON organizations(teacher_invite) WHERE teacher_invite IS NOT NULL
+    `;
+  } catch (e) {
+    log.error('db-init', 'Migration 053_center_teachers failed', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)

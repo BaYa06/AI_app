@@ -18,12 +18,30 @@ import { log } from './_log.js';
  * GET  /api/center?action=books                       книги центра
  * GET  /api/center?action=book-units&bookId=          юниты и слова книги
  * POST /api/center?action=profile                     { greeting, contact, logo }
+ * GET  /api/center?action=teachers                    учителя центра и ссылка для них
+ * POST /api/center?action=teacher-link                 новая ссылка (старая перестаёт работать)
+ * POST /api/center?action=teacher-remove              { userId, confirm? }  убрать учителя
+ * GET  /api/center?action=groups                      группы учителей с книгами центра
  *
  * Договор кончился — только чтение (новые коды и профиль — 403 contract_ended).
  */
 
-const GET_ACTIONS = new Set(['me', 'overview', 'codes', 'books', 'book-units']);
-const POST_ACTIONS = new Set(['code-create', 'code-off', 'profile']);
+const GET_ACTIONS = new Set([
+  'me',
+  'overview',
+  'codes',
+  'books',
+  'book-units',
+  'teachers',
+  'groups',
+]);
+const POST_ACTIONS = new Set([
+  'code-create',
+  'code-off',
+  'profile',
+  'teacher-link',
+  'teacher-remove',
+]);
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');

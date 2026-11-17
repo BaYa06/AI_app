@@ -29,7 +29,13 @@ type Props = {
 };
 
 /** Логотип центра или первая буква названия. */
-export function CenterLogo({ org, size }: { org: CenterOrganization; size: number }) {
+export function CenterLogo({
+  org,
+  size,
+}: {
+  org: Pick<CenterOrganization, 'name' | 'logoUrl'>;
+  size: number;
+}) {
   const colors = useThemeColors();
   const radius = Math.round(size * 0.28);
   if (org.logoUrl) {

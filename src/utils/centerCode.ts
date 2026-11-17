@@ -32,6 +32,15 @@ export function parseCenterJoin(url: string): string | null {
   return isCenterCode(code) ? code : null;
 }
 
+/**
+ * Ссылка для учителей центра (Center 13): https://flashlycards.app/t/<код> или flashly://t/<код>
+ * или путь /t/<код> (веб) → код ссылки (16 знаков A–Z, a–z, 0–9, _ и -) или null. Регистр важен.
+ */
+export function parseTeacherInvite(url: string): string | null {
+  const m = url.match(/(?:^|flashlycards\.app|flashly:\/)\/t\/([A-Za-z0-9_-]{8,32})(?:[/?#]|$)/);
+  return m ? m[1] : null;
+}
+
 /** Можно искать: полный код курса или код центра. */
 export function isJoinCodeReady(code: string): boolean {
   return isCourseCode(code) || isCenterCode(code);

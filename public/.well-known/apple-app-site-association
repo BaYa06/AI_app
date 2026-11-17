@@ -9,7 +9,8 @@
         ],
         "paths": [
           "/join/*",
-          "/s/*"
+          "/s/*",
+          "/t/*"
         ],
         "components": [
           {
@@ -19,6 +20,10 @@
           {
             "/": "/s/*",
             "comment": "Набор по ссылке (plan/new/share_set.md)"
+          },
+          {
+            "/": "/t/*",
+            "comment": "Учитель учебного центра (plan/new/center_books.md, Center 13)"
           }
         ]
       }

@@ -18,6 +18,8 @@ export type GateOwner =
   | 'courseInvite'
   /** Ссылка учебного центра у вошедшего пользователя (plan/new/center_books.md, Center 5) */
   | 'centerInvite'
+  /** Ссылка для учителей учебного центра /t/<код> (Center 13) */
+  | 'teacherInvite'
   | 'shareLink'
   | 'appUpdate'
   | 'freezeNotice'
@@ -28,6 +30,7 @@ const PRIORITY: Record<GateOwner, number> = {
   appUpdateForce: -1,
   courseInvite: 0,
   centerInvite: 0,
+  teacherInvite: 0,
   shareLink: 1,
   appUpdate: 2,
   // «Заморозка спасла серию» (plan/new/streak_freeze_display.md, Freeze 4): «Что нового» ждёт его,

@@ -8,6 +8,7 @@ import {
   isJoinCodeReady,
   normalizeJoinCode,
   parseCenterJoin,
+  parseTeacherInvite,
 } from '../centerCode';
 
 describe('код учителя или центра в одном поле (Center 5)', () => {
@@ -56,5 +57,23 @@ describe('код учителя или центра в одном поле (Cent
     expect(parseCenterJoin(`https://x.app/join/${'a'.repeat(64)}`)).toBeNull();
     expect(parseCenterJoin('https://x.app/join/K7M2QX')).toBeNull();
     expect(parseCenterJoin('https://x.app/s/ABC-DEF')).toBeNull();
+  });
+});
+
+describe('ссылка для учителей центра (Center 13)', () => {
+  it('https, flashly:// и путь на вебе', () => {
+    expect(parseTeacherInvite('https://flashlycards.app/t/Ab3_x-9QzK1mNpLs')).toBe(
+      'Ab3_x-9QzK1mNpLs'
+    );
+    expect(parseTeacherInvite('flashly://t/Ab3_x-9QzK1mNpLs')).toBe('Ab3_x-9QzK1mNpLs');
+    expect(parseTeacherInvite('/t/Ab3_x-9QzK1mNpLs')).toBe('Ab3_x-9QzK1mNpLs');
+    expect(parseTeacherInvite('https://flashlycards.app/t/Ab3_x-9QzK1mNpLs?x=1')).toBe(
+      'Ab3_x-9QzK1mNpLs'
+    );
+  });
+  it('чужие адреса и короткий код — нет', () => {
+    expect(parseTeacherInvite('https://evil.example/t/Ab3_x-9QzK1mNpLs')).toBeNull();
+    expect(parseTeacherInvite('https://flashlycards.app/t/abc')).toBeNull();
+    expect(parseTeacherInvite('https://flashlycards.app/join/ALFA-DEC-7K')).toBeNull();
   });
 });
