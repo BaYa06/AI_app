@@ -4,6 +4,8 @@ import {
   activeCenter,
   centerBooksOfLanguage,
   centerLanguages,
+  closedCenterBookIds,
+  isCenterOpen,
   myBookEntries,
   nextLevelBook,
 } from '../centerBooks';
@@ -28,7 +30,7 @@ const center = (id: string, active: boolean, books: CenterBook[]): MyCenter => (
   logoUrl: null,
   greeting: null,
   contact: null,
-  accessUntil: '2027-02-15T00:00:00Z',
+  accessUntil: '2099-01-01T00:00:00Z',
   active,
   books,
 });
@@ -80,5 +82,21 @@ describe('«Мои книги» учебного центра (Center 6)', () =>
     expect(activeCenter(expired)).toBeNull();
     expect(activeCenter(data, 'alfa')?.id).toBe('alfa');
     expect(activeCenter(data, 'other')).toBeNull();
+  });
+
+  it('доступ закрыт: сервер сказал «нет» или срок прошёл по часам телефона (Center 7)', () => {
+    const now = Date.parse('2026-11-17T00:00:00Z');
+    expect(isCenterOpen(alfa, now)).toBe(true);
+    // Без сети кэш «активен», но срок уже прошёл
+    expect(isCenterOpen({ ...alfa, accessUntil: '2026-11-16T23:59:00Z' }, now)).toBe(false);
+    expect(isCenterOpen({ ...alfa, active: false }, now)).toBe(false);
+    expect(isCenterOpen({ ...alfa, accessUntil: 'не дата' }, now)).toBe(false);
+  });
+
+  it('закрытые книги — все книги центров без доступа', () => {
+    const beta = center('beta', false, [book('beta-1', 'en', 1)]);
+    const both = { ...data, organizations: [alfa, beta] };
+    expect([...closedCenterBookIds(both, Date.parse('2026-11-17T00:00:00Z'))]).toEqual(['beta-1']);
+    expect(closedCenterBookIds(null).size).toBe(0);
   });
 });

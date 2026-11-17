@@ -15,6 +15,7 @@ import { borderRadius, iconSize, spacing } from '@/constants';
 import { pluralize } from '@/utils';
 import { BookService } from '@/services/BookService';
 import { studyCenterUnit } from '@/components/study/centerSession';
+import { Analytics } from '@/services/analytics';
 import type { BookDetail, BookUnit } from '@/types/books';
 import type { RootStackScreenProps } from '@/types/navigation';
 
@@ -57,6 +58,7 @@ export function CenterUnitPickScreen({
       toast.error('Не удалось сохранить книгу. Проверь интернет и попробуй ещё раз');
       return;
     }
+    Analytics.orgBookPicked(mode);
     if (mode !== 'first') {
       setSaving(false);
       navigation.navigate('MyBooks');

@@ -2033,6 +2033,7 @@ export function HomeScreen({ navigation, route }: any) {
               <CenterBookCard
                 onStudy={studyCenter}
                 onMyBooks={() => navigation.navigate('MyBooks')}
+                onEnterCode={() => setJoinByCodeVisible(true)}
                 style={styles.lessonCard}
               />
             )}

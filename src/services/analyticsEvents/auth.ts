@@ -40,6 +40,10 @@ export const authEvents = {
   orgCodeEntered: (valid: boolean, reason: string) => log('org_code_entered', { valid, reason }),
   orgJoined: (via: 'code' | 'link' | 'menu') => log('org_joined', { via }),
   orgNotMine: (via: 'code' | 'link') => log('org_not_mine', { via }),
+  /** Ученик увидел «Доступ к книгам закончился» (Center 7) */
+  orgAccessExpiredSeen: () => log('org_access_expired_seen'),
+  /** Выбрал книгу центра (Center 6): first — сразу после кода */
+  orgBookPicked: (mode: string) => log('org_book_picked', { mode }),
 
   /**
    * Показан шаг онбординга (Start 2.8): воронка по шагам — где уходят.

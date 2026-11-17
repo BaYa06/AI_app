@@ -13,7 +13,12 @@ import { Badge, Button, Card, EmptyState, Screen, ScreenHeader, toast } from '@/
 import { useThemeColors } from '@/store';
 import { useCenterStore } from '@/store/centerStore';
 import { alpha, borderRadius, getLanguageLabel, iconSize, spacing } from '@/constants';
-import { myBookEntries, nextLevelBook, type MyBookEntry } from '@/services/centerBooks';
+import {
+  isCenterOpen,
+  myBookEntries,
+  nextLevelBook,
+  type MyBookEntry,
+} from '@/services/centerBooks';
 import { formatAccessDate } from '@/utils/centerCode';
 import { CenterLogo } from '@/screens/courseJoin/CenterFoundScreen';
 import type { RootStackScreenProps } from '@/types/navigation';
@@ -25,7 +30,7 @@ export function MyBooksScreen({ navigation }: RootStackScreenProps<'MyBooks'>) {
   const pickBook = useCenterStore((s) => s.pickBook);
   const entries = myBookEntries(data);
   const center = entries[0]?.center ?? data?.organizations[0] ?? null;
-  const locked = !!center && !center.active;
+  const locked = !!center && !isCenterOpen(center);
 
   useFocusEffect(
     useCallback(() => {
