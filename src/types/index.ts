@@ -130,6 +130,8 @@ export interface Course {
   isStudentCourse?: boolean;
   teacherName?: string;
   ownerId?: string;
+  /** Курс книги учебного центра: вся книга, юниты — наборы (plan/new/center_books.md, этап 7) */
+  sourceBookId?: string;
 }
 
 /** Откуда набор (Teacher 31); нет — старый набор, значок общий */

@@ -23,11 +23,13 @@ import { log } from './_log.js';
  * POST /api/books?action=fork-set            { setId, courseId? }  копия официального набора в свой обычный набор
  * GET  /api/books?action=official-sets       ?setIds=a,b           официальные наборы + карточки с моим прогрессом:
  *                                                                   запрошенные + открытые в моих курсах (я учитель
- *                                                                   или ученик) + те, что я уже начинал учить
+ *                                                                   или ученик) + все юниты моего курса книги
+ *                                                                   центра (этап 7) + те, что я уже начинал учить
  * GET  /api/books?action=org-info            ?code=                центр по коду без активации     ┐ книги учебного
  * POST /api/books?action=org-activate        { code }              активация кода центра           │ центра,
  * GET  /api/books?action=my-orgs                                   мои центры, их книги, мои книги │ _handlers/center/
- * POST /api/books?action=my-book             { bookId, unitId?, active?, remove? }                 ┘ student.js
+ * POST /api/books?action=my-book             { bookId, unitId?, active?, remove? }                 │ student.js
+ * POST /api/books?action=book-course         { bookId }            книга целиком = мой курс        ┘ (этап 7)
  * GET  /api/books?action=org-teacher-info    ?token=               центр по ссылке учителей        ┐ учителя
  * POST /api/books?action=org-teacher-join    { token }             стать учителем центра           │ центра,
  * GET  /api/books?action=teacher-orgs                              полки «Книги <центр>»           ┘ teacher.js
@@ -75,6 +77,7 @@ export default async function handler(req, res) {
     'fork-set',
     'org-activate',
     'my-book',
+    'book-course',
     'org-teacher-join',
   ]);
   if (GET_ACTIONS.has(action) && req.method !== 'GET')
@@ -103,11 +106,12 @@ export default async function handler(req, res) {
     }
 
     // Книги учебного центра по коду (plan/new/center_books.md, Center 3) — модуль грузится лениво
-    if (['org-info', 'org-activate', 'my-orgs', 'my-book'].includes(action)) {
+    if (['org-info', 'org-activate', 'my-orgs', 'my-book', 'book-course'].includes(action)) {
       const center = await import('./_handlers/center/student.js');
       if (action === 'org-info') return await center.orgInfo(req, res, sql, userId);
       if (action === 'org-activate') return await center.orgActivate(req, res, sql, userId);
       if (action === 'my-orgs') return await center.myOrgs(req, res, sql, userId);
+      if (action === 'book-course') return await center.bookCourse(req, res, sql, userId);
       return await center.myBook(req, res, sql, userId);
     }
 
@@ -542,6 +546,13 @@ async function officialSets(req, res, sql, userId) {
           c.user_id = ${userId}::uuid
           OR EXISTS (SELECT 1 FROM course_members m WHERE m.course_id = c.id AND m.user_id = ${userId}::uuid)
         )
+      UNION
+      -- Мой курс книги центра (этап 7): открыты все юниты, без строк course_units. Слова всё равно
+      -- только при доступе по коду — flashly_unit_access ниже
+      SELECT bu.id AS unit_id, c.id AS course_id
+      FROM courses c
+      JOIN book_units bu ON bu.book_id = c.source_book_id
+      WHERE c.user_id = ${userId}::uuid AND c.source_book_id IS NOT NULL
     )
     SELECT cs.id, cs.title, cs.description, cs.category, cs.language_from, cs.language_to,
            cs.created_at, cs.updated_at, cs.unit_id,

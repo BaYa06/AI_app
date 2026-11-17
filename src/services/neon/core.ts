@@ -361,17 +361,19 @@ export function mapSetRow(set: any): CardSet {
   } as CardSet;
 }
 
-export function mapCourseRow(course: any): {
-  id: string;
-  title: string;
-  createdAt: number;
-  updatedAt?: number;
-} {
+/** Свой курс из базы (без полей курса учителя у ученика) */
+export type OwnCourseRow = Pick<
+  Course,
+  'id' | 'title' | 'createdAt' | 'updatedAt' | 'sourceBookId'
+>;
+
+export function mapCourseRow(course: any): OwnCourseRow {
   return {
     id: course.id,
     title: course.title,
     createdAt: new Date(course.created_at).getTime(),
     updatedAt: course.updated_at ? new Date(course.updated_at).getTime() : undefined,
+    ...(course.source_book_id ? { sourceBookId: course.source_book_id } : {}),
   };
 }
 
@@ -510,7 +512,7 @@ export function mapUserStatsRow(row: any): UserStatsData {
 export type BootstrapData = {
   sets: CardSet[];
   cards: Card[];
-  courses: Array<{ id: string; title: string; createdAt: number; updatedAt?: number }>;
+  courses: OwnCourseRow[];
   studentCourses: Course[];
   /** Наборы курсов ученика: courseId → наборы */
   courseSets: Record<string, CardSet[]>;

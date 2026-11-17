@@ -10,7 +10,8 @@
  *
  * Проверяет: активацию (валидный, истёкший, без мест, повторный, продление, договор), гонку за последнее
  * место, перебор кодов, доступ к словам без доступа (UI-путь и прямые запросы), два центра,
- * библиотеку и поиск, группу центра и места в ней.
+ * библиотеку и поиск, группу центра и места в ней, курс книги (этап 7: все юниты, повтор, группа
+ * с той же книгой, конец доступа, удаление курса).
  */
 import http from 'node:http';
 import { randomUUID, randomBytes } from 'node:crypto';
@@ -1237,6 +1238,181 @@ async function main() {
     check(
       'новая ссылка — старая перестаёт работать',
       (await call(books, late, 'GET', { action: 'org-teacher-info', token })).status === 404
+    );
+    // ── 7. Книга = курс (этап 7, Center 16) ──────────────────
+    console.log('\nКнига центра = мой курс');
+    const orgK = await newOrg('Kurs', 5, 365);
+    const bookK = await newBook('Kurs Book', orgK);
+    // Второй юнит — курс книги отдаёт все юниты, не только открытые учителем
+    await db.query('BEGIN');
+    await db.query("SET LOCAL flashly.official_write = 'on'");
+    const unitK2 = (
+      await db.query<{ id: string }>(
+        `INSERT INTO book_units (book_id, number, title) VALUES ($1, 2, 'Unit 2') RETURNING id`,
+        [bookK.bookId]
+      )
+    ).rows[0].id;
+    const setK2 = (
+      await db.query<{ id: string }>(
+        `INSERT INTO card_sets (title, language_from, language_to, is_official, unit_id, total_cards)
+         VALUES ($1, 'en', 'ru', true, $2, 1) RETURNING id`,
+        [`${TAG} Kurs Book U2`, unitK2]
+      )
+    ).rows[0].id;
+    await db.query(
+      `INSERT INTO cards (set_id, front, back, sort_order) VALUES ($1, 'plum', 'слива', 1)`,
+      [setK2]
+    );
+    await db.query('COMMIT');
+
+    const kStudent = await newUser('kurs student');
+    const addCourse = (user: string, bookId: string) =>
+      call(books, user, 'POST', { action: 'book-course' }, { bookId });
+    const officialRows = async (user: string) =>
+      ((await call(books, user, 'GET', { action: 'official-sets' })).body?.sets || []) as any[];
+
+    const noAccess = await addCourse(kStudent, bookK.bookId);
+    check('book-course без кода — 404', noAccess.status === 404, noAccess.status);
+    await activate(kStudent, await newCode(orgK, `CC${RUN}-KURS`, { days: 30 }));
+
+    const add1 = await addCourse(kStudent, bookK.bookId);
+    const kCourse = add1.body?.course?.id as string;
+    check(
+      'book-course: курс создан, название книги, sourceBookId',
+      add1.status === 200 &&
+        add1.body?.created === true &&
+        add1.body.course.title === `${TAG} Kurs Book` &&
+        add1.body.course.sourceBookId === bookK.bookId,
+      add1.body
+    );
+    const add2 = await addCourse(kStudent, bookK.bookId);
+    check(
+      'book-course повторно: тот же курс, второго нет',
+      add2.status === 200 && add2.body?.created === false && add2.body?.course?.id === kCourse,
+      add2.body
+    );
+    check(
+      'у курса книги нет organization_id (не группа центра)',
+      (await db.query(`SELECT organization_id FROM courses WHERE id = $1`, [kCourse])).rows[0]
+        ?.organization_id === null
+    );
+    check(
+      'курс книги не занимает второе место',
+      (await db.query<{ n: number }>(`SELECT flashly_org_seats_used($1) AS n`, [orgK])).rows[0]
+        .n === 1
+    );
+
+    const kRows = await officialRows(kStudent);
+    const kU1 = kRows.find((r) => r.id === bookK.setId);
+    const kU2 = kRows.find((r) => r.id === setK2);
+    check(
+      'official-sets: все юниты книги под моим курсом',
+      !!kU1 && !!kU2 && kU1.courseIds.includes(kCourse) && kU2.courseIds.includes(kCourse),
+      kRows.map((r) => ({ id: r.id, courseIds: r.courseIds }))
+    );
+    const kCourses = await call(data, kStudent, 'GET', { action: 'loadCourses' });
+    check(
+      'loadCourses: курс книги с source_book_id',
+      (kCourses.body?.data || []).some(
+        (c: any) => c.id === kCourse && c.source_book_id === bookK.bookId
+      ),
+      kCourses.body
+    );
+    const kOrgs = await call(books, kStudent, 'GET', { action: 'my-orgs' });
+    const kBook = (kOrgs.body?.organizations || [])
+      .find((o: any) => o.id === orgK)
+      ?.books.find((b: any) => b.id === bookK.bookId);
+    check('my-orgs: у книги courseId моего курса', kBook?.courseId === kCourse, kBook);
+
+    const kStranger = await newUser('kurs stranger');
+    check(
+      'чужой: book-course — 404, слов книги нет',
+      (await addCourse(kStranger, bookK.bookId)).status === 404 &&
+        !(await officialSetIds(kStranger, [setK2])).includes(setK2)
+    );
+
+    // Та же книга в группе учителя: юнит 1 открыт учителем, юнит 2 — нет. Две логики независимо
+    const kTeacher = await newUser('kurs teacher');
+    await db.query(
+      `INSERT INTO organization_members (organization_id, user_id, role) VALUES ($1, $2, 'teacher')`,
+      [orgK, kTeacher]
+    );
+    const kGroup = (
+      await db.query<{ id: string }>(
+        `INSERT INTO courses (user_id, title, organization_id) VALUES ($1, $2, $3) RETURNING id`,
+        [kTeacher, `${TAG} kurs group`, orgK]
+      )
+    ).rows[0].id;
+    ids.courses.push(kGroup);
+    await db.query(`INSERT INTO course_books (course_id, book_id) VALUES ($1, $2)`, [
+      kGroup,
+      bookK.bookId,
+    ]);
+    await db.query(
+      `INSERT INTO course_units (course_id, unit_id, is_open, opened_at) VALUES ($1, $2, true, NOW())`,
+      [kGroup, bookK.unitId]
+    );
+    await db.query(
+      `INSERT INTO course_members (course_id, user_id, role) VALUES ($1, $2, 'student')`,
+      [kGroup, kStudent]
+    );
+    const both = await officialRows(kStudent);
+    const bU1 = both.find((r) => r.id === bookK.setId);
+    const bU2 = both.find((r) => r.id === setK2);
+    check(
+      'книга и в группе: открытый учителем юнит — под обоими курсами',
+      !!bU1 && bU1.courseIds.includes(kCourse) && bU1.courseIds.includes(kGroup),
+      bU1
+    );
+    check(
+      'книга и в группе: закрытый учителем юнит — только под моим курсом',
+      !!bU2 && bU2.courseIds.includes(kCourse) && !bU2.courseIds.includes(kGroup),
+      bU2
+    );
+    check(
+      'книга и в группе: место по-прежнему одно',
+      (await db.query<{ n: number }>(`SELECT flashly_org_seats_used($1) AS n`, [orgK])).rows[0]
+        .n === 1
+    );
+    await db.query(`DELETE FROM course_members WHERE course_id = $1 AND user_id = $2`, [
+      kGroup,
+      kStudent,
+    ]);
+
+    // Доступ закончился: курс остаётся, слова не приходят
+    await db.query(
+      `UPDATE org_students SET access_until = NOW() - INTERVAL '1 minute' WHERE organization_id = $1 AND user_id = $2`,
+      [orgK, kStudent]
+    );
+    const kExpired = await officialRows(kStudent);
+    check(
+      'доступ закончился: юниты курса книги не приходят, курс остался',
+      !kExpired.some((r) => r.id === bookK.setId || r.id === setK2) &&
+        (await db.query(`SELECT 1 FROM courses WHERE id = $1`, [kCourse])).rows.length === 1,
+      kExpired.map((r) => r.id)
+    );
+    check(
+      'доступ закончился: новый курс книги не создать',
+      (await addCourse(kStudent, bookK.bookId)).status === 404
+    );
+    await db.query(
+      `UPDATE org_students SET access_until = NOW() + INTERVAL '30 days' WHERE organization_id = $1 AND user_id = $2`,
+      [orgK, kStudent]
+    );
+
+    // Удалить курс = убрать книгу; «Добавить себе» вернёт курс
+    const del = await call(
+      teacher,
+      kStudent,
+      'POST',
+      { action: 'delete-course' },
+      { courseId: kCourse }
+    );
+    const reAdd = await addCourse(kStudent, bookK.bookId);
+    check(
+      'удалил курс книги — «Добавить» создаёт его заново',
+      del.status === 200 && reAdd.body?.created === true && reAdd.body?.course?.id !== kCourse,
+      { del: del.status, reAdd: reAdd.body }
     );
   } finally {
     // ── Уборка ───────────────────────────────────────────────

@@ -12,6 +12,7 @@ import {
   type LoadOptions,
   NetworkLoadError,
   mapCourseRow,
+  type OwnCourseRow,
   mapStudentCourseRow,
   mapMembershipSetRow,
   type CourseScheduleItem,
@@ -35,17 +36,7 @@ export const coursesApi = {
   /**
    * Загрузить все курсы пользователя (где он учитель)
    */
-  async loadCourses(
-    userId?: string,
-    options?: LoadOptions
-  ): Promise<
-    Array<{
-      id: string;
-      title: string;
-      createdAt: number;
-      updatedAt?: number;
-    }>
-  > {
+  async loadCourses(userId?: string, options?: LoadOptions): Promise<OwnCourseRow[]> {
     if (!userId) return [];
     const courses = await callDataApi<any[]>('loadCourses', {}, 'GET');
     if (courses === null && options?.throwOnError) throw new NetworkLoadError('loadCourses');

@@ -6,6 +6,8 @@
  * POST /api/books?action=org-activate       { code }  активация: доступ к книгам центра
  * GET  /api/books?action=my-orgs            мои центры: доступ, книги центра, мои книги
  * POST /api/books?action=my-book            { bookId, unitId?, active?, remove? }  выбрать / сменить книгу
+ *                                           (Center 6; нужен приложениям 1.9.x)
+ * POST /api/books?action=book-course        { bookId }  книга целиком = мой курс (этап 7, Center 16)
  *
  * Проверка кода, места и запись — одна SQL-функция flashly_activate_org_code (миграция 052): строка
  * центра блокируется, последнее место не займут двое. Лимиты и счётчики кода клиенту не отдаём.
@@ -160,7 +162,7 @@ export async function myOrgs(req, res, sql, userId) {
   if (orgs.length === 0) return res.status(200).json({ ok: true, organizations: [] });
 
   const orgIds = orgs.map((o) => o.id);
-  const [books, mine] = await Promise.all([
+  const [books, mine, courses] = await Promise.all([
     sql`
       SELECT b.id, b.organization_id, b.title, b.edition, b.level, b.language_from, b.language_to,
              b.org_position,
@@ -191,7 +193,13 @@ export async function myOrgs(req, res, sql, userId) {
        WHERE ub.user_id = ${userId}::uuid AND b.organization_id = ANY(${orgIds}::uuid[])
        ORDER BY ub.updated_at DESC
     `,
+    // Мой курс книги (этап 7): «Добавлена» на полке и «Открыть курс»
+    sql`
+      SELECT c.id, c.source_book_id FROM courses c JOIN books b ON b.id = c.source_book_id
+       WHERE c.user_id = ${userId}::uuid AND b.organization_id = ANY(${orgIds}::uuid[])
+    `,
   ]);
+  const courseByBook = new Map(courses.map((c) => [c.source_book_id, c.id]));
 
   return res.status(200).json({
     ok: true,
@@ -211,6 +219,7 @@ export async function myOrgs(req, res, sql, userId) {
           position: b.org_position,
           unitsCount: b.units_count,
           cardsCount: b.cards_count,
+          courseId: courseByBook.get(b.id) || null,
         })),
     })),
     myBooks: mine.map((m) => ({
@@ -286,6 +295,51 @@ export async function myBook(req, res, sql, userId) {
       currentUnitId: m.current_unit_id,
       isActive: m.is_active === true,
       updatedAt: m.updated_at,
+    },
+  });
+}
+
+/**
+ * Книга центра целиком = мой курс (plan/new/center_books.md, этап 7, Center 16).
+ * Курс с source_book_id: название — книги, все юниты открыты по правилу в official-sets, строк
+ * course_books / course_units нет. organization_id не ставим — это не группа центра: места не
+ * занимает (место уже даёт код) и в кабинете центра не виден. Одна книга — один курс: повторный
+ * вызов вернёт тот же курс (уникальный индекс миграции 054). Та же книга в группе учителя не мешает:
+ * юнит покажется под обоими курсами.
+ */
+export async function bookCourse(req, res, sql, userId) {
+  const { bookId } = req.body || {};
+  if (!isUuid(bookId)) return res.status(400).json({ error: 'bookId required' });
+
+  const book = await sql`
+    SELECT id, title FROM books
+     WHERE id = ${bookId}::uuid AND is_published = true AND organization_id IS NOT NULL
+       AND flashly_org_access(organization_id, ${userId}::uuid)
+  `;
+  if (book.length === 0) return res.status(404).json({ error: 'Book not found' });
+
+  const rows = await sql`
+    INSERT INTO courses (id, user_id, title, source_book_id, created_at, updated_at)
+    VALUES (gen_random_uuid(), ${userId}::uuid, ${book[0].title}, ${bookId}::uuid, NOW(), NOW())
+    ON CONFLICT (user_id, source_book_id) WHERE source_book_id IS NOT NULL
+      DO UPDATE SET updated_at = courses.updated_at
+    RETURNING id, title, created_at, updated_at, source_book_id, (xmax = 0) AS created
+  `;
+  // Для приложений 1.9.x: книга в «Моих книгах» (my-orgs.myBooks), юнит они выберут сами
+  await sql`
+    INSERT INTO user_books (user_id, book_id) VALUES (${userId}::uuid, ${bookId}::uuid)
+    ON CONFLICT (user_id, book_id) DO NOTHING
+  `;
+  const c = rows[0];
+  return res.status(200).json({
+    ok: true,
+    created: c.created === true,
+    course: {
+      id: c.id,
+      title: c.title,
+      createdAt: c.created_at,
+      updatedAt: c.updated_at,
+      sourceBookId: c.source_book_id,
     },
   });
 }

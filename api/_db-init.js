@@ -8,7 +8,7 @@ import { log } from './_log.js';
  */
 // schema_039: в 038 (official_sets_guard) и 039 (set_kind) версию не подняли — миграции не выполнились,
 // и запросы с card_sets.kind падали на тестовом сервере (plan/new/set_kind.md, слабые места)
-const SCHEMA_VERSION = 'schema_053';
+const SCHEMA_VERSION = 'schema_054';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -1259,6 +1259,20 @@ async function applyMigrations(sql) {
     `;
   } catch (e) {
     log.error('db-init', 'Migration 053_center_teachers failed', e);
+  }
+
+  // Migration 054: книга центра = личный курс ученика (plan/new/center_books.md, этап 7, Center 16).
+  // Курс с source_book_id — все юниты книги открыты по правилу (official-sets), без строк
+  // course_books / course_units. organization_id такому курсу не ставим: это не группа центра.
+  // Тексты — как в database/migrations/054_book_courses.sql
+  try {
+    await sql`ALTER TABLE courses ADD COLUMN IF NOT EXISTS source_book_id UUID REFERENCES books(id) ON DELETE CASCADE`;
+    await sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_courses_user_source_book
+        ON courses(user_id, source_book_id) WHERE source_book_id IS NOT NULL
+    `;
+  } catch (e) {
+    log.error('db-init', 'Migration 054_book_courses failed', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)
