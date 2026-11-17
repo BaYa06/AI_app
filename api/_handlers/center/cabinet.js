@@ -86,7 +86,9 @@ async function overview(req, res, sql, c) {
   // 0 — всё время: берём с начала договора центра
   const since = days ? new Date(Date.now() - days * 86400_000) : new Date(0);
 
-  const [seats] = await sql`
+  // Три запроса независимы — параллельно
+  const [[seats], activity, perBook] = await Promise.all([
+    sql`
     WITH seats AS (
       SELECT s.user_id, true AS by_code FROM org_students s
        WHERE s.organization_id = ${c.id} AND s.access_until > NOW()
@@ -104,10 +106,10 @@ async function overview(req, res, sql, c) {
            (SELECT COUNT(*)::int FROM organization_members m
              WHERE m.organization_id = ${c.id} AND m.role = 'teacher') AS teachers,
            (SELECT COUNT(*)::int FROM courses co WHERE co.organization_id = ${c.id}) AS groups
-      FROM seats`;
+      FROM seats`,
 
-  // Ответы по карточкам книг центра. Сначала люди центра (индекс answers/reviews по user_id).
-  const activity = await sql`
+    // Ответы по карточкам книг центра. Сначала люди центра (индекс answers/reviews по user_id).
+    sql`
     WITH people AS (
       SELECT s.user_id FROM org_students s WHERE s.organization_id = ${c.id}
       UNION
@@ -127,9 +129,9 @@ async function overview(req, res, sql, c) {
       JOIN people p ON p.user_id = rl.user_id
       JOIN org_cards oc ON oc.card_id = rl.card_id
      WHERE rl.reviewed_at >= LEAST(${since.toISOString()}::timestamptz, NOW() - INTERVAL '14 days') AT TIME ZONE 'UTC'
-     GROUP BY 1, 2, 3`;
+     GROUP BY 1, 2, 3`,
 
-  const perBook = await sql`
+    sql`
     SELECT b.id, b.title, b.level, b.language_from, b.org_position,
            (SELECT COUNT(*)::int FROM user_books ub WHERE ub.book_id = b.id) AS students,
            (SELECT COUNT(*)::int FROM card_progress cp
@@ -142,7 +144,8 @@ async function overview(req, res, sql, c) {
              GROUP BY u.number ORDER BY COUNT(*) DESC, u.number LIMIT 1) AS top_unit
       FROM books b
      WHERE b.organization_id = ${c.id}
-     ORDER BY b.language_from, b.org_position NULLS LAST, b.title`;
+     ORDER BY b.language_from, b.org_position NULLS LAST, b.title`,
+  ]);
 
   // Активность: за период и по дням (последние 14 дней)
   const sinceDay = days ? dayIn(TZ, since) : '0000-00-00';

@@ -112,7 +112,7 @@ main.view{flex:999 1 560px;min-width:0;padding:32px;display:flex;flex-direction:
 .col div{width:100%;max-width:36px;background:#6467F2;border-radius:6px 6px 0 0;min-height:2px}
 .xlabels{display:flex;gap:8px;font-size:11px;color:var(--muted)}
 .xlabels span{flex:1 1 0;text-align:center;min-width:0}
-.tbl{overflow-x:auto}
+.tbl{overflow-x:auto;position:relative}
 table{border-collapse:collapse;width:100%;min-width:640px}
 th{padding:10px 16px;text-align:left;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 td{padding:12px 16px;text-align:left;border-top:1px solid var(--line2);font-size:14px;vertical-align:middle}
@@ -124,6 +124,11 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 .note.bad{border-color:#FCA5A5;background:var(--bad-bg)}
 .note.bad .ic{background:#FEE2E2;color:var(--bad)}
 .empty{padding:24px 20px;color:var(--muted);font-size:14px}
+table.codes{min-width:560px}
+table.codes th,table.codes td{padding-left:10px;padding-right:10px}
+table.codes .mono{white-space:nowrap}
+table.codes .lnk{padding:10px 4px}
+#cd-code{font-size:20px;overflow-wrap:anywhere}
 
 /* Окно */
 .modal{position:fixed;inset:0;background:rgba(17,24,39,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
@@ -174,6 +179,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
     <div class="org"><div class="logo" id="org-logo"></div><div style="min-width:0"><b id="org-name"></b><span id="org-city"></span></div></div>
     <div class="nav" id="nav">
       <a href="#overview" data-view="overview"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>Обзор</a>
+      <a href="#codes" data-view="codes"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 20h1"/></svg>Коды подключения</a>
     </div>
     <div class="who"><b id="who"></b><button class="lnk" type="button" id="logout">Выйти</button></div>
   </nav>
@@ -212,6 +218,50 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
     </section>
     <div id="ov-expiring"></div>
   </main>
+
+  <main class="view hidden" id="view-codes" aria-labelledby="cd-h">
+    <div class="head"><div><h1 id="cd-h">Коды подключения</h1><p>Ученик вводит код в приложении или наводит камеру на QR — и получает доступ к книгам центра. Книгу и юнит он выбирает сам.</p></div></div>
+    <div id="cd-contract"></div>
+    <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start">
+      <section class="card" aria-labelledby="cd-list-h" style="flex:999 1 560px;min-width:0">
+        <div class="sec-h"><h2 id="cd-list-h">Все коды</h2><span style="font-size:13px;color:var(--muted)" id="cd-free"></span></div>
+        <div class="tbl"><table class="codes"><thead><tr><th>Код · для кого</th><th>Ввести до</th><th class="n">Доступ</th><th class="n">Вошли</th><th>Статус</th><th><span class="sr">Действия</span></th></tr></thead><tbody id="cd-rows"></tbody></table></div>
+        <p style="padding:14px 20px 18px;font-size:13px;color:var(--muted)">Выключенный код больше нельзя ввести. Ученики, которые уже вошли по нему, сохраняют доступ до конца своего срока.</p>
+      </section>
+
+      <section class="card" aria-labelledby="cd-new-h" style="flex:1 1 360px;min-width:0;padding:20px;display:flex;flex-direction:column;gap:16px">
+        <h2 id="cd-new-h" style="font-size:17px">Новый код</h2>
+        <form id="cd-form" novalidate style="display:flex;flex-direction:column;gap:16px">
+          <div class="fld"><label for="cd-label">Для кого (видите только вы)</label><input id="cd-label" maxlength="80" placeholder="Группы декабря"></div>
+          <div class="fld"><label for="cd-tag">Метка в коде</label><input id="cd-tag" class="mono" maxlength="6" autocapitalize="characters" spellcheck="false"><small id="cd-preview"></small></div>
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+            <div class="fld"><label for="cd-until">Можно ввести до</label><input id="cd-until" type="date" required></div>
+            <div class="fld"><label for="cd-days">Доступ после ввода</label><select id="cd-days"><option value="30">30 дней</option><option value="90" selected>90 дней</option><option value="180">180 дней</option><option value="365">365 дней</option></select></div>
+          </div>
+          <div class="fld"><label for="cd-seats">Мест по коду</label><input id="cd-seats" type="number" min="1" inputmode="numeric" required><small id="cd-seats-help"></small></div>
+          <p class="err" id="cd-err" role="alert"></p>
+          <button class="btn p" type="submit" id="cd-btn">Выпустить код</button>
+        </form>
+        <div id="cd-result" class="hidden" style="border-top:1px solid var(--line2);padding-top:16px;display:flex;flex-direction:column;gap:14px" aria-live="polite">
+          <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+            <div id="cd-qr" role="img" style="width:140px;height:140px;flex:0 0 auto"></div>
+            <div style="flex:1 1 160px;display:flex;flex-direction:column;gap:4px;min-width:0">
+              <span style="font-size:12px;color:var(--muted)">Код</span>
+              <span class="mono" style="font-size:22px" id="cd-code"></span>
+              <span style="font-size:12px;color:var(--muted);overflow-wrap:anywhere" id="cd-link"></span>
+            </div>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <button class="btn s" type="button" id="cd-dl">Скачать QR</button>
+            <button class="btn s" type="button" id="cd-copy-link">Скопировать ссылку</button>
+            <button class="btn s" type="button" id="cd-copy-text">Текст для WhatsApp</button>
+          </div>
+          <div id="cd-text" style="background:var(--bg);border-radius:12px;padding:12px 14px;font-size:13px;color:#374151;white-space:pre-line"></div>
+          <span id="cd-copied" style="font-size:13px;color:var(--ok)" role="status"></span>
+        </div>
+      </section>
+    </div>
+  </main>
 </div>
 
 <!-- ── Смена временного пароля ──────────────────────── -->
@@ -226,6 +276,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
   </form>
 </div>
 
+<script src="/site/vendor/qrcode-generator-1.4.4.js"></script>
 <script>
 'use strict';
 // ── Настройки ────────────────────────────────────────────
@@ -425,6 +476,7 @@ async function start() {
 // ── Обзор ────────────────────────────────────────────────
 let ovDays = 7;
 let ovData = null;
+let ovSeq = 0;
 $('ov-period').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-days]');
   if (!b) return;
@@ -442,12 +494,16 @@ function contractNote(c) {
 views.overview = async function () {
   $('ov-contract').innerHTML = contractNote(me.center);
   let d;
+  // Период переключили, пока грузился прошлый, — показываем только последний ответ
+  const seq = ++ovSeq;
   try {
     d = await api('overview', { query: { days: String(ovDays) } });
   } catch (e) {
+    if (seq !== ovSeq) return;
     if (e.status !== 401) $('ov-books').innerHTML = `<tr><td colspan="5" class="empty">Не загрузилось. Обновите страницу.</td></tr>`;
     return;
   }
+  if (seq !== ovSeq) return;
   ovData = d;
   const periodLabel = d.period === 0 ? 'за всё время' : `за ${d.period} дней`;
   const s = d.seats;
@@ -508,6 +564,180 @@ $('ov-csv').addEventListener('click', () => {
     ['По кодам', ovData.seats.byCode],
     ['Только в группах учителей', ovData.seats.groupsOnly],
   ]);
+});
+
+// ── Коды подключения (Center 10) ─────────────────────────
+const SITE = 'https://flashlycards.app';
+const APP_STORE = 'https://apps.apple.com/app/id6808731151';
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+let cdData = null;
+let cdShown = null;
+const isoDay = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+
+function codeStatus(c) {
+  const now = Date.now();
+  if (!c.isActive) return ['Выключен', 'background:var(--off-bg);color:var(--off)', false];
+  if (new Date(c.validUntil).getTime() <= now) return ['Срок вышел', 'background:var(--off-bg);color:var(--off)', false];
+  if (c.activations >= c.maxActivations) return ['Места кончились', 'background:#FEF3C7;color:var(--warn)', true];
+  if (new Date(c.validFrom).getTime() > now) return ['Ещё не начался', 'background:var(--accent-bg);color:var(--accent-d)', true];
+  return ['Действует', 'background:var(--ok-bg);color:var(--ok)', true];
+}
+
+function cdPreview() {
+  const prefix = cdData?.codePrefix || '';
+  const tag = $('cd-tag').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  $('cd-tag').value = tag;
+  $('cd-preview').textContent = prefix
+    ? `Код будет таким: ${prefix}-${tag ? tag + '-' : ''}XXXX. Хвост из случайных символов добавится сам — так код не угадать. Метка — например, месяц или группа.`
+    : 'Начало кода центра ещё не задано — напишите нам.';
+}
+$('cd-tag').addEventListener('input', cdPreview);
+
+views.codes = async function () {
+  const ended = me.center.contractEnded;
+  $('cd-contract').innerHTML = contractNote(me.center);
+  $('cd-form').querySelectorAll('input,select,button').forEach((el) => (el.disabled = ended));
+  try {
+    cdData = await api('codes');
+  } catch (e) {
+    if (e.status !== 401) $('cd-rows').innerHTML = `<tr><td colspan="6" class="empty">Не загрузилось. Обновите страницу.</td></tr>`;
+    return;
+  }
+  const free = Math.max(0, cdData.seats.limit - cdData.seats.used);
+  $('cd-free').textContent = `Свободно ${fmt(free)} ${plural(free, 'место', 'места', 'мест')} из ${fmt(cdData.seats.limit)}`;
+  $('cd-rows').innerHTML = cdData.codes.length
+    ? cdData.codes.map((c) => {
+        const [label, style, live] = codeStatus(c);
+        return `<tr><td><span class="mono">${esc(c.code)}</span>${c.label ? `<br><span style="font-size:13px;color:var(--muted)">${esc(c.label)}</span>` : ''}</td>
+          <td>${new Date(c.validUntil).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' })}</td><td class="n">${c.accessDays} дн.</td>
+          <td class="n">${fmt(c.activations)} / ${fmt(c.maxActivations)}</td>
+          <td><span class="badge" style="${style}">${label}</span></td>
+          <td style="white-space:nowrap"><button class="lnk" type="button" data-qr="${c.id}">QR</button>${live && c.isActive && !ended ? `<button class="lnk bad" type="button" data-off="${c.id}">Выключить</button>` : ''}</td></tr>`;
+      }).join('')
+    : `<tr><td colspan="6" class="empty">Кодов пока нет. Выпустите первый — справа.</td></tr>`;
+
+  // Значения формы по умолчанию — только для пустой формы
+  if (!$('cd-until').value) {
+    const until = new Date(Date.now() + 30 * 86400000);
+    const max = me.center.contractUntil ? new Date(me.center.contractUntil) : null;
+    $('cd-until').value = isoDay(max && max < until ? max : until);
+    $('cd-until').min = isoDay(new Date());
+    if (max) $('cd-until').max = isoDay(max);
+    $('cd-tag').value = MONTHS[new Date().getMonth()];
+  }
+  if (!$('cd-seats').value) $('cd-seats').value = String(Math.max(1, Math.min(40, free || 1)));
+  $('cd-seats').max = String(cdData.seats.limit);
+  $('cd-seats-help').textContent = `Свободно ${fmt(free)} мест центра. Место занимает каждый новый ученик — по коду или в группе учителя; один человек — одно место. Новый код тому же ученику прибавляет дни к оставшимся.`;
+  cdPreview();
+};
+
+$('cd-rows').addEventListener('click', async (e) => {
+  const qr = e.target.closest('[data-qr]');
+  const off = e.target.closest('[data-off]');
+  if (qr) {
+    const c = cdData.codes.find((x) => x.id === qr.dataset.qr);
+    if (c) showCode(c.code, c.accessDays);
+  }
+  if (off) {
+    const c = cdData.codes.find((x) => x.id === off.dataset.off);
+    if (!c || !confirm(`Выключить код ${c.code}? Ввести его больше будет нельзя. Кто уже вошёл — сохранит доступ до конца срока.`)) return;
+    try {
+      await api('code-off', { body: { id: c.id } });
+      views.codes();
+    } catch (x) {
+      alert(x.body?.reason === 'contract_ended' ? 'Договор закончился — коды менять нельзя' : 'Не удалось выключить код. Попробуйте ещё раз.');
+    }
+  }
+});
+
+$('cd-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const seats = Number($('cd-seats').value);
+  const until = $('cd-until').value;
+  $('cd-err').textContent = '';
+  if (!until) return ($('cd-err').textContent = 'Укажите, до какого дня можно ввести код');
+  if (!Number.isInteger(seats) || seats < 1) return ($('cd-err').textContent = 'Мест по коду — от 1');
+  if (seats > cdData.seats.limit) return ($('cd-err').textContent = `Больше, чем мест у центра (${cdData.seats.limit})`);
+  $('cd-btn').disabled = true;
+  try {
+    const r = await api('code-create', { body: { label: $('cd-label').value, tag: $('cd-tag').value, validUntil: until, accessDays: Number($('cd-days').value), maxActivations: seats } });
+    $('cd-label').value = '';
+    showCode(r.code, r.accessDays);
+    await views.codes();
+  } catch (x) {
+    const reason = x.body?.reason;
+    $('cd-err').textContent =
+      reason === 'bad_date' ? 'Дата должна быть не раньше завтрашнего дня'
+      : reason === 'bad_seats' ? `Мест по коду — от 1 до ${x.body?.seatLimit ?? cdData.seats.limit}`
+      : reason === 'too_many_codes' ? 'Слишком много действующих кодов. Выключите старые.'
+      : reason === 'contract_ended' ? 'Договор закончился — новые коды выпустить нельзя'
+      : reason === 'no_prefix' ? 'Начало кода центра не задано — напишите нам'
+      : 'Не удалось выпустить код. Попробуйте ещё раз.';
+  } finally {
+    $('cd-btn').disabled = me.center.contractEnded;
+  }
+});
+
+/** QR ссылки /join/<код>: модули из qrcode-generator, рисуем сами (SVG на странице, PNG для скачивания) */
+function qrFor(text) {
+  const qr = qrcode(0, 'M');
+  qr.addData(text);
+  qr.make();
+  return qr;
+}
+function qrSvg(qr, size) {
+  const n = qr.getModuleCount(), m = 2, total = n + m * 2;
+  let d = '';
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += `M${c + m} ${r + m}h1v1h-1z`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${total} ${total}" width="${size}" height="${size}" shape-rendering="crispEdges"><rect width="${total}" height="${total}" fill="#fff"/><path d="${d}" fill="#111827"/></svg>`;
+}
+function whatsappText(code, days) {
+  return `Ваш доступ к книгам ${me.center.name} во Flashly — ${days} ${plural(days, 'день', 'дня', 'дней')}.\n1. Скачайте Flashly в App Store: ${APP_STORE}\n2. Откройте ссылку ${SITE}/join/${code} или введите код ${code}.\n3. Выберите свою книгу и юнит.`;
+}
+function showCode(code, days) {
+  const link = `${SITE}/join/${code}`;
+  cdShown = { code, days, link, qr: qrFor(link) };
+  $('cd-result').classList.remove('hidden');
+  $('cd-qr').innerHTML = qrSvg(cdShown.qr, 140);
+  $('cd-qr').setAttribute('aria-label', `QR-код ссылки ${link}`);
+  $('cd-code').textContent = code;
+  $('cd-link').textContent = link.replace('https://', '');
+  $('cd-text').textContent = whatsappText(code, days);
+  $('cd-copied').textContent = '';
+  $('cd-result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+async function copy(text, done) {
+  try {
+    await navigator.clipboard.writeText(text);
+    $('cd-copied').textContent = done;
+  } catch {
+    $('cd-copied').textContent = 'Не удалось скопировать — выделите текст вручную';
+  }
+}
+$('cd-copy-link').addEventListener('click', () => cdShown && copy(cdShown.link, 'Ссылка скопирована'));
+$('cd-copy-text').addEventListener('click', () => cdShown && copy(whatsappText(cdShown.code, cdShown.days), 'Текст скопирован — вставьте его в WhatsApp'));
+$('cd-dl').addEventListener('click', () => {
+  if (!cdShown) return;
+  // PNG 1024 px с кодом под QR — для печати и рассылки
+  const qr = cdShown.qr, n = qr.getModuleCount(), cell = Math.floor(880 / (n + 4));
+  const side = cell * (n + 4);
+  const canvas = Object.assign(document.createElement('canvas'), { width: side, height: side + 120 });
+  const g = canvas.getContext('2d');
+  g.fillStyle = '#fff';
+  g.fillRect(0, 0, canvas.width, canvas.height);
+  g.fillStyle = '#111827';
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) g.fillRect((c + 2) * cell, (r + 2) * cell, cell, cell);
+  g.font = 'bold 56px ui-monospace, Menlo, monospace';
+  g.textAlign = 'center';
+  g.fillText(cdShown.code, side / 2, side + 70);
+  canvas.toBlob((blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = Object.assign(document.createElement('a'), { href: url, download: `flashly-${cdShown.code}.png` });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }, 'image/png');
 });
 
 // ── Запуск ───────────────────────────────────────────────
