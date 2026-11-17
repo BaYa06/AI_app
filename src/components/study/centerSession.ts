@@ -8,6 +8,7 @@
  */
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BookService } from '@/services/BookService';
+import { useCenterStore } from '@/store/centerStore';
 import type { RootStackParamList } from '@/types/navigation';
 import { currentSetSessionPlan, firstSetSessionStep } from './setSession';
 
@@ -40,4 +41,23 @@ export async function studyCenterUnit(
     navigation.push(step.screen, step.params);
   }
   return 'session';
+}
+
+/**
+ * После кода центра: книг этого центра ещё нет — выбор книги (first), есть (продление новым
+ * кодом) — «Мои книги». navigate — из экрана или navigationRef.
+ */
+export async function openCenterBooks(
+  navigate: (
+    screen: 'CenterBookPick' | 'MyBooks',
+    params?: { orgId: string; mode: 'first' }
+  ) => void,
+  orgId: string
+): Promise<void> {
+  const data = await useCenterStore.getState().refresh();
+  const center = data?.organizations.find((o) => o.id === orgId);
+  const hasBook =
+    !!center && !!data && data.myBooks.some((m) => center.books.some((b) => b.id === m.bookId));
+  if (hasBook) navigate('MyBooks');
+  else navigate('CenterBookPick', { orgId, mode: 'first' });
 }

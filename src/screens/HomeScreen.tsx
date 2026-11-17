@@ -76,6 +76,9 @@ import { leaderboardSeenKey, type LeaderboardSeen } from '@/screens/CourseLeader
 import { DatabaseService } from '@/services/DatabaseService';
 import { JoinByCodeModal } from '@/components/JoinByCodeModal';
 import { CenterInviteModal } from '@/components/CenterInviteModal';
+import { CenterBookCard } from '@/components/home/CenterBookCard';
+import { openCenterBooks, studyCenterUnit } from '@/components/study/centerSession';
+import { useCenterStore } from '@/store/centerStore';
 import type { DailyActivity, UserStats } from '@/services/StreakService';
 import type { Card, CardSet } from '@/types';
 import { isCardWaitingReview } from '@/services/SRSService';
@@ -873,6 +876,21 @@ export function HomeScreen({ navigation, route }: any) {
       const { lessonSets: sets, cardsBySet: bySet, cardsMap: map } = lessonInputsRef.current;
       useLessonStore.getState().ensureToday(countWaitingReview(sets, bySet, map, Date.now()));
     }, [hasLessonCards])
+  );
+
+  // Книги учебного центра (plan/new/center_books.md, Center 6): кэш сразу, свежее — с сервера
+  useFocusEffect(
+    useCallback(() => {
+      useCenterStore.getState().refresh();
+    }, [])
+  );
+  const studyCenter = useCallback(
+    async (setId: string) => {
+      const rootNav = (navigation.getParent?.() ?? navigation) as never;
+      const r = await studyCenterUnit(rootNav, setId);
+      if (r === 'unavailable') toast.error('Не удалось загрузить юнит. Проверь интернет');
+    },
+    [navigation]
   );
 
   // Аналитика (plan/done/home_redesign.md, 0.2): что главная предлагала в момент захода — один раз за заход,
@@ -2011,6 +2029,13 @@ export function HomeScreen({ navigation, route }: any) {
               />
             }
           >
+            {isTeacher !== true && (
+              <CenterBookCard
+                onStudy={studyCenter}
+                onMyBooks={() => navigation.navigate('MyBooks')}
+                style={styles.lessonCard}
+              />
+            )}
             {filteredSets.length === 0 ? (
               <HomeEmptyState
                 colors={colors}
@@ -2458,7 +2483,13 @@ export function HomeScreen({ navigation, route }: any) {
         <CenterInviteModal
           code={centerCode}
           via="menu"
-          onJoined={() => setCenterCode(null)}
+          onJoined={(info) => {
+            setCenterCode(null);
+            openCenterBooks((screen, params) => {
+              if (screen === 'MyBooks') navigation.navigate('MyBooks');
+              else if (params) navigation.navigate('CenterBookPick', params);
+            }, info.organization.id);
+          }}
           onDismiss={() => setCenterCode(null)}
         />
 

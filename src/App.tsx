@@ -38,6 +38,7 @@ import type { CourseInviteInfo } from '@/services/neon/courses';
 import { callDataApi } from '@/services/neon/core';
 import { describeTeacherApiReason } from '@/utils/teacherApiErrors';
 import { CenterService, type CenterCodeResult } from '@/services/CenterService';
+import { openCenterBooks } from '@/components/study/centerSession';
 import {
   describeCenterReason,
   isCenterCode,
@@ -829,6 +830,28 @@ export default function App() {
   }, [courseJoin, currentUserId, onboardingData.displayName, finishCourseJoin]);
 
   // ── Ученик с кодом или ссылкой учебного центра (plan/new/center_books.md, Center 5) ──
+  // После кода — выбор книги (или «Мои книги» при продлении), как только навигатор смонтирован
+  // (после онбординга он появляется не сразу) — Center 6
+  const openCenterBooksWhenReady = useCallback((orgId: string) => {
+    const go = () => {
+      openCenterBooks((screen, params) => {
+        if (screen === 'MyBooks') navigationRef.navigate('MyBooks');
+        else if (params) navigationRef.navigate('CenterBookPick', params);
+      }, orgId).catch(() => {});
+    };
+    if (navigationRef.isReady()) {
+      go();
+      return;
+    }
+    let tries = 0;
+    const timer = setInterval(() => {
+      tries += 1;
+      if (navigationRef.isReady() || tries > 100) {
+        clearInterval(timer);
+        if (navigationRef.isReady()) go();
+      }
+    }, 100);
+  }, []);
   const handleCenterFound = useCallback(
     (code: string, info: Extract<CenterCodeResult, { ok: true }>) => {
       setCenterJoin({ via: 'code', code, info });
@@ -862,9 +885,10 @@ export default function App() {
     };
     setOnboardingData(finalData);
     setCenterJoin(null);
-    finishOnboarding(finalData, { joinedCenter: true });
+    await finishOnboarding(finalData, { joinedCenter: true });
+    openCenterBooksWhenReady(result.organization.id);
     return null;
-  }, [centerJoin, currentUserId, onboardingData, finishOnboarding]);
+  }, [centerJoin, currentUserId, onboardingData, finishOnboarding, openCenterBooksWhenReady]);
 
   const handleSubmitDaily = useCallback((dailyId: string) => {
     // Выбор «5 / 10 / 20 слов в день» — квота новых слов урока дня (plan/done/home_redesign.md, 1.5)
@@ -1014,7 +1038,10 @@ export default function App() {
           onCenterActivate={handleCenterActivate}
           onCenterNotMine={handleCenterNotMine}
           pendingCenterCode={pendingCenterCode}
-          onCenterInviteJoined={() => setPendingCenterCode(null)}
+          onCenterInviteJoined={(info) => {
+            setPendingCenterCode(null);
+            openCenterBooksWhenReady(info.organization.id);
+          }}
           onCenterInviteDismiss={() => setPendingCenterCode(null)}
           firstLesson={firstLesson}
           starterReady={starterReady}
