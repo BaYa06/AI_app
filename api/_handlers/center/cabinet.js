@@ -309,7 +309,7 @@ async function codeOff(req, res, sql, c) {
 
 async function books(res, sql, c) {
   const rows = await sql`
-    SELECT b.id, b.title, b.edition, b.level, b.language_from, b.org_position,
+    SELECT b.id, b.title, b.edition, b.level, b.language_from, b.org_position, b.is_published,
            (SELECT COUNT(*)::int FROM book_units u WHERE u.book_id = b.id) AS units,
            (SELECT COUNT(*)::int FROM cards cd
               JOIN card_sets cs ON cs.id = cd.set_id
@@ -330,6 +330,7 @@ async function books(res, sql, c) {
       level: b.level,
       languageFrom: b.language_from,
       position: b.org_position,
+      isPublished: b.is_published === true,
       units: b.units,
       words: b.words,
       students: b.students,
@@ -484,6 +485,9 @@ async function groups(res, sql, c) {
                      'openTo', (SELECT MAX(bu.number) FROM course_units cu
                                   JOIN book_units bu ON bu.id = cu.unit_id
                                  WHERE cu.course_id = co.id AND cu.is_open AND bu.book_id = b.id),
+                     'open', (SELECT COUNT(*) FROM course_units cu
+                                JOIN book_units bu ON bu.id = cu.unit_id
+                               WHERE cu.course_id = co.id AND cu.is_open AND bu.book_id = b.id),
                      'units', (SELECT COUNT(*) FROM book_units bu WHERE bu.book_id = b.id))
                    ORDER BY b.org_position NULLS LAST, b.title), '[]')
               FROM course_books cb JOIN books b ON b.id = cb.book_id
@@ -511,6 +515,7 @@ async function groups(res, sql, c) {
         title: b.title,
         level: b.level,
         openTo: b.openTo,
+        open: Number(b.open) || 0,
         units: Number(b.units) || 0,
       })),
     })),

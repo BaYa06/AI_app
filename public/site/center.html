@@ -197,6 +197,7 @@ table.codes .lnk{padding:10px 4px}
       <a href="#overview" data-view="overview"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>Обзор</a>
       <a href="#codes" data-view="codes"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 20h1"/></svg>Коды подключения</a>
       <a href="#books" data-view="books"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>Книги</a>
+      <a href="#teachers" data-view="teachers"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>Учителя и группы</a>
       <a href="#profile" data-view="profile"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Профиль центра</a>
     </div>
     <div class="who"><b id="who"></b><button class="lnk" type="button" id="logout">Выйти</button></div>
@@ -292,6 +293,25 @@ table.codes .lnk{padding:10px 4px}
         <p style="font-size:14px;color:var(--muted2)">Пришлите нам список слов книги в Excel: юнит, слово, перевод, пример. Мы проверим и загрузим книгу — обычно за один рабочий день. Затем она появится у учеников и учителей центра.</p>
       </div>
       <a class="btn s" href="mailto:support@flashlycards.app?subject=%D0%9A%D0%BD%D0%B8%D0%B3%D0%B0%20%D0%B4%D0%BB%D1%8F%20%D1%86%D0%B5%D0%BD%D1%82%D1%80%D0%B0">Написать нам</a>
+    </section>
+  </main>
+
+  <main class="view hidden" id="view-teachers" aria-labelledby="tc-h">
+    <div class="head"><div><h1 id="tc-h">Учителя и группы</h1><p>Учителя центра ведут свои группы в приложении Flashly и подключают к ним книги центра. Ученики групп занимают места центра.</p></div></div>
+    <div id="tc-contract"></div>
+    <section class="card" aria-labelledby="tc-link-h" style="padding:20px;display:flex;flex-direction:column;gap:12px">
+      <h2 id="tc-link-h" style="font-size:17px">Ссылка для учителей</h2>
+      <p style="font-size:14px;color:var(--muted2);max-width:70ch">Отправьте ссылку своим учителям. Учитель открывает её в телефоне, входит во Flashly и нажимает «Стать учителем центра» — книги центра появятся у него в «Библиотеке». Ссылку переслали не тому — сделайте новую: старая перестанет работать.</p>
+      <div id="tc-link" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"></div>
+      <span id="tc-copied" role="status" style="font-size:13px;color:var(--ok)"></span>
+    </section>
+    <section class="card" aria-labelledby="tc-list-h">
+      <div class="sec-h"><h2 id="tc-list-h">Учителя</h2><span style="font-size:13px;color:var(--muted)" id="tc-count"></span></div>
+      <div class="tbl"><table style="min-width:600px"><thead><tr><th>Учитель</th><th class="n">Групп с книгами центра</th><th class="n">Учеников</th><th>С нами с</th><th><span class="sr">Действия</span></th></tr></thead><tbody id="tc-rows"></tbody></table></div>
+    </section>
+    <section class="card" aria-labelledby="gr-h">
+      <div class="sec-h"><h2 id="gr-h">Группы</h2><span style="font-size:13px;color:var(--muted)">имена учеников не показываем</span></div>
+      <div class="tbl"><table style="min-width:680px"><thead><tr><th>Группа</th><th>Учитель</th><th>Книги · открыто до</th><th class="n">Учеников</th><th class="n">Занимались за 7 дней</th></tr></thead><tbody id="gr-rows"></tbody></table></div>
     </section>
   </main>
 
@@ -832,7 +852,7 @@ function renderBooks() {
           <div style="flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:4px">
             <b style="font-size:16px">${esc(b.title)}${b.edition ? ` <span style="font-weight:400;color:var(--muted)">${esc(b.edition)}</span>` : ''}</b>
             <span style="font-size:13px;color:var(--muted)">${esc((LANGS[b.languageFrom] || b.languageFrom).replace(/^./, (c) => c.toUpperCase()))} · ${b.units} ${plural(b.units, 'юнит', 'юнита', 'юнитов')} · ${fmt(b.words)} ${plural(b.words, 'слово', 'слова', 'слов')}</span>
-            <span class="badge" style="align-self:flex-start;background:var(--ok-bg);color:var(--ok)">Доступна ученикам</span>
+            ${b.isPublished ? '<span class="badge" style="align-self:flex-start;background:var(--ok-bg);color:var(--ok)">Доступна ученикам</span>' : '<span class="badge" style="align-self:flex-start;background:#FEF3C7;color:var(--warn)">Готовится — ученики пока не видят</span>'}
           </div>
         </div>
         <div class="stats2"><div><span>Выбрали книгу</span><b>${fmt(b.students)}</b></div><div><span>Групп у учителей</span><b>${fmt(b.groups)}</b></div></div>
@@ -944,6 +964,87 @@ $('pf-form').addEventListener('submit', async (e) => {
     $('pf-err').textContent = x.body?.reason === 'bad_logo' ? 'Картинка не подошла — попробуйте другую' : x.body?.reason === 'contract_ended' ? 'Договор закончился — профиль менять нельзя' : 'Не удалось сохранить. Попробуйте ещё раз.';
   } finally {
     $('pf-save').disabled = me.center.contractEnded;
+  }
+});
+
+// ── Учителя и группы (Center 15) ─────────────────────────
+let tcData = null;
+const teacherUrl = (t) => `${SITE}/t/${t}`;
+
+function renderTeacherLink() {
+  const ended = me.center.contractEnded;
+  const t = tcData?.linkToken;
+  $('tc-link').innerHTML = t
+    ? `<span class="mono" style="font-size:14px;overflow-wrap:anywhere;flex:1 1 260px">${esc(teacherUrl(t).replace('https://', ''))}</span>
+       <button class="btn s" type="button" id="tc-copy">Скопировать ссылку</button>
+       ${ended ? '' : '<button class="lnk bad" type="button" id="tc-new">Новая ссылка</button>'}`
+    : ended
+      ? '<span style="color:var(--muted);font-size:14px">Договор закончился — новых учителей подключить нельзя.</span>'
+      : '<button class="btn p" type="button" id="tc-new">Создать ссылку</button>';
+}
+
+views.teachers = async function () {
+  $('tc-contract').innerHTML = contractNote(me.center);
+  $('tc-copied').textContent = '';
+  let g;
+  try {
+    [tcData, g] = await Promise.all([api('teachers'), api('groups')]);
+  } catch (e) {
+    if (e.status !== 401) $('tc-rows').innerHTML = `<tr><td colspan="5" class="empty">Не загрузилось. Обновите страницу.</td></tr>`;
+    return;
+  }
+  renderTeacherLink();
+  const ended = me.center.contractEnded;
+  $('tc-count').textContent = tcData.teachers.length ? `${tcData.teachers.length} ${plural(tcData.teachers.length, 'учитель', 'учителя', 'учителей')}` : '';
+  $('tc-rows').innerHTML = tcData.teachers.length
+    ? tcData.teachers.map((t) => `<tr><td><b>${esc(t.name)}</b>${t.email ? `<br><span style="font-size:13px;color:var(--muted)">${esc(t.email)}</span>` : ''}</td>
+        <td class="n">${fmt(t.groups)}</td><td class="n">${fmt(t.students)}</td>
+        <td>${new Date(t.joinedAt).toLocaleDateString('ru-RU')}</td>
+        <td style="white-space:nowrap">${ended ? '' : `<button class="lnk bad" type="button" data-remove="${t.id}">Убрать из центра</button>`}</td></tr>`).join('')
+    : `<tr><td colspan="5" class="empty">Учителей пока нет. Отправьте им ссылку выше.</td></tr>`;
+  $('gr-rows').innerHTML = g.groups.length
+    ? g.groups.map((r) => `<tr><td><b>${esc(r.title)}</b></td><td>${esc(r.teacher)}</td>
+        <td>${r.books.map((b) => `${esc(b.title)} <span style="color:var(--muted)">· ${b.openTo != null ? `до Unit ${b.openTo} · открыто ${b.open} из ${b.units}` : 'юниты не открыты'}</span>`).join('<br>')}</td>
+        <td class="n">${fmt(r.students)}</td><td class="n">${fmt(r.active)}</td></tr>`).join('')
+    : `<tr><td colspan="5" class="empty">Групп с книгами центра пока нет. Учитель подключает книгу к группе в приложении: «Библиотека» → книга центра → «Подключить к курсу».</td></tr>`;
+};
+
+$('view-teachers').addEventListener('click', async (e) => {
+  if (e.target.closest('#tc-copy')) {
+    try {
+      await navigator.clipboard.writeText(teacherUrl(tcData.linkToken));
+      $('tc-copied').textContent = 'Ссылка скопирована';
+    } catch {
+      $('tc-copied').textContent = 'Не удалось скопировать — выделите ссылку вручную';
+    }
+    return;
+  }
+  if (e.target.closest('#tc-new')) {
+    if (tcData.linkToken && !confirm('Сделать новую ссылку? Старая перестанет работать. Учителя, которые уже подключились, останутся.')) return;
+    try {
+      const r = await api('teacher-link', { body: {} });
+      tcData.linkToken = r.linkToken;
+      renderTeacherLink();
+      $('tc-copied').textContent = 'Новая ссылка готова';
+    } catch {
+      alert('Не удалось сделать ссылку. Попробуйте ещё раз.');
+    }
+    return;
+  }
+  const rm = e.target.closest('[data-remove]');
+  if (rm) {
+    const t = tcData.teachers.find((x) => x.id === rm.dataset.remove);
+    try {
+      const ask = await api('teacher-remove', { body: { userId: t.id } });
+      const impact = ask.groups
+        ? `\n\nОтключим книги центра от ${ask.groups} ${plural(ask.groups, 'группы', 'групп', 'групп')} (${ask.students} ${plural(ask.students, 'ученик', 'ученика', 'учеников')}). Группы останутся у учителя, прогресс учеников сохранится, места центра освободятся.`
+        : '';
+      if (!confirm(`Убрать ${t.name} из центра?${impact}`)) return;
+      await api('teacher-remove', { body: { userId: t.id, confirm: true } });
+      views.teachers();
+    } catch {
+      alert('Не удалось убрать учителя. Попробуйте ещё раз.');
+    }
   }
 });
 
