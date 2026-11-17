@@ -42,8 +42,10 @@ export const authEvents = {
   orgNotMine: (via: 'code' | 'link') => log('org_not_mine', { via }),
   /** Ученик увидел «Доступ к книгам закончился» (Center 7) */
   orgAccessExpiredSeen: () => log('org_access_expired_seen'),
-  /** Выбрал книгу центра (Center 6): first — сразу после кода */
-  orgBookPicked: (mode: string) => log('org_book_picked', { mode }),
+  /** Добавил книгу центра как свой курс (этап 7): onboarding — сразу после кода, library — из «Библиотеки» */
+  orgBookAdded: (via: 'onboarding' | 'library') => log('org_book_added', { via }),
+  /** Строка «Другие книги центра · Посмотреть» на главной курса книги (этап 7) */
+  orgLibraryHint: (action: 'open' | 'close') => log('org_library_hint', { action }),
   /** Стал учителем центра по ссылке /t/<код> (Center 13) */
   orgTeacherJoined: () => log('org_teacher_joined'),
 

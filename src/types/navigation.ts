@@ -47,12 +47,6 @@ export interface SessionRouteParams {
 
 // ==================== ROOT STACK ====================
 
-/**
- * Книги учебного центра (plan/new/center_books.md, Center 6): first — сразу после кода центра,
- * change — заменить текущую книгу, add — книга на другом языке, unit — сменить юнит текущей.
- */
-export type CenterPickMode = 'first' | 'change' | 'add' | 'unit';
-
 export type RootStackParamList = {
   Main: NavigatorScreenParams<MainTabParamList>;
   SetDetail: { setId: string };
@@ -164,9 +158,8 @@ export type RootStackParamList = {
   LibraryCollection: { collectionId: string; title?: string };
   LibraryBooks: undefined;
   BookDetail: { bookId: string };
-  CenterBookPick: { orgId?: string; mode: CenterPickMode; replaceBookId?: string };
-  CenterUnitPick: { bookId: string; mode: CenterPickMode; replaceBookId?: string };
-  MyBooks: undefined;
+  /** Выбор книги сразу после кода учебного центра (plan/new/center_books.md, этап 7) */
+  CenterBookPick: { orgId?: string } | undefined;
   CourseBooks: { courseId: string; courseTitle: string };
   MyPublications: undefined;
   PersonalInfo: undefined;

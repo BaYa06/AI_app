@@ -45,6 +45,8 @@ interface CoursesActions {
   renameCourse: (id: string, title: string) => void;
   deleteCourse: (id: string) => void;
   removeLocalCourse: (id: string) => void;
+  /** Курс, созданный сервером (курс книги центра, этап 7): только в стор, без запроса createCourse */
+  upsertServerCourse: (course: Course) => void;
 
   // Выбор активного курса
   setActiveCourse: (id: string | null) => void;
@@ -225,6 +227,15 @@ export const useCoursesStore = create<CoursesState & CoursesActions>()(
       });
       const setsStore = getSetsStore().getState();
       setsStore.moveSetsFromCourse(id);
+      get().saveCourses();
+    },
+
+    upsertServerCourse: (course) => {
+      set((s) => {
+        const existing = s.courses.find((c) => c.id === course.id);
+        if (existing) Object.assign(existing, course);
+        else s.courses.push(course);
+      });
       get().saveCourses();
     },
 

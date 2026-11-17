@@ -406,7 +406,7 @@ user_books              user_id, book_id, current_unit_id, is_active, updated_at
   - `my-book` оставить для 1.9.x до следующего обязательного обновления.
   - `npm run center:check`: курс создаётся один раз; все юниты приходят под ним; без доступа —
     404 и наборы не приходят; курс книги не занимает место и не виден в кабинете центра.
-- **Center 17** — выбор книги при первом входе. `CenterBookPickScreen`: кнопка «Добавить книгу» →
+- ✅ **Center 17** (вместе с ним убраны экраны «Юнит», «Мои книги» и `CenterBookCard` — они ссылались друг на друга; `openCenterBooks` при продлении ведёт на главную курса книги; `coursesStore.upsertServerCourse`; аналитика `org_book_added`) — выбор книги при первом входе. `CenterBookPickScreen`: кнопка «Добавить книгу» →
   `book-course` → `loadCourses()` + `BookService.syncOfficialSets()` → `setActiveCourse(courseId)` →
   `navigation.reset` на главную. Экран юнита (`CenterUnitPickScreen`) из пути убрать. Нет сети —
   ошибка на экране, книга не добавлена.

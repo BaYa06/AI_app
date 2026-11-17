@@ -845,13 +845,13 @@ export default function App() {
   }, [courseJoin, currentUserId, onboardingData.displayName, finishCourseJoin]);
 
   // ── Ученик с кодом или ссылкой учебного центра (plan/new/center_books.md, Center 5) ──
-  // После кода — выбор книги (или «Мои книги» при продлении), как только навигатор смонтирован
-  // (после онбординга он появляется не сразу) — Center 6
+  // После кода — выбор книги (или главная на курсе книги при продлении), как только навигатор
+  // смонтирован (после онбординга он появляется не сразу) — этап 7
   const openCenterBooksWhenReady = useCallback((orgId: string) => {
     const go = () => {
       openCenterBooks((screen, params) => {
-        if (screen === 'MyBooks') navigationRef.navigate('MyBooks');
-        else if (params) navigationRef.navigate('CenterBookPick', params);
+        if (screen === 'Home') navigationRef.navigate('Main', { screen: 'Home' });
+        else navigationRef.navigate('CenterBookPick', params);
       }, orgId).catch(() => {});
     };
     if (navigationRef.isReady()) {
@@ -899,7 +899,7 @@ export default function App() {
     if (!result.ok) return describeCenterReason(result.reason);
     Analytics.orgJoined(centerJoin.via);
     // Языки карточек — из книги центра: экраны языков, цели, нормы и имени ученик центра пропускает.
-    // Выбор книги и юнита — Center 6
+    // Выбор книги — сразу после (этап 7: книга целиком = курс, юнит не выбираем)
     const mine = await CenterService.loadMine();
     const book = mine?.organizations.find((o) => o.id === result.organization.id)?.books[0];
     const finalData = {

@@ -1,58 +1,46 @@
 /**
- * «Какую книгу учишь?» — книги учебного центра (plan/new/center_books.md, Center 6).
- * Сразу после кода центра (first), «Сменить книгу» (change), «Добавить книгу» (add) из «Моих книг».
- * Языки — вкладками, если у центра их больше одного. Языки карточек берутся из книги.
+ * «Какую книгу учишь?» — сразу после кода учебного центра (plan/new/center_books.md, Center 6, этап 7).
+ * «Добавить книгу» делает книгу целиком моим курсом и открывает главную на нём — юнит не выбираем.
+ * Другие книги центра потом добавляют из «Библиотеки». Языки — вкладками, если у центра их больше
+ * одного. Языки карточек берутся из книги.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { BookOpen, Check } from 'lucide-react-native';
 import { Text } from '@/components/common/Text';
-import { Badge, Button, Card, Chip, EmptyState, Screen, ScreenHeader } from '@/components/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  Chip,
+  EmptyState,
+  Screen,
+  ScreenHeader,
+  toast,
+} from '@/components/ui';
 import { useThemeColors } from '@/store';
 import { useCenterStore } from '@/store/centerStore';
 import { borderRadius, getLanguageLabel, iconSize, spacing } from '@/constants';
 import { pluralize } from '@/utils';
-import {
-  activeBookEntry,
-  activeCenter,
-  centerBooksOfLanguage,
-  centerLanguages,
-} from '@/services/centerBooks';
+import { activeCenter, centerBooksOfLanguage, centerLanguages } from '@/services/centerBooks';
+import { addCenterBookCourse } from '@/components/study/centerSession';
 import type { RootStackScreenProps } from '@/types/navigation';
-
-const TITLES = {
-  first: 'Какую книгу учишь?',
-  change: 'На какую книгу перейти?',
-  add: 'Какую книгу добавить?',
-  unit: 'Какую книгу учишь?',
-} as const;
 
 export function CenterBookPickScreen({
   navigation,
   route,
 }: RootStackScreenProps<'CenterBookPick'>) {
-  const { orgId, mode, replaceBookId } = route.params;
+  const orgId = route.params?.orgId;
   const colors = useThemeColors();
   const data = useCenterStore((s) => s.data);
   const loaded = useCenterStore((s) => s.loaded);
   const refresh = useCenterStore((s) => s.refresh);
   const center = activeCenter(data, orgId);
-  const current = activeBookEntry(data);
   const languages = useMemo(() => (center ? centerLanguages(center) : []), [center]);
-  const myIds = useMemo(() => new Set((data?.myBooks ?? []).map((m) => m.bookId)), [data]);
-  const myLanguages = useMemo(
-    () => new Set((center?.books ?? []).filter((b) => myIds.has(b.id)).map((b) => b.languageFrom)),
-    [center, myIds]
-  );
-
-  // Вкладка по умолчанию: «добавить» — язык, которого ещё нет; «сменить» — язык текущей книги
-  const initialLanguage =
-    (mode === 'add' && languages.find((l) => !myLanguages.has(l))) ||
-    (mode === 'change' && current?.book.languageFrom) ||
-    languages[0] ||
-    '';
+  const initialLanguage = languages[0] || '';
   const [language, setLanguage] = useState(initialLanguage);
   const [picked, setPicked] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => {
     if (!loaded) refresh();
@@ -62,13 +50,20 @@ export function CenterBookPickScreen({
   }, [language, initialLanguage]);
 
   const books = center ? centerBooksOfLanguage(center, language) : [];
-  const header = (
-    <ScreenHeader
-      title={mode === 'add' ? 'Добавить книгу' : mode === 'change' ? 'Сменить книгу' : undefined}
-      onBack={mode === 'first' ? undefined : () => navigation.goBack()}
-      bordered={mode !== 'first'}
-    />
-  );
+  const header = <ScreenHeader bordered={false} />;
+
+  // Книга целиком — мой курс; сразу главная на нём (не «Мои наборы» и без сессии)
+  const add = async () => {
+    if (!picked || adding) return;
+    setAdding(true);
+    const r = await addCenterBookCourse(picked, 'onboarding');
+    setAdding(false);
+    if (!r.ok) {
+      toast.error(r.message);
+      return;
+    }
+    navigation.reset({ index: 0, routes: [{ name: 'Main', params: { screen: 'Home' } }] });
+  };
 
   if (!center) {
     return (
@@ -91,23 +86,17 @@ export function CenterBookPickScreen({
       header={header}
       footer={
         <Button
-          title="Дальше"
+          title={picked ? 'Добавить книгу' : 'Выбери книгу'}
           disabled={!picked}
+          loading={adding}
           fullWidth
-          onPress={() =>
-            picked &&
-            navigation.navigate('CenterUnitPick', {
-              bookId: picked,
-              mode,
-              replaceBookId: mode === 'change' ? (replaceBookId ?? current?.book.id) : undefined,
-            })
-          }
+          onPress={add}
         />
       }
     >
       <View style={styles.head}>
         <Text variant="h1" style={{ color: colors.textPrimary }}>
-          {TITLES[mode]}
+          Какую книгу учишь?
         </Text>
         <Text variant="body" style={{ color: colors.textSecondary }}>
           Посмотри на обложку учебника или спроси учителя.
@@ -154,8 +143,8 @@ export function CenterBookPickScreen({
                     {b.unitsCount} {pluralize(b.unitsCount, 'юнит', 'юнита', 'юнитов')} ·{' '}
                     {b.cardsCount} {pluralize(b.cardsCount, 'слово', 'слова', 'слов')}
                   </Text>
-                  {myIds.has(b.id) ? (
-                    <Badge label="Уже учишь" tone="neutral" style={styles.badge} />
+                  {b.courseId ? (
+                    <Badge label="Добавлена" tone="neutral" style={styles.badge} />
                   ) : null}
                 </View>
                 {selected ? <Check size={iconSize.m} color={colors.primary} /> : null}
@@ -165,6 +154,10 @@ export function CenterBookPickScreen({
         })}
       </View>
 
+      <Text variant="bodySmall" style={[styles.note, { color: colors.textSecondary }]}>
+        Откроются сразу все юниты — отдельным курсом в боковом меню. Другие книги центра будут в
+        «Библиотеке».
+      </Text>
       <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
         Языки карточек — из книги: {getLanguageLabel(language)} →{' '}
         {getLanguageLabel(books[0]?.languageTo ?? 'ru')}. Выбирать не нужно.
@@ -188,4 +181,5 @@ const styles = StyleSheet.create({
   flex: { flex: 1, gap: 2 },
   bold: { fontWeight: '700' },
   badge: { alignSelf: 'flex-start', marginTop: spacing.xxs },
+  note: { marginBottom: spacing.xs },
 });

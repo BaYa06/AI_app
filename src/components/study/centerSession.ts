@@ -1,63 +1,94 @@
 /**
- * Учить юнит книги учебного центра (plan/new/center_books.md, Center 6): загрузить официальный набор
- * юнита в сторы и запустить обычную сессию «Изучить» (setSession). Слова отдаёт сервер только при
- * доступе к центру (Center 2) — без доступа или сети вернётся 'unavailable'.
+ * Книга учебного центра = мой курс (plan/new/center_books.md, этап 7).
  *
- * fromHome: стек собирается заново — «главная → сессия» (сразу после кода центра: экраны выбора
- * книги и юнита из стека уходят, «назад» из итогов ведёт в набор юнита, оттуда — на главную).
+ * «Добавить книгу» (первый вход по коду) и «Добавить себе» (Библиотека) создают на сервере мой курс
+ * с названием книги (book-course). Все юниты книги приходят официальными наборами под этим курсом
+ * (official-sets), главная переключается на него — урок дня, разминка и юниты как обычные наборы.
  */
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BookService } from '@/services/BookService';
+import { CenterService, type MyCenters } from '@/services/CenterService';
+import { Analytics } from '@/services/analytics';
 import { useCenterStore } from '@/store/centerStore';
-import type { RootStackParamList } from '@/types/navigation';
-import { currentSetSessionPlan, firstSetSessionStep } from './setSession';
+import { useCoursesStore } from '@/store/coursesStore';
+import { isCenterOpen } from '@/services/centerBooks';
 
-export type CenterUnitStart = 'session' | 'set' | 'unavailable';
+export type AddBookCourseOutcome = { ok: true; courseId: string } | { ok: false; message: string };
 
-export async function studyCenterUnit(
-  navigation: NativeStackNavigationProp<RootStackParamList>,
-  setId: string,
-  { fromHome = false }: { fromHome?: boolean } = {}
-): Promise<CenterUnitStart> {
-  const ok = await BookService.openOfficialSet(setId);
-  if (!ok) return 'unavailable';
-  const info = currentSetSessionPlan(setId);
-  const step = info ? firstSetSessionStep(setId, info.plan) : null;
-  const home = { name: 'Main' as const, params: { screen: 'Home' as const } };
+const FAIL_TEXT = {
+  network: 'Нет интернета. Проверь соединение и попробуй ещё раз',
+  no_access: 'Доступ к книгам центра закончился. Возьми новый код у менеджера курса',
+  unknown: 'Не получилось добавить книгу. Попробуй ещё раз',
+} as const;
 
-  if (!step) {
-    // Сессии нет (всё выучено и повторять сегодня нечего) — открываем набор юнита
-    if (fromHome)
-      navigation.reset({ index: 1, routes: [home, { name: 'SetDetail', params: { setId } }] });
-    else navigation.navigate('SetDetail', { setId });
-    return 'set';
-  }
-  if (fromHome) {
-    navigation.reset({
-      index: 1,
-      routes: [home, { name: step.screen, params: step.params } as never],
-    });
-  } else {
-    navigation.push(step.screen, step.params);
-  }
-  return 'session';
+/** Положить курс книги в стор и подтянуть его юниты. Без запроса createCourse — курс уже на сервере. */
+async function placeBookCourse(course: {
+  id: string;
+  title: string;
+  sourceBookId: string;
+  createdAt?: string;
+  updatedAt?: string | null;
+}): Promise<void> {
+  useCoursesStore.getState().upsertServerCourse({
+    id: course.id,
+    title: course.title,
+    createdAt: (course.createdAt && Date.parse(course.createdAt)) || Date.now(),
+    updatedAt: course.updatedAt ? Date.parse(course.updatedAt) : undefined,
+    sourceBookId: course.sourceBookId,
+  });
+  await BookService.syncOfficialSets().catch(() => {});
 }
 
 /**
- * После кода центра: книг этого центра ещё нет — выбор книги (first), есть (продление новым
- * кодом) — «Мои книги». navigate — из экрана или navigationRef.
+ * Добавить книгу центра как мой курс и сделать его текущим на главной. Уже добавлена — тот же курс.
+ * via — откуда: экран выбора книги после кода или «Библиотека».
+ */
+export async function addCenterBookCourse(
+  bookId: string,
+  via: 'onboarding' | 'library'
+): Promise<AddBookCourseOutcome> {
+  const r = await CenterService.addBookCourse(bookId);
+  if (!r.ok) return { ok: false, message: FAIL_TEXT[r.reason] };
+  await placeBookCourse(r.course);
+  useCoursesStore.getState().setActiveCourse(r.course.id);
+  if (r.created) Analytics.orgBookAdded(via);
+  useCenterStore
+    .getState()
+    .refresh()
+    .catch(() => {});
+  return { ok: true, courseId: r.course.id };
+}
+
+/** Мой курс книги центра (первый по порядку книг) или null. */
+export function centerCourseOf(
+  data: MyCenters | null,
+  orgId: string
+): { courseId: string; bookId: string; title: string } | null {
+  const center = data?.organizations.find((o) => o.id === orgId);
+  const book = center?.books.find((b) => !!b.courseId);
+  return book?.courseId ? { courseId: book.courseId, bookId: book.id, title: book.title } : null;
+}
+
+/**
+ * После кода центра: курса книги ещё нет — выбор книги; есть (продление новым кодом) — главная на
+ * этом курсе. navigate — из экрана или navigationRef.
  */
 export async function openCenterBooks(
-  navigate: (
-    screen: 'CenterBookPick' | 'MyBooks',
-    params?: { orgId: string; mode: 'first' }
-  ) => void,
+  navigate: (screen: 'CenterBookPick' | 'Home', params?: { orgId: string }) => void,
   orgId: string
 ): Promise<void> {
   const data = await useCenterStore.getState().refresh();
+  const mine = centerCourseOf(data, orgId);
   const center = data?.organizations.find((o) => o.id === orgId);
-  const hasBook =
-    !!center && !!data && data.myBooks.some((m) => center.books.some((b) => b.id === m.bookId));
-  if (hasBook) navigate('MyBooks');
-  else navigate('CenterBookPick', { orgId, mode: 'first' });
+  if (!mine || !center || !isCenterOpen(center)) {
+    navigate('CenterBookPick', { orgId });
+    return;
+  }
+  if (!useCoursesStore.getState().courses.some((c) => c.id === mine.courseId)) {
+    await placeBookCourse({ id: mine.courseId, title: mine.title, sourceBookId: mine.bookId });
+  } else {
+    // Новый код после конца доступа: юниты вернулись — подтянуть их
+    await BookService.syncOfficialSets().catch(() => {});
+  }
+  useCoursesStore.getState().setActiveCourse(mine.courseId);
+  navigate('Home');
 }

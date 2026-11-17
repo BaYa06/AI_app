@@ -46,7 +46,22 @@ export type CenterBook = {
   position: number | null;
   unitsCount: number;
   cardsCount: number;
+  /** Мой курс этой книги (этап 7): «Добавлена» на полке и «Открыть курс». null — не добавлена */
+  courseId?: string | null;
 };
+
+/** Курс книги центра от сервера (book-course) — как свой курс в coursesStore */
+export type CenterBookCourse = {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string | null;
+  sourceBookId: string;
+};
+
+export type AddBookCourseResult =
+  | { ok: true; course: CenterBookCourse; created: boolean }
+  | { ok: false; reason: 'network' | 'no_access' | 'unknown' };
 
 export type MyCenter = CenterOrganization & {
   accessUntil: string;
@@ -221,6 +236,23 @@ export const CenterService = {
       return (res.json.organizations || []) as TeacherShelf[];
     } catch {
       return [];
+    }
+  },
+
+  /**
+   * Книга центра целиком = мой курс (plan/new/center_books.md, этап 7). Повторный вызов вернёт тот же
+   * курс. no_access — кода нет или он закончился (сервер отвечает 404).
+   */
+  async addBookCourse(bookId: string): Promise<AddBookCourseResult> {
+    try {
+      const res = await callCenter('book-course', { method: 'POST', body: { bookId } });
+      if (res.status === 0) return { ok: false, reason: 'network' };
+      if (res.ok && res.json?.ok && res.json.course) {
+        return { ok: true, course: res.json.course, created: res.json.created === true };
+      }
+      return { ok: false, reason: res.status === 404 ? 'no_access' : 'unknown' };
+    } catch {
+      return { ok: false, reason: 'network' };
     }
   },
 
