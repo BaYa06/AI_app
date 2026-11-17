@@ -293,7 +293,7 @@ user_books              user_id, book_id, current_unit_id, is_active, updated_at
   Имена учеников в своих группах видят учителя в приложении, как сейчас.
 
 **Шаги**
-- **Center 8** — (таблицы уже в миграции 052, Center 1.) Вкладка «Центры» в Flashly Admin
+- ✅ **Center 8** (логика — `api/_handlers/center/admin.js` и `codes.js` в git; сама вкладка — в локальных `admin-server.mjs` + `public/admin.html`, они в .gitignore. База выбирается переключателем staging / прод, по умолчанию staging; запись в прод — после ввода слова «прод». Supabase один на обе базы: логин центра, созданный в одной базе, во второй переиспользуется с новым паролем. `import-book.ts --org ALFA`: существующую книгу импорт к центру не перепривязывает — только вкладка. Код: `ALFA-DEC-7KXM`, хвост 3–4 знака без похожих символов) — (таблицы уже в миграции 052, Center 1.) Вкладка «Центры» в Flashly Admin
   (`public/admin.html` + `api/admin.js`, только localhost). **Внимание:** админка берёт
   `POSTGRES_URL` из `.env.local`, а это **прод** (`ep-misty-scene`); staging — только
   `.env.staging`. Вкладке нужен явный выбор базы и крупная пометка «прод / staging»; центры на
