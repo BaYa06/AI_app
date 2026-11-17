@@ -777,6 +777,219 @@ async function main() {
       (await call(books, teacherG, 'GET', { action: 'book-detail', bookId: bookG.bookId }))
         .status === 404
     );
+
+    // ── 5. Кабинет центра (Center 9–11) ──────────────────────
+    console.log('\nКабинет центра');
+    const center = (await import('../api/center.js')).default as Handler;
+    const ownerA = await newUser('owner A');
+    const ownerG = await newUser('owner G');
+    await db.query(
+      `INSERT INTO organization_members (organization_id, user_id, role) VALUES ($1, $2, 'owner'), ($3, $4, 'owner')`,
+      [orgA, ownerA, orgG, ownerG]
+    );
+    const prefix = `CC${RUN}`;
+    await db.query(`UPDATE organizations SET code_prefix = $2 WHERE id = $1`, [orgA, prefix]);
+    const cab = (
+      user: string | null,
+      method: 'GET' | 'POST',
+      q: Record<string, string>,
+      b?: unknown
+    ) => call(center, user, method, q, b);
+
+    check('кабинет без входа — 401', (await cab(null, 'GET', { action: 'me' })).status === 401);
+    const notCenter = await cab(student, 'GET', { action: 'me' });
+    check(
+      'ученик и учитель центра в кабинет не входят (403 not_center)',
+      notCenter.status === 403 &&
+        notCenter.body?.reason === 'not_center' &&
+        (await cab(teacherA, 'GET', { action: 'overview' })).status === 403,
+      notCenter
+    );
+    const meA = await cab(ownerA, 'GET', { action: 'me' });
+    check(
+      'me: свой центр, договор действует',
+      meA.status === 200 && meA.body.center.id === orgA && meA.body.center.contractEnded === false,
+      meA.body
+    );
+
+    const ov = await cab(ownerA, 'GET', { action: 'overview', days: '30' });
+    const ovText = JSON.stringify(ov.body);
+    check(
+      'обзор: места, 14 дней, только книги своего центра',
+      ov.status === 200 &&
+        ov.body.seats.limit === 4 &&
+        ov.body.seats.used >= 1 &&
+        ov.body.days.length === 14 &&
+        ov.body.books.length === 1 &&
+        ov.body.books[0].id === bookA.bookId,
+      ov.body
+    );
+    check(
+      'обзор: ни id, ни имён учеников',
+      ![student, studentB, stranger].some((id) => ovText.includes(id)) &&
+        !ovText.includes(`${TAG} student`),
+      ovText.slice(0, 200)
+    );
+    check(
+      'обзор «всё время» и неизвестный период — без ошибок',
+      (await cab(ownerA, 'GET', { action: 'overview', days: '0' })).status === 200 &&
+        (await cab(ownerA, 'GET', { action: 'overview', days: 'abc' })).body?.period === 7
+    );
+
+    const inMonth = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+    const made = await cab(
+      ownerA,
+      'POST',
+      { action: 'code-create' },
+      {
+        label: 'Группы декабря',
+        tag: 'dec',
+        validUntil: inMonth,
+        accessDays: 90,
+        maxActivations: 3,
+      }
+    );
+    check(
+      'выпустить код: начало центра + метка + случайный хвост',
+      made.status === 200 && new RegExp(`^${prefix}-DEC-[A-Z0-9]{3,4}$`).test(made.body?.code),
+      made.body
+    );
+    const codeInfo = await call(books, stranger, 'GET', {
+      action: 'org-info',
+      code: made.body?.code,
+    });
+    // У центра A места уже заняты — код находится, но отвечает «мест нет», а не «не найден»
+    check(
+      'новый код находится в приложении',
+      codeInfo.status === 200 || codeInfo.body?.reason === 'full',
+      codeInfo
+    );
+    check(
+      'код: мест больше, чем у центра — 400',
+      (
+        await cab(
+          ownerA,
+          'POST',
+          { action: 'code-create' },
+          {
+            validUntil: inMonth,
+            accessDays: 90,
+            maxActivations: 5,
+          }
+        )
+      ).status === 400
+    );
+    check(
+      'код: дата в прошлом — 400',
+      (
+        await cab(
+          ownerA,
+          'POST',
+          { action: 'code-create' },
+          {
+            validUntil: '2020-01-01',
+            accessDays: 90,
+            maxActivations: 1,
+          }
+        )
+      ).status === 400
+    );
+    const codeList = await cab(ownerA, 'GET', { action: 'codes' });
+    const mine = (codeList.body?.codes || []).map((c: any) => c.code);
+    check(
+      'список кодов — только свои',
+      codeList.status === 200 &&
+        mine.includes(made.body?.code) &&
+        mine.includes(codeOk) &&
+        mine.length ===
+          Number(
+            (
+              await db.query<{ n: string }>(
+                `SELECT COUNT(*) AS n FROM org_codes WHERE organization_id = $1`,
+                [orgA]
+              )
+            ).rows[0].n
+          ),
+      mine
+    );
+    const foreignCode = (
+      await db.query<{ id: string }>(
+        `SELECT id FROM org_codes WHERE organization_id = $1 LIMIT 1`,
+        [orgB]
+      )
+    ).rows[0]?.id;
+    check(
+      'выключить чужой код нельзя (404)',
+      !foreignCode ||
+        (await cab(ownerA, 'POST', { action: 'code-off' }, { id: foreignCode })).status === 404
+    );
+    const off = await cab(ownerA, 'POST', { action: 'code-off' }, { id: made.body?.id });
+    const infoOff = await call(books, stranger, 'GET', {
+      action: 'org-info',
+      code: made.body?.code,
+    });
+    check(
+      'выключенный код больше не находится',
+      off.status === 200 && infoOff.status !== 200,
+      infoOff
+    );
+
+    const bks = await cab(ownerA, 'GET', { action: 'books' });
+    check(
+      'книги: своя книга, юниты и слова',
+      bks.status === 200 && bks.body.books.length === 1 && bks.body.books[0].words === 2,
+      bks.body
+    );
+    const units = await cab(ownerA, 'GET', { action: 'book-units', bookId: bookA.bookId });
+    check(
+      'юниты книги со словами',
+      units.status === 200 && units.body.units[0]?.words?.length === 2,
+      units.body
+    );
+    check(
+      'юниты чужой книги — 404',
+      (await cab(ownerA, 'GET', { action: 'book-units', bookId: bookB.bookId })).status === 404
+    );
+
+    const prof = await cab(
+      ownerA,
+      'POST',
+      { action: 'profile' },
+      {
+        greeting: 'Добро пожаловать!',
+        contact: 'WhatsApp +996 555 000 000',
+      }
+    );
+    const orgsAfter = await call(books, student, 'GET', { action: 'my-orgs' });
+    const shownA = (orgsAfter.body?.organizations || []).find((o: any) => o.id === orgA);
+    check(
+      'профиль: приветствие и контакт видны ученику в приложении',
+      prof.status === 200 && shownA?.contact === 'WhatsApp +996 555 000 000',
+      shownA
+    );
+    check(
+      'профиль: логотип не картинкой — 400',
+      (await cab(ownerA, 'POST', { action: 'profile' }, { logo: 'https://evil.example/x.png' }))
+        .status === 400
+    );
+
+    const endedCreate = await cab(
+      ownerG,
+      'POST',
+      { action: 'code-create' },
+      {
+        validUntil: inMonth,
+        accessDays: 30,
+        maxActivations: 1,
+      }
+    );
+    check(
+      'договор кончился: кабинет только смотрит (403 contract_ended), чтение работает',
+      endedCreate.status === 403 &&
+        endedCreate.body?.reason === 'contract_ended' &&
+        (await cab(ownerG, 'GET', { action: 'overview' })).status === 200,
+      endedCreate
+    );
   } finally {
     // ── Уборка ───────────────────────────────────────────────
     try {

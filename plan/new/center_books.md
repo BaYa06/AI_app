@@ -302,7 +302,7 @@ user_books              user_id, book_id, current_unit_id, is_active, updated_at
   Там же привязка уже загруженной книги к центру (выбор «Общая / Alfa / …») и порядок уровней.
   **Привязка общей опубликованной книги** убирает её из библиотеки у всех: админка спрашивает
   подтверждение и показывает, сколько людей её уже учат.
-- **Center 9** — `/center` (`vercel.json`: `center` и `t` в исключения правила с `host =
+- ✅ **Center 9** (`api/center.js` + `api/_handlers/center/cabinet.js` — весь API кабинета сразу, вместе с кодами, книгами и профилем; страница `public/site/center.html` без библиотек: вход в Supabase через REST, сессия в localStorage, временный пароль меняется в окне при первом входе; «Занимались» — по ответам на слова книг центра (`review_log`), «Слов выучено» — `card_progress` young + mature; `center:check` — 84 проверки; страница проверена в headless Chrome на staging с подменённым входом) — `/center` (`vercel.json`: `center` и `t` в исключения правила с `host =
   flashlycards.app`, rewrite `/center` → `/site/center.html`): вход по логину и паролю, боковое меню, «Обзор» (места, ученики с
   доступом, занимались за 7 дней, слов выучено, по дням, по книгам, «скоро закончится доступ»,
   CSV).

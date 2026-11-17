@@ -125,8 +125,11 @@ export async function createCenter(sql, supa, input) {
   let created = false;
   if (authUser) {
     if (!authUser.user_metadata?.center) fail('login_taken', `Почта ${email} занята`);
+    // email_confirm: почту центра никто не читает; user_metadata пишет и сам пользователь, поэтому
+    // права даёт только organization_members, а не метка center
     const { error } = await supa.auth.admin.updateUserById(authUser.id, {
       password,
+      email_confirm: true,
       user_metadata: meta,
     });
     if (error) throw error;
@@ -193,6 +196,7 @@ export async function resetCenterPassword(sql, supa, id) {
   const password = makeTempPassword();
   const { error } = await supa.auth.admin.updateUserById(rows[0].id, {
     password,
+    email_confirm: true,
     user_metadata: { center: true, must_change_password: true, center_name: rows[0].name },
   });
   if (error) throw error;

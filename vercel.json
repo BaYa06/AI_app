@@ -44,6 +44,15 @@
       ]
     },
     {
+      "source": "/(center|site/center\\.html)",
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
+        { "key": "Cache-Control", "value": "no-cache" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Referrer-Policy", "value": "same-origin" }
+      ]
+    },
+    {
       "source": "/admin.html",
       "headers": [
         { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
@@ -125,7 +134,7 @@
   ],
   "redirects": [
     {
-      "source": "/:path((?!(?:api|ai|s|join|privacy|terms|support|delete-account|admin|site|icons|fonts|\\.well-known|en|learn|how-to-learn-words|spaced-repetition|teachers)(?:/|$))[^.]+)",
+      "source": "/:path((?!(?:api|ai|s|join|privacy|terms|support|delete-account|admin|site|icons|fonts|\\.well-known|en|learn|how-to-learn-words|spaced-repetition|teachers|center)(?:/|$))[^.]+)",
       "has": [{ "type": "host", "value": "flashlycards.app" }],
       "destination": "https://app.flashlycards.app/:path",
       "permanent": false
@@ -165,6 +174,7 @@
     { "source": "/spaced-repetition", "destination": "/site/p/spaced-repetition.html" },
     { "source": "/teachers", "destination": "/site/p/teachers.html" },
     { "source": "/support", "destination": "/site/support.html" },
+    { "source": "/center", "destination": "/site/center.html" },
     { "source": "/delete-account", "destination": "/site/delete-account.html" },
     { "source": "/api/translate-words",           "destination": "/api/ai?fn=translate-words" },
     { "source": "/api/generate-examples",         "destination": "/api/ai?fn=generate-examples" },
