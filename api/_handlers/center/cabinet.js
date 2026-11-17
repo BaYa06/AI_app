@@ -348,7 +348,7 @@ async function bookUnits(req, res, sql, c) {
       LEFT JOIN card_sets cs ON cs.unit_id = u.id AND cs.is_official
       LEFT JOIN cards cd ON cd.set_id = cs.id
      WHERE u.book_id = ${bookId}
-     ORDER BY u.sort_order, u.number, cd.created_at, cd.id`;
+     ORDER BY u.sort_order, u.number, cd.sort_order NULLS LAST, cd.created_at, cd.id`;
   const units = [];
   for (const r of rows) {
     let unit = units[units.length - 1];
