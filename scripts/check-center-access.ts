@@ -571,6 +571,16 @@ async function main() {
       pick.status === 200 && pick.body?.myBook?.isActive === true,
       pick
     );
+    const orgsUnit = await call(books, student, 'GET', { action: 'my-orgs' });
+    const cu = orgsUnit.body?.myBooks?.[0]?.currentUnit;
+    check(
+      'my-orgs: текущий юнит — номер, набор слов и «последний юнит» (Center 6)',
+      cu?.id === bookA.unitId &&
+        cu?.setId === bookA.setId &&
+        cu?.totalCards === 2 &&
+        cu?.isLast === true,
+      cu
+    );
     const pickB = await call(
       books,
       student,

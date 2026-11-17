@@ -82,6 +82,9 @@ import { SupportListScreen } from '@/screens/SupportListScreen';
 import { SupportThreadScreen } from '@/screens/SupportThreadScreen';
 import { LibrarySetDetailScreen } from '@/screens/LibrarySetDetailScreen';
 import { BookDetailScreen } from '@/screens/BookDetailScreen';
+import { CenterBookPickScreen } from '@/screens/center/CenterBookPickScreen';
+import { CenterUnitPickScreen } from '@/screens/center/CenterUnitPickScreen';
+import { MyBooksScreen } from '@/screens/center/MyBooksScreen';
 import { CourseBooksScreen } from '@/screens/CourseBooksScreen';
 import { MyPublicationsScreen } from '@/screens/MyPublicationsScreen';
 import {
@@ -559,6 +562,18 @@ export function AppNavigator() {
           component={BookDetailScreen}
           options={{ headerShown: false }}
         />
+        {/* Книги учебного центра (plan/new/center_books.md, Center 6) */}
+        <Stack.Screen
+          name="CenterBookPick"
+          component={CenterBookPickScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="CenterUnitPick"
+          component={CenterUnitPickScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen name="MyBooks" component={MyBooksScreen} options={{ headerShown: false }} />
         {LIBRARY_CATALOG_ENABLED && (
           <Stack.Screen
             name="LibrarySubject"

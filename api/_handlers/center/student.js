@@ -174,8 +174,20 @@ export async function myOrgs(req, res, sql, userId) {
        ORDER BY b.language_to, b.org_position NULLS LAST, b.title
     `,
     sql`
-      SELECT ub.book_id, ub.current_unit_id, ub.is_active, ub.updated_at
-        FROM user_books ub JOIN books b ON b.id = ub.book_id
+      SELECT ub.book_id, ub.current_unit_id, ub.is_active, ub.updated_at,
+             u.number AS unit_number, u.title AS unit_title,
+             (SELECT cs.id FROM card_sets cs WHERE cs.unit_id = u.id AND cs.is_official
+               ORDER BY cs.created_at LIMIT 1) AS unit_set_id,
+             (SELECT COUNT(*) FROM card_sets cs JOIN cards c ON c.set_id = cs.id
+               WHERE cs.unit_id = u.id AND cs.is_official)::int AS unit_cards,
+             NOT EXISTS (
+               SELECT 1 FROM book_units u2
+                WHERE u2.book_id = u.book_id
+                  AND (u2.sort_order, u2.number) > (u.sort_order, u.number)
+             ) AS unit_is_last
+        FROM user_books ub
+        JOIN books b ON b.id = ub.book_id
+        LEFT JOIN book_units u ON u.id = ub.current_unit_id
        WHERE ub.user_id = ${userId}::uuid AND b.organization_id = ANY(${orgIds}::uuid[])
        ORDER BY ub.updated_at DESC
     `,
@@ -204,6 +216,17 @@ export async function myOrgs(req, res, sql, userId) {
     myBooks: mine.map((m) => ({
       bookId: m.book_id,
       currentUnitId: m.current_unit_id,
+      // Текущий юнит для карточки на главной и «Моих книг» (Center 6). setId — его официальный набор
+      currentUnit: m.current_unit_id
+        ? {
+            id: m.current_unit_id,
+            number: m.unit_number,
+            title: m.unit_title,
+            setId: m.unit_set_id,
+            totalCards: m.unit_cards,
+            isLast: m.unit_is_last === true,
+          }
+        : null,
       isActive: m.is_active === true,
       updatedAt: m.updated_at,
     })),

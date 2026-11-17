@@ -54,9 +54,22 @@ export type MyCenter = CenterOrganization & {
   books: CenterBook[];
 };
 
+export type MyCenterUnit = {
+  id: string;
+  number: number;
+  title: string;
+  /** Официальный набор юнита — по нему сессия «Изучить» */
+  setId: string | null;
+  totalCards: number;
+  /** Последний юнит книги — «Перейти на следующий уровень» */
+  isLast: boolean;
+};
+
 export type MyCenterBook = {
   bookId: string;
   currentUnitId: string | null;
+  /** Есть, если сервер новее Center 6 и юнит выбран */
+  currentUnit?: MyCenterUnit | null;
   isActive: boolean;
   updatedAt: string;
 };
@@ -122,6 +135,25 @@ export const CenterService = {
       return toCodeResult(await callCenter('org-activate', { method: 'POST', body: { code } }));
     } catch {
       return { ok: false, reason: 'network' };
+    }
+  },
+
+  /**
+   * Выбрать книгу центра: юнит, сделать текущей (на главной) или убрать из «Моих книг».
+   * Прогресс по словам не трогается. ok: false — нет сети или нет доступа к центру.
+   */
+  async setMyBook(input: {
+    bookId: string;
+    unitId?: string | null;
+    active?: boolean;
+    remove?: boolean;
+  }): Promise<{ ok: boolean; myBook?: MyCenterBook }> {
+    try {
+      const res = await callCenter('my-book', { method: 'POST', body: input });
+      if (!res.ok || !res.json?.ok) return { ok: false };
+      return { ok: true, myBook: res.json.myBook as MyCenterBook | undefined };
+    } catch {
+      return { ok: false };
     }
   },
 
