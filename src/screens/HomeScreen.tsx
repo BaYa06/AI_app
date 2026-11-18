@@ -1891,7 +1891,8 @@ export function HomeScreen({ navigation, route }: any) {
       if (!firstOwnCourse) return;
       const params = { courseId: firstOwnCourse.id, courseTitle: firstOwnCourse.title };
       if (task === 'invite') openInviteModal(firstOwnCourse.id);
-      else if (task === 'test') navigation.navigate('ExamLobby', params);
+      // Живой тест = экзамен с оценкой (plan/new/live_exam.md)
+      else if (task === 'test') navigation.navigate('ExamSetup', params);
       else if (task === 'stats') navigation.navigate('TeacherCourseStats', params);
     },
     [navigation, firstOwnCourse, openInviteModal]

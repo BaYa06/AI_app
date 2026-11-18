@@ -299,7 +299,7 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
           route={route}
           setJoinCodeDialog={setJoinCodeDialog}
           onLiveTest={() =>
-            navigation.navigate('ExamLobby', {
+            navigation.navigate('ExamSetup', {
               courseId: route.params.courseId,
               courseTitle: route.params.courseTitle,
             })

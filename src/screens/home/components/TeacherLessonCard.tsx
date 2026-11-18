@@ -66,26 +66,29 @@ export function TeacherLessonCard({
   const [schedule, setSchedule] = useState<ScheduleItem[] | null | undefined>(undefined);
   const [scheduleSheet, setScheduleSheet] = useState(false);
   const [codeDialog, setCodeDialog] = useState(false);
-  /** «Живой тест» сразу открывает настройку теста: выбора типа больше нет (Teacher 32) */
+  /** «Живой тест» сразу открывает настройку экзамена с оценкой (plan/new/live_exam.md) */
   const openLiveTest = () => {
     const rootNav = navigation?.getParent?.() ?? navigation;
-    rootNav?.navigate('ExamLobby', { courseId, courseTitle });
+    rootNav?.navigate('ExamSetup', { courseId, courseTitle });
   };
   /**
    * «Проверить на уроке» (Teacher 39): живой тест по словам текущего задания. Слова не пришли
-   * (нет сети, старый сервер) — обычная настройка теста.
+   * (нет сети, старый сервер) — настройка экзамена.
    */
   const checkOnLesson = async () => {
     track('lesson_check');
     const status = hw.current ? await NeonService.loadHomeworkStatus(hw.current.id) : null;
     const cardIds = status?.homework.cardIds;
     const rootNav = navigation?.getParent?.() ?? navigation;
+    if (!status || !cardIds || cardIds.length === 0) {
+      rootNav?.navigate('ExamSetup', { courseId, courseTitle });
+      return;
+    }
     rootNav?.navigate('ExamLobby', {
       courseId,
       courseTitle,
-      ...(status && cardIds && cardIds.length > 0
-        ? { cardIds, title: lessonCheckTitle(status.homework.title) }
-        : {}),
+      cardIds,
+      title: lessonCheckTitle(status.homework.title),
     });
   };
   const [reminding, setReminding] = useState(false);
