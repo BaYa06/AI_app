@@ -343,6 +343,8 @@ const NATIVE_LINKING: LinkingOptions<RootStackParamList> = {
       Feedback: 'feedback',
       // Push «Команда Flashly ответила» (plan/new/support_threads.md): flashly://support/<id>?from=push
       SupportThread: 'support/:id',
+      // Push «Результат экзамена» (plan/new/live_exam.md): flashly://exam-result/<sessionId>?from=push
+      ExamResult: 'exam-result/:sessionId',
       ...(COMMUNITY_LIBRARY_ENABLED ? { LibrarySetDetail: 'library-set/:setId' } : null),
       BookDetail: 'book/:bookId',
       CourseBooks: 'course-books/:courseId',

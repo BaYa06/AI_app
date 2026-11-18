@@ -55,6 +55,13 @@ const SUPPORT_BODY_MAX = 120;
  * задания ведёт туда; на старые версии такие пуши не шлём. Поднять, если этап 2 выйдет позже.
  */
 export const HOMEWORK_MIN_APP_VERSION = '1.8.9';
+/** Первая версия с экраном «Мой результат» экзамена (plan/new/live_exam.md, LiveExam 20) */
+export const EXAM_MIN_APP_VERSION = '1.9.6';
+const examLink = (data) =>
+  data?.sessionId
+    ? `flashly://exam-result/${encodeURIComponent(data.sessionId)}?from=push`
+    : LESSON_LINK();
+
 const homeworkLink = (data) =>
   data?.homeworkId
     ? `flashly://homework/${encodeURIComponent(data.homeworkId)}?from=push`
@@ -622,6 +629,23 @@ export const PUSH_TYPES = {
       ({ data }) => ({
         title: `${data.unit} открыт 2 дня`,
         body: `Начали ${data.started} из ${data.total} · ${data.course}. Задать срок?`,
+      }),
+    ],
+  },
+  // Учитель открыл результаты экзамена (plan/new/live_exam.md, LiveExam 20). Шлёт api/test.js
+  exam_results: {
+    category: 'course',
+    priority: 1,
+    transactional: true,
+    minIntervalDays: 0,
+    minAppVersion: EXAM_MIN_APP_VERSION,
+    link: examLink,
+    variants: [
+      ({ data }) => ({
+        title: Number.isFinite(data.score)
+          ? `Результат экзамена: ${data.score} из 100`
+          : 'Учитель открыл результаты экзамена',
+        body: `${data.title ? `«${data.title}» · ` : ''}посмотри, где были ошибки`,
       }),
     ],
   },

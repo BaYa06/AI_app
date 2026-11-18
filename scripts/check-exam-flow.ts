@@ -436,7 +436,26 @@ async function main() {
 
     const mine0 = await call(students[0], 'GET', 'exam-my', { sessionId });
     check('до открытия ученик не видит балл', mine0.body.released === false, mine0.body);
+    // Ученик 2 ошибся на вопросе №2 (№1 учитель засчитал) — слово «выучено» (шаг 3); после открытия — шаг 2
+    const wrongCard = draft.items[1].cardId;
+    await db.query(
+      `INSERT INTO card_progress (user_id, card_id, status, learning_step, next_review, updated_at)
+       VALUES ($1, $2, 'young', 3, NOW() + interval '5 days', NOW())`,
+      [students[1], wrongCard]
+    );
     const rel = await call(teacher, 'POST', 'exam-release', { sessionId });
+    const prog = (
+      await db.query<{ learning_step: number; due: boolean }>(
+        `SELECT learning_step, next_review <= NOW() + interval '1 minute' AS due
+         FROM card_progress WHERE user_id = $1 AND card_id = $2`,
+        [students[1], wrongCard]
+      )
+    ).rows[0];
+    check(
+      'ошибка вернулась в повторения: шаг 3 → 2, сразу к повторению',
+      prog?.learning_step === 2 && prog?.due === true,
+      prog
+    );
     check('открыть результаты', rel.status === 200, rel.body);
     const mine = await call(students[3], 'GET', 'exam-my', { sessionId });
     check(
@@ -455,6 +474,7 @@ async function main() {
   } finally {
     if (courseId) {
       await db.query(`DELETE FROM test_sessions WHERE course_id = $1`, [courseId]);
+      await db.query(`DELETE FROM card_progress WHERE user_id = ANY($1)`, [users]);
       await db.query(`DELETE FROM card_sets WHERE course_id = $1`, [courseId]);
       await db.query(`DELETE FROM courses WHERE id = $1`, [courseId]);
     }

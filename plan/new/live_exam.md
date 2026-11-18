@@ -400,7 +400,7 @@
 - [x] ✅ **LiveExam 19** — сервер: `exam-decide`, `exam-override`, `exam-undo`, `exam-question`
       (18.11.2026); засчитать / аннулировать / изменить балл + `test_score_log` (с отменой);
       `ExamQuestionScreen` (разбор вопроса до решения); `ExamStudentScreen` (+ `exam-student`).
-- [ ] **LiveExam 20** — `exam-release` (push), ошибки → повторения.
+- [x] ✅ **LiveExam 20** — `exam-release`: пуш `exam_results` («Результат экзамена: N из 100», `minAppVersion` 1.9.6, ссылка `flashly://exam-result/<id>`), ошибки и «нет ответа» → повторения по правилу неверного ответа (шаг −1, сразу к повторению; только слова, которые ученик уже учил). Один раз — при первом открытии.
 
 ### Этап 7 — ученик: результат
 - [x] ✅ **LiveExam 21** — сервер `exam-my`; `ExamResultScreen` (разбор) и `MyExamsScreen` (ссылка на экране входа по коду); разбор и «Мои экзамены», «Повторить N слов».

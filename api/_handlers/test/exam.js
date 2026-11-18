@@ -10,6 +10,7 @@
  * - черновик экзамена — status = 'draft': его не видят ни вход по коду, ни история.
  */
 import { broadcast, broadcastTestFinished } from './_shared.js';
+import { log } from '../../_log.js';
 import { generateUniqueCode, mainSetId } from './teacher.js';
 import { rejectIfLeft } from './student.js';
 import { finishParticipantEarly, attemptSummary } from './_shared.js';
@@ -1248,12 +1249,72 @@ export async function examRelease(req, res, sql, userId) {
   const session = await loadOwnExam(res, sql, userId, req.body?.sessionId);
   if (!session) return;
   if (session.status !== 'finished') return res.status(409).json({ error: 'Test not finished' });
+  const first = !session.results_released_at;
   const [row] = await sql`
     UPDATE test_sessions SET results_released_at = COALESCE(results_released_at, NOW())
     WHERE id = ${session.id}::uuid RETURNING results_released_at
   `;
+  if (first) {
+    await mistakesToReview(sql, session.id);
+    await notifyResults(sql, session);
+  }
   await broadcast(session.id, 'exam_results_released', { at: row.results_released_at }, ':exam');
   return res.status(200).json({ ok: true, releasedAt: row.results_released_at });
+}
+
+/**
+ * Ошибки возвращаются в обучение (LiveExam 20): слова, на которые ученик ответил неверно или не
+ * ответил, — по правилу неверного ответа в повторении (api/progress.js, applyAnswer): шаг −1, не
+ * ниже 0, сразу к повторению. Только у слов, которые ученик уже учил (строка card_progress есть).
+ */
+export async function mistakesToReview(sql, sessionId) {
+  const rows = await sql`
+    WITH m AS (
+      SELECT DISTINCT tp.user_id, ti.card_id
+      FROM test_items ti
+      JOIN test_participants tp ON tp.session_id = ti.session_id
+      LEFT JOIN test_answers ta ON ta.participant_id = tp.id AND ta.item_id = ti.id
+      WHERE ti.session_id = ${sessionId}::uuid AND NOT ti.voided AND ti.card_id IS NOT NULL
+        AND COALESCE(ta.verdict, 'none') <> 'correct'
+    )
+    UPDATE card_progress cp SET
+      learning_step = GREATEST(0, COALESCE(cp.learning_step, 0) - 1),
+      status = CASE
+        WHEN GREATEST(0, COALESCE(cp.learning_step, 0) - 1) = 0 THEN 'new'
+        WHEN GREATEST(0, COALESCE(cp.learning_step, 0) - 1) <= 2 THEN 'learning'
+        WHEN GREATEST(0, COALESCE(cp.learning_step, 0) - 1) <= 4 THEN 'young'
+        ELSE 'mature' END,
+      next_review = NOW(),
+      review_scheduled = false,
+      updated_at = NOW()
+    FROM m
+    WHERE cp.user_id = m.user_id AND cp.card_id = m.card_id
+    RETURNING cp.card_id
+  `;
+  return rows.length;
+}
+
+/** Пуш «Результат экзамена: N из 100» каждому сдававшему (тихие часы — в sendNotification) */
+async function notifyResults(sql, session) {
+  try {
+    const { sendNotification } = await import('../../push.js');
+    const items = await loadItems(sql, session.id);
+    const participants = await loadParticipants(sql, session.id);
+    const [meta] = await sql`
+      SELECT cs.title FROM card_sets cs WHERE cs.id = ${session.set_id}::uuid
+    `;
+    await Promise.allSettled(
+      participants.map((p) =>
+        sendNotification(sql, p.user_id, 'exam_results', {
+          sessionId: session.id,
+          score: scoreParticipant(items, p.answers, p.override).score,
+          title: meta?.title || '',
+        })
+      )
+    );
+  } catch (e) {
+    log.error('test', 'exam results push failed', e);
+  }
 }
 
 /** Подготовка учеников: повторения слов экзамена и дни с повторениями за 14 дней до начала */
