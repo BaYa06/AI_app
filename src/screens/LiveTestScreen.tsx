@@ -17,6 +17,7 @@ import type { RootStackParamList } from '@/types/navigation';
 import { log } from '@/utils/logger';
 import { getAccessToken } from '@/services/auth/session';
 import { rawApiFetch } from '@/services/api/client';
+import { ExamApi } from '@/services/exam';
 
 // Цвета аватаров участников — имена токенов, значения берутся из темы
 const AVATAR_TOKENS: ColorToken[] = ['primaryFill', 'warning', 'like', 'success', 'streak'];
@@ -62,6 +63,12 @@ export function LiveTestScreen({ navigation, route }: Props) {
   // Тест по списку слов (разминка, «Проверить на уроке»): слова — из monitor (Teacher 40)
   const [byCard, setByCard] = useState<CardStat[] | null>(null);
   const purposeRef = useRef<string | null>(null);
+  // Экзамен движка 2 (plan/new/live_exam.md): общий срок, пауза, +2 мин, свои итоги
+  const engineRef = useRef(1);
+  const [isExam, setIsExam] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [pausing, setPausing] = useState(false);
+  const [extraFor, setExtraFor] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hasNavigated = useRef(false);
 
@@ -69,7 +76,13 @@ export function LiveTestScreen({ navigation, route }: Props) {
     if (hasNavigated.current) return;
     hasNavigated.current = true;
     // Разминка заканчивается своим экраном итогов (П4, Teacher 41)
-    navigation.replace(purposeRef.current === 'warmup' ? 'WarmupResults' : 'TestResultsTeacher', {
+    const target =
+      engineRef.current === 2
+        ? 'ExamResults'
+        : purposeRef.current === 'warmup'
+          ? 'WarmupResults'
+          : 'TestResultsTeacher';
+    navigation.replace(target, {
       courseId: route.params.courseId,
       courseTitle: route.params.courseTitle,
       sessionId,
@@ -92,6 +105,11 @@ export function LiveTestScreen({ navigation, route }: Props) {
         if (!mountedRef.current) return;
 
         if (data.purpose) purposeRef.current = data.purpose;
+        if (data.engine === 2) {
+          engineRef.current = 2;
+          setIsExam(true);
+          setPaused(data.paused === true);
+        }
         if (data.status === 'finished') {
           goToResults();
           return;
@@ -112,8 +130,16 @@ export function LiveTestScreen({ navigation, route }: Props) {
           })
         );
 
-        // Вычислить оставшееся время
-        if (data.timePerQuestion > 0 && data.startedAt && data.questionCount) {
+        // Экзамен: общий срок; на паузе время стоит (срок считает сервер, здесь — показ)
+        if (data.engine === 2 && data.durationSec && data.startedAt) {
+          const now = data.serverNow ? new Date(data.serverNow).getTime() : Date.now();
+          const pausedNow = data.pausedAt ? now - new Date(data.pausedAt).getTime() : 0;
+          const elapsed = Math.floor(
+            (now - new Date(data.startedAt).getTime() - pausedNow) / 1000 -
+              (data.pausedTotalSec || 0)
+          );
+          setTimeLeft(Math.max(0, data.durationSec - elapsed));
+        } else if (data.timePerQuestion > 0 && data.startedAt && data.questionCount) {
           const totalSec = data.timePerQuestion * data.questionCount;
           const elapsed = Math.floor((Date.now() - new Date(data.startedAt).getTime()) / 1000);
           setTimeLeft(Math.max(0, totalSec - elapsed));
@@ -137,7 +163,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
 
   // Таймер обратного отсчёта
   useEffect(() => {
-    if (timeLeft === null || timeLeft <= 0) return;
+    if (timeLeft === null || timeLeft <= 0 || paused) return;
     timerRef.current = setInterval(() => {
       setTimeLeft((t) => {
         if (t === null || t <= 1) {
@@ -150,11 +176,11 @@ export function LiveTestScreen({ navigation, route }: Props) {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [timeLeft !== null && timeLeft > 0]);
+  }, [timeLeft !== null && timeLeft > 0, paused]);
 
-  // Auto-finish: время вышло
+  // Auto-finish: время вышло. Экзамен завершает сервер сам — у кого-то может быть +2 мин.
   useEffect(() => {
-    if (timeLeft === 0 && !hasNavigated.current) {
+    if (timeLeft === 0 && !hasNavigated.current && engineRef.current !== 2) {
       handleEndTest();
     }
   }, [timeLeft]);
@@ -261,6 +287,31 @@ export function LiveTestScreen({ navigation, route }: Props) {
   }, [ending, sessionId, goToResults]);
 
   // Ложное срабатывание (звонок, блокировка телефона, сбой) — вернуть ученика к тесту
+  const togglePause = useCallback(async () => {
+    setPausing(true);
+    try {
+      const res = await ExamApi.pause(sessionId, !paused);
+      if (res.ok) setPaused(res.data.paused);
+      else toast.error('Не удалось поставить паузу. Проверь интернет.');
+    } finally {
+      setPausing(false);
+    }
+  }, [sessionId, paused]);
+
+  const addTime = useCallback(
+    async (studentUserId: string) => {
+      setExtraFor(studentUserId);
+      try {
+        const res = await ExamApi.extraTime(sessionId, studentUserId, 2);
+        if (res.ok) toast.success('Добавили ученику 2 минуты');
+        else toast.error('Не удалось добавить время.');
+      } finally {
+        setExtraFor(null);
+      }
+    },
+    [sessionId]
+  );
+
   const handleReinstate = useCallback(
     async (st: StudentProgress) => {
       const ok = await confirmDialog({
@@ -336,7 +387,9 @@ export function LiveTestScreen({ navigation, route }: Props) {
         >
           <ArrowLeft size={22} color={colors.textPrimary} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Тест идёт</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+          {isExam ? (paused ? 'Экзамен на паузе' : 'Экзамен идёт') : 'Тест идёт'}
+        </Text>
         <Pressable
           accessibilityRole="button"
           style={({ pressed }) => [pressed && { opacity: 0.6 }]}
@@ -382,6 +435,14 @@ export function LiveTestScreen({ navigation, route }: Props) {
           <Text style={[styles.timerLabel, { color: colors.textSecondary }]}>Мин</Text>
           <Text style={[styles.timerLabel, { color: colors.textSecondary }]}>Сек</Text>
         </View>
+        {isExam && (
+          <Button
+            title={paused ? 'Продолжить экзамен' : 'Пауза для всех'}
+            variant="secondary"
+            loading={pausing}
+            onPress={togglePause}
+          />
+        )}
 
         {/* Live Status Card */}
         <View style={[styles.statusCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
@@ -560,6 +621,16 @@ export function LiveTestScreen({ navigation, route }: Props) {
                       )}
                     </View>
                   )}
+                {isExam && !st.done && !left && (
+                  <Button
+                    title="+2 мин"
+                    variant="quiet"
+                    size="s"
+                    loading={extraFor === st.userId}
+                    disabled={extraFor !== null}
+                    onPress={() => addTime(st.userId)}
+                  />
+                )}
                 {left && (
                   <Button
                     title="Разрешить продолжить"

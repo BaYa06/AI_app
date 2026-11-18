@@ -173,7 +173,12 @@ export function TestHistoryScreen({ navigation, route }: Props) {
               key={item.sessionId}
               onPress={() =>
                 navigation.navigate(
-                  item.purpose === 'warmup' ? 'WarmupResults' : 'TestResultsTeacher',
+                  // Экзамен движка 2 (plan/new/live_exam.md) — свои итоги
+                  item.testMode === 'exam'
+                    ? 'ExamResults'
+                    : item.purpose === 'warmup'
+                      ? 'WarmupResults'
+                      : 'TestResultsTeacher',
                   {
                     courseId,
                     courseTitle,

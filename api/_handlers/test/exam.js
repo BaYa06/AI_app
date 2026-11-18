@@ -1256,6 +1256,74 @@ export async function examRelease(req, res, sql, userId) {
   return res.status(200).json({ ok: true, releasedAt: row.results_released_at });
 }
 
+/** Подготовка учеников: повторения слов экзамена и дни с повторениями за 14 дней до начала */
+export const PREP_DAYS = 14;
+
+async function preparation(sql, session) {
+  const cardIds = (session.card_ids || []).filter(Boolean);
+  const since = session.started_at || session.created_at;
+  if (!cardIds.length || !since) return new Map();
+  const rows = await sql`
+    SELECT rl.user_id, COUNT(*)::int AS reviews,
+           COUNT(DISTINCT date_trunc('day', rl.reviewed_at))::int AS days
+    FROM review_log rl
+    WHERE rl.card_id = ANY(${cardIds}::uuid[])
+      AND rl.reviewed_at <= ${since}::timestamptz
+      AND rl.reviewed_at > ${since}::timestamptz - make_interval(days => ${PREP_DAYS})
+      AND rl.user_id IN (SELECT user_id FROM test_participants WHERE session_id = ${session.id}::uuid)
+    GROUP BY rl.user_id
+  `;
+  return new Map(rows.map((r) => [r.user_id, { reviews: r.reviews, days: r.days }]));
+}
+
+/**
+ * GET ?action=exam-student&sessionId=…&participantId=…
+ * Карточка ученика для учителя: ответы с вердиктами, подготовка против класса, выходы из
+ * приложения, ручной балл и комментарий.
+ */
+export async function examStudent(req, res, sql, userId) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  const session = await loadOwnExam(res, sql, userId, req.query.sessionId);
+  if (!session) return;
+  const { participantId } = req.query;
+  if (!isUuid(participantId)) return res.status(400).json({ error: 'participantId is required' });
+  const [p] = await sql`
+    SELECT id, user_id, display_name, score_override, score_comment, left_reason, away_count,
+           finished_at, submitted_at, extra_sec
+    FROM test_participants WHERE id = ${participantId}::uuid AND session_id = ${session.id}::uuid
+  `;
+  if (!p) return res.status(404).json({ error: 'Participant not found' });
+  const review = await studentReview(sql, session.id, p.id);
+  const prep = await preparation(sql, session);
+  const [count] = await sql`
+    SELECT COUNT(*)::int AS n FROM test_participants WHERE session_id = ${session.id}::uuid
+  `;
+  const all = [...prep.values()];
+  const n = Math.max(1, count?.n || 1);
+  const mine = prep.get(p.user_id) || { reviews: 0, days: 0 };
+  const [computed] = [review.score];
+  return res.status(200).json({
+    participantId: p.id,
+    userId: p.user_id,
+    name: p.display_name,
+    override: p.score_override,
+    comment: p.score_comment,
+    leftReason: p.left_reason,
+    awayCount: p.away_count || 0,
+    finished: Boolean(p.finished_at),
+    extraSec: p.extra_sec || 0,
+    preparation: {
+      days: PREP_DAYS,
+      reviews: mine.reviews,
+      reviewDays: mine.days,
+      classReviews: Math.round(all.reduce((a, x) => a + x.reviews, 0) / n),
+      classReviewDays: Math.round((all.reduce((a, x) => a + x.days, 0) / n) * 10) / 10,
+    },
+    ...review,
+    score: computed,
+  });
+}
+
 // ─── Ученик: результат ──────────────────────────────────────
 
 /** Разбор для ученика: балл, по форматам, ответы с пометками учителя */

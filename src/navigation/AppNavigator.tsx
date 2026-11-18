@@ -106,6 +106,12 @@ import { StudentHomeworkScreen } from '@/screens/StudentHomeworkScreen';
 import { HomeworkDoneScreen } from '@/screens/HomeworkDoneScreen';
 import { StudentDetailScreen } from '@/screens/StudentDetailScreen';
 import { ExamLobbyScreen } from '@/screens/ExamLobbyScreen';
+import { ExamSetupScreen } from '@/screens/ExamSetupScreen';
+import { ExamBuildScreen } from '@/screens/ExamBuildScreen';
+import { ExamPreviewScreen } from '@/screens/ExamPreviewScreen';
+import { ExamResultsScreen } from '@/screens/ExamResultsScreen';
+import { ExamQuestionScreen } from '@/screens/ExamQuestionScreen';
+import { ExamStudentScreen } from '@/screens/ExamStudentScreen';
 import { TestHistoryScreen } from '@/screens/TestHistoryScreen';
 import { CourseLeaderboardScreen } from '@/screens/CourseLeaderboardScreen';
 import { TestLobbyScreen } from '@/screens/TestLobbyScreen';
@@ -663,6 +669,37 @@ export function AppNavigator() {
           name="ExamLobby"
           component={ExamLobbyScreen}
           options={{ headerShown: false, gestureEnabled: true }}
+        />
+        {/* Экзамен с оценкой — учитель (plan/new/live_exam.md) */}
+        <Stack.Screen
+          name="ExamSetup"
+          component={ExamSetupScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ExamBuild"
+          component={ExamBuildScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ExamPreview"
+          component={ExamPreviewScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ExamResults"
+          component={ExamResultsScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ExamQuestion"
+          component={ExamQuestionScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ExamStudent"
+          component={ExamStudentScreen}
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="TestHistory"

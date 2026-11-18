@@ -187,6 +187,25 @@ export type StudentReview = {
   items?: ReviewItem[];
 };
 
+export type ExamStudentCard = StudentReview & {
+  participantId: string;
+  userId: string;
+  name: string;
+  override: number | null;
+  comment: string | null;
+  leftReason: string | null;
+  awayCount: number;
+  finished: boolean;
+  extraSec: number;
+  preparation: {
+    days: number;
+    reviews: number;
+    reviewDays: number;
+    classReviews: number;
+    classReviewDays: number;
+  };
+};
+
 export type MyExam = {
   sessionId: string;
   setTitle: string;
@@ -281,6 +300,8 @@ export const ExamApi = {
     callExam<{ ok: boolean }>('exam-undo', 'POST', { sessionId, logId }),
   release: (sessionId: string) =>
     callExam<{ releasedAt: string }>('exam-release', 'POST', { sessionId }),
+  student: (sessionId: string, participantId: string) =>
+    callExam<ExamStudentCard>('exam-student', 'GET', { sessionId, participantId }),
   my: () => callExam<MyExam[]>('exam-my', 'GET'),
   myOne: (sessionId: string) => callExam<StudentReview>('exam-my', 'GET', { sessionId }),
 };

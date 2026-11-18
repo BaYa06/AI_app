@@ -150,6 +150,10 @@ export function ExamResultScreen({ navigation, route }: Props) {
         </View>
       ) : null}
 
+      <Text variant="caption" style={{ color: colors.textSecondary }}>
+        Учитель видит, сколько ты повторял слова экзамена в последние две недели.
+      </Text>
+
       {voided.length ? (
         <View style={styles.section}>
           <Text variant="h3" accessibilityRole="header">

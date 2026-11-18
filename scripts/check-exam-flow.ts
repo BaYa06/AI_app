@@ -419,6 +419,21 @@ async function main() {
       st3
     );
 
+    const card = await call(teacher, 'GET', 'exam-student', { sessionId, participantId: pids[3] });
+    check(
+      'карточка ученика: ответы, подготовка, комментарий',
+      card.status === 200 &&
+        card.body.items?.length === 20 &&
+        card.body.preparation?.days === 14 &&
+        card.body.comment === 'Устно ответил хорошо',
+      card.body
+    );
+    const cardForeign = await call(students[0], 'GET', 'exam-student', {
+      sessionId,
+      participantId: pids[3],
+    });
+    check('ученик не видит карточку другого', cardForeign.status === 403, cardForeign.status);
+
     const mine0 = await call(students[0], 'GET', 'exam-my', { sessionId });
     check('до открытия ученик не видит балл', mine0.body.released === false, mine0.body);
     const rel = await call(teacher, 'POST', 'exam-release', { sessionId });

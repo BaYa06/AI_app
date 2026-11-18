@@ -386,8 +386,8 @@
 - [x] ✅ **LiveExam 12** — `ChoiceQuestion`, `WriteQuestion` (+ офлайн-очередь ответов) — `src/screens/exam/ExamFormats.tsx`.
 
 ### Этап 4 — учитель: создание
-- [ ] **LiveExam 13** — новый `ExamLobbyScreen` (сложность, форматы, «Советуем»).
-- [ ] **LiveExam 14** — `ExamBuildScreen` и `ExamPreviewScreen`.
+- [x] ✅ **LiveExam 13** — `ExamSetupScreen` (новый; в `ExamLobbyScreen` — карточка «Экзамен с оценкой», старая настройка теста не тронута): наборы, число слов, сложность/случайно, неизученные, форматы, время с «Советуем» и расчётом, шкала, когда показать, контроль выхода. «Вручную» — пока нет.
+- [x] ✅ **LiveExam 14** — `ExamBuildScreen` и `ExamPreviewScreen` (замена слова, «Открыть экзамен» → `TestLobby`).
 
 ### Этап 5 — остальные форматы
 - [x] ✅ **LiveExam 15** — `ScrambleQuestion` (1 и 2 ряда).
@@ -395,24 +395,27 @@
 - [x] ✅ **LiveExam 17** — `GapQuestion` (выбор и письмо «в нужной форме»).
 
 ### Этап 6 — итоги и оценки учителя
-- [ ] **LiveExam 18** — ✅ сервер `exam-results` (18.11.2026); `TestResultsTeacherScreen` движка 2 (карточки учеников,
+- [x] ✅ **LiveExam 18** — сервер `exam-results`; `ExamResultsScreen` (новый, из монитора и истории по `engine = 2` / `testMode = 'exam'`) вместо `TestResultsTeacherScreen` движка 2 (карточки учеников,
       вкладка «Слова», анализ вопросов).
-- [ ] **LiveExam 19** — ✅ сервер: `exam-decide`, `exam-override`, `exam-undo`, `exam-question`
+- [x] ✅ **LiveExam 19** — сервер: `exam-decide`, `exam-override`, `exam-undo`, `exam-question`
       (18.11.2026); засчитать / аннулировать / изменить балл + `test_score_log` (с отменой);
-      `ExamQuestionScreen` (разбор вопроса до решения); `ExamStudentScreen`.
+      `ExamQuestionScreen` (разбор вопроса до решения); `ExamStudentScreen` (+ `exam-student`).
 - [ ] **LiveExam 20** — `exam-release` (push), ошибки → повторения.
 
 ### Этап 7 — ученик: результат
 - [x] ✅ **LiveExam 21** — сервер `exam-my`; `ExamResultScreen` (разбор) и `MyExamsScreen` (ссылка на экране входа по коду); разбор и «Мои экзамены», «Повторить N слов».
 
 ### Этап 8 — знание учеников в итогах
-- [ ] **LiveExam 22** — подготовка ученика (повторения/дни vs класс), подозрительные признаки,
-      сообщение ученику о том, что учитель это видит.
+- [x] ✅ **LiveExam 22** — подготовка ученика (повторения/дни vs класс), подозрительные признаки,
+      сообщение ученику о том, что учитель это видит. Сделано: подготовка в `exam-student`
+      (14 дней до начала, повторения и дни против среднего по классу), признаки «все ответы
+      быстрее 2 с» и выходы — в итогах. **Не сделано:** признак «высокий балл без единого
+      повторения».
 - [ ] **LiveExam 23** — домашка по ошибкам, экспорт Excel (по образцу
       `src/screens/teacherHomework/exportHomework.ts`), пересдача.
 
 ### Этап 9 — управление во время экзамена
-- [ ] **LiveExam 24** — ✅ сервер `exam-pause`, `exam-extra-time`, срок в `monitor`; пауза для всех, +2 мин ученику, в мониторе — таймер экзамена.
+- [x] ✅ **LiveExam 24** — сервер `exam-pause`, `exam-extra-time`, срок в `monitor`; пауза для всех, +2 мин ученику, в мониторе — таймер экзамена.
 
 ### Аналитика
 `exam_built` (N, режим, доли, предупреждения), `exam_started`, `exam_submitted`,

@@ -16,6 +16,8 @@ import {
   Plus,
   Check,
   ChevronDown,
+  ChevronRight,
+  GraduationCap,
 } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import { Switch, BottomBar } from '@/components/ui';
@@ -137,6 +139,41 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Экзамен с оценкой (plan/new/live_exam.md): отдельная настройка — сложность, форматы */}
+        {!byList && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Экзамен с оценкой: одинаковые слова, 100 баллов, разные форматы"
+            onPress={() =>
+              navigation.navigate('ExamSetup', {
+                courseId: route.params.courseId,
+                courseTitle: route.params.courseTitle,
+              })
+            }
+            style={({ pressed }) => [
+              styles.examEntry,
+              {
+                backgroundColor: alpha(colors.primary, 10),
+                borderColor: alpha(colors.primary, 40),
+              },
+              pressed && { opacity: 0.8 },
+            ]}
+          >
+            <View style={[styles.dropdownIcon, { backgroundColor: colors.primaryFill }]}>
+              <GraduationCap size={18} color={colors.onPrimary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.setCardTitle, { color: colors.textPrimary }]}>
+                Экзамен с оценкой
+              </Text>
+              <Text style={[styles.settingHint, { color: colors.textSecondary }]}>
+                Одинаковые слова для всех, 100 баллов, выбор, письмо, пары и «собери слово»
+              </Text>
+            </View>
+            <ChevronRight size={20} color={colors.textSecondary} />
+          </Pressable>
+        )}
+
         {/* Select Set — Dropdown */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
@@ -523,6 +560,15 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
+  examEntry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+    padding: spacing.m,
+    borderRadius: borderRadius.l,
+    borderWidth: 1,
+    marginBottom: spacing.l,
+  },
   container: {
     flex: 1,
   },

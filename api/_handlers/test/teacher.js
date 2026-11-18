@@ -271,7 +271,9 @@ export async function monitorTest(req, res, sql, userId) {
           engine,
           durationSec: session[0].duration_sec,
           paused: Boolean(session[0].paused_at),
+          pausedAt: session[0].paused_at || null,
           pausedTotalSec: session[0].paused_total_sec || 0,
+          serverNow: new Date().toISOString(),
         }
       : {}),
     ...(byCard ? { byCard } : {}),
