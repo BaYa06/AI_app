@@ -50,6 +50,7 @@ import { recordHighlightLessonDay } from '@/services/dailyHighlight';
 import { localDay } from '@/store/challengeStore';
 import type { StarterSet } from '@/services/StarterSetService';
 import { initCrashReporting, setCrashUserId } from '@/services/crashReporting';
+import { StreakService } from '@/services/StreakService';
 import {
   refreshPushToken,
   subscribeForegroundMessages,
@@ -66,6 +67,15 @@ import { type AuthStep, AppRoot } from './app/AppRoot';
 
 // Метка сервера для отчётов о падениях (plan/done/release_safety.md, Release 4)
 initCrashReporting();
+
+/** Момент запуска JS — от него считаем, сколько уже видна заставка */
+const APP_STARTED_AT = Date.now();
+/**
+ * Заставка с логотипом — не меньше этого. Сохранённые данные грузятся почти мгновенно, а свежие
+ * с сервера (серия, урок дня, роль) — в фоне: без паузы главная открывалась раньше них и
+ * перерисовывалась на глазах. Пока видна заставка, они успевают прийти.
+ */
+const SPLASH_MIN_MS = 3_000;
 
 /** Дождаться, пока очередь отправит ответы (не дольше timeoutMs) */
 async function waitForSyncQueue(timeoutMs: number): Promise<void> {
@@ -217,6 +227,18 @@ export default function App() {
             const { data: sess } = await supabase.auth.getSession();
             if (sess.session?.user?.id) {
               loadedUserIdRef.current = sess.session.user.id;
+              // Пока видна заставка (SPLASH_MIN_MS) — то, что главная иначе спросила бы уже на экране:
+              // роль и серия. Ответы ложатся в кэш, главная откроется сразу с ними
+              const userId = sess.session.user.id;
+              useSettingsStore
+                .getState()
+                .fetchIsTeacher(userId)
+                .catch(() => {});
+              Promise.all([
+                StreakService.fetchTodayActivity(),
+                StreakService.fetchUserStats(),
+                StreakService.fetchWeekActivity(10),
+              ]).catch(() => {});
             }
           } catch {}
           unsubscribe = setupAutoSave();
@@ -224,6 +246,9 @@ export default function App() {
       } catch (error) {
         log.error('App', 'Failed to initialize app', error);
       } finally {
+        // Данные уже есть — держим заставку до SPLASH_MIN_MS от запуска (не дольше общего лимита)
+        const rest = SPLASH_MIN_MS - (Date.now() - APP_STARTED_AT);
+        if (rest > 0 && !splashReleased) await new Promise((r) => setTimeout(r, rest));
         clearTimeout(splashTimer);
         splashReleased = true;
         if (isMounted) {
