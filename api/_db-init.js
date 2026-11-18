@@ -8,7 +8,7 @@ import { log } from './_log.js';
  */
 // schema_039: в 038 (official_sets_guard) и 039 (set_kind) версию не подняли — миграции не выполнились,
 // и запросы с card_sets.kind падали на тестовом сервере (plan/new/set_kind.md, слабые места)
-const SCHEMA_VERSION = 'schema_054';
+const SCHEMA_VERSION = 'schema_055';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -1273,6 +1273,75 @@ async function applyMigrations(sql) {
     `;
   } catch (e) {
     log.error('db-init', 'Migration 054_book_courses failed', e);
+  }
+
+  // Migration 055: живой экзамен (plan/new/live_exam.md, LiveExam 1). Только добавляющие
+  // изменения: старый тест (engine = 1) не меняется. Тексты — как в database/migrations/055_live_exam.sql
+  try {
+    await sql`ALTER TABLE card_sets ADD COLUMN IF NOT EXISTS back_kind TEXT CHECK (back_kind IN ('translation', 'definition'))`;
+    await sql`ALTER TABLE card_sets ADD COLUMN IF NOT EXISTS back_kind_source TEXT DEFAULT 'auto'`;
+    await sql`ALTER TABLE cards ADD COLUMN IF NOT EXISTS pos_guess VARCHAR(8)`;
+    await sql`ALTER TABLE cards ADD COLUMN IF NOT EXISTS gap_text TEXT`;
+    await sql`ALTER TABLE cards ADD COLUMN IF NOT EXISTS gap_answer TEXT`;
+    await sql`ALTER TABLE cards ADD COLUMN IF NOT EXISTS gap_kind VARCHAR(10)`;
+
+    await sql`ALTER TABLE test_sessions ADD COLUMN IF NOT EXISTS engine SMALLINT NOT NULL DEFAULT 1`;
+    await sql`ALTER TABLE test_sessions ADD COLUMN IF NOT EXISTS config JSONB`;
+    await sql`ALTER TABLE test_sessions ADD COLUMN IF NOT EXISTS duration_sec INTEGER`;
+    await sql`ALTER TABLE test_sessions ADD COLUMN IF NOT EXISTS paused_at TIMESTAMPTZ`;
+    await sql`ALTER TABLE test_sessions ADD COLUMN IF NOT EXISTS paused_total_sec INTEGER NOT NULL DEFAULT 0`;
+    await sql`ALTER TABLE test_sessions ADD COLUMN IF NOT EXISTS reveal_mode VARCHAR(12)`;
+    await sql`ALTER TABLE test_sessions ADD COLUMN IF NOT EXISTS results_released_at TIMESTAMPTZ`;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS test_items (
+        id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        session_id       UUID NOT NULL REFERENCES test_sessions(id) ON DELETE CASCADE,
+        card_id          UUID REFERENCES cards(id) ON DELETE SET NULL,
+        block_no         INTEGER NOT NULL,
+        format           VARCHAR(10) NOT NULL,
+        direction        VARCHAR(10),
+        prompt           TEXT NOT NULL,
+        answer           TEXT NOT NULL,
+        options          JSONB,
+        extra            JSONB,
+        difficulty       VARCHAR(10),
+        points           NUMERIC(6,2) NOT NULL DEFAULT 0,
+        voided           BOOLEAN NOT NULL DEFAULT false,
+        accepted_answers JSONB NOT NULL DEFAULT '[]'::jsonb,
+        sort_key         INTEGER NOT NULL DEFAULT 0
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_test_items_session ON test_items(session_id)`;
+
+    await sql`ALTER TABLE test_participants ADD COLUMN IF NOT EXISTS block_order JSONB`;
+    await sql`ALTER TABLE test_participants ADD COLUMN IF NOT EXISTS extra_sec INTEGER NOT NULL DEFAULT 0`;
+    await sql`ALTER TABLE test_participants ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ`;
+    await sql`ALTER TABLE test_participants ADD COLUMN IF NOT EXISTS score_override SMALLINT`;
+    await sql`ALTER TABLE test_participants ADD COLUMN IF NOT EXISTS score_comment TEXT`;
+    await sql`ALTER TABLE test_participants ADD COLUMN IF NOT EXISTS retake_of UUID`;
+
+    await sql`ALTER TABLE test_answers ADD COLUMN IF NOT EXISTS item_id UUID`;
+    await sql`ALTER TABLE test_answers ADD COLUMN IF NOT EXISTS verdict VARCHAR(12)`;
+    await sql`ALTER TABLE test_answers ADD COLUMN IF NOT EXISTS points NUMERIC(6,2)`;
+    await sql`ALTER TABLE test_answers ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ`;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS test_score_log (
+        id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        session_id     UUID NOT NULL REFERENCES test_sessions(id) ON DELETE CASCADE,
+        teacher_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        action         VARCHAR(20) NOT NULL,
+        item_id        UUID,
+        participant_id UUID,
+        payload        JSONB,
+        created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        undone_at      TIMESTAMPTZ
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_test_score_log_session ON test_score_log(session_id)`;
+  } catch (e) {
+    log.error('db-init', 'Migration 055_live_exam failed', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)
