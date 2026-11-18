@@ -13,11 +13,12 @@
  * результатов, «Мои экзамены» и разбор у ученика, совместимость монитора и старых итогов.
  */
 import http from 'node:http';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 import { connect, describeDatabaseTarget, getDatabaseUrl, isStagingRun } from './lib/db';
 
 const TAG = 'EXAM-CHECK';
+const RUN = randomBytes(2).toString('hex').toUpperCase(); // users.user_name уникален
 type Res = { status: number; body: any };
 type Handler = (req: any, res: any) => Promise<unknown>;
 
@@ -143,7 +144,7 @@ async function main() {
     for (const [i, id] of users.entries()) {
       await db.query(`INSERT INTO users (id, display_name, user_name) VALUES ($1, $2, $2)`, [
         id,
-        `${TAG} ${i === 0 ? 'Учитель' : `Ученик ${i}`}`,
+        `${TAG} ${RUN} ${i === 0 ? 'Учитель' : `Ученик ${i}`}`,
       ]);
     }
     courseId = (
@@ -491,15 +492,24 @@ async function main() {
       Array.isArray(list.body) && list.body.some((e: any) => e.sessionId === sessionId)
     );
   } finally {
-    if (courseId) {
-      await db.query(`DELETE FROM test_sessions WHERE course_id = $1`, [courseId]);
-      await db.query(`DELETE FROM card_progress WHERE user_id = ANY($1)`, [users]);
-      await db.query(`DELETE FROM homework WHERE course_id = $1`, [courseId]);
-      await db.query(`DELETE FROM card_sets WHERE course_id = $1`, [courseId]);
-      await db.query(`DELETE FROM courses WHERE id = $1`, [courseId]);
+    // Каждый шаг отдельно: упавший шаг не должен оставить пользователей EXAM-CHECK в базе
+    const cleanup: [string, unknown[]][] = [
+      [`DELETE FROM test_sessions WHERE course_id = $1`, [courseId]],
+      [`DELETE FROM card_progress WHERE user_id = ANY($1)`, [users]],
+      [`DELETE FROM homework WHERE course_id = $1`, [courseId]],
+      [`DELETE FROM card_sets WHERE course_id = $1`, [courseId]],
+      [`DELETE FROM courses WHERE id = $1`, [courseId]],
+      [`DELETE FROM api_rate_limits WHERE user_id = ANY($1)`, [users]],
+      [`DELETE FROM users WHERE id = ANY($1)`, [users]],
+    ];
+    for (const [text, params] of cleanup) {
+      if (!courseId && text.includes('course_id')) continue;
+      try {
+        await db.query(text, params);
+      } catch (e) {
+        console.error(`  ! очистка: ${text} — ${(e as Error).message}`);
+      }
     }
-    await db.query(`DELETE FROM api_rate_limits WHERE user_id = ANY($1)`, [users]);
-    await db.query(`DELETE FROM users WHERE id = ANY($1)`, [users]);
     await db.end();
     fake.close();
   }
