@@ -266,6 +266,30 @@ export type RootStackParamList = {
     sessionId: string;
   };
   TestJoin: undefined;
+  /** Живой экзамен, движок 2 (plan/new/live_exam.md): экран ученика */
+  ExamTake: { sessionId: string; participantId: string; exitControl?: boolean; setTitle?: string };
+  /** «Мой результат» — разбор экзамена у ученика */
+  ExamResult: { sessionId: string; setTitle?: string };
+  /** «Мои экзамены» ученика */
+  MyExams: undefined;
+  /** Учитель: настройка экзамена с оценкой */
+  ExamSetup: { courseId: string; courseTitle: string };
+  /** Учитель: «Собираем экзамен» — шаги сборки с настоящими цифрами */
+  ExamBuild: {
+    courseId: string;
+    courseTitle: string;
+    sessionId: string;
+    steps: { key: string; title: string; detail: string }[];
+    warnings: { code: string; text: string }[];
+  };
+  /** Учитель: превью «что увидят ученики» */
+  ExamPreview: { courseId: string; courseTitle: string; sessionId: string };
+  /** Учитель: итоги экзамена движка 2 */
+  ExamResults: { courseId: string; courseTitle: string; sessionId: string };
+  /** Учитель: разбор одного вопроса */
+  ExamQuestion: { sessionId: string; itemId: string };
+  /** Учитель: карточка ученика в итогах экзамена */
+  ExamStudent: { sessionId: string; participantId: string; courseId: string };
   TestWaiting: {
     sessionId: string;
     participantId: string;
@@ -276,6 +300,8 @@ export type RootStackParamList = {
     timePerQuestion: number;
     // Учитель включил контроль выхода из приложения (plan/done/exam_lockdown.md)
     exitControl?: boolean;
+    /** 2 — экзамен (plan/new/live_exam.md): после старта открыть ExamTake */
+    engine?: number;
   };
   TestExam: {
     sessionId: string;

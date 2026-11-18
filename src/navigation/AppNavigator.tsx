@@ -115,6 +115,9 @@ import { TestResultsTeacherScreen } from '@/screens/TestResultsTeacherScreen';
 import { WarmupResultsScreen } from '@/screens/WarmupResultsScreen';
 import { TestJoinScreen } from '@/screens/TestJoinScreen';
 import { TestWaitingScreen } from '@/screens/TestWaitingScreen';
+import { ExamTakeScreen } from '@/screens/ExamTakeScreen';
+import { ExamResultScreen } from '@/screens/ExamResultScreen';
+import { MyExamsScreen } from '@/screens/MyExamsScreen';
 import { TestExamScreen } from '@/screens/TestExamScreen';
 import { TestDoneScreen } from '@/screens/TestDoneScreen';
 import { ContextFillScreen } from '@/screens/ContextFillScreen';
@@ -716,6 +719,18 @@ export function AppNavigator() {
           component={TestDoneScreen}
           options={{ headerShown: false, gestureEnabled: false }}
         />
+        {/* Живой экзамен, движок 2 (plan/new/live_exam.md) */}
+        <Stack.Screen
+          name="ExamTake"
+          component={ExamTakeScreen}
+          options={{ headerShown: false, gestureEnabled: false }}
+        />
+        <Stack.Screen
+          name="ExamResult"
+          component={ExamResultScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen name="MyExams" component={MyExamsScreen} options={{ headerShown: false }} />
         <Stack.Screen
           name="ContextFill"
           component={ContextFillScreen}

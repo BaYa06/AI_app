@@ -17,6 +17,7 @@ import type { RootStackParamList } from '@/types/navigation';
 import { describeTestError } from '@/utils/testApiErrors';
 import { getAccessToken, getSession } from '@/services/auth/session';
 import { rawApiFetch } from '@/services/api/client';
+import { EXAM_FEATURES } from '@/services/exam';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TestJoin'>;
 
@@ -95,12 +96,31 @@ export function TestJoinScreen({ navigation, route }: Props) {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         // exitControl: приложение умеет контроль выхода (plan/done/exam_lockdown.md) — сервер
         // применяет к нему правило «повторный вход в идущий тест = выход».
-        body: { code, exitControl: true },
+        // features: приложение умеет экзамен движка 2 (plan/new/live_exam.md) — без этого сервер
+        // отвечает 426 «обновите приложение».
+        body: { code, exitControl: true, features: EXAM_FEATURES },
       });
       const result = await resp.json();
 
       if (!resp.ok) {
         throw new Error(result.error || `Error ${resp.status}`);
+      }
+
+      // Экзамен движка 2: идёт — сразу экран экзамена (он сам покажет «сдано» / «вышел»)
+      if (result.engine === 2 && result.alreadyJoined && result.status === 'active') {
+        const params = {
+          sessionId: result.sessionId,
+          participantId: result.participantId,
+          exitControl: result.exitControl === true,
+          setTitle: result.setTitle,
+        };
+        if (isTab) {
+          resetForm();
+          navigation.navigate('ExamTake', params);
+        } else {
+          navigation.replace('ExamTake', params);
+        }
+        return;
       }
 
       // Переподключение к уже идущему тесту — открыть сразу вопрос, на котором ученик
@@ -163,6 +183,7 @@ export function TestJoinScreen({ navigation, route }: Props) {
         questionCount: result.questionCount,
         timePerQuestion: result.timePerQuestion,
         exitControl: result.exitControl === true,
+        ...(result.engine === 2 ? { engine: 2 } : {}),
       };
       if (isTab) {
         resetForm();
@@ -294,6 +315,9 @@ export function TestJoinScreen({ navigation, route }: Props) {
         loading={joining}
         onPress={handleJoin}
       />
+
+      {/* История экзаменов и разбор (plan/new/live_exam.md, LiveExam 21) */}
+      <Button title="Мои экзамены" variant="quiet" onPress={() => navigation.navigate('MyExams')} />
     </Screen>
   );
 }

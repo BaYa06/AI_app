@@ -42,6 +42,7 @@ export function TestWaitingScreen({ navigation, route }: Props) {
     questionCount,
     timePerQuestion,
     exitControl,
+    engine,
   } = route.params;
 
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -56,6 +57,11 @@ export function TestWaitingScreen({ navigation, route }: Props) {
   const openExam = useCallback(() => {
     if (navigatedRef.current) return;
     navigatedRef.current = true;
+    // Экзамен движка 2 (plan/new/live_exam.md) — свой экран: карта вопросов, общий таймер
+    if (engine === 2) {
+      navigation.replace('ExamTake', { sessionId, participantId, exitControl, setTitle });
+      return;
+    }
     navigation.replace('TestExam', {
       sessionId,
       participantId,
@@ -64,7 +70,17 @@ export function TestWaitingScreen({ navigation, route }: Props) {
       timePerQuestion,
       exitControl,
     });
-  }, [navigation, sessionId, participantId, testMode, questionCount, timePerQuestion, exitControl]);
+  }, [
+    navigation,
+    sessionId,
+    participantId,
+    testMode,
+    questionCount,
+    timePerQuestion,
+    exitControl,
+    engine,
+    setTitle,
+  ]);
 
   const onTestStarted = useCallback(() => {
     if (rulesAcceptedRef.current) openExam();
