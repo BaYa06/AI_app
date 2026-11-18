@@ -30,6 +30,7 @@ import {
 } from '@/services/exam';
 import { describeTestError } from '@/utils/testApiErrors';
 import { FORMAT_LABELS } from './exam/examConfig';
+import { Analytics } from '@/services/analytics';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ExamPreview'>;
 
@@ -88,6 +89,7 @@ export function ExamPreviewScreen({ navigation, route }: Props) {
         return;
       }
       setDraft(res.data);
+      Analytics.examItemReplaced();
       const fresh = res.data.items.find((x) => x.itemId === it.itemId);
       toast.info(
         res.data.sameLevel === false
@@ -108,6 +110,10 @@ export function ExamPreviewScreen({ navigation, route }: Props) {
         toast.error(describeTestError(res.error, 'Не удалось открыть экзамен.'));
         return;
       }
+      Analytics.examOpened({
+        words: res.data.questionCount,
+        minutes: Math.round(res.data.durationSec / 60),
+      });
       navigation.replace('TestLobby', {
         courseId,
         courseTitle,

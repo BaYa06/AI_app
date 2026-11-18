@@ -5,7 +5,7 @@
  * вопрос — только через разбор: «Посмотреть вопрос» или «Оставить», без «Аннулировать» здесь.
  */
 import React, { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, Share, StyleSheet, View } from 'react-native';
 import { AlertTriangle, ChevronRight } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -26,6 +26,10 @@ import { spacing, borderRadius, alpha, iconSize, screenPadding } from '@/constan
 import type { RootStackParamList } from '@/types/navigation';
 import { ExamApi, type ExamResults, type ResultStudent, type Verdict } from '@/services/exam';
 import { FORMAT_LABELS } from './exam/examConfig';
+import { examCsv } from './exam/examCsv';
+import { Analytics } from '@/services/analytics';
+
+const HOMEWORK_DAYS = 3;
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ExamResults'>;
 
@@ -36,6 +40,7 @@ export function ExamResultsScreen({ navigation, route }: Props) {
   const [error, setError] = useState(false);
   const [tab, setTab] = useState<'students' | 'words'>('students');
   const [releasing, setReleasing] = useState(false);
+  const [busy, setBusy] = useState<'homework' | 'retake' | null>(null);
 
   const load = useCallback(async () => {
     const res = await ExamApi.results(sessionId);
@@ -53,8 +58,10 @@ export function ExamResultsScreen({ navigation, route }: Props) {
 
   const keep = async (itemId: string) => {
     const res = await ExamApi.decide(sessionId, itemId, 'keep');
-    if (res.ok) load();
-    else toast.error('Не удалось сохранить. Проверь интернет.');
+    if (res.ok) {
+      Analytics.examDecision('keep');
+      load();
+    } else toast.error('Не удалось сохранить. Проверь интернет.');
   };
 
   const release = async () => {
@@ -72,10 +79,78 @@ export function ExamResultsScreen({ navigation, route }: Props) {
       const res = await ExamApi.release(sessionId);
       if (res.ok) {
         toast.success('Результаты открыты');
+        Analytics.examReleased({ students: data.students.length, avgScore: data.avgScore });
         load();
       } else toast.error('Не удалось открыть результаты.');
     } finally {
       setReleasing(false);
+    }
+  };
+
+  const homework = async () => {
+    if (!data) return;
+    const withErrors = data.students.filter(
+      (s) => s.counts.wrong + s.counts.typo + s.counts.wrong_form + s.counts.none > 0
+    ).length;
+    if (withErrors === 0) {
+      toast.info('Ошибок нет — домашка не нужна');
+      return;
+    }
+    const ok = await confirmDialog({
+      title: 'Домашка по ошибкам',
+      message: `Каждый из ${withErrors} учеников получит задание «повторить» из своих слов с ошибками. Срок — через ${HOMEWORK_DAYS} дня.`,
+      confirmText: 'Отправить',
+      cancelText: 'Отмена',
+    });
+    if (!ok) return;
+    setBusy('homework');
+    try {
+      const due = new Date(Date.now() + HOMEWORK_DAYS * 24 * 3600 * 1000);
+      due.setHours(20, 0, 0, 0);
+      const res = await ExamApi.homework(sessionId, due.toISOString());
+      if (res.ok) {
+        toast.success(`Задания отправлены: ${res.data.created.length}`);
+        Analytics.examHomework(res.data.created.length);
+      } else toast.error('Не удалось отправить задания.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const shareTable = async () => {
+    if (!data) return;
+    try {
+      await Share.share({
+        title: `Экзамен · ${data.setTitle}`,
+        message: examCsv(data, courseTitle),
+      });
+    } catch {
+      toast.error('Не удалось поделиться таблицей.');
+    }
+  };
+
+  const retake = async () => {
+    const ok = await confirmDialog({
+      title: 'Пересдача',
+      message:
+        'Соберём новый экзамен с теми же словами и вариантами. Порядок у учеников снова свой. Дайте код тем, кто пересдаёт.',
+      confirmText: 'Собрать',
+      cancelText: 'Отмена',
+    });
+    if (!ok) return;
+    setBusy('retake');
+    try {
+      const res = await ExamApi.retake(sessionId);
+      if (res.ok) {
+        Analytics.examRetake();
+        navigation.navigate('ExamPreview', {
+          sessionId: res.data.sessionId,
+          courseId,
+          courseTitle,
+        });
+      } else toast.error('Не удалось собрать пересдачу.');
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -119,6 +194,33 @@ export function ExamResultsScreen({ navigation, route }: Props) {
               onPress={release}
             />
           )}
+          {finished ? (
+            <View style={styles.footerRow}>
+              <Button
+                title="Домашка по ошибкам"
+                variant="secondary"
+                size="s"
+                loading={busy === 'homework'}
+                onPress={homework}
+                style={styles.flex}
+              />
+              <Button
+                title="Таблица"
+                variant="secondary"
+                size="s"
+                onPress={shareTable}
+                style={styles.flex}
+              />
+              <Button
+                title="Пересдача"
+                variant="secondary"
+                size="s"
+                loading={busy === 'retake'}
+                onPress={retake}
+                style={styles.flex}
+              />
+            </View>
+          ) : null}
         </View>
       }
     >
@@ -337,7 +439,8 @@ function StudentCard({ st, onPress }: { st: ResultStudent; onPress: () => void }
 
 const styles = StyleSheet.create({
   content: { paddingTop: spacing.xs, gap: spacing.m },
-  footer: { paddingHorizontal: screenPadding },
+  footer: { paddingHorizontal: screenPadding, gap: spacing.xs },
+  footerRow: { flexDirection: 'row', gap: spacing.xs },
   center: { textAlign: 'center' },
   flex: { flex: 1 },
   tiles: { flexDirection: 'row', gap: spacing.s },

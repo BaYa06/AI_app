@@ -411,15 +411,20 @@
       (14 дней до начала, повторения и дни против среднего по классу), признаки «все ответы
       быстрее 2 с» и выходы — в итогах. **Не сделано:** признак «высокий балл без единого
       повторения».
-- [ ] **LiveExam 23** — домашка по ошибкам, экспорт Excel (по образцу
-      `src/screens/teacherHomework/exportHomework.ts`), пересдача.
+- [x] ✅ **LiveExam 23** — `exam-homework`: каждому ученику с ошибками — своё задание «повторить»
+      из его слов (через обычный `homeworkCreate`: проверки, зачёт выученного, пуш), срок 3 дня;
+      «Таблица» — CSV через «Поделиться» (Excel и Google Таблицы её открывают; отдельный .xlsx
+      на сервере — если попросят); `exam-retake` — пересдача: черновик с теми же словами и
+      вариантами → превью → код.
 
 ### Этап 9 — управление во время экзамена
 - [x] ✅ **LiveExam 24** — сервер `exam-pause`, `exam-extra-time`, срок в `monitor`; пауза для всех, +2 мин ученику, в мониторе — таймер экзамена.
 
 ### Аналитика
-`exam_built` (N, режим, доли, предупреждения), `exam_started`, `exam_submitted`,
-`exam_released`, `exam_item_voided`, `exam_answer_accepted` — в `src/services/analyticsEvents/teacher.ts`.
+✅ `exam_built` (слова, режим, форматы, предупреждения, минуты), `exam_item_replaced`,
+`exam_started`, `exam_released`, `exam_item_voided`, `exam_answer_accepted`, `exam_item_kept`,
+`exam_homework`, `exam_retake` — в `src/services/analyticsEvents/teacher.ts`.
+`exam_submitted` (ученик) не добавлен: сдачу видно на сервере (`test_participants.submitted_at`).
 
 ---
 

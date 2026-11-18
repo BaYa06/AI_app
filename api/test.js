@@ -31,6 +31,8 @@ import {
   examRelease,
   examMy,
   examStudent,
+  examHomework,
+  examRetake,
 } from './_handlers/test/exam.js';
 import { SUPABASE_URL } from './_handlers/test/_shared.js';
 
@@ -134,6 +136,8 @@ export default async function handler(req, res) {
       'exam-release': examRelease,
       'exam-my': examMy,
       'exam-student': examStudent,
+      'exam-homework': examHomework,
+      'exam-retake': examRetake,
     }[action];
     if (exam) return await exam(req, res, sql, userId);
 

@@ -434,6 +434,25 @@ async function main() {
     });
     check('ученик не видит карточку другого', cardForeign.status === 403, cardForeign.status);
 
+    const due = new Date(Date.now() + 3 * 24 * 3600 * 1000).toISOString();
+    const hw = await call(teacher, 'POST', 'exam-homework', { sessionId, dueAt: due });
+    check(
+      'домашка по ошибкам: задание каждому, у кого есть ошибки',
+      hw.status === 200 && hw.body.created?.length >= 2 && hw.body.failed?.length === 0,
+      hw.body
+    );
+    const retake = await call(teacher, 'POST', 'exam-retake', { sessionId });
+    const retakeDraft = await call(teacher, 'GET', 'exam-draft', {
+      sessionId: retake.body.sessionId,
+    });
+    check(
+      'пересдача: черновик с теми же словами',
+      retake.status === 201 &&
+        retakeDraft.body.items?.length === 20 &&
+        retakeDraft.body.status === 'draft',
+      retakeDraft.body
+    );
+
     const mine0 = await call(students[0], 'GET', 'exam-my', { sessionId });
     check('до открытия ученик не видит балл', mine0.body.released === false, mine0.body);
     // Ученик 2 ошибся на вопросе №2 (№1 учитель засчитал) — слово «выучено» (шаг 3); после открытия — шаг 2
@@ -475,6 +494,7 @@ async function main() {
     if (courseId) {
       await db.query(`DELETE FROM test_sessions WHERE course_id = $1`, [courseId]);
       await db.query(`DELETE FROM card_progress WHERE user_id = ANY($1)`, [users]);
+      await db.query(`DELETE FROM homework WHERE course_id = $1`, [courseId]);
       await db.query(`DELETE FROM card_sets WHERE course_id = $1`, [courseId]);
       await db.query(`DELETE FROM courses WHERE id = $1`, [courseId]);
     }

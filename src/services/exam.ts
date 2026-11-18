@@ -302,6 +302,13 @@ export const ExamApi = {
     callExam<{ releasedAt: string }>('exam-release', 'POST', { sessionId }),
   student: (sessionId: string, participantId: string) =>
     callExam<ExamStudentCard>('exam-student', 'GET', { sessionId, participantId }),
+  homework: (sessionId: string, dueAt: string) =>
+    callExam<{
+      created: { name: string; words: number }[];
+      failed: { name: string; reason: string }[];
+    }>('exam-homework', 'POST', { sessionId, dueAt }),
+  retake: (sessionId: string) =>
+    callExam<{ sessionId: string }>('exam-retake', 'POST', { sessionId }),
   my: () => callExam<MyExam[]>('exam-my', 'GET'),
   myOne: (sessionId: string) => callExam<StudentReview>('exam-my', 'GET', { sessionId }),
 };

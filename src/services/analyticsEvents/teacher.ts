@@ -32,6 +32,33 @@ export type TeacherAction =
   | 'report_pdf';
 
 export const teacherEvents = {
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ЖИВОЙ ЭКЗАМЕН (plan/new/live_exam.md). Зачем: доверяют ли учителя сборке (сколько заменяют
+  // слов), какие форматы берут, как часто аннулируют и засчитывают — признак плохих вопросов.
+  // ═══════════════════════════════════════════════════════════════════════════
+  examBuilt: (p: {
+    words: number;
+    mode: string;
+    formats: string;
+    warnings: number;
+    minutes: number;
+  }) => log('exam_built', p),
+  examItemReplaced: () => log('exam_item_replaced', {}),
+  examOpened: (p: { words: number; minutes: number }) => log('exam_started', p),
+  examReleased: (p: { students: number; avgScore: number }) =>
+    log('exam_released', { students: p.students, avg_score: p.avgScore }),
+  examDecision: (decision: 'void' | 'accept' | 'keep') =>
+    log(
+      decision === 'void'
+        ? 'exam_item_voided'
+        : decision === 'accept'
+          ? 'exam_answer_accepted'
+          : 'exam_item_kept',
+      {}
+    ),
+  examHomework: (students: number) => log('exam_homework', { students }),
+  examRetake: () => log('exam_retake', {}),
+
   // Первые шаги учителя (plan/new/new_user_activation.md, этап 6)
   teacherDemoStarted: () => log('teacher_demo_started'),
   teacherDemoFinished: () => log('teacher_demo_finished'),

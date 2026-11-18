@@ -28,6 +28,7 @@ import { NeonService } from '@/services/NeonService';
 import { ExamApi, type ExamFormat } from '@/services/exam';
 import { describeTestError } from '@/utils/testApiErrors';
 import { log } from '@/utils/logger';
+import { Analytics } from '@/services/analytics';
 import {
   FORMATS,
   FORMAT_LABELS,
@@ -190,6 +191,16 @@ export function ExamSetupScreen({ navigation, route }: Props) {
         toast.error(describeTestError(res.error, 'Не удалось собрать экзамен. Попробуй ещё раз.'));
         return;
       }
+      Analytics.examBuilt({
+        words: res.data.items.length,
+        mode,
+        formats: Object.entries(res.data.counts || {})
+          .filter(([, v]) => v)
+          .map(([k, v]) => `${k}:${v}`)
+          .join(','),
+        warnings: (res.data.warnings || []).length,
+        minutes,
+      });
       navigation.navigate('ExamBuild', {
         courseId,
         courseTitle,

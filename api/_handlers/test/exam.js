@@ -1385,6 +1385,94 @@ export async function examStudent(req, res, sql, userId) {
   });
 }
 
+/** Вызвать обработчик api/teacher.js изнутри (те же проверки, зачёт выученного, пуш) */
+function callHandler(fn, body, sql, userId) {
+  return new Promise((resolve) => {
+    let code = 200;
+    const res = {
+      status(c) {
+        code = c;
+        return res;
+      },
+      json(b) {
+        resolve({ status: code, body: b });
+        return res;
+      },
+      setHeader: () => res,
+    };
+    Promise.resolve(fn({ method: 'POST', body, query: {} }, res, sql, userId)).catch((e) =>
+      resolve({ status: 500, body: { error: e.message } })
+    );
+  });
+}
+
+/**
+ * POST ?action=exam-homework  Body: { sessionId, dueAt, title? }
+ * Домашка по ошибкам (LiveExam 23): каждому ученику — задание из его слов с ошибками
+ * («повторить»), через обычные задания учителя (api/_handlers/teacher/homework.js).
+ */
+export async function examHomework(req, res, sql, userId) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const session = await loadOwnExam(res, sql, userId, req.body?.sessionId);
+  if (!session) return;
+  const { dueAt } = req.body;
+  const [meta] = await sql`SELECT title FROM card_sets WHERE id = ${session.set_id}::uuid`;
+  const title = String(req.body.title || `Ошибки экзамена · ${meta?.title || ''}`)
+    .trim()
+    .slice(0, 80);
+  const items = await loadItems(sql, session.id);
+  const participants = await loadParticipants(sql, session.id);
+  const { homeworkCreate } = await import('../teacher/homework.js');
+  const created = [];
+  const failed = [];
+  for (const p of participants) {
+    const r = scoreParticipant(items, p.answers, null);
+    const cardIds = items
+      .filter((it) => !it.voided && it.cardId && r.perItem.get(it.id).verdict !== 'correct')
+      .map((it) => it.cardId);
+    if (cardIds.length === 0) continue;
+    const out = await callHandler(
+      homeworkCreate,
+      { courseId: session.course_id, title, cardIds, dueAt, userIds: [p.user_id], kind: 'review' },
+      sql,
+      userId
+    );
+    if (out.status === 200) created.push({ name: p.name, words: cardIds.length });
+    else failed.push({ name: p.name, reason: out.body?.reason || out.body?.error });
+  }
+  if (created.length === 0 && failed.length > 0) {
+    return res.status(400).json({ error: 'Homework failed', reason: failed[0].reason, failed });
+  }
+  return res.status(200).json({ ok: true, created, failed });
+}
+
+/**
+ * POST ?action=exam-retake  Body: { sessionId }
+ * Пересдача: новый черновик с теми же словами и вариантами (порядок у учеников снова свой).
+ */
+export async function examRetake(req, res, sql, userId) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const session = await loadOwnExam(res, sql, userId, req.body?.sessionId);
+  if (!session) return;
+  const config = { ...(session.config || {}), retakeOf: session.id };
+  const [copy] = await sql`
+    INSERT INTO test_sessions (teacher_id, set_id, course_id, code, test_mode, question_count,
+      time_per_question, status, exit_control, card_ids, engine, config, duration_sec, reveal_mode)
+    VALUES (${userId}::uuid, ${session.set_id}::uuid, ${session.course_id}::uuid, '0000', 'exam',
+      ${session.question_count}, 0, 'draft', ${session.exit_control}, ${session.card_ids}::uuid[], 2,
+      ${JSON.stringify(config)}::jsonb, ${session.duration_sec}, ${session.reveal_mode})
+    RETURNING id
+  `;
+  await sql`
+    INSERT INTO test_items (session_id, card_id, block_no, format, direction, prompt, answer,
+      options, extra, difficulty, points, sort_key)
+    SELECT ${copy.id}::uuid, card_id, block_no, format, direction, prompt, answer, options,
+      COALESCE(extra, '{}'::jsonb) - 'kept', difficulty, points, sort_key
+    FROM test_items WHERE session_id = ${session.id}::uuid
+  `;
+  return res.status(201).json({ sessionId: copy.id });
+}
+
 // ─── Ученик: результат ──────────────────────────────────────
 
 /** Разбор для ученика: балл, по форматам, ответы с пометками учителя */

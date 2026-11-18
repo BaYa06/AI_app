@@ -23,6 +23,7 @@ import { spacing, borderRadius, alpha, iconSize, screenPadding } from '@/constan
 import type { RootStackParamList } from '@/types/navigation';
 import { ExamApi, type QuestionReview, type Simulation } from '@/services/exam';
 import { FORMAT_LABELS } from './exam/examConfig';
+import { Analytics } from '@/services/analytics';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ExamQuestion'>;
 type Choice = 'void' | 'accept' | 'keep';
@@ -78,6 +79,7 @@ export function ExamQuestionScreen({ navigation, route }: Props) {
         return;
       }
       setDone({ choice: pick, logId: res.data.logId });
+      Analytics.examDecision(pick);
       load();
     } finally {
       setApplying(false);
