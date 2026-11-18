@@ -13,6 +13,24 @@ import {
   reinstateParticipant,
 } from './_handlers/test/teacher.js';
 import { markAway, markBack, leaveTest } from './_handlers/test/exitControl.js';
+import {
+  examBuild,
+  examDraft,
+  examReplaceItem,
+  examCreate,
+  examState,
+  examAnswer,
+  examSubmit,
+  examPause,
+  examExtraTime,
+  examResults,
+  examQuestion,
+  examDecide,
+  examOverride,
+  examUndo,
+  examRelease,
+  examMy,
+} from './_handlers/test/exam.js';
 import { SUPABASE_URL } from './_handlers/test/_shared.js';
 
 /**
@@ -36,6 +54,13 @@ import { SUPABASE_URL } from './_handlers/test/_shared.js';
  * POST /api/test?action=back          — ученик вернулся: продолжить или завершить попытку
  * POST /api/test?action=leave         — ученик сам завершил тест досрочно
  * POST /api/test?action=reinstate     — учитель разрешает вышедшему ученику продолжить
+ *
+ * Живой экзамен, движок 2 (plan/new/live_exam.md):
+ * POST exam-build — собрать черновик · GET exam-draft — превью · POST exam-replace-item — заменить
+ * слово · POST exam-create — открыть черновик (код) · POST exam-state / exam-answer / exam-submit —
+ * ученик · POST exam-pause / exam-extra-time — во время экзамена · GET exam-results / exam-question
+ * — итоги и разбор · POST exam-decide / exam-override / exam-undo / exam-release — оценки ·
+ * GET exam-my — мои экзамены ученика
  */
 
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
@@ -89,6 +114,26 @@ export default async function handler(req, res) {
     if (action === 'back') return await markBack(req, res, sql, userId);
     if (action === 'leave') return await leaveTest(req, res, sql, userId);
     if (action === 'reinstate') return await reinstateParticipant(req, res, sql, userId);
+
+    const exam = {
+      'exam-build': examBuild,
+      'exam-draft': examDraft,
+      'exam-replace-item': examReplaceItem,
+      'exam-create': examCreate,
+      'exam-state': examState,
+      'exam-answer': examAnswer,
+      'exam-submit': examSubmit,
+      'exam-pause': examPause,
+      'exam-extra-time': examExtraTime,
+      'exam-results': examResults,
+      'exam-question': examQuestion,
+      'exam-decide': examDecide,
+      'exam-override': examOverride,
+      'exam-undo': examUndo,
+      'exam-release': examRelease,
+      'exam-my': examMy,
+    }[action];
+    if (exam) return await exam(req, res, sql, userId);
 
     return res.status(400).json({
       error:

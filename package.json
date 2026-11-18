@@ -13,7 +13,7 @@
     "db:init": "node database/load-data.js",
     "db:check-migrations": "node scripts/check-migrations.mjs",
     "center:check": "tsx scripts/check-center-access.ts --staging",
-    "exam:check": "tsx scripts/check-exam.ts --staging",
+    "exam:check": "tsx scripts/check-exam.ts --staging && tsx scripts/check-exam-flow.ts --staging",
     "test": "jest",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx,.mjs,.cjs",
     "format": "prettier --write .",

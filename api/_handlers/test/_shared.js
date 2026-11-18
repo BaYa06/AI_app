@@ -17,6 +17,8 @@ function getSupabase() {
  * ученика (`:exam`, см. broadcastTestFinished).
  */
 export async function broadcast(sessionId, event, payload, topicSuffix = '') {
+  // Проверочные скрипты (npm run exam:check) вызывают обработчики без настоящего Supabase
+  if (process.env.TEST_BROADCAST_OFF === '1') return;
   return new Promise((resolve) => {
     try {
       const supabase = getSupabase();

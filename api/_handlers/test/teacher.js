@@ -3,6 +3,7 @@
  */
 import { broadcast, broadcastTestFinished, AWAY_GRACE_SEC, sessionCardStats } from './_shared.js';
 import { courseSetIdsSql } from '../../_course.js';
+import { finishExpired } from './exam.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 /** Больше слов в одном тесте не бывает (защита от случайно огромного списка) */
@@ -54,6 +55,8 @@ export const NO_TIME_LIMIT_SEC_PER_QUESTION = 60; // консервативна�
 
 export async function autoFinishIfStale(sql, sessionId, session) {
   if (session.status !== 'active' || !session.started_at) return session;
+  // У экзамена движка 2 общий срок (duration_sec) — его завершает finishExpired из exam.js
+  if (session.engine === 2) return session;
 
   const perQuestion =
     session.time_per_question > 0 ? session.time_per_question : NO_TIME_LIMIT_SEC_PER_QUESTION;
@@ -190,7 +193,7 @@ export async function monitorTest(req, res, sql, userId) {
 
   const session = await sql`
     SELECT status, started_at, time_per_question, question_count, teacher_id, exit_control,
-           card_ids, purpose
+           card_ids, purpose, engine, duration_sec, paused_at, paused_total_sec
     FROM test_sessions
     WHERE id = ${sessionId}::uuid
   `;
@@ -214,6 +217,12 @@ export async function monitorTest(req, res, sql, userId) {
   }
 
   session[0] = await autoFinishIfStale(sql, sessionId, session[0]);
+  const engine = session[0].engine || 1;
+  if (engine === 2) {
+    await finishExpired(sql, sessionId);
+    const [s2] = await sql`SELECT status FROM test_sessions WHERE id = ${sessionId}::uuid`;
+    session[0] = { ...session[0], status: s2.status };
+  }
 
   // Контроль выхода: ученик ушёл в фон и не возвращается — закрыть попытку по истечении льготы,
   // не дожидаясь его `back`, чтобы учитель сразу видел «Вышел» и мог разрешить продолжить.
@@ -256,6 +265,15 @@ export async function monitorTest(req, res, sql, userId) {
     questionCount: session[0].question_count,
     exitControl,
     ...(isTeacher ? { purpose: purpose || null } : {}),
+    // Экзамен движка 2: общий срок вместо времени на вопрос (plan/new/live_exam.md)
+    ...(engine === 2
+      ? {
+          engine,
+          durationSec: session[0].duration_sec,
+          paused: Boolean(session[0].paused_at),
+          pausedTotalSec: session[0].paused_total_sec || 0,
+        }
+      : {}),
     ...(byCard ? { byCard } : {}),
     participants: participants.map((p) => {
       const initials = (p.display_name || 'S')
