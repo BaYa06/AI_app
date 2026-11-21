@@ -247,9 +247,11 @@ ${
 <section id="reels" aria-labelledby="h-reels-h">
   <div class="h-sh"><h2 id="h-reels-h">Ролики за минуту</h2><span class="overline h-muted">вертикальные · листайте</span></div>
   <div class="h-reels">${videos
-    .map(
-      (q) =>
-        `<button class="h-reel" type="button" data-video="${q.slug}" data-slug="${q.slug}" style="background-image:linear-gradient(180deg,rgba(17,17,40,0) 40%,rgba(17,17,40,.85)),url('${poster(q)}')" aria-label="Ролик: ${esc(q.question)}, ${esc(q.video.duration || '')}"><span class="h-pl">${PLAY}</span><b>${esc(q.question)}</b><small>${esc(q.video.duration || '')}</small></button>`
+    .map((q) =>
+      q.video.poster
+        ? // Своя обложка уже с заголовком — текст поверх не дублируем
+          `<button class="h-reel h-reel-own" type="button" data-video="${q.slug}" data-slug="${q.slug}" style="background-image:url('${poster(q)}')" aria-label="Ролик: ${esc(q.question)}, ${esc(q.video.duration || '')}"><span class="h-pl">${PLAY}</span><small>${esc(q.video.duration || '')}</small></button>`
+        : `<button class="h-reel" type="button" data-video="${q.slug}" data-slug="${q.slug}" style="background-image:linear-gradient(180deg,rgba(17,17,40,0) 40%,rgba(17,17,40,.85)),url('${poster(q)}')" aria-label="Ролик: ${esc(q.question)}, ${esc(q.video.duration || '')}"><span class="h-pl">${PLAY}</span><b>${esc(q.question)}</b><small>${esc(q.video.duration || '')}</small></button>`
     )
     .join('')}</div>
 </section>`

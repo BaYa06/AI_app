@@ -140,7 +140,7 @@ mark { background: var(--h-mark); color: inherit; border-radius: 3px; padding: 0
   .h-vcol { position: sticky; top: calc(84px + env(safe-area-inset-top, 0px)); }
 }
 .h-video { position: relative; display: block; width: min(100%, 320px, calc(72vh * 9 / 16)); aspect-ratio: 9 / 16; margin: 0 auto; border: 0; border-radius: 18px; overflow: hidden; background-color: #4447D6; background-size: cover; background-position: center; color: #FFFFFF; cursor: pointer; padding: 0; }
-.h-play { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 64px; height: 64px; border-radius: 50%; background: rgba(255, 255, 255, 0.95); display: grid; place-items: center; color: #4447D6; }
+.h-play { position: absolute; left: 50%; top: 82%; transform: translate(-50%, -50%); width: 64px; height: 64px; border-radius: 50%; background: rgba(255, 255, 255, 0.95); display: grid; place-items: center; color: #4447D6; }
 .h-play svg { width: 26px; height: 26px; margin-left: 4px; }
 .h-dur { position: absolute; right: 12px; bottom: 12px; background: rgba(0, 0, 0, 0.6); border-radius: 6px; padding: 2px 8px; font: 13px/18px var(--font); font-variant-numeric: tabular-nums; }
 .h-chapters { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; justify-content: center; }
