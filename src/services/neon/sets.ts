@@ -1,5 +1,5 @@
 /** Наборы и карточки пользователя (Clean 9 — методы NeonService без изменений). */
-import type { Card, CardSet, UpdateCardInput, SetKind } from '@/types';
+import type { Card, CardSet, UpdateCardInput, SetKind, SetOrigin } from '@/types';
 import { log } from '@/utils/logger';
 import { callDataApi, type LoadOptions, NetworkLoadError, mapCardRow, mapSetRow } from './core';
 
@@ -58,6 +58,7 @@ export const setsApi = {
     languageFrom?: string;
     languageTo?: string;
     kind?: SetKind;
+    origin?: SetOrigin;
     isPublic?: boolean;
     createdAt?: number;
     updatedAt?: number;

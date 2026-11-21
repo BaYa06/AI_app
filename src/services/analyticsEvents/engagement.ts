@@ -34,6 +34,24 @@ export const engagementEvents = {
   /**
    * Юзер дал разрешение на push-уведомления.
    */
+  // «Начало пути» (plan/new/new_user_activation.md, Start 3.10): какие задания нажимают,
+  // откладывают и выполняют. Доля закрывших всю стопку — цель > 25%
+  startTaskAction: (task: string) => log('start_task_action', { task }),
+  startTaskLater: (task: string) => log('start_task_later', { task }),
+  startTaskCompleted: (task: string, awarded: number) =>
+    log('start_task_completed', { task, awarded }),
+  startTasksClosed: (done: number) => log('start_tasks_closed', { done }),
+  startTasksFinished: () => log('start_tasks_finished'),
+
+  // «Новое» — фича дня (Start 4.2): показали, нажали, закрыли
+  newFeatureShown: (feature: string, day: number) => log('new_feature_shown', { feature, day }),
+  newFeatureTapped: (feature: string) => log('new_feature_tapped', { feature }),
+  newFeatureDismissed: (feature: string) => log('new_feature_dismissed', { feature }),
+
+  // Подсказки в момент нужды (Start 4.3): показали и нажали
+  momentHintShown: (hint: string) => log('moment_hint_shown', { hint }),
+  momentHintTapped: (hint: string) => log('moment_hint_tapped', { hint }),
+
   pushPermissionGranted: () => log('push_permission_granted'),
 
   /**
@@ -112,6 +130,16 @@ export const engagementEvents = {
    */
   widgetWordReviewed: (params: { inWidget: boolean; correct: boolean }) =>
     log('widget_word_reviewed', { in_widget: params.inWidget, correct: params.correct }),
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ЗАМОРОЗКА СЕРИИ
+  // Зачем: видят ли, что заморозка сработала (plan/new/streak_freeze_display.md, Freeze 4).
+  // Цель: обращений «заморозка не сработала» — 0.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /** Показано «Заморозка спасла серию». streak — сохранённая серия, freezes_left — осталось заморозок. */
+  freezeNoticeShown: (params: { streak: number; freezesLeft: number }) =>
+    log('freeze_notice_shown', { streak: params.streak, freezes_left: params.freezesLeft }),
 
   // ═══════════════════════════════════════════════════════════════════════════
   // «ЧТО НОВОГО»

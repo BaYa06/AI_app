@@ -1,0 +1,179 @@
+/**
+ * Задания курса у учителя: список с сервера + окна «Новое задание» и «Кто не сдал»
+ * (plan/done/teacher_cabinet.md, Teacher 24). Один хук для главной (TeacherLessonCard) и страницы курса.
+ * Без флага TEACHER_HOMEWORK_ENABLED ничего не грузит и ничего не рисует.
+ */
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { TEACHER_HOMEWORK_ENABLED } from '@/config/features';
+import { NeonService } from '@/services/NeonService';
+import type { TeacherHomeworkSummary } from '@/services/homework';
+import type { ScheduleItem } from '@/utils/nextLesson';
+import { useCardsStore, useSetsStore, isSetInCourse } from '@/store';
+import { NewHomeworkSheet, type HomeworkStudent } from './NewHomeworkSheet';
+import { NotSubmittedSheet } from '@/screens/teacherHomework/NotSubmittedSheet';
+import { currentHomework, defaultHomeworkWords } from './teacherHomework';
+import { getCachedHomework, setCachedHomework, subscribeHomeworkCache } from './homeworkCache';
+import { sortPickerSets, type PickerSet } from './wordPicker';
+import type { HomeworkWords } from './newHomework';
+
+/** Слова наборов курса, которые уже есть на устройстве (без сети) */
+function localCourseSets(courseId: string): PickerSet[] {
+  const { sets } = useSetsStore.getState();
+  const { cards, cardsBySet } = useCardsStore.getState();
+  return sortPickerSets(
+    Object.values(sets)
+      .filter((s) => isSetInCourse(s, courseId))
+      .map((s) => ({
+        id: s.id,
+        title: s.title,
+        words: (cardsBySet[s.id] || [])
+          .map((id) => cards[id])
+          .filter(Boolean)
+          .map((c) => ({ id: c.id, front: c.frontText || '', back: c.backText || '' })),
+      }))
+      .filter((s) => s.words.length > 0)
+  );
+}
+
+interface Params {
+  courseId: string;
+  courseTitle: string;
+  students: HomeworkStudent[] | null;
+  schedule: ScheduleItem[] | null;
+  navigation: any;
+}
+
+export function useTeacherHomework({
+  courseId,
+  courseTitle,
+  students,
+  schedule,
+  navigation,
+}: Params) {
+  const [list, setList] = useState<TeacherHomeworkSummary[] | null>(
+    () => getCachedHomework(courseId) ?? null
+  );
+  const [newOpen, setNewOpen] = useState(false);
+  const [initialWords, setInitialWords] = useState<HomeworkWords | null>(null);
+  const [statusFor, setStatusFor] = useState<{ id: string; tab: 'all' | 'not_started' } | null>(
+    null
+  );
+
+  const reload = useCallback(async () => {
+    if (!TEACHER_HOMEWORK_ENABLED) return;
+    const res = await NeonService.loadCourseHomework(courseId);
+    if (!res) return;
+    setCachedHomework(courseId, res);
+  }, [courseId]);
+
+  useEffect(() => {
+    setList(getCachedHomework(courseId) ?? null);
+    // Отмена и перенос срока на экране задания (Teacher 57) приходят сюда же
+    const unsubscribe = subscribeHomeworkCache((id) => {
+      if (id === courseId) setList(getCachedHomework(courseId) ?? null);
+    });
+    reload();
+    return unsubscribe;
+  }, [courseId, reload]);
+
+  const current = useMemo(() => (list ? currentHomework(list) : null), [list]);
+
+  // Кто не начал текущее задание — для «Кому уделить внимание» (Teacher 25)
+  const [notStarted, setNotStarted] = useState<string[]>([]);
+  useEffect(() => {
+    setNotStarted([]);
+    if (
+      !TEACHER_HOMEWORK_ENABLED ||
+      !current ||
+      current.assigned - current.submitted - current.started <= 0
+    )
+      return;
+    let cancelled = false;
+    NeonService.loadHomeworkStatus(current.id).then((res) => {
+      if (cancelled || !res) return;
+      setNotStarted(
+        res.students.filter((s) => s.status === 'not_started').map((s) => s.displayName)
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [current?.id, current?.started, current?.submitted]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const rootNav = navigation?.getParent?.() ?? navigation;
+  const openStatus = useCallback(
+    (homeworkId: string) =>
+      rootNav?.navigate('TeacherHomework', { homeworkId, courseId, courseTitle }),
+    [rootNav, courseId, courseTitle]
+  );
+  const openNew = useCallback(() => {
+    setInitialWords(defaultHomeworkWords(localCourseSets(courseId)));
+    setNewOpen(true);
+  }, [courseId]);
+  /** Кнопка «Задание»: есть текущее — экран сдачи, нет — окно «Новое задание» */
+  const openHomework = useCallback(() => {
+    if (current) openStatus(current.id);
+    else openNew();
+  }, [current, openStatus, openNew]);
+  const openNotSubmitted = useCallback(
+    (homeworkId: string, tab: 'all' | 'not_started' = 'all') =>
+      setStatusFor({ id: homeworkId, tab }),
+    []
+  );
+
+  const sheets = TEACHER_HOMEWORK_ENABLED ? (
+    <>
+      <NewHomeworkSheet
+        visible={newOpen}
+        onClose={() => setNewOpen(false)}
+        courseId={courseId}
+        courseTitle={courseTitle}
+        students={students ?? []}
+        schedule={schedule}
+        initialWords={initialWords}
+        onCreated={(id) => {
+          setNewOpen(false);
+          reload();
+          openStatus(id);
+        }}
+      />
+      {statusFor && (
+        <NotSubmittedSheet
+          visible
+          homeworkId={statusFor.id}
+          courseTitle={courseTitle}
+          initialTab={statusFor.tab}
+          onClose={() => {
+            setStatusFor(null);
+            reload();
+          }}
+          onOpenStudent={(id, name) => {
+            setStatusFor(null);
+            rootNav?.navigate('StudentDetail', {
+              courseId,
+              courseTitle,
+              studentId: id,
+              studentName: name,
+              studentInitials: name.slice(0, 2).toUpperCase(),
+              streak: 0,
+              todayCards: 0,
+              lastActivity: '',
+            });
+          }}
+        />
+      )}
+    </>
+  ) : null;
+
+  return {
+    list,
+    current,
+    notStarted,
+    reload,
+    openNew,
+    openHomework,
+    openStatus,
+    openNotSubmitted,
+    sheets,
+  };
+}

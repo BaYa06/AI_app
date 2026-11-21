@@ -48,6 +48,13 @@ export async function courseSetsForStudent(sql, courseId) {
     JOIN course_books cb ON cb.course_id = cu.course_id AND cb.book_id = b.id
     JOIN card_sets cs ON cs.unit_id = u.id AND cs.is_official = true
     WHERE cu.course_id = ${courseId}::uuid AND cu.is_open = true
+      -- Книга учебного центра — только в группе этого центра и пока его договор действует
+      -- (plan/new/center_books.md, Center 2)
+      AND (b.organization_id IS NULL OR EXISTS (
+        SELECT 1 FROM courses c JOIN organizations o ON o.id = c.organization_id
+         WHERE c.id = cu.course_id AND c.organization_id = b.organization_id
+           AND (o.contract_until IS NULL OR o.contract_until > NOW())
+      ))
     ORDER BY b.title, u.sort_order, u.number, cs.created_at
   `;
 
@@ -67,6 +74,7 @@ export async function courseSetsForStudent(sql, courseId) {
     // Официальный набор в курс попадает через план юнитов — отдаём его под этим курсом.
     courseId: row.is_official ? courseId : row.course_id,
     isOfficial: row.is_official === true,
+    origin: row.origin || null,
     unitId: row.unit_id || null,
     bookId: row.book_id || null,
     bookTitle: row.book_title || null,

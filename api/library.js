@@ -30,7 +30,7 @@ import {
  * POST /api/library?action=import-collection – вся подборка в свой курс { collectionId, courseId } (JWT)
  * GET  /api/library?action=cards&id=xxx      – все карточки опубликованного набора
  *
- * Каталог (plan/new/library_catalog.md, Catalog 3; api/_handlers/library/catalog.js), токен необязателен:
+ * Каталог (plan/done/library_catalog.md, Catalog 3; api/_handlers/library/catalog.js), токен необязателен:
  * GET  /api/library?action=catalog[&lang=en]  – предметы, «Продолжить» / «С чего начать», полка учебников
  * GET  /api/library?action=subject&subject=slug – разделы, уровни, подборки предмета
  * GET  /api/library?action=collection&id=xxx – наборы подборки по порядку
@@ -405,7 +405,7 @@ async function checkPublished(req, res, sql) {
 }
 
 // ── action=like / action=rate ─────────────────────────────────────────────────
-// Лайки и оценки убраны (plan/new/library_catalog.md, решение 8): каталог ведёт команда.
+// Лайки и оценки убраны (plan/done/library_catalog.md, решение 8): каталог ведёт команда.
 // Старые версии приложения ещё вызывают эти action — отвечаем в прежнем формате текущим
 // состоянием и ничего не записываем. Таблицы удаляются, когда сменится минимальная версия.
 async function toggleLike(req, res, sql) {
@@ -483,9 +483,9 @@ async function ownsCourse(sql, userId, courseId) {
 function importQuery(sql, userId, set, courseId) {
   return sql`
     WITH new_set AS (
-      INSERT INTO card_sets (user_id, course_id, title, description, category, language_from, language_to, kind, total_cards)
+      INSERT INTO card_sets (user_id, course_id, title, description, category, language_from, language_to, kind, origin, total_cards)
       VALUES (${userId}::uuid, ${courseId}::uuid, ${set.title}, ${set.description || ''},
-              ${set.category || 'general'}, ${set.language_from || 'en'}, ${set.language_to || 'ru'}, ${set.kind || null},
+              ${set.category || 'general'}, ${set.language_from || 'en'}, ${set.language_to || 'ru'}, ${set.kind || null}, 'library',
               (SELECT COUNT(*) FROM library_cards WHERE library_set_id = ${set.id}::uuid))
       RETURNING id
     ), copied AS (

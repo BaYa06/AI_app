@@ -242,6 +242,22 @@ describe('callDataApi', () => {
 });
 
 describe('callProgressApi', () => {
+  it('session-complete: сервер без заданий (400 Unknown action) — пустой итог, не null', async () => {
+    mockFetch.mockResolvedValue(jsonResponse(400, { error: 'Unknown action' }));
+    expect(await NeonService.reportHomeworkSession([{ cardId: 'c1', firstTry: true }])).toEqual({
+      credited: 0,
+      submitted: [],
+    });
+    noLogs();
+  });
+
+  it('session-complete: другая ошибка 400 и 500 — null (очередь повторит)', async () => {
+    mockFetch.mockResolvedValue(jsonResponse(400, { error: 'cards required' }));
+    expect(await NeonService.reportHomeworkSession([])).toBeNull();
+    mockFetch.mockResolvedValue(jsonResponse(500, { error: 'Unknown action' }));
+    expect(await NeonService.reportHomeworkSession([])).toBeNull();
+  });
+
   it('GET: params в query, без тела, успех — весь json', async () => {
     mockFetch.mockResolvedValue(jsonResponse(200, { enabled: false }));
     expect(await NeonService.loadLeaderboard('c1', 'previous')).toEqual({ enabled: false });

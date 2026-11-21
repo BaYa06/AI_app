@@ -2,6 +2,7 @@
  * api/test.js — живой тест — сторона ученика: войти, вопрос, ответ (Clean 10 — перенесено без изменений).
  */
 import { broadcast, AWAY_GRACE_SEC, attemptSummary, finishParticipantEarly } from './_shared.js';
+import { joinExam } from './exam.js';
 
 /**
  * Rate-limit на угадывание 4-значного кода live-теста: не больше `maxAttempts` попыток от
@@ -67,7 +68,7 @@ export async function joinTest(req, res, sql, userId) {
   // Найти активную сессию по коду
   const sessions = await sql`
     SELECT ts.id, ts.course_id, ts.set_id, ts.test_mode, ts.question_count, ts.time_per_question, ts.status,
-           ts.exit_control,
+           ts.exit_control, ts.card_ids, ts.engine, ts.duration_sec,
            cs.title AS set_title,
            COALESCE(u.display_name, u.email) AS teacher_name
     FROM test_sessions ts
@@ -81,6 +82,9 @@ export async function joinTest(req, res, sql, userId) {
   }
 
   const session = sessions[0];
+
+  // Экзамен движка 2 (plan/new/live_exam.md) — свой вход: общий состав, порядок с зерном
+  if (session.engine === 2) return joinExam(req, res, sql, userId, session);
 
   // Проверить что ученик в курсе
   const membership = await sql`
@@ -143,8 +147,12 @@ export async function joinTest(req, res, sql, userId) {
     });
   }
 
-  // Получить карточки набора
-  const cards = await sql`
+  // Вопросы — слова из списка теста (Teacher 34), иначе все карточки набора.
+  // Удалённое после создания теста слово просто выпадает.
+  const byList = Array.isArray(session.card_ids) && session.card_ids.length > 0;
+  const cards = byList
+    ? await sql`SELECT id FROM cards WHERE id = ANY(${session.card_ids}::uuid[])`
+    : await sql`
     SELECT id FROM cards WHERE set_id = ${session.set_id}::uuid
   `;
   if (cards.length === 0) {

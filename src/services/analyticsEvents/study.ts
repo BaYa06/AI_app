@@ -178,7 +178,7 @@ export const studyEvents = {
     stages: string[];
     dropped: number;
     minutes: number;
-    from: 'sheet' | 'results';
+    from: 'sheet' | 'results' | 'homework';
   }) =>
     log('set_session_started', {
       mode: params.mode,

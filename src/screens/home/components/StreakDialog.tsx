@@ -1,6 +1,6 @@
 /**
  * Окно «Ударный режим» на главной: серия, неделя, дневная цель, заморозка
- * (Clean 8a — вынесено из HomeScreen без изменений разметки.)
+ * Неделя — как считает сервер: засчитан / заморозка / занимался, но не засчитан (Freeze 3).
  */
 import React from 'react';
 import { View } from 'react-native';
@@ -8,15 +8,50 @@ import { useThemeColors } from '@/store';
 import { Text } from '@/components/common';
 import { iconSize, alpha } from '@/constants';
 import { Button, Dialog, ProgressBar } from '@/components/ui';
-import { Check, Flame, Gem } from 'lucide-react-native';
-import { getLocalDateKey } from '@/services/StreakService';
-import type { DailyActivity } from '@/services/StreakService';
+import { AlertCircle, Check, Flame, Gem, Snowflake } from 'lucide-react-native';
+import { buildWeekStatus, getLocalDateKey, weekNotes } from '@/services/StreakService';
+import type { DailyActivity, WeekDayState } from '@/services/StreakService';
 import { styles } from '../styles';
+
+type Colors = ReturnType<typeof useThemeColors>;
+
+/** Для экранного диктора — по таблице плана. */
+const DAY_A11Y: Record<WeekDayState, string> = {
+  counted: 'засчитан',
+  frozen: 'спасён заморозкой',
+  studied: 'занимался, но день не засчитан',
+  missed: 'пропущен',
+  today: 'сегодня, ещё не засчитан',
+  future: 'впереди',
+};
+
+function dayLook(status: WeekDayState, colors: Colors) {
+  switch (status) {
+    case 'counted':
+      return {
+        circle: { backgroundColor: colors.streak, borderColor: colors.streak },
+        number: colors.onPrimary,
+      };
+    case 'frozen':
+      return {
+        circle: { backgroundColor: alpha(colors.info, 10), borderColor: alpha(colors.info, 40) },
+        number: colors.info,
+      };
+    case 'studied':
+      return { circle: { borderColor: alpha(colors.warning, 40) }, number: colors.textSecondary };
+    case 'missed':
+      return { circle: { borderColor: colors.border }, number: colors.textTertiary };
+    case 'today':
+      return { circle: { borderColor: colors.primary }, number: colors.primary };
+    default:
+      return { circle: { borderColor: colors.border }, number: colors.textSecondary };
+  }
+}
 
 type Props = {
   streakModalVisible: boolean;
   closeStreakModal: () => void;
-  colors: ReturnType<typeof useThemeColors>;
+  colors: Colors;
   todayGoalReached: boolean;
   formatDays: (value: number) => string;
   streakValue: number;
@@ -50,6 +85,8 @@ export function StreakDialog({
   handleBuyStreakFreeze,
   buyingFreeze,
 }: Props) {
+  const week = buildWeekStatus(weekActivity, getLocalDateKey());
+  const notes = weekNotes(week);
   return (
     <Dialog
       visible={streakModalVisible}
@@ -82,76 +119,53 @@ export function StreakDialog({
         </View>
       </View>
 
-      {/* Week grid */}
+      {/* Week grid — то, что считает сервер (plan/new/streak_freeze_display.md, Freeze 3) */}
       <View style={styles.weekGrid}>
-        {(() => {
-          const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-          const today = new Date();
-          const todayKey = getLocalDateKey();
-
-          // Форматтер для получения YYYY-MM-DD в правильном timezone
-          const dateFmt = new Intl.DateTimeFormat('en-CA', {
-            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-          });
-          // Определяем день недели из todayKey (надёжнее чем getDay())
-          const todayParsed = new Date(todayKey + 'T12:00:00');
-          const todayIndex = (todayParsed.getDay() + 6) % 7; // Пн = 0
-
-          // Создаём Set дат, когда была активность (из реальных данных БД)
-          const activeDates = new Set(
-            weekActivity.filter((a) => a.cards_studied >= 10).map((a) => a.local_date)
-          );
-
-          return weekDays.map((day, idx) => {
-            const isToday = idx === todayIndex;
-            // Вычисляем дату для каждой ячейки
-            const dateForCell = new Date(today);
-            const diff = idx - todayIndex;
-            dateForCell.setDate(today.getDate() + diff);
-            const dayNumber = parseInt(dateFmt.format(dateForCell).split('-')[2], 10);
-            const dateKey = dateFmt.format(dateForCell); // YYYY-MM-DD в local tz
-            const isFuture = dateKey > todayKey;
-            const done = !isFuture && activeDates.has(dateKey);
-            return (
-              <View key={day} style={styles.weekItem}>
-                <Text
-                  variant="overline"
-                  style={{ color: isToday ? colors.primary : colors.textSecondary }}
-                >
-                  {day}
-                </Text>
-                <View
-                  accessible
-                  accessibilityLabel={`${day}, ${dayNumber}: ${done ? 'цель выполнена' : isToday ? 'сегодня' : 'нет занятий'}`}
-                  style={[
-                    styles.weekCircle,
-                    done
-                      ? { backgroundColor: colors.success, borderColor: colors.success }
-                      : { borderColor: isToday ? colors.primary : colors.border },
-                  ]}
-                >
-                  {done ? (
-                    <Check size={iconSize.xs} color={colors.onPrimary} strokeWidth={3} />
-                  ) : (
-                    <Text
-                      variant="caption"
-                      style={[
-                        styles.bold,
-                        { color: isToday ? colors.primary : colors.textSecondary },
-                      ]}
-                    >
-                      {dayNumber}
-                    </Text>
-                  )}
-                </View>
+        {week.map((d) => {
+          const look = dayLook(d.status, colors);
+          return (
+            <View key={d.date} style={styles.weekItem}>
+              <Text
+                variant="overline"
+                style={{ color: d.isToday ? colors.primary : colors.textSecondary }}
+              >
+                {d.dayLabel}
+              </Text>
+              <View
+                accessible
+                accessibilityLabel={`${d.dayLabel}, ${d.dayNumber}: ${DAY_A11Y[d.status]}`}
+                style={[styles.weekCircle, look.circle]}
+              >
+                {d.status === 'counted' ? (
+                  <Check size={iconSize.xs} color={colors.onPrimary} strokeWidth={3} />
+                ) : d.status === 'frozen' ? (
+                  <Snowflake size={iconSize.xs} color={colors.info} strokeWidth={2.5} />
+                ) : (
+                  <Text variant="caption" style={[styles.bold, { color: look.number }]}>
+                    {d.dayNumber}
+                  </Text>
+                )}
               </View>
-            );
-          });
-        })()}
+            </View>
+          );
+        })}
       </View>
+      {notes.length > 0 && (
+        <View style={styles.weekNotes}>
+          {notes.map((n) => (
+            <View key={n.kind} style={styles.weekNote}>
+              {n.kind === 'frozen' ? (
+                <Snowflake size={14} color={colors.info} />
+              ) : (
+                <AlertCircle size={14} color={colors.warning} />
+              )}
+              <Text variant="bodySmall" style={[styles.flex1, { color: colors.textSecondary }]}>
+                {n.text}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
 
       {/* Section 3: Progress / goal */}
       <View style={styles.goalCard}>
@@ -180,13 +194,33 @@ export function StreakDialog({
 
       {streakFreezes !== null && (
         <View style={[styles.freezeRow, { borderColor: colors.border }]}>
+          {/* Сколько заморозок в запасе — значками (Freeze 5) */}
+          <View
+            style={styles.freezeIcons}
+            accessible
+            accessibilityLabel={`Заморозки: ${streakFreezes} из ${MAX_STREAK_FREEZES}`}
+          >
+            {Array.from({ length: MAX_STREAK_FREEZES }, (_, i) => (
+              <Snowflake
+                key={i}
+                size={iconSize.s}
+                color={i < streakFreezes ? colors.info : colors.textTertiary}
+              />
+            ))}
+          </View>
           <View style={styles.flex1}>
             <Text variant="body" style={[styles.semibold, { color: colors.textPrimary }]}>
-              Заморозка серии: {streakFreezes} из {MAX_STREAK_FREEZES}
+              Заморозки: {streakFreezes} из {MAX_STREAK_FREEZES}
             </Text>
-            <Text variant="caption" style={{ color: colors.textSecondary }}>
-              Спасёт серию, если пропустишь один день
-            </Text>
+            {streakFreezes === 0 && streakValue >= 3 ? (
+              <Text variant="caption" style={{ color: colors.warningText }}>
+                Без заморозки пропуск сбросит серию
+              </Text>
+            ) : (
+              <Text variant="caption" style={{ color: colors.textSecondary }}>
+                Спасает один пропущенный день. Два пропуска подряд — серия начнётся заново
+              </Text>
+            )}
           </View>
           {streakFreezes < MAX_STREAK_FREEZES && (
             <Button

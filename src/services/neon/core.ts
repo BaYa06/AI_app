@@ -6,6 +6,7 @@ import { getAccessToken } from '../auth/session';
 import { apiFetch } from '../api/client';
 import type { Card, CardSet, CardStatus, Course } from '@/types';
 import { parseSetKind } from '@/utils/setKind';
+import { parseSetOrigin } from '@/utils/setOrigin';
 import { log } from '@/utils/logger';
 
 // Учительские мутации (курсы/инвайты/ростер/видимость наборов) идут через настоящий backend
@@ -30,6 +31,8 @@ export type TeacherApiReason =
   | 'unauthorized'
   | 'forbidden'
   | 'rate_limited'
+  /** Группа учителя учебного центра: места центра кончились (plan/new/center_books.md) */
+  | 'org_seats_full'
   | 'bad_request'
   | 'network'
   | 'unknown';
@@ -215,6 +218,11 @@ export type CourseLeaderboard =
       } | null;
     };
 
+/** Сервер старше клиента: действия ещё нет (ответ 400 «Unknown action») — повтор не поможет */
+export function isUnknownAction(status: number, error: unknown): boolean {
+  return status === 400 && typeof error === 'string' && error.startsWith('Unknown action');
+}
+
 /** Вызов api/progress.js (рейтинг курса). null — нет сессии, сети или ошибка сервера. */
 export async function callProgressApi<T = any>(
   action: string,
@@ -222,7 +230,14 @@ export async function callProgressApi<T = any>(
     method,
     params,
     body,
-  }: { method: 'GET' | 'POST'; params?: Record<string, string>; body?: object }
+    unknownAction,
+  }: {
+    method: 'GET' | 'POST';
+    params?: Record<string, string>;
+    body?: object;
+    /** Что вернуть, если сервер ещё не знает это действие (400 «Unknown action»), — вместо null */
+    unknownAction?: T;
+  }
 ): Promise<T | null> {
   const token = await getAccessToken();
   if (!token) return null;
@@ -241,6 +256,9 @@ export async function callProgressApi<T = any>(
     }
     const json = res.json;
     if (!res.ok) {
+      if (unknownAction !== undefined && isUnknownAction(res.status, json?.error)) {
+        return unknownAction;
+      }
       (res.status >= 500 ? log.error : log.warn)(
         'Neon',
         `Progress API ${action} failed`,
@@ -328,6 +346,7 @@ export function mapSetRow(set: any): CardSet {
     languageFrom: set.language_from || 'de',
     languageTo: set.language_to || 'ru',
     kind: parseSetKind(set.kind),
+    origin: parseSetOrigin(set.origin),
     createdAt: new Date(set.created_at).getTime(),
     updatedAt: new Date(set.updated_at).getTime(),
     cardCount: set.total_cards || 0,
@@ -342,17 +361,19 @@ export function mapSetRow(set: any): CardSet {
   } as CardSet;
 }
 
-export function mapCourseRow(course: any): {
-  id: string;
-  title: string;
-  createdAt: number;
-  updatedAt?: number;
-} {
+/** Свой курс из базы (без полей курса учителя у ученика) */
+export type OwnCourseRow = Pick<
+  Course,
+  'id' | 'title' | 'createdAt' | 'updatedAt' | 'sourceBookId'
+>;
+
+export function mapCourseRow(course: any): OwnCourseRow {
   return {
     id: course.id,
     title: course.title,
     createdAt: new Date(course.created_at).getTime(),
     updatedAt: course.updated_at ? new Date(course.updated_at).getTime() : undefined,
+    ...(course.source_book_id ? { sourceBookId: course.source_book_id } : {}),
   };
 }
 
@@ -378,6 +399,7 @@ export type MembershipSetRow = {
   languageFrom: string;
   languageTo: string;
   kind?: string | null;
+  origin?: string | null;
   totalCards: number;
   createdAt: string;
   updatedAt: string | null;
@@ -400,6 +422,7 @@ export function mapMembershipSetRow(row: MembershipSetRow, courseId: string): Ca
     languageFrom: row.languageFrom || 'de',
     languageTo: row.languageTo || 'ru',
     kind: parseSetKind(row.kind),
+    origin: parseSetOrigin(row.origin),
     totalCards: row.totalCards || 0,
     createdAt: new Date(row.createdAt).getTime(),
     updatedAt: row.updatedAt ? new Date(row.updatedAt).getTime() : undefined,
@@ -444,6 +467,13 @@ export type UserStatsData = {
   streak_freezes: number;
   /** Сегодня заморозка спасла серию (вчера был пропуск) */
   freeze_used: boolean;
+  /** Засчитан ли сегодня и сколько ещё (сервер, Freeze 6). Нет полей — старый сервер. */
+  today_counted?: boolean;
+  today_left?: number;
+  /** review — повторить слова, которые ждут; any — ждать нечего, нужны любые ответы */
+  today_need?: 'review' | 'any' | null;
+  /** Учил только новые слова, а ждущие не трогал — день не засчитан (Freeze 6) */
+  today_new_only?: boolean;
   /** Сегмент активности из профиля привычек (plan/new/push_notifications.md, 2.6): new / daily / regular / casual / sleeping / lost */
   activity_segment?: string;
 };
@@ -466,6 +496,15 @@ export function mapUserStatsRow(row: any): UserStatsData {
     streak_freezes: row.streak_freezes || 0,
     freeze_used: row.freeze_used === true,
     activity_segment: row.activity_segment || undefined,
+    ...(typeof row.today_counted === 'boolean'
+      ? {
+          today_counted: row.today_counted,
+          today_left: Number(row.today_left) || 0,
+          today_need:
+            row.today_need === 'review' || row.today_need === 'any' ? row.today_need : null,
+          today_new_only: row.today_new_only === true,
+        }
+      : {}),
   };
 }
 
@@ -473,7 +512,7 @@ export function mapUserStatsRow(row: any): UserStatsData {
 export type BootstrapData = {
   sets: CardSet[];
   cards: Card[];
-  courses: Array<{ id: string; title: string; createdAt: number; updatedAt?: number }>;
+  courses: OwnCourseRow[];
   studentCourses: Course[];
   /** Наборы курсов ученика: courseId → наборы */
   courseSets: Record<string, CardSet[]>;

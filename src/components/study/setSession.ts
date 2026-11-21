@@ -13,7 +13,7 @@ import {
   ensureLessonDay,
   type SetSessionPlan,
 } from '@/services/LessonService';
-import { firstSessionStep } from '@/services/lessonFlow';
+import { firstSessionStep, type SessionStep } from '@/services/lessonFlow';
 import { isCardWaitingReview } from '@/services/SRSService';
 import { Analytics } from '@/services/analytics';
 import type { RootStackParamList } from '@/types/navigation';
@@ -64,6 +64,57 @@ export function currentSetSessionPlan(
 }
 
 /**
+ * Выйти из сессии (или её итогов) в набор так, чтобы экран сессии не остался в стеке.
+ * Набор уже есть ниже (сессию начали из него) — возвращаемся к нему; иначе (начали с главной,
+ * из задания) — заменяем текущий экран набором. Раньше navigate клал набор поверх сессии,
+ * и «назад» из набора снова открывал сессию.
+ */
+export function exitSessionToSet(
+  navigation: NativeStackNavigationProp<RootStackParamList>,
+  setId: string
+): void {
+  const { routes, index } = navigation.getState();
+  let target = -1;
+  for (let i = index - 1; i >= 0; i--) {
+    const r = routes[i];
+    if (r.name === 'SetDetail' && (r.params as { setId?: string } | undefined)?.setId === setId) {
+      target = i;
+      break;
+    }
+  }
+  if (target >= 0) navigation.pop(index - target);
+  else navigation.replace('SetDetail', { setId });
+}
+
+/**
+ * Первый экран сессии по плану (без перехода) + аналитика старта. null — запускать нечего
+ * (пустой набор, ни одному этапу слова не подошли).
+ */
+export function firstSetSessionStep(
+  setId: string,
+  plan: SetSessionPlan,
+  from: 'sheet' | 'results' = 'sheet'
+): SessionStep | null {
+  if (plan.cardIds.length === 0) return null;
+  const { cards } = useCardsStore.getState();
+  const words = plan.cardIds.map((id) => cards[id]).filter((c): c is Card => !!c);
+  const xpBase = useSettingsStore.getState().todayStats.cardsStudied;
+  const step = firstSessionStep(setId, plan.stages, words, Date.now(), xpBase);
+  if (!step) return null;
+  const stages = step.params.session?.stages ?? [];
+  Analytics.setSessionStarted({
+    mode: plan.mode,
+    words: words.length,
+    newCount: plan.newCount,
+    stages: stages.map((s) => s.stage),
+    dropped: plan.stages.length - stages.length,
+    minutes: plan.minutes,
+    from,
+  });
+  return step;
+}
+
+/**
  * Запустить сессию по плану: push — из набора (этап поверх него), replace — с итогов прошлой сессии.
  * false — запускать нечего (пустой набор, ни одному этапу слова не подошли).
  */
@@ -73,22 +124,8 @@ export function startSetSession(
   plan: SetSessionPlan,
   how: 'push' | 'replace' = 'push'
 ): boolean {
-  if (plan.cardIds.length === 0) return false;
-  const { cards } = useCardsStore.getState();
-  const words = plan.cardIds.map((id) => cards[id]).filter((c): c is Card => !!c);
-  const xpBase = useSettingsStore.getState().todayStats.cardsStudied;
-  const step = firstSessionStep(setId, plan.stages, words, Date.now(), xpBase);
+  const step = firstSetSessionStep(setId, plan, how === 'replace' ? 'results' : 'sheet');
   if (!step) return false;
-  const stages = step.params.session?.stages ?? [];
-  Analytics.setSessionStarted({
-    mode: plan.mode,
-    words: words.length,
-    newCount: plan.newCount,
-    stages: stages.map((s) => s.stage),
-    dropped: plan.stages.length - stages.length,
-    minutes: plan.minutes,
-    from: how === 'replace' ? 'results' : 'sheet',
-  });
   if (how === 'replace') navigation.replace(step.screen, step.params);
   else navigation.push(step.screen, step.params);
   return true;

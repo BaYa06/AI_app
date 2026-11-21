@@ -1,5 +1,6 @@
 /**
- * JoinByCodeModal — модалка вступления в курс по короткому коду
+ * JoinByCodeModal — «Ввести код»: вступление в курс по 6-значному коду учителя или код учебного
+ * центра с дефисом (plan/new/center_books.md, Center 5) — его передаём наверх, там окно центра.
  */
 import React, { useState, useRef } from 'react';
 import { View, StyleSheet, TextInput as RNTextInput } from 'react-native';
@@ -10,15 +11,24 @@ import { useThemeColors } from '@/store';
 import { iconSize, spacing, typography } from '@/constants';
 import { NeonService } from '@/services/NeonService';
 import { describeTeacherApiReason } from '@/utils/teacherApiErrors';
+import { CENTER_CODE_MAX, isCenterCode, isCourseCode, normalizeJoinCode } from '@/utils/centerCode';
 
 interface JoinByCodeModalProps {
   visible: boolean;
   userId: string | null;
   onAccepted: (courseId: string, courseTitle: string) => void;
+  /** Ввели код учебного центра — окно центра откроет вызывающий */
+  onCenterCode: (code: string) => void;
   onDismiss: () => void;
 }
 
-export function JoinByCodeModal({ visible, userId, onAccepted, onDismiss }: JoinByCodeModalProps) {
+export function JoinByCodeModal({
+  visible,
+  userId,
+  onAccepted,
+  onCenterCode,
+  onDismiss,
+}: JoinByCodeModalProps) {
   const colors = useThemeColors();
   const [code, setCode] = useState('');
   const [looking, setLooking] = useState(false);
@@ -46,8 +56,13 @@ export function JoinByCodeModal({ visible, userId, onAccepted, onDismiss }: Join
 
   const handleLookup = async () => {
     const trimmed = code.trim();
-    if (trimmed.length < 6) {
-      setError('Введи 6-значный код');
+    if (isCenterCode(trimmed)) {
+      reset();
+      onCenterCode(trimmed);
+      return;
+    }
+    if (!isCourseCode(trimmed)) {
+      setError('Введи 6-значный код учителя или код центра с дефисом');
       return;
     }
     setLooking(true);
@@ -89,7 +104,7 @@ export function JoinByCodeModal({ visible, userId, onAccepted, onDismiss }: Join
     <Dialog
       visible={visible}
       onClose={handleDismiss}
-      title="Войти по коду"
+      title="Ввести код"
       headerRight={
         <Button
           variant="icon"
@@ -103,22 +118,23 @@ export function JoinByCodeModal({ visible, userId, onAccepted, onDismiss }: Join
       }
     >
       <Text variant="bodySmall" style={[styles.hint, { color: colors.textSecondary }]}>
-        Введи 6-значный код от учителя
+        От учителя — 6 цифр. От учебного центра — с дефисом, например ALFA-DEC-7K.
       </Text>
 
       {/* Код: ошибка — под полем (брендбук, 7.2) */}
       <TextField
         ref={inputRef}
-        accessibilityLabel="Код курса"
+        accessibilityLabel="Код от учителя или учебного центра"
         placeholder="000000"
         value={code}
         onChangeText={(v) => {
-          setCode(v.replace(/\D/g, '').slice(0, 6));
+          setCode(normalizeJoinCode(v));
           setInfo(null);
           setError(null);
         }}
-        keyboardType="numeric"
-        maxLength={6}
+        autoCapitalize="characters"
+        autoCorrect={false}
+        maxLength={CENTER_CODE_MAX}
         onSubmitEditing={handleLookup}
         error={error}
         inputStyle={styles.codeInput}

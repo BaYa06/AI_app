@@ -26,6 +26,14 @@ export interface OnboardingOptionProps {
   selected: boolean;
   /** single — радио (один вариант), multiple — чекбокс. */
   mode?: 'single' | 'multiple';
+  /** Цвет выбора: native — родной язык (success), иначе фирменный */
+  tone?: 'primary' | 'native';
+  /** Пометка справа: «язык телефона», «Основной», «Твой родной» */
+  badge?: { text: string; tone: 'primary' | 'native' | 'neutral' };
+  /** Плитка флага/иконки — источник перелёта флага на мост (Start 2.4) */
+  tileRef?: React.Ref<View>;
+  /** Неактивный вариант (родной язык в списке изучаемых) — без индикатора выбора */
+  disabled?: boolean;
   onPress: () => void;
 }
 
@@ -37,32 +45,41 @@ export const OnboardingOption = memo(function OnboardingOption({
   meta,
   selected,
   mode = 'single',
+  tone = 'primary',
+  badge,
+  disabled = false,
+  tileRef,
   onPress,
 }: OnboardingOptionProps) {
   const colors = useThemeColors();
+  const accent = tone === 'native' ? colors.success : colors.primary;
+  const accentFill = tone === 'native' ? colors.success : colors.primaryFill;
   const MetaIcon = meta?.icon;
   const large = !!meta;
 
   return (
     <Pressable
       accessibilityRole={mode === 'single' ? 'radio' : 'checkbox'}
-      accessibilityState={{ checked: selected }}
+      accessibilityState={{ checked: selected, disabled }}
+      disabled={disabled}
       accessibilityLabel={[title, description ?? meta?.text].filter(Boolean).join('. ')}
       onPress={onPress}
       style={({ pressed }) => [
         styles.option,
         {
-          borderColor: selected ? colors.primary : colors.border,
-          backgroundColor: selected ? alpha(colors.primary, 10) : colors.surface,
+          borderColor: selected ? accent : colors.border,
+          backgroundColor: selected ? alpha(accent, 10) : colors.surface,
         },
+        disabled && styles.disabled,
         pressed && styles.pressed,
       ]}
     >
       {Glyph || flag ? (
         <View
+          ref={tileRef}
           style={[
             styles.tile,
-            { backgroundColor: selected ? colors.primaryFill : colors.surfaceMuted },
+            { backgroundColor: selected && Glyph ? accentFill : colors.surfaceMuted },
           ]}
         >
           {Glyph ? (
@@ -95,19 +112,50 @@ export const OnboardingOption = memo(function OnboardingOption({
         ) : null}
       </View>
 
-      {mode === 'single' ? (
-        <View style={[styles.radio, { borderColor: selected ? colors.primary : colors.border }]}>
-          {selected ? (
-            <View style={[styles.radioDot, { backgroundColor: colors.primary }]} />
-          ) : null}
+      {badge ? (
+        <View
+          style={[
+            styles.badge,
+            {
+              backgroundColor:
+                badge.tone === 'primary'
+                  ? colors.primaryFill
+                  : badge.tone === 'native'
+                    ? alpha(colors.success, 10)
+                    : colors.surfaceMuted,
+            },
+          ]}
+        >
+          <Text
+            variant="caption"
+            style={[
+              styles.badgeText,
+              {
+                color:
+                  badge.tone === 'primary'
+                    ? colors.onPrimary
+                    : badge.tone === 'native'
+                      ? colors.successText
+                      : colors.textSecondary,
+              },
+            ]}
+          >
+            {badge.text}
+          </Text>
+        </View>
+      ) : null}
+
+      {disabled ? null : mode === 'single' ? (
+        <View style={[styles.radio, { borderColor: selected ? accent : colors.border }]}>
+          {selected ? <View style={[styles.radioDot, { backgroundColor: accent }]} /> : null}
         </View>
       ) : (
         <View
           style={[
             styles.checkbox,
             {
-              borderColor: selected ? colors.primary : colors.border,
-              backgroundColor: selected ? colors.primaryFill : colors.surface,
+              borderColor: selected ? accent : colors.border,
+              backgroundColor: selected ? accentFill : colors.surface,
             },
           ]}
         >
@@ -129,6 +177,17 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.85,
+  },
+  disabled: {
+    opacity: 0.5,
+  },
+  badge: {
+    borderRadius: borderRadius.s,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xxs,
+  },
+  badgeText: {
+    fontWeight: '700',
   },
   tile: {
     width: 52,

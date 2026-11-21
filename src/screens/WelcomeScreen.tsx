@@ -4,16 +4,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, Platform, Linking, ActivityIndicator } from 'react-native';
-import {
-  Zap,
-  Sparkles,
-  BookOpen,
-  Lightbulb,
-  Download,
-  Share,
-  PlusSquare,
-  CheckCircle2,
-} from 'lucide-react-native';
+import { Download, Share, PlusSquare, CheckCircle2 } from 'lucide-react-native';
 import InAppBrowser from 'react-native-inappbrowser-reborn';
 import appleAuth, { AppleButton } from '@invertase/react-native-apple-authentication';
 import { Text } from '@/components/common';
@@ -30,15 +21,19 @@ import { log } from '@/utils/logger';
 
 type Props = {
   isLoading?: boolean;
+  /** Открыта ссылка учителя — «Тебя пригласили в курс» (Start 7.3) */
+  invited?: boolean;
+  /** Открыта ссылка учебного центра — «Тебе открыт доступ к книгам» (plan/new/center_books.md) */
+  centerInvited?: boolean;
+  /** Открыли ссылку для учителей центра /t/<код> (Center 13) */
+  teacherInvited?: boolean;
 };
 
-// Декоративные плитки: насыщенные — заливка primaryFill, светлые — подложка primary 10 / 20 %
-type Tile = { icon: IconComponent; fill: 'solid' | 10 | 20; rotate: string; offset: number };
-const TILES: Tile[] = [
-  { icon: Sparkles, fill: 'solid', rotate: '-6deg', offset: 0 },
-  { icon: BookOpen, fill: 10, rotate: '12deg', offset: spacing.s },
-  { icon: Zap, fill: 'solid', rotate: '5deg', offset: -spacing.s },
-  { icon: Lightbulb, fill: 20, rotate: '-8deg', offset: spacing.xs },
+// Стопка из трёх карточек: нижние повёрнуты, верхняя залита фирменным цветом
+const DECK = [
+  { word: 'Hola', translation: 'Привет', rotate: '-9deg', x: -26, y: 8 },
+  { word: 'Danke', translation: 'Спасибо', rotate: '7deg', x: 24, y: 4 },
+  { word: 'Hello', translation: 'Привет', rotate: '0deg', x: 0, y: 0 },
 ];
 
 const INSTALL_STEPS: { icon: IconComponent; text: string }[] = [
@@ -50,7 +45,12 @@ const INSTALL_STEPS: { icon: IconComponent; text: string }[] = [
 // Кнопка Google берёт иконку по тем же пропсам size/color, что и lucide
 const GoogleIcon = GoogleLogo as unknown as IconComponent;
 
-export function WelcomeScreen({ isLoading: externalLoading }: Props) {
+export function WelcomeScreen({
+  isLoading: externalLoading,
+  invited = false,
+  centerInvited = false,
+  teacherInvited = false,
+}: Props) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const { canInstall, promptInstall, isIosSafari } = usePwaInstall();
@@ -205,53 +205,80 @@ export function WelcomeScreen({ isLoading: externalLoading }: Props) {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.shell}>
+          {/* Стопка карточек — с первого экрана видно, что это за приложение
+              (plan/new/new_user_activation.md, Start 2.0) */}
+          <View
+            style={styles.deck}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            {DECK.map((card, idx) => {
+              const top = idx === DECK.length - 1;
+              return (
+                <View
+                  key={card.word}
+                  style={[
+                    styles.deckCard,
+                    {
+                      backgroundColor: top
+                        ? colors.primaryFill
+                        : idx === 0
+                          ? alpha(colors.primary, 10)
+                          : colors.surface,
+                      borderColor: top ? colors.primaryFill : colors.border,
+                      transform: [
+                        { rotate: card.rotate },
+                        { translateX: card.x },
+                        { translateY: card.y },
+                      ],
+                    },
+                  ]}
+                >
+                  <Text variant="h2" style={{ color: top ? colors.onPrimary : colors.textPrimary }}>
+                    {card.word}
+                  </Text>
+                  <Text
+                    variant="body"
+                    style={[
+                      { color: top ? colors.onPrimary : colors.textSecondary },
+                      top && styles.deckTopTranslation,
+                    ]}
+                  >
+                    {card.translation}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+
           <View style={styles.header}>
-            <View style={[styles.logoCircle, { backgroundColor: colors.surfaceMuted }]}>
-              <Zap size={iconSize.l} color={colors.primary} fill={colors.primary} />
-            </View>
             <Text
               variant="h1"
               align="center"
               accessibilityRole="header"
               style={{ color: colors.textPrimary }}
             >
-              Flashly
+              {teacherInvited
+                ? 'Тебя приглашают учителем'
+                : centerInvited
+                  ? 'Тебе открыт доступ к книгам'
+                  : invited
+                    ? 'Тебя пригласили в курс'
+                    : 'Первые слова за 2 минуты'}
             </Text>
             <Text
               variant="bodyLarge"
               align="center"
               style={[styles.subtitle, { color: colors.textSecondary }]}
             >
-              Учись умнее. Запоминай надолго.
+              {teacherInvited
+                ? 'Войди, и подключишься к учебному центру: его книги появятся в Библиотеке.'
+                : centerInvited
+                  ? 'Войди, и сразу выберешь свою книгу учебного центра.'
+                  : invited
+                    ? 'Войди, и курс учителя сразу откроется.'
+                    : 'Карточки, игры и повторение в нужный момент. Слова не забываются.'}
             </Text>
-          </View>
-
-          <View
-            style={styles.illustration}
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants"
-          >
-            <View style={styles.tilesGrid}>
-              {TILES.map(({ icon: Glyph, fill, rotate, offset }, idx) => (
-                <View
-                  key={idx}
-                  style={[
-                    styles.tile,
-                    {
-                      backgroundColor:
-                        fill === 'solid' ? colors.primaryFill : alpha(colors.primary, fill),
-                      transform: [{ rotate }],
-                      marginTop: offset,
-                    },
-                  ]}
-                >
-                  <Glyph
-                    size={iconSize.l}
-                    color={fill === 'solid' ? colors.onPrimary : colors.primary}
-                  />
-                </View>
-              ))}
-            </View>
           </View>
 
           <View style={styles.actions}>
@@ -370,32 +397,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.l,
   },
-  logoCircle: {
-    padding: spacing.m,
-    borderRadius: borderRadius.l,
-  },
   subtitle: {
     marginTop: spacing.xs,
   },
-  illustration: {
+  deck: {
+    alignSelf: 'center',
+    width: 210,
+    height: 150,
+    marginTop: spacing.xl,
+    marginBottom: spacing.xxl,
+  },
+  deckTopTranslation: {
+    opacity: 0.8,
+  },
+  deckCard: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: borderRadius.xl,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: spacing.l,
-  },
-  tilesGrid: {
-    width: '100%',
-    maxWidth: 320,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  tile: {
-    width: '48%',
-    aspectRatio: 4 / 3,
-    borderRadius: borderRadius.l,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.m,
+    gap: spacing.xxs,
   },
   actions: {
     gap: spacing.s,

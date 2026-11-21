@@ -37,9 +37,15 @@ import { playCorrectSound, playSessionSfx, preloadSessionSfx, preloadSound } fro
 import { buildDistractorPool, pickSimilarDistractors } from '@/utils/choiceDistractors';
 import { Analytics } from '@/services/analytics';
 import { useChallengeStore } from '@/store';
-import { StageLayout, AnswerPanel, sessionStageProgress } from '@/components/study/StageLayout';
+import {
+  StageLayout,
+  AnswerPanel,
+  sessionStageProgress,
+  useAutoAdvance,
+} from '@/components/study/StageLayout';
 import { isSubjectSet } from '@/utils/setKind';
 import type { RootStackScreenProps } from '@/types/navigation';
+import { exitSessionToSet } from '@/components/study/setSession';
 import type { Card, Rating } from '@/types';
 import { pluralize } from '@/utils';
 import { log } from '@/utils/logger';
@@ -687,6 +693,8 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
     setSelectedOption(null);
     setShowResult(false);
   };
+  // Верно — дальше само (Start 3.4)
+  const autoNext = useAutoAdvance(!!feedback?.correct, handleNextQuestion);
 
   // Сохраняем активность при уходе в background
   useEffect(() => {
@@ -861,7 +869,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
   if (isPlainTest) {
     const exitTest = () => {
       finishStudySession();
-      if (session) navigation.navigate('SetDetail', { setId: session.setId });
+      if (session) exitSessionToSet(navigation, session.setId);
       else navigation.goBack();
     };
     // «Не могу слушать»: этап пропускается целиком, итоги сессии решают, что дальше
@@ -913,6 +921,7 @@ export function MultipleChoiceScreen({ navigation, route }: Props) {
                 back: getBack(currentCard),
                 example: currentCard.example || undefined,
               }}
+              autoAdvance={autoNext}
               onNext={handleNextQuestion}
             />
           ) : null

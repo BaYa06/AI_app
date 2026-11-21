@@ -34,10 +34,10 @@ export async function getAdminStats(sql) {
           AND (is_anonymous = false OR is_anonymous IS NULL)`,
 
     sql`SELECT COUNT(DISTINCT user_id) as count FROM daily_activity
-        WHERE local_date = CURRENT_DATE`,
+        WHERE local_date = CURRENT_DATE AND (cards_studied > 0 OR NOT frozen)`,
 
     sql`SELECT COUNT(DISTINCT user_id) as count FROM daily_activity
-        WHERE local_date >= CURRENT_DATE - INTERVAL '6 days'`,
+        WHERE local_date >= CURRENT_DATE - INTERVAL '6 days' AND (cards_studied > 0 OR NOT frozen)`,
 
     sql`SELECT DATE(created_at) as day, COUNT(*) as count
         FROM users
@@ -47,7 +47,7 @@ export async function getAdminStats(sql) {
 
     sql`SELECT local_date::text as day, COUNT(DISTINCT user_id) as count
         FROM daily_activity
-        WHERE local_date >= CURRENT_DATE - INTERVAL '29 days'
+        WHERE local_date >= CURRENT_DATE - INTERVAL '29 days' AND (cards_studied > 0 OR NOT frozen)
         GROUP BY local_date
         ORDER BY local_date`,
 
@@ -62,6 +62,7 @@ export async function getAdminStats(sql) {
         LEFT JOIN daily_activity da
           ON da.user_id = u.id
           AND da.local_date = DATE(u.created_at AT TIME ZONE 'UTC') + 1
+          AND (da.cards_studied > 0 OR NOT da.frozen)
         WHERE u.created_at BETWEEN NOW() - INTERVAL '8 days' AND NOW() - INTERVAL '1 day'
           AND (u.is_anonymous = false OR u.is_anonymous IS NULL)`,
 
@@ -72,6 +73,7 @@ export async function getAdminStats(sql) {
         LEFT JOIN daily_activity da
           ON da.user_id = u.id
           AND da.local_date = DATE(u.created_at AT TIME ZONE 'UTC') + 7
+          AND (da.cards_studied > 0 OR NOT da.frozen)
         WHERE u.created_at BETWEEN NOW() - INTERVAL '14 days' AND NOW() - INTERVAL '7 days'
           AND (u.is_anonymous = false OR u.is_anonymous IS NULL)`,
 
@@ -82,6 +84,7 @@ export async function getAdminStats(sql) {
         LEFT JOIN daily_activity da
           ON da.user_id = u.id
           AND da.local_date = DATE(u.created_at AT TIME ZONE 'UTC') + 30
+          AND (da.cards_studied > 0 OR NOT da.frozen)
         WHERE u.created_at BETWEEN NOW() - INTERVAL '37 days' AND NOW() - INTERVAL '30 days'
           AND (u.is_anonymous = false OR u.is_anonymous IS NULL)`,
 
@@ -89,13 +92,13 @@ export async function getAdminStats(sql) {
                COUNT(DISTINCT user_id) as users,
                COALESCE(SUM(cards_studied), 0) as cards
         FROM daily_activity
-        WHERE local_date >= CURRENT_DATE - INTERVAL '29 days'
+        WHERE local_date >= CURRENT_DATE - INTERVAL '29 days' AND (cards_studied > 0 OR NOT frozen)
         GROUP BY dow ORDER BY dow`,
 
     sql`SELECT COALESCE(SUM(cards_studied), 0) as total,
                COALESCE(AVG(cards_studied), 0) as avg_per_user_day
         FROM daily_activity
-        WHERE local_date >= CURRENT_DATE - INTERVAL '6 days'`,
+        WHERE local_date >= CURRENT_DATE - INTERVAL '6 days' AND (cards_studied > 0 OR NOT frozen)`,
 
     sql`SELECT COUNT(*) as count FROM courses`,
 
@@ -112,7 +115,7 @@ export async function getAdminStats(sql) {
         FROM users u
         JOIN daily_activity da ON da.user_id = u.id
         WHERE u.teacher = true
-          AND da.local_date >= CURRENT_DATE - INTERVAL '6 days'`,
+          AND da.local_date >= CURRENT_DATE - INTERVAL '6 days' AND (da.cards_studied > 0 OR NOT da.frozen)`,
 
     sql`SELECT COUNT(*) as count FROM test_sessions
         WHERE created_at >= NOW() - INTERVAL '7 days'`,

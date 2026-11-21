@@ -20,6 +20,9 @@ type SizeOption = {
 };
 
 type Props = {
+  /** Номер шага и сколько всего — считает AppRoot по роли и пути */
+  step?: number;
+  total?: number;
   onContinue?: (optionId: string) => void;
   onBack?: () => void;
 };
@@ -31,7 +34,7 @@ const OPTIONS: SizeOption[] = [
   { id: 'unknown', label: 'Пока не знаю', icon: HelpCircle, vibe: 'Определюсь позже' },
 ];
 
-export function TeacherGroupSizeScreen({ onContinue, onBack }: Props) {
+export function TeacherGroupSizeScreen({ onContinue, onBack, step = 6, total }: Props) {
   const colors = useThemeColors();
   const [selected, setSelected] = useState<string>('1-10');
 
@@ -39,7 +42,8 @@ export function TeacherGroupSizeScreen({ onContinue, onBack }: Props) {
     <OnboardingStep
       onBack={onBack}
       title="Flashly"
-      step={6}
+      step={step}
+      total={total}
       headline="Сколько у тебя учеников?"
       description="Это поможет нам подобрать оптимальные инструменты."
       align="center"

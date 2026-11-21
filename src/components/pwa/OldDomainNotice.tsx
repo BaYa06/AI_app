@@ -1,6 +1,6 @@
 /**
  * «У Flashly новый адрес» на старом ai-app-seven-zeta.vercel.app (plan/new/seo_launch.md, SEO 5;
- * plan/new/official_site.md, Site 9).
+ * plan/done/official_site.md, Site 9).
  * @description Старый адрес не перенаправляем: на нём установленные PWA, вход и push. Один раз
  * показываем тост, что сайт теперь flashlycards.app, а здесь всё продолжит работать.
  * Тост, а не окно: при запуске и так могут открыться обновление, «Что нового», приглашение.

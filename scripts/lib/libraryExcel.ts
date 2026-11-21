@@ -2,7 +2,7 @@
  * Формат Excel-файла каталога библиотеки (один файл на все предметы) и его разбор с валидацией.
  * Используется import-library.ts (чтение) и create-library-template.ts (заголовки).
  *
- * Иерархия (plan/new/library_catalog.md, «Формат Excel»):
+ * Иерархия (plan/done/library_catalog.md, «Формат Excel»):
  *   L1 subject → L2 track (язык / раздел, если есть у предмета) → L3 level (если есть) → L4 collection → L5 набор.
  *
  * Разбор в два этапа:

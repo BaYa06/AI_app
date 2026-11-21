@@ -82,25 +82,48 @@ import { SupportListScreen } from '@/screens/SupportListScreen';
 import { SupportThreadScreen } from '@/screens/SupportThreadScreen';
 import { LibrarySetDetailScreen } from '@/screens/LibrarySetDetailScreen';
 import { BookDetailScreen } from '@/screens/BookDetailScreen';
+import { CenterBookPickScreen } from '@/screens/center/CenterBookPickScreen';
 import { CourseBooksScreen } from '@/screens/CourseBooksScreen';
 import { MyPublicationsScreen } from '@/screens/MyPublicationsScreen';
-import { COMMUNITY_LIBRARY_ENABLED, LIBRARY_CATALOG_ENABLED } from '@/config/features';
+import {
+  COMMUNITY_LIBRARY_ENABLED,
+  LIBRARY_CATALOG_ENABLED,
+  TEACHER_INSIGHTS_ENABLED,
+  TEACHER_LESSON_PREP_ENABLED,
+} from '@/config/features';
+import { rewriteTeacherLink } from '@/services/teacherNotifications';
 import { PersonalInfoScreen } from '@/screens/PersonalInfoScreen';
 import { SecurityScreen } from '@/screens/SecurityScreen';
 import { TeacherCourseStatsScreen } from '@/screens/TeacherCourseStatsScreen';
 import { TeacherStudentsScreen } from '@/screens/TeacherStudentsScreen';
+import { TeacherHomeworkScreen } from '@/screens/TeacherHomeworkScreen';
+import { TeacherHomeworkHistoryScreen } from '@/screens/TeacherHomeworkHistoryScreen';
+import { TeacherLessonPrepScreen } from '@/screens/TeacherLessonPrepScreen';
+import { TeacherNotificationsScreen } from '@/screens/TeacherNotificationsScreen';
+import { StudentInsightScreen } from '@/screens/StudentInsightScreen';
+import { TeacherReportScreen } from '@/screens/TeacherReportScreen';
+import { StudentHomeworkScreen } from '@/screens/StudentHomeworkScreen';
+import { HomeworkDoneScreen } from '@/screens/HomeworkDoneScreen';
 import { StudentDetailScreen } from '@/screens/StudentDetailScreen';
 import { ExamLobbyScreen } from '@/screens/ExamLobbyScreen';
+import { ExamSetupScreen } from '@/screens/ExamSetupScreen';
+import { ExamBuildScreen } from '@/screens/ExamBuildScreen';
+import { ExamPreviewScreen } from '@/screens/ExamPreviewScreen';
+import { ExamResultsScreen } from '@/screens/ExamResultsScreen';
+import { ExamQuestionScreen } from '@/screens/ExamQuestionScreen';
+import { ExamStudentScreen } from '@/screens/ExamStudentScreen';
 import { TestHistoryScreen } from '@/screens/TestHistoryScreen';
 import { CourseLeaderboardScreen } from '@/screens/CourseLeaderboardScreen';
-import { OralTestLobbyScreen } from '@/screens/OralTestLobbyScreen';
-import { OralTestSessionScreen } from '@/screens/OralTestSessionScreen';
-import { OralTestResultsScreen } from '@/screens/OralTestResultsScreen';
 import { TestLobbyScreen } from '@/screens/TestLobbyScreen';
 import { LiveTestScreen } from '@/screens/LiveTestScreen';
+import { TeacherDemoTestScreen } from '@/screens/TeacherDemoTestScreen';
 import { TestResultsTeacherScreen } from '@/screens/TestResultsTeacherScreen';
+import { WarmupResultsScreen } from '@/screens/WarmupResultsScreen';
 import { TestJoinScreen } from '@/screens/TestJoinScreen';
 import { TestWaitingScreen } from '@/screens/TestWaitingScreen';
+import { ExamTakeScreen } from '@/screens/ExamTakeScreen';
+import { ExamResultScreen } from '@/screens/ExamResultScreen';
+import { MyExamsScreen } from '@/screens/MyExamsScreen';
 import { TestExamScreen } from '@/screens/TestExamScreen';
 import { TestDoneScreen } from '@/screens/TestDoneScreen';
 import { ContextFillScreen } from '@/screens/ContextFillScreen';
@@ -139,7 +162,7 @@ function MainTabs() {
     <Tab.Navigator
       // Без этого фона экран-вкладка сидит на нативном (белом по умолчанию) фоне окна.
       sceneContainerStyle={{ backgroundColor: colors.background }}
-      // iOS: плавающая стеклянная капсула на Swift (plan/new/liquid_glass.md, Glass 4.1) —
+      // iOS: плавающая стеклянная капсула на Swift (plan/done/liquid_glass.md, Glass 4.1) —
       // контент вкладок уходит под неё (отступ — useTabBarOverlayInset). Android и веб — обычная панель.
       tabBar={isGlassTabBarSupported ? (props) => <GlassTabBar {...props} /> : undefined}
       screenOptions={{
@@ -261,6 +284,16 @@ function MainTabs() {
 // Из flashly:// пропускаем только ссылки виджета (plan/new/widgets.md, 0.3): lesson и set/<setId>.
 // Вход (flashly://auth-callback) и приглашения по-прежнему разбирает App.tsx.
 // Тап по пушу (plan/new/push_notifications.md, 0.5) идёт сюда же: data.link пуша — та же flashly:// ссылка.
+/** Ссылка пуша учителя на экран этапа, выключенного флагом, — на ближайший работающий экран */
+function teacherPushLink(link: string | null): string | null {
+  return link
+    ? rewriteTeacherLink(link, {
+        lessonPrep: TEACHER_LESSON_PREP_ENABLED,
+        insights: TEACHER_INSIGHTS_ENABLED,
+      })
+    : null;
+}
+
 const NATIVE_LINKING: LinkingOptions<RootStackParamList> = {
   prefixes: ['flashly://'],
   filter: isNavigationUrl,
@@ -268,12 +301,12 @@ const NATIVE_LINKING: LinkingOptions<RootStackParamList> = {
   async getInitialURL() {
     const url = await Linking.getInitialURL();
     if (url) return url;
-    return handlePushOpen(await getInitialPushData());
+    return teacherPushLink(handlePushOpen(await getInitialPushData()));
   },
   subscribe(listener) {
     const linkSubscription = Linking.addEventListener('url', ({ url }) => listener(url));
     const unsubscribePush = onPushOpened((data) => {
-      const link = handlePushOpen(data);
+      const link = teacherPushLink(handlePushOpen(data));
       if (link) listener(link);
     });
     return () => {
@@ -310,6 +343,8 @@ const NATIVE_LINKING: LinkingOptions<RootStackParamList> = {
       Feedback: 'feedback',
       // Push «Команда Flashly ответила» (plan/new/support_threads.md): flashly://support/<id>?from=push
       SupportThread: 'support/:id',
+      // Push «Результат экзамена» (plan/new/live_exam.md): flashly://exam-result/<sessionId>?from=push
+      ExamResult: 'exam-result/:sessionId',
       ...(COMMUNITY_LIBRARY_ENABLED ? { LibrarySetDetail: 'library-set/:setId' } : null),
       BookDetail: 'book/:bookId',
       CourseBooks: 'course-books/:courseId',
@@ -320,6 +355,17 @@ const NATIVE_LINKING: LinkingOptions<RootStackParamList> = {
       CourseLeaderboard: 'rating/:courseId',
       TeacherCourseStats: 'teacher/:courseId',
       TeacherStudents: 'teacher/:courseId/students',
+      StudentHomework: 'homework/:homeworkId',
+      // Пуши и колокольчик учителя (plan/done/teacher_cabinet.md, этап 4). Экран выключенного этапа
+      // в ссылке заменяет teacherPushLink.
+      ...(TEACHER_LESSON_PREP_ENABLED ? { TeacherLessonPrep: 'lesson-prep/:courseId' } : null),
+      TeacherHomework: 'teacher-homework/:courseId/:homeworkId',
+      ...(TEACHER_INSIGHTS_ENABLED
+        ? {
+            StudentDetail: 'teacher-student/:courseId/:studentId',
+            TeacherNotifications: 'teacher-notifications',
+          }
+        : null),
     },
   },
 };
@@ -525,6 +571,12 @@ export function AppNavigator() {
           component={BookDetailScreen}
           options={{ headerShown: false }}
         />
+        {/* Выбор книги учебного центра после кода (plan/new/center_books.md, этап 7) */}
+        <Stack.Screen
+          name="CenterBookPick"
+          component={CenterBookPickScreen}
+          options={{ headerShown: false }}
+        />
         {LIBRARY_CATALOG_ENABLED && (
           <Stack.Screen
             name="LibrarySubject"
@@ -575,14 +627,81 @@ export function AppNavigator() {
           options={{ headerShown: false, gestureEnabled: true }}
         />
         <Stack.Screen
+          name="HomeworkDone"
+          component={HomeworkDoneScreen}
+          options={{ headerShown: false, gestureEnabled: false, animation: 'fade' }}
+        />
+        <Stack.Screen
+          name="StudentHomework"
+          component={StudentHomeworkScreen}
+          options={{ headerShown: false, gestureEnabled: true }}
+        />
+        <Stack.Screen
+          name="TeacherHomework"
+          component={TeacherHomeworkScreen}
+          options={{ headerShown: false, gestureEnabled: true }}
+        />
+        <Stack.Screen
+          name="TeacherHomeworkHistory"
+          component={TeacherHomeworkHistoryScreen}
+          options={{ headerShown: false, gestureEnabled: true }}
+        />
+        <Stack.Screen
+          name="TeacherReport"
+          component={TeacherReportScreen}
+          options={{ headerShown: false, gestureEnabled: true }}
+        />
+        <Stack.Screen
+          name="TeacherNotifications"
+          component={TeacherNotificationsScreen}
+          options={{ headerShown: false, gestureEnabled: true }}
+        />
+        <Stack.Screen
+          name="TeacherLessonPrep"
+          component={TeacherLessonPrepScreen}
+          options={{ headerShown: false, gestureEnabled: true }}
+        />
+        <Stack.Screen
           name="StudentDetail"
-          component={StudentDetailScreen}
+          // Этап 4: новый экран ученика за флагом, прежний остаётся для отката
+          component={TEACHER_INSIGHTS_ENABLED ? StudentInsightScreen : StudentDetailScreen}
           options={{ headerShown: false, gestureEnabled: true }}
         />
         <Stack.Screen
           name="ExamLobby"
           component={ExamLobbyScreen}
           options={{ headerShown: false, gestureEnabled: true }}
+        />
+        {/* Экзамен с оценкой — учитель (plan/new/live_exam.md) */}
+        <Stack.Screen
+          name="ExamSetup"
+          component={ExamSetupScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ExamBuild"
+          component={ExamBuildScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ExamPreview"
+          component={ExamPreviewScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ExamResults"
+          component={ExamResultsScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ExamQuestion"
+          component={ExamQuestionScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ExamStudent"
+          component={ExamStudentScreen}
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="TestHistory"
@@ -595,24 +714,14 @@ export function AppNavigator() {
           options={{ headerShown: false, gestureEnabled: true }}
         />
         <Stack.Screen
-          name="OralTestLobby"
-          component={OralTestLobbyScreen}
-          options={{ headerShown: false, gestureEnabled: true }}
-        />
-        <Stack.Screen
-          name="OralTestSession"
-          component={OralTestSessionScreen}
-          options={{ headerShown: false, gestureEnabled: false }}
-        />
-        <Stack.Screen
-          name="OralTestResults"
-          component={OralTestResultsScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
           name="TestLobby"
           component={TestLobbyScreen}
           options={{ headerShown: false, gestureEnabled: true }}
+        />
+        <Stack.Screen
+          name="TeacherDemoTest"
+          component={TeacherDemoTestScreen}
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="LiveTest"
@@ -622,6 +731,11 @@ export function AppNavigator() {
         <Stack.Screen
           name="TestResultsTeacher"
           component={TestResultsTeacherScreen}
+          options={{ headerShown: false, gestureEnabled: false }}
+        />
+        <Stack.Screen
+          name="WarmupResults"
+          component={WarmupResultsScreen}
           options={{ headerShown: false, gestureEnabled: false }}
         />
         <Stack.Screen
@@ -644,6 +758,18 @@ export function AppNavigator() {
           component={TestDoneScreen}
           options={{ headerShown: false, gestureEnabled: false }}
         />
+        {/* Живой экзамен, движок 2 (plan/new/live_exam.md) */}
+        <Stack.Screen
+          name="ExamTake"
+          component={ExamTakeScreen}
+          options={{ headerShown: false, gestureEnabled: false }}
+        />
+        <Stack.Screen
+          name="ExamResult"
+          component={ExamResultScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen name="MyExams" component={MyExamsScreen} options={{ headerShown: false }} />
         <Stack.Screen
           name="ContextFill"
           component={ContextFillScreen}

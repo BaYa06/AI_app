@@ -18,31 +18,54 @@ type RoleOption = {
 };
 
 type Props = {
+  /** Номер шага и сколько всего — считает AppRoot по роли и пути */
+  step?: number;
+  total?: number;
   onContinue?: (roleId: string) => void;
   onBack?: () => void;
+  /** «У меня есть код от учителя» (Start 7.1) */
+  onHaveCode?: () => void;
 };
 
 const OPTIONS: RoleOption[] = [
   {
     id: 'student',
     title: 'Я учусь',
-    description: 'Создавай карточки и учи новое',
+    description: 'Сразу первый урок на 5 слов',
     icon: GraduationCap,
   },
-  { id: 'teacher', title: 'Я преподаю', description: 'Создавай курсы для учеников', icon: Users },
+  {
+    id: 'teacher',
+    title: 'Я учитель',
+    description: 'Курс для учеников, тесты и задания',
+    icon: Users,
+  },
 ];
 
-export function RoleSelectionScreen({ onContinue, onBack }: Props) {
+export function RoleSelectionScreen({ onContinue, onBack, onHaveCode, step = 2, total }: Props) {
   const [selected, setSelected] = useState<string>('student');
 
   return (
     <OnboardingStep
       onBack={onBack}
       title="Flashly"
-      step={2}
+      step={step}
+      total={total}
       headline="Кто ты?"
       description="Это поможет нам настроить приложение под тебя."
-      footer={<Button title="Продолжить" onPress={() => onContinue?.(selected)} fullWidth />}
+      footer={
+        <>
+          <Button title="Продолжить" onPress={() => onContinue?.(selected)} fullWidth />
+          {onHaveCode ? (
+            <Button
+              title="У меня есть код от учителя"
+              variant="quiet"
+              onPress={onHaveCode}
+              fullWidth
+            />
+          ) : null}
+        </>
+      }
     >
       <View accessibilityRole="radiogroup" style={styles.options}>
         {OPTIONS.map((option) => (

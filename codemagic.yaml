@@ -1,4 +1,4 @@
-# iOS: два workflow с одинаковыми шагами (plan/new/release_safety.md, Release 3).
+# iOS: два workflow с одинаковыми шагами (plan/done/release_safety.md, Release 3).
 #   ios-testflight-staging — из ветки dev, APP_ENV=staging: приложение ходит на тестовый сервер
 #     (Vercel Preview ветки dev + ветка базы Neon), сверху метка «Тестовый сервер». Только для
 #     проверки в TestFlight — в App Store такую сборку не отправлять.

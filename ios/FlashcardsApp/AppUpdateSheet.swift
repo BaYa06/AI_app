@@ -1,6 +1,6 @@
 //
 //  AppUpdateSheet.swift
-//  Нативная шторка «Вышла новая версия» (plan/new/app_update_prompt.md, шаг Update 3).
+//  Нативная шторка «Вышла новая версия» (plan/done/app_update_prompt.md, шаг Update 3).
 //
 //  Тот же подход, что WhatsNewSheet.swift: лист показывает UISheetPresentationController,
 //  содержимое на SwiftUI. Не RN Modal — он падал на iOS 26 (коммит a12afa6).

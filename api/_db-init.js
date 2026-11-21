@@ -8,7 +8,7 @@ import { log } from './_log.js';
  */
 // schema_039: в 038 (official_sets_guard) и 039 (set_kind) версию не подняли — миграции не выполнились,
 // и запросы с card_sets.kind падали на тестовом сервере (plan/new/set_kind.md, слабые места)
-const SCHEMA_VERSION = 'schema_040';
+const SCHEMA_VERSION = 'schema_055';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -720,7 +720,7 @@ async function applyMigrations(sql) {
     log.error('db-init', 'Migration 039_set_kind failed', e);
   }
 
-  // Migration 040: библиотека-каталог (plan/new/library_catalog.md, Catalog 1) — предметы, разделы,
+  // Migration 040: библиотека-каталог (plan/done/library_catalog.md, Catalog 1) — предметы, разделы,
   // подборки, порядок наборов, курс и копия в library_imports, юниты учебника у ученика.
   // Подробные комментарии — database/migrations/040_library_catalog.sql.
   try {
@@ -805,6 +805,543 @@ async function applyMigrations(sql) {
       ON CONFLICT (subject_id, key) DO NOTHING`;
   } catch (e) {
     log.error('db-init', 'Migration 040_library_catalog failed', e);
+  }
+
+  // Migration 041: задания учителя (plan/done/teacher_cabinet.md, Teacher 14). Задание — снимок списка
+  // слов; «сдано» — вариант Б (слово засчитано после законченной сессии). Только новые таблицы —
+  // старые версии приложения их не замечают. Комментарии — database/migrations/041_homework.sql.
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS homework (
+        id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        course_id   UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        created_by  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title       TEXT NOT NULL,
+        card_ids    UUID[] NOT NULL,
+        kind        TEXT NOT NULL DEFAULT 'learn',
+        due_at      TIMESTAMPTZ NOT NULL,
+        min_score   SMALLINT,
+        assign_all  BOOLEAN NOT NULL DEFAULT true,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        canceled_at TIMESTAMPTZ
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_homework_course ON homework(course_id, due_at) WHERE canceled_at IS NULL`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS homework_assignees (
+        homework_id UUID NOT NULL REFERENCES homework(id) ON DELETE CASCADE,
+        user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        PRIMARY KEY (homework_id, user_id)
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_homework_assignees_user ON homework_assignees(user_id)`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS homework_credits (
+        homework_id       UUID NOT NULL REFERENCES homework(id) ON DELETE CASCADE,
+        user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        card_id           UUID NOT NULL,
+        credited_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        first_try_correct BOOLEAN NOT NULL,
+        PRIMARY KEY (homework_id, user_id, card_id)
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_homework_credits_user ON homework_credits(user_id)`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS homework_results (
+        homework_id  UUID NOT NULL REFERENCES homework(id) ON DELETE CASCADE,
+        user_id      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        late         BOOLEAN NOT NULL,
+        score        SMALLINT NOT NULL,
+        diamonds     SMALLINT NOT NULL DEFAULT 0,
+        PRIMARY KEY (homework_id, user_id)
+      )
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS homework_reminders (
+        homework_id UUID NOT NULL REFERENCES homework(id) ON DELETE CASCADE,
+        user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        sent_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (homework_id, user_id)
+      )
+    `;
+  } catch (e) {
+    log.error('db-init', 'Migration 041_homework failed', e);
+  }
+
+  // Migration 042: откуда набор (plan/done/teacher_cabinet.md, Teacher 31): manual / ai / file /
+  // library / share, NULL у старых наборов. Только новая колонка — старые клиенты её не замечают.
+  try {
+    await sql`ALTER TABLE card_sets ADD COLUMN IF NOT EXISTS origin TEXT`;
+  } catch (e) {
+    log.error('db-init', 'Migration 042_set_origin failed', e);
+  }
+
+  // Migration 043: живой тест по списку слов и разминка (plan/done/teacher_cabinet.md, Teacher 34).
+  // card_ids NULL — обычный тест по набору; purpose 'warmup' — разминка (в оценки не идёт).
+  try {
+    await sql`ALTER TABLE test_sessions ADD COLUMN IF NOT EXISTS card_ids UUID[]`;
+    await sql`ALTER TABLE test_sessions ADD COLUMN IF NOT EXISTS purpose VARCHAR(10)`;
+  } catch (e) {
+    log.error('db-init', 'Migration 043_test_card_ids failed', e);
+  }
+
+  // Migration 044: «Напомнить» выбранным ученикам (plan/done/teacher_cabinet.md, Teacher 36) —
+  // лимит «раз в 20 часов» на каждого ученика курса, а не на курс.
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS review_reminders (
+        course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        user_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        sent_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (course_id, user_id)
+      )
+    `;
+  } catch (e) {
+    log.error('db-init', 'Migration 044_review_reminders failed', e);
+  }
+
+  // Migration 045: колокольчик учителя (plan/done/teacher_cabinet.md, Teacher 48) — когда запись
+  // журнала уведомлений просмотрена в списке.
+  try {
+    await sql`ALTER TABLE push_log ADD COLUMN IF NOT EXISTS seen_at TIMESTAMPTZ`;
+  } catch (e) {
+    log.error('db-init', 'Migration 045_push_seen failed', e);
+  }
+
+  // Migration 046: отчёты учителя (plan/done/teacher_cabinet.md, Teacher 53). Ссылка /r/<code>
+  // показывает сохранённый снимок (data); живёт до expires_at или пока учитель не отзовёт.
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS teacher_reports (
+        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        code       VARCHAR(16) NOT NULL UNIQUE,
+        course_id  UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        student_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        kind       VARCHAR(10) NOT NULL,
+        period     VARCHAR(10) NOT NULL,
+        comment    TEXT NOT NULL DEFAULT '',
+        data       JSONB NOT NULL,
+        created_by UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        expires_at TIMESTAMPTZ NOT NULL,
+        revoked_at TIMESTAMPTZ
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_teacher_reports_creator ON teacher_reports(created_by, created_at DESC)`;
+  } catch (e) {
+    log.error('db-init', 'Migration 046_teacher_reports failed', e);
+  }
+
+  // Migration 047: какой день засчитан в серию и какой спасён заморозкой
+  // (plan/new/streak_freeze_display.md, Freeze 1). Заполнение прошлого — строго один раз:
+  // миграции повторяются при каждой новой SCHEMA_VERSION, а повтор засчитал бы по старому правилу
+  // дни, которые сервер уже честно не засчитал.
+  try {
+    await sql`ALTER TABLE daily_activity ADD COLUMN IF NOT EXISTS streak_counted BOOLEAN NOT NULL DEFAULT false`;
+    await sql`ALTER TABLE daily_activity ADD COLUMN IF NOT EXISTS frozen BOOLEAN NOT NULL DEFAULT false`;
+    const done = await sql`SELECT 1 FROM app_migrations WHERE name = 'backfill_047_streak_counted'`;
+    if (done.length === 0) {
+      await sql`
+        UPDATE daily_activity da SET streak_counted = true
+        FROM user_stats us
+        WHERE us.user_id = da.user_id
+          AND da.streak_counted = false
+          AND us.last_active_date IS NOT NULL
+          AND da.local_date <= us.last_active_date
+          AND (
+            da.cards_studied >= 10
+            OR (us.current_streak > 0 AND da.cards_studied > 0
+                AND da.local_date > us.last_active_date - us.current_streak)
+          )
+      `;
+      await sql`
+        INSERT INTO app_migrations (name) VALUES ('backfill_047_streak_counted')
+        ON CONFLICT (name) DO NOTHING
+      `;
+    }
+  } catch (e) {
+    log.error('db-init', 'Migration 047_streak_day_flags failed', e);
+  }
+
+  // Migration 048: стартовый набор нового ученика выдаётся один раз в жизни аккаунта
+  // (plan/new/new_user_activation.md, Start 1.3). Отметка на сервере: удаление набора,
+  // переустановка и второе устройство второй набор не дают.
+  try {
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS starter_set_id UUID`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS starter_set_issued_at TIMESTAMPTZ`;
+  } catch (e) {
+    log.error('db-init', 'Migration 048_starter_set failed', e);
+  }
+
+  // Migration 049: выполненные задания «Начало пути» — по 10 алмазов один раз на задание
+  // (plan/new/new_user_activation.md, Start 3.1, 3.9)
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS onboarding_tasks (
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        task VARCHAR(32) NOT NULL,
+        done_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (user_id, task)
+      )
+    `;
+  } catch (e) {
+    log.error('db-init', 'Migration 049_onboarding_tasks failed', e);
+  }
+
+  // Migration 050: стартовые наборы второго и третьего изучаемого языка — по одному на язык
+  // (plan/new/new_user_activation.md, Start 4.3): { язык: id набора }
+  try {
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS starter_extra JSONB`;
+  } catch (e) {
+    log.error('db-init', 'Migration 050_starter_extra failed', e);
+  }
+
+  // Migration 051: ученик пришёл по коду учителя — его задания «Начала пути» и алмазы
+  // (plan/new/new_user_activation.md, Start 7.4)
+  try {
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS start_tasks_at TIMESTAMPTZ`;
+  } catch (e) {
+    log.error('db-init', 'Migration 051_start_tasks_at failed', e);
+  }
+
+  // Migration 052: книги учебного центра по коду — центры, коды, доступ учеников, места
+  // (plan/new/center_books.md, Center 1). Тексты — как в database/migrations/052_center_books.sql
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS organizations (
+        id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name           TEXT NOT NULL,
+        city           TEXT,
+        logo_url       TEXT,
+        greeting       TEXT,
+        contact        TEXT,
+        code_prefix    VARCHAR(8),
+        seat_limit     INT NOT NULL DEFAULT 0 CHECK (seat_limit >= 0),
+        contract_until TIMESTAMPTZ,
+        created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS organization_members (
+        organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        role            VARCHAR(16) NOT NULL CHECK (role IN ('owner', 'admin', 'teacher')),
+        created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (organization_id, user_id)
+      )
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_organization_members_user ON organization_members(user_id)
+    `;
+    await sql`
+      ALTER TABLE books ADD COLUMN IF NOT EXISTS organization_id UUID REFERENCES organizations(id)
+    `;
+    await sql`
+      ALTER TABLE books ADD COLUMN IF NOT EXISTS org_position INT
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_books_organization ON books(organization_id) WHERE organization_id IS NOT NULL
+    `;
+    await sql`
+      ALTER TABLE courses ADD COLUMN IF NOT EXISTS organization_id UUID REFERENCES organizations(id) ON DELETE SET NULL
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_courses_organization ON courses(organization_id) WHERE organization_id IS NOT NULL
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS org_codes (
+        id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        organization_id   UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        code              VARCHAR(20) NOT NULL,
+        label             TEXT,
+        valid_from        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        valid_until       TIMESTAMPTZ NOT NULL,
+        access_days       INT NOT NULL CHECK (access_days > 0),
+        max_activations   INT NOT NULL CHECK (max_activations >= 0),
+        activations_count INT NOT NULL DEFAULT 0,
+        is_active         BOOLEAN NOT NULL DEFAULT true,
+        created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+    await sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_org_codes_code ON org_codes(upper(code))
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_org_codes_org ON org_codes(organization_id)
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS org_code_activations (
+        code_id      UUID NOT NULL REFERENCES org_codes(id) ON DELETE CASCADE,
+        user_id      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        activated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (code_id, user_id)
+      )
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_org_code_activations_user ON org_code_activations(user_id)
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS org_students (
+        organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        access_until    TIMESTAMPTZ NOT NULL,
+        code_id         UUID REFERENCES org_codes(id) ON DELETE SET NULL,
+        created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (organization_id, user_id)
+      )
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_org_students_user ON org_students(user_id)
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS user_books (
+        user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        book_id         UUID NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+        current_unit_id UUID REFERENCES book_units(id) ON DELETE SET NULL,
+        is_active       BOOLEAN NOT NULL DEFAULT false,
+        updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (user_id, book_id)
+      )
+    `;
+    await sql`
+      CREATE OR REPLACE FUNCTION flashly_org_access(p_org uuid, p_user uuid) RETURNS boolean
+      LANGUAGE sql STABLE AS $fn$
+        SELECT EXISTS (SELECT 1 FROM users u WHERE u.id = p_user AND u.is_admin)
+            OR EXISTS (
+              SELECT 1 FROM organizations o
+               WHERE o.id = p_org
+                 AND (o.contract_until IS NULL OR o.contract_until > NOW())
+                 AND (
+                   EXISTS (SELECT 1 FROM org_students s
+                            WHERE s.organization_id = o.id AND s.user_id = p_user AND s.access_until > NOW())
+                   OR EXISTS (SELECT 1 FROM organization_members m
+                               WHERE m.organization_id = o.id AND m.user_id = p_user)
+                 )
+            )
+      $fn$
+    `;
+    await sql`
+      CREATE OR REPLACE FUNCTION flashly_unit_access(p_unit uuid, p_user uuid) RETURNS boolean
+      LANGUAGE sql STABLE AS $fn$
+        SELECT COALESCE((
+          SELECT b.organization_id IS NULL
+              OR flashly_org_access(b.organization_id, p_user)
+              OR EXISTS (
+                SELECT 1 FROM course_units cu
+                  JOIN courses c ON c.id = cu.course_id
+                  JOIN organizations o ON o.id = c.organization_id
+                 WHERE cu.unit_id = u.id AND cu.is_open
+                   AND c.organization_id = b.organization_id
+                   AND (o.contract_until IS NULL OR o.contract_until > NOW())
+                   AND (c.user_id = p_user
+                        OR EXISTS (SELECT 1 FROM course_members m WHERE m.course_id = c.id AND m.user_id = p_user))
+              )
+            FROM book_units u JOIN books b ON b.id = u.book_id
+           WHERE u.id = p_unit
+        ), true)
+      $fn$
+    `;
+    await sql`
+      CREATE OR REPLACE FUNCTION flashly_card_access(p_card uuid, p_user uuid) RETURNS boolean
+      LANGUAGE sql STABLE AS $fn$
+        SELECT COALESCE((
+          SELECT NOT s.is_official OR s.unit_id IS NULL OR flashly_unit_access(s.unit_id, p_user)
+            FROM cards c JOIN card_sets s ON s.id = c.set_id
+           WHERE c.id = p_card
+        ), true)
+      $fn$
+    `;
+    await sql`
+      CREATE OR REPLACE FUNCTION flashly_org_seats_used(p_org uuid) RETURNS int
+      LANGUAGE sql STABLE AS $fn$
+        SELECT COUNT(*)::int FROM (
+          SELECT s.user_id FROM org_students s
+           WHERE s.organization_id = p_org AND s.access_until > NOW()
+          UNION
+          SELECT m.user_id FROM course_members m JOIN courses c ON c.id = m.course_id
+           WHERE c.organization_id = p_org AND m.role = 'student'
+        ) seats
+      $fn$
+    `;
+    await sql`
+      CREATE OR REPLACE FUNCTION flashly_org_has_seat(p_org uuid, p_user uuid) RETURNS boolean
+      LANGUAGE sql STABLE AS $fn$
+        SELECT EXISTS (SELECT 1 FROM org_students s
+                        WHERE s.organization_id = p_org AND s.user_id = p_user AND s.access_until > NOW())
+            OR EXISTS (SELECT 1 FROM course_members m JOIN courses c ON c.id = m.course_id
+                        WHERE c.organization_id = p_org AND m.user_id = p_user AND m.role = 'student')
+      $fn$
+    `;
+    await sql`
+      DROP FUNCTION IF EXISTS flashly_activate_org_code(uuid, text)
+    `;
+    await sql`
+      CREATE OR REPLACE FUNCTION flashly_activate_org_code(p_user uuid, p_code text, p_dry_run boolean DEFAULT false)
+      RETURNS TABLE (out_reason text, out_org uuid, out_until timestamptz)
+      LANGUAGE plpgsql AS $fn$
+      DECLARE
+        c org_codes%ROWTYPE;
+        o organizations%ROWTYPE;
+        cur timestamptz;
+        new_until timestamptz;
+      BEGIN
+        SELECT * INTO c FROM org_codes WHERE upper(code) = upper(btrim(p_code));
+        IF NOT FOUND OR NOT c.is_active THEN
+          RETURN QUERY SELECT 'not_found'::text, NULL::uuid, NULL::timestamptz;
+          RETURN;
+        END IF;
+
+        SELECT * INTO o FROM organizations WHERE id = c.organization_id FOR UPDATE;
+        SELECT * INTO c FROM org_codes WHERE id = c.id FOR UPDATE;
+        SELECT s.access_until INTO cur FROM org_students s
+         WHERE s.organization_id = o.id AND s.user_id = p_user;
+
+        IF EXISTS (SELECT 1 FROM org_code_activations a WHERE a.code_id = c.id AND a.user_id = p_user) THEN
+          IF cur IS NOT NULL AND cur > NOW() THEN
+            RETURN QUERY SELECT 'already_active'::text, o.id, cur;
+          ELSE
+            RETURN QUERY SELECT 'expired'::text, NULL::uuid, NULL::timestamptz;
+          END IF;
+          RETURN;
+        END IF;
+
+        IF NOW() < c.valid_from OR NOW() > c.valid_until THEN
+          RETURN QUERY SELECT 'expired'::text, NULL::uuid, NULL::timestamptz;
+          RETURN;
+        END IF;
+        IF o.contract_until IS NOT NULL AND o.contract_until <= NOW() THEN
+          RETURN QUERY SELECT 'contract_ended'::text, NULL::uuid, NULL::timestamptz;
+          RETURN;
+        END IF;
+        IF c.activations_count >= c.max_activations THEN
+          RETURN QUERY SELECT 'full'::text, NULL::uuid, NULL::timestamptz;
+          RETURN;
+        END IF;
+        IF NOT flashly_org_has_seat(o.id, p_user) AND flashly_org_seats_used(o.id) >= o.seat_limit THEN
+          RETURN QUERY SELECT 'full'::text, NULL::uuid, NULL::timestamptz;
+          RETURN;
+        END IF;
+
+        new_until := GREATEST(COALESCE(cur, NOW()), NOW()) + make_interval(days => c.access_days);
+        IF o.contract_until IS NOT NULL AND new_until > o.contract_until THEN
+          new_until := o.contract_until;
+        END IF;
+
+        IF p_dry_run THEN
+          RETURN QUERY SELECT 'ok'::text, o.id, new_until;
+          RETURN;
+        END IF;
+
+        INSERT INTO org_code_activations (code_id, user_id) VALUES (c.id, p_user);
+        UPDATE org_codes SET activations_count = activations_count + 1 WHERE id = c.id;
+        INSERT INTO org_students (organization_id, user_id, access_until, code_id)
+        VALUES (o.id, p_user, new_until, c.id)
+        ON CONFLICT (organization_id, user_id)
+        DO UPDATE SET access_until = EXCLUDED.access_until, code_id = EXCLUDED.code_id, updated_at = NOW();
+
+        RETURN QUERY SELECT 'ok'::text, o.id, new_until;
+      END
+      $fn$
+    `;
+  } catch (e) {
+    log.error('db-init', 'Migration 052_center_books failed', e);
+  }
+
+  // Migration 053: ссылка-приглашение учителей центра (plan/new/center_books.md, Center 13).
+  // Тексты — как в database/migrations/053_center_teachers.sql
+  try {
+    await sql`ALTER TABLE organizations ADD COLUMN IF NOT EXISTS teacher_invite VARCHAR(32)`;
+    await sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_organizations_teacher_invite
+        ON organizations(teacher_invite) WHERE teacher_invite IS NOT NULL
+    `;
+  } catch (e) {
+    log.error('db-init', 'Migration 053_center_teachers failed', e);
+  }
+
+  // Migration 054: книга центра = личный курс ученика (plan/new/center_books.md, этап 7, Center 16).
+  // Курс с source_book_id — все юниты книги открыты по правилу (official-sets), без строк
+  // course_books / course_units. organization_id такому курсу не ставим: это не группа центра.
+  // Тексты — как в database/migrations/054_book_courses.sql
+  try {
+    await sql`ALTER TABLE courses ADD COLUMN IF NOT EXISTS source_book_id UUID REFERENCES books(id) ON DELETE CASCADE`;
+    await sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_courses_user_source_book
+        ON courses(user_id, source_book_id) WHERE source_book_id IS NOT NULL
+    `;
+  } catch (e) {
+    log.error('db-init', 'Migration 054_book_courses failed', e);
+  }
+
+  // Migration 055: живой экзамен (plan/new/live_exam.md, LiveExam 1). Только добавляющие
+  // изменения: старый тест (engine = 1) не меняется. Тексты — как в database/migrations/055_live_exam.sql
+  try {
+    await sql`ALTER TABLE card_sets ADD COLUMN IF NOT EXISTS back_kind TEXT CHECK (back_kind IN ('translation', 'definition'))`;
+    await sql`ALTER TABLE card_sets ADD COLUMN IF NOT EXISTS back_kind_source TEXT DEFAULT 'auto'`;
+    await sql`ALTER TABLE cards ADD COLUMN IF NOT EXISTS pos_guess VARCHAR(8)`;
+    await sql`ALTER TABLE cards ADD COLUMN IF NOT EXISTS gap_text TEXT`;
+    await sql`ALTER TABLE cards ADD COLUMN IF NOT EXISTS gap_answer TEXT`;
+    await sql`ALTER TABLE cards ADD COLUMN IF NOT EXISTS gap_kind VARCHAR(10)`;
+
+    await sql`ALTER TABLE test_sessions ADD COLUMN IF NOT EXISTS engine SMALLINT NOT NULL DEFAULT 1`;
+    await sql`ALTER TABLE test_sessions ADD COLUMN IF NOT EXISTS config JSONB`;
+    await sql`ALTER TABLE test_sessions ADD COLUMN IF NOT EXISTS duration_sec INTEGER`;
+    await sql`ALTER TABLE test_sessions ADD COLUMN IF NOT EXISTS paused_at TIMESTAMPTZ`;
+    await sql`ALTER TABLE test_sessions ADD COLUMN IF NOT EXISTS paused_total_sec INTEGER NOT NULL DEFAULT 0`;
+    await sql`ALTER TABLE test_sessions ADD COLUMN IF NOT EXISTS reveal_mode VARCHAR(12)`;
+    await sql`ALTER TABLE test_sessions ADD COLUMN IF NOT EXISTS results_released_at TIMESTAMPTZ`;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS test_items (
+        id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        session_id       UUID NOT NULL REFERENCES test_sessions(id) ON DELETE CASCADE,
+        card_id          UUID REFERENCES cards(id) ON DELETE SET NULL,
+        block_no         INTEGER NOT NULL,
+        format           VARCHAR(10) NOT NULL,
+        direction        VARCHAR(10),
+        prompt           TEXT NOT NULL,
+        answer           TEXT NOT NULL,
+        options          JSONB,
+        extra            JSONB,
+        difficulty       VARCHAR(10),
+        points           NUMERIC(6,2) NOT NULL DEFAULT 0,
+        voided           BOOLEAN NOT NULL DEFAULT false,
+        accepted_answers JSONB NOT NULL DEFAULT '[]'::jsonb,
+        sort_key         INTEGER NOT NULL DEFAULT 0
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_test_items_session ON test_items(session_id)`;
+
+    await sql`ALTER TABLE test_participants ADD COLUMN IF NOT EXISTS block_order JSONB`;
+    await sql`ALTER TABLE test_participants ADD COLUMN IF NOT EXISTS extra_sec INTEGER NOT NULL DEFAULT 0`;
+    await sql`ALTER TABLE test_participants ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ`;
+    await sql`ALTER TABLE test_participants ADD COLUMN IF NOT EXISTS score_override SMALLINT`;
+    await sql`ALTER TABLE test_participants ADD COLUMN IF NOT EXISTS score_comment TEXT`;
+    await sql`ALTER TABLE test_participants ADD COLUMN IF NOT EXISTS retake_of UUID`;
+
+    await sql`ALTER TABLE test_answers ADD COLUMN IF NOT EXISTS item_id UUID`;
+    await sql`ALTER TABLE test_answers ADD COLUMN IF NOT EXISTS verdict VARCHAR(12)`;
+    await sql`ALTER TABLE test_answers ADD COLUMN IF NOT EXISTS points NUMERIC(6,2)`;
+    await sql`ALTER TABLE test_answers ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ`;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS test_score_log (
+        id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        session_id     UUID NOT NULL REFERENCES test_sessions(id) ON DELETE CASCADE,
+        teacher_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        action         VARCHAR(20) NOT NULL,
+        item_id        UUID,
+        participant_id UUID,
+        payload        JSONB,
+        created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        undone_at      TIMESTAMPTZ
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_test_score_log_session ON test_score_log(session_id)`;
+  } catch (e) {
+    log.error('db-init', 'Migration 055_live_exam failed', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)

@@ -153,7 +153,7 @@ export const WHATS_NEW_FALLBACK: WhatsNewItem[] = [
     expiresAt: EXPIRES,
   },
 
-  // ── 1.8 (plan/new/official_site.md, «Перенос в прод») ──
+  // ── 1.8 (plan/done/official_site.md, «Перенос в прод») ──
   {
     // Первой: без неё человек решит, что режимы пропали (plan/new/study_session.md)
     id: 'study-session',

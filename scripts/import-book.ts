@@ -1,11 +1,15 @@
 /**
  * Импорт книги из Excel в каталог (Neon).
  *
- *   npx tsx scripts/import-book.ts path/to/book.xlsx [--dry-run] [--publish] [--prune]
+ *   npx tsx scripts/import-book.ts path/to/book.xlsx [--dry-run] [--publish] [--prune] [--org ALFA] [--staging]
  *
  * --dry-run  всё выполняется в транзакции и откатывается: отчёт точный, в базе ничего не меняется
  * --publish  после импорта сделать книгу видимой всем (is_published = true)
  * --prune    удалить карточки, которых больше нет в Excel (с подтверждением; удаляет и прогресс учеников по ним)
+ * --org X    книга учебного центра (приватная): X — начало кодов центра (ALFA), логин (alfa) или id.
+ *            Такую книгу видят только ученики центра (plan/new/center_books.md, Center 8). Порядок
+ *            уровней и привязку уже загруженной книги меняют во вкладке «Центры» админки.
+ * --staging  база из .env.staging (scripts/lib/db.ts)
  *
  * Идемпотентно: повторный запуск того же файла ничего не создаёт. Карточки сопоставляются по
  * нормализованному term внутри набора юнита и обновляются с сохранением id — прогресс SRS
@@ -26,6 +30,8 @@ interface Args {
   dryRun: boolean;
   publish: boolean;
   prune: boolean;
+  /** --org: начало кодов, логин или id центра */
+  org: string | null;
 }
 
 interface MissingCard {
@@ -51,14 +57,19 @@ interface Stats {
 }
 
 function parseArgs(argv: string[]): Args {
-  const flags = new Set(argv.filter((a) => a.startsWith('--')));
-  const positional = argv.filter((a) => !a.startsWith('--'));
-  const known = new Set(['--dry-run', '--publish', '--prune']);
+  // --org берёт следующее значение
+  const orgAt = argv.indexOf('--org');
+  const org = orgAt >= 0 ? (argv[orgAt + 1] ?? '') : null;
+  const rest = orgAt >= 0 ? argv.filter((_, i) => i !== orgAt && i !== orgAt + 1) : argv;
+  const flags = new Set(rest.filter((a) => a.startsWith('--')));
+  const positional = rest.filter((a) => !a.startsWith('--'));
+  const known = new Set(['--dry-run', '--publish', '--prune', '--staging']);
   const unknown = [...flags].filter((f) => !known.has(f));
-  if (unknown.length > 0 || positional.length !== 1) {
+  if (unknown.length > 0 || positional.length !== 1 || org === '' || org?.startsWith('--')) {
     if (unknown.length > 0) console.error(`Неизвестные флаги: ${unknown.join(', ')}`);
+    if (org === '' || org?.startsWith('--')) console.error('После --org нужен центр: --org ALFA');
     console.error(
-      'Использование: npx tsx scripts/import-book.ts path/to/book.xlsx [--dry-run] [--publish] [--prune]'
+      'Использование: npx tsx scripts/import-book.ts path/to/book.xlsx [--dry-run] [--publish] [--prune] [--org ALFA] [--staging]'
     );
     process.exit(2);
   }
@@ -67,10 +78,37 @@ function parseArgs(argv: string[]): Args {
     dryRun: flags.has('--dry-run'),
     publish: flags.has('--publish'),
     prune: flags.has('--prune'),
+    org,
   };
 }
 
-async function upsertBook(db: Db, book: ParsedBook, stats: Stats): Promise<string> {
+/** Центр по началу кодов (ALFA), логину владельца (alfa) или id. */
+async function resolveOrg(db: Db, value: string): Promise<{ id: string; name: string }> {
+  const rows = await db.query<{ id: string; name: string }>(
+    `SELECT o.id, o.name FROM organizations o
+      WHERE o.id::text = lower($1)
+         OR upper(o.code_prefix) = upper($1)
+         OR EXISTS (SELECT 1 FROM organization_members m JOIN users u ON u.id = m.user_id
+                     WHERE m.organization_id = o.id AND m.role = 'owner'
+                       AND lower(u.email) = lower($1) || '@center.flashlycards.app')`,
+    [value]
+  );
+  if (rows.rows.length !== 1) {
+    throw new Error(
+      rows.rows.length === 0
+        ? `Центр «${value}» не найден (нужно начало кодов, логин или id)`
+        : `«${value}» подходит нескольким центрам — укажите id`
+    );
+  }
+  return rows.rows[0];
+}
+
+async function upsertBook(
+  db: Db,
+  book: ParsedBook,
+  stats: Stats,
+  orgId: string | null
+): Promise<string> {
   const existing = await db.query<{
     id: string;
     level: string | null;
@@ -79,16 +117,17 @@ async function upsertBook(db: Db, book: ParsedBook, stats: Stats): Promise<strin
     language_to: string;
     publisher: string | null;
     is_published: boolean;
+    organization_id: string | null;
   }>(
-    `SELECT id, level, subject, language_from, language_to, publisher, is_published
+    `SELECT id, level, subject, language_from, language_to, publisher, is_published, organization_id
        FROM books WHERE title = $1 AND edition = $2 FOR UPDATE`,
     [book.title, book.edition]
   );
 
   if (existing.rows.length === 0) {
     const inserted = await db.query<{ id: string }>(
-      `INSERT INTO books (title, edition, level, subject, language_from, language_to, publisher)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+      `INSERT INTO books (title, edition, level, subject, language_from, language_to, publisher, organization_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
       [
         book.title,
         book.edition,
@@ -97,6 +136,7 @@ async function upsertBook(db: Db, book: ParsedBook, stats: Stats): Promise<strin
         book.languageFrom,
         book.languageTo,
         book.publisher,
+        orgId,
       ]
     );
     stats.bookStatus = 'создана';
@@ -105,6 +145,13 @@ async function upsertBook(db: Db, book: ParsedBook, stats: Stats): Promise<strin
   }
 
   const row = existing.rows[0];
+  // Владельца книги импорт не меняет: общая книга не станет книгой центра молча (её уже могут учить)
+  if ((row.organization_id ?? null) !== orgId) {
+    throw new Error(
+      `Книга «${book.title}» (${book.edition}) уже есть как ${row.organization_id ? 'книга другого центра' : 'общая книга'}. ` +
+        'Поменяйте издание (edition) в Excel, чтобы загрузить отдельную копию, или привяжите книгу во вкладке «Центры» админки.'
+    );
+  }
   stats.isPublished = row.is_published;
   const changed =
     row.level !== book.level ||
@@ -420,7 +467,9 @@ async function main(): Promise<void> {
       throw new Error(`ADMIN_USER_ID ${adminUserId} не найден в users или у него is_admin = false`);
     }
 
-    const bookId = await upsertBook(db, book, stats);
+    const org = args.org ? await resolveOrg(db, args.org) : null;
+    if (org) console.log(`🏫 Книга центра: ${org.name}`);
+    const bookId = await upsertBook(db, book, stats, org?.id ?? null);
 
     const excelNumbers = new Set(parsed.units.map((u) => u.number));
     const dbUnits = await db.query<{ number: number }>(

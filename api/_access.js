@@ -18,14 +18,18 @@ export function uuid(value, name) {
   return value;
 }
 
-/** Набор можно читать: свой, официальный (учебник) или набор курса, где пользователь учитель или ученик. */
+/**
+ * Набор можно читать: свой, официальный (учебник) или набор курса, где пользователь учитель или ученик.
+ * Официальный набор книги учебного центра — только при доступе к центру или к открытому юниту в группе
+ * центра (flashly_unit_access, миграция 052; plan/new/center_books.md, Center 2).
+ */
 export async function assertReadableSet(sql, me, setId) {
   const rows = await sql`
     SELECT 1 FROM card_sets s
     WHERE s.id = ${setId}::uuid
       AND (
         s.user_id = ${me}::uuid
-        OR s.is_official
+        OR (s.is_official AND (s.unit_id IS NULL OR flashly_unit_access(s.unit_id, ${me}::uuid)))
         OR s.course_id IN (
           SELECT id FROM courses WHERE user_id = ${me}::uuid
           UNION

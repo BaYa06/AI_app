@@ -12,26 +12,31 @@ import {
   type LoadOptions,
   NetworkLoadError,
   mapCourseRow,
+  type OwnCourseRow,
   mapStudentCourseRow,
   mapMembershipSetRow,
   type CourseScheduleItem,
 } from './core';
 
+/** Присоединиться к найденному курсу: null — получилось, строка — что показать ученику */
+export type JoinCourseAction = () => Promise<string | null>;
+
+/** Курс по коду или ссылке; наборы, слова и языки — для «Курс найден» (Start 7.2), могут не прийти от старого сервера */
+export interface CourseInviteInfo {
+  courseId: string;
+  courseTitle: string;
+  teacherName: string;
+  setsCount?: number;
+  wordsCount?: number;
+  languageFrom?: string | null;
+  languageTo?: string | null;
+}
+
 export const coursesApi = {
   /**
    * Загрузить все курсы пользователя (где он учитель)
    */
-  async loadCourses(
-    userId?: string,
-    options?: LoadOptions
-  ): Promise<
-    Array<{
-      id: string;
-      title: string;
-      createdAt: number;
-      updatedAt?: number;
-    }>
-  > {
+  async loadCourses(userId?: string, options?: LoadOptions): Promise<OwnCourseRow[]> {
     if (!userId) return [];
     const courses = await callDataApi<any[]>('loadCourses', {}, 'GET');
     if (courses === null && options?.throwOnError) throw new NetworkLoadError('loadCourses');
@@ -194,27 +199,18 @@ export const coursesApi = {
    */
   async getCourseInviteInfoByCode(
     code: string
-  ): Promise<
-    | { ok: true; courseId: string; courseTitle: string; teacherName: string }
-    | { ok: false; reason: TeacherApiReason }
-  > {
-    const result = await callTeacherApi<{
-      courseId: string;
-      courseTitle: string;
-      teacherName: string;
-    }>('invite-info-by-code', { method: 'GET', params: { code } });
+  ): Promise<({ ok: true } & CourseInviteInfo) | { ok: false; reason: TeacherApiReason }> {
+    const result = await callTeacherApi<CourseInviteInfo>('invite-info-by-code', {
+      method: 'GET',
+      params: { code },
+    });
     if (!result.ok) {
       if (result.reason !== 'not_found' && result.reason !== 'expired') {
         log.warn('Neon', 'Failed to get course invite info by code', result.error);
       }
       return { ok: false, reason: result.reason };
     }
-    return {
-      ok: true,
-      courseId: result.data.courseId,
-      courseTitle: result.data.courseTitle,
-      teacherName: result.data.teacherName,
-    };
+    return { ok: true, ...result.data };
   },
 
   /**
@@ -249,27 +245,18 @@ export const coursesApi = {
    */
   async getCourseInviteInfo(
     token: string
-  ): Promise<
-    | { ok: true; courseId: string; courseTitle: string; teacherName: string }
-    | { ok: false; reason: TeacherApiReason }
-  > {
-    const result = await callTeacherApi<{
-      courseId: string;
-      courseTitle: string;
-      teacherName: string;
-    }>('invite-info-by-token', { method: 'GET', params: { token } });
+  ): Promise<({ ok: true } & CourseInviteInfo) | { ok: false; reason: TeacherApiReason }> {
+    const result = await callTeacherApi<CourseInviteInfo>('invite-info-by-token', {
+      method: 'GET',
+      params: { token },
+    });
     if (!result.ok) {
       if (result.reason !== 'not_found' && result.reason !== 'expired') {
         log.warn('Neon', 'Failed to get course invite info', result.error);
       }
       return { ok: false, reason: result.reason };
     }
-    return {
-      ok: true,
-      courseId: result.data.courseId,
-      courseTitle: result.data.courseTitle,
-      teacherName: result.data.teacherName,
-    };
+    return { ok: true, ...result.data };
   },
 
   /**

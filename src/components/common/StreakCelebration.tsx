@@ -159,7 +159,7 @@ function StreakCelebrationContent({
         accessibilityViewIsModal
         style={[
           styles.content,
-          { paddingTop: insets.top + spacing.xl, paddingBottom: insets.bottom + spacing.l },
+          { paddingTop: spacing.xl, paddingBottom: insets.bottom + spacing.l },
         ]}
       >
         <View style={styles.hero}>

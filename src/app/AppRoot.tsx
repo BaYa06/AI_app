@@ -19,6 +19,21 @@ import { borderRadius, iconSize, screenPadding, spacing } from '@/constants';
 import { CourseInviteModal } from '@/components/CourseInviteModal';
 import { SharedSetPreviewModal } from '@/components/share/SharedSetPreviewModal';
 import { WelcomeScreen } from '@/screens/WelcomeScreen';
+import { StepTransition } from '@/components/onboarding/StepTransition';
+import { StarterBuildScreen } from '@/screens/firstLesson/StarterBuildScreen';
+import { WithTeacherScreen } from '@/screens/WithTeacherScreen';
+import { TeacherCodeScreen } from '@/screens/courseJoin/TeacherCodeScreen';
+import { CourseFoundScreen } from '@/screens/courseJoin/CourseFoundScreen';
+import { CourseNameScreen } from '@/screens/courseJoin/CourseNameScreen';
+import { CenterFoundScreen } from '@/screens/courseJoin/CenterFoundScreen';
+import { CenterInviteModal } from '@/components/CenterInviteModal';
+import { TeacherInviteModal } from '@/components/TeacherInviteModal';
+import type { CenterActivateAction, CenterCodeResult } from '@/services/CenterService';
+import type { CourseInviteInfo, JoinCourseAction } from '@/services/neon/courses';
+import { FirstCardsScreen } from '@/screens/firstLesson/FirstCardsScreen';
+import { FirstMatchScreen } from '@/screens/firstLesson/FirstMatchScreen';
+import { FirstResultsScreen } from '@/screens/firstLesson/FirstResultsScreen';
+import type { StarterSet } from '@/services/StarterSetService';
 import { NameOnboardingScreen } from '@/screens/NameOnboardingScreen';
 import { RoleSelectionScreen } from '@/screens/RoleSelectionScreen';
 import { NativeLanguageScreen } from '@/screens/NativeLanguageScreen';
@@ -54,10 +69,19 @@ export type AuthStep =
   | 'welcome'
   | 'name'
   | 'role'
+  | 'teacher_code'
+  | 'course_found'
+  | 'course_name'
+  | 'center_found'
   | 'native_language'
   | 'target_languages'
+  | 'starter_build'
+  | 'first_cards'
+  | 'first_match'
+  | 'first_results'
   | 'goal'
   | 'daily'
+  | 'with_teacher'
   | 'about'
   | 'teacher_subject'
   | 'teacher_size';
@@ -88,13 +112,50 @@ type AppRootProps = {
   onSubmitRole: (role: string) => void;
   onSubmitNativeLanguage: (code: string) => void;
   onSubmitTargetLanguages: (codes: string[]) => void;
-  onSubmitGoal: (goalId: string) => void;
+  /** «Поменять местами»: новый родной язык (бывший изучаемый) */
+  onSwapLanguages: (newNative: string) => void;
+  /** Ученик с кодом или ссылкой учителя (этап 7) */
+  courseJoin: { via: 'code' | 'link'; info: CourseInviteInfo; joined?: boolean } | null;
+  onHaveCode: () => void;
+  onCodeFound: (code: string, info: CourseInviteInfo) => void;
+  onCourseJoin: JoinCourseAction;
+  onCourseNotMine: () => void;
+  onCourseName: (name: string) => void;
+  /** Ученик с кодом или ссылкой учебного центра (plan/new/center_books.md, Center 5) */
+  centerJoin: { via: 'code' | 'link'; info: Extract<CenterCodeResult, { ok: true }> } | null;
+  onCenterFound: (code: string, info: Extract<CenterCodeResult, { ok: true }>) => void;
+  onCenterActivate: CenterActivateAction;
+  onCenterNotMine: () => void;
+  /** Ссылка центра /join/<код> (Center 5): у вошедшего — окно, у нового — онбординг */
+  pendingCenterCode: string | null;
+  onCenterInviteJoined: (info: Extract<CenterCodeResult, { ok: true }>) => void;
+  onCenterInviteDismiss: () => void;
+  /** Ссылка для учителей центра /t/<код> (Center 13) */
+  pendingTeacherInvite: string | null;
+  onTeacherInviteJoined: () => void;
+  onTeacherInviteDismiss: () => void;
+  /** Первый урок (Start 2.5): выданный стартовый набор и шаги урока */
+  firstLesson: StarterSet | null;
+  starterReady: boolean | null;
+  onStarterBuilt: (ok: boolean) => void;
+  onFirstCardsDone: () => void;
+  onFirstMatchDone: () => void;
+  onFirstResultsDone: () => void;
+  /** «Ты учишься с учителем?» (Start 3.6) */
+  onSubmitWithTeacher: (withTeacher?: boolean) => void;
+  onBackToWithTeacher: () => void;
+  targetLanguages?: string[];
+  onSubmitGoal: (goalId?: string) => void;
   onSubmitDaily: (dailyId: string) => void;
   onBackToDaily: () => void;
   onSubmitAboutMe: (answers: AboutMeAnswers) => void;
   onSubmitTeacherSubject: (subjectId: string) => void;
   onSubmitTeacherSize: (sizeId: string) => void;
   authStep: AuthStep;
+  /** Роль из онбординга: у учителя другой путь и другой счёт шагов */
+  onboardingRole?: 'student' | 'teacher';
+  /** Имя пришло из Sign in with Apple — экран имени пропускается */
+  nameSkipped: boolean;
   authLoading: boolean;
   nativeLanguage?: string;
 };
@@ -124,6 +185,32 @@ export function AppRoot({
   onSubmitRole,
   onSubmitNativeLanguage,
   onSubmitTargetLanguages,
+  onSwapLanguages,
+  courseJoin,
+  onHaveCode,
+  onCodeFound,
+  onCourseJoin,
+  onCourseNotMine,
+  onCourseName,
+  centerJoin,
+  onCenterFound,
+  onCenterActivate,
+  onCenterNotMine,
+  pendingCenterCode,
+  onCenterInviteJoined,
+  onCenterInviteDismiss,
+  pendingTeacherInvite,
+  onTeacherInviteJoined,
+  onTeacherInviteDismiss,
+  firstLesson,
+  starterReady,
+  onStarterBuilt,
+  onFirstCardsDone,
+  onFirstMatchDone,
+  onFirstResultsDone,
+  onSubmitWithTeacher,
+  onBackToWithTeacher,
+  targetLanguages,
   onSubmitGoal,
   onSubmitDaily,
   onBackToDaily,
@@ -131,6 +218,8 @@ export function AppRoot({
   onSubmitTeacherSubject,
   onSubmitTeacherSize,
   authStep,
+  onboardingRole,
+  nameSkipped,
   authLoading,
   nativeLanguage,
 }: AppRootProps) {
@@ -138,7 +227,21 @@ export function AppRoot({
   const resolvedTheme = useSettingsStore((s) => s.resolvedTheme);
   const insets = useSafeAreaInsets();
   const signedIn = isReady && isAuthenticated && !needsOnboarding;
-  const inviteOpen = isAuthenticated && !!pendingInviteToken;
+
+  // Счёт шагов (plan/new/new_user_activation.md, Start 2.1). Ученик: до урока роль → родной →
+  // изучаемый (из 3), после урока имя → цель → норма (из 3, без имени — из 2).
+  // Учитель: роль → имя → родной → изучаемый → предмет → группа (из 6, без имени — из 5).
+  const isTeacher = onboardingRole === 'teacher';
+  const teacherTotal = isTeacher ? (nameSkipped ? 5 : 6) : undefined;
+  const teacherStep = (studentStep: number) =>
+    isTeacher ? studentStep + (nameSkipped ? 0 : 1) : studentStep;
+  // После урока: имя → цель → норма → «С учителем?» (из 4, без имени — из 3)
+  const afterLessonTotal = nameSkipped ? 3 : 4;
+  // Во время онбординга ссылку учителя ведёт сам онбординг («Курс найден», Start 7.3)
+  const inviteOpen = isAuthenticated && !needsOnboarding && !!pendingInviteToken;
+  const centerInviteOpen = isAuthenticated && !needsOnboarding && !!pendingCenterCode;
+  // Учитель по ссылке центра: окно после входа и онбординга (Center 13)
+  const teacherInviteOpen = isAuthenticated && !needsOnboarding && !!pendingTeacherInvite;
   const shareOpen =
     isReady && !!pendingShareCode && (signedIn || (!isAuthenticated && !shareDeferred));
 
@@ -149,10 +252,13 @@ export function AppRoot({
     initWhatsNew({ hasSession: isAuthenticated, signedIn, allIds: currentNews().map((n) => n.id) });
   }, [isReady, isAuthenticated, signedIn]);
   useEffect(() => setGateOpen('courseInvite', inviteOpen), [inviteOpen]);
+  useEffect(() => setGateOpen('centerInvite', centerInviteOpen), [centerInviteOpen]);
+  useEffect(() => setGateOpen('teacherInvite', teacherInviteOpen), [teacherInviteOpen]);
   useEffect(() => setGateOpen('shareLink', shareOpen), [shareOpen]);
   useEffect(() => {
-    if (pendingInviteToken || pendingShareCode) markLaunchInterrupted();
-  }, [pendingInviteToken, pendingShareCode]);
+    if (pendingInviteToken || pendingShareCode || pendingCenterCode || pendingTeacherInvite)
+      markLaunchInterrupted();
+  }, [pendingInviteToken, pendingShareCode, pendingCenterCode, pendingTeacherInvite]);
 
   const [showPushBanner, setShowPushBanner] = useState(false);
   const [pushBannerLoading, setPushBannerLoading] = useState(false);
@@ -200,39 +306,137 @@ export function AppRoot({
         <LoadingSplash />
       ) : isAuthenticated && !needsOnboarding ? (
         <AppNavigator />
-      ) : authStep === 'welcome' ? (
-        <WelcomeScreen isLoading={authLoading} />
-      ) : authStep === 'name' ? (
-        <NameOnboardingScreen
-          onBack={onBackToWelcome}
-          onContinue={onSubmitName}
-          onSkip={onSubmitName}
-        />
-      ) : authStep === 'role' ? (
-        <RoleSelectionScreen onBack={onBackToName} onContinue={onSubmitRole} />
-      ) : authStep === 'native_language' ? (
-        <NativeLanguageScreen onBack={onBackToRole} onContinue={onSubmitNativeLanguage} />
-      ) : authStep === 'target_languages' ? (
-        <TargetLanguagesScreen
-          nativeLanguage={nativeLanguage}
-          onBack={onBackToNativeLanguage}
-          onContinue={onSubmitTargetLanguages}
-        />
-      ) : authStep === 'goal' ? (
-        <LearningGoalScreen onBack={onBackToTargetLanguages} onContinue={onSubmitGoal} />
-      ) : authStep === 'daily' ? (
-        <DailyGoalScreen onBack={onBackToGoal} onContinue={onSubmitDaily} />
-      ) : authStep === 'about' ? (
-        <AboutMeOnboardingScreen onBack={onBackToDaily} onContinue={onSubmitAboutMe} />
-      ) : authStep === 'teacher_subject' ? (
-        <TeacherSubjectScreen
-          onBack={onBackToTargetLanguages}
-          onContinue={onSubmitTeacherSubject}
-        />
-      ) : authStep === 'teacher_size' ? (
-        <TeacherGroupSizeScreen onBack={onBackToTeacherSubject} onContinue={onSubmitTeacherSize} />
       ) : (
-        <WelcomeScreen isLoading={authLoading} />
+        <StepTransition step={authStep}>
+          {authStep === 'welcome' ? (
+            <WelcomeScreen
+              isLoading={authLoading}
+              centerInvited={!!pendingCenterCode}
+              teacherInvited={!!pendingTeacherInvite}
+            />
+          ) : authStep === 'name' ? (
+            <NameOnboardingScreen
+              onBack={isTeacher ? onBackToRole : undefined}
+              onContinue={onSubmitName}
+              onSkip={onSubmitName}
+              step={isTeacher ? 2 : 1}
+              total={isTeacher ? 6 : 3}
+            />
+          ) : authStep === 'role' ? (
+            <RoleSelectionScreen
+              onBack={onBackToWelcome}
+              onContinue={onSubmitRole}
+              onHaveCode={onHaveCode}
+              step={1}
+              total={3}
+            />
+          ) : authStep === 'teacher_code' ? (
+            <TeacherCodeScreen
+              onFound={onCodeFound}
+              onCenterFound={onCenterFound}
+              onBack={onBackToRole}
+            />
+          ) : authStep === 'course_found' && courseJoin ? (
+            <CourseFoundScreen
+              info={courseJoin.info}
+              viaLink={courseJoin.via === 'link'}
+              onJoin={onCourseJoin}
+              onNotMine={onCourseNotMine}
+            />
+          ) : authStep === 'center_found' && centerJoin ? (
+            <CenterFoundScreen
+              info={centerJoin.info}
+              viaLink={centerJoin.via === 'link'}
+              onActivate={onCenterActivate}
+              onNotMine={onCenterNotMine}
+            />
+          ) : authStep === 'course_name' ? (
+            <CourseNameScreen onContinue={onCourseName} />
+          ) : authStep === 'native_language' ? (
+            <NativeLanguageScreen
+              initial={nativeLanguage}
+              onBack={isTeacher && !nameSkipped ? onBackToName : onBackToRole}
+              onContinue={onSubmitNativeLanguage}
+              step={teacherStep(2)}
+              total={teacherTotal ?? 3}
+            />
+          ) : authStep === 'target_languages' ? (
+            <TargetLanguagesScreen
+              nativeLanguage={nativeLanguage}
+              initial={targetLanguages}
+              onSwap={onSwapLanguages}
+              onBack={onBackToNativeLanguage}
+              onContinue={onSubmitTargetLanguages}
+              step={teacherStep(3)}
+              total={teacherTotal ?? 3}
+            />
+          ) : authStep === 'starter_build' ? (
+            <StarterBuildScreen
+              native={nativeLanguage ?? 'ru'}
+              target={targetLanguages?.[0] ?? 'en'}
+              ready={starterReady}
+              onDone={onStarterBuilt}
+            />
+          ) : authStep === 'first_cards' && firstLesson ? (
+            <FirstCardsScreen
+              cards={firstLesson.cards}
+              target={firstLesson.set.languageFrom ?? 'en'}
+              native={firstLesson.set.languageTo ?? 'ru'}
+              onDone={onFirstCardsDone}
+            />
+          ) : authStep === 'first_match' && firstLesson ? (
+            <FirstMatchScreen cards={firstLesson.cards} onDone={onFirstMatchDone} />
+          ) : authStep === 'first_results' && firstLesson ? (
+            <FirstResultsScreen
+              cards={firstLesson.cards}
+              questionsLeft={afterLessonTotal}
+              onContinue={onFirstResultsDone}
+            />
+          ) : authStep === 'goal' ? (
+            <LearningGoalScreen
+              onBack={nameSkipped ? undefined : onBackToName}
+              onContinue={onSubmitGoal}
+              step={nameSkipped ? 1 : 2}
+              total={afterLessonTotal}
+            />
+          ) : authStep === 'daily' ? (
+            <DailyGoalScreen
+              onBack={onBackToGoal}
+              onContinue={onSubmitDaily}
+              step={nameSkipped ? 2 : 3}
+              total={afterLessonTotal}
+            />
+          ) : authStep === 'with_teacher' ? (
+            <WithTeacherScreen
+              onBack={onBackToDaily}
+              onContinue={onSubmitWithTeacher}
+              step={nameSkipped ? 3 : 4}
+              total={afterLessonTotal}
+            />
+          ) : authStep === 'about' ? (
+            <AboutMeOnboardingScreen onBack={onBackToWithTeacher} onContinue={onSubmitAboutMe} />
+          ) : authStep === 'teacher_subject' ? (
+            <TeacherSubjectScreen
+              onBack={onBackToTargetLanguages}
+              onContinue={onSubmitTeacherSubject}
+              step={teacherStep(4)}
+              total={teacherTotal}
+            />
+          ) : authStep === 'teacher_size' ? (
+            <TeacherGroupSizeScreen
+              onBack={onBackToTeacherSubject}
+              onContinue={onSubmitTeacherSize}
+              step={teacherStep(5)}
+              total={teacherTotal}
+            />
+          ) : (
+            <WelcomeScreen
+              isLoading={authLoading}
+              centerInvited={!!pendingCenterCode}
+              teacherInvited={!!pendingTeacherInvite}
+            />
+          )}
+        </StepTransition>
       )}
     </>
   );
@@ -338,6 +542,24 @@ export function AppRoot({
           userId={currentUserId}
           onAccepted={onInviteAccepted}
           onDismiss={onInviteDismiss}
+        />
+      )}
+
+      {/* Ссылка учебного центра у вошедшего пользователя (plan/new/center_books.md, Center 5) */}
+      {centerInviteOpen && (
+        <CenterInviteModal
+          code={pendingCenterCode}
+          onJoined={onCenterInviteJoined}
+          onDismiss={onCenterInviteDismiss}
+        />
+      )}
+
+      {/* Ссылка для учителей учебного центра (plan/new/center_books.md, Center 13) */}
+      {teacherInviteOpen && (
+        <TeacherInviteModal
+          token={pendingTeacherInvite}
+          onJoined={onTeacherInviteJoined}
+          onDismiss={onTeacherInviteDismiss}
         />
       )}
 

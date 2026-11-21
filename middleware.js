@@ -1,5 +1,5 @@
 /**
- * Routing Middleware Vercel (plan/new/official_site.md, Site 3).
+ * Routing Middleware Vercel (plan/done/official_site.md, Site 3).
  *
  * Главная flashlycards.app показывает лендинг (public/site/index.html), а не приложение.
  * Правилом в vercel.json это не сделать: на «/» лежит index.html приложения, а файл в сборке

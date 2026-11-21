@@ -16,6 +16,8 @@ import {
   Plus,
   Check,
   ChevronDown,
+  ChevronRight,
+  GraduationCap,
 } from 'lucide-react-native';
 import { Text } from '@/components/common';
 import { Switch, BottomBar } from '@/components/ui';
@@ -41,12 +43,20 @@ const TIME_OPTIONS = [
   { label: '30с', value: 30 },
 ];
 
+import { TEST_MAX_QUESTIONS, examLobbyTitle, examLobbyWords } from './examLobby/examLobbyText';
+
 export function ExamLobbyScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
 
+  // Тест по списку слов (Teacher 39): разминка или «Проверить на уроке» — набор не выбирается,
+  // вопросов столько, сколько слов (но не больше обычного предела)
+  const cardIds = route.params.cardIds;
+  const byList = !!cardIds && cardIds.length > 0;
+  const listCount = byList ? Math.min(TEST_MAX_QUESTIONS, cardIds.length) : 0;
+
   const [testMode, setTestMode] = useState<TestMode>('multiple');
-  const [totalQuestions, setTotalQuestions] = useState(20);
+  const [totalQuestions, setTotalQuestions] = useState(byList ? listCount : 20);
   const [timePerQuestion, setTimePerQuestion] = useState(20);
   // Контроль выхода из приложения (plan/done/exam_lockdown.md) — по умолчанию включён
   const [exitControl, setExitControl] = useState(true);
@@ -59,6 +69,10 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
   const [loadingSets, setLoadingSets] = useState(true);
 
   useEffect(() => {
+    if (byList) {
+      setLoadingSets(false);
+      return;
+    }
     let mounted = true;
     (async () => {
       try {
@@ -75,10 +89,11 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
     return () => {
       mounted = false;
     };
-  }, [route.params.courseId]);
+  }, [route.params.courseId, byList]);
 
   const selectedSet = sets.find((s) => s.setId === selectedSetId);
-  const maxQuestions = Math.min(50, selectedSet?.totalCards || 50);
+  const maxQuestions = Math.min(TEST_MAX_QUESTIONS, selectedSet?.totalCards || TEST_MAX_QUESTIONS);
+  const canCreate = byList || !!selectedSetId;
 
   const cardBg = colors.surface;
   const cardBorder = colors.border;
@@ -115,18 +130,72 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
         >
           <ArrowLeft size={22} color={colors.textPrimary} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Новый тест</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+          {examLobbyTitle(route.params)}
+        </Text>
       </View>
 
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Экзамен с оценкой (plan/new/live_exam.md): отдельная настройка — сложность, форматы */}
+        {!byList && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Экзамен с оценкой: одинаковые слова, 100 баллов, разные форматы"
+            onPress={() =>
+              navigation.navigate('ExamSetup', {
+                courseId: route.params.courseId,
+                courseTitle: route.params.courseTitle,
+              })
+            }
+            style={({ pressed }) => [
+              styles.examEntry,
+              {
+                backgroundColor: alpha(colors.primary, 10),
+                borderColor: alpha(colors.primary, 40),
+              },
+              pressed && { opacity: 0.8 },
+            ]}
+          >
+            <View style={[styles.dropdownIcon, { backgroundColor: colors.primaryFill }]}>
+              <GraduationCap size={18} color={colors.onPrimary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.setCardTitle, { color: colors.textPrimary }]}>
+                Экзамен с оценкой
+              </Text>
+              <Text style={[styles.settingHint, { color: colors.textSecondary }]}>
+                Одинаковые слова для всех, 100 баллов, выбор, письмо, пары и «собери слово»
+              </Text>
+            </View>
+            <ChevronRight size={20} color={colors.textSecondary} />
+          </Pressable>
+        )}
+
         {/* Select Set — Dropdown */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Набор карточек</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+            {byList ? 'Слова теста' : 'Набор карточек'}
+          </Text>
 
-          {loadingSets ? (
+          {byList ? (
+            <View
+              style={[styles.settingCard, { backgroundColor: cardBg, borderColor: cardBorder }]}
+            >
+              <View style={styles.listInfo}>
+                <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>
+                  {examLobbyWords(listCount)}
+                </Text>
+                <Text style={[styles.settingHint, { color: colors.textSecondary }]}>
+                  {route.params.purpose === 'warmup'
+                    ? 'Самые трудные слова группы. В оценки разминка не идёт'
+                    : 'Все слова по одному вопросу'}
+                </Text>
+              </View>
+            </View>
+          ) : loadingSets ? (
             <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />
           ) : sets.length === 0 ? (
             <Text
@@ -314,8 +383,14 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Настройки</Text>
 
-          {/* Total Questions Stepper */}
-          <View style={[styles.settingCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+          {/* Total Questions Stepper — у теста по списку слов вопросов столько, сколько слов */}
+          <View
+            style={[
+              styles.settingCard,
+              { backgroundColor: cardBg, borderColor: cardBorder },
+              byList && styles.hidden,
+            ]}
+          >
             <View>
               <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>
                 Кол-во вопросов
@@ -424,12 +499,12 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
           accessibilityRole="button"
           style={({ pressed }) => [
             styles.ctaBtn,
-            { backgroundColor: !selectedSetId || creating ? colors.textSecondary : colors.primary },
+            { backgroundColor: !canCreate || creating ? colors.textSecondary : colors.primaryFill },
             pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
           ]}
-          disabled={!selectedSetId || creating}
+          disabled={!canCreate || creating}
           onPress={async () => {
-            if (!selectedSetId || creating) return;
+            if (!canCreate || creating) return;
             triggerHaptic('selection');
             setCreating(true);
             try {
@@ -440,7 +515,9 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: {
-                  setId: selectedSetId,
+                  ...(byList
+                    ? { cardIds: cardIds.slice(0, listCount), purpose: route.params.purpose }
+                    : { setId: selectedSetId }),
                   courseId: route.params.courseId,
                   testMode,
                   questionCount: totalQuestions,
@@ -483,6 +560,15 @@ export function ExamLobbyScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
+  examEntry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+    padding: spacing.m,
+    borderRadius: borderRadius.l,
+    borderWidth: 1,
+    marginBottom: spacing.l,
+  },
   container: {
     flex: 1,
   },
@@ -516,6 +602,8 @@ const styles = StyleSheet.create({
   section: {
     gap: spacing.s,
   },
+  hidden: { display: 'none' },
+  listInfo: { flex: 1 },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',

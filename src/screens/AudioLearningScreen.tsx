@@ -6,7 +6,13 @@ import React, { useCallback, useState, useEffect, useMemo, useRef } from 'react'
 import { View, StyleSheet, Pressable, Dimensions, Vibration, Animated, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Settings, Mic, Check, X, AudioLines } from 'lucide-react-native';
-import { useThemeColors, useSettingsStore, useCardsStore, useSetsStore } from '@/store';
+import {
+  useThemeColors,
+  useSettingsStore,
+  useCardsStore,
+  useSetsStore,
+  useStartTasksStore,
+} from '@/store';
 import { Text } from '@/components/common';
 import { Button, Switch, toast } from '@/components/ui';
 import { StageLayout } from '@/components/study/StageLayout';
@@ -174,6 +180,8 @@ export function AudioLearningScreen({ navigation, route }: Props) {
     const failedBefore = new Set(phaseFailedIds || []);
     const newCardsInBatch = cards.filter((c) => !failedBefore.has(c.id)).length;
     const timeSpent = Math.round((Date.now() - sessionStartTime.current) / 1000);
+    // Задание «Проверь произношение» — хотя бы одно слово сказано верно (Start 3.2)
+    if (learnedCards > 0) useStartTasksStore.getState().complete('voice');
 
     navigation.replace('StudyResults', {
       setId,

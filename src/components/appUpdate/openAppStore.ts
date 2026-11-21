@@ -1,5 +1,5 @@
 /**
- * Открыть приложение в App Store (plan/new/app_update_prompt.md, Update 4)
+ * Открыть приложение в App Store (plan/done/app_update_prompt.md, Update 4)
  */
 import { Linking } from 'react-native';
 import { version } from '../../../package.json';

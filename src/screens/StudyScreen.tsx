@@ -31,6 +31,7 @@ import { useLessonStore } from '@/store/lessonStore';
 import { spacing, iconSize, alpha } from '@/constants';
 import { DatabaseService, Analytics } from '@/services';
 import type { RootStackScreenProps } from '@/types/navigation';
+import { exitSessionToSet } from '@/components/study/setSession';
 import type { Rating, Card } from '@/types';
 import { Settings, Volume2 } from 'lucide-react-native';
 import {
@@ -694,7 +695,7 @@ export function StudyScreen({ navigation, route }: Props) {
     }
     finishStudySession();
     endSession();
-    if (sessionRoute) navigation.navigate('SetDetail', { setId: sessionRoute.setId });
+    if (sessionRoute) exitSessionToSet(navigation, sessionRoute.setId);
     else navigation.goBack();
   }, [finishStudySession, endSession, navigation, session, setId, sessionRoute]);
 

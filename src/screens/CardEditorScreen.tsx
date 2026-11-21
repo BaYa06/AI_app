@@ -16,6 +16,7 @@ const counterHint = (text: string, max: number) =>
 import { Button, ScreenHeader, TextField, confirmDialog, toast } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
 import { cardFront, cardBack } from '@/utils/cardText';
+import { afterManualCard } from '@/services/photoHint';
 
 type Props = RootStackScreenProps<'CardEditor'>;
 
@@ -98,6 +99,7 @@ export function CardEditorScreen({ navigation, route }: Props) {
           backText: backText.trim(),
         });
         incrementCardCount(setId);
+        afterManualCard(() => navigation.navigate('ImportFiles', { setId }));
       }
 
       navigation.goBack();
@@ -149,6 +151,7 @@ export function CardEditorScreen({ navigation, route }: Props) {
         backText: backText.trim(),
       });
       incrementCardCount(setId);
+      afterManualCard(() => navigation.navigate('ImportFiles', { setId }));
 
       // Очистка формы
       setFrontText('');
@@ -158,7 +161,7 @@ export function CardEditorScreen({ navigation, route }: Props) {
     } finally {
       setIsSaving(false);
     }
-  }, [frontText, backText, setId, addCard, incrementCardCount, handleSave]);
+  }, [frontText, backText, setId, addCard, incrementCardCount, handleSave, navigation]);
 
   return (
     <Container>

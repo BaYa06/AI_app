@@ -8,6 +8,7 @@
 import React from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useReducedMotion } from 'react-native-reanimated';
 import { Text } from '@/components/common/Text';
 import { ProgressBar, ScreenHeader } from '@/components/ui';
 import { useThemeColors } from '@/store';
@@ -18,9 +19,13 @@ export interface OnboardingStepProps {
   onBack?: () => void;
   /** Заголовок шапки («Flashly»). */
   title?: string;
-  /** Номер шага 1…ONBOARDING_STEPS — по нему считаются подпись «Шаг N из 6» и процент.
-   *  Нет — необязательный экран после основных шагов, прогресс не показываем. */
+  /** Номер шага — по нему считаются подпись «Шаг N из M» и процент.
+   *  Нет — необязательный экран, прогресс не показываем. */
   step?: number;
+  /** Сколько шагов в этом отрезке онбординга (до урока, после урока, путь учителя) */
+  total?: number;
+  /** Над заголовком: мост языков на экранах родного и изучаемого (Start 2.2) */
+  top?: React.ReactNode;
   headline: string;
   description?: string;
   /** Выравнивание заголовка и пояснения. */
@@ -30,30 +35,45 @@ export interface OnboardingStepProps {
   children?: React.ReactNode;
   /** Закреплённый низ: главная кнопка, тихая кнопка, примечание. */
   footer?: React.ReactNode;
+  /** Слой поверх всего экрана (перелёт флага, Start 2.4) */
+  overlay?: React.ReactNode;
 }
 
 /**
- * Шагов у ученика и учителя одинаково: имя → роль → родной язык → изучаемые языки →
- * (ученик: цель → дневная норма | учитель: предмет → размер группы).
+ * Шагов по умолчанию — путь учителя: роль → имя → родной язык → изучаемые → предмет → группа.
+ * У ученика два отрезка (plan/new/new_user_activation.md, Start 2.1): до первого урока
+ * (роль → родной → изучаемый) и после него (имя → цель → норма); их считает AppRoot.
  */
 export const ONBOARDING_STEPS = 6;
+
+/** Процент прошлого шага: новая полоска растёт от него, а не от нуля (Start 2.4) */
+let lastProgress = 0;
 
 export function OnboardingStep({
   onBack,
   title,
   step,
+  total = ONBOARDING_STEPS,
+  top,
   headline,
   description,
   align = 'left',
   keyboard = false,
   children,
   footer,
+  overlay,
 }: OnboardingStepProps) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const hasHeader = !!onBack || !!title;
-  const progress = step ? Math.round((step / ONBOARDING_STEPS) * 100) : 100;
-  const progressLabel = `Шаг ${step} из ${ONBOARDING_STEPS}`;
+  const progress = step ? Math.round((step / total) * 100) : 100;
+  const progressLabel = `Шаг ${step} из ${total}`;
+  const reduceMotion = useReducedMotion();
+  // Значение прошлого шага запоминаем один раз при появлении экрана
+  const [progressFrom] = React.useState(() => (step ? lastProgress : 0));
+  React.useEffect(() => {
+    if (step) lastProgress = progress;
+  }, [step, progress]);
 
   const body = (
     <>
@@ -63,6 +83,7 @@ export function OnboardingStep({
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        {top}
         <View style={[styles.headlineBlock, align === 'center' && styles.centered]}>
           <Text
             variant="h1"
@@ -103,7 +124,12 @@ export function OnboardingStep({
               {progress}%
             </Text>
           </View>
-          <ProgressBar progress={progress} animated={false} accessibilityLabel={progressLabel} />
+          <ProgressBar
+            progress={progress}
+            animated={!reduceMotion}
+            from={progressFrom}
+            accessibilityLabel={progressLabel}
+          />
         </View>
       ) : null}
 
@@ -117,6 +143,7 @@ export function OnboardingStep({
       ) : (
         body
       )}
+      {overlay}
     </View>
   );
 }

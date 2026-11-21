@@ -12,6 +12,16 @@
 		1A2F31A7D5870C95A980158F /* FlashlyWidgetBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = 52B11D15E0DD18295FE59251 /* FlashlyWidgetBridge.m */; };
 		5C3D2A1E9B7F40A1C6E8D201 /* StudyModeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3D2A1E9B7F40A1C6E8D203 /* StudyModeSheet.swift */; };
 		5C3D2A1E9B7F40A1C6E8D202 /* StudyModeSheet.m in Sources */ = {isa = PBXBuildFile; fileRef = 5C3D2A1E9B7F40A1C6E8D204 /* StudyModeSheet.m */; };
+		7B4E2C1A9D3F40B2A1C6E701 /* NewCourseSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B4E2C1A9D3F40B2A1C6E703 /* NewCourseSheet.swift */; };
+		7B4E2C1A9D3F40B2A1C6E702 /* NewCourseSheet.m in Sources */ = {isa = PBXBuildFile; fileRef = 7B4E2C1A9D3F40B2A1C6E704 /* NewCourseSheet.m */; };
+		9C5F3D2B8E4A41C3B2D7F801 /* NewHomeworkSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C5F3D2B8E4A41C3B2D7F803 /* NewHomeworkSheet.swift */; };
+		9C5F3D2B8E4A41C3B2D7F802 /* NewHomeworkSheet.m in Sources */ = {isa = PBXBuildFile; fileRef = 9C5F3D2B8E4A41C3B2D7F804 /* NewHomeworkSheet.m */; };
+		9C5F3D2B8E4A41C3B2D7F811 /* NotSubmittedSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C5F3D2B8E4A41C3B2D7F813 /* NotSubmittedSheet.swift */; };
+		9C5F3D2B8E4A41C3B2D7F812 /* NotSubmittedSheet.m in Sources */ = {isa = PBXBuildFile; fileRef = 9C5F3D2B8E4A41C3B2D7F814 /* NotSubmittedSheet.m */; };
+		8C5F3D2B0E4A41C3B2D7F801 /* JoinCodeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C5F3D2B0E4A41C3B2D7F803 /* JoinCodeSheet.swift */; };
+		8C5F3D2B0E4A41C3B2D7F802 /* JoinCodeSheet.m in Sources */ = {isa = PBXBuildFile; fileRef = 8C5F3D2B0E4A41C3B2D7F804 /* JoinCodeSheet.m */; };
+		9D6A4E3C1F5B42D4C3E8A903 /* ScheduleSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D6A4E3C1F5B42D4C3E8A907 /* ScheduleSheet.swift */; };
+		9D6A4E3C1F5B42D4C3E8A904 /* ScheduleSheet.m in Sources */ = {isa = PBXBuildFile; fileRef = 9D6A4E3C1F5B42D4C3E8A908 /* ScheduleSheet.m */; };
 		8B4E6D2F1A3C50B2D7F9E401 /* WhatsNewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B4E6D2F1A3C50B2D7F9E403 /* WhatsNewSheet.swift */; };
 		8B4E6D2F1A3C50B2D7F9E402 /* WhatsNewSheet.m in Sources */ = {isa = PBXBuildFile; fileRef = 8B4E6D2F1A3C50B2D7F9E404 /* WhatsNewSheet.m */; };
 		9D5F7E3A2B4C60C3E8A1F501 /* AppUpdateSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D5F7E3A2B4C60C3E8A1F503 /* AppUpdateSheet.swift */; };
@@ -77,6 +87,16 @@
 		52B11D15E0DD18295FE59251 /* FlashlyWidgetBridge.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlashcardsApp/FlashlyWidgetBridge.m; sourceTree = "<group>"; };
 		5C3D2A1E9B7F40A1C6E8D203 /* StudyModeSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/StudyModeSheet.swift; sourceTree = "<group>"; };
 		5C3D2A1E9B7F40A1C6E8D204 /* StudyModeSheet.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlashcardsApp/StudyModeSheet.m; sourceTree = "<group>"; };
+		7B4E2C1A9D3F40B2A1C6E703 /* NewCourseSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/NewCourseSheet.swift; sourceTree = "<group>"; };
+		7B4E2C1A9D3F40B2A1C6E704 /* NewCourseSheet.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlashcardsApp/NewCourseSheet.m; sourceTree = "<group>"; };
+		9C5F3D2B8E4A41C3B2D7F803 /* NewHomeworkSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/NewHomeworkSheet.swift; sourceTree = "<group>"; };
+		9C5F3D2B8E4A41C3B2D7F804 /* NewHomeworkSheet.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlashcardsApp/NewHomeworkSheet.m; sourceTree = "<group>"; };
+		9C5F3D2B8E4A41C3B2D7F813 /* NotSubmittedSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/NotSubmittedSheet.swift; sourceTree = "<group>"; };
+		9C5F3D2B8E4A41C3B2D7F814 /* NotSubmittedSheet.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlashcardsApp/NotSubmittedSheet.m; sourceTree = "<group>"; };
+		8C5F3D2B0E4A41C3B2D7F803 /* JoinCodeSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/JoinCodeSheet.swift; sourceTree = "<group>"; };
+		8C5F3D2B0E4A41C3B2D7F804 /* JoinCodeSheet.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlashcardsApp/JoinCodeSheet.m; sourceTree = "<group>"; };
+		9D6A4E3C1F5B42D4C3E8A907 /* ScheduleSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/ScheduleSheet.swift; sourceTree = "<group>"; };
+		9D6A4E3C1F5B42D4C3E8A908 /* ScheduleSheet.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlashcardsApp/ScheduleSheet.m; sourceTree = "<group>"; };
 		8B4E6D2F1A3C50B2D7F9E403 /* WhatsNewSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/WhatsNewSheet.swift; sourceTree = "<group>"; };
 		8B4E6D2F1A3C50B2D7F9E404 /* WhatsNewSheet.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = FlashcardsApp/WhatsNewSheet.m; sourceTree = "<group>"; };
 		9D5F7E3A2B4C60C3E8A1F503 /* AppUpdateSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlashcardsApp/AppUpdateSheet.swift; sourceTree = "<group>"; };
@@ -161,6 +181,16 @@
 				52B11D15E0DD18295FE59251 /* FlashlyWidgetBridge.m */,
 				5C3D2A1E9B7F40A1C6E8D203 /* StudyModeSheet.swift */,
 				5C3D2A1E9B7F40A1C6E8D204 /* StudyModeSheet.m */,
+				7B4E2C1A9D3F40B2A1C6E703 /* NewCourseSheet.swift */,
+				7B4E2C1A9D3F40B2A1C6E704 /* NewCourseSheet.m */,
+				9C5F3D2B8E4A41C3B2D7F803 /* NewHomeworkSheet.swift */,
+				9C5F3D2B8E4A41C3B2D7F804 /* NewHomeworkSheet.m */,
+				9C5F3D2B8E4A41C3B2D7F813 /* NotSubmittedSheet.swift */,
+				9C5F3D2B8E4A41C3B2D7F814 /* NotSubmittedSheet.m */,
+				8C5F3D2B0E4A41C3B2D7F803 /* JoinCodeSheet.swift */,
+				8C5F3D2B0E4A41C3B2D7F804 /* JoinCodeSheet.m */,
+				9D6A4E3C1F5B42D4C3E8A907 /* ScheduleSheet.swift */,
+				9D6A4E3C1F5B42D4C3E8A908 /* ScheduleSheet.m */,
 				8B4E6D2F1A3C50B2D7F9E403 /* WhatsNewSheet.swift */,
 				8B4E6D2F1A3C50B2D7F9E404 /* WhatsNewSheet.m */,
 				9D5F7E3A2B4C60C3E8A1F503 /* AppUpdateSheet.swift */,
@@ -460,6 +490,16 @@
 				1A2F31A7D5870C95A980158F /* FlashlyWidgetBridge.m in Sources */,
 				5C3D2A1E9B7F40A1C6E8D201 /* StudyModeSheet.swift in Sources */,
 				5C3D2A1E9B7F40A1C6E8D202 /* StudyModeSheet.m in Sources */,
+				7B4E2C1A9D3F40B2A1C6E701 /* NewCourseSheet.swift in Sources */,
+				7B4E2C1A9D3F40B2A1C6E702 /* NewCourseSheet.m in Sources */,
+				9C5F3D2B8E4A41C3B2D7F801 /* NewHomeworkSheet.swift in Sources */,
+				9C5F3D2B8E4A41C3B2D7F802 /* NewHomeworkSheet.m in Sources */,
+				9C5F3D2B8E4A41C3B2D7F811 /* NotSubmittedSheet.swift in Sources */,
+				9C5F3D2B8E4A41C3B2D7F812 /* NotSubmittedSheet.m in Sources */,
+				8C5F3D2B0E4A41C3B2D7F801 /* JoinCodeSheet.swift in Sources */,
+				8C5F3D2B0E4A41C3B2D7F802 /* JoinCodeSheet.m in Sources */,
+				9D6A4E3C1F5B42D4C3E8A903 /* ScheduleSheet.swift in Sources */,
+				9D6A4E3C1F5B42D4C3E8A904 /* ScheduleSheet.m in Sources */,
 				8B4E6D2F1A3C50B2D7F9E401 /* WhatsNewSheet.swift in Sources */,
 				8B4E6D2F1A3C50B2D7F9E402 /* WhatsNewSheet.m in Sources */,
 				9D5F7E3A2B4C60C3E8A1F501 /* AppUpdateSheet.swift in Sources */,
@@ -500,7 +540,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = FlashcardsApp/FlashcardsApp.entitlements;
-				CURRENT_PROJECT_VERSION = 97;
+				CURRENT_PROJECT_VERSION = 111;
 				DEVELOPMENT_TEAM = QY39YM9ZQ2;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = FlashcardsApp/Info.plist;
@@ -509,7 +549,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.8.8;
+				MARKETING_VERSION = 2.0.2;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -532,7 +572,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = FlashcardsApp/FlashcardsApp.entitlements;
-				CURRENT_PROJECT_VERSION = 97;
+				CURRENT_PROJECT_VERSION = 111;
 				DEVELOPMENT_TEAM = QY39YM9ZQ2;
 				INFOPLIST_FILE = FlashcardsApp/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
@@ -540,7 +580,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.8.8;
+				MARKETING_VERSION = 2.0.2;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -716,7 +756,7 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CODE_SIGN_ENTITLEMENTS = FlashlyWidget/FlashlyWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 97;
+				CURRENT_PROJECT_VERSION = 111;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = QY39YM9ZQ2;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -732,7 +772,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 1.8.8;
+				MARKETING_VERSION = 2.0.2;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.baiirbek.flashly.widget;
@@ -761,7 +801,7 @@
 				CODE_SIGN_ENTITLEMENTS = FlashlyWidget/FlashlyWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 97;
+				CURRENT_PROJECT_VERSION = 111;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = QY39YM9ZQ2;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -777,7 +817,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 1.8.8;
+				MARKETING_VERSION = 2.0.2;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.baiirbek.flashly.widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";

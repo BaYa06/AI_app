@@ -15,6 +15,10 @@ export interface DailyActivity {
   words_learned: number;
   minutes_learned: number;
   cards_studied: number;
+  /** День засчитан в серию (сервер, Freeze 1). Нет поля — старый сервер. */
+  streak_counted?: boolean;
+  /** День спасён заморозкой (сервер, Freeze 1). */
+  frozen?: boolean;
 }
 
 export interface UserStats {
@@ -29,14 +33,36 @@ export interface UserStats {
   streak_freezes: number;
   /** Сегодня заморозка спасла серию */
   freeze_used: boolean;
+  /** Засчитан ли сегодня и сколько ещё (сервер, Freeze 6). Нет полей — старый сервер. */
+  today_counted?: boolean;
+  today_left?: number;
+  /** review — повторить слова, которые ждут; any — ждать нечего, нужны любые ответы */
+  today_need?: 'review' | 'any' | null;
+  /** Учил только новые слова, а ждущие не трогал — день не засчитан (Freeze 6) */
+  today_new_only?: boolean;
 }
+
+/**
+ * Состояние дня в неделе серии (plan/new/streak_freeze_display.md, «Как выглядит день в неделе»):
+ * counted — засчитан; frozen — спасён заморозкой; studied — занимался, но день не засчитан;
+ * missed — пропущен; today — сегодня, ещё не засчитан; future — впереди.
+ */
+export type WeekDayState = 'counted' | 'frozen' | 'studied' | 'missed' | 'today' | 'future';
 
 export interface WeekDayStatus {
   dayLabel: string; // 'Пн', 'Вт', ...
   date: string; // YYYY-MM-DD
   dayNumber: number; // число месяца
-  status: 'done' | 'today' | 'future' | 'missed';
+  status: WeekDayState;
+  isToday: boolean;
   todayProgress?: number; // 0..1 для сегодня
+}
+
+/** Строка-пояснение под неделей: последний день каждого «непонятного» состояния. */
+export interface WeekNote {
+  kind: 'frozen' | 'studied';
+  date: string;
+  text: string;
 }
 
 export interface RecordActivityParams {
@@ -277,63 +303,75 @@ export async function fetchUserStats(): Promise<UserStats | null> {
 /**
  * Построить статус недели для UI
  */
+const WEEK_DAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
+/** YYYY-MM-DD ± дни — по календарю, без часовых поясов. */
+function shiftDateKey(key: string, days: number): string {
+  const d = new Date(`${key}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Неделя серии (Пн–Вс, в которую входит todayKey) — то, что считает сервер (Freeze 3).
+ * Засчитан ли день, решает только сервер (`streak_counted`, `frozen`). Старый сервер этих полей
+ * не отдаёт — тогда прежнее правило «≥ 10 карточек», без снежинок и жёлтых дней.
+ * Одна функция для ученика и учителя (Freeze 7).
+ */
 export function buildWeekStatus(
   activity: DailyActivity[],
   todayKey: string,
   todayProgress: number = 0
 ): WeekDayStatus[] {
-  const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-  const today = new Date();
+  const byDate = new Map<string, DailyActivity>();
+  activity.forEach((a) => byDate.set(a.local_date, a));
+  const serverFlags = activity.some((a) => typeof a.streak_counted === 'boolean');
 
-  // Определяем день недели из todayKey (timezone-safe)
-  const todayParsed = new Date(todayKey + 'T12:00:00');
-  const todayDayOfWeek = (todayParsed.getDay() + 6) % 7; // Пн = 0, Вс = 6
-
-  // Форматтер для YYYY-MM-DD в правильном timezone
-  const dateFmt = new Intl.DateTimeFormat('en-CA', {
-    timeZone: getDeviceTimezone(),
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-
-  // Создаём Map для быстрого поиска активности по дате
-  const activityMap = new Map<string, DailyActivity>();
-  activity.forEach((a) => activityMap.set(a.local_date, a));
-
-  const result: WeekDayStatus[] = [];
-
-  for (let i = 0; i < 7; i++) {
-    const diff = i - todayDayOfWeek;
-    const date = new Date(today);
-    date.setDate(today.getDate() + diff);
-
-    const dateKey = dateFmt.format(date);
-    const dayNumber = parseInt(dateKey.split('-')[2], 10);
-    const dayActivity = activityMap.get(dateKey);
-
-    let status: WeekDayStatus['status'];
-
-    if (dateKey === todayKey) {
-      status = 'today';
-    } else if (dateKey > todayKey) {
-      status = 'future';
-    } else if (dayActivity && (dayActivity.cards_studied > 0 || dayActivity.words_learned > 0)) {
-      status = 'done';
-    } else {
-      status = 'missed';
-    }
-
-    result.push({
-      dayLabel: weekDays[i],
-      date: dateKey,
-      dayNumber,
+  const todayDow = (new Date(`${todayKey}T12:00:00Z`).getUTCDay() + 6) % 7; // Пн = 0
+  return WEEK_DAYS.map((dayLabel, i) => {
+    const date = shiftDateKey(todayKey, i - todayDow);
+    const a = byDate.get(date);
+    const isToday = date === todayKey;
+    const counted = serverFlags ? a?.streak_counted === true : (a?.cards_studied ?? 0) >= 10;
+    let status: WeekDayState;
+    if (date > todayKey) status = 'future';
+    else if (counted) status = 'counted';
+    else if (isToday) status = 'today';
+    else if (serverFlags && a?.frozen) status = 'frozen';
+    else if (serverFlags && a && (a.cards_studied > 0 || a.words_learned > 0)) status = 'studied';
+    else status = 'missed';
+    return {
+      dayLabel,
+      date,
+      dayNumber: parseInt(date.slice(8), 10),
       status,
-      todayProgress: status === 'today' ? todayProgress : undefined,
+      isToday,
+      todayProgress: isToday ? todayProgress : undefined,
+    };
+  });
+}
+
+/** Пояснения под неделей: только если в ней есть такой день; по одному — за последний. */
+export function weekNotes(week: WeekDayStatus[]): WeekNote[] {
+  const last = (kind: WeekNote['kind']) => [...week].reverse().find((d) => d.status === kind);
+  const notes: WeekNote[] = [];
+  const frozen = last('frozen');
+  if (frozen) {
+    notes.push({
+      kind: 'frozen',
+      date: frozen.date,
+      text: `${frozen.dayLabel} — заморозка спасла серию`,
     });
   }
-
-  return result;
+  const studied = last('studied');
+  if (studied) {
+    notes.push({
+      kind: 'studied',
+      date: studied.date,
+      text: `${studied.dayLabel} — занимался, но день не засчитан: нужно повторить 10 слов, которые ждали`,
+    });
+  }
+  return notes.sort((x, y) => x.date.localeCompare(y.date));
 }
 
 /**
@@ -388,6 +426,7 @@ export const StreakService = {
   fetchUserStats,
   fetchTodayActivity,
   buildWeekStatus,
+  weekNotes,
 };
 
 export default StreakService;

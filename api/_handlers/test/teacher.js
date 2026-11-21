@@ -1,7 +1,35 @@
 /**
  * api/test.js — живой тест — сторона учителя: создать, начать, монитор, завершить, результаты, история, восстановить (Clean 10 — перенесено без изменений).
  */
-import { broadcast, broadcastTestFinished, AWAY_GRACE_SEC } from './_shared.js';
+import { broadcast, broadcastTestFinished, AWAY_GRACE_SEC, sessionCardStats } from './_shared.js';
+import { courseSetIdsSql } from '../../_course.js';
+import { finishExpired } from './exam.js';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+/** Больше слов в одном тесте не бывает (защита от случайно огромного списка) */
+export const TEST_MAX_CARDS = 200;
+
+/**
+ * Список слов теста (plan/done/teacher_cabinet.md, Teacher 34): массив uuid без повторов.
+ * undefined / пустой — обычный тест по набору (null); кривой — 'invalid'.
+ */
+export function parseTestCardIds(value) {
+  if (value === undefined || value === null) return null;
+  if (!Array.isArray(value)) return 'invalid';
+  if (value.length === 0) return null;
+  if (value.length > TEST_MAX_CARDS) return 'invalid';
+  if (!value.every((id) => typeof id === 'string' && UUID_RE.test(id))) return 'invalid';
+  return [...new Set(value)];
+}
+
+/** Набор, в котором больше всего слов списка: старый клиент видит его в истории и итогах */
+export function mainSetId(rows) {
+  const counts = new Map();
+  for (const r of rows) counts.set(r.set_id, (counts.get(r.set_id) || 0) + 1);
+  let best = null;
+  for (const [setId, n] of counts) if (!best || n > best[1]) best = [setId, n];
+  return best ? best[0] : null;
+}
 
 /** Генерация уникального 4-значного кода */
 export async function generateUniqueCode(sql) {
@@ -27,6 +55,8 @@ export const NO_TIME_LIMIT_SEC_PER_QUESTION = 60; // консервативна�
 
 export async function autoFinishIfStale(sql, sessionId, session) {
   if (session.status !== 'active' || !session.started_at) return session;
+  // У экзамена движка 2 общий срок (duration_sec) — его завершает finishExpired из exam.js
+  if (session.engine === 2) return session;
 
   const perQuestion =
     session.time_per_question > 0 ? session.time_per_question : NO_TIME_LIMIT_SEC_PER_QUESTION;
@@ -59,15 +89,21 @@ export async function autoFinishIfStale(sql, sessionId, session) {
 
 /**
  * POST ?action=create
- * Body: { setId, courseId, testMode, questionCount, timePerQuestion, exitControl? }
+ * Body: { setId, courseId, testMode, questionCount, timePerQuestion, exitControl?, cardIds?, purpose? }
  * exitControl — контроль выхода из приложения (plan/done/exam_lockdown.md). Необязательный: старые
  * версии приложения учителя его не шлют, и их тесты работают как раньше.
+ * cardIds — тест по списку слов курса вместо набора (Teacher 34); setId тогда не нужен.
+ * purpose = 'warmup' — разминка: в истории с пометкой, в оценки не идёт.
  */
 export async function createTest(req, res, sql, userId) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { setId, courseId, testMode, questionCount, timePerQuestion, exitControl } = req.body;
-  if (!setId || !courseId || !questionCount) {
+  const { courseId, testMode, timePerQuestion, exitControl } = req.body;
+  let { setId, questionCount } = req.body;
+  const cardIds = parseTestCardIds(req.body.cardIds);
+  if (cardIds === 'invalid') return res.status(400).json({ error: 'cardIds is invalid' });
+  const purpose = req.body.purpose === 'warmup' ? 'warmup' : null;
+  if (!courseId || (!cardIds && (!setId || !questionCount))) {
     return res.status(400).json({ error: 'setId, courseId, questionCount are required' });
   }
 
@@ -80,11 +116,25 @@ export async function createTest(req, res, sql, userId) {
     return res.status(403).json({ error: 'Access denied: not course owner' });
   }
 
+  if (cardIds) {
+    // Слова — только из наборов этого курса (свои и юниты учебников)
+    const owned = await sql`
+      SELECT id, set_id FROM cards
+      WHERE id = ANY(${cardIds}::uuid[]) AND set_id IN (${courseSetIdsSql(sql, courseId)})
+    `;
+    if (owned.length !== cardIds.length) {
+      return res.status(400).json({ error: 'cardIds must belong to the course' });
+    }
+    setId = mainSetId(owned);
+    const wanted = parseInt(questionCount, 10);
+    questionCount = wanted > 0 ? Math.min(wanted, cardIds.length) : cardIds.length;
+  }
+
   const code = await generateUniqueCode(sql);
 
   const result = await sql`
-    INSERT INTO test_sessions (teacher_id, set_id, course_id, code, test_mode, question_count, time_per_question, exit_control)
-    VALUES (${userId}::uuid, ${setId}::uuid, ${courseId}::uuid, ${code}, ${testMode || 'multiple'}, ${questionCount}, ${timePerQuestion || 0}, ${exitControl === true})
+    INSERT INTO test_sessions (teacher_id, set_id, course_id, code, test_mode, question_count, time_per_question, exit_control, card_ids, purpose)
+    VALUES (${userId}::uuid, ${setId}::uuid, ${courseId}::uuid, ${code}, ${testMode || 'multiple'}, ${questionCount}, ${timePerQuestion || 0}, ${exitControl === true}, ${cardIds}::uuid[], ${purpose})
     RETURNING id
   `;
 
@@ -92,6 +142,8 @@ export async function createTest(req, res, sql, userId) {
     sessionId: result[0].id,
     code,
     exitControl: exitControl === true,
+    questionCount,
+    purpose,
   });
 }
 
@@ -140,7 +192,8 @@ export async function monitorTest(req, res, sql, userId) {
   }
 
   const session = await sql`
-    SELECT status, started_at, time_per_question, question_count, teacher_id, exit_control
+    SELECT status, started_at, time_per_question, question_count, teacher_id, exit_control,
+           card_ids, purpose, engine, duration_sec, paused_at, paused_total_sec
     FROM test_sessions
     WHERE id = ${sessionId}::uuid
   `;
@@ -148,6 +201,8 @@ export async function monitorTest(req, res, sql, userId) {
     return res.status(404).json({ error: 'Session not found' });
   }
   const isTeacher = session[0].teacher_id === userId;
+  // autoFinishIfStale ниже может заменить строку сессии — список слов запоминаем сразу
+  const { card_ids: cardIds, purpose } = session[0];
   const exitControl = session[0].exit_control;
 
   // Разрешено учителю — владельцу сессии, либо ученику, который уже подключился к ней
@@ -162,6 +217,12 @@ export async function monitorTest(req, res, sql, userId) {
   }
 
   session[0] = await autoFinishIfStale(sql, sessionId, session[0]);
+  const engine = session[0].engine || 1;
+  if (engine === 2) {
+    await finishExpired(sql, sessionId);
+    const [s2] = await sql`SELECT status FROM test_sessions WHERE id = ${sessionId}::uuid`;
+    session[0] = { ...session[0], status: s2.status };
+  }
 
   // Контроль выхода: ученик ушёл в фон и не возвращается — закрыть попытку по истечении льготы,
   // не дожидаясь его `back`, чтобы учитель сразу видел «Вышел» и мог разрешить продолжить.
@@ -190,12 +251,32 @@ export async function monitorTest(req, res, sql, userId) {
     ORDER BY joined_at ASC
   `;
 
+  // Блок «Слова» в мониторе (Teacher 40): только учителю и только у теста по списку слов —
+  // обычный тест лишним запросом на каждый опрос не нагружаем.
+  const byCard =
+    isTeacher && Array.isArray(cardIds) && cardIds.length > 0
+      ? await sessionCardStats(sql, sessionId, cardIds)
+      : undefined;
+
   return res.status(200).json({
     status: session[0].status,
     startedAt: session[0].started_at,
     timePerQuestion: session[0].time_per_question,
     questionCount: session[0].question_count,
     exitControl,
+    ...(isTeacher ? { purpose: purpose || null } : {}),
+    // Экзамен движка 2: общий срок вместо времени на вопрос (plan/new/live_exam.md)
+    ...(engine === 2
+      ? {
+          engine,
+          durationSec: session[0].duration_sec,
+          paused: Boolean(session[0].paused_at),
+          pausedAt: session[0].paused_at || null,
+          pausedTotalSec: session[0].paused_total_sec || 0,
+          serverNow: new Date().toISOString(),
+        }
+      : {}),
+    ...(byCard ? { byCard } : {}),
     participants: participants.map((p) => {
       const initials = (p.display_name || 'S')
         .split(' ')
@@ -293,6 +374,7 @@ export async function getResults(req, res, sql, userId) {
   // Данные сессии
   const session = await sql`
     SELECT ts.question_count, ts.created_at, ts.teacher_id,
+           ts.course_id, ts.card_ids, ts.purpose, ts.started_at, ts.finished_at,
            cs.title AS set_title
     FROM test_sessions ts
     JOIN card_sets cs ON cs.id = ts.set_id
@@ -337,7 +419,28 @@ export async function getResults(req, res, sql, userId) {
     LIMIT 5
   `;
 
+  // Итоги по словам и кто не подключился (Teacher 35) — новые поля, старые не меняются
+  const byCard = await sessionCardStats(sql, sessionId, session[0].card_ids);
+  const absent = session[0].course_id
+    ? await sql`
+        SELECT cm.user_id, COALESCE(u.display_name, u.user_name, 'Ученик') AS name
+        FROM course_members cm
+        JOIN users u ON u.id = cm.user_id
+        WHERE cm.course_id = ${session[0].course_id}::uuid AND cm.role = 'student'
+          AND cm.user_id NOT IN (
+            SELECT user_id FROM test_participants WHERE session_id = ${sessionId}::uuid
+          )
+        ORDER BY name
+      `
+    : [];
+
   return res.status(200).json({
+    byCard,
+    absent: absent.map((a) => ({ userId: a.user_id, name: a.name })),
+    purpose: session[0].purpose || null,
+    courseId: session[0].course_id || null,
+    startedAt: session[0].started_at || null,
+    finishedAt: session[0].finished_at || null,
     setTitle: session[0].set_title,
     date: session[0].created_at,
     totalQuestions: session[0].question_count,
@@ -379,6 +482,7 @@ export async function getHistory(req, res, sql, userId) {
       ts.finished_at   AS "finishedAt",
       ts.question_count AS "questionCount",
       ts.test_mode     AS "testMode",
+      ts.purpose       AS "purpose",
       COUNT(tp.id)::int                                   AS "participantCount",
       COALESCE(ROUND(AVG(tp.score))::int, 0)              AS "avgScore"
     FROM test_sessions ts

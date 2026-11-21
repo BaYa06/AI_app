@@ -13,6 +13,9 @@
     },
     "api/push.js": {
       "maxDuration": 60
+    },
+    "api/teacher.js": {
+      "includeFiles": "api/_fonts/**"
     }
   },
   "headers": [
@@ -22,7 +25,7 @@
       "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
     },
     {
-      "source": "/join/(.*)",
+      "source": "/(join|t)/(.*)",
       "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
     },
     {
@@ -38,6 +41,15 @@
         { "key": "Access-Control-Allow-Origin", "value": "*" },
         { "key": "Access-Control-Allow-Methods", "value": "GET,OPTIONS,PATCH,DELETE,POST,PUT" },
         { "key": "Access-Control-Allow-Headers", "value": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization" }
+      ]
+    },
+    {
+      "source": "/(center|site/center\\.html)",
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
+        { "key": "Cache-Control", "value": "no-cache" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Referrer-Policy", "value": "same-origin" }
       ]
     },
     {
@@ -122,7 +134,7 @@
   ],
   "redirects": [
     {
-      "source": "/:path((?!(?:api|ai|s|join|privacy|terms|support|delete-account|admin|site|icons|fonts|\\.well-known|en|learn|how-to-learn-words|spaced-repetition|teachers)(?:/|$))[^.]+)",
+      "source": "/:path((?!(?:api|ai|s|join|privacy|terms|support|delete-account|admin|site|icons|fonts|\\.well-known|en|learn|how-to-learn-words|spaced-repetition|teachers|center|t)(?:/|$))[^.]+)",
       "has": [{ "type": "host", "value": "flashlycards.app" }],
       "destination": "https://app.flashlycards.app/:path",
       "permanent": false
@@ -146,7 +158,9 @@
     { "source": "/api/library/import",             "destination": "/api/library?action=import" },
     { "source": "/ai/:path*", "destination": "/api/ai?fn=:path*" },
     { "source": "/join/:token", "destination": "/api/join?token=:token" },
+    { "source": "/t/:token", "destination": "/api/join?teacher=:token" },
     { "source": "/s/:code", "destination": "/api/share?action=page&code=:code" },
+    { "source": "/r/:code", "destination": "/api/share?action=report-page&code=:code" },
     { "source": "/admin", "destination": "/admin.html" },
     { "source": "/privacy", "destination": "/privacy.html" },
     { "source": "/terms", "destination": "/terms.html" },
@@ -160,7 +174,11 @@
     { "source": "/how-to-learn-words", "destination": "/site/p/how-to-learn-words.html" },
     { "source": "/spaced-repetition", "destination": "/site/p/spaced-repetition.html" },
     { "source": "/teachers", "destination": "/site/p/teachers.html" },
+    { "source": "/teachers/help", "destination": "/site/help/index.html" },
+    { "source": "/teachers/help/c/:cat", "destination": "/site/help/c/:cat.html" },
+    { "source": "/teachers/help/:slug", "destination": "/site/help/:slug.html" },
     { "source": "/support", "destination": "/site/support.html" },
+    { "source": "/center", "destination": "/site/center.html" },
     { "source": "/delete-account", "destination": "/site/delete-account.html" },
     { "source": "/api/translate-words",           "destination": "/api/ai?fn=translate-words" },
     { "source": "/api/generate-examples",         "destination": "/api/ai?fn=generate-examples" },

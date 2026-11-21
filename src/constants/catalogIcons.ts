@@ -1,5 +1,5 @@
 /**
- * Иконки каталога библиотеки (plan/new/library_catalog.md): в базе у предмета и подборки хранится
+ * Иконки каталога библиотеки (plan/done/library_catalog.md): в базе у предмета и подборки хранится
  * имя иконки lucide (`library_subjects.icon`, `library_collections.icon`) — здесь оно превращается
  * в компонент. Неизвестное имя — книга. Импорт напрямую: `@/constants/catalogIcons` (как categoryIcons).
  */

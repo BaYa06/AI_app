@@ -9,10 +9,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { ChevronRight, Clock, Target, X, Zap } from 'lucide-react-native';
-import { useCardsStore, useSettingsStore, useThemeColors } from '@/store';
+import { useCardsStore, useSettingsStore, useStartTasksStore, useThemeColors } from '@/store';
 import { StreakCelebration, Text } from '@/components/common';
 import { Badge, Button, Sheet, useScreenBottomInset } from '@/components/ui';
 import type { IconComponent } from '@/components/ui';
@@ -22,7 +21,7 @@ import { Analytics } from '@/services/analytics';
 import { isSessionWordWeak, sessionCardIds } from '@/services/lessonFlow';
 import type { RootStackParamList, SessionRouteParams } from '@/types/navigation';
 import type { Card } from '@/types';
-import { currentSetSessionPlan, startSetSession } from './setSession';
+import { currentSetSessionPlan, exitSessionToSet, startSetSession } from './setSession';
 import { SessionSummaryArt } from './SessionSummaryArt';
 import { useSummaryChoreography, type TileMotion } from './useSummaryChoreography';
 
@@ -35,13 +34,15 @@ const COMPACT_HEIGHT = 700;
 export function SessionSummary({
   session,
   streakCount,
+  dayHint,
 }: {
   session: SessionRouteParams;
   streakCount?: number;
+  /** День не засчитан: учил только новые слова (Freeze 6) */
+  dayHint?: string | null;
 }) {
   const colors = useThemeColors();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const insets = useSafeAreaInsets();
   const bottomInset = useScreenBottomInset();
   const { height } = useWindowDimensions();
   const compact = height < COMPACT_HEIGHT;
@@ -70,6 +71,8 @@ export function SessionSummary({
   }, []);
 
   useEffect(() => {
+    // Задание «Пройди первую сессию» (plan/new/new_user_activation.md, Start 3.4)
+    useStartTasksStore.getState().complete('session');
     Analytics.setSessionCompleted({
       words: list.length,
       weak: weakIds.size,
@@ -93,7 +96,7 @@ export function SessionSummary({
   const plan = info?.plan;
   const canContinue =
     !!plan && (plan.mode === 'review' || plan.mode === 'learn' || plan.mode === 'more');
-  const goToSet = () => navigation.navigate('SetDetail', { setId: session.setId });
+  const goToSet = () => exitSessionToSet(navigation, session.setId);
   // Серия выросла — празднуем после итогов, по нажатию кнопки, и уже потом уходим с экрана (решение 14)
   const leave = (go: () => void) => {
     motion.stop();
@@ -154,10 +157,7 @@ export function SessionSummary({
 
   return (
     <View
-      style={[
-        styles.container,
-        { backgroundColor: colors.background, paddingTop: insets.top + spacing.xs },
-      ]}
+      style={[styles.container, { backgroundColor: colors.background, paddingTop: spacing.xs }]}
     >
       <View style={styles.top}>
         {canContinue ? (
@@ -189,6 +189,12 @@ export function SessionSummary({
             <StatTile key={s.label} {...s} />
           ))}
         </View>
+
+        {dayHint ? (
+          <Text variant="bodySmall" align="center" style={{ color: colors.warningText }}>
+            {dayHint}
+          </Text>
+        ) : null}
 
         <Animated.View style={tailStyle}>
           <Pressable

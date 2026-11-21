@@ -1,6 +1,6 @@
 /**
  * Каталог библиотеки: предмет → (язык / раздел) → (уровень) → подборка → набор
- * (plan/new/library_catalog.md, Catalog 3). Только чтение; маршруты — в api/library.js:
+ * (plan/done/library_catalog.md, Catalog 3). Только чтение; маршруты — в api/library.js:
  *
  * GET /api/library?action=catalog[&lang=en]       предметы, «Продолжить» или «С чего начать», полка учебников
  * GET /api/library?action=subject&subject=<slug>   разделы, уровни и подборки предмета
@@ -183,6 +183,8 @@ async function loadShelf(sql, allBooks, { q = null, limit = SHELF_LIMIT } = {}) 
       FROM books b
      WHERE b.is_published = true
        AND (${allBooks}::boolean OR b.student_visible = true)
+       -- Книги учебных центров в общей библиотеке и поиске не показываем (plan/new/center_books.md)
+       AND b.organization_id IS NULL
        AND (${q}::text IS NULL
             OR b.title ILIKE ${q}::text ESCAPE '\\'
             OR EXISTS (SELECT 1 FROM book_units u WHERE u.book_id = b.id AND u.title ILIKE ${q}::text ESCAPE '\\'))

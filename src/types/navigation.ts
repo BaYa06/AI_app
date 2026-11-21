@@ -153,11 +153,13 @@ export type RootStackParamList = {
     phaseFailedIds?: string[];
   };
   LibrarySetDetail: { setId: string };
-  /** Каталог библиотеки (plan/new/library_catalog.md): экран предмета и экран подборки */
+  /** Каталог библиотеки (plan/done/library_catalog.md): экран предмета и экран подборки */
   LibrarySubject: { slug: string; title?: string };
   LibraryCollection: { collectionId: string; title?: string };
   LibraryBooks: undefined;
   BookDetail: { bookId: string };
+  /** Выбор книги сразу после кода учебного центра (plan/new/center_books.md, этап 7) */
+  CenterBookPick: { orgId?: string } | undefined;
   CourseBooks: { courseId: string; courseTitle: string };
   MyPublications: undefined;
   PersonalInfo: undefined;
@@ -179,7 +181,25 @@ export type RootStackParamList = {
   Settings: undefined;
   Search: undefined;
   TeacherCourseStats: { courseId: string; courseTitle: string };
-  TeacherStudents: { courseId: string; courseTitle: string };
+  TeacherStudents: {
+    courseId: string;
+    courseTitle: string;
+    /** С какого фильтра открыть список (главная учителя → «Не заходят 7+ дней») */
+    filter?: 'all' | 'active' | 'away3d' | 'away7d';
+  };
+  /** «Задание сдано!» (plan/done/teacher_cabinet.md, Teacher 28) */
+  HomeworkDone: { homeworkId: string; late: boolean; score: number; diamonds: number };
+  /** Экран задания ученика (plan/done/teacher_cabinet.md, Teacher 27) */
+  StudentHomework: { homeworkId: string; from?: string };
+  /** Сдача задания учителем (plan/done/teacher_cabinet.md, Teacher 21) */
+  /** courseTitle нет, когда экран открыт ссылкой из пуша учителю */
+  TeacherHomework: { homeworkId: string; courseId: string; courseTitle?: string };
+  /** История заданий курса: идут сейчас, прошедшие, отменённые (Teacher 57) */
+  TeacherHomeworkHistory: { courseId: string; courseTitle?: string };
+  /**
+   * Ученик глазами учителя. По ссылке из пуша (этап 4) приходят только courseId и studentId —
+   * новый экран (StudentInsightScreen) остальное загружает сам.
+   */
   StudentDetail: {
     courseId: string;
     courseTitle: string;
@@ -190,26 +210,34 @@ export type RootStackParamList = {
     todayCards: number;
     lastActivity: string;
   };
-  ExamLobby: { courseId: string; courseTitle: string };
+  /**
+   * Отчёт (экран 14, Teacher 55): вкладка «Родителям» — по ученику, «Группе» — по курсу.
+   * studentId нет — открывается вкладка «Группе».
+   */
+  TeacherReport: {
+    courseId: string;
+    courseTitle?: string;
+    studentId?: string;
+    studentName?: string;
+  };
+  /**
+   * Настройка живого теста. cardIds — тест по списку слов вместо набора, purpose = 'warmup' —
+   * разминка перед уроком, title — заголовок («Ünite 4 · проверка задания») (Teacher 39).
+   */
+  ExamLobby: {
+    courseId: string;
+    courseTitle: string;
+    cardIds?: string[];
+    purpose?: 'warmup';
+    title?: string;
+  };
+  /** Колокольчик учителя — список уведомлений (Teacher 49) */
+  TeacherNotifications: undefined;
+  /** Экран 10 «Перед уроком» (Teacher 38) */
+  TeacherLessonPrep: { courseId: string; courseTitle?: string };
   TestHistory: { courseId: string; courseTitle: string };
   /** Рейтинг курса за неделю (week: 'previous' — сразу итоги прошлой недели) */
   CourseLeaderboard: { courseId: string; courseTitle?: string; week?: 'current' | 'previous' };
-  OralTestLobby: { courseId: string; courseTitle: string };
-  OralTestSession: {
-    courseId: string;
-    courseTitle: string;
-    setId: string;
-    setTitle: string;
-    cardIds: string[];
-  };
-  OralTestResults: {
-    courseId: string;
-    courseTitle: string;
-    setTitle: string;
-    total: number;
-    known: number;
-    unknown: number;
-  };
   TestLobby: {
     courseId: string;
     courseTitle: string;
@@ -219,7 +247,15 @@ export type RootStackParamList = {
     questionCount: number;
     timePerQuestion: number;
   };
+  /** Демо живого теста с ботами — только на устройстве (Start 6.2) */
+  TeacherDemoTest: undefined;
   LiveTest: {
+    courseId: string;
+    courseTitle: string;
+    sessionId: string;
+  };
+  /** Итоги разминки (П4, Teacher 41) */
+  WarmupResults: {
     courseId: string;
     courseTitle: string;
     sessionId: string;
@@ -230,6 +266,30 @@ export type RootStackParamList = {
     sessionId: string;
   };
   TestJoin: undefined;
+  /** Живой экзамен, движок 2 (plan/new/live_exam.md): экран ученика */
+  ExamTake: { sessionId: string; participantId: string; exitControl?: boolean; setTitle?: string };
+  /** «Мой результат» — разбор экзамена у ученика */
+  ExamResult: { sessionId: string; setTitle?: string };
+  /** «Мои экзамены» ученика */
+  MyExams: undefined;
+  /** Учитель: настройка экзамена с оценкой */
+  ExamSetup: { courseId: string; courseTitle: string };
+  /** Учитель: «Собираем экзамен» — шаги сборки с настоящими цифрами */
+  ExamBuild: {
+    courseId: string;
+    courseTitle: string;
+    sessionId: string;
+    steps: { key: string; title: string; detail: string }[];
+    warnings: { code: string; text: string }[];
+  };
+  /** Учитель: превью «что увидят ученики» */
+  ExamPreview: { courseId: string; courseTitle: string; sessionId: string };
+  /** Учитель: итоги экзамена движка 2 */
+  ExamResults: { courseId: string; courseTitle: string; sessionId: string };
+  /** Учитель: разбор одного вопроса */
+  ExamQuestion: { sessionId: string; itemId: string };
+  /** Учитель: карточка ученика в итогах экзамена */
+  ExamStudent: { sessionId: string; participantId: string; courseId: string };
   TestWaiting: {
     sessionId: string;
     participantId: string;
@@ -240,6 +300,8 @@ export type RootStackParamList = {
     timePerQuestion: number;
     // Учитель включил контроль выхода из приложения (plan/done/exam_lockdown.md)
     exitControl?: boolean;
+    /** 2 — экзамен (plan/new/live_exam.md): после старта открыть ExamTake */
+    engine?: number;
   };
   TestExam: {
     sessionId: string;
@@ -283,7 +345,12 @@ export type RootStackParamList = {
     session?: SessionRouteParams;
   };
   /** append — пришли с проверки по «+ Фото»: новые карточки дописать к черновику */
-  ImportFiles: { setId: string; append?: boolean };
+  /** newSet — набор ещё не создан (задание «Набор из фото», Start 3.5): setId '' */
+  ImportFiles: {
+    setId: string;
+    append?: boolean;
+    newSet?: { languageFrom: string; languageTo: string };
+  };
   PreviewImport: {
     /** example/wordForm/wordType — у «незнакомых слов» из текста, confidence — неуверенно распознано */
     cards: Array<{
@@ -300,6 +367,8 @@ export type RootStackParamList = {
     /** Языки нового набора по умолчанию (ИИ определил, что слова на другом языке) */
     languageFrom?: string;
     languageTo?: string;
+    /** Откуда слова нового набора: таблица без ИИ — 'file'; по умолчанию 'ai' (Teacher 31) */
+    origin?: 'ai' | 'file';
     /** Чей черновик ИИ-импорта очистить после сохранения (по умолчанию — setId) */
     draftKey?: string;
   };
@@ -309,7 +378,11 @@ export type RootStackParamList = {
 
 export type MainTabParamList = {
   /** from: 'widget' — открыто ссылкой виджета, главная запускает урок дня (plan/new/widgets.md, 0.3) */
-  Home: { from?: string; state?: string; family?: string } | undefined;
+  /**
+   * openCourseId — главная на этом курсе, боковое меню открывается само (книга добавлена из
+   * «Библиотеки», plan/new/center_books.md, этап 7)
+   */
+  Home: { from?: string; state?: string; family?: string; openCourseId?: string } | undefined;
   Library: undefined;
   TestTab: undefined;
   Statistics: undefined;

@@ -15,9 +15,10 @@ import {
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import {
   useSetsStore,
+  useStartTasksStore,
   useSettingsStore,
   useThemeColors,
   useCardsStore,
@@ -26,6 +27,7 @@ import {
   useChallengeStore,
   isSetInCourse,
   isSetInMySets,
+  useCatalogStore,
 } from '@/store';
 import type { ChallengeId } from '@/store';
 import { selectSetStats } from '@/store/cardsStore';
@@ -37,6 +39,10 @@ import {
   type StudyMode,
 } from '@/components/study/StudyModeSheet';
 import { CoursesDrawer } from '@/components/home/CoursesDrawer';
+import { TEACHER_CABINET_ENABLED, TEACHER_HOMEWORK_ENABLED } from '@/config/features';
+import { useTeacherBell } from '@/components/teacher/useTeacherBell';
+import { NewCourseSheet } from '@/components/teacher/NewCourseSheet';
+import { CourseJoinCodeDialog } from '@/components/CourseJoinCodeDialog';
 import {
   animateDrawerTo,
   clampTranslateX,
@@ -69,7 +75,10 @@ import { NeonService, type CourseLeaderboard } from '@/services/NeonService';
 import { leaderboardSeenKey, type LeaderboardSeen } from '@/screens/CourseLeaderboardScreen';
 import { DatabaseService } from '@/services/DatabaseService';
 import { JoinByCodeModal } from '@/components/JoinByCodeModal';
-import type { DailyActivity } from '@/services/StreakService';
+import { CenterInviteModal } from '@/components/CenterInviteModal';
+import { openCenterBooks } from '@/components/study/centerSession';
+import { useCenterStore } from '@/store/centerStore';
+import type { DailyActivity, UserStats } from '@/services/StreakService';
 import type { Card, CardSet } from '@/types';
 import { isCardWaitingReview } from '@/services/SRSService';
 import { StorageService, STORAGE_KEYS } from '@/services/StorageService';
@@ -99,6 +108,11 @@ import {
   streakRiskHoursLeft,
 } from '@/components/home/lessonText';
 import { LessonCard } from '@/components/home/LessonCard';
+import { StudentHomeworkCard } from '@/components/home/StudentHomeworkCard';
+import { useHomeworkStore } from '@/store/homeworkStore';
+import { nearestActiveHomework } from '@/services/homework';
+import { startHomeworkSession } from '@/components/study/homeworkSession';
+import { useHomeworkDoneRedirect } from '@/components/study/useHomeworkDoneRedirect';
 import { syncWidget, checkWidgetUsage } from '@/services/WidgetService';
 import type { WidgetPlanInput } from '@/services/WidgetPlanner';
 import { FocusSetSheet } from '@/components/home/FocusSetSheet';
@@ -111,11 +125,15 @@ import { useAppUpdateOnHome } from '@/components/appUpdate/useAppUpdateOnHome';
 import { WhatsNewSheet } from '@/components/whatsNew/WhatsNewSheet';
 
 import {
+  DEFAULT_SETS_SORT,
   SETS_COMPARATORS,
   SETS_SORT_OPTIONS,
+  byUnitNumber,
   loadSetsSort,
   type SetsSortKey,
 } from './home/setsSort';
+import { CenterCourseLocked, CenterCourseNotes } from '@/components/home/CenterCourseCards';
+import { centerEntryOfBook, isCenterOpen } from '@/services/centerBooks';
 import { pickCardsForGame } from './home/pickCardsForGame';
 import { styles } from './home/styles';
 import { useCourseRemoval } from './home/useCourseRemoval';
@@ -128,10 +146,50 @@ import { LeaveCourseDialog } from './home/components/LeaveCourseDialog';
 import { DeleteCourseDialog } from './home/components/DeleteCourseDialog';
 import { EditCourseDialog } from './home/components/EditCourseDialog';
 import { StreakDialog } from './home/components/StreakDialog';
+import { FreezeNoticeDialog } from './home/components/FreezeNoticeDialog';
+import { useFreezeNoticeOnHome } from './home/useFreezeNoticeOnHome';
+import { isFreezeNoticeSeen, pickFreezeNotice, type FreezeNotice } from '@/services/freezeNotice';
 import { HomeEmptyState } from './home/components/HomeEmptyState';
 import { SetsSectionHeader } from './home/components/SetsSectionHeader';
 import { HomeHeader } from './home/components/HomeHeader';
+import { useStartTasks } from './home/useStartTasks';
+import { StartTasksStack } from '@/components/home/StartTasksStack';
+import { JoinTeacherCard } from '@/components/home/JoinTeacherCard';
+import { NewFeatureCard } from '@/components/home/NewFeatureCard';
+import { KnownWordsRow } from '@/components/home/KnownWordsRow';
+import { TeacherStartSection } from '@/components/home/TeacherStartSection';
+import { createTeacherStarterCourse } from '@/services/teacherStarterCourse';
+import { useTeacherStartStore, type TeacherTaskId } from '@/services/teacherStart';
+import {
+  MILESTONE_DAYS,
+  chaptersComparison,
+  countKnownWords,
+  goalProgressLine,
+  knownCards,
+  studyDay,
+} from '@/utils/knownWords';
+import { ExtraLanguageCard } from '@/components/home/ExtraLanguageCard';
+import { issueExtraStarterSet } from '@/services/starterSetIssue';
+import { useDailyHighlight } from './home/useDailyHighlight';
+import type { HighlightId } from '@/services/dailyHighlight';
+import { closeJoinTeacherCard, shouldShowJoinTeacherCard } from '@/services/joinTeacherCard';
+import { WidgetHowToSheet } from '@/components/widget/WidgetHowToSheet';
 import { TeacherBanner } from './home/components/TeacherBanner';
+import { TeacherLessonCard } from './home/components/TeacherLessonCard';
+import { useTeacherCourseData } from './home/useTeacherCourseData';
+
+/** «Сегодня» из ответа сервера; старый сервер полей не отдаёт — null, остаётся прежний текст */
+function todayDayOf(stats: UserStats) {
+  if (typeof stats.today_counted !== 'boolean') return null;
+  return {
+    counted: stats.today_counted,
+    left: stats.today_left ?? 0,
+    need: stats.today_need ?? null,
+  };
+}
+
+/** Предмет «Языки» в каталоге библиотеки (database/migrations/040_library_catalog.sql) */
+const LIBRARY_LANGUAGES_SLUG = 'languages';
 
 export function HomeScreen({ navigation, route }: any) {
   const colors = useThemeColors();
@@ -173,6 +231,14 @@ export function HomeScreen({ navigation, route }: any) {
   const [streakModalVisible, setStreakModalVisible] = useState(false);
   // Заморозки серии в запасе (план §3.5); null — ещё не загружено
   const [streakFreezes, setStreakFreezes] = useState<number | null>(null);
+  // «Заморозка спасла серию» (plan/new/streak_freeze_display.md, Freeze 4)
+  const [freezeCandidate, setFreezeCandidate] = useState<FreezeNotice | null>(null);
+  // Засчитан ли сегодня и сколько ещё — по серверу (Freeze 6); null — старый сервер или нет сети
+  const [todayDay, setTodayDay] = useState<{
+    counted: boolean;
+    left: number;
+    need: 'review' | 'any' | null;
+  } | null>(null);
   const [buyingFreeze, setBuyingFreeze] = useState(false);
   // Сразу — сохранённое с прошлого раза; свежее с сервера подменит в useFocusEffect ниже
   const [todayBackendCards, setTodayBackendCards] = useState<number | null>(
@@ -213,12 +279,17 @@ export function HomeScreen({ navigation, route }: any) {
   const isTeacher = useSettingsStore((s) => s.isTeacher);
   const fetchIsTeacher = useSettingsStore((s) => s.fetchIsTeacher);
   const [joinByCodeVisible, setJoinByCodeVisible] = useState(false);
+  // Код учебного центра из «Ввести код» (plan/new/center_books.md, Center 5)
+  const [centerCode, setCenterCode] = useState<string | null>(null);
   const [addByLinkVisible, setAddByLinkVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Потянуть вниз — подтянуть изменения в курсах учителя (новые наборы, карточки, юниты)
+  // Потянуть вниз — подтянуть изменения в курсах учителя (новые наборы, карточки, юниты),
+  // а у учителя в своём курсе — ещё учеников и прогресс группы (Teacher 5)
+  const [teacherRefreshTick, setTeacherRefreshTick] = useState(0);
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
+    setTeacherRefreshTick((t) => t + 1);
     try {
       await DatabaseService.syncStudentCourses();
     } finally {
@@ -536,6 +607,7 @@ export function HomeScreen({ navigation, route }: any) {
                 lastActiveDate: stats.last_active_date,
               });
               setStreakFreezes(stats.streak_freezes);
+              setTodayDay(todayDayOf(stats));
             }
           }
         })
@@ -551,7 +623,62 @@ export function HomeScreen({ navigation, route }: any) {
   // Courses store
   const courses = useCoursesStore((s) => s.courses);
   const activeCourseId = useCoursesStore((s) => s.activeCourseId);
+
+  // Задания учителя у ученика (plan/done/teacher_cabinet.md, Teacher 26): есть задание в этом курсе —
+  // карточка задания вместо «Урока дня», набор задания в списке — янтарный с «до: …»
+  const homeworkItems = useHomeworkStore((s) => s.items);
+  useFocusEffect(
+    useCallback(() => {
+      if (TEACHER_HOMEWORK_ENABLED && isTeacher === false) {
+        useHomeworkStore
+          .getState()
+          .load()
+          .catch(() => {});
+      }
+    }, [isTeacher])
+  );
+  const courseHomework = useMemo(
+    () =>
+      TEACHER_HOMEWORK_ENABLED && isTeacher === false && activeCourseId
+        ? homeworkItems.filter((h) => h.courseId === activeCourseId && !h.submitted)
+        : [],
+    [homeworkItems, isTeacher, activeCourseId]
+  );
+  const activeHomework = useMemo(() => nearestActiveHomework(courseHomework), [courseHomework]);
+  const homeFocused = useIsFocused();
+  useHomeworkDoneRedirect(navigation, isTeacher === false && homeFocused);
+  /** setId → срок ближайшего задания с этим набором */
+  const homeworkDueBySet = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const h of [...courseHomework].sort((a, b) => Date.parse(b.dueAt) - Date.parse(a.dueAt))) {
+      for (const setId of h.setIds) out[setId] = h.dueAt;
+    }
+    return out;
+  }, [courseHomework]);
   const setActiveCourse = useCoursesStore((s) => s.setActiveCourse);
+
+  // Курс книги учебного центра (plan/new/center_books.md, этап 7): та же главная, что у любого
+  // курса; юниты — по порядку книги, доступ центра — карточки CenterCourse*
+  const activeBookId = useMemo(
+    () => courses.find((c) => c.id === activeCourseId)?.sourceBookId ?? null,
+    [courses, activeCourseId]
+  );
+  const centerData = useCenterStore((s) => s.data);
+  const bookEntry = useMemo(
+    () => (activeBookId ? centerEntryOfBook(centerData, activeBookId) : null),
+    [centerData, activeBookId]
+  );
+  const bookClosed = !!bookEntry && !isCenterOpen(bookEntry.center);
+  const setsComparator = activeBookId ? byUnitNumber : SETS_COMPARATORS[setsSort];
+
+  // Книга добавлена из «Библиотеки»: главная на новом курсе, боковое меню открывается само
+  const openCourseId: string | undefined = route?.params?.openCourseId;
+  useEffect(() => {
+    if (!openCourseId) return;
+    setActiveCourse(openCourseId);
+    setDrawerOpen(true);
+    navigation.setParams({ openCourseId: undefined });
+  }, [openCourseId, setActiveCourse, navigation]);
   const createCourse = useCoursesStore((s) => s.createCourse);
   const renameCourse = useCoursesStore((s) => s.renameCourse);
   const deleteCourse = useCoursesStore((s) => s.deleteCourse);
@@ -573,7 +700,10 @@ export function HomeScreen({ navigation, route }: any) {
       }),
     []
   );
+  // Серию считает сервер (plan/new/streak_freeze_display.md): свой подсчёт по «≥ 10 карточек» —
+  // только для старого сервера без streak_counted, иначе он рисовал серию из незасчитанных дней
   const computedStreak = useMemo(() => {
+    if (weekActivity.some((a) => typeof a.streak_counted === 'boolean')) return 0;
     const activeDates = new Set(
       weekActivity.filter((a) => a.cards_studied >= 10).map((a) => a.local_date)
     );
@@ -597,6 +727,14 @@ export function HomeScreen({ navigation, route }: any) {
     return Math.min(100, Math.round((cardsLearned / dailyGoal) * 100));
   }, [dailyGoal, cardsLearned]);
   const streakSupportText = useMemo(() => {
+    // Сервер сказал, засчитан ли сегодня (Freeze 6): без «серия продлена», пока это не так
+    if (todayDay) {
+      if (todayDay.counted) return `День засчитан. Серия ${formatDays(streakValue)}`;
+      const cards = `${todayDay.left} ${pluralize(todayDay.left, 'карточка', 'карточки', 'карточек')}`;
+      return todayDay.need === 'review'
+        ? `Ещё ${cards} на повторение — и день засчитан`
+        : `Ещё ${cards} — и день засчитан`;
+    }
     const remaining = Math.max(dailyGoal - cardsLearned, 0);
     if (goalProgress >= 10) {
       return `Отлично! Цель на сегодня выполнена — ${cardsLearned} из ${dailyGoal}. Серия продлена!`;
@@ -608,7 +746,7 @@ export function HomeScreen({ navigation, route }: any) {
       return `Осталось всего ${remaining} — ты почти у цели! Ещё чуть-чуть и серия продлена.`;
     }
     return `Хорошее начало! Осталось ${remaining} ${pluralize(remaining, 'слово', 'слова', 'слов')} до цели. Продолжай в том же духе!`;
-  }, [goalProgress, dailyGoal, cardsLearned]);
+  }, [todayDay, formatDays, streakValue, goalProgress, dailyGoal, cardsLearned]);
 
   // Id известных курсов: набор, чей курс пропал, показываем в «Моих наборах» (isSetInMySets)
   const courseIdSet = useMemo(() => new Set(courses.map((c) => c.id)), [courses]);
@@ -653,8 +791,8 @@ export function HomeScreen({ navigation, route }: any) {
   // Урок дня: новые слова — из наборов открытого курса в порядке списка (без учёта поиска),
   // повторение — из всех наборов: иначе слова других курсов не повторялись бы, пока курс закрыт
   const lessonNewSets = useMemo(
-    () => [...filteredSets].sort(SETS_COMPARATORS[setsSort]),
-    [filteredSets, setsSort]
+    () => [...filteredSets].sort(setsComparator),
+    [filteredSets, setsComparator]
   );
   const lessonSets = useMemo(() => {
     const inCourse = new Set(lessonNewSets.map((set) => set.id));
@@ -764,6 +902,14 @@ export function HomeScreen({ navigation, route }: any) {
       const { lessonSets: sets, cardsBySet: bySet, cardsMap: map } = lessonInputsRef.current;
       useLessonStore.getState().ensureToday(countWaitingReview(sets, bySet, map, Date.now()));
     }, [hasLessonCards])
+  );
+
+  // Книги учебного центра (plan/new/center_books.md, этап 7): доступ и полка «Другие книги» —
+  // кэш сразу, свежее — с сервера
+  useFocusEffect(
+    useCallback(() => {
+      useCenterStore.getState().refresh();
+    }, [])
   );
 
   // Аналитика (plan/done/home_redesign.md, 0.2): что главная предлагала в момент захода — один раз за заход,
@@ -896,6 +1042,7 @@ export function HomeScreen({ navigation, route }: any) {
     courseMenuOpen !== null ||
     isEditModalVisible ||
     joinByCodeVisible ||
+    centerCode !== null ||
     addByLinkVisible ||
     setMenuTarget !== null ||
     focusSheetVisible ||
@@ -904,9 +1051,13 @@ export function HomeScreen({ navigation, route }: any) {
     leaveModalCourseId !== null ||
     inviteModalCourseId !== null;
 
-  // «Вышла новая версия» (plan/new/app_update_prompt.md, Update 4) — до «Что нового»: его эффект
+  // «Вышла новая версия» (plan/done/app_update_prompt.md, Update 4) — до «Что нового»: его эффект
   // занимает очередь первым, и «Что нового» не откроется раньше
   useAppUpdateOnHome({ ready: isTeacher !== null, blocked: homeOverlayOpen });
+  const freezeNotice = useFreezeNoticeOnHome({
+    candidate: isTeacher !== null ? freezeCandidate : null,
+    blocked: homeOverlayOpen,
+  });
 
   // «Что нового» после обновления (plan/new/whats_new.md, News 3) — ждёт, пока на главной закрыты свои окна
   const whatsNew = useWhatsNewOnHome({
@@ -980,7 +1131,8 @@ export function HomeScreen({ navigation, route }: any) {
   const [lastWeekBoard, setLastWeekBoard] = useState<CourseLeaderboard | null>(null);
   useFocusEffect(
     useCallback(() => {
-      if (!activeCourseId || isTeacher !== false) {
+      // Курс книги центра — личный, участников нет: рейтинга нет
+      if (!activeCourseId || isTeacher !== false || activeBookId) {
         setLeaderboard(null);
         setLastWeekBoard(null);
         return;
@@ -1001,7 +1153,7 @@ export function HomeScreen({ navigation, route }: any) {
       return () => {
         active = false;
       };
-    }, [activeCourseId, isTeacher])
+    }, [activeCourseId, isTeacher, activeBookId])
   );
 
   const ratingTeaser = useMemo(() => {
@@ -1103,6 +1255,118 @@ export function HomeScreen({ navigation, route }: any) {
     };
   }, [activeCourseId, leaderboard, lastWeekBoard]);
 
+  // Новый набор из фото (Start 3.5): набора ещё нет, он создастся на проверке. Языки — как у
+  // стартового набора или первого своего набора
+  const openPhotoImport = useCallback(
+    (fromSetId?: string | null) => {
+      const source =
+        (fromSetId ? useSetsStore.getState().getSet(fromSetId) : undefined) ?? filteredSets[0];
+      navigation.navigate('ImportFiles', {
+        setId: '',
+        newSet: {
+          languageFrom: source?.languageFrom ?? 'en',
+          languageTo: source?.languageTo ?? 'ru',
+        },
+      });
+    },
+    [navigation, filteredSets]
+  );
+
+  const [courseHint, setCourseHint] = useState(false);
+
+  // Задание «Добавь набор из библиотеки» (Start 3.8): сразу изучаемый язык и уровень A1.
+  // Языка нет в библиотеке — задание не показываем (пока не знаем — тоже)
+  const starterSetIdForTasks = useStartTasksStore((st) => st.starterSetId);
+  const studiedLanguage =
+    (starterSetIdForTasks
+      ? useSetsStore.getState().getSet(starterSetIdForTasks)?.languageFrom
+      : undefined) ?? filteredSets[0]?.languageFrom;
+  const librarySubject = useCatalogStore((st) => st.subjects[LIBRARY_LANGUAGES_SLUG]);
+  const libraryHasLanguage =
+    !!studiedLanguage && !!librarySubject?.data.tracks.some((t) => t.key === studiedLanguage);
+  useEffect(() => {
+    if (isTeacher === false) useCatalogStore.getState().fetchSubject(LIBRARY_LANGUAGES_SLUG);
+  }, [isTeacher]);
+  const openLibraryForTask = useCallback(() => {
+    if (studiedLanguage) {
+      const all =
+        StorageService.getObject<
+          Record<string, { track: string | null; levels: Record<string, string> }>
+        >(STORAGE_KEYS.LIBRARY_SELECTION) ?? {};
+      const entry = all[LIBRARY_LANGUAGES_SLUG] ?? { track: null, levels: {} };
+      all[LIBRARY_LANGUAGES_SLUG] = {
+        track: studiedLanguage,
+        levels: { ...entry.levels, [studiedLanguage]: entry.levels[studiedLanguage] ?? 'A1' },
+      };
+      StorageService.setObject(STORAGE_KEYS.LIBRARY_SELECTION, all);
+    }
+    navigation.navigate('LibrarySubject', { slug: LIBRARY_LANGUAGES_SLUG, title: 'Языки' });
+  }, [navigation, studiedLanguage]);
+
+  // «Подключиться к учителю» (Start 3.6): ответил «Да» на онбординге и ещё не в курсе учителя
+  const [joinCardClosed, setJoinCardClosed] = useState(false);
+  const showJoinTeacher =
+    isTeacher === false &&
+    !joinCardClosed &&
+    shouldShowJoinTeacherCard(courses.some((c) => c.isStudentCourse));
+
+  // «Начало пути» — только у ученика (plan/new/new_user_activation.md, Start 3.2)
+  const playStartTaskReward = useCallback((from: { x: number; y: number }) => {
+    diamondRewardRef.current?.collect(from);
+  }, []);
+  const startTasks = useStartTasks({
+    navigation,
+    enabled: isTeacher === false,
+    fallbackSetId: filteredSets[0]?.id ?? null,
+    onCourse: () => {
+      // Боковое меню с раскрытой формой нового курса и объяснением (Start 3.7)
+      setCourseHint(true);
+      setDrawerOpen(true);
+      setTimeout(() => setIsCreatingCourse(true), 350);
+    },
+    onPhoto: (starterId) => openPhotoImport(starterId),
+    onLibrary: () => openLibraryForTask(),
+    playReward: playStartTaskReward,
+  });
+
+  // «Новое» — одна фича в день после урока (Start 4.2)
+  const daily = useDailyHighlight(isTeacher === false);
+  const highlightSetId =
+    lessonPlan.focusSetId ?? starterSetIdForTasks ?? filteredSets[0]?.id ?? null;
+  // «Ты знаешь N слов» (Start 5.3): у ученика, когда есть хоть одно выученное слово
+  const knownWords = isTeacher === false ? countKnownWords() : 0;
+  const startedAtForWords = useStartTasksStore((st) => st.startedAt);
+  const dayOfStudy = studyDay(startedAtForWords);
+  const learningGoal = useStartTasksStore((st) => st.learningGoal);
+  // На 7-й и 30-й день — сравнение с учебником, в остальные — подпись по цели (Start 5.4)
+  const wordsComparison =
+    (dayOfStudy !== null && MILESTONE_DAYS.includes(dayOfStudy)
+      ? chaptersComparison(knownWords)
+      : null) ?? (knownWords > 0 ? goalProgressLine(learningGoal, knownWords, knownCards()) : null);
+  const handleHighlight = useCallback(
+    (id: HighlightId) => {
+      daily.dismiss(id, true);
+      if (id === 'photo') openPhotoImport(starterSetIdForTasks);
+      else if (id === 'widget') startTasks.openWidgetSheet();
+      else if (id === 'voice') startTasks.handleStartTask('voice');
+      else if (id === 'week') openLibraryForTask();
+      else if (highlightSetId) {
+        navigation.navigate(id === 'builder' ? 'WordBuilder' : 'ContextFill', {
+          setId: highlightSetId,
+        });
+      }
+    },
+    [
+      daily,
+      openPhotoImport,
+      starterSetIdForTasks,
+      startTasks,
+      openLibraryForTask,
+      highlightSetId,
+      navigation,
+    ]
+  );
+
   // Поиск и сортировка по текущему списку наборов
   const visibleSets = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -1114,8 +1378,8 @@ export function HomeScreen({ navigation, route }: any) {
           const tags = (set.tags || []).join(' ').toLowerCase();
           return title.includes(query) || desc.includes(query) || tags.includes(query);
         });
-    return [...found].sort(SETS_COMPARATORS[setsSort]);
-  }, [filteredSets, searchQuery, setsSort]);
+    return [...found].sort(setsComparator);
+  }, [filteredSets, searchQuery, setsComparator]);
 
   const setsSortShortLabel = SETS_SORT_OPTIONS.find((o) => o.key === setsSort)?.short;
 
@@ -1125,6 +1389,24 @@ export function HomeScreen({ navigation, route }: any) {
     const course = courses.find((c) => c.id === activeCourseId);
     return course?.title || 'этот курс';
   }, [activeCourseId, courses]);
+
+  // Учитель в своём курсе (plan/done/teacher_cabinet.md, Teacher 1): в шапке название курса вместо
+  // серии, алмазов и рейтинга. «Мои наборы» и чужой курс, где учитель сам ученик, — как у ученика.
+  const teacherCourseTitle = useMemo(() => {
+    if (!TEACHER_CABINET_ENABLED || isTeacher !== true || activeCourseId === null) return null;
+    const course = courses.find((c) => c.id === activeCourseId);
+    if (!course || course.isStudentCourse) return null;
+    return course.title || 'Курс';
+  }, [isTeacher, activeCourseId, courses]);
+
+  // Колокольчик учителя (Teacher 49): непросмотренные уведомления; без флага этапа 4 не грузится
+  const teacherBell = useTeacherBell(teacherCourseTitle !== null);
+
+  // Ученики и прогресс группы по наборам — для карточки урока и строк наборов (Teacher 4–5)
+  const teacherCourse = useTeacherCourseData(
+    teacherCourseTitle !== null ? activeCourseId : null,
+    teacherRefreshTick
+  );
 
   const openLeaderboard = useCallback(
     (week: 'current' | 'previous') => {
@@ -1288,6 +1570,17 @@ export function HomeScreen({ navigation, route }: any) {
                 longestStreak: stats.longest_streak,
                 lastActiveDate: stats.last_active_date,
               });
+              setTodayDay(todayDayOf(stats));
+              setFreezeCandidate(
+                pickFreezeNotice({
+                  todayKey: StreakService.getLocalDateKey(),
+                  freezeUsed: stats.freeze_used,
+                  week,
+                  streak: stats.current_streak,
+                  freezesLeft: stats.streak_freezes,
+                  isSeen: isFreezeNoticeSeen,
+                })
+              );
             }
           }
         } catch {
@@ -1344,10 +1637,27 @@ export function HomeScreen({ navigation, route }: any) {
     [setActiveCourse]
   );
 
+  // «Новый курс»: у учителя — окно с учебником и расписанием (plan/done/teacher_cabinet.md, Teacher 6),
+  // у ученика курс — просто папка, поле ввода в шторке, как раньше
+  const [newCourseSheetVisible, setNewCourseSheetVisible] = useState(false);
+  const [joinCodeCourse, setJoinCodeCourse] = useState<{ id: string; title: string } | null>(null);
   const handleStartCreatingCourse = useCallback(() => {
     setCourseMenuOpen(null);
+    if (TEACHER_CABINET_ENABLED && isTeacher === true) {
+      runAfterDrawerClosed(() => setNewCourseSheetVisible(true));
+      return;
+    }
     setIsCreatingCourse(true);
-  }, []);
+  }, [isTeacher, runAfterDrawerClosed]);
+  const handleNewCourseCreated = useCallback(
+    (course: { id: string; title: string }) => {
+      setNewCourseSheetVisible(false);
+      setActiveCourse(course.id);
+      // Курс создан — сразу код подключения, когда окно «Новый курс» закроется
+      setTimeout(() => setJoinCodeCourse(course), animation.sheet);
+    },
+    [setActiveCourse]
+  );
 
   const handleJoinByCodePress = useCallback(() => {
     setCourseMenuOpen(null);
@@ -1384,6 +1694,9 @@ export function HomeScreen({ navigation, route }: any) {
     createCourse(title);
     setIsCreatingCourse(false);
     setNewCourseTitle('');
+    setCourseHint(false);
+    // Задание «Создай свой курс» (plan/new/new_user_activation.md, Start 3.7)
+    useStartTasksStore.getState().complete('course');
   }, [newCourseTitle, createCourse]);
 
   const {
@@ -1565,13 +1878,67 @@ export function HomeScreen({ navigation, route }: any) {
 
   // Баннер учителя — вход в курс (ученики, приглашения, тесты, «Учебники курса»). Показывается и
   // когда в курсе ещё нет наборов: иначе в новом пустом курсе до него было не добраться.
+  // Учитель в своём курсе — карточка урока (plan/done/teacher_cabinet.md, Teacher 2); в «Мои наборы»
+  // и без курсов — прежний баннер.
+  // Первые шаги учителя (plan/new/new_user_activation.md, Start 6.1, 6.3)
+  const firstOwnCourse = courses.find((c) => !c.isStudentCourse) ?? null;
+  const handleTeacherTask = useCallback(
+    (task: TeacherTaskId) => {
+      if (task === 'demo') {
+        navigation.navigate('TeacherDemoTest');
+        return;
+      }
+      if (!firstOwnCourse) return;
+      const params = { courseId: firstOwnCourse.id, courseTitle: firstOwnCourse.title };
+      if (task === 'invite') openInviteModal(firstOwnCourse.id);
+      // Живой тест = экзамен с оценкой (plan/new/live_exam.md)
+      else if (task === 'test') navigation.navigate('ExamSetup', params);
+      else if (task === 'stats') navigation.navigate('TeacherCourseStats', params);
+    },
+    [navigation, firstOwnCourse, openInviteModal]
+  );
+  const handleCreateStarterCourse = useCallback(async () => {
+    const { subject, nativeLanguage, targetLanguage } = useTeacherStartStore.getState();
+    const course = await createTeacherStarterCourse({ subject, nativeLanguage, targetLanguage });
+    if (!course) {
+      toast.error('Не получилось создать курс — проверь интернет и попробуй ещё раз');
+      return;
+    }
+    useCoursesStore.getState().setActiveCourse(course.id);
+    toast.success('Курс готов — можно приглашать учеников и запускать тест');
+  }, []);
+  const teacherStart = (
+    <View style={styles.startTasks}>
+      <TeacherStartSection
+        hasCourse={!!firstOwnCourse}
+        onCreateStarterCourse={handleCreateStarterCourse}
+        onAction={handleTeacherTask}
+      />
+    </View>
+  );
+
+  const teacherBannerCard =
+    teacherCourseTitle !== null && activeCourseId !== null ? (
+      <TeacherLessonCard
+        colors={colors}
+        courseId={activeCourseId}
+        courseTitle={teacherCourseTitle}
+        navigation={navigation}
+        courseMembers={teacherCourse.members}
+      />
+    ) : (
+      <TeacherBanner
+        colors={colors}
+        activeCourseId={activeCourseId}
+        courses={courses}
+        navigation={navigation}
+      />
+    );
   const teacherBanner = (
-    <TeacherBanner
-      colors={colors}
-      activeCourseId={activeCourseId}
-      courses={courses}
-      navigation={navigation}
-    />
+    <>
+      {teacherStart}
+      {teacherBannerCard}
+    </>
   );
 
   // Карточка ежедневного челленджа: играть → "Забрать" 10 алмазов → "Получено" до завтра
@@ -1653,6 +2020,16 @@ export function HomeScreen({ navigation, route }: any) {
           diamondCountAnimStyle={diamondCountAnimStyle}
           ratingTeaser={ratingTeaser}
           openLeaderboard={openLeaderboard}
+          teacherCourseTitle={teacherCourseTitle}
+          teacherBell={
+            teacherBell.enabled
+              ? {
+                  unseen: teacherBell.unseen,
+                  onPress: () =>
+                    (navigation?.getParent?.() ?? navigation)?.navigate('TeacherNotifications'),
+                }
+              : null
+          }
         />
 
         <View style={styles.body}>
@@ -1673,7 +2050,16 @@ export function HomeScreen({ navigation, route }: any) {
               />
             }
           >
-            {filteredSets.length === 0 ? (
+            {/* Курс книги центра без доступа: наборы закрыты, вместо пустого курса — «Ввести новый код» */}
+            {bookEntry && bookClosed && isTeacher === false && (
+              <CenterCourseLocked
+                center={bookEntry.center}
+                bookTitle={bookEntry.book.title}
+                onEnterCode={() => setJoinByCodeVisible(true)}
+                style={styles.lessonCard}
+              />
+            )}
+            {filteredSets.length === 0 && !bookClosed ? (
               <HomeEmptyState
                 colors={colors}
                 teacherBanner={teacherBanner}
@@ -1707,12 +2093,32 @@ export function HomeScreen({ navigation, route }: any) {
                 ) : (
                   <>
                     {/* Урок дня — единственное главное действие главной (plan/done/home_redesign.md, 2.2) */}
-                    {lessonContent && (
-                      <LessonCard
-                        content={lessonContent}
-                        onPress={handleLessonPress}
-                        onSecondaryPress={openFocusSheet}
+                    {activeHomework ? (
+                      <StudentHomeworkCard
+                        homework={activeHomework}
+                        onOpen={() =>
+                          navigation.navigate('StudentHomework', { homeworkId: activeHomework.id })
+                        }
+                        onContinue={() => startHomeworkSession(navigation, activeHomework)}
                         style={styles.lessonCard}
+                      />
+                    ) : (
+                      lessonContent &&
+                      !bookClosed && (
+                        <LessonCard
+                          content={lessonContent}
+                          onPress={handleLessonPress}
+                          onSecondaryPress={openFocusSheet}
+                          style={styles.lessonCard}
+                        />
+                      )
+                    )}
+                    {bookEntry && !bookClosed && (
+                      <CenterCourseNotes
+                        center={bookEntry.center}
+                        onEnterCode={() => setJoinByCodeVisible(true)}
+                        onOpenLibrary={() => navigation.navigate('Library')}
+                        style={styles.startTasks}
                       />
                     )}
                     {pushNudgePermission && !pushNudgeClosed && (
@@ -1720,6 +2126,72 @@ export function HomeScreen({ navigation, route }: any) {
                         <PushStreakNudge
                           permission={pushNudgePermission}
                           onClose={() => setPushNudgeClosed(true)}
+                        />
+                      </View>
+                    )}
+                    {knownWords > 0 && (
+                      <View style={styles.startTasks}>
+                        <KnownWordsRow words={knownWords} comparison={wordsComparison} />
+                      </View>
+                    )}
+                    {daily.highlight && (
+                      <View style={styles.startTasks}>
+                        <NewFeatureCard
+                          id={daily.highlight.id}
+                          knownWords={knownWords}
+                          onAction={() => daily.highlight && handleHighlight(daily.highlight.id)}
+                          onClose={() =>
+                            daily.highlight && daily.dismiss(daily.highlight.id, false)
+                          }
+                        />
+                      </View>
+                    )}
+                    {daily.extraLanguage && (
+                      <View style={styles.startTasks}>
+                        <ExtraLanguageCard
+                          language={daily.extraLanguage}
+                          onAdd={async () => {
+                            const language = daily.extraLanguage;
+                            const starter = starterSetIdForTasks
+                              ? useSetsStore.getState().getSet(starterSetIdForTasks)
+                              : undefined;
+                            if (!language || !currentUserId) return;
+                            Analytics.momentHintTapped('extra_language');
+                            const created = await issueExtraStarterSet({
+                              userId: currentUserId,
+                              nativeLanguage: starter?.languageTo ?? 'ru',
+                              language,
+                            });
+                            daily.dismissLanguage(language);
+                            if (created) {
+                              useStartTasksStore.getState().load();
+                              toast.success('Набор «Первые слова» добавлен');
+                            } else {
+                              toast.error('Не получилось добавить набор — попробуй позже');
+                            }
+                          }}
+                          onClose={() =>
+                            daily.extraLanguage && daily.dismissLanguage(daily.extraLanguage)
+                          }
+                        />
+                      </View>
+                    )}
+                    {showJoinTeacher && (
+                      <View style={styles.startTasks}>
+                        <JoinTeacherCard
+                          onJoin={() => setJoinByCodeVisible(true)}
+                          onClose={() => {
+                            closeJoinTeacherCard();
+                            setJoinCardClosed(true);
+                          }}
+                        />
+                      </View>
+                    )}
+                    {isTeacher === false && (
+                      <View ref={startTasks.stackRef} collapsable={false} style={styles.startTasks}>
+                        <StartTasksStack
+                          hidden={libraryHasLanguage ? [] : ['library']}
+                          onAction={startTasks.handleStartTask}
                         />
                       </View>
                     )}
@@ -1743,7 +2215,7 @@ export function HomeScreen({ navigation, route }: any) {
                   activeCourseTitle={activeCourseTitle}
                   openSetsMenu={openSetsMenu}
                   setSortSheetVisible={setSortSheetVisible}
-                  setsSort={setsSort}
+                  setsSort={activeBookId ? DEFAULT_SETS_SORT : setsSort}
                   setsSortShortLabel={setsSortShortLabel}
                 />
 
@@ -1788,6 +2260,15 @@ export function HomeScreen({ navigation, route }: any) {
                       reviewStats={reviewStats}
                       setSetMenuTarget={setSetMenuTarget}
                       navigation={navigation}
+                      homeworkDue={homeworkDueBySet[set.id] ?? null}
+                      groupProgress={
+                        teacherCourse.members?.length && teacherCourse.setProgress?.[set.id]
+                          ? {
+                              total: teacherCourse.members.length,
+                              ...teacherCourse.setProgress[set.id],
+                            }
+                          : null
+                      }
                     />
                   ))}
                   {/* Создание набора — в конце списка, у самих наборов (plan/done/home_redesign.md, 4.2) */}
@@ -1837,6 +2318,7 @@ export function HomeScreen({ navigation, route }: any) {
           onCancelEditingTitle={cancelCourseEdit}
           editInputRef={editInputRef}
           isCreatingCourse={isCreatingCourse}
+          showCourseHint={courseHint}
           newCourseTitle={newCourseTitle}
           onChangeNewCourseTitle={setNewCourseTitle}
           onStartCreatingCourse={handleStartCreatingCourse}
@@ -1890,6 +2372,20 @@ export function HomeScreen({ navigation, route }: any) {
         />
 
         {/* Invite Students Modal */}
+        <NewCourseSheet
+          visible={newCourseSheetVisible}
+          onClose={() => setNewCourseSheetVisible(false)}
+          onCreated={handleNewCourseCreated}
+        />
+        {joinCodeCourse && (
+          <CourseJoinCodeDialog
+            visible
+            courseId={joinCodeCourse.id}
+            courseTitle={joinCodeCourse.title}
+            onClose={() => setJoinCodeCourse(null)}
+          />
+        )}
+
         <InviteStudentsDialog
           inviteModalCourseId={inviteModalCourseId}
           closeInviteModal={closeInviteModal}
@@ -1943,6 +2439,10 @@ export function HomeScreen({ navigation, route }: any) {
             setSetsMenuVisible(false);
             Analytics.homeAction('create_set');
             navigation?.navigate('SetEditor', {});
+          }}
+          onCreateFromPhoto={() => {
+            setSetsMenuVisible(false);
+            openPhotoImport();
           }}
           onAddByLink={() =>
             afterSetsMenu(() => {
@@ -2005,10 +2505,28 @@ export function HomeScreen({ navigation, route }: any) {
             setActiveCourse(courseId);
             setDrawerOpen(false);
           }}
+          onCenterCode={(code) => {
+            // Окно центра — после того, как уедет окно ввода кода
+            setJoinByCodeVisible(false);
+            setTimeout(() => setCenterCode(code), animation.sheet);
+          }}
           onDismiss={() => setJoinByCodeVisible(false)}
+        />
+        <CenterInviteModal
+          code={centerCode}
+          via="menu"
+          onJoined={(info) => {
+            setCenterCode(null);
+            // Курс книги уже есть (продление) — главная сама переключилась на него; нет — выбор книги
+            openCenterBooks((screen, params) => {
+              if (screen === 'CenterBookPick') navigation.navigate('CenterBookPick', params);
+            }, info.organization.id);
+          }}
+          onDismiss={() => setCenterCode(null)}
         />
 
         {/* Streak Modal */}
+        <FreezeNoticeDialog {...freezeNotice} />
         <StreakDialog
           streakModalVisible={streakModalVisible}
           closeStreakModal={closeStreakModal}
@@ -2057,6 +2575,7 @@ export function HomeScreen({ navigation, route }: any) {
           moveTargetCourses={moveTargetCourses}
           navigation={navigation}
         />
+        <WidgetHowToSheet visible={startTasks.widgetSheet} onClose={startTasks.closeWidgetSheet} />
         <DiamondReward
           ref={diamondRewardRef}
           targetPosition={diamondTargetPos}

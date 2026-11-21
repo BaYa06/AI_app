@@ -21,6 +21,9 @@ const KNOWN: Array<[RegExp, string]> = [
   [/test already started/i, 'Тест уже начался.'],
   [/test not active/i, 'Тест сейчас не идёт.'],
   [/session not found/i, 'Тест не найден.'],
+  [/update the app/i, 'Чтобы пройти этот экзамен, обнови приложение.'],
+  [/time is up/i, 'Время экзамена вышло.'],
+  [/no other words/i, 'Других подходящих слов нет.'],
   [
     /network request failed|failed to fetch|aborted/i,
     'Нет соединения. Проверь интернет и попробуй снова.',

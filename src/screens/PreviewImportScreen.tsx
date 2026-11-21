@@ -14,6 +14,7 @@ import {
   useCoursesStore,
   useSetsStore,
   useThemeColors,
+  useStartTasksStore,
 } from '@/store';
 import { TOP_LANGUAGES, alpha, borderRadius, iconSize, screenPadding, spacing } from '@/constants';
 import {
@@ -541,6 +542,7 @@ export function PreviewImportScreen({ navigation, route }: Props) {
           languageFrom,
           languageTo,
           kind,
+          origin: route.params.origin ?? 'ai',
           courseId,
         });
         setModalVisible(false);
@@ -551,12 +553,14 @@ export function PreviewImportScreen({ navigation, route }: Props) {
           languageTo,
           subject: kind === 'subject',
         });
+        // Задание «Сделай набор из фото» (plan/new/new_user_activation.md, Start 3.5)
+        useStartTasksStore.getState().complete('photo');
       } catch (e) {
         setProgress(null);
         toast.error(describeError(e, 'Не удалось сохранить набор'));
       }
     },
-    [addSet, save]
+    [addSet, save, route.params.origin]
   );
 
   /** «Догенерировать»: примеры для уже добавленных карточек без них */

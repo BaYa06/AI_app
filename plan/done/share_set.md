@@ -95,7 +95,7 @@ plan/new/new_user_activation.md кладёт новичку стартовый �
 ## Шаги
 
 ### Share 1 — сервер: таблицы и API ✅
-Совместимость по plan/new/release_safety.md (Release 2): только новые таблицы.
+Совместимость по plan/done/release_safety.md (Release 2): только новые таблицы.
 - `_db-init.js`:
   - `set_shares (code TEXT PK, set_id UUID → card_sets ON DELETE CASCADE, owner_id UUID, created_at, disabled_at NULL, views INT DEFAULT 0, imports INT DEFAULT 0)`, уникальный индекс по `set_id` где `disabled_at IS NULL`;
   - `set_share_imports (user_id, code, course_id NULL, set_id_created, created_at, UNIQUE NULLS NOT DISTINCT (user_id, code, course_id))`;
@@ -155,7 +155,7 @@ plan/new/new_user_activation.md кладёт новичку стартовый �
 ### Share 4 — приложение: открытие ссылки и превью ✅
 Макет (согласован 30.10.2026, дизайн доводим при реализации): https://claude.ai/artifact/4tsWywJmzW97fbxApmwSNd —
 превью, «Набор добавлен», меню «…». Цвета, шрифты, отступы — только токены брендбука; шапка и
-нижняя панель с кнопкой — стекло из plan/new/liquid_glass.md (Glass 5, 6).
+нижняя панель с кнопкой — стекло из plan/done/liquid_glass.md (Glass 5, 6).
 - `App.tsx`: разбор `https://<домен>/s/<code>`, `flashly://share/<code>` и на вебе `/s/<code>`, `?share=<code>` — по образцу приглашений (`pendingShareCode`).
 - Экран `SharedSetPreview` (переиспользовать вёрстку `SharedSetDetailScreen` — сейчас там мок-данные): шапка, языки, число карточек, список карточек, кнопка **«Добавить все карточки»**, «…» → «Пожаловаться», «Заблокировать автора».
 - Под заголовком — **имя автора** (`display_name`; если пусто — «Пользователь Flashly»).
@@ -200,7 +200,7 @@ plan/new/new_user_activation.md кладёт новичку стартовый �
 - На потом (не в этом плане): «Добавить слова по ссылке» внутри своего набора — слить карточки, а не создавать копию.
 
 ### Share 6 — жалобы и блокировки ✅
-**iOS — нативно на Swift**, как в последних версиях (plan/new/liquid_glass.md: Glass 0, 7), чтобы
+**iOS — нативно на Swift**, как в последних версиях (plan/done/liquid_glass.md: Glass 0, 7), чтобы
 на iOS 26 меню и лист были системными, со стеклом и плавной пружиной:
 - **Меню «…»** — `UIMenu` на кнопке шапки (системное стеклянное меню, как в Glass 7): «Пожаловаться»
   (`Flag`), «Заблокировать автора» (`Ban`, `.destructive`).

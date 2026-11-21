@@ -23,7 +23,16 @@ import { log } from './_log.js';
  * POST /api/books?action=fork-set            { setId, courseId? }  копия официального набора в свой обычный набор
  * GET  /api/books?action=official-sets       ?setIds=a,b           официальные наборы + карточки с моим прогрессом:
  *                                                                   запрошенные + открытые в моих курсах (я учитель
- *                                                                   или ученик) + те, что я уже начинал учить
+ *                                                                   или ученик) + все юниты моего курса книги
+ *                                                                   центра (этап 7) + те, что я уже начинал учить
+ * GET  /api/books?action=org-info            ?code=                центр по коду без активации     ┐ книги учебного
+ * POST /api/books?action=org-activate        { code }              активация кода центра           │ центра,
+ * GET  /api/books?action=my-orgs                                   мои центры, их книги, мои книги │ _handlers/center/
+ * POST /api/books?action=my-book             { bookId, unitId?, active?, remove? }                 │ student.js
+ * POST /api/books?action=book-course         { bookId }            книга целиком = мой курс        ┘ (этап 7)
+ * GET  /api/books?action=org-teacher-info    ?token=               центр по ссылке учителей        ┐ учителя
+ * POST /api/books?action=org-teacher-join    { token }             стать учителем центра           │ центра,
+ * GET  /api/books?action=teacher-orgs                              полки «Книги <центр>»           ┘ teacher.js
  *
  * План юнитов: строка в course_units есть только у юнитов, которые хоть раз переключали.
  * Нет строки = юнит закрыт. Поэтому юниты, добавленные в книгу позже, в уже подключённых
@@ -51,12 +60,25 @@ export default async function handler(req, res) {
   const sql = neon(process.env.POSTGRES_URL);
   const { action } = req.query;
 
-  const GET_ACTIONS = new Set(['list-books', 'book-detail', 'course-plan', 'official-sets']);
+  const GET_ACTIONS = new Set([
+    'list-books',
+    'book-detail',
+    'course-plan',
+    'official-sets',
+    'org-info',
+    'my-orgs',
+    'org-teacher-info',
+    'teacher-orgs',
+  ]);
   const POST_ACTIONS = new Set([
     'attach-to-courses',
     'detach-from-course',
     'set-unit-open',
     'fork-set',
+    'org-activate',
+    'my-book',
+    'book-course',
+    'org-teacher-join',
   ]);
   if (GET_ACTIONS.has(action) && req.method !== 'GET')
     return res.status(405).json({ error: 'Method not allowed' });
@@ -72,6 +94,26 @@ export default async function handler(req, res) {
     if (action === 'set-unit-open') return await setUnitOpen(req, res, sql, userId);
     if (action === 'fork-set') return await forkSet(req, res, sql, userId);
     if (action === 'official-sets') return await officialSets(req, res, sql, userId);
+
+    // Учителя учебного центра (plan/new/center_books.md, Center 13–14) — модуль грузится лениво
+    if (['org-teacher-info', 'org-teacher-join', 'teacher-orgs'].includes(action)) {
+      const teacher = await import('./_handlers/center/teacher.js');
+      if (action === 'org-teacher-info')
+        return await teacher.teacherInviteInfo(req, res, sql, userId);
+      if (action === 'org-teacher-join')
+        return await teacher.teacherInviteJoin(req, res, sql, userId);
+      return await teacher.teacherOrgs(req, res, sql, userId);
+    }
+
+    // Книги учебного центра по коду (plan/new/center_books.md, Center 3) — модуль грузится лениво
+    if (['org-info', 'org-activate', 'my-orgs', 'my-book', 'book-course'].includes(action)) {
+      const center = await import('./_handlers/center/student.js');
+      if (action === 'org-info') return await center.orgInfo(req, res, sql, userId);
+      if (action === 'org-activate') return await center.orgActivate(req, res, sql, userId);
+      if (action === 'my-orgs') return await center.myOrgs(req, res, sql, userId);
+      if (action === 'book-course') return await center.bookCourse(req, res, sql, userId);
+      return await center.myBook(req, res, sql, userId);
+    }
 
     return res.status(400).json({ error: 'Unknown action' });
   } catch (error) {
@@ -99,11 +141,18 @@ async function catalogAccess(sql, userId) {
   return { admin, allBooks: admin || rows[0]?.teacher === true };
 }
 
-/** Книга, видимая вызывающему: опубликованная, либо любая — для админа. */
-async function findVisibleBook(sql, bookId, admin) {
+/**
+ * Книга, видимая вызывающему: опубликованная, либо любая — для админа. Книга учебного центра — только
+ * с доступом к центру (flashly_org_access: ученик по коду, участник центра, админ Flashly).
+ * Без доступа — как будто книги нет (404): не раскрываем, что она существует.
+ */
+async function findVisibleBook(sql, bookId, admin, userId) {
   const rows = await sql`
-    SELECT id, title, edition, level, subject, language_from, language_to, publisher, is_published, student_visible
-    FROM books WHERE id = ${bookId}::uuid AND (is_published = true OR ${admin}::boolean)
+    SELECT id, title, edition, level, subject, language_from, language_to, publisher, is_published,
+           student_visible, organization_id
+    FROM books
+    WHERE id = ${bookId}::uuid AND (is_published = true OR ${admin}::boolean)
+      AND (organization_id IS NULL OR flashly_org_access(organization_id, ${userId}::uuid))
   `;
   return rows[0] || null;
 }
@@ -141,6 +190,9 @@ async function listBooks(req, res, sql, userId) {
     FROM books b
     WHERE (b.is_published = true OR ${admin}::boolean)
       AND (${allBooks}::boolean OR b.student_visible = true)
+      -- Книги учебных центров в общем каталоге не показываем (у учителя центра — своя полка,
+      -- teacher-orgs, Center 14)
+      AND (b.organization_id IS NULL OR ${admin}::boolean)
       AND (${subject}::text IS NULL OR lower(b.subject) = lower(${subject}::text))
       AND (${level}::text IS NULL OR lower(b.level) = lower(${level}::text))
       AND (${q}::text IS NULL OR b.title ILIKE '%' || ${q}::text || '%' OR b.publisher ILIKE '%' || ${q}::text || '%')
@@ -163,8 +215,9 @@ async function bookDetail(req, res, sql, userId) {
   if (!isUuid(bookId)) return res.status(400).json({ error: 'bookId required' });
 
   const { admin, allBooks } = await catalogAccess(sql, userId);
-  const book = await findVisibleBook(sql, bookId, admin);
-  if (!book || !(allBooks || book.student_visible))
+  const book = await findVisibleBook(sql, bookId, admin, userId);
+  // Книгу центра findVisibleBook уже отдал только тому, у кого доступ к центру
+  if (!book || !(allBooks || book.student_visible || book.organization_id))
     return res.status(404).json({ error: 'Book not found' });
 
   // На старте 1 юнит = 1 набор, но отдаём массив — схема допускает несколько наборов в юните.
@@ -222,7 +275,7 @@ async function attachToCourses(req, res, sql, userId) {
   const uniqueIds = [...new Set(courseIds)];
 
   const admin = await isAdmin(sql, userId);
-  const book = await findVisibleBook(sql, bookId, admin);
+  const book = await findVisibleBook(sql, bookId, admin, userId);
   if (!book) return res.status(404).json({ error: 'Book not found' });
 
   // Все курсы должны принадлежать вызывающему — иначе не подключаем ни один.
@@ -233,12 +286,24 @@ async function attachToCourses(req, res, sql, userId) {
     return res.status(403).json({ error: 'Not the owner of all courses', reason: 'forbidden' });
   }
 
+  // Книгу центра — только участник центра, к группам не другого центра и при свободных местах
+  // для новых учеников (Center 14). Ученик центра по коду книгу к своим группам не подключит.
+  let orgTeacher = null;
+  if (book.organization_id) {
+    orgTeacher = await import('./_handlers/center/teacher.js');
+    const denied = await orgTeacher.checkOrgAttach(sql, book.organization_id, userId, uniqueIds, {
+      admin,
+    });
+    if (denied) return res.status(denied.status).json(denied.body);
+  }
+
   const inserted = await sql`
     INSERT INTO course_books (course_id, book_id)
     SELECT unnest(${uniqueIds}::uuid[]), ${bookId}::uuid
     ON CONFLICT (course_id, book_id) DO NOTHING
     RETURNING course_id
   `;
+  if (orgTeacher) await orgTeacher.markOrgCourses(sql, book.organization_id, uniqueIds);
 
   return res.status(200).json({
     ok: true,
@@ -270,6 +335,8 @@ async function detachFromCourse(req, res, sql, userId) {
   `;
   if (deleted.length === 0)
     return res.status(404).json({ error: 'Book is not attached to this course' });
+  // Последняя книга центра ушла из группы — группа снова обычная, места центра свободны
+  await (await import('./_handlers/center/teacher.js')).releaseOrgCourse(sql, courseId);
   await notifyCoursesChanged([courseId]);
   return res.status(200).json({ ok: true });
 }
@@ -312,6 +379,8 @@ async function coursePlan(req, res, sql, userId) {
     ) cs ON true
     WHERE cb.course_id = ${courseId}::uuid
       AND (${isOwner}::boolean OR (b.is_published = true AND cu.is_open = true))
+      -- Книга центра: у учителя — пока он в центре, у ученика — открытый юнит группы центра
+      AND (b.organization_id IS NULL OR flashly_unit_access(u.id, ${userId}::uuid))
     ORDER BY cb.created_at, b.title, u.sort_order, u.number
   `;
 
@@ -406,6 +475,8 @@ async function forkSet(req, res, sql, userId) {
     JOIN book_units u ON u.id = cs.unit_id
     JOIN books b ON b.id = u.book_id
     WHERE cs.id = ${setId}::uuid AND cs.is_official AND (b.is_published = true OR ${admin}::boolean)
+      -- Книги учебных центров не копируются: копию можно было бы поделить и опубликовать
+      AND b.organization_id IS NULL
   `;
   if (source.length === 0) return res.status(404).json({ error: 'Official set not found' });
 
@@ -475,6 +546,13 @@ async function officialSets(req, res, sql, userId) {
           c.user_id = ${userId}::uuid
           OR EXISTS (SELECT 1 FROM course_members m WHERE m.course_id = c.id AND m.user_id = ${userId}::uuid)
         )
+      UNION
+      -- Мой курс книги центра (этап 7): открыты все юниты, без строк course_units. Слова всё равно
+      -- только при доступе по коду — flashly_unit_access ниже
+      SELECT bu.id AS unit_id, c.id AS course_id
+      FROM courses c
+      JOIN book_units bu ON bu.book_id = c.source_book_id
+      WHERE c.user_id = ${userId}::uuid AND c.source_book_id IS NOT NULL
     )
     SELECT cs.id, cs.title, cs.description, cs.category, cs.language_from, cs.language_to,
            cs.created_at, cs.updated_at, cs.unit_id,
@@ -485,8 +563,12 @@ async function officialSets(req, res, sql, userId) {
     JOIN book_units u ON u.id = cs.unit_id
     JOIN books b ON b.id = u.book_id AND (b.is_published = true OR ${admin}::boolean)
     WHERE cs.is_official = true
+      -- Книга центра: только при доступе (по коду, в центре, открытый юнит группы центра). Начатые
+      -- юниты закрытой книги больше не приходят — прогресс в card_progress остаётся
+      AND (b.organization_id IS NULL OR flashly_unit_access(u.id, ${userId}::uuid))
       AND (
-        (cs.id = ANY(${requested}::uuid[]) AND (${allBooks}::boolean OR b.student_visible = true))
+        (cs.id = ANY(${requested}::uuid[])
+          AND (${allBooks}::boolean OR b.student_visible = true OR b.organization_id IS NOT NULL))
         OR u.id IN (SELECT unit_id FROM my_open_units)
         OR EXISTS (
           SELECT 1 FROM cards c JOIN card_progress p ON p.card_id = c.id AND p.user_id = ${userId}::uuid

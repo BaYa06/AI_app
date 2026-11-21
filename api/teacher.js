@@ -28,8 +28,26 @@ import {
   courseActivityChart,
   courseSetStats,
   setHardCards,
+  courseHardCards,
+  courseSetStudents,
   courseSetsByMembership,
 } from './_handlers/teacher/stats.js';
+import {
+  homeworkCreate,
+  homeworkList,
+  homeworkStatus,
+  homeworkCancel,
+  homeworkDue,
+  homeworkRemind,
+  homeworkExport,
+} from './_handlers/teacher/homework.js';
+
+import {
+  teacherNotifications,
+  teacherNotificationsSeen,
+} from './_handlers/teacher/notifications.js';
+
+import { reportData, reportCreate, reportRevoke, reportPdf } from './_handlers/teacher/reports.js';
 
 /**
  * API для учительских мутаций (курсы, приглашения, ростер, видимость наборов)
@@ -57,9 +75,29 @@ import {
  * GET  /api/teacher?action=course-activity-chart ?courseId=&days=
  * GET  /api/teacher?action=course-set-stats      ?courseId=
  * GET  /api/teacher?action=set-hard-cards        ?setId=&courseId=
+ * GET  /api/teacher?action=course-hard-cards     ?courseId=&days=14&limit=20 — трудные слова группы
+ * GET  /api/teacher?action=course-set-students    ?courseId=&setId= — кто прошёл / начал / не открывал
  * GET  /api/teacher?action=course-sets-by-membership ?courseId= (ученик — курс, в котором состоит)
- * POST /api/teacher?action=remind-review       { courseId, studentId? } — пуш «повтори слова»
- *                                               (всему классу — не чаще раза в сутки)
+ * POST /api/teacher?action=remind-review       { courseId, studentId?, studentIds? } — пуш «повтори
+ *                                               слова» (всему классу — не чаще раза в сутки;
+ *                                               studentIds — каждому не чаще раза в 20 ч)
+ * Задания (plan/done/teacher_cabinet.md, этап 2):
+ * POST /api/teacher?action=homework-create  { courseId, title, cardIds, dueAt, minScore?, userIds? }
+ * GET  /api/teacher?action=homework-list    ?courseId=
+ * GET  /api/teacher?action=homework-status  ?homeworkId=
+ * GET  /api/teacher?action=homework-list    ?courseId=&history=1 — с отменёнными (Teacher 57)
+ * POST /api/teacher?action=homework-cancel  { homeworkId }
+ * POST /api/teacher?action=homework-due     { homeworkId, dueAt } — перенести срок (Teacher 57)
+ * POST /api/teacher?action=homework-remind  { homeworkId, userIds } — каждому не чаще раза в 20 ч
+ * GET  /api/teacher?action=homework-export  ?homeworkId= → { filename, base64 } (xlsx)
+ * Колокольчик учителя (этап 4):
+ * GET  /api/teacher?action=teacher-notifications       → { notifications, unseen } за 30 дней
+ * POST /api/teacher?action=teacher-notifications-seen  → отметить просмотренными
+ * Отчёты (этап 4): родителям — по ученику, группе — по курсу
+ * GET  /api/teacher?action=report-data    ?courseId=&kind=parent|group&studentId=&period=all|month|week
+ * POST /api/teacher?action=report-create  { courseId, kind, studentId?, period, comment } → { code, url }
+ * POST /api/teacher?action=report-revoke  { code }
+ * POST /api/teacher?action=report-pdf     { courseId, kind, studentId?, period, comment } → { filename, base64 }
  */
 
 export default async function handler(req, res) {
@@ -101,8 +139,29 @@ export default async function handler(req, res) {
     if (action === 'course-activity-chart') return await courseActivityChart(req, res, sql, userId);
     if (action === 'course-set-stats') return await courseSetStats(req, res, sql, userId);
     if (action === 'set-hard-cards') return await setHardCards(req, res, sql, userId);
-    if (action === 'course-sets-by-membership')
+    if (action === 'course-hard-cards') return await courseHardCards(req, res, sql, userId);
+    if (action === 'course-set-students') return await courseSetStudents(req, res, sql, userId);
+    if (action === 'course-sets-by-membership') {
       return await courseSetsByMembership(req, res, sql, userId);
+    }
+    if (action === 'homework-create') return await homeworkCreate(req, res, sql, userId);
+    if (action === 'homework-list') return await homeworkList(req, res, sql, userId);
+    if (action === 'homework-status') return await homeworkStatus(req, res, sql, userId);
+    if (action === 'homework-cancel') return await homeworkCancel(req, res, sql, userId);
+    if (action === 'homework-due') return await homeworkDue(req, res, sql, userId);
+    if (action === 'homework-remind') return await homeworkRemind(req, res, sql, userId);
+    if (action === 'homework-export') return await homeworkExport(req, res, sql, userId);
+
+    if (action === 'report-data') return await reportData(req, res, sql, userId);
+    if (action === 'report-create') return await reportCreate(req, res, sql, userId);
+    if (action === 'report-revoke') return await reportRevoke(req, res, sql, userId);
+    if (action === 'report-pdf') return await reportPdf(req, res, sql, userId);
+    if (action === 'teacher-notifications') {
+      return await teacherNotifications(req, res, sql, userId);
+    }
+    if (action === 'teacher-notifications-seen') {
+      return await teacherNotificationsSeen(req, res, sql, userId);
+    }
 
     return res.status(400).json({ error: 'Unknown action' });
   } catch (error) {

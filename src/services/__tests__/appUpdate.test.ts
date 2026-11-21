@@ -1,5 +1,5 @@
 /**
- * Окно «Вышла новая версия» (plan/new/app_update_prompt.md, Update 2)
+ * Окно «Вышла новая версия» (plan/done/app_update_prompt.md, Update 2)
  */
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 

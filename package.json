@@ -1,6 +1,6 @@
 {
   "name": "flashcards-app",
-  "version": "1.8.8",
+  "version": "2.0.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,6 +12,8 @@
     "site:build": "node scripts/build-site.mjs",
     "db:init": "node database/load-data.js",
     "db:check-migrations": "node scripts/check-migrations.mjs",
+    "center:check": "tsx scripts/check-center-access.ts --staging",
+    "exam:check": "tsx scripts/check-exam.ts --staging && tsx scripts/check-exam-flow.ts --staging",
     "test": "jest",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx,.mjs,.cjs",
     "format": "prettier --write .",
@@ -49,6 +51,7 @@
     "js-sha256": "^0.11.1",
     "lottie-react-native": "^7.3.6",
     "lucide-react-native": "^0.344.0",
+    "pdfkit": "^0.20.2",
     "process": "^0.11.10",
     "react": "18.2.0",
     "react-dom": "^18.2.0",
@@ -77,6 +80,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.28.5",
+    "@babel/plugin-transform-dynamic-import": "7.27.1",
     "@babel/preset-env": "^7.28.5",
     "@babel/preset-flow": "^7.27.1",
     "@babel/preset-react": "^7.28.5",

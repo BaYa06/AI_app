@@ -38,3 +38,13 @@ export function getLanguageLabel(code: string): string {
 export function getLanguageFlag(code: string): string {
   return getLanguageDefByCode(code)?.flag ?? '🌐';
 }
+
+/** «английский» — название языка внутри фразы: «учишь английский» */
+export function languageAccusative(code: string): string {
+  return (getLanguageDefByCode(code)?.label ?? code).toLowerCase();
+}
+
+/** «на английском» без «на»: «Я говорю на русском». Все названия TOP_LANGUAGES кончаются на «-ий». */
+export function languagePrepositional(code: string): string {
+  return languageAccusative(code).replace(/ий$/, 'ом');
+}

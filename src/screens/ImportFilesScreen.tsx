@@ -181,11 +181,30 @@ const SourceTile = React.memo(function SourceTile({
 
 // ─── Экран ────────────────────────────────────────────────────────────────────
 
+/** Черновик нового набора из фото — один на устройство, у набора ещё нет id */
+const NEW_SET_DRAFT_KEY = 'new_set';
+
 export function ImportFilesScreen({ navigation, route }: Props) {
-  const { setId } = route.params;
+  const { setId, newSet } = route.params;
   const colors = useThemeColors();
   const bottomInset = useScreenBottomInset();
-  const set = useSetsStore((s) => s.getSet(setId));
+  const storeSet = useSetsStore((s) => (setId ? s.getSet(setId) : undefined));
+  // Новый набор из фото (plan/new/new_user_activation.md, Start 3.5): набора ещё нет — он
+  // создастся на проверке по кнопке «Сохранить», с языками ученика и названием от ИИ
+  const set = useMemo(
+    () =>
+      storeSet ??
+      (newSet
+        ? {
+            title: '',
+            languageFrom: newSet.languageFrom,
+            languageTo: newSet.languageTo,
+            kind: 'language' as const,
+          }
+        : undefined),
+    [storeSet, newSet]
+  );
+  const draftKey = newSet ? NEW_SET_DRAFT_KEY : setId;
   const isSubject = isSubjectSet(set);
   const goals = isSubject ? SUBJECT_GOALS : GOALS;
 
@@ -193,7 +212,7 @@ export function ImportFilesScreen({ navigation, route }: Props) {
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasted, setPasted] = useState('');
   const [goal, setGoal] = useState<ImportGoal>(() =>
-    isSubjectSet(useSetsStore.getState().getSet(setId)) ? 'qa' : 'vocab'
+    isSubjectSet(setId ? useSetsStore.getState().getSet(setId) : undefined) ? 'qa' : 'vocab'
   );
   const [level, setLevel] = useState<CefrLevel>('B1');
   const [promptOpen, setPromptOpen] = useState(false);
@@ -201,7 +220,7 @@ export function ImportFilesScreen({ navigation, route }: Props) {
   const [guideOpen, setGuideOpen] = useState(false);
   const [usage, setUsage] = useState<AiUsage | null>(null);
   const [phase, setPhase] = useState<Phase>({ name: 'form' });
-  const [draft, setDraft] = useState<ImportDraft | null>(() => getImportDraft(setId));
+  const [draft, setDraft] = useState<ImportDraft | null>(() => getImportDraft(draftKey));
   const [retryIn, setRetryIn] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
   const autoRetriesRef = useRef(0);
@@ -212,8 +231,8 @@ export function ImportFilesScreen({ navigation, route }: Props) {
 
   // Вернулись с проверки, не добавив карточки, — черновик остаётся, показываем его
   useEffect(
-    () => navigation.addListener('focus', () => setDraft(getImportDraft(setId))),
-    [navigation, setId]
+    () => navigation.addListener('focus', () => setDraft(getImportDraft(draftKey))),
+    [navigation, draftKey]
   );
 
   // Ушли с экрана во время запроса — обрываем его
@@ -275,15 +294,29 @@ export function ImportFilesScreen({ navigation, route }: Props) {
       : files;
   }, [files, pasted]);
 
+  // Куда добавлять на проверке: в этот набор или — в новый (setId '' → «Сохранить» создаёт набор)
+  const reviewTarget = useMemo(
+    () =>
+      newSet
+        ? {
+            setId: '',
+            languageFrom: newSet.languageFrom,
+            languageTo: newSet.languageTo,
+            draftKey: NEW_SET_DRAFT_KEY,
+          }
+        : { setId },
+    [newSet, setId]
+  );
+
   const openReview = useCallback(
     (d: Omit<ImportDraft, 'savedAt'>) => {
       navigation.navigate('PreviewImport', {
         cards: d.cards,
         suggestedTitle: d.suggestedTitle,
-        setId,
+        ...reviewTarget,
       });
     },
-    [navigation, setId]
+    [navigation, reviewTarget]
   );
 
   // Последний запрос — повтор после ошибки повторяет его же (с той же целью)
@@ -320,7 +353,7 @@ export function ImportFilesScreen({ navigation, route }: Props) {
 
         if (result.cards.length > 0) {
           // Запрос потрачен — сохраняем результат до добавления в набор
-          const previous = appendRef.current ? getImportDraft(setId) : null;
+          const previous = appendRef.current ? getImportDraft(draftKey) : null;
           appendRef.current = false;
           const next = {
             cards: previous ? [...previous.cards, ...result.cards] : result.cards,
@@ -328,7 +361,7 @@ export function ImportFilesScreen({ navigation, route }: Props) {
             kind: result.kind,
             lang: result.lang,
           };
-          saveImportDraft(setId, next);
+          saveImportDraft(draftKey, next);
           // Эти файлы уже распознаны — следующие фото не должны отправить их снова
           setFiles([]);
           setPasted('');
@@ -407,7 +440,7 @@ export function ImportFilesScreen({ navigation, route }: Props) {
       const pairs = inputs.map((f) => parseWordTable(f.content || ''));
       if (pairs.every((p) => p !== null)) {
         const cards = pairs.flat() as Array<{ front: string; back: string }>;
-        navigation.navigate('PreviewImport', { cards, setId });
+        navigation.navigate('PreviewImport', { cards, ...reviewTarget, origin: 'file' });
         return;
       }
     }
@@ -450,7 +483,7 @@ export function ImportFilesScreen({ navigation, route }: Props) {
   }, [busyAutoRetry, runImport]);
 
   const discardDraft = useCallback(() => {
-    clearImportDraft(setId);
+    clearImportDraft(draftKey);
     setDraft(null);
   }, [setId]);
 
@@ -517,7 +550,7 @@ export function ImportFilesScreen({ navigation, route }: Props) {
             // Язык из списка приложения — подставим; иначе пользователь выберет сам
             languageFrom: TOP_LANGUAGES.some((l) => l.code === foundLang) ? foundLang : undefined,
             languageTo: set.languageTo,
-            draftKey: setId,
+            draftKey,
           });
         }}
         onTranslateHere={() =>
@@ -675,7 +708,15 @@ export function ImportFilesScreen({ navigation, route }: Props) {
   return (
     // Верхний safe area уже учтён в App.tsx; снизу — свой (экран без панели вкладок)
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <ScreenHeader title="Создать карточки" onBack={() => navigation.goBack()} />
+      <ScreenHeader
+        title={newSet ? 'Новый набор из фото' : 'Создать карточки'}
+        onBack={() => navigation.goBack()}
+      />
+      {newSet && (
+        <Text variant="bodySmall" color="secondary" style={styles.subtitle}>
+          Набор создастся сам: языки возьмём твои, название подскажет ИИ — его можно поменять.
+        </Text>
+      )}
       {(set?.title || languages) && (
         <Text variant="caption" color="secondary" style={styles.subtitle} numberOfLines={1}>
           {[set?.title && `Набор «${set.title}»`, languages].filter(Boolean).join(' · ')}

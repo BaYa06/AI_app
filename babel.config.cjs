@@ -44,4 +44,10 @@ module.exports = {
       : []),
     'react-native-reanimated/plugin', // Must be last
   ],
+  env: {
+    // Jest (NODE_ENV=test): await import() в api/ → require. Без плагина Jest падает с
+    // «dynamic import callback was invoked without --experimental-vm-modules». На Vercel это обычный
+    // Node, там import() работает и так (plan/new/vercel_cpu.md, CPU 2).
+    test: { plugins: ['@babel/plugin-transform-dynamic-import'] },
+  },
 };

@@ -153,6 +153,29 @@ export function lessonCardContent(
           secondary,
         };
       }
+      // Часть новых слов уже пройдена сегодня (например, первым уроком в онбординге):
+      // не «10 новых» с нуля, а «5 из 10 · ещё 5 до нормы» (plan/new/new_user_activation.md, Start 2.7)
+      if (
+        plan.state === 'lesson' &&
+        plan.doneToday > 0 &&
+        plan.reviewIds.length === 0 &&
+        plan.newIds.length > 0
+      ) {
+        const left = plan.newIds.length;
+        return {
+          calm: false,
+          overline: `Урок дня · ${plan.doneToday} из ${plan.doneToday + left}`,
+          title: `Ещё ${left} ${pluralize(left, 'слово', 'слова', 'слов')} до нормы`,
+          meta: plan.focusSetTitle
+            ? `Следующие слова из набора «${plan.focusSetTitle}» · ${time}`
+            : time,
+          hint: null,
+          action: 'Продолжить урок',
+          kind: 'start',
+          progress,
+          secondary,
+        };
+      }
       return {
         calm: false,
         overline:

@@ -6,7 +6,7 @@ import { optString, isoOrNull } from './_shared.js';
 
 export async function loadCourses(sql, me) {
   return sql`
-    SELECT id, title, created_at, updated_at FROM courses
+    SELECT id, title, created_at, updated_at, source_book_id FROM courses
     WHERE user_id = ${me}::uuid
     ORDER BY created_at ASC
   `;

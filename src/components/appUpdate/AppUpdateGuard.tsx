@@ -1,6 +1,6 @@
 /**
  * Наблюдатель за версией и обязательное окно «Нужно обновить Flashly»
- * (plan/new/app_update_prompt.md, Update 4)
+ * (plan/done/app_update_prompt.md, Update 4)
  * @description Стоит в корне приложения (AppRoot), поэтому работает на любом экране и даже до
  * входа: окно должно запирать приложение и тогда, когда сломан вход.
  * - Отмечает заходы (холодный запуск, возврат после 30+ минут в фоне) и на каждом спрашивает
@@ -31,8 +31,6 @@ export const TEST_ROUTES = new Set([
   'TestWaiting',
   'TestExam',
   'ExamLobby',
-  'OralTestLobby',
-  'OralTestSession',
 ]);
 
 const enabled = Platform.OS === 'ios';

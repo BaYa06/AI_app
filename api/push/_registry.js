@@ -50,12 +50,57 @@ const LESSON_LINK = () => 'flashly://lesson?from=push';
 export const SUPPORT_MIN_APP_VERSION = '1.6.10';
 const SUPPORT_BODY_MAX = 120;
 
+/**
+ * Первая версия приложения с экраном задания (plan/done/teacher_cabinet.md, Teacher 27) — тап по пушу
+ * задания ведёт туда; на старые версии такие пуши не шлём. Поднять, если этап 2 выйдет позже.
+ */
+export const HOMEWORK_MIN_APP_VERSION = '1.8.9';
+/** Первая версия с экраном «Мой результат» экзамена (plan/new/live_exam.md, LiveExam 20) */
+export const EXAM_MIN_APP_VERSION = '1.9.6';
+const examLink = (data) =>
+  data?.sessionId
+    ? `flashly://exam-result/${encodeURIComponent(data.sessionId)}?from=push`
+    : LESSON_LINK();
+
+const homeworkLink = (data) =>
+  data?.homeworkId
+    ? `flashly://homework/${encodeURIComponent(data.homeworkId)}?from=push`
+    : LESSON_LINK();
+
 function excerpt(text, max) {
   const t = String(text ?? '')
     .replace(/\s+/g, ' ')
     .trim();
   return t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t;
 }
+
+/**
+ * Первая версия приложения с экранами учителя, куда ведут его пуши (plan/done/teacher_cabinet.md,
+ * этап 4): «Перед уроком», колокольчик, экран ученика. Поднять, если этап 4 выйдет позже.
+ */
+export const TEACHER_PUSH_MIN_APP_VERSION = '1.8.10';
+const enc = encodeURIComponent;
+/**
+ * Ссылки пушей учителя — пути из NATIVE_LINKING приложения (src/navigation/AppNavigator.tsx).
+ * «Перед уроком» при выключенном этапе 3 клиент сам заменяет на страницу курса.
+ */
+const teacherLink = {
+  prep: (data) => (data?.courseId ? `flashly://lesson-prep/${enc(data.courseId)}?from=push` : null),
+  course: (data) => (data?.courseId ? `flashly://teacher/${enc(data.courseId)}?from=push` : null),
+  students: (data) =>
+    data?.courseId ? `flashly://teacher/${enc(data.courseId)}/students?from=push` : null,
+  homework: (data) =>
+    data?.homeworkId && data?.courseId
+      ? `flashly://teacher-homework/${enc(data.courseId)}/${enc(data.homeworkId)}?from=push`
+      : null,
+  student: (data) =>
+    data?.courseId && data?.studentId
+      ? `flashly://teacher-student/${enc(data.courseId)}/${enc(data.studentId)}?from=push`
+      : null,
+};
+/** Нет курса в данных и «Итоги недели» — список уведомлений учителя */
+const TEACHER_HOME_LINK = 'flashly://teacher-notifications?from=push';
+const teacherLinkOr = (make) => (data) => make(data) || TEACHER_HOME_LINK;
 
 /** '1.6.10' >= '1.6.9' — по числам, а не по строке */
 export function versionAtLeast(version, min) {
@@ -89,7 +134,55 @@ export const PUSH_TYPES = {
     variants: [
       ({ data, secPerAnswer }) => ({
         title: `${data.teacher || 'Учитель'} просит повторить слова`,
-        body: `${data.count} ${plural(data.count, 'слово ждёт', 'слова ждут', 'слов ждут')} повторения · ~${minutesFor(data.count, secPerAnswer)} мин`,
+        // count = 0 — «Напомнить» выбранным (Teacher 36): ученик ещё не открывал слова курса
+        body:
+          data.count > 0
+            ? `${data.count} ${plural(data.count, 'слово ждёт', 'слова ждут', 'слов ждут')} повторения · ~${minutesFor(data.count, secPerAnswer)} мин`
+            : 'Открой курс и позанимайся перед уроком',
+      }),
+    ],
+  },
+  // Задания учителя (plan/done/teacher_cabinet.md, Teacher 15 и 29): при выдаче, вечером накануне
+  // срока (если не сдано) и «Напомнить» учителя. Тап — экран задания.
+  homework_assigned: {
+    category: 'course',
+    priority: 1,
+    transactional: true,
+    minIntervalDays: 0,
+    minAppVersion: HOMEWORK_MIN_APP_VERSION,
+    link: homeworkLink,
+    variants: [
+      ({ data }) => ({
+        title: data.teacher ? `Новое задание от: ${data.teacher}` : 'Новое задание',
+        body: `${data.title ? `«${data.title}» · ` : ''}${data.count} ${plural(data.count, 'слово', 'слова', 'слов')}${data.dueText ? ` · до: ${data.dueText}` : ''}`,
+      }),
+    ],
+  },
+  homework_due: {
+    category: 'course',
+    priority: 1,
+    transactional: true,
+    minIntervalDays: 0,
+    minAppVersion: HOMEWORK_MIN_APP_VERSION,
+    link: homeworkLink,
+    variants: [
+      ({ data }) => ({
+        title: `Завтра срок${data.title ? `: ${data.title}` : ''}`,
+        body: `Осталось ${data.count} ${plural(data.count, 'слово', 'слова', 'слов')} · ~${newWordsMinutes(data.count)} мин${data.dueText ? `. Сдать до: ${data.dueText}` : ''}`,
+      }),
+    ],
+  },
+  homework_reminder: {
+    category: 'course',
+    priority: 1,
+    transactional: true,
+    minIntervalDays: 0,
+    minAppVersion: HOMEWORK_MIN_APP_VERSION,
+    link: homeworkLink,
+    variants: [
+      ({ data }) => ({
+        title: `${data.teacher || 'Учитель'} напоминает о задании`,
+        body: `${data.title ? `«${data.title}»: о` : 'О'}сталось ${data.count} ${plural(data.count, 'слово', 'слова', 'слов')} · ~${newWordsMinutes(data.count)} мин`,
       }),
     ],
   },
@@ -379,9 +472,10 @@ export const PUSH_TYPES = {
     minIntervalDays: 0,
     link: LESSON_LINK,
     variants: [
-      ({ data }) => ({
+      // «Второй день решает» (plan/new/new_user_activation.md, Start 5.1): число слов и время
+      ({ data, secPerAnswer }) => ({
         title: 'Повтори вчерашние слова',
-        body: `${data.count} ${plural(data.count, 'слово', 'слова', 'слов')} со вчерашнего урока пора повторить — так ${data.count === 1 ? 'оно запомнится' : 'они запомнятся'}`,
+        body: `${data.count} ${plural(data.count, 'слово ждёт', 'слова ждут', 'слов ждут')} повторения · ~${minutesFor(data.count, secPerAnswer)} мин — так ${data.count === 1 ? 'оно запомнится' : 'они запомнятся'}`,
       }),
     ],
   },
@@ -410,6 +504,148 @@ export const PUSH_TYPES = {
       ({ name, data }) => ({
         title: `${data.days} ${plural(data.days, 'день', 'дня', 'дней')} подряд!`,
         body: `${name}, это твой личный рекорд. Так держать`,
+      }),
+    ],
+  },
+  // ── Пуши учителю (plan/done/teacher_cabinet.md, этап 4). Отправляет api/push/_teacher.js, не арбитр:
+  // свой лимит (2 в день), тихие часы по поясу курса, запись в журнал остаётся для колокольчика.
+  // П1 «Урок через 2 часа» (Teacher 46): цифры задания или готовности + 2–3 трудных слова.
+  teacher_lesson_soon: {
+    category: 'teacher_lesson',
+    priority: 1,
+    transactional: true,
+    minIntervalDays: 0,
+    minAppVersion: TEACHER_PUSH_MIN_APP_VERSION,
+    link: teacherLinkOr(teacherLink.prep),
+    variants: [
+      ({ data }) => ({
+        title: `Урок ${data.course} в ${data.time}`,
+        body: [
+          data.total > 0 ? `${data.readyLabel || 'Готовы'} ${data.ready} из ${data.total}` : null,
+          Array.isArray(data.hardWords) && data.hardWords.length > 0
+            ? `Трудные слова: ${data.hardWords.slice(0, 3).join(', ')}`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+      }),
+    ],
+  },
+  // «Итоги недели» (Teacher 47): понедельник 09:00 по поясу учителя, по всем его курсам
+  teacher_week_summary: {
+    category: 'teacher_week',
+    priority: 2,
+    transactional: true,
+    minIntervalDays: 0,
+    minAppVersion: TEACHER_PUSH_MIN_APP_VERSION,
+    link: () => TEACHER_HOME_LINK,
+    variants: [
+      ({ data }) => ({
+        title: `Итоги недели: занимались ${data.active} из ${data.total}`,
+        body: [
+          data.answers > 0
+            ? `${data.answers} ${plural(data.answers, 'ответ', 'ответа', 'ответов')} · ${data.correctPct}% верных`
+            : null,
+          data.inactive > 0
+            ? `${data.inactive} ${plural(data.inactive, 'не заходит', 'не заходят', 'не заходят')} неделю`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+      }),
+    ],
+  },
+  // «N не заходят 7+ дней» — сводно по курсу, не чаще раза в 3 дня
+  teacher_inactive: {
+    category: 'teacher_students',
+    priority: 3,
+    transactional: true,
+    minIntervalDays: 3,
+    minAppVersion: TEACHER_PUSH_MIN_APP_VERSION,
+    link: teacherLinkOr(teacherLink.students),
+    variants: [
+      ({ data }) => {
+        const names = Array.isArray(data.names) ? data.names : [];
+        const more = data.count - Math.min(names.length, 2);
+        return {
+          title: `${data.course}: ${data.count} ${plural(data.count, 'не заходит', 'не заходят', 'не заходят')} 7+ дней`,
+          body: `${names.slice(0, 2).join(', ')}${more > 0 ? ` и ещё ${more}` : ''}`,
+        };
+      },
+    ],
+  },
+  // Задание: все сдали / срок прошёл
+  teacher_homework_done: {
+    category: 'teacher_students',
+    priority: 2,
+    transactional: true,
+    minIntervalDays: 0,
+    minAppVersion: TEACHER_PUSH_MIN_APP_VERSION,
+    link: teacherLinkOr(teacherLink.homework),
+    variants: [
+      ({ data }) => ({
+        title: `Все сдали задание: ${data.total} из ${data.total}`,
+        body: `«${data.title}» · ${data.course}`,
+      }),
+    ],
+  },
+  teacher_homework_due: {
+    category: 'teacher_students',
+    priority: 2,
+    transactional: true,
+    minIntervalDays: 0,
+    minAppVersion: TEACHER_PUSH_MIN_APP_VERSION,
+    link: teacherLinkOr(teacherLink.homework),
+    variants: [
+      ({ data }) => ({
+        title: `Срок задания прошёл: сдали ${data.submitted} из ${data.total}`,
+        body: `«${data.title}» · ${data.course}`,
+      }),
+    ],
+  },
+  // Только колокольчик, без пуша (решение 2 этапа 4): похвала ученику и «юнит открыт 2 дня»
+  teacher_streak_praise: {
+    category: 'teacher_students',
+    priority: 4,
+    transactional: true,
+    minIntervalDays: 0,
+    bellOnly: true,
+    link: teacherLinkOr(teacherLink.student),
+    variants: [
+      ({ data }) => ({
+        title: `${data.student}: ${data.streak} ${plural(data.streak, 'день', 'дня', 'дней')} подряд`,
+        body: `Лучшая серия в группе ${data.course} — можно похвалить`,
+      }),
+    ],
+  },
+  teacher_unit_open: {
+    category: 'teacher_students',
+    priority: 4,
+    transactional: true,
+    minIntervalDays: 0,
+    bellOnly: true,
+    link: teacherLinkOr(teacherLink.course),
+    variants: [
+      ({ data }) => ({
+        title: `${data.unit} открыт 2 дня`,
+        body: `Начали ${data.started} из ${data.total} · ${data.course}. Задать срок?`,
+      }),
+    ],
+  },
+  // Учитель открыл результаты экзамена (plan/new/live_exam.md, LiveExam 20). Шлёт api/test.js
+  exam_results: {
+    category: 'course',
+    priority: 1,
+    transactional: true,
+    minIntervalDays: 0,
+    minAppVersion: EXAM_MIN_APP_VERSION,
+    link: examLink,
+    variants: [
+      ({ data }) => ({
+        title: Number.isFinite(data.score)
+          ? `Результат экзамена: ${data.score} из 100`
+          : 'Учитель открыл результаты экзамена',
+        body: `${data.title ? `«${data.title}» · ` : ''}посмотри, где были ошибки`,
       }),
     ],
   },

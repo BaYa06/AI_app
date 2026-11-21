@@ -55,6 +55,15 @@ export const styles = StyleSheet.create({
     letterSpacing: 0,
   },
   // Ширина как у кнопки меню слева — серия и алмазы по центру, даже когда справа пусто
+  bellDot: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 10,
+    height: 10,
+    borderRadius: borderRadius.full,
+    borderWidth: 2,
+  },
   headerRight: {
     minWidth: heights.touch,
     flexDirection: 'row',
@@ -97,6 +106,16 @@ export const styles = StyleSheet.create({
     marginHorizontal: screenPadding,
     marginBottom: spacing.xs,
   },
+  // Подпись под стартовым набором (Start 3.3)
+  starterHint: {
+    marginTop: spacing.xxs,
+    marginHorizontal: spacing.xs,
+  },
+  // Стопка «Начало пути» (plan/new/new_user_activation.md, Start 3.2) — между уроком и мини-играми
+  startTasks: {
+    marginHorizontal: screenPadding,
+    marginTop: spacing.s,
+  },
   skeletonTiles: {
     paddingHorizontal: screenPadding,
     gap: spacing.xs,
@@ -117,6 +136,10 @@ export const styles = StyleSheet.create({
     marginTop: spacing.m,
     paddingTop: spacing.m,
     borderTopWidth: 1,
+  },
+  freezeIcons: {
+    flexDirection: 'row',
+    gap: 2,
   },
 
   // Teacher Mode Banner
@@ -227,21 +250,6 @@ export const styles = StyleSheet.create({
     flex: 1,
     gap: spacing.s,
   },
-  dateIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: borderRadius.m,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dateMonth: {
-    fontWeight: '600',
-    opacity: 0.85,
-  },
-  dateDay: {
-    fontWeight: '700',
-    lineHeight: 20,
-  },
   setTitle: {
     fontWeight: '600',
     flexShrink: 1,
@@ -254,6 +262,14 @@ export const styles = StyleSheet.create({
   },
   setProgress: {
     marginTop: spacing.s,
+  },
+  setHomeworkDue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.s,
+    paddingTop: spacing.s,
+    borderTopWidth: 1,
   },
   setStatusCounts: {
     flexDirection: 'row',
@@ -371,6 +387,15 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
+  },
+  weekNotes: {
+    gap: spacing.xs,
+    marginBottom: spacing.s,
+  },
+  weekNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   goalCard: {
     padding: spacing.m,

@@ -3,7 +3,7 @@
  *
  *   npx tsx scripts/create-library-template.ts
  *
- * Формат: plan/new/library_catalog.md, «Формат Excel». Примеры в шаблоне проходят проверку импорта.
+ * Формат: plan/done/library_catalog.md, «Формат Excel». Примеры в шаблоне проходят проверку импорта.
  */
 
 import fs from 'fs';

@@ -27,6 +27,59 @@ export const authEvents = {
   onboardingComplete: () => log('onboarding_complete'),
 
   /**
+   * «Перепутал? Поменять местами» на экране изучаемого языка (Start 2.3).
+   * Доля от onboarding_complete больше 5% — экраны языков всё ещё путают.
+   */
+  onboardingLanguagesSwapped: () => log('onboarding_languages_swapped'),
+
+  /** Ученик курса на онбординге (Start 7.5): присоединился по коду или ссылке / «Это не мой курс» */
+  courseJoinOnboarding: (via: 'code' | 'link') => log('course_join_onboarding', { via }),
+  courseJoinNotMine: (via: 'code' | 'link') => log('course_join_not_mine', { via }),
+
+  /** Код учебного центра (plan/new/center_books.md, Center 5): проверили код / вошли / «Это не мой центр» */
+  orgCodeEntered: (valid: boolean, reason: string) => log('org_code_entered', { valid, reason }),
+  orgJoined: (via: 'code' | 'link' | 'menu') => log('org_joined', { via }),
+  orgNotMine: (via: 'code' | 'link') => log('org_not_mine', { via }),
+  /** Ученик увидел «Доступ к книгам закончился» (Center 7) */
+  orgAccessExpiredSeen: () => log('org_access_expired_seen'),
+  /** Добавил книгу центра как свой курс (этап 7): onboarding — сразу после кода, library — из «Библиотеки» */
+  orgBookAdded: (via: 'onboarding' | 'library') => log('org_book_added', { via }),
+  /** Строка «Другие книги центра · Посмотреть» на главной курса книги (этап 7) */
+  orgLibraryHint: (action: 'open' | 'close') => log('org_library_hint', { action }),
+  /** Стал учителем центра по ссылке /t/<код> (Center 13) */
+  orgTeacherJoined: () => log('org_teacher_joined'),
+
+  /**
+   * Показан шаг онбординга (Start 2.8): воронка по шагам — где уходят.
+   * sec_since_sign_in — сколько прошло от входа.
+   */
+  onboardingStepViewed: (step: string, secSinceSignIn: number) =>
+    log('onboarding_step_viewed', { step, sec_since_sign_in: secSinceSignIn }),
+
+  /** Первый урок в онбординге начат / закончен; цель — закончить меньше чем за 2 минуты от входа */
+  firstLessonStarted: (secSinceSignIn: number) =>
+    log('first_lesson_started', { sec_since_sign_in: secSinceSignIn }),
+  firstLessonCompleted: (secSinceSignIn: number) =>
+    log('first_lesson_completed', { sec_since_sign_in: secSinceSignIn }),
+
+  /**
+   * Новому ученику выдан стартовый набор (plan/new/new_user_activation.md, Start 1.5).
+   * Сколько учеников с набором начали его учить — starter_set_first_answer.
+   */
+  starterSetCreated: (params: { target: string; native: string; theme: string }) =>
+    log('starter_set_created', {
+      target_language: params.target,
+      native_language: params.native,
+      theme: params.theme,
+    }),
+
+  /**
+   * Первый ответ по карточке стартового набора — один раз на устройство.
+   * Funnel: starter_set_created → starter_set_first_answer.
+   */
+  starterSetFirstAnswer: (mode: string) => log('starter_set_first_answer', { mode }),
+
+  /**
    * Юзер вышел из аккаунта.
    */
   logout: () => log('logout'),

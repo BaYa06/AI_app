@@ -145,6 +145,34 @@ export async function lookupInviteByToken(sql, token) {
   return resolveInviteLookup(rows);
 }
 
+/**
+ * Что в курсе — для экрана «Курс найден» (plan/new/new_user_activation.md, Start 7.2): сколько
+ * наборов и слов видят ученики и на каких языках курс (по самому большому языковому набору).
+ * Новые поля ответа: старые клиенты их не читают.
+ */
+async function courseSummary(sql, courseId) {
+  const rows = await sql`
+    SELECT COUNT(*)::int AS sets, COALESCE(SUM(total_cards), 0)::int AS words,
+           (SELECT language_from FROM card_sets
+              WHERE course_id = ${courseId}::uuid AND COALESCE(is_hidden_from_students, false) = false
+                AND COALESCE(kind, 'language') = 'language'
+              ORDER BY total_cards DESC LIMIT 1) AS language_from,
+           (SELECT language_to FROM card_sets
+              WHERE course_id = ${courseId}::uuid AND COALESCE(is_hidden_from_students, false) = false
+                AND COALESCE(kind, 'language') = 'language'
+              ORDER BY total_cards DESC LIMIT 1) AS language_to
+    FROM card_sets
+    WHERE course_id = ${courseId}::uuid AND COALESCE(is_hidden_from_students, false) = false
+  `;
+  const r = rows[0] ?? {};
+  return {
+    setsCount: r.sets ?? 0,
+    wordsCount: r.words ?? 0,
+    languageFrom: r.language_from ?? null,
+    languageTo: r.language_to ?? null,
+  };
+}
+
 export async function inviteInfoByCode(req, res, sql, userId) {
   const { code } = req.query;
   if (!code) return res.status(400).json({ error: 'code required', reason: 'bad_request' });
@@ -165,6 +193,7 @@ export async function inviteInfoByCode(req, res, sql, userId) {
     courseId: lookup.courseId,
     courseTitle: lookup.courseTitle,
     teacherName: lookup.teacherName,
+    ...(await courseSummary(sql, lookup.courseId)),
   });
 }
 
@@ -182,8 +211,31 @@ export async function inviteInfoByToken(req, res, sql) {
     courseId: lookup.courseId,
     courseTitle: lookup.courseTitle,
     teacherName: lookup.teacherName,
+    ...(await courseSummary(sql, lookup.courseId)),
   });
 }
+
+/**
+ * Группа учителя учебного центра (courses.organization_id) занимает места центра: новый для центра
+ * ученик не вступит, если места кончились (plan/new/center_books.md, решение 5). Уже состоящий в
+ * группе или уже занимающий место центра проходит. Без блокировки — при одновременном вступлении
+ * возможен перебор на одно-два места; активация кода центра блокируется строго.
+ */
+async function orgSeatsFull(sql, courseId, userId) {
+  const rows = await sql`
+    SELECT o.seat_limit, flashly_org_seats_used(o.id) AS used, flashly_org_has_seat(o.id, ${userId}::uuid) AS has
+      FROM courses c JOIN organizations o ON o.id = c.organization_id
+     WHERE c.id = ${courseId}::uuid
+       AND NOT EXISTS (SELECT 1 FROM course_members m WHERE m.course_id = c.id AND m.user_id = ${userId}::uuid)
+  `;
+  const r = rows[0];
+  return !!r && !r.has && r.used >= r.seat_limit;
+}
+
+const ORG_SEATS_FULL = {
+  error: 'Learning center seats are full',
+  reason: 'org_seats_full',
+};
 
 export async function joinByCode(req, res, sql, userId) {
   const { code } = req.body || {};
@@ -202,6 +254,7 @@ export async function joinByCode(req, res, sql, userId) {
     return res.status(410).json({ error: 'Invite expired', reason: 'expired' });
   if (lookup.ownerId === userId)
     return res.status(400).json({ error: 'Cannot join your own course', reason: 'own_course' });
+  if (await orgSeatsFull(sql, lookup.courseId, userId)) return res.status(409).json(ORG_SEATS_FULL);
 
   await sql`
     INSERT INTO course_members (course_id, user_id, role)
@@ -224,6 +277,7 @@ export async function joinByToken(req, res, sql, userId) {
     return res.status(410).json({ error: 'Invite expired', reason: 'expired' });
   if (lookup.ownerId === userId)
     return res.status(400).json({ error: 'Cannot join your own course', reason: 'own_course' });
+  if (await orgSeatsFull(sql, lookup.courseId, userId)) return res.status(409).json(ORG_SEATS_FULL);
 
   await sql`
     INSERT INTO course_members (course_id, user_id, role)

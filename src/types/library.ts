@@ -22,7 +22,7 @@ export interface LibrarySet {
   status: 'published' | 'archived' | 'blocked';
   is_featured: boolean;
   cover_emoji: string | null;
-  /** Подборка каталога и номер в ней (plan/new/library_catalog.md); null — набор вне каталога */
+  /** Подборка каталога и номер в ней (plan/done/library_catalog.md); null — набор вне каталога */
   collection_id?: string | null;
   position?: number | null;
   published_at: string;
@@ -104,7 +104,7 @@ export interface RateResponse {
 }
 
 // ── Каталог: предмет → (язык / раздел) → (уровень) → подборка → набор ──────────
-// plan/new/library_catalog.md; ответы api/library.js?action=catalog|subject|collection|search
+// plan/done/library_catalog.md; ответы api/library.js?action=catalog|subject|collection|search
 // (api/_handlers/library/catalog.js). «Добавлено» — только личный импорт, без «положил в курс».
 
 /** Шкала уровней предмета: A1–C2, basic / advanced или без уровней. */

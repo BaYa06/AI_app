@@ -1,0 +1,129 @@
+import { log } from './core';
+
+/** Где учитель нажал: главная (карточка урока, быстрые действия) или страница курса */
+export type TeacherPlace = 'home' | 'course';
+
+export type TeacherAction =
+  | 'live_test'
+  | 'join_code'
+  | 'students'
+  | 'inactive'
+  | 'remind'
+  | 'schedule'
+  | 'course'
+  | 'books'
+  | 'homework'
+  | 'homework_export'
+  // Отмена, перенос срока и история заданий (Teacher 57)
+  | 'homework_cancel'
+  | 'homework_due'
+  | 'homework_history'
+  // Этап 3 «Подготовка к уроку» (Teacher 44)
+  | 'lesson_prep'
+  | 'warmup_start'
+  | 'lesson_check'
+  | 'prep_remind'
+  | 'warmup_homework'
+  // Этап 4 (Teacher 56)
+  | 'notifications'
+  | 'student_remind'
+  | 'report'
+  | 'report_share'
+  | 'report_pdf';
+
+export const teacherEvents = {
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ЖИВОЙ ЭКЗАМЕН (plan/new/live_exam.md). Зачем: доверяют ли учителя сборке (сколько заменяют
+  // слов), какие форматы берут, как часто аннулируют и засчитывают — признак плохих вопросов.
+  // ═══════════════════════════════════════════════════════════════════════════
+  examBuilt: (p: {
+    words: number;
+    mode: string;
+    formats: string;
+    warnings: number;
+    minutes: number;
+  }) => log('exam_built', p),
+  examItemReplaced: () => log('exam_item_replaced', {}),
+  examOpened: (p: { words: number; minutes: number }) => log('exam_started', p),
+  examReleased: (p: { students: number; avgScore: number }) =>
+    log('exam_released', { students: p.students, avg_score: p.avgScore }),
+  examDecision: (decision: 'void' | 'accept' | 'keep') =>
+    log(
+      decision === 'void'
+        ? 'exam_item_voided'
+        : decision === 'accept'
+          ? 'exam_answer_accepted'
+          : 'exam_item_kept',
+      {}
+    ),
+  examHomework: (students: number) => log('exam_homework', { students }),
+  examRetake: () => log('exam_retake', {}),
+
+  // Первые шаги учителя (plan/new/new_user_activation.md, этап 6)
+  teacherDemoStarted: () => log('teacher_demo_started'),
+  teacherDemoFinished: () => log('teacher_demo_finished'),
+  teacherStartTaskAction: (task: string) => log('teacher_start_task_action', { task }),
+  teacherStarterCourseCreated: (subject: string) =>
+    log('teacher_starter_course_created', { subject }),
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // КАБИНЕТ УЧИТЕЛЯ (plan/done/teacher_cabinet.md, Teacher 12)
+  // Зачем: учителя заходили один раз и бросали. Смотрим, возвращаются ли они и что делают.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Учитель открыл главную в своём курсе (раз на курс за показ главной).
+   * Зачем: сколько учителей заходят регулярно; есть ли у курса расписание и сколько учеников пропали.
+   */
+  teacherHomeViewed: (params: { hasSchedule: boolean; students: number; inactive: number }) =>
+    log('teacher_home_viewed', {
+      has_schedule: params.hasSchedule,
+      students: params.students,
+      inactive: params.inactive,
+    }),
+
+  /**
+   * Учитель открыл экран «Перед уроком» (10).
+   * Зачем: пользуются ли подготовкой к уроку вообще.
+   */
+  teacherLessonPrepViewed: () => log('teacher_lesson_prep_viewed', {}),
+
+  /**
+   * Нажатие в кабинете учителя.
+   * Зачем: какие действия нужны (живой тест, напомнить, код), а какие никто не трогает.
+   */
+  teacherAction: (action: TeacherAction, place: TeacherPlace) =>
+    log('teacher_action', { action, place }),
+
+  /**
+   * Курс создан через окно «Новый курс».
+   * Зачем: сколько сразу подключают учебник и расписание; problems — что не сохранилось.
+   */
+  teacherCourseCreated: (params: { withBook: boolean; withSchedule: boolean; problems: string }) =>
+    log('teacher_course_created', {
+      with_book: params.withBook,
+      with_schedule: params.withSchedule,
+      problems: params.problems,
+    }),
+
+  /**
+   * Учитель выдал задание через окно «Новое задание» (этап 2).
+   * Зачем: какой объём задают, ставят ли порог, сколько дней дают; result — ok или причина отказа.
+   */
+  teacherHomeworkCreated: (params: {
+    words: number;
+    sets: number;
+    minScore: number;
+    allStudents: boolean;
+    days: number;
+    result: string;
+  }) =>
+    log('teacher_homework_created', {
+      words: params.words,
+      sets: params.sets,
+      min_score: params.minScore,
+      all_students: params.allStudents,
+      days: params.days,
+      result: params.result,
+    }),
+};

@@ -1,5 +1,5 @@
 /**
- * Учебник (plan/book_catalog_plan.md, часть 4; plan/new/library_catalog.md, Catalog 9).
+ * Учебник (plan/book_catalog_plan.md, часть 4; plan/done/library_catalog.md, Catalog 9).
  *
  * Устроен как подборка: юниты по порядку книги, «добавлено k из N».
  *  - «Добавить» кладёт юнит в «Мои наборы» без копии — это сам официальный набор книги (решение
@@ -8,6 +8,8 @@
  *    (тот же набор, второй раз добавлять нечего).
  *  - Нажатие на юнит — открыть и учить (как раньше).
  *  - Учитель: «Подключить к курсу» (course_books), юниты затем открывают в «Учебниках курса».
+ *  - Ученик учебного центра, книга его центра (plan/new/center_books.md, этап 7, Center 19): книга
+ *    целиком = курс — «Добавить себе» / «Открыть курс», юниты по одному не добавляются.
  */
 import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -30,6 +32,9 @@ import { useCoursesStore, useSetsStore, useSettingsStore, useThemeColors } from 
 import { alpha, borderRadius, getLanguageDef, iconSize, spacing } from '@/constants';
 import { pluralize } from '@/utils';
 import { BookService } from '@/services/BookService';
+import { centerEntryOfBook, isCenterOpen } from '@/services/centerBooks';
+import { addCenterBookCourse } from '@/components/study/centerSession';
+import { useCenterStore } from '@/store/centerStore';
 import { getBookCover, formatBookMeta } from '@/utils/bookCover';
 import { confirmAction } from '@/utils/dialogs';
 import { describeError } from '@/utils/userErrors';
@@ -42,6 +47,26 @@ type Colors = ReturnType<typeof useThemeColors>;
 type UnitState = 'none' | 'added' | 'course';
 
 /** Где юнит у пользователя: набор юнита уже в сторе — сам или открыт через курс. */
+/**
+ * Почему книгу не подключили: свои курсы, места учебного центра (Center 14), другой центр,
+ * остальное — общий текст.
+ */
+export function describeAttachError(result: {
+  status: number;
+  error: string;
+  reason?: string;
+  body?: Record<string, unknown>;
+}): string {
+  if (result.reason === 'org_seats_full') {
+    const need = Number(result.body?.need) || 0;
+    const free = Number(result.body?.free) || 0;
+    return `Не хватает мест учебного центра: нужно ${need}, свободно ${free}. Скажите менеджеру центра.`;
+  }
+  if (result.reason === 'other_org') return 'В курсе уже есть книги другого учебного центра.';
+  if (result.status === 403) return 'Можно подключать только к своим курсам.';
+  return describeError(result.error, 'Попробуйте ещё раз.');
+}
+
 function unitState(unit: BookUnit, sets: Record<string, CardSet>): UnitState {
   const set = unit.sets[0] ? sets[unit.sets[0].id] : undefined;
   if (!set) return 'none';
@@ -57,6 +82,7 @@ const UnitRow = memo(function UnitRow({
   onOpen,
   onAdd,
   colors,
+  readOnly = false,
 }: {
   unit: BookUnit;
   state: UnitState;
@@ -65,6 +91,8 @@ const UnitRow = memo(function UnitRow({
   onOpen: () => void;
   onAdd: () => void;
   colors: Colors;
+  /** Книга центра у ученика: юниты не добавляются по одному — книга целиком становится курсом */
+  readOnly?: boolean;
 }) {
   const words = unit.sets.reduce((acc, x) => acc + x.totalCards, 0);
   const hasSet = unit.sets.length > 0;
@@ -116,7 +144,7 @@ const UnitRow = memo(function UnitRow({
             {meta}
           </Text>
         </View>
-        {state === 'course' ? (
+        {readOnly ? null : state === 'course' ? (
           <Badge label="Есть в курсе" tone="primary" />
         ) : state === 'added' ? (
           <Badge label="Добавлен" tone="success" />
@@ -148,6 +176,11 @@ export function BookDetailScreen({ navigation, route }: Props) {
   const [busySetId, setBusySetId] = useState<string | null>(null);
   const [attachVisible, setAttachVisible] = useState(false);
   const [attaching, setAttaching] = useState(false);
+  // Книга моего учебного центра, а я ученик (этап 7): «Добавить себе» / «Открыть курс»
+  const centerData = useCenterStore((st) => st.data);
+  const centerEntry = isTeacher ? null : centerEntryOfBook(centerData, bookId);
+  const [addingCourse, setAddingCourse] = useState(false);
+  const setActiveCourse = useCoursesStore((st) => st.setActiveCourse);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -207,9 +240,7 @@ export function BookDetailScreen({ navigation, route }: Props) {
       const result = await BookService.attachToCourses(detail.book.id, courseIds);
       setAttaching(false);
       if (!result.ok) {
-        toast.error(
-          `Не удалось подключить. ${result.status === 403 ? 'Можно подключать только к своим курсам.' : describeError(result.error, 'Попробуйте ещё раз.')}`
-        );
+        toast.error(`Не удалось подключить. ${describeAttachError(result)}`);
         return;
       }
       const attached = [...result.data.attachedCourseIds, ...result.data.alreadyAttachedCourseIds];
@@ -234,6 +265,27 @@ export function BookDetailScreen({ navigation, route }: Props) {
       }
     },
     [detail, courses, navigation]
+  );
+
+  const addBookCourse = useCallback(async () => {
+    if (addingCourse) return;
+    setAddingCourse(true);
+    const r = await addCenterBookCourse(bookId, 'library');
+    setAddingCourse(false);
+    if (!r.ok) {
+      toast.error(r.message);
+      return;
+    }
+    // Как при вступлении в курс учителя: главная на новом курсе, боковое меню открывается само
+    navigation.navigate('Main', { screen: 'Home', params: { openCourseId: r.courseId } });
+  }, [addingCourse, bookId, navigation]);
+
+  const openBookCourse = useCallback(
+    (courseId: string) => {
+      setActiveCourse(courseId);
+      navigation.navigate('Main', { screen: 'Home' });
+    },
+    [navigation, setActiveCourse]
   );
 
   const header = <ScreenHeader onBack={() => navigation.goBack()} bordered />;
@@ -269,7 +321,27 @@ export function BookDetailScreen({ navigation, route }: Props) {
     .filter(Boolean)
     .join(' · ');
 
-  const footer = next ? (
+  const centerCourseId = centerEntry?.book.courseId ?? null;
+  const centerOpen = !!centerEntry && isCenterOpen(centerEntry.center);
+  const footer = centerEntry ? (
+    centerCourseId ? (
+      <Button
+        title="Открыть курс"
+        variant="secondary"
+        fullWidth
+        onPress={() => openBookCourse(centerCourseId)}
+      />
+    ) : (
+      <Button
+        title="Добавить себе"
+        icon={Plus}
+        fullWidth
+        disabled={!centerOpen}
+        loading={addingCourse}
+        onPress={addBookCourse}
+      />
+    )
+  ) : next ? (
     <Button
       title={`Добавить следующий: юнит ${next.number}`}
       icon={Plus}
@@ -326,6 +398,25 @@ export function BookDetailScreen({ navigation, route }: Props) {
           </View>
         )}
 
+        {centerEntry ? (
+          <Card tone={centerCourseId ? 'default' : 'muted'}>
+            <Text variant="body" style={[s.semibold, { color: colors.textPrimary }]}>
+              {centerCourseId
+                ? 'Уже в твоих курсах'
+                : centerOpen
+                  ? `Добавим отдельным курсом «${book.title}»`
+                  : 'Доступ к книгам центра закончился'}
+            </Text>
+            <Text variant="bodySmall" color="secondary">
+              {centerCourseId
+                ? 'Все юниты открыты, прогресс сохраняется.'
+                : centerOpen
+                  ? `Сразу все ${units.length} ${pluralize(units.length, 'юнит', 'юнита', 'юнитов')}. Курс появится в боковом меню на главной.`
+                  : 'Возьми новый код у менеджера курса — книга откроется.'}
+            </Text>
+          </Card>
+        ) : null}
+
         {units.length === 0 ? (
           <EmptyState
             compact
@@ -335,7 +426,7 @@ export function BookDetailScreen({ navigation, route }: Props) {
           />
         ) : (
           <>
-            {withSets > 0 && (
+            {withSets > 0 && !centerEntry && (
               <Card>
                 <View style={s.summaryHead}>
                   <Text variant="body" style={[s.semibold, { color: colors.textPrimary }]}>
@@ -359,11 +450,12 @@ export function BookDetailScreen({ navigation, route }: Props) {
                   key={unit.id}
                   unit={unit}
                   state={states[i]}
-                  isNext={i === nextIndex}
+                  isNext={!centerEntry && i === nextIndex}
                   busy={busySetId !== null && busySetId === unit.sets[0]?.id}
                   onOpen={() => openUnit(unit)}
                   onAdd={() => addUnit(unit)}
                   colors={colors}
+                  readOnly={!!centerEntry}
                 />
               ))}
             </View>

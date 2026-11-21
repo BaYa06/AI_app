@@ -4,8 +4,13 @@
  */
 import React from 'react';
 import { View, StyleSheet, Pressable, ScrollView, Platform } from 'react-native';
-import { useThemeColors } from '@/store';
+import { useSetsStore, useThemeColors } from '@/store';
 import { Text, StreakCelebration } from '@/components/common';
+import { recordHighlightLessonDay } from '@/services/dailyHighlight';
+import { isHintShown, markHintShown, noteStudyMode } from '@/services/momentHints';
+import { loadHighlightState } from '@/services/dailyHighlight';
+import { canShareSet, useShareSet } from '@/components/share/useShareSet';
+import { countKnownWords } from '@/utils/knownWords';
 import { Analytics } from '@/services/analytics';
 import { currentPushOrigin, reportPushLesson } from '@/services/pushOpens';
 import { recordSessionForRatingPrompt, markRatingPromptShown } from '@/services/feedback';
@@ -21,12 +26,21 @@ import {
 } from '@/services/pushPrompt';
 import { spacing, borderRadius, heights, iconSize, screenPadding, alpha } from '@/constants';
 import { pluralize } from '@/utils';
-import { nextLessonStep, nextLessonLabel, sessionStepAfterPortion } from '@/services/lessonFlow';
+import {
+  nextLessonStep,
+  nextLessonLabel,
+  sessionStepAfterPortion,
+  sessionCardIds,
+  isSessionWordWeak,
+} from '@/services/lessonFlow';
+import { useHomeworkStore } from '@/store/homeworkStore';
+import { useHomeworkDoneRedirect } from '@/components/study/useHomeworkDoneRedirect';
 import { useCardsStore } from '@/store/cardsStore';
 import { Badge, Button, Card, ScreenHeader, Sheet, useScreenBottomInset } from '@/components/ui';
 import type { RootStackScreenProps } from '@/types/navigation';
 import { WidgetPromptCard } from '@/components/widget/WidgetPromptCard';
 import { SessionSummary } from '@/components/study/SessionSummary';
+import { useDayHint } from '@/components/study/useDayHint';
 import { SUMMARY_ANIMATION_MS } from '@/components/study/useSummaryChoreography';
 import { WidgetHowToSheet } from '@/components/widget/WidgetHowToSheet';
 import {
@@ -51,6 +65,9 @@ import {
 import { log } from '@/utils/logger';
 
 type Props = RootStackScreenProps<'StudyResults'>;
+
+/** С какого дня с уроком предлагаем пригласить друга (Start 5.5) */
+const INVITE_FROM_LESSON_DAY = 4;
 
 export function StudyResultsScreen({ navigation, route }: Props) {
   const {
@@ -107,10 +124,24 @@ export function StudyResultsScreen({ navigation, route }: Props) {
     }
     if (sessionStep) navigation.replace(sessionStep.screen, sessionStep.params);
   }, []);
+  // Сессия закончена (все этапы) — итог уходит на сервер: засчитываем слова заданий учителя
+  // (plan/done/teacher_cabinet.md, решение 1, вариант Б). Брошенная сессия сюда не доходит.
+  React.useEffect(() => {
+    if (!session || sessionStep) return;
+    const ids = sessionCardIds(session);
+    const cards = useCardsStore.getState().cards;
+    const now = Date.now();
+    const weak = ids.filter((id) => cards[id] && isSessionWordWeak(cards[id], now));
+    useHomeworkStore.getState().reportSession(ids, weak);
+  }, []);
+  // Задание сдано этой сессией — «Задание сдано!» (Teacher 28)
+  useHomeworkDoneRedirect(navigation, !!session && !sessionStep);
   // Итоги сессии: серия могла вырасти на любом этапе
   const streakCount = newStreakCount ?? session?.streakCount;
   const streakGrew = streakIncreased === true || (!sessionStep && !!session?.streakCount);
   const bottomInset = useScreenBottomInset();
+  // День не засчитан, хотя занимался: учил только новые слова (Freeze 6)
+  const dayHint = useDayHint(!sessionStep);
   const [showErrorsModal, setShowErrorsModal] = React.useState(false);
   // Итоги сессии празднуют серию сами — по нажатию кнопки, после анимации (plan/new/session_results.md, решение 14)
   const [showStreakModal, setShowStreakModal] = React.useState(
@@ -191,6 +222,8 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   React.useEffect(() => {
     if (!isLessonEnd) return;
     const today = localDay();
+    // «Новое» — фича дня считает дни с уроком (plan/new/new_user_activation.md, Start 4.2)
+    recordHighlightLessonDay(today);
     const state = addLessonDay(loadPromptState(), today);
     savePromptState(state);
     const supported = isLockScreenWidgetAvailable();
@@ -212,6 +245,35 @@ export function StudyResultsScreen({ navigation, route }: Props) {
       cancelled = true;
     };
   }, [isLessonEnd]);
+
+  const [knownTotal] = React.useState(countKnownWords);
+
+  // «Учи вместе с другом» (plan/new/new_user_activation.md, Start 5.5): с 4-го дня с уроком, один раз,
+  // набор свой и не пустой — отправить ссылку на него (тот же «Поделиться», что в наборе)
+  const resultSet = useSetsStore((st) => st.getSet(setId));
+  const { share, isSharing } = useShareSet();
+  const [showInvite, setShowInvite] = React.useState(false);
+  React.useEffect(() => {
+    if (!isLessonEnd || session || !canShareSet(resultSet) || resultSet.cardCount === 0) return;
+    if (isHintShown('invite_friend')) return;
+    if (loadHighlightState().lessonDays.length < INVITE_FROM_LESSON_DAY) return;
+    markHintShown('invite_friend');
+    Analytics.momentHintShown('invite_friend');
+    setShowInvite(true);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // «Попробуй другую игру» (plan/new/new_user_activation.md, Start 4.3): 3 дня подряд — одним
+  // режимом. Сессия «Изучить» и урок дня и так из разных этапов — их не считаем
+  const [sameMode, setSameMode] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (session || lesson) return;
+    const mode = noteStudyMode(localDay(), modeTitle);
+    if (!mode) return;
+    markHintShown('another_game');
+    Analytics.momentHintShown('another_game');
+    setSameMode(mode);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const otherGame = sameMode === 'Пары' ? 'MultipleChoice' : 'Match';
 
   // Осталось = карточки которые еще не просмотрены + ошибочные карточки
   const remainingNewCards =
@@ -430,7 +492,11 @@ export function StudyResultsScreen({ navigation, route }: Props) {
   if (session) {
     return (
       <>
-        <SessionSummary session={session} streakCount={streakGrew ? streakCount : undefined} />
+        <SessionSummary
+          session={session}
+          streakCount={streakGrew ? streakCount : undefined}
+          dayHint={dayHint}
+        />
         <RatingPromptModal visible={showRatingPrompt} onClose={() => setShowRatingPrompt(false)} />
       </>
     );
@@ -480,6 +546,13 @@ export function StudyResultsScreen({ navigation, route }: Props) {
             из {totalCards}
           </Text>
 
+          {/* Прогресс в словах (plan/new/new_user_activation.md, Start 5.3) */}
+          {knownTotal > 0 && (
+            <Text variant="body" color="secondary" align="center" style={styles.phaseProgress}>
+              Теперь ты знаешь {knownTotal} {pluralize(knownTotal, 'слово', 'слова', 'слов')}
+            </Text>
+          )}
+
           {/* Прогресс фазы */}
           {phaseId && totalPhaseCards > 0 && (
             <Text variant="body" color="secondary" align="center" style={styles.phaseProgress}>
@@ -493,6 +566,11 @@ export function StudyResultsScreen({ navigation, route }: Props) {
               ? 'Все карточки фазы выучены! Так держать!'
               : 'Отличная работа — продолжай серию!'}
           </Text>
+          {dayHint ? (
+            <Text variant="bodySmall" align="center" style={{ color: colors.warningText }}>
+              {dayHint}
+            </Text>
+          ) : null}
         </View>
 
         {/* Statistics Card */}
@@ -551,6 +629,51 @@ export function StudyResultsScreen({ navigation, route }: Props) {
               Список слов, ответы и ошибки
             </Text>
           </Pressable>
+        )}
+
+        {showInvite && resultSet && (
+          <View style={[styles.otherGame, { backgroundColor: alpha(colors.primary, 10) }]}>
+            <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '600' }}>
+              Учи вместе с другом
+            </Text>
+            <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
+              Отправь другу набор «{resultSet.title}» — вдвоём заниматься каждый день проще.
+            </Text>
+            <Button
+              title="Пригласить друга"
+              variant="secondary"
+              size="s"
+              loading={isSharing}
+              style={styles.otherGameButton}
+              onPress={() => {
+                Analytics.momentHintTapped('invite_friend');
+                setShowInvite(false);
+                share(resultSet);
+              }}
+            />
+          </View>
+        )}
+
+        {sameMode && (
+          <View style={[styles.otherGame, { backgroundColor: alpha(colors.primary, 10) }]}>
+            <Text variant="body" style={{ color: colors.textPrimary, fontWeight: '600' }}>
+              Попробуй другую игру
+            </Text>
+            <Text variant="bodySmall" style={{ color: colors.textSecondary }}>
+              Ты третий день учишь режимом «{sameMode}». Разные игры — слова запоминаются лучше.
+            </Text>
+            <Button
+              title={otherGame === 'Match' ? 'Сыграть в «Пары»' : 'Пройти тест'}
+              variant="secondary"
+              size="s"
+              style={styles.otherGameButton}
+              onPress={() => {
+                Analytics.momentHintTapped('another_game');
+                setSameMode(null);
+                navigation.replace(otherGame, { setId });
+              }}
+            />
+          </View>
         )}
 
         {showWidgetPrompt && (
@@ -695,6 +818,16 @@ export function StudyResultsScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
+  // «Попробуй другую игру» (Start 4.3)
+  otherGame: {
+    borderRadius: borderRadius.l,
+    padding: spacing.m,
+    gap: spacing.xxs,
+  },
+  otherGameButton: {
+    alignSelf: 'flex-start',
+    marginTop: spacing.xs,
+  },
   container: {
     flex: 1,
   },

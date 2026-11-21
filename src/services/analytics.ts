@@ -17,6 +17,7 @@ import { engagementEvents } from './analyticsEvents/engagement';
 import { monetizationEvents } from './analyticsEvents/monetization';
 import { navigationEvents } from './analyticsEvents/navigation';
 import { errorsEvents } from './analyticsEvents/errors';
+import { teacherEvents } from './analyticsEvents/teacher';
 import type { SubscriptionTier } from './analyticsEvents/core';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -160,4 +161,5 @@ export const Analytics = {
   ...monetizationEvents,
   ...navigationEvents,
   ...errorsEvents,
+  ...teacherEvents,
 };

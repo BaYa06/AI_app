@@ -24,6 +24,7 @@ import {
   type StudyMode,
 } from '@/components/study/StudyModeSheet';
 import { currentSetSessionPlan, startSetSession } from '@/components/study/setSession';
+import { afterManualCard } from '@/services/photoHint';
 import { isModeAllowedForSets } from '@/utils/setKind';
 import { spacing, iconSize, alpha } from '@/constants';
 import { BottomBar, EmptyState, ProgressBar, toast } from '@/components/ui';
@@ -41,6 +42,7 @@ import {
   Camera,
   BookOpen,
   Layers,
+  Library,
 } from 'lucide-react-native';
 import { describeError } from '@/utils/userErrors';
 import { pluralize } from '@/utils';
@@ -430,10 +432,11 @@ export function SetDetailScreen({ navigation, route }: Props) {
       setNewFront('');
       setNewBack('');
       setNewExample('');
+      afterManualCard(() => navigation.navigate('ImportFiles', { setId }));
     } finally {
       setIsAdding(false);
     }
-  }, [addCard, newFront, newBack, newExample, setId, updateSetStats]);
+  }, [addCard, newFront, newBack, newExample, setId, updateSetStats, navigation]);
 
   const handleEditSet = useCallback(() => {
     navigation.navigate('SetEditor', { setId });
@@ -817,12 +820,19 @@ export function SetDetailScreen({ navigation, route }: Props) {
           icon={Camera}
           compact
           title="Пока нет карточек"
-          description="Сфотографируй страницу учебника — карточки появятся сами"
+          description="Три способа: сфоткай страницу, возьми готовый набор или добавь слова сам"
           action={{
             label: 'Из фото или файла',
+            icon: Camera,
             onPress: () => navigation.navigate('ImportFiles', { setId }),
           }}
-          secondaryAction={{ label: 'Добавить вручную', onPress: openAddCardSheet }}
+          // Готовый набор из библиотеки — это отдельный набор, а не карточки в этот (Start 4.4)
+          secondaryAction={{
+            label: 'Готовый набор из библиотеки',
+            icon: Library,
+            onPress: () => navigation.navigate('Main', { screen: 'Library' }),
+          }}
+          tertiaryAction={{ label: 'Добавить вручную', onPress: openAddCardSheet }}
         />
       ),
     [openAddCardSheet, isReadOnly, navigation, setId]

@@ -1,26 +1,76 @@
 /**
  * TargetLanguagesScreen
- * @description Шаг 4: выбор изучаемых языков (1-3). Только UI, без сохранения.
+ * @description Изучаемые языки, 1–3 (plan/new/new_user_activation.md, Start 2.2–2.3).
+ * Заранее ничего не выбрано; родной язык в списке есть, но неактивен. Первый выбранный —
+ * «Основной», на нём будет стартовый набор. Внизу строка-проверка и «Поменять местами».
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { Info } from 'lucide-react-native';
+import { Text } from '@/components/common/Text';
 import { Button, toast } from '@/components/ui';
+import { CardPreview } from '@/components/onboarding/CardPreview';
+import { useFlagFlight } from '@/components/onboarding/FlagFlight';
+import { LanguageBridge } from '@/components/onboarding/LanguageBridge';
 import { OnboardingOption } from '@/components/onboarding/OnboardingOption';
 import { OnboardingStep } from '@/components/onboarding/OnboardingStep';
-import { spacing, TOP_LANGUAGES, MAX_TARGET_LANGUAGES } from '@/constants';
+import { useThemeColors } from '@/store';
+import {
+  borderRadius,
+  iconSize,
+  languageAccusative,
+  languagePrepositional,
+  MAX_TARGET_LANGUAGES,
+  spacing,
+  TOP_LANGUAGES,
+} from '@/constants';
+import { Analytics } from '@/services/analytics';
 
 type Props = {
+  /** Номер шага и сколько всего — считает AppRoot по роли и пути */
+  step?: number;
+  total?: number;
   nativeLanguage?: string;
+  /** Уже выбранные (вернулись назад) */
+  initial?: string[];
   onContinue?: (codes: string[]) => void;
+  /** «Поменять местами»: родной становится изучаемым и наоборот */
+  onSwap?: (newNative: string) => void;
   onBack?: () => void;
 };
 
-export function TargetLanguagesScreen({ nativeLanguage, onContinue, onBack }: Props) {
-  const [selected, setSelected] = useState<string[]>(['en']);
+export function TargetLanguagesScreen({
+  nativeLanguage = 'ru',
+  initial,
+  onContinue,
+  onSwap,
+  onBack,
+  step = 4,
+  total,
+}: Props) {
+  const colors = useThemeColors();
+  const [selected, setSelected] = useState<string[]>(
+    () => initial?.filter((c) => c !== nativeLanguage) ?? []
+  );
+  const main = selected[0];
 
-  // Изучать свой же родной язык бессмысленно — убираем его из списка выбора.
+  // Место «Хочу выучить» меняется, когда флаг первого выбранного долетит (Start 2.4);
+  // снятие галочки и «Поменять местами» обновляют его сразу
+  const [bridgeTarget, setBridgeTarget] = useState(main);
+  const flying = useRef(false);
+  useEffect(() => {
+    if (!flying.current) setBridgeTarget(main);
+  }, [main]);
+  const tiles = useRef<Record<string, View | null>>({});
+  const slotRef = useRef<View>(null);
+  const { fly, layer } = useFlagFlight();
+
+  // Родной — в конце списка и неактивен: видно, куда он делся
   const options = useMemo(
-    () => TOP_LANGUAGES.filter((l) => l.code !== nativeLanguage),
+    () => [
+      ...TOP_LANGUAGES.filter((l) => l.code !== nativeLanguage),
+      ...TOP_LANGUAGES.filter((l) => l.code === nativeLanguage),
+    ],
     [nativeLanguage]
   );
 
@@ -36,35 +86,110 @@ export function TargetLanguagesScreen({ nativeLanguage, onContinue, onBack }: Pr
       return;
     }
     setSelected([...selected, code]);
+    if (selected.length === 0) {
+      const flag = TOP_LANGUAGES.find((l) => l.code === code)?.flag ?? '';
+      flying.current = true;
+      fly(tiles.current[code], slotRef.current, flag, () => {
+        flying.current = false;
+        setBridgeTarget(code);
+      });
+    }
+  };
+
+  const swap = () => {
+    if (!main) return;
+    Analytics.onboardingLanguagesSwapped();
+    onSwap?.(main);
+    setSelected([nativeLanguage]);
   };
 
   return (
     <OnboardingStep
       onBack={onBack}
       title="Flashly"
-      step={4}
-      headline="Какие языки хочешь учить?"
-      description="Выбери от 1 до 3 языков — можно изменить позже в настройках."
-      footer={
-        <Button
-          title="Продолжить"
-          onPress={() => onContinue?.(selected)}
-          disabled={selected.length === 0}
-          fullWidth
+      step={step}
+      total={total}
+      top={
+        <LanguageBridge
+          native={nativeLanguage}
+          target={bridgeTarget}
+          active="target"
+          targetFlagRef={slotRef}
         />
       }
-    >
-      <View style={styles.options}>
-        {options.map((lang) => (
-          <OnboardingOption
-            key={lang.code}
-            title={lang.label}
-            flag={lang.flag}
-            mode="multiple"
-            selected={selected.includes(lang.code)}
-            onPress={() => toggle(lang.code)}
+      overlay={layer}
+      headline="Какой язык хочешь выучить?"
+      description="Слова в карточках будут на этом языке. Можно выбрать до 3, первый станет основным."
+      footer={
+        <>
+          {main ? (
+            <View style={[styles.check, { backgroundColor: colors.surfaceVariant }]}>
+              <Info size={iconSize.s} color={colors.primary} />
+              <View style={styles.flex}>
+                <Text variant="bodySmall" style={{ color: colors.textPrimary }}>
+                  Ты говоришь на{' '}
+                  <Text variant="bodySmall" style={styles.bold}>
+                    {languagePrepositional(nativeLanguage)}
+                  </Text>{' '}
+                  и учишь{' '}
+                  <Text variant="bodySmall" style={styles.bold}>
+                    {languageAccusative(main)}
+                  </Text>
+                  {selected.length > 1 ? ` (и ещё ${selected.length - 1})` : ''}.
+                </Text>
+                {selected.length === 1 && onSwap ? (
+                  <Button
+                    title="Перепутал? Поменять местами"
+                    variant="quiet"
+                    size="s"
+                    onPress={swap}
+                    style={styles.swap}
+                  />
+                ) : null}
+              </View>
+            </View>
+          ) : null}
+          <Button
+            title={main ? `Учить ${languageAccusative(main)}` : 'Выбери язык'}
+            onPress={() => onContinue?.(selected)}
+            disabled={!main}
+            fullWidth
           />
-        ))}
+        </>
+      }
+    >
+      <CardPreview native={nativeLanguage} target={main} />
+      <View style={styles.options}>
+        {options.map((lang) => {
+          if (lang.code === nativeLanguage) {
+            return (
+              <OnboardingOption
+                key={lang.code}
+                title={lang.label}
+                description="На нём ты уже говоришь"
+                flag={lang.flag}
+                badge={{ text: 'Твой родной', tone: 'native' }}
+                disabled
+                selected={false}
+                onPress={() => {}}
+              />
+            );
+          }
+          return (
+            <OnboardingOption
+              key={lang.code}
+              title={lang.label}
+              flag={lang.flag}
+              mode="multiple"
+              tileRef={(v) => {
+                tiles.current[lang.code] = v;
+              }}
+              badge={main === lang.code ? { text: 'Основной', tone: 'primary' } : undefined}
+              selected={selected.includes(lang.code)}
+              onPress={() => toggle(lang.code)}
+            />
+          );
+        })}
       </View>
     </OnboardingStep>
   );
@@ -73,5 +198,22 @@ export function TargetLanguagesScreen({ nativeLanguage, onContinue, onBack }: Pr
 const styles = StyleSheet.create({
   options: {
     gap: spacing.m,
+  },
+  check: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.s,
+    borderRadius: borderRadius.m,
+    padding: spacing.s,
+  },
+  flex: {
+    flex: 1,
+  },
+  bold: {
+    fontWeight: '700',
+  },
+  swap: {
+    alignSelf: 'flex-start',
+    marginLeft: -spacing.s,
   },
 });

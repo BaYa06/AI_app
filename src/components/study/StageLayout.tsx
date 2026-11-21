@@ -6,8 +6,8 @@
  * - сессия: × · полоски этапов · «+N опыта»; перед этапом — экран «Этап 2 из 6», выход — через окно;
  * - практика: × · одна полоса · «7 из 20», выход сразу.
  */
-import React, { memo, useCallback, useEffect, useLayoutEffect, useState } from 'react';
-import { BackHandler, ScrollView, StyleSheet, View } from 'react-native';
+import React, { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, BackHandler, ScrollView, StyleSheet, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Check, X } from 'lucide-react-native';
 import { useSettingsStore, useThemeColors } from '@/store';
@@ -99,11 +99,13 @@ export const StageLayout = memo(function StageLayout({
   }, [navigation, session]);
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      requestExit();
+      // Окно выхода — слой внутри экрана: «Назад» при нём его закрывает, как закрывал бы <Modal>
+      if (confirmExit) setConfirmExit(false);
+      else requestExit();
       return true;
     });
     return () => sub.remove();
-  }, [requestExit]);
+  }, [requestExit, confirmExit]);
 
   useEffect(() => {
     if (!introVisible) {
@@ -210,7 +212,10 @@ export const StageLayout = memo(function StageLayout({
         />
       ) : null}
 
+      {/* Слоем, не <Modal>: «Выйти» сразу уводит с экрана (replace/pop), а закрытие системного
+          окна в том же кадре роняло iOS (Crashlytics 1.9.3, NSInvalidArgumentException) */}
       <Dialog
+        inScreen
         visible={confirmExit}
         onClose={() => setConfirmExit(false)}
         title="Выйти из сессии?"
@@ -316,6 +321,32 @@ function StageIntro({
   );
 }
 
+/** Через сколько после верного ответа следующий вопрос открывается сам */
+export const AUTO_ADVANCE_MS = 700;
+
+/**
+ * Верный ответ — дальше само, без лишнего нажатия (отзыв ученика v1.8.8,
+ * plan/new/new_user_activation.md, Start 3.4). После ошибки остаётся панель с «Понятно».
+ * С экранным диктором автоперехода нет: ответ должен успеть прозвучать.
+ */
+export function useAutoAdvance(correct: boolean, onNext: () => void): boolean {
+  const [screenReader, setScreenReader] = useState(false);
+  const next = useRef(onNext);
+  next.current = onNext;
+  useEffect(() => {
+    AccessibilityInfo.isScreenReaderEnabled()
+      .then(setScreenReader)
+      .catch(() => {});
+  }, []);
+  const auto = correct && !screenReader;
+  useEffect(() => {
+    if (!auto) return;
+    const timer = setTimeout(() => next.current(), AUTO_ADVANCE_MS);
+    return () => clearTimeout(timer);
+  }, [auto]);
+  return auto;
+}
+
 interface AnswerPanelProps {
   correct: boolean;
   /** Правильный ответ — показывается после ошибки */
@@ -323,6 +354,8 @@ interface AnswerPanelProps {
   /** Подсказка после ошибки: слово, перевод и пример (карточка вместо отдельного этапа) */
   hint?: { front: string; back: string; example?: string };
   onNext: () => void;
+  /** Верный ответ переходит дальше сам (useAutoAdvance) — вместо кнопки подпись «Дальше само» */
+  autoAdvance?: boolean;
 }
 
 /** Нижняя панель ответа — одинаковая во всех режимах */
@@ -331,6 +364,7 @@ export const AnswerPanel = memo(function AnswerPanel({
   answer,
   hint,
   onNext,
+  autoAdvance = false,
 }: AnswerPanelProps) {
   const colors = useThemeColors();
   const tone = correct ? colors.success : colors.error;
@@ -368,7 +402,13 @@ export const AnswerPanel = memo(function AnswerPanel({
           ) : null}
         </View>
       ) : null}
-      <Button title={correct ? 'Дальше' : 'Понятно'} fullWidth onPress={onNext} />
+      {correct && autoAdvance ? (
+        <Text variant="bodySmall" style={{ color: toneText }}>
+          Дальше само
+        </Text>
+      ) : (
+        <Button title={correct ? 'Дальше' : 'Понятно'} fullWidth onPress={onNext} />
+      )}
     </View>
   );
 });

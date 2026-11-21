@@ -31,14 +31,33 @@ import { isAppleUser, takeAppleSignInName } from '@/services/appleSignInName';
 import { useCourseRealtime } from '@/hooks/useCourseRealtime';
 import { StorageService } from '@/services/StorageService';
 import { CACHE_OWNER_KEY } from '@/services/DatabaseService';
+import { issueStarterSet, putStarterSetInStores } from '@/services/starterSetIssue';
+import { setWantsTeacher } from '@/services/joinTeacherCard';
+import { markTeacherStarted } from '@/services/teacherStart';
+import type { CourseInviteInfo } from '@/services/neon/courses';
+import { callDataApi } from '@/services/neon/core';
+import { describeTeacherApiReason } from '@/utils/teacherApiErrors';
+import { CenterService, type CenterCodeResult } from '@/services/CenterService';
+import { openCenterBooks } from '@/components/study/centerSession';
+import {
+  describeCenterReason,
+  isCenterCode,
+  normalizeJoinCode,
+  parseCenterJoin,
+  parseTeacherInvite,
+} from '@/utils/centerCode';
+import { recordHighlightLessonDay } from '@/services/dailyHighlight';
+import { localDay } from '@/store/challengeStore';
+import type { StarterSet } from '@/services/StarterSetService';
 import { initCrashReporting, setCrashUserId } from '@/services/crashReporting';
+import { StreakService } from '@/services/StreakService';
 import {
   refreshPushToken,
   subscribeForegroundMessages,
   syncPushPermission,
   requestProvisionalPermission,
 } from '@/services/pushNotifications';
-import { useCatalogStore, useCoursesStore, useSettingsStore } from '@/store';
+import { useCatalogStore, useCoursesStore, useSettingsStore, useStartTasksStore } from '@/store';
 import { NEW_PER_DAY_OPTIONS } from '@/services/LessonService';
 import type { AboutMeAnswers } from '@/screens/AboutMeOnboardingScreen';
 
@@ -46,8 +65,25 @@ import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-c
 import { log } from '@/utils/logger';
 import { type AuthStep, AppRoot } from './app/AppRoot';
 
-// Метка сервера для отчётов о падениях (plan/new/release_safety.md, Release 4)
+// Метка сервера для отчётов о падениях (plan/done/release_safety.md, Release 4)
 initCrashReporting();
+
+/** Момент запуска JS — от него считаем, сколько уже видна заставка */
+const APP_STARTED_AT = Date.now();
+/**
+ * Заставка с логотипом — не меньше этого. Сохранённые данные грузятся почти мгновенно, а свежие
+ * с сервера (серия, урок дня, роль) — в фоне: без паузы главная открывалась раньше них и
+ * перерисовывалась на глазах. Пока видна заставка, они успевают прийти.
+ */
+const SPLASH_MIN_MS = 3_000;
+
+/** Дождаться, пока очередь отправит ответы (не дольше timeoutMs) */
+async function waitForSyncQueue(timeoutMs: number): Promise<void> {
+  const started = Date.now();
+  while (SyncQueueService.pendingCount > 0 && Date.now() - started < timeoutMs) {
+    await new Promise((r) => setTimeout(r, 150));
+  }
+}
 
 export default function App() {
   const [isReady, setIsReady] = useState(false);
@@ -69,6 +105,30 @@ export default function App() {
     } & AboutMeAnswers
   >({});
   const [pendingInviteToken, setPendingInviteToken] = useState<string | null>(null);
+  // Ссылка учителя, открытая до входа: новый ученик идёт сразу в «Курс найден» (Start 7.3)
+  const pendingInviteTokenRef = useRef<string | null>(null);
+  pendingInviteTokenRef.current = pendingInviteToken;
+  // Ссылка учебного центра /join/<код> (plan/new/center_books.md, Center 5): до входа — онбординг
+  // «Центр найден», у вошедшего — окно поверх приложения
+  const [pendingCenterCode, setPendingCenterCode] = useState<string | null>(null);
+  const pendingCenterCodeRef = useRef<string | null>(null);
+  pendingCenterCodeRef.current = pendingCenterCode;
+  // Ссылка для учителей центра /t/<код> (Center 13): окно после входа и онбординга
+  const [pendingTeacherInvite, setPendingTeacherInvite] = useState<string | null>(null);
+  // Ученик с кодом или ссылкой учителя (plan/new/new_user_activation.md, этап 7)
+  const [courseJoin, setCourseJoin] = useState<{
+    via: 'code' | 'link';
+    code?: string;
+    token?: string;
+    info: CourseInviteInfo;
+    joined?: boolean;
+  } | null>(null);
+  // Ученик с кодом или ссылкой учебного центра (plan/new/center_books.md, Center 5)
+  const [centerJoin, setCenterJoin] = useState<{
+    via: 'code' | 'link';
+    code: string;
+    info: Extract<CenterCodeResult, { ok: true }>;
+  } | null>(null);
   // Набор по ссылке: код, «ждём входа» (человек нажал «Войти и добавить») и «добавить сразу после входа»
   const [pendingShareCode, setPendingShareCode] = useState<string | null>(null);
   const [shareDeferred, setShareDeferred] = useState(false);
@@ -84,6 +144,16 @@ export default function App() {
   const ensuredUserIdRef = useRef<string | null>(null);
   // Вход через Apple: шага «Как к тебе обращаться?» нет, «назад» с выбора роли — на приветствие
   const skipNameStepRef = useRef(false);
+  // Первый урок в онбординге (plan/new/new_user_activation.md, Start 2.5): стартовый набор
+  // создаётся сразу после выбора языков; null в starterReady — ещё создаётся
+  const [firstLesson, setFirstLesson] = useState<StarterSet | null>(null);
+  const [starterReady, setStarterReady] = useState<boolean | null>(null);
+  // Воронка онбординга (Start 2.8): время от входа нового пользователя
+  const onboardingStartedAtRef = useRef<number | null>(null);
+  const secSinceSignIn = () =>
+    onboardingStartedAtRef.current
+      ? Math.round((Date.now() - onboardingStartedAtRef.current) / 1000)
+      : 0;
   const loadedUserIdRef = useRef<string | null>(null);
   const processedOAuthCodeRef = useRef<string | null>(null);
   // Guard: не отправляем push токен повторно для того же userId
@@ -157,6 +227,18 @@ export default function App() {
             const { data: sess } = await supabase.auth.getSession();
             if (sess.session?.user?.id) {
               loadedUserIdRef.current = sess.session.user.id;
+              // Пока видна заставка (SPLASH_MIN_MS) — то, что главная иначе спросила бы уже на экране:
+              // роль и серия. Ответы ложатся в кэш, главная откроется сразу с ними
+              const userId = sess.session.user.id;
+              useSettingsStore
+                .getState()
+                .fetchIsTeacher(userId)
+                .catch(() => {});
+              Promise.all([
+                StreakService.fetchTodayActivity(),
+                StreakService.fetchUserStats(),
+                StreakService.fetchWeekActivity(10),
+              ]).catch(() => {});
             }
           } catch {}
           unsubscribe = setupAutoSave();
@@ -164,6 +246,9 @@ export default function App() {
       } catch (error) {
         log.error('App', 'Failed to initialize app', error);
       } finally {
+        // Данные уже есть — держим заставку до SPLASH_MIN_MS от запуска (не дольше общего лимита)
+        const rest = SPLASH_MIN_MS - (Date.now() - APP_STARTED_AT);
+        if (rest > 0 && !splashReleased) await new Promise((r) => setTimeout(r, rest));
         clearTimeout(splashTimer);
         splashReleased = true;
         if (isMounted) {
@@ -251,12 +336,31 @@ export default function App() {
         // Новый пользователь — начинаем онбординг
         setIsAuthenticated(true);
         setNeedsOnboarding(true);
-        if (signedInWithApple) {
-          setOnboardingData((prev) => ({ ...prev, displayName }));
-          setAuthStep('role');
-        } else {
-          setAuthStep('name');
+        onboardingStartedAtRef.current = Date.now();
+        // Первый шаг — роль; имя ученик вводит после первого урока (Start 2.1)
+        if (signedInWithApple) setOnboardingData((prev) => ({ ...prev, displayName }));
+        // Открыл ссылку учителя — без роли и языков, сразу «Курс найден» (Start 7.3)
+        const token = pendingInviteTokenRef.current;
+        if (token) {
+          const info = await NeonService.getCourseInviteInfo(token).catch(() => null);
+          if (info?.ok) {
+            setCourseJoin({ via: 'link', token, info });
+            setAuthStep('course_found');
+            return;
+          }
         }
+        // Открыл ссылку учебного центра — сразу «Центр найден», без роли и языков (Center 5)
+        const centerCode = pendingCenterCodeRef.current;
+        if (centerCode) {
+          const info = await CenterService.getInfo(centerCode);
+          setPendingCenterCode(null);
+          if (info.ok) {
+            setCenterJoin({ via: 'link', code: centerCode, info });
+            setAuthStep('center_found');
+            return;
+          }
+        }
+        setAuthStep('role');
       }
     },
     []
@@ -369,6 +473,18 @@ export default function App() {
       setPendingInviteToken(joinMatch[1]);
       return;
     }
+    // Ссылка учебного центра: /join/ALFA-DEC-7K (Center 5)
+    const centerPath = parseCenterJoin(path);
+    if (centerPath) {
+      setPendingCenterCode(centerPath);
+      return;
+    }
+    // Ссылка для учителей центра: /t/<код> (Center 13)
+    const teacherPath = parseTeacherInvite(path);
+    if (teacherPath) {
+      setPendingTeacherInvite(teacherPath);
+      return;
+    }
 
     // Набор по ссылке: ?share=CODE — кнопка «Открыть в Flashly» на странице /s/CODE
     const shareParam = new URLSearchParams(window.location.search).get('share');
@@ -385,6 +501,10 @@ export default function App() {
       log.debug('Invite', 'Query param detected, token', joinParam.slice(0, 8) + '...');
       setPendingInviteToken(joinParam);
       // Очистить query из URL
+      window.history.replaceState({}, '', '/');
+    } else if (joinParam && isCenterCode(normalizeJoinCode(joinParam))) {
+      // Страница /join/<код центра> → «Открыть Flashly» (Center 5)
+      setPendingCenterCode(normalizeJoinCode(joinParam));
       window.history.replaceState({}, '', '/');
     }
   }, []);
@@ -434,6 +554,18 @@ export default function App() {
         if (joinMatch) {
           log.debug('Invite', 'Deep link detected, token', joinMatch[1].slice(0, 8) + '...');
           setPendingInviteToken(joinMatch[1]);
+          return;
+        }
+        // Ссылка учебного центра: https://…/join/ALFA-DEC-7K или flashly://join/ALFA-DEC-7K
+        const centerLink = parseCenterJoin(url);
+        if (centerLink) {
+          setPendingCenterCode(centerLink);
+          return;
+        }
+        // Ссылка для учителей центра: https://flashlycards.app/t/<код> или flashly://t/<код>
+        const teacherLink = parseTeacherInvite(url);
+        if (teacherLink) {
+          setPendingTeacherInvite(teacherLink);
           return;
         }
 
@@ -489,12 +621,8 @@ export default function App() {
   }, []);
 
   const handleBackToName = useCallback(() => {
-    if (skipNameStepRef.current) {
-      handleBackToWelcome();
-      return;
-    }
     setAuthStep('name');
-  }, [handleBackToWelcome]);
+  }, []);
 
   const handleBackToRole = useCallback(() => {
     setAuthStep('role');
@@ -516,15 +644,21 @@ export default function App() {
     setAuthStep('teacher_subject');
   }, []);
 
-  const handleSubmitName = useCallback((name?: string) => {
-    setOnboardingData((prev) => ({ ...prev, displayName: name }));
-    setAuthStep('role');
-  }, []);
+  // Порядок (plan/new/new_user_activation.md, Start 2.1): ученик — роль → родной → изучаемый →
+  // имя → цель → норма; учитель — роль → имя → родной → изучаемый → предмет → группа.
+  // Имя из Sign in with Apple не спрашиваем.
+  const handleSubmitName = useCallback(
+    (name?: string) => {
+      setOnboardingData((prev) => ({ ...prev, displayName: name || prev.displayName }));
+      setAuthStep(onboardingData.role === 'teacher' ? 'native_language' : 'goal');
+    },
+    [onboardingData.role]
+  );
 
   const handleSubmitRole = useCallback((role: string) => {
     const r = role as 'student' | 'teacher';
     setOnboardingData((prev) => ({ ...prev, role: r }));
-    setAuthStep('native_language');
+    setAuthStep(r === 'teacher' && !skipNameStepRef.current ? 'name' : 'native_language');
   }, []);
 
   const handleSubmitNativeLanguage = useCallback((code: string) => {
@@ -535,18 +669,78 @@ export default function App() {
   const handleSubmitTargetLanguages = useCallback(
     (codes: string[]) => {
       setOnboardingData((prev) => ({ ...prev, targetLanguages: codes }));
-      setAuthStep(onboardingData.role === 'teacher' ? 'teacher_subject' : 'goal');
+      if (onboardingData.role === 'teacher') {
+        setAuthStep('teacher_subject');
+        return;
+      }
+      // Ученик: «Собираем твой первый набор», пока набор создаётся на сервере
+      setStarterReady(null);
+      setAuthStep('starter_build');
+      if (!currentUserId) {
+        setStarterReady(false);
+        return;
+      }
+      issueStarterSet({
+        userId: currentUserId,
+        nativeLanguage: onboardingData.nativeLanguage,
+        targetLanguages: codes,
+      }).then((starter) => {
+        if (starter) {
+          putStarterSetInStores(starter);
+          setFirstLesson(starter);
+        }
+        setStarterReady(!!starter);
+      });
     },
-    [onboardingData.role]
+    [onboardingData.role, onboardingData.nativeLanguage, currentUserId]
   );
 
-  const handleSubmitGoal = useCallback((goalId: string) => {
+  // После первого урока — вопросы: имя (если не пришло из Apple), цель, норма
+  const afterLessonStep = useCallback(
+    (): AuthStep => (skipNameStepRef.current ? 'goal' : 'name'),
+    []
+  );
+  const handleStarterBuilt = useCallback(
+    (ok: boolean) => setAuthStep(ok ? 'first_cards' : afterLessonStep()),
+    [afterLessonStep]
+  );
+  const handleFirstCardsDone = useCallback(() => setAuthStep('first_match'), []);
+
+  // Каждый показанный шаг онбординга и начало/конец первого урока
+  useEffect(() => {
+    if (!needsOnboarding || authStep === 'welcome') return;
+    Analytics.onboardingStepViewed(authStep, secSinceSignIn());
+    if (authStep === 'first_cards') Analytics.firstLessonStarted(secSinceSignIn());
+    if (authStep === 'first_results') Analytics.firstLessonCompleted(secSinceSignIn());
+  }, [authStep, needsOnboarding]); // eslint-disable-line react-hooks/exhaustive-deps
+  const handleFirstMatchDone = useCallback(() => setAuthStep('first_results'), []);
+  const handleFirstResultsDone = useCallback(() => {
+    // Первое задание «Начала пути» выполнено — первые 10 алмазов (Start 3.9)
+    useStartTasksStore.getState().complete('first_lesson');
+    // Первый урок — день 1 для «Нового» (Start 4.2)
+    recordHighlightLessonDay(localDay());
+    setAuthStep(afterLessonStep());
+  }, [afterLessonStep]);
+
+  // «Перепутал? Поменять местами» (Start 2.3): бывший изучаемый — родной, бывший родной — изучаемый
+  const handleSwapLanguages = useCallback((newNative: string) => {
+    setOnboardingData((prev) => ({
+      ...prev,
+      nativeLanguage: newNative,
+      targetLanguages: prev.nativeLanguage ? [prev.nativeLanguage] : prev.targetLanguages,
+    }));
+  }, []);
+
+  const handleSubmitGoal = useCallback((goalId?: string) => {
     setOnboardingData((prev) => ({ ...prev, learningGoal: goalId }));
     setAuthStep('daily');
   }, []);
 
   const finishOnboarding = useCallback(
-    async (finalData: typeof onboardingData) => {
+    async (
+      finalData: typeof onboardingData,
+      opts: { joinedCourseId?: string; joinedCenter?: boolean } = {}
+    ) => {
       if (!currentUserId) return;
       await NeonService.saveOnboardingData(currentUserId, {
         displayName: finalData.displayName,
@@ -561,8 +755,41 @@ export default function App() {
         classDays: finalData.classDays,
         classHour: finalData.classHour,
       });
+      // Стартовый набор — до перезагрузки данных, иначе она его сотрёт (plan/new/new_user_activation.md, 1.3).
+      // Обычно он уже выдан перед первым уроком; здесь — если тогда не было сети
+      if (
+        finalData.role !== 'teacher' &&
+        !firstLesson &&
+        !opts.joinedCourseId &&
+        !opts.joinedCenter
+      ) {
+        await issueStarterSet({
+          userId: currentUserId,
+          nativeLanguage: finalData.nativeLanguage,
+          targetLanguages: finalData.targetLanguages,
+          learningGoal: finalData.learningGoal,
+        });
+      }
+      // Первые шаги учителя на главной (Start 6.1, 6.3)
+      if (finalData.role === 'teacher') {
+        markTeacherStarted({
+          subject: finalData.teacherSubject ?? null,
+          nativeLanguage: finalData.nativeLanguage,
+          targetLanguage: finalData.targetLanguages?.[0],
+        });
+      }
+      // Ответы первого урока должны дойти до сервера, иначе перезагрузка покажет слова невыученными
+      await waitForSyncQueue(3000);
       setNeedsOnboarding(false);
-      DatabaseService.reloadRemoteDataForUser(currentUserId);
+      const reloaded = DatabaseService.reloadRemoteDataForUser(currentUserId);
+      // Ученик курса: открываем курс учителя и включаем его задания «Начала пути» (Start 7.4)
+      if (opts.joinedCourseId) {
+        const courseId = opts.joinedCourseId;
+        callDataApi('startCourseStudentTasks').catch(() => {});
+        reloaded.then(() => useCoursesStore.getState().setActiveCourse(courseId)).catch(() => {});
+      }
+      // Ученик учебного центра: те же 3 задания «Начала пути», что у ученика курса (Center 5)
+      if (opts.joinedCenter) callDataApi('startCourseStudentTasks').catch(() => {});
       setAnalyticsUserId(currentUserId);
       setCrashUserId(currentUserId);
       Analytics.onboardingComplete();
@@ -588,8 +815,130 @@ export default function App() {
         refreshPushToken(currentUserId).catch(() => {});
       }
     },
-    [currentUserId]
+    [currentUserId, firstLesson]
   );
+
+  // ── Ученик с кодом или ссылкой учителя (plan/new/new_user_activation.md, этап 7) ──
+  const handleHaveCode = useCallback(() => setAuthStep('teacher_code'), []);
+  const handleCodeFound = useCallback((code: string, info: CourseInviteInfo) => {
+    setCourseJoin({ via: 'code', code, info });
+    setAuthStep('course_found');
+  }, []);
+  const handleCourseNotMine = useCallback(() => {
+    Analytics.courseJoinNotMine(courseJoin?.via ?? 'code');
+    if (courseJoin?.via === 'link') {
+      setPendingInviteToken(null);
+      setCourseJoin(null);
+      setAuthStep('role');
+      return;
+    }
+    setAuthStep('teacher_code');
+  }, [courseJoin]);
+  const finishCourseJoin = useCallback(
+    (name: string | undefined) => {
+      if (!courseJoin) return;
+      const { info } = courseJoin;
+      const finalData = {
+        ...onboardingData,
+        role: 'student' as const,
+        displayName: name ?? onboardingData.displayName,
+        nativeLanguage: info.languageTo ?? onboardingData.nativeLanguage,
+        targetLanguages: info.languageFrom ? [info.languageFrom] : onboardingData.targetLanguages,
+      };
+      setOnboardingData(finalData);
+      finishOnboarding(finalData, { joinedCourseId: info.courseId });
+    },
+    [courseJoin, onboardingData, finishOnboarding]
+  );
+  const handleCourseJoin = useCallback(async (): Promise<string | null> => {
+    if (!courseJoin || !currentUserId) return describeTeacherApiReason('network');
+    const result =
+      courseJoin.via === 'link' && courseJoin.token
+        ? await NeonService.joinCourseByToken(courseJoin.token, currentUserId)
+        : await NeonService.joinCourseByCode(courseJoin.code ?? '', currentUserId);
+    if (!result.ok) return describeTeacherApiReason(result.reason);
+    Analytics.courseJoinOnboarding(courseJoin.via);
+    setPendingInviteToken(null);
+    setCourseJoin({ ...courseJoin, joined: true });
+    // Имя из Apple уже есть — экран имени не нужен
+    if (skipNameStepRef.current && onboardingData.displayName) {
+      finishCourseJoin(onboardingData.displayName);
+    } else {
+      setAuthStep('course_name');
+    }
+    return null;
+  }, [courseJoin, currentUserId, onboardingData.displayName, finishCourseJoin]);
+
+  // ── Ученик с кодом или ссылкой учебного центра (plan/new/center_books.md, Center 5) ──
+  // После кода — выбор книги (или главная на курсе книги при продлении), как только навигатор
+  // смонтирован (после онбординга он появляется не сразу) — этап 7
+  const openCenterBooksWhenReady = useCallback((orgId: string) => {
+    const go = () => {
+      openCenterBooks((screen, params) => {
+        if (screen === 'Home') navigationRef.navigate('Main', { screen: 'Home' });
+        else navigationRef.navigate('CenterBookPick', params);
+      }, orgId).catch(() => {});
+    };
+    if (navigationRef.isReady()) {
+      go();
+      return;
+    }
+    let tries = 0;
+    const timer = setInterval(() => {
+      tries += 1;
+      if (navigationRef.isReady() || tries > 100) {
+        clearInterval(timer);
+        if (navigationRef.isReady()) go();
+      }
+    }, 100);
+  }, []);
+  // Стал учителем центра (Center 13): роль учителя в приложении и полка центра в «Библиотеке»
+  const handleTeacherInviteJoined = useCallback(() => {
+    setPendingTeacherInvite(null);
+    if (currentUserId)
+      useSettingsStore
+        .getState()
+        .fetchIsTeacher(currentUserId)
+        .catch(() => {});
+    if (navigationRef.isReady()) navigationRef.navigate('Main', { screen: 'Library' });
+  }, [currentUserId]);
+  const handleCenterFound = useCallback(
+    (code: string, info: Extract<CenterCodeResult, { ok: true }>) => {
+      setCenterJoin({ via: 'code', code, info });
+      setAuthStep('center_found');
+    },
+    []
+  );
+  const handleCenterNotMine = useCallback(() => {
+    Analytics.orgNotMine(centerJoin?.via ?? 'code');
+    if (centerJoin?.via === 'link') {
+      setCenterJoin(null);
+      setAuthStep('role');
+      return;
+    }
+    setAuthStep('teacher_code');
+  }, [centerJoin]);
+  const handleCenterActivate = useCallback(async (): Promise<string | null> => {
+    if (!centerJoin || !currentUserId) return describeCenterReason('network');
+    const result = await CenterService.activate(centerJoin.code);
+    if (!result.ok) return describeCenterReason(result.reason);
+    Analytics.orgJoined(centerJoin.via);
+    // Языки карточек — из книги центра: экраны языков, цели, нормы и имени ученик центра пропускает.
+    // Выбор книги — сразу после (этап 7: книга целиком = курс, юнит не выбираем)
+    const mine = await CenterService.loadMine();
+    const book = mine?.organizations.find((o) => o.id === result.organization.id)?.books[0];
+    const finalData = {
+      ...onboardingData,
+      role: 'student' as const,
+      nativeLanguage: book?.languageTo ?? onboardingData.nativeLanguage,
+      targetLanguages: book ? [book.languageFrom] : onboardingData.targetLanguages,
+    };
+    setOnboardingData(finalData);
+    setCenterJoin(null);
+    await finishOnboarding(finalData, { joinedCenter: true });
+    openCenterBooksWhenReady(result.organization.id);
+    return null;
+  }, [centerJoin, currentUserId, onboardingData, finishOnboarding, openCenterBooksWhenReady]);
 
   const handleSubmitDaily = useCallback((dailyId: string) => {
     // Выбор «5 / 10 / 20 слов в день» — квота новых слов урока дня (plan/done/home_redesign.md, 1.5)
@@ -598,9 +947,19 @@ export default function App() {
       useSettingsStore.getState().updateSettings({ lessonNewPerDay: perDay });
       DatabaseService.saveSettings();
     }
-    // Дальше — необязательные «Ещё два вопроса» для напоминаний (plan/new/push_notifications.md, 2.7)
+    // Дальше — «Ты учишься с учителем?» (Start 3.6), потом необязательные «Ещё два вопроса»
+    // для напоминаний (plan/new/push_notifications.md, 2.7)
     setOnboardingData((prev) => ({ ...prev, dailyGoal: dailyId }));
+    setAuthStep('with_teacher');
+  }, []);
+
+  const handleSubmitWithTeacher = useCallback((withTeacher?: boolean) => {
+    if (withTeacher !== undefined) setWantsTeacher(withTeacher);
     setAuthStep('about');
+  }, []);
+
+  const handleBackToWithTeacher = useCallback(() => {
+    setAuthStep('with_teacher');
   }, []);
 
   const handleBackToDaily = useCallback(() => {
@@ -717,6 +1076,35 @@ export default function App() {
           onSubmitRole={handleSubmitRole}
           onSubmitNativeLanguage={handleSubmitNativeLanguage}
           onSubmitTargetLanguages={handleSubmitTargetLanguages}
+          onSwapLanguages={handleSwapLanguages}
+          courseJoin={courseJoin}
+          onHaveCode={handleHaveCode}
+          onCodeFound={handleCodeFound}
+          onCourseJoin={handleCourseJoin}
+          onCourseNotMine={handleCourseNotMine}
+          onCourseName={finishCourseJoin}
+          centerJoin={centerJoin}
+          onCenterFound={handleCenterFound}
+          onCenterActivate={handleCenterActivate}
+          onCenterNotMine={handleCenterNotMine}
+          pendingCenterCode={pendingCenterCode}
+          onCenterInviteJoined={(info) => {
+            setPendingCenterCode(null);
+            openCenterBooksWhenReady(info.organization.id);
+          }}
+          onCenterInviteDismiss={() => setPendingCenterCode(null)}
+          pendingTeacherInvite={pendingTeacherInvite}
+          onTeacherInviteJoined={handleTeacherInviteJoined}
+          onTeacherInviteDismiss={() => setPendingTeacherInvite(null)}
+          firstLesson={firstLesson}
+          starterReady={starterReady}
+          onStarterBuilt={handleStarterBuilt}
+          onFirstCardsDone={handleFirstCardsDone}
+          onFirstMatchDone={handleFirstMatchDone}
+          onFirstResultsDone={handleFirstResultsDone}
+          onSubmitWithTeacher={handleSubmitWithTeacher}
+          onBackToWithTeacher={handleBackToWithTeacher}
+          targetLanguages={onboardingData.targetLanguages}
           onSubmitGoal={handleSubmitGoal}
           onSubmitDaily={handleSubmitDaily}
           onBackToDaily={handleBackToDaily}
@@ -724,6 +1112,8 @@ export default function App() {
           onSubmitTeacherSubject={handleSubmitTeacherSubject}
           onSubmitTeacherSize={handleSubmitTeacherSize}
           authStep={authStep}
+          onboardingRole={onboardingData.role}
+          nameSkipped={skipNameStepRef.current}
           authLoading={authLoading}
           nativeLanguage={onboardingData.nativeLanguage}
         />

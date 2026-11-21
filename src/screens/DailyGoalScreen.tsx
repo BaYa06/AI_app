@@ -5,12 +5,10 @@
  */
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Leaf, Zap, Flame, Rocket } from 'lucide-react-native';
-import { Text } from '@/components/common';
+import { Leaf, Zap, Flame } from 'lucide-react-native';
 import { Button, type IconComponent } from '@/components/ui';
 import { OnboardingOption } from '@/components/onboarding/OnboardingOption';
 import { OnboardingStep } from '@/components/onboarding/OnboardingStep';
-import { useThemeColors } from '@/store';
 import { spacing } from '@/constants';
 
 type DailyOption = {
@@ -21,6 +19,9 @@ type DailyOption = {
 };
 
 type Props = {
+  /** Номер шага и сколько всего — считает AppRoot по роли и пути */
+  step?: number;
+  total?: number;
   onContinue?: (optionId: string) => void;
   onBack?: () => void;
 };
@@ -31,29 +32,22 @@ const OPTIONS: DailyOption[] = [
   { id: '20', label: '20 слов в день', icon: Flame, vibe: 'Серьезно' },
 ];
 
-export function DailyGoalScreen({ onContinue, onBack }: Props) {
-  const colors = useThemeColors();
+export function DailyGoalScreen({ onContinue, onBack, step = 6, total }: Props) {
   const [selected, setSelected] = useState<string>('10');
 
   return (
     <OnboardingStep
       onBack={onBack}
       title="Flashly"
-      step={6}
-      headline="Установи дневную цель"
-      description="Сколько новых слов хочешь учить каждый день?"
+      step={step}
+      total={total}
+      headline="Сколько слов в день?"
+      description="Можно поменять в любой момент."
       align="center"
       footer={
         <>
-          <Text variant="bodySmall" align="center" style={{ color: colors.textTertiary }}>
-            Это можно изменить в настройках профиля.
-          </Text>
-          <Button
-            title="Начать обучение"
-            icon={Rocket}
-            onPress={() => onContinue?.(selected)}
-            fullWidth
-          />
+          <Button title="Продолжить" onPress={() => onContinue?.(selected)} fullWidth />
+          <Button title="Пропустить" variant="quiet" onPress={() => onContinue?.('10')} fullWidth />
         </>
       }
     >

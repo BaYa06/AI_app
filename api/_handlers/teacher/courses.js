@@ -55,7 +55,7 @@ export async function renameCourse(req, res, sql, userId) {
 
 export const SCHEDULE_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
-/** [{ day, time: 'HH:MM' }] — только дни недели и время кратно 15 минутам, не больше одного занятия в день */
+/** [{ day, time: 'HH:MM' }] — только дни недели и время кратно 5 минутам (шаг барабана в окне расписания), не больше одного занятия в день */
 export function parseSchedule(value) {
   if (!Array.isArray(value)) return null;
   const byDay = new Map();
@@ -65,7 +65,7 @@ export function parseSchedule(value) {
     if (!SCHEDULE_DAYS.includes(day) || !m) continue;
     const h = Number(m[1]),
       min = Number(m[2]);
-    if (h > 23 || min > 59 || min % 15 !== 0) continue;
+    if (h > 23 || min > 59 || min % 5 !== 0) continue;
     byDay.set(day, `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`);
   }
   const schedule = SCHEDULE_DAYS.filter((d) => byDay.has(d)).map((day) => ({
