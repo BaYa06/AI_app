@@ -430,7 +430,10 @@ export async function examCreate(req, res, sql, userId) {
 export async function joinExam(req, res, sql, userId, session) {
   const features = Array.isArray(req.body?.features) ? req.body.features : [];
   if (!features.includes(EXAM_FEATURE)) {
-    return res.status(426).json({ error: 'Update the app to take this exam', update: true });
+    // Текст показывает как есть старое приложение (1.8.6 и раньше) — поэтому по-русски
+    return res
+      .status(426)
+      .json({ error: 'Обновите приложение в App Store, чтобы пройти этот экзамен', update: true });
   }
   const clientExitControl = req.body?.exitControl === true;
 
