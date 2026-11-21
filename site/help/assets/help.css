@@ -71,13 +71,14 @@ header.h-top { top: env(safe-area-inset-top, 0px); }
 
 /* Ролики: лента 9:16 */
 .h-reels { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 6px; }
-.h-reel { flex: 0 0 132px; aspect-ratio: 9 / 16; border-radius: 14px; border: 0; scroll-snap-align: start; position: relative; overflow: hidden; color: #FFFFFF; text-align: left; padding: 10px; display: flex; flex-direction: column; justify-content: flex-end; gap: 4px; background-color: #4447D6; background-size: cover; background-position: center; cursor: pointer; font-family: var(--font); }
-.h-reel b { font-size: 13px; line-height: 17px; }
-.h-reel small { font-size: 11px; opacity: 0.85; }
-.h-pl { position: absolute; top: 10px; left: 10px; width: 26px; height: 26px; border-radius: 50%; background: rgba(255, 255, 255, 0.92); display: grid; place-items: center; color: #4447D6; }
-.h-pl svg { width: 12px; height: 12px; margin-left: 2px; }
-.h-reel.is-seen::after { content: "✓"; position: absolute; top: 12px; right: 10px; font-size: 12px; background: rgba(0, 0, 0, 0.4); width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; }
-@media (min-width: 900px) { .h-reel { flex-basis: 150px; } }
+.h-reel { flex: 0 0 min(264px, 72vw); aspect-ratio: 9 / 16; border-radius: 18px; border: 0; scroll-snap-align: start; position: relative; overflow: hidden; color: #FFFFFF; text-align: left; padding: 16px; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; background-color: #4447D6; background-size: cover; background-position: center; cursor: pointer; font-family: var(--font); }
+.h-reel b { font-size: 18px; line-height: 24px; }
+.h-reel small { font-size: 14px; opacity: 0.9; }
+.h-reel-own small { position: absolute; right: 12px; bottom: 12px; background: rgba(0, 0, 0, 0.45); border-radius: 6px; padding: 2px 8px; }
+.h-pl { position: absolute; top: 14px; left: 14px; width: 44px; height: 44px; border-radius: 50%; background: rgba(255, 255, 255, 0.92); display: grid; place-items: center; color: #4447D6; }
+.h-pl svg { width: 18px; height: 18px; margin-left: 3px; }
+.h-reel.is-seen::after { content: "✓"; position: absolute; top: 18px; right: 14px; font-size: 16px; background: rgba(0, 0, 0, 0.4); width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; }
+@media (min-width: 900px) { .h-reel { flex-basis: 300px; } }
 
 /* Первые 10 минут */
 .h-path { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; counter-reset: hs; }
