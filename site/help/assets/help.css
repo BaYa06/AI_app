@@ -1,0 +1,211 @@
+/* Раздел «Помощь учителю» (plan/new/teacher_help.md). Поверх /site/site.css: те же токены и шапка.
+   Телефон — главный экран: нижняя панель, крупные цели нажатия, вертикальные ролики 9:16. */
+:root {
+  --h-urgent: #B91C1C;
+  --h-urgent-tint: rgba(220, 38, 38, 0.07);
+  --h-urgent-border: rgba(220, 38, 38, 0.26);
+  --h-new: #B45309;
+  --h-new-tint: rgba(245, 158, 11, 0.12);
+  --h-ok: #047857;
+  --h-ok-tint: rgba(16, 185, 129, 0.12);
+  --h-mark: rgba(250, 204, 21, 0.45);
+  --h-tint2: rgba(100, 103, 242, 0.18);
+  --h-reel: linear-gradient(170deg, #7C7FF0, #4447D6 60%, #2E3099);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --h-urgent: #FCA5A5;
+    --h-urgent-tint: rgba(248, 113, 113, 0.10);
+    --h-urgent-border: rgba(248, 113, 113, 0.30);
+    --h-new: #FBBF24;
+    --h-new-tint: rgba(251, 191, 36, 0.12);
+    --h-ok: #6EE7B7;
+    --h-ok-tint: rgba(16, 185, 129, 0.14);
+    --h-mark: rgba(250, 204, 21, 0.30);
+    --h-tint2: rgba(129, 140, 248, 0.22);
+  }
+}
+
+.h-body { line-height: 1.5; }
+.h-body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 6; background: var(--bg); }
+.h-draftbar { background: var(--h-new-tint); color: var(--h-new); font-size: 13px; line-height: 18px; text-align: center; padding: 6px max(16px, env(safe-area-inset-right, 0px)) 6px max(16px, env(safe-area-inset-left, 0px)); }
+
+/* Шапка с поиском */
+header.h-top { top: env(safe-area-inset-top, 0px); }
+.h-top .wrap { height: auto; min-height: 64px; gap: 16px; padding-block: 10px; }
+.h-top .logo { flex: none; gap: 8px; font-size: 18px; }
+.h-sub { color: var(--text-3); font-weight: 500; font-size: 15px; }
+.h-search { flex: 1; min-width: 0; position: relative; margin: 0; }
+.h-search svg { position: absolute; left: 13px; top: 13px; width: 20px; height: 20px; color: var(--text-3); pointer-events: none; }
+.h-search input { width: 100%; height: 46px; border-radius: 12px; border: 1.5px solid var(--border); background: var(--surface-muted); color: var(--text); padding: 0 44px 0 42px; font: 16px var(--font); -webkit-appearance: none; appearance: none; }
+.h-search input::-webkit-search-cancel-button { display: none; }
+.h-search input:focus { outline: none; border-color: var(--primary); background: var(--surface); box-shadow: 0 0 0 4px var(--tint); }
+.h-kbd { position: absolute; right: 10px; top: 11px; font: 12px/20px var(--font); color: var(--text-3); border: 1px solid var(--border); border-radius: 6px; padding: 1px 7px; background: var(--surface); }
+.h-clear { position: absolute; right: 6px; top: 6px; width: 34px; height: 34px; border: 0; background: none; border-radius: 8px; color: var(--text-3); font-size: 22px; cursor: pointer; }
+.h-to { flex: none; font-size: 14px; font-weight: 600; color: var(--text-2); }
+
+.h-main { padding-block: 24px 64px; }
+.h-narrow { max-width: 760px; margin: 0 auto; }
+.h-main h1 { margin: 6px 0 0; font-size: 32px; line-height: 40px; font-weight: 700; letter-spacing: -0.4px; text-wrap: balance; }
+.h-main h2 { margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; text-wrap: balance; }
+.h-h2 { margin: 32px 0 12px !important; }
+.h-lead { margin: 6px 0 0; font-size: 17px; line-height: 26px; }
+.h-main section { margin-top: 36px; }
+.h-sh { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.h-muted { color: var(--text-3); }
+
+/* Идёт урок */
+.h-urgent { border: 1px solid var(--h-urgent-border); background: var(--h-urgent-tint); border-radius: 16px; padding: 16px; margin-top: 22px !important; }
+.h-urgent-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.h-urgent-head h2 { font-size: 18px !important; color: var(--h-urgent); }
+.h-urgent-head p { margin: 0; color: var(--text-2); font-size: 14px; }
+.h-ugrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.h-u { background: var(--surface); border: 1px solid var(--border) !important; border-radius: 12px; padding: 12px 14px; min-width: 0; }
+.h-u summary { padding: 0; display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: 15px; line-height: 21px; }
+.h-u summary::after { content: none; }
+.h-u .h-hint { font-weight: 400; font-size: 13px; color: var(--text-3); }
+.h-u[open] { border-color: var(--h-urgent-border) !important; }
+.h-u[open] .h-hint { display: none; }
+.h-u p { margin: 8px 0 6px; color: var(--text); font-size: 15px; line-height: 22px; }
+.h-u a { font-size: 14px; font-weight: 600; }
+
+/* Ролики: лента 9:16 */
+.h-reels { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 6px; }
+.h-reel { flex: 0 0 132px; aspect-ratio: 9 / 16; border-radius: 14px; border: 0; scroll-snap-align: start; position: relative; overflow: hidden; color: #FFFFFF; text-align: left; padding: 10px; display: flex; flex-direction: column; justify-content: flex-end; gap: 4px; background-color: #4447D6; background-size: cover; background-position: center; cursor: pointer; font-family: var(--font); }
+.h-reel b { font-size: 13px; line-height: 17px; }
+.h-reel small { font-size: 11px; opacity: 0.85; }
+.h-pl { position: absolute; top: 10px; left: 10px; width: 26px; height: 26px; border-radius: 50%; background: rgba(255, 255, 255, 0.92); display: grid; place-items: center; color: #4447D6; }
+.h-pl svg { width: 12px; height: 12px; margin-left: 2px; }
+.h-reel.is-seen::after { content: "✓"; position: absolute; top: 12px; right: 10px; font-size: 12px; background: rgba(0, 0, 0, 0.4); width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; }
+@media (min-width: 900px) { .h-reel { flex-basis: 150px; } }
+
+/* Первые 10 минут */
+.h-path { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; counter-reset: hs; }
+.h-path li { counter-increment: hs; min-width: 0; }
+.h-step { height: 100%; border: 1px solid var(--border); border-radius: 12px; padding: 14px; background: var(--surface); display: flex; flex-direction: column; gap: 4px; color: var(--text); }
+.h-step::before { content: counter(hs); width: 26px; height: 26px; border-radius: 50%; background: var(--tint); color: var(--primary); font-weight: 700; font-size: 13px; display: grid; place-items: center; margin-bottom: 4px; }
+.h-step b { font-weight: 600; font-size: 15px; line-height: 21px; }
+.h-step small { color: var(--text-3); }
+.h-step.is-seen::before { content: "✓"; background: var(--h-ok-tint); color: var(--h-ok); }
+.h-step:hover { border-color: var(--primary); text-decoration: none; }
+@media (max-width: 760px) { .h-path { grid-template-columns: 1fr 1fr; } }
+
+/* Темы */
+.h-cats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.h-cat { display: flex; gap: 12px; align-items: flex-start; padding: 14px; border-radius: 12px; background: var(--surface-muted); color: var(--text); border: 1px solid transparent; min-width: 0; }
+.h-cat:hover { border-color: var(--primary); background: var(--tint); text-decoration: none; }
+.h-ic { width: 38px; height: 38px; border-radius: 10px; background: var(--surface); display: grid; place-items: center; flex-shrink: 0; color: var(--primary); }
+.h-ic svg { width: 20px; height: 20px; }
+.h-cat b { display: block; font-size: 15px; line-height: 21px; }
+.h-cat small { color: var(--text-3); font-size: 13px; line-height: 18px; }
+@media (max-width: 860px) { .h-cats { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 420px) { .h-cats { grid-template-columns: 1fr; } }
+
+/* Список вопросов: ответ раскрывается на месте */
+.h-list { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 16px; overflow: hidden; background: var(--surface); }
+.h-q { border: 0 !important; border-top: 1px solid var(--border) !important; }
+.h-q:first-child { border-top: 0 !important; }
+.h-q summary { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; font-weight: 400; }
+.h-q summary::after, .h-q[open] summary::after, .h-u[open] summary::after { content: none; }
+.h-q summary:hover { background: var(--surface-muted); }
+.h-qt { flex: 1; min-width: 0; }
+.h-qt b { font-weight: 600; font-size: 15.5px; line-height: 22px; }
+.h-chev { width: 18px; height: 18px; color: var(--text-3); flex-shrink: 0; margin-top: 3px; transition: transform 0.15s; }
+.h-q[open] .h-chev { transform: rotate(90deg); }
+.h-qb { padding: 0 16px 16px; }
+.h-short { margin: 0 0 10px !important; color: var(--text) !important; font-size: 15.5px; line-height: 23px; }
+.h-more { font-weight: 600; font-size: 14px; }
+.h-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.h-badge { font-size: 12px; line-height: 18px; border-radius: 999px; padding: 1px 8px; background: var(--surface-muted); color: var(--text-3); white-space: nowrap; }
+.h-vid { background: var(--tint); color: var(--primary); }
+.h-new, .h-draftb { background: var(--h-new-tint); color: var(--h-new); }
+.h-urg { background: var(--h-urgent-tint); color: var(--h-urgent); }
+.h-where { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 13.5px; line-height: 20px; margin-bottom: 10px; }
+.h-wl { color: var(--text-3); margin-right: 4px; }
+.h-crumb { background: var(--surface-muted); border: 1px solid var(--border); border-radius: 7px; padding: 1px 8px; }
+.h-sep { color: var(--text-3); }
+mark { background: var(--h-mark); color: inherit; border-radius: 3px; padding: 0 1px; }
+
+/* Страница вопроса */
+.h-crumbs { font-size: 14px; color: var(--text-3); display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.h-crumbs [aria-current] { display: none; }
+.h-article > .h-meta { margin-top: 8px; }
+.h-answer { margin: 16px 0 12px; border-radius: 16px; background: var(--tint); padding: 16px 18px; }
+.h-answer p { margin: 4px 0 0; font-size: 18px; line-height: 27px; }
+.h-grid { display: grid; gap: 24px; margin-top: 20px; }
+.h-grid .h-h2 { margin-top: 0 !important; }
+@media (min-width: 820px) {
+  .h-grid { grid-template-columns: 300px 1fr; align-items: start; }
+  .h-grid.h-novid { grid-template-columns: 1fr; }
+  .h-vcol { position: sticky; top: calc(84px + env(safe-area-inset-top, 0px)); }
+}
+.h-video { position: relative; display: block; width: min(100%, 320px, calc(72vh * 9 / 16)); aspect-ratio: 9 / 16; margin: 0 auto; border: 0; border-radius: 18px; overflow: hidden; background-color: #4447D6; background-size: cover; background-position: center; color: #FFFFFF; cursor: pointer; padding: 0; }
+.h-play { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 64px; height: 64px; border-radius: 50%; background: rgba(255, 255, 255, 0.95); display: grid; place-items: center; color: #4447D6; }
+.h-play svg { width: 26px; height: 26px; margin-left: 4px; }
+.h-dur { position: absolute; right: 12px; bottom: 12px; background: rgba(0, 0, 0, 0.6); border-radius: 6px; padding: 2px 8px; font: 13px/18px var(--font); font-variant-numeric: tabular-nums; }
+.h-chapters { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; justify-content: center; }
+.h-chapters button { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 8px; padding: 4px 10px; font: 13px/20px var(--font); font-variant-numeric: tabular-nums; cursor: pointer; }
+.h-chapters button span { color: var(--primary); font-weight: 600; margin-right: 6px; }
+@media (max-width: 819px) { .h-chapters { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; padding-bottom: 4px; } .h-chapters button { flex-shrink: 0; } }
+.h-steps { margin: 0; padding: 0; list-style: none; counter-reset: st; display: flex; flex-direction: column; gap: 10px; }
+.h-steps li { counter-increment: st; display: grid; grid-template-columns: 30px 1fr; gap: 12px; align-items: start; margin: 0; }
+.h-steps li::before { content: counter(st); width: 30px; height: 30px; border-radius: 50%; background: var(--primary-fill); color: var(--on-primary); font-weight: 700; font-size: 14px; display: grid; place-items: center; }
+.h-steps li div { padding-top: 3px; min-width: 0; }
+.h-platform { margin: 14px 0 0; font-size: 14px; color: var(--text-3); }
+.h-tips { margin-top: 20px; border-radius: 12px; padding: 14px 16px; background: var(--surface-muted); }
+.h-tips ul { margin: 6px 0 0; padding-left: 20px; color: var(--text-2); }
+.h-helpful { margin-top: 28px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; border-top: 1px solid var(--border); padding-top: 18px; }
+.h-helpful button { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 10px; padding: 8px 14px; font: 15px var(--font); cursor: pointer; }
+.h-helpful button:hover { border-color: var(--primary); }
+.h-helpful .h-thanks { color: var(--h-ok); font-weight: 600; }
+.h-copy { margin-left: auto; font-size: 14px !important; }
+
+/* Поддержка, результаты поиска */
+.h-support { display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; border: 1px solid var(--border); border-radius: 16px; padding: 18px; background: var(--surface); }
+.h-support h2 { font-size: 17px !important; }
+.h-support p { margin: 2px 0 0; color: var(--text-2); font-size: 14px; line-height: 20px; max-width: 34em; }
+.h-rh { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.h-rh p { margin: 0; color: var(--text-3); font-size: 14px; }
+.h-empty { border: 1px dashed var(--border); border-radius: 16px; padding: 24px; text-align: center; color: var(--text-2); }
+.h-empty b { display: block; color: var(--text); font-size: 17px; margin-bottom: 4px; }
+.h-suggest { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 12px; }
+.h-chip { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 6px 12px; font: 14px var(--font); color: var(--text); cursor: pointer; }
+.h-chip:hover { border-color: var(--primary); color: var(--primary); }
+
+/* Просмотр роликов на весь экран, как Reels и Shorts */
+.h-viewer { position: fixed; inset: 0; z-index: 30; background: rgba(5, 6, 20, 0.96); display: flex; align-items: center; justify-content: center; padding: calc(12px + env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) calc(28px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); }
+.h-vscreen { position: relative; width: min(100%, calc((100vh - 64px) * 9 / 16), 420px); aspect-ratio: 9 / 16; border-radius: 18px; overflow: hidden; background: #000000; color: #FFFFFF; }
+.h-vscreen iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.h-vprog { position: absolute; left: 10px; right: 10px; top: 8px; display: flex; gap: 4px; z-index: 2; pointer-events: none; }
+.h-vprog i { flex: 1; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.3); }
+.h-vprog i.on { background: #FFFFFF; }
+.h-vinfo { position: absolute; left: 0; right: 0; bottom: 0; padding: 40px 64px 14px 14px; background: linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.75)); z-index: 2; }
+.h-vinfo b { display: block; font-size: 16px; line-height: 22px; }
+.h-vinfo a { display: inline-block; margin-top: 8px; color: #FFFFFF; font-weight: 600; font-size: 14px; background: rgba(255, 255, 255, 0.2); border-radius: 10px; padding: 6px 12px; }
+.h-vbtn { border: 0; background: rgba(255, 255, 255, 0.16); color: #FFFFFF; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; }
+.h-vbtn:disabled { opacity: 0.35; cursor: default; }
+.h-vbtn svg { width: 20px; height: 20px; }
+.h-vclose { position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); right: max(14px, env(safe-area-inset-right, 0px)); }
+.h-vnav { position: absolute; right: 10px; bottom: 76px; display: flex; flex-direction: column; gap: 10px; z-index: 3; }
+.h-vhint { position: absolute; left: 0; right: 0; bottom: calc(6px + env(safe-area-inset-bottom, 0px)); text-align: center; color: rgba(255, 255, 255, 0.6); font-size: 12px; }
+
+/* Нижняя панель на телефоне */
+.h-tabbar { display: none; }
+.h-toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 8px 14px; border-radius: 10px; font-size: 14px; z-index: 40; }
+@media (max-width: 640px) {
+  .h-sub, .h-kbd, .h-to { display: none; }
+  .h-top .wrap { gap: 10px; }
+  .h-top .logo .h-brand { display: none; }
+  .h-main h1 { font-size: 26px; line-height: 33px; }
+  .h-search input { height: 44px; }
+  .h-q summary { padding: 16px 14px; }
+  .h-u { padding: 14px; }
+  .h-tabbar { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; position: fixed; left: 0; right: 0; bottom: 0; z-index: 9; background: var(--bg); border-top: 1px solid var(--border); padding: 4px max(8px, env(safe-area-inset-right, 0px)) calc(4px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px)); }
+  .h-tabbar a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 11px; line-height: 14px; font-weight: 600; color: var(--text-2); min-height: 52px; }
+  .h-tabbar a:hover { text-decoration: none; }
+  .h-tabbar svg { width: 22px; height: 22px; }
+  .h-tabbar .h-hot { color: var(--h-urgent); }
+  .h-body > footer { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+  .h-toast { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (prefers-reduced-motion: reduce) { .h-chev { transition: none; } }

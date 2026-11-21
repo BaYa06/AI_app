@@ -48,6 +48,7 @@ export const T = {
     help: [
       ['/support', 'Поддержка'],
       ['/#faq', 'Частые вопросы'],
+      ['/teachers/help', 'Помощь учителю'],
     ],
     otherLang: ['/en', 'English'],
   },

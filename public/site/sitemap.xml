@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Генерируется scripts/build-site.mjs — правь там -->
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
   <url>
     <loc>https://flashlycards.app/</loc>
     <lastmod>2026-11-09</lastmod>
@@ -64,7 +64,147 @@
   </url>
   <url>
     <loc>https://flashlycards.app/teachers</loc>
-    <lastmod>2026-11-09</lastmod>
+    <lastmod>2026-11-21</lastmod>
     <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers/help</loc>
+    <lastmod>2026-11-21</lastmod>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers/help/c/start</loc>
+    <lastmod>2026-11-21</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers/help/c/students</loc>
+    <lastmod>2026-11-21</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers/help/c/sets</loc>
+    <lastmod>2026-11-21</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers/help/c/books</loc>
+    <lastmod>2026-11-21</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers/help/c/lesson</loc>
+    <lastmod>2026-11-21</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers/help/c/progress</loc>
+    <lastmod>2026-11-21</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers/help/start-as-teacher</loc>
+    <lastmod>2026-11-21</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers/help/create-course</loc>
+    <lastmod>2026-11-21</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers/help/demo-live-test</loc>
+    <lastmod>2026-11-21</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers/help/no-streak</loc>
+    <lastmod>2026-11-21</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers/help/invite-students</loc>
+    <lastmod>2026-11-21</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers/help/student-cant-join</loc>
+    <lastmod>2026-11-21</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers/help/what-student-sees</loc>
+    <lastmod>2026-11-21</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers/help/invite-link-vs-code</loc>
+    <lastmod>2026-11-21</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers/help/remove-student</loc>
+    <lastmod>2026-11-21</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers/help/change-course-code</loc>
+    <lastmod>2026-11-21</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers/help/create-set</loc>
+    <lastmod>2026-11-21</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers/help/set-not-visible</loc>
+    <lastmod>2026-11-21</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers/help/set-from-photo</loc>
+    <lastmod>2026-11-21</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers/help/set-from-library</loc>
+    <lastmod>2026-11-21</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers/help/attach-textbook</loc>
+    <lastmod>2026-11-21</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers/help/open-next-unit</loc>
+    <lastmod>2026-11-21</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers/help/student-test-code</loc>
+    <lastmod>2026-11-21</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers/help/test-results</loc>
+    <lastmod>2026-11-21</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers/help/who-is-behind</loc>
+    <lastmod>2026-11-21</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers/help/student-progress</loc>
+    <lastmod>2026-11-21</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://flashlycards.app/teachers/help/set-progress</loc>
+    <lastmod>2026-11-21</lastmod>
+    <priority>0.6</priority>
   </url>
 </urlset>

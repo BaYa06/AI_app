@@ -91,3 +91,6 @@ admin-server.mjs
 books/
 sets/
 sounds/
+
+# Раздел «Помощь учителю» генерирует scripts/build-help.mjs при каждой сборке (plan/new/teacher_help.md)
+public/site/help/

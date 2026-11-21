@@ -9,7 +9,8 @@
  *   public/site/p/<file>.html — страницы (vercel.json: rewrite «путь → /site/p/<file>.html»);
  *   public/site/404.html      — страница «не найдено»;
  *   public/site/sitemap.xml   — карта сайта (лендинг, официальные страницы, страницы из site/pages);
- *   public/site/llms.txt      — краткое описание для ИИ-ассистентов.
+ *   public/site/llms.txt      — краткое описание для ИИ-ассистентов;
+ *   public/site/help/…        — раздел «Помощь учителю» (scripts/build-help.mjs).
  *
  * Проверяет, что у каждой страницы есть rewrite в vercel.json и что редирект
  * «flashlycards.app → app.flashlycards.app» её не перехватит. Ошибка — код выхода 1
@@ -38,6 +39,7 @@ import {
   footLearnLinks,
   ORGANIZATION,
 } from './site/template.mjs';
+import { buildHelp } from './build-help.mjs';
 
 /** Страницы, написанные вручную (лендинг и документы), — только для sitemap */
 const STATIC_PAGES = [
@@ -205,10 +207,14 @@ ${siteFooter(t, page.lang, footLearnLinks(all, page.lang))}
 
 // ─── sitemap и llms.txt ───────────────────────────────────────────────────────
 
-function sitemap(pages) {
+const xml = (s) => esc(s).replace(/'/g, '&apos;');
+
+/** extra — адреса раздела «Помощь учителю» (scripts/build-help.mjs), у части есть ролик */
+function sitemap(pages, extra = []) {
   const entries = [
     ...STATIC_PAGES,
     ...pages.filter((p) => !p.noindex).map((p) => ({ ...p, priority: p.priority || '0.8' })),
+    ...extra,
   ];
   const urls = entries.map((p) => {
     const alt = p.alternates
@@ -221,17 +227,20 @@ function sitemap(pages) {
           ? `\n    <xhtml:link rel="alternate" hreflang="x-default" href="${ORIGIN}${p.alternates.ru}"/>`
           : '')
       : '';
-    return `  <url>\n    <loc>${ORIGIN}${p.path}</loc>\n    <lastmod>${p.updated}</lastmod>\n    <priority>${p.priority}</priority>${alt}\n  </url>`;
+    const video = p.video
+      ? `\n    <video:video>\n      <video:thumbnail_loc>${xml(p.video.thumb)}</video:thumbnail_loc>\n      <video:title>${xml(p.video.title)}</video:title>\n      <video:description>${xml(p.video.description)}</video:description>\n      <video:player_loc>${xml(p.video.player)}</video:player_loc>\n      <video:duration>${p.video.duration}</video:duration>\n    </video:video>`
+      : '';
+    return `  <url>\n    <loc>${ORIGIN}${p.path}</loc>\n    <lastmod>${p.updated}</lastmod>\n    <priority>${p.priority}</priority>${alt}${video}\n  </url>`;
   });
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!-- Генерируется scripts/build-site.mjs — правь там -->
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
 ${urls.join('\n')}
 </urlset>
 `;
 }
 
-function llms(pages) {
+function llms(pages, helpLines = []) {
   const ru = pages.filter((p) => p.lang === 'ru' && !p.noindex);
   return `# Flashly — карточки для изучения слов (Flashly flashcards app)
 
@@ -252,6 +261,9 @@ function llms(pages) {
 - [Flashly — карточки для изучения слов](${ORIGIN}/): что умеет приложение, как скачать, частые вопросы
 - [Flashly in English](${ORIGIN}/en): the same overview in English
 ${ru.map((p) => `- [${p.h1 || p.title}](${ORIGIN}${p.path}): ${p.description}`).join('\n')}
+
+## Помощь учителю
+${helpLines.join('\n')}
 
 ## Помощь и документы
 - [Поддержка](${ORIGIN}/support): как связаться, почта support@flashlycards.app
@@ -297,6 +309,7 @@ for (const page of pages) {
     page.file === '404' ? path.join(OUT, '404.html') : path.join(OUT, 'p', `${page.file}.html`);
   fs.writeFileSync(target, render(page, pages));
 }
-fs.writeFileSync(path.join(OUT, 'sitemap.xml'), sitemap(pages));
-fs.writeFileSync(path.join(OUT, 'llms.txt'), llms(pages));
+const help = buildHelp(pages);
+fs.writeFileSync(path.join(OUT, 'sitemap.xml'), sitemap(pages, help.sitemap));
+fs.writeFileSync(path.join(OUT, 'llms.txt'), llms(pages, help.llms));
 console.log(`build-site: ${pages.length} страниц, sitemap и llms.txt обновлены`);
