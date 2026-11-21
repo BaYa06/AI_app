@@ -107,7 +107,7 @@ const catUrl = (c) => `${BASE}/c/${c.id}`;
 const poster = (q) =>
   q.video.poster
     ? `/site/help/img/${q.video.poster}`
-    : `https://i.ytimg.com/vi/${q.video.youtubeId}/hqdefault.jpg`;
+    : `https://i.ytimg.com/vi/${q.video.youtubeId}/oardefault.jpg`; // вертикальная обложка Shorts
 /** «1:30» → «PT1M30S» */
 const isoDuration = (d) => {
   const [m, s] = String(d || '0:00')
@@ -461,6 +461,7 @@ function indexJson(ctx) {
     })),
     videos: ctx.videos.map((q) => ({
       s: q.slug,
+      ss: ctx.questions.filter((o) => o.video?.youtubeId === q.video.youtubeId).map((o) => o.slug),
       q: q.question,
       a: q.answer,
       id: q.video.youtubeId,
@@ -500,7 +501,11 @@ function checkRoutes() {
  */
 export function buildHelp(pages) {
   const ctx = load();
-  ctx.videos = ctx.questions.filter(hasVideo);
+  // Один ролик может отвечать на несколько вопросов: в ленте и в просмотре он один раз
+  ctx.videos = ctx.questions.filter(
+    (q, i, all) =>
+      hasVideo(q) && all.findIndex((o) => o.video?.youtubeId === q.video.youtubeId) === i
+  );
   ctx.footLearn = footLearnLinks(pages, 'ru');
   checkRoutes();
   for (const c of ctx.categories)

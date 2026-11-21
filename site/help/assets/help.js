@@ -221,7 +221,10 @@
   function openViewer(s, start) {
     load().then(function (d) {
       if (!d) return;
-      var i = d.videos.map(function (v) { return v.s; }).indexOf(s);
+      var i = -1;
+      d.videos.forEach(function (v, k) {
+        if (i < 0 && (v.s === s || (v.ss || []).indexOf(s) >= 0)) i = k;
+      });
       if (i < 0) return;
       vIdx = i;
       startAt = start || 0;
@@ -245,7 +248,7 @@
   }
   function draw() {
     var list = data.videos, v = list[vIdx];
-    markSeen(v.s);
+    (v.ss || [v.s]).forEach(markSeen);
     if (viewer) viewer.remove();
     viewer = document.createElement('div');
     viewer.className = 'h-viewer';

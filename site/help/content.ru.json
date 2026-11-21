@@ -50,7 +50,7 @@
       "tips": ["Один курс — одна группа. Для двух групп создайте два курса."],
       "platform": "На Android и в браузере окно выглядит иначе, поля те же.",
       "keywords": "группа класс курс создать новый добавить",
-      "video": { "youtubeId": null, "duration": "1:30" },
+      "video": { "youtubeId": "7zNH7fpWGJE", "duration": "2:37", "uploaded": "2026-11-21" },
       "related": ["invite-students", "attach-textbook"],
       "updated": "2026-11-21"
     },
@@ -97,7 +97,7 @@
       ],
       "tips": ["Ученику достаточно открыть ссылку из «Поделиться» — код вводить не нужно."],
       "keywords": "код пригласить добавить учеников ссылка qr присоединиться подключить",
-      "video": { "youtubeId": null, "duration": "1:30", "chapters": [["0:00", "Где код"], ["0:20", "Поделиться"], ["0:50", "Кто подключился"]] },
+      "video": { "youtubeId": "7zNH7fpWGJE", "duration": "2:37", "uploaded": "2026-11-21" },
       "related": ["student-cant-join", "what-student-sees", "change-course-code"],
       "updated": "2026-11-21"
     },
