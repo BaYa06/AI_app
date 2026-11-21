@@ -54,20 +54,6 @@ header.h-top { top: env(safe-area-inset-top, 0px); }
 .h-sh { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .h-muted { color: var(--text-3); }
 
-/* Идёт урок */
-.h-urgent { border: 1px solid var(--h-urgent-border); background: var(--h-urgent-tint); border-radius: 16px; padding: 16px; margin-top: 22px !important; }
-.h-urgent-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
-.h-urgent-head h2 { font-size: 18px !important; color: var(--h-urgent); }
-.h-urgent-head p { margin: 0; color: var(--text-2); font-size: 14px; }
-.h-ugrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
-.h-u { background: var(--surface); border: 1px solid var(--border) !important; border-radius: 12px; padding: 12px 14px; min-width: 0; }
-.h-u summary { padding: 0; display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: 15px; line-height: 21px; }
-.h-u summary::after { content: none; }
-.h-u .h-hint { font-weight: 400; font-size: 13px; color: var(--text-3); }
-.h-u[open] { border-color: var(--h-urgent-border) !important; }
-.h-u[open] .h-hint { display: none; }
-.h-u p { margin: 8px 0 6px; color: var(--text); font-size: 15px; line-height: 22px; }
-.h-u a { font-size: 14px; font-weight: 600; }
 
 /* Ролики: лента 9:16 */
 .h-reels { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 6px; }
@@ -80,16 +66,18 @@ header.h-top { top: env(safe-area-inset-top, 0px); }
 .h-reel.is-seen::after { content: "✓"; position: absolute; top: 18px; right: 14px; font-size: 16px; background: rgba(0, 0, 0, 0.4); width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; }
 @media (min-width: 900px) { .h-reel { flex-basis: 300px; } }
 
-/* Первые 10 минут */
-.h-path { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; counter-reset: hs; }
+/* Начните здесь: 4 шага по порядку */
+.h-path { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; counter-reset: hs; }
 .h-path li { counter-increment: hs; min-width: 0; }
-.h-step { height: 100%; border: 1px solid var(--border); border-radius: 12px; padding: 14px; background: var(--surface); display: flex; flex-direction: column; gap: 4px; color: var(--text); }
-.h-step::before { content: counter(hs); width: 26px; height: 26px; border-radius: 50%; background: var(--tint); color: var(--primary); font-weight: 700; font-size: 13px; display: grid; place-items: center; margin-bottom: 4px; }
-.h-step b { font-weight: 600; font-size: 15px; line-height: 21px; }
-.h-step small { color: var(--text-3); }
+.h-step { height: 100%; border: 1px solid var(--border); border-radius: 14px; padding: 16px; background: var(--surface); display: grid; grid-template-columns: 32px 1fr; column-gap: 12px; row-gap: 4px; align-content: start; color: var(--text); }
+.h-step::before { content: counter(hs); grid-row: 1 / span 3; width: 32px; height: 32px; border-radius: 50%; background: var(--primary-fill); color: var(--on-primary); font-weight: 700; font-size: 15px; display: grid; place-items: center; }
+.h-step b { font-weight: 600; font-size: 16px; line-height: 22px; }
+.h-step span { color: var(--text-2); font-size: 14px; line-height: 20px; }
+.h-step small { color: var(--primary); font-weight: 600; font-size: 13px; }
 .h-step.is-seen::before { content: "✓"; background: var(--h-ok-tint); color: var(--h-ok); }
 .h-step:hover { border-color: var(--primary); text-decoration: none; }
-@media (max-width: 760px) { .h-path { grid-template-columns: 1fr 1fr; } }
+.h-note { margin: -6px 0 12px; color: var(--text-2); font-size: 14px; line-height: 20px; }
+@media (max-width: 700px) { .h-path { grid-template-columns: 1fr; } }
 
 /* Темы */
 .h-cats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
@@ -107,7 +95,7 @@ header.h-top { top: env(safe-area-inset-top, 0px); }
 .h-q { border: 0 !important; border-top: 1px solid var(--border) !important; }
 .h-q:first-child { border-top: 0 !important; }
 .h-q summary { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; font-weight: 400; }
-.h-q summary::after, .h-q[open] summary::after, .h-u[open] summary::after { content: none; }
+.h-q summary::after, .h-q[open] summary::after { content: none; }
 .h-q summary:hover { background: var(--surface-muted); }
 .h-qt { flex: 1; min-width: 0; }
 .h-qt b { font-weight: 600; font-size: 15.5px; line-height: 22px; }
@@ -198,6 +186,6 @@ mark { background: var(--h-mark); color: inherit; border-radius: 3px; padding: 0
   .h-main h1 { font-size: 26px; line-height: 33px; }
   .h-search input { height: 44px; }
   .h-q summary { padding: 16px 14px; }
-  .h-u { padding: 14px; }
 }
 @media (prefers-reduced-motion: reduce) { .h-chev { transition: none; } }
+.h-reel-own .h-pl { top: auto; bottom: 14px; }

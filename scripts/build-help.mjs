@@ -228,24 +228,27 @@ const catGrid = (cats, ctx) =>
 
 function hubPage(ctx) {
   const { home, videos } = ctx;
-  const body = `<div class="overline">Справка для учителей</div>
-<h1>Чем помочь?</h1>
-<p class="lead h-lead">Напишите вопрос своими словами — ответ появится сразу, без перехода на другую страницу.</p>
+  // Один список частых вопросов: сначала то, что нужно срочно на уроке, без повторов
+  const faq = [...home.urgent, ...home.popular]
+    .filter((q, i, all) => all.indexOf(q) === i)
+    .slice(0, 8);
+  const body = `<h1>Чем помочь?</h1>
+<p class="lead h-lead">Впервые во Flashly — пройдите 4 шага ниже. Есть вопрос — напишите его в поиске вверху.</p>
 
-<section id="urgent" class="h-urgent" aria-labelledby="h-urg">
-  <div class="h-urgent-head"><h2 id="h-urg">Идёт урок?</h2><p>Нажмите — ответ откроется прямо здесь</p></div>
-  <div class="h-ugrid">${home.urgent
+<section id="start" aria-labelledby="h-first">
+  <div class="h-sh"><h2 id="h-first">Начните здесь</h2><span class="overline h-muted" id="h-first-count"></span></div>
+  <ol class="h-path">${home.firstSteps
     .map(
       (q) =>
-        `<details class="h-u"><summary><b>${esc(q.question)}</b><span class="h-hint">Показать ответ</span></summary><p>${esc(q.answer)}</p><a href="${qUrl(q)}">Шаги →</a></details>`
+        `<li><a class="h-step" href="${qUrl(q)}" data-slug="${q.slug}"><b>${esc(q.question.replace(/\?$/, ''))}</b><span>${esc(q.answer)}</span>${hasVideo(q) ? `<small>▶ Ролик · ${esc(q.video.duration || '')}</small>` : ''}</a></li>`
     )
-    .join('')}</div>
+    .join('')}</ol>
 </section>
 ${
   videos.length
     ? `
 <section id="reels" aria-labelledby="h-reels-h">
-  <div class="h-sh"><h2 id="h-reels-h">Ролики за минуту</h2><span class="overline h-muted">вертикальные · листайте</span></div>
+  <div class="h-sh"><h2 id="h-reels-h">Короткие ролики</h2></div>
   <div class="h-reels">${videos
     .map((q) =>
       q.video.poster
@@ -258,24 +261,15 @@ ${
     : ''
 }
 
-<section aria-labelledby="h-first">
-  <div class="h-sh"><h2 id="h-first">Первые 10 минут</h2><span class="overline h-muted" id="h-first-count"></span></div>
-  <ol class="h-path">${home.firstSteps
-    .map(
-      (q) =>
-        `<li><a class="h-step" href="${qUrl(q)}" data-slug="${q.slug}"><b>${esc(q.question.replace(/\?$/, ''))}</b>${hasVideo(q) ? `<small>▶ ${esc(q.video.duration || '')}</small>` : ''}</a></li>`
-    )
-    .join('')}</ol>
+<section id="faq" aria-labelledby="h-pop">
+  <div class="h-sh"><h2 id="h-pop">Частые вопросы</h2></div>
+  <p class="h-note">Нажмите на вопрос — ответ откроется здесь же. Метка «на уроке» — то, что бывает нужно срочно.</p>
+  <div class="h-list">${faq.map((q) => qRow(q, ctx)).join('')}</div>
 </section>
 
 <section id="topics" aria-labelledby="h-topics">
-  <div class="h-sh"><h2 id="h-topics">Темы</h2></div>
+  <div class="h-sh"><h2 id="h-topics">Все темы</h2></div>
   ${catGrid(ctx.categories, ctx)}
-</section>
-
-<section aria-labelledby="h-pop">
-  <div class="h-sh"><h2 id="h-pop">Частые вопросы</h2></div>
-  <div class="h-list">${home.popular.map((q) => qRow(q, ctx, { withCat: true })).join('')}</div>
 </section>
 
 ${supportBlock()}`;

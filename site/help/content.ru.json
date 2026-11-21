@@ -2,17 +2,16 @@
   "_readme": "Раздел «Помощь учителю» (plan/new/teacher_help.md). Собирает scripts/build-help.mjs. draft: true — функции ещё нет на проде: вопрос виден только в сборках не для production (preview, локально). video.youtubeId — из колонки «Ссылка YouTube» в Notion.",
   "categories": [
     { "id": "start", "title": "Начало работы", "description": "Вход, роль учителя, первый курс", "icon": "start" },
-    { "id": "students", "title": "Ученики и код", "description": "Пригласить, подключить, удалить", "icon": "students" },
-    { "id": "sets", "title": "Слова и наборы", "description": "Создать набор, слова из фото", "icon": "sets" },
-    { "id": "books", "title": "Учебники", "description": "Подключить книгу, открыть юнит", "icon": "books" },
+    { "id": "students", "title": "Ученики", "description": "Пригласить, подключить, удалить", "icon": "students" },
+    { "id": "words", "title": "Слова и учебники", "description": "Наборы, слова из фото, учебники", "icon": "sets" },
     { "id": "lesson", "title": "На уроке", "description": "Живой тест и разминка", "icon": "lesson" },
     { "id": "homework", "title": "Задания", "description": "Задать, проверить, напомнить", "icon": "homework" },
-    { "id": "progress", "title": "Прогресс и отчёты", "description": "Кто отстаёт, отчёт родителям", "icon": "progress" },
+    { "id": "progress", "title": "Прогресс учеников", "description": "Кто отстаёт, отчёт родителям", "icon": "progress" },
     { "id": "center", "title": "Учебный центр", "description": "Книги центра и места", "icon": "center" }
   ],
   "home": {
     "urgent": ["live-test", "student-test-code", "invite-students", "student-cant-join", "set-not-visible", "who-is-behind"],
-    "firstSteps": ["start-as-teacher", "create-course", "invite-students", "attach-textbook"],
+    "firstSteps": ["start-as-teacher", "create-course", "invite-students", "create-set"],
     "popular": ["invite-students", "set-not-visible", "live-test", "attach-textbook", "assign-homework", "student-cant-join", "who-is-behind", "set-from-photo"]
   },
   "questions": [
@@ -185,7 +184,7 @@
 
     {
       "slug": "create-set",
-      "category": "sets",
+      "category": "words",
       "question": "Как создать набор слов?",
       "answer": "Выберите курс в ☰, пролистайте список вниз и нажмите «Новый набор». Ученики увидят набор после сохранения.",
       "where": ["☰", "Курс", "Новый набор"],
@@ -203,7 +202,7 @@
     },
     {
       "slug": "set-not-visible",
-      "category": "sets",
+      "category": "words",
       "urgent": true,
       "question": "Ученик не видит набор",
       "answer": "Скорее всего набор лежит в «Моих наборах», а не в курсе, или юнит учебника ещё не открыт.",
@@ -221,7 +220,7 @@
     },
     {
       "slug": "set-from-photo",
-      "category": "sets",
+      "category": "words",
       "question": "Как сделать набор из фото страницы учебника?",
       "answer": "Откройте набор и нажмите «Из фото». ИИ найдёт слова и переведёт, вы проверяете и сохраняете.",
       "where": ["Набор", "Из фото"],
@@ -240,7 +239,7 @@
     },
     {
       "slug": "set-from-library",
-      "category": "sets",
+      "category": "words",
       "question": "Как взять готовый набор из библиотеки?",
       "answer": "Вкладка «Библиотека» → предмет → подборка → набор → «В мой курс». Это ваша копия, её можно менять.",
       "where": ["Библиотека", "Предмет", "Подборка", "В мой курс"],
@@ -257,7 +256,7 @@
 
     {
       "slug": "attach-textbook",
-      "category": "books",
+      "category": "words",
       "question": "Как подключить учебник к курсу?",
       "answer": "«Библиотека» → предмет → учебник → «Подключить к курсу». Потом откройте юниты, иначе ученики их не увидят.",
       "where": ["Библиотека", "Учебник", "Подключить к курсу"],
@@ -275,7 +274,7 @@
     },
     {
       "slug": "open-next-unit",
-      "category": "books",
+      "category": "words",
       "question": "Как открыть следующий юнит?",
       "answer": "Страница курса → «Учебники курса» → включите переключатель у нужного юнита.",
       "where": ["Курс", "Учебники курса"],
