@@ -173,9 +173,6 @@
     var q = new URLSearchParams(location.search).get('q');
     if (q) { input.value = q; render(); }
   }
-  Array.prototype.forEach.call(document.querySelectorAll('[data-go="search"]'), function (a) {
-    a.addEventListener('click', function (e) { e.preventDefault(); input.focus(); window.scrollTo(0, 0); });
-  });
 
   // ─── Отметки «просмотрено» ────────────────────────────────────────────────
   var slug = document.body.getAttribute('data-slug');

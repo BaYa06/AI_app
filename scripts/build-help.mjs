@@ -210,13 +210,6 @@ ${body}
 </div>
 </main>
 
-<nav class="h-tabbar" aria-label="Быстрые разделы">
-  <a href="#hq" data-go="search">${SEARCH_ICON}Поиск</a>
-  <a href="${BASE}#urgent" class="h-hot">${svg('<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>')}Идёт урок</a>
-  ${ctx.videos.length ? `<a href="${BASE}#reels">${svg('<rect x="6" y="2" width="12" height="20" rx="3"/><path d="m10.5 9 4 3-4 3z"/>')}Ролики</a>` : ''}
-  <a href="${BASE}#topics">${svg('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>')}Темы</a>
-</nav>
-
 ${siteFooter(t, 'ru', ctx.footLearn)}
 </body>
 </html>

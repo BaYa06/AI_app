@@ -1,5 +1,5 @@
 /* Раздел «Помощь учителю» (plan/new/teacher_help.md). Поверх /site/site.css: те же токены и шапка.
-   Телефон — главный экран: нижняя панель, крупные цели нажатия, вертикальные ролики 9:16. */
+   Телефон — главный экран: крупные цели нажатия, вертикальные ролики 9:16. */
 :root {
   --h-urgent: #B91C1C;
   --h-urgent-tint: rgba(220, 38, 38, 0.07);
@@ -189,8 +189,6 @@ mark { background: var(--h-mark); color: inherit; border-radius: 3px; padding: 0
 .h-vnav { position: absolute; right: 10px; bottom: 76px; display: flex; flex-direction: column; gap: 10px; z-index: 3; }
 .h-vhint { position: absolute; left: 0; right: 0; bottom: calc(6px + env(safe-area-inset-bottom, 0px)); text-align: center; color: rgba(255, 255, 255, 0.6); font-size: 12px; }
 
-/* Нижняя панель на телефоне */
-.h-tabbar { display: none; }
 .h-toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 8px 14px; border-radius: 10px; font-size: 14px; z-index: 40; }
 @media (max-width: 640px) {
   .h-sub, .h-kbd, .h-to { display: none; }
@@ -200,12 +198,5 @@ mark { background: var(--h-mark); color: inherit; border-radius: 3px; padding: 0
   .h-search input { height: 44px; }
   .h-q summary { padding: 16px 14px; }
   .h-u { padding: 14px; }
-  .h-tabbar { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; position: fixed; left: 0; right: 0; bottom: 0; z-index: 9; background: var(--bg); border-top: 1px solid var(--border); padding: 4px max(8px, env(safe-area-inset-right, 0px)) calc(4px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px)); }
-  .h-tabbar a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 11px; line-height: 14px; font-weight: 600; color: var(--text-2); min-height: 52px; }
-  .h-tabbar a:hover { text-decoration: none; }
-  .h-tabbar svg { width: 22px; height: 22px; }
-  .h-tabbar .h-hot { color: var(--h-urgent); }
-  .h-body > footer { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
-  .h-toast { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
 }
 @media (prefers-reduced-motion: reduce) { .h-chev { transition: none; } }
