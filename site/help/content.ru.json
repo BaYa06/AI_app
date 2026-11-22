@@ -196,7 +196,7 @@
       ],
       "tips": ["Набор создаётся в том курсе, который сейчас открыт. В «Моих наборах» ученики его не увидят."],
       "keywords": "набор создать слова карточки добавить слово",
-      "video": { "youtubeId": null, "duration": "2:00" },
+      "video": { "youtubeId": "qo2DFgyZZVA", "duration": "3:41", "uploaded": "2026-11-22", "poster": "create-set.jpg" },
       "related": ["set-from-photo", "set-not-visible"],
       "updated": "2026-11-21"
     },
@@ -268,7 +268,7 @@
       ],
       "tips": ["Подключить и открыть — разные шаги. Ученики видят только открытые юниты."],
       "keywords": "учебник книга подключить прикрепить юнит unit",
-      "video": { "youtubeId": null, "duration": "2:20", "chapters": [["0:00", "Найти учебник"], ["0:40", "Подключить"], ["1:20", "Открыть юниты"]] },
+      "video": { "youtubeId": "KuGdl8STbF0", "duration": "2:13", "uploaded": "2026-11-22", "poster": "attach-textbook.jpg" },
       "related": ["open-next-unit", "set-not-visible"],
       "updated": "2026-11-21"
     },
@@ -284,7 +284,7 @@
         "Включите переключатель у юнита — он станет «Открыт» и появится у учеников."
       ],
       "keywords": "юнит открыть следующий unit урок глава закрыт",
-      "video": { "youtubeId": null, "duration": "0:45" },
+      "video": { "youtubeId": "KuGdl8STbF0", "duration": "2:13", "uploaded": "2026-11-22", "poster": "attach-textbook.jpg" },
       "related": ["attach-textbook"],
       "updated": "2026-11-21"
     },

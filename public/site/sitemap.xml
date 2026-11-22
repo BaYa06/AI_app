@@ -165,6 +165,13 @@
     <loc>https://flashlycards.app/teachers/help/create-set</loc>
     <lastmod>2026-11-21</lastmod>
     <priority>0.6</priority>
+    <video:video>
+      <video:thumbnail_loc>https://flashlycards.app/site/help/img/create-set.jpg</video:thumbnail_loc>
+      <video:title>Как создать набор слов?</video:title>
+      <video:description>Выберите курс в ☰, пролистайте список вниз и нажмите «Новый набор». Ученики увидят набор после сохранения.</video:description>
+      <video:player_loc>https://www.youtube-nocookie.com/embed/qo2DFgyZZVA</video:player_loc>
+      <video:duration>221</video:duration>
+    </video:video>
   </url>
   <url>
     <loc>https://flashlycards.app/teachers/help/set-not-visible</loc>
@@ -185,11 +192,25 @@
     <loc>https://flashlycards.app/teachers/help/attach-textbook</loc>
     <lastmod>2026-11-21</lastmod>
     <priority>0.6</priority>
+    <video:video>
+      <video:thumbnail_loc>https://flashlycards.app/site/help/img/attach-textbook.jpg</video:thumbnail_loc>
+      <video:title>Как подключить учебник к курсу?</video:title>
+      <video:description>«Библиотека» → предмет → учебник → «Подключить к курсу». Потом откройте юниты, иначе ученики их не увидят.</video:description>
+      <video:player_loc>https://www.youtube-nocookie.com/embed/KuGdl8STbF0</video:player_loc>
+      <video:duration>133</video:duration>
+    </video:video>
   </url>
   <url>
     <loc>https://flashlycards.app/teachers/help/open-next-unit</loc>
     <lastmod>2026-11-21</lastmod>
     <priority>0.6</priority>
+    <video:video>
+      <video:thumbnail_loc>https://flashlycards.app/site/help/img/attach-textbook.jpg</video:thumbnail_loc>
+      <video:title>Как открыть следующий юнит?</video:title>
+      <video:description>Страница курса → «Учебники курса» → включите переключатель у нужного юнита.</video:description>
+      <video:player_loc>https://www.youtube-nocookie.com/embed/KuGdl8STbF0</video:player_loc>
+      <video:duration>133</video:duration>
+    </video:video>
   </url>
   <url>
     <loc>https://flashlycards.app/teachers/help/student-test-code</loc>
