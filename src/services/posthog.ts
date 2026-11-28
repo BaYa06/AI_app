@@ -53,6 +53,9 @@ export function phSetPersonProps(props: Record<string, string | number | boolean
   if (ready) posthog.setPersonProperties(props);
 }
 
+/** Записи на телефоне выбираются по пользователю; в вебе их включают настройки проекта PostHog */
+export function phReplayForUser(_userId: string, _daysSinceRegistration: number) {}
+
 export function phScreen(name: string) {
   if (ready) posthog.capture('$screen', { $screen_name: name });
 }

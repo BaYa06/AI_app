@@ -55,6 +55,7 @@
     "pdfkit": "^0.20.2",
     "posthog-js": "^1.455.4",
     "posthog-react-native": "^4.87.3",
+    "posthog-react-native-session-replay": "^1.6.0",
     "process": "^0.11.10",
     "react": "18.2.0",
     "react-dom": "^18.2.0",

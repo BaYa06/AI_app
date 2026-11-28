@@ -25,6 +25,7 @@ import {
 import { isWidgetUrl, parseWidgetUrl } from '@/services/widgetLinks';
 import { parseShareUrl, isShareCode, onOpenShareRequest } from '@/services/shareLinks';
 import { markLaunchInterrupted } from '@/services/modalGate';
+import { phReplayForUser } from '@/services/posthog';
 import { navigationRef } from '@/navigation/navigationRef';
 import { resetWidget } from '@/services/WidgetService';
 import { isAppleUser, takeAppleSignInName } from '@/services/appleSignInName';
@@ -318,6 +319,7 @@ export default function App() {
         Analytics.login(provider as 'google' | 'email');
         const createdAt = new Date((user as any).created_at ?? Date.now()).getTime();
         const daysSince = Math.floor((Date.now() - createdAt) / 86400000);
+        phReplayForUser(user.id, daysSince);
         setAnalyticsUserProperties({
           subscription_tier: 'free',
           language: 'ru',
@@ -792,6 +794,7 @@ export default function App() {
       if (opts.joinedCenter) callDataApi('startCourseStudentTasks').catch(() => {});
       setAnalyticsUserId(currentUserId);
       setCrashUserId(currentUserId);
+      phReplayForUser(currentUserId, 0);
       Analytics.onboardingComplete();
       setAnalyticsUserProperties({
         subscription_tier: 'free',
