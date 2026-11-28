@@ -63,3 +63,25 @@ describe('resolveSession', () => {
     ).toBe('error');
   });
 });
+
+import { authEventAction } from '../auth/resolveSession';
+
+describe('authEventAction — возврат на вкладку не перерисовывает кабинет', () => {
+  const teacher = { status: 'teacher' as const, user: { id: 'u1', email: null } };
+  it('повторный SIGNED_IN того же учителя (Supabase шлёт его при возврате на вкладку) — ничего', () => {
+    expect(authEventAction(teacher, 'SIGNED_IN', 'u1')).toBe('ignore');
+    expect(authEventAction(teacher, 'USER_UPDATED', 'u1')).toBe('ignore');
+  });
+  it('обновление токена — ничего', () => {
+    expect(authEventAction(teacher, 'TOKEN_REFRESHED', 'u1')).toBe('ignore');
+  });
+  it('выход — на экран входа', () => {
+    expect(authEventAction(teacher, 'SIGNED_OUT', null)).toBe('out');
+    expect(authEventAction(teacher, 'SIGNED_IN', null)).toBe('out');
+  });
+  it('другой пользователь или первый вход — тихая перепроверка', () => {
+    expect(authEventAction(teacher, 'SIGNED_IN', 'u2')).toBe('resolve');
+    expect(authEventAction({ status: 'out' }, 'SIGNED_IN', 'u1')).toBe('resolve');
+    expect(authEventAction({ status: 'guest' }, 'USER_UPDATED', 'u1')).toBe('resolve');
+  });
+});

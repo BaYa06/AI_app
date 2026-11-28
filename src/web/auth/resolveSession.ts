@@ -50,3 +50,23 @@ export async function resolveSession(deps: ResolveDeps): Promise<TeacherSession>
     return { status: 'error' };
   }
 }
+
+/**
+ * Что делать с событием Supabase. Важно: при возврате на вкладку Supabase сам перепроверяет сессию и
+ * присылает SIGNED_IN заново (auth-js, _onVisibilityChanged → _recoverAndRefresh). Если в ответ
+ * показывать загрузку, кабинет целиком перерисовывается и теряет всё, что было на странице
+ * (введённое, предложения ИИ). Поэтому тот же пользователь — ничего не делаем.
+ *   ignore  — ничего не меняется;
+ *   out     — вышел (на любой вкладке);
+ *   resolve — сменился пользователь: тихо перепроверить роль, текущий экран не трогать.
+ */
+export function authEventAction(
+  current: TeacherSession,
+  event: string,
+  sessionUserId: string | null
+): 'ignore' | 'out' | 'resolve' {
+  if (event === 'SIGNED_OUT' || (!sessionUserId && current.status !== 'loading')) return 'out';
+  if (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') return 'ignore';
+  if (current.status === 'teacher' && current.user.id === sessionUserId) return 'ignore';
+  return 'resolve';
+}

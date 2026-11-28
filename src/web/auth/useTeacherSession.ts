@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { getCurrentUser, onAuthChange } from '@/services/auth/session';
 import { profileApi } from '@/services/neon/profile';
 import { previewMode } from '../preview';
-import { resolveSession, type TeacherSession } from './resolveSession';
+import { authEventAction, resolveSession, type TeacherSession } from './resolveSession';
 
 /** Только в разработке: подмена входа (см. ../preview.ts) */
 function devPreview(): TeacherSession | null {
@@ -17,12 +17,15 @@ function devPreview(): TeacherSession | null {
 
 /**
  * Состояние входа учителя: loading | out | guest | notTeacher | error | teacher.
- * Обновляется при любой смене сессии Supabase (вход, выход, обновление токена не трогает роль).
+ * Экран загрузки — только при первом открытии. Возврат на вкладку, обновление токена и повторный
+ * SIGNED_IN того же пользователя страницу не трогают (см. authEventAction).
  */
 export function useTeacherSession(): { session: TeacherSession; reload: () => void } {
   const preview = devPreview();
   const [session, setSession] = useState<TeacherSession>(preview ?? { status: 'loading' });
   const run = useRef(0);
+  const current = useRef(session);
+  current.current = session;
 
   const reload = useCallback(() => {
     if (preview) return;
@@ -36,18 +39,25 @@ export function useTeacherSession(): { session: TeacherSession; reload: () => vo
       },
     }).then((next) => {
       // Устаревший ответ (пользователь успел выйти/войти снова) отбрасываем
-      if (id === run.current) setSession(next);
+      if (id !== run.current) return;
+      // Учитель уже в кабинете, а перепроверка не удалась (сеть) — не выкидываем его на экран ошибки
+      if (next.status === 'error' && current.current.status === 'teacher') return;
+      setSession(next);
     });
   }, []);
 
   useEffect(() => {
     if (preview) return;
     reload();
-    return onAuthChange((event) => {
-      // Обновление токена роль не меняет — не мигаем загрузкой
-      if (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') return;
-      setSession({ status: 'loading' });
-      reload();
+    return onAuthChange((event, authSession) => {
+      const action = authEventAction(current.current, event, authSession?.user?.id ?? null);
+      if (action === 'out') {
+        run.current++;
+        setSession({ status: 'out' });
+      } else if (action === 'resolve') {
+        // Без экрана загрузки: страница остаётся на месте, пока роль перепроверяется
+        reload();
+      }
     });
   }, [reload, preview]);
 
