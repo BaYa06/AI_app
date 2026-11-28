@@ -310,7 +310,7 @@ export const PreviewExam = {
         avgScore: 0,
       },
       {
-        sessionId: 'f1',
+        sessionId: 'fin1',
         courseId: 'c1',
         courseTitle: COURSES[0].title,
         setTitle: 'Unit 3',
@@ -356,6 +356,7 @@ export const PreviewExam = {
     const d = ensureDraft();
     if (sessionId === 'wait1') return wait({ ...d, sessionId, status: 'waiting', code: '4821' });
     if (sessionId === 'act1') return wait({ ...d, sessionId, status: 'active', code: '4821' });
+    if (sessionId === 'fin1') return wait({ ...d, sessionId, status: 'finished', code: '4821' });
     return wait(d);
   },
   replace: (itemId: string) => {
@@ -542,4 +543,261 @@ export const PreviewLive = {
         at: new Date(Date.now() - 120_000).toISOString(),
       },
     ] as import('@/services/exam').ExamEvent[]),
+};
+
+// ─── Итоги и разбор (Web 23–25) ─────────────────────────────────────────
+
+import type { ExamResults, ExamStudentCard, QuestionReview } from '@/services/exam';
+
+const R_NAMES = [
+  'Айгерим Нурмухамбетова',
+  'Тимур Жумабаев',
+  'Алия Касымов',
+  'Данияр Сулейменов',
+  'Милана Ким',
+  'Руслан Абдрахманова-Калиева',
+  'Самира Ибрагимова',
+  'Арман Петрова',
+  'Дана Нурмухамбетова',
+  'Ержан Жумабаев',
+];
+const R_COUNTS: ExamResults['students'][number]['counts'][] = [
+  { correct: 12, wrong: 0, typo: 0, wrong_form: 0, none: 0 },
+  { correct: 10, wrong: 1, typo: 1, wrong_form: 0, none: 0 },
+  { correct: 9, wrong: 2, typo: 0, wrong_form: 1, none: 0 },
+  { correct: 9, wrong: 3, typo: 0, wrong_form: 0, none: 0 },
+  { correct: 7, wrong: 3, typo: 1, wrong_form: 0, none: 1 },
+  { correct: 6, wrong: 4, typo: 0, wrong_form: 0, none: 2 },
+  { correct: 11, wrong: 1, typo: 0, wrong_form: 0, none: 0 },
+  { correct: 5, wrong: 5, typo: 1, wrong_form: 0, none: 1 },
+  { correct: 8, wrong: 3, typo: 0, wrong_form: 1, none: 0 },
+  { correct: 3, wrong: 6, typo: 0, wrong_form: 0, none: 3 },
+];
+let released = false;
+const overrides: Record<string, { score: number; comment: string }> = {};
+const decisionsByItem: Record<
+  string,
+  { logId: string; action: string; payload: Record<string, unknown>; at: string }[]
+> = {};
+
+function previewStudents(): ExamResults['students'] {
+  return R_NAMES.map((name, i) => {
+    const c = R_COUNTS[i];
+    const computed = Math.round((c.correct / 12) * 100);
+    const ov = overrides[`p${i}`];
+    return {
+      participantId: `p${i}`,
+      userId: `u${i}`,
+      name,
+      initials: name[0],
+      score: ov ? ov.score : computed,
+      computedScore: computed,
+      overridden: Boolean(ov),
+      comment: ov?.comment ?? null,
+      counts: c,
+      finished: true,
+      leftReason: i === 9 ? 'background' : null,
+      awayCount: i === 3 ? 2 : 0,
+      flags: i === 1 ? ['fast'] : [],
+    };
+  });
+}
+
+export const PreviewResults = {
+  results: (): Promise<ExamResults> => {
+    const students = previewStudents();
+    const words = WORDS.map(([front, back], i) => {
+      const dec = decisionsByItem[`w${i}`] ?? [];
+      return {
+        itemId: `w${i}`,
+        cardId: `cd${i}`,
+        format: (
+          [
+            'choice',
+            'choice',
+            'choice',
+            'choice',
+            'write',
+            'write',
+            'gap',
+            'gap',
+            'scramble',
+            'match',
+            'match',
+            'match',
+          ] as const
+        )[i],
+        prompt: front,
+        answer: back,
+        voided: dec.some((d) => d.action === 'void'),
+        accepted: dec.filter((d) => d.action === 'accept').map((d) => String(d.payload.answer)),
+        answered: 10,
+        correct: [9, 8, 2, 7, 6, 8, 9, 5, 7, 9, 8, 6][i],
+        wrong: 10 - [9, 8, 2, 7, 6, 8, 9, 5, 7, 9, 8, 6][i],
+        suspicious: i === 2 && !dec.some((d) => d.action === 'keep' || d.action === 'void'),
+      };
+    });
+    return wait({
+      sessionId: 'fin1',
+      status: 'finished',
+      setTitle: 'Unit 4',
+      date: new Date(Date.now() - 3600_000).toISOString(),
+      released,
+      durationSec: 420,
+      totalQuestions: 12,
+      avgScore: Math.round(students.reduce((a, s) => a + s.score, 0) / students.length),
+      distribution: [
+        { label: '90–100', n: 2 },
+        { label: '75–89', n: 3 },
+        { label: '50–74', n: 3 },
+        { label: '0–49', n: 2 },
+      ],
+      students,
+      words,
+      absent: [
+        { userId: 'a1', name: 'Мадина Ким' },
+        { userId: 'a2', name: 'Нурлан Ибрагимов' },
+      ],
+    });
+  },
+  question: (itemId: string): Promise<QuestionReview> => {
+    const dec = decisionsByItem[itemId] ?? [];
+    const voided = dec.some((d) => d.action === 'void');
+    const sim = {
+      rows: [
+        { participantId: 'p3', name: 'Данияр Сулейменов', from: 75, to: 82 },
+        { participantId: 'p4', name: 'Милана Ким', from: 58, to: 67 },
+        { participantId: 'p5', name: 'Руслан Абдрахманова-Калиева', from: 50, to: 58 },
+      ],
+      unchanged: ['Айгерим Нурмухамбетова', 'Тимур Жумабаев'],
+      avgFrom: 70,
+      avgTo: 72,
+    };
+    return wait({
+      item: {
+        itemId,
+        format: 'choice',
+        direction: 'forward',
+        prompt: 'achievement',
+        answer: 'достижение',
+        options: ['достижение', 'успех', 'победа', 'награда'],
+        voided,
+        accepted: [],
+        kept: false,
+        number: 3,
+      },
+      stats: { answered: 10, correct: 2, wrong: 8 },
+      groups: [
+        {
+          text: 'достижение',
+          count: 2,
+          names: ['Айгерим Нурмухамбетова', 'Тимур Жумабаев'],
+          verdict: 'correct',
+        },
+        {
+          text: 'успех',
+          count: 5,
+          names: [
+            'Данияр Сулейменов',
+            'Милана Ким',
+            'Руслан Абдрахманова-Калиева',
+            'Самира Ибрагимова',
+            'Арман Петрова',
+          ],
+          verdict: 'wrong',
+        },
+        {
+          text: 'победа',
+          count: 2,
+          names: ['Дана Нурмухамбетова', 'Ержан Жумабаев'],
+          verdict: 'wrong',
+        },
+        { text: 'награда', count: 1, names: ['Алия Касымов'], verdict: 'wrong' },
+      ],
+      hints: [
+        {
+          code: 'question_issue',
+          text: 'Верно ответили 2 из 10 — это намного ниже, чем по другим словам. Возможно, вопрос сформулирован неудачно.',
+          suggest: 'void',
+        },
+        {
+          code: 'near_answer',
+          text: '5 учеников выбрали «успех» — близкое по смыслу слово.',
+          suggest: 'accept',
+          answer: 'успех',
+        },
+      ],
+      actions: { void: voided ? null : sim, accept: { ...sim, answer: 'успех' } },
+      decisions: dec,
+    });
+  },
+  decide: (itemId: string, decision: 'void' | 'accept' | 'keep', answer?: string) => {
+    const logId = `log${Date.now()}`;
+    (decisionsByItem[itemId] ??= []).push({
+      logId,
+      action: decision,
+      payload: answer ? { answer } : {},
+      at: new Date().toISOString(),
+    });
+    return wait({ logId });
+  },
+  undo: (logId: string) => {
+    for (const k of Object.keys(decisionsByItem))
+      decisionsByItem[k] = decisionsByItem[k].filter((d) => d.logId !== logId);
+    return wait(undefined);
+  },
+  override: (participantId: string, score: number | null, comment?: string) => {
+    if (score === null) delete overrides[participantId];
+    else overrides[participantId] = { score, comment: comment ?? '' };
+    return wait(undefined);
+  },
+  release: () => {
+    released = true;
+    return wait(undefined);
+  },
+  retake: () => wait('draft1'),
+  student: (participantId: string): Promise<ExamStudentCard> => {
+    const i = Math.max(
+      0,
+      R_NAMES.findIndex((_, k) => `p${k}` === participantId)
+    );
+    const st = previewStudents()[i];
+    const mistakes = WORDS.slice(0, st.counts.wrong + st.counts.typo + st.counts.none).map(
+      ([front, back], k) => ({
+        itemId: `w${k}`,
+        cardId: `cd${k}`,
+        format: (k % 2 ? 'write' : 'choice') as 'write' | 'choice',
+        prompt: k % 2 ? back : front,
+        answer: k % 2 ? front : back,
+        given: k % 3 === 2 ? null : k % 2 ? 'recieve' : 'успех',
+        verdict: (k % 3 === 2 ? 'none' : k % 2 ? 'typo' : 'wrong') as 'none' | 'typo' | 'wrong',
+        accepted: false,
+        voided: false,
+        points: 8.33,
+      })
+    );
+    return wait({
+      participantId,
+      userId: st.userId,
+      name: st.name,
+      override: overrides[participantId]?.score ?? null,
+      comment: overrides[participantId]?.comment ?? null,
+      leftReason: st.leftReason,
+      awayCount: st.awayCount,
+      finished: true,
+      extraSec: 0,
+      preparation: {
+        days: 7,
+        reviews: i < 4 ? 64 : 9,
+        reviewDays: i < 4 ? 6 : 2,
+        classReviews: 38,
+        classReviewDays: 4,
+      },
+      released,
+      setTitle: 'Unit 4',
+      score: st.score,
+      counts: st.counts,
+      items: mistakes,
+    });
+  },
 };

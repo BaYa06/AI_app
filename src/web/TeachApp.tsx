@@ -20,6 +20,8 @@ import { ExamsPage } from './pages/ExamsPage';
 import { ExamSetupPage } from './pages/ExamSetupPage';
 import { ExamBuildPage } from './pages/ExamBuildPage';
 import { ExamPage } from './pages/ExamPage';
+import { ExamQuestionPage } from './pages/ExamQuestionPage';
+import { ExamStudentPage } from './pages/ExamStudentPage';
 import { ProjectorPage } from './pages/ProjectorPage';
 import { UiGalleryPage } from './pages/UiGalleryPage';
 
@@ -30,6 +32,8 @@ const ROUTES: RouteDef[] = [
   { name: 'exams', pattern: '/exams' },
   { name: 'examNew', pattern: '/courses/:courseId/exams/new' },
   { name: 'examBuild', pattern: '/exams/:sessionId/build' },
+  { name: 'examQuestion', pattern: '/exams/:sessionId/questions/:itemId' },
+  { name: 'examStudent', pattern: '/exams/:sessionId/students/:participantId' },
   { name: 'exam', pattern: '/exams/:sessionId' },
   ...(__DEV__ ? [{ name: 'ui', pattern: '/_ui' }] : []),
 ];
@@ -44,6 +48,22 @@ function Routes() {
   if (route.name === 'examNew')
     return <ExamSetupPage key={route.params.courseId} courseId={route.params.courseId} />;
   if (route.name === 'examBuild') return <ExamBuildPage sessionId={route.params.sessionId} />;
+  if (route.name === 'examQuestion')
+    return (
+      <ExamQuestionPage
+        key={route.params.itemId}
+        sessionId={route.params.sessionId}
+        itemId={route.params.itemId}
+      />
+    );
+  if (route.name === 'examStudent')
+    return (
+      <ExamStudentPage
+        key={route.params.participantId}
+        sessionId={route.params.sessionId}
+        participantId={route.params.participantId}
+      />
+    );
   if (route.name === 'exam')
     return <ExamPage key={route.params.sessionId} sessionId={route.params.sessionId} />;
   if (route.name === 'student')

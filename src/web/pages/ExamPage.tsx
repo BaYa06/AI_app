@@ -18,7 +18,6 @@ import type { DraftItem, ExamDraft } from '@/services/exam';
 import { FORMAT_LABELS } from '@/screens/exam/examConfig';
 import { describeTestError } from '@/utils/testApiErrors';
 import { describeApiError, WebApiError } from '../api';
-import { navigate } from '../router';
 import { ExamData } from '../data/exam';
 import { useLoad } from '../useLoad';
 import { takeBuild } from '../exam/buildCache';
@@ -33,6 +32,7 @@ import { ConfirmDialog } from '../ui/dialogs';
 import { ErrorPage, LoadingPage } from '../ui/states';
 import { LobbyView } from '../exam/LobbyView';
 import { MonitorView } from '../exam/MonitorView';
+import { ResultsView } from '../exam/ResultsView';
 import { PageHeader, SectionLabel } from '../ui/kit';
 import {
   LEVEL_NAME,
@@ -450,33 +450,7 @@ function LiveExam({ sessionId, draft }: { sessionId: string; draft: ExamDraft })
         onStatus={setStatus}
       />
     );
-  return <StatusView draft={{ ...draft, status }} />;
-}
-
-function StatusView({ draft }: { draft: ExamDraft }) {
-  const colors = useThemeColors();
-  return (
-    <View style={{ maxWidth: 640 }}>
-      <PageHeader title="Экзамен завершён" back={{ label: 'Экзамены', path: '/exams' }} />
-      <Card>
-        <View style={{ gap: spacing.m, alignItems: 'center' }}>
-          <Text variant="body" color="secondary" align="center">
-            Итоги и разбор вопросов скоро появятся в кабинете. Пока они — в приложении Flashly: Тест
-            → История.
-          </Text>
-          <Button
-            variant="secondary"
-            title="К списку экзаменов"
-            onPress={() => navigate('/exams')}
-          />
-        </View>
-      </Card>
-      <View style={{ height: spacing.m }} />
-      <Text variant="caption" style={{ color: colors.textTertiary }}>
-        {draft.items.length} слов · {Math.round((draft.durationSec || 0) / 60)} мин
-      </Text>
-    </View>
-  );
+  return <ResultsView sessionId={sessionId} />;
 }
 
 const styles = StyleSheet.create({
