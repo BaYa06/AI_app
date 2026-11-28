@@ -52,5 +52,9 @@ export async function groqGenerate({ model, prompt, temperature, maxOutputTokens
   }
 
   const data = await response.json();
-  return data.choices?.[0]?.message?.content || '';
+  return {
+    text: data.choices?.[0]?.message?.content || '',
+    usage: data.usage,
+    finishReason: data.choices?.[0]?.finish_reason,
+  };
 }

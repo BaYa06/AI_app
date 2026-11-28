@@ -250,6 +250,7 @@ export default async function handler(req, res) {
       temperature: 0.2,
       // «Все слова подряд» из длинного текста — сотни карточек
       maxOutputTokens: goal === 'all_words' ? 16384 : 8192,
+      distinctId: userId,
     });
     const parsed = parseJsonObject(text);
 

@@ -1,5 +1,8 @@
+import { randomUUID } from 'node:crypto';
+import { GoogleGenAI as PostHogGoogleGenAI } from '@posthog/ai/gemini';
 import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 import { GROQ_MODELS, groqGenerate, isGroqEnabled } from './groq.js';
+import { flushPostHog, posthog } from './posthog.js';
 import { log } from '../_log.js';
 
 /**
@@ -52,7 +55,11 @@ let client = null;
 
 function getClient() {
   if (!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not set');
-  if (!client) client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  if (!client) {
+    client = posthog
+      ? new PostHogGoogleGenAI({ apiKey: process.env.GEMINI_API_KEY, posthog })
+      : new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  }
   return client;
 }
 
@@ -76,7 +83,15 @@ function isRetryable(error) {
  * prompt — строка; files — необязательные [{ mimeType, data(base64) }] перед текстом.
  * Все модели Gemini перегружены и файлов нет → резерв Groq (если задан GROQ_API_KEY).
  */
-export async function generateJson({ models, prompt, files = [], temperature, maxOutputTokens }) {
+export async function generateJson({
+  models,
+  prompt,
+  files = [],
+  temperature,
+  maxOutputTokens,
+  distinctId,
+}) {
+  const traceId = randomUUID();
   const parts = [
     ...files.map((f) => ({ inlineData: { mimeType: f.mimeType, data: f.data } })),
     { text: prompt },
@@ -86,62 +101,142 @@ export async function generateJson({ models, prompt, files = [], temperature, ma
   const useGroq = files.length === 0 && isGroqEnabled();
   const geminiDeadline = useGroq ? deadline - GROQ_RESERVE_MS : deadline;
 
-  let lastError = null;
-  for (const [index, model] of models.entries()) {
-    const remaining = geminiDeadline - Date.now();
-    if (remaining < MIN_ATTEMPT_MS) break;
-    const isLast = index === models.length - 1;
-    const attemptMs = isLast ? remaining : Math.min(remaining, ATTEMPT_MS);
-    try {
-      const response = await getClient().models.generateContent({
-        model,
-        contents: [{ role: 'user', parts }],
-        config: {
-          temperature,
-          maxOutputTokens,
-          responseMimeType: 'application/json',
-          // Размышления в 2–3 раза удлиняют ответ, для извлечения слов и примеров они не нужны
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-          abortSignal: AbortSignal.timeout(attemptMs),
-        },
-      });
-      return response.text || '';
-    } catch (error) {
-      lastError = error;
-      if (!isRetryable(error) && !isTimeout(error)) throw error;
-      log.warn(
-        'gemini',
-        `${model} → ${isTimeout(error) ? 'timeout' : errorStatus(error)}, пробуем следующую модель`
-      );
-    }
-  }
-
-  if (useGroq) {
-    for (const model of GROQ_MODELS) {
-      const remaining = deadline - Date.now();
+  try {
+    let lastError = null;
+    for (const [index, model] of models.entries()) {
+      const remaining = geminiDeadline - Date.now();
       if (remaining < MIN_ATTEMPT_MS) break;
+      const isLast = index === models.length - 1;
+      const attemptMs = isLast ? remaining : Math.min(remaining, ATTEMPT_MS);
       try {
-        const text = await groqGenerate({
+        const request = {
           model,
-          prompt,
-          temperature,
-          maxOutputTokens,
-          timeoutMs: Math.min(remaining, GROQ_ATTEMPT_MS),
-        });
-        log.warn('gemini', `все модели заняты — ответил резерв Groq ${model}`);
-        return text;
+          contents: [{ role: 'user', parts }],
+          config: {
+            temperature,
+            maxOutputTokens,
+            responseMimeType: 'application/json',
+            // Размышления в 2–3 раза удлиняют ответ, для извлечения слов и примеров они не нужны
+            thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+            abortSignal: AbortSignal.timeout(attemptMs),
+          },
+        };
+        if (posthog) {
+          request.posthogTraceId = traceId;
+          request.posthogProperties = { $ai_session_id: null };
+          if (distinctId) request.posthogDistinctId = distinctId;
+        }
+        const response = await getClient().models.generateContent(request);
+        return response.text || '';
       } catch (error) {
-        // Последний резерв: любая ошибка (квота, 413 «больше поминутного лимита токенов»,
-        // снятая с поддержки модель) — пробуем следующую; в ответ уйдёт ошибка Gemini
+        lastError = error;
+        if (!isRetryable(error) && !isTimeout(error)) throw error;
         log.warn(
-          'groq',
+          'gemini',
           `${model} → ${isTimeout(error) ? 'timeout' : errorStatus(error)}, пробуем следующую модель`
         );
       }
     }
-  }
 
-  throw lastError || Object.assign(new Error('timeout'), { name: 'TimeoutError' });
+    if (useGroq) {
+      for (const model of GROQ_MODELS) {
+        const remaining = deadline - Date.now();
+        if (remaining < MIN_ATTEMPT_MS) break;
+        const startedAt = Date.now();
+        try {
+          const result = await groqGenerate({
+            model,
+            prompt,
+            temperature,
+            maxOutputTokens,
+            timeoutMs: Math.min(remaining, GROQ_ATTEMPT_MS),
+          });
+          captureGroqGeneration({
+            model,
+            prompt,
+            temperature,
+            maxOutputTokens,
+            traceId,
+            distinctId,
+            startedAt,
+            result,
+          });
+          log.warn('gemini', `все модели заняты — ответил резерв Groq ${model}`);
+          return result.text;
+        } catch (error) {
+          captureGroqGeneration({
+            model,
+            prompt,
+            temperature,
+            maxOutputTokens,
+            traceId,
+            distinctId,
+            startedAt,
+            error,
+          });
+          // Последний резерв: любая ошибка (квота, 413 «больше поминутного лимита токенов»,
+          // снятая с поддержки модель) — пробуем следующую; в ответ уйдёт ошибка Gemini
+          log.warn(
+            'groq',
+            `${model} → ${isTimeout(error) ? 'timeout' : errorStatus(error)}, пробуем следующую модель`
+          );
+        }
+      }
+    }
+
+    throw lastError || Object.assign(new Error('timeout'), { name: 'TimeoutError' });
+  } finally {
+    await flushPostHog();
+  }
+}
+
+function captureGroqGeneration({
+  model,
+  prompt,
+  temperature,
+  maxOutputTokens,
+  traceId,
+  distinctId,
+  startedAt,
+  result,
+  error,
+}) {
+  if (!posthog) return;
+
+  posthog.captureAi({
+    distinctId: distinctId || `ai-${traceId}`,
+    event: '$ai_generation',
+    properties: {
+      $ai_trace_id: traceId,
+      $ai_session_id: null,
+      $ai_model: model,
+      $ai_provider: 'groq',
+      $ai_input: [
+        { role: 'system', content: 'Reply with valid JSON only — no markdown, no comments.' },
+        { role: 'user', content: prompt },
+      ],
+      ...(result
+        ? {
+            $ai_output_choices: [{ role: 'assistant', content: result.text }],
+            ...(typeof result.usage?.prompt_tokens === 'number'
+              ? { $ai_input_tokens: result.usage.prompt_tokens }
+              : {}),
+            ...(typeof result.usage?.completion_tokens === 'number'
+              ? { $ai_output_tokens: result.usage.completion_tokens }
+              : {}),
+            ...(result.finishReason ? { $ai_stop_reason: result.finishReason } : {}),
+            $ai_http_status: 200,
+          }
+        : {
+            $ai_is_error: true,
+            $ai_error: error?.message || String(error),
+            ...(errorStatus(error) ? { $ai_http_status: errorStatus(error) } : {}),
+          }),
+      $ai_latency: (Date.now() - startedAt) / 1000,
+      $ai_temperature: temperature,
+      $ai_max_tokens: maxOutputTokens,
+    },
+  });
 }
 
 /** Достаёт JSON-массив из ответа; [] если не удалось. */

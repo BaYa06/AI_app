@@ -9,6 +9,8 @@ module.exports = {
         include: [
           // 'staging' — тестовая сборка на тестовом сервере (src/config/apiBase.ts)
           'APP_ENV',
+          'POSTHOG_PROJECT_TOKEN',
+          'POSTHOG_HOST',
           'SUPABASE_URL',
           'SUPABASE_ANON_KEY',
           'SUPABASE_REDIRECT_URI',
