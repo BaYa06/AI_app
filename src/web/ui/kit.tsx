@@ -4,11 +4,12 @@
  */
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { ChevronLeft } from 'lucide-react-native';
+import { ChevronLeft, Minus, Plus } from 'lucide-react-native';
 import { useThemeColors } from '@/store';
 import { alpha, borderRadius, spacing } from '@/constants';
 import { Text } from '@/components/common/Text';
 import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
 import { initials, type ActivityTone } from '../teacherLogic';
 import { navigate } from '../router';
 
@@ -139,6 +140,45 @@ export function TabBar<K extends string>({
   );
 }
 
+/** Счётчик «− 12 +» для чисел в настройках (слова, форматы, минуты) */
+export function Stepper({
+  value,
+  onMinus,
+  onPlus,
+  minusDisabled,
+  plusDisabled,
+  label,
+}: {
+  value: number | string;
+  onMinus: () => void;
+  onPlus: () => void;
+  minusDisabled?: boolean;
+  plusDisabled?: boolean;
+  label: string;
+}) {
+  return (
+    <View style={styles.stepper}>
+      <Button
+        variant="icon"
+        icon={Minus}
+        accessibilityLabel={`${label}: меньше`}
+        onPress={onMinus}
+        disabled={minusDisabled}
+      />
+      <Text variant="h3" align="center" style={styles.stepValue} accessibilityLiveRegion="polite">
+        {String(value)}
+      </Text>
+      <Button
+        variant="icon"
+        icon={Plus}
+        accessibilityLabel={`${label}: больше`}
+        onPress={onPlus}
+        disabled={plusDisabled}
+      />
+    </View>
+  );
+}
+
 /** Плитка с одним числом: «Занимались сегодня 18» */
 export function StatTile({
   value,
@@ -176,5 +216,7 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.s },
   tabs: { flexDirection: 'row', gap: spacing.l, borderBottomWidth: 1, marginBottom: spacing.l },
   tab: { minHeight: 44, justifyContent: 'center', borderBottomWidth: 2, marginBottom: -1 },
+  stepper: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  stepValue: { minWidth: 40 },
   tile: { flex: 1, minWidth: 160, gap: spacing.xxs },
 });

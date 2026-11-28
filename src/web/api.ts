@@ -15,11 +15,16 @@ export type ApiErrorKind =
 export class WebApiError extends Error {
   kind: ApiErrorKind;
   status: number;
-  constructor(kind: ApiErrorKind, status = 0) {
+  /** Текст ошибки с сервера (`error` в ответе), если он был: по нему экраны подбирают точное сообщение */
+  serverError?: string;
+  /** Остальные поля тела ошибки (например, номер неверного варианта) */
+  details?: Record<string, unknown>;
+  constructor(kind: ApiErrorKind, status = 0, serverError?: string) {
     super(kind);
     this.name = 'WebApiError';
     this.kind = kind;
     this.status = status;
+    this.serverError = serverError;
   }
 }
 
@@ -58,9 +63,9 @@ export function describeApiError(error: unknown): string {
 }
 
 /** Результат вида { ok, status, data } (как у ExamApi) → данные или WebApiError */
-export function unwrap<T>(result: { ok: boolean; status: number; data: T }): T {
+export function unwrap<T>(result: { ok: boolean; status: number; data: T; error?: string }): T {
   if (result.ok) return result.data;
-  throw new WebApiError(classifyStatus(result.status), result.status);
+  throw new WebApiError(classifyStatus(result.status), result.status, result.error);
 }
 
 /** Сессия кончилась: выходим, экран входа вернёт на то же место (returnTo) */

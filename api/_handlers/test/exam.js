@@ -19,6 +19,7 @@ import { detectBackKind } from '../../_exam/prepare.js';
 import { classifyDifficulty, LEARNED_STEP } from '../../_exam/difficulty.js';
 import { buildExam, replaceItem, LIMITS } from '../../_exam/build.js';
 import { checkAnswer } from '../../_exam/check.js';
+import { isEditable, validateDistractors, validateSentence } from '../../_exam/edit.js';
 import { studentScreens } from '../../_exam/deliver.js';
 import { scoreParticipant, averageScore } from '../../_exam/score.js';
 import { itemStats, isSuspicious, whyHints, simulate } from '../../_exam/analysis.js';
@@ -159,6 +160,8 @@ function draftView(session, items, extra = {}) {
   return {
     sessionId: session.id,
     status: session.status,
+    // Код входа есть только у открытого экзамена; у черновика он ещё не выдан
+    code: session.status === 'draft' ? null : session.code,
     config: session.config,
     durationSec: session.duration_sec,
     items: items.map((it) => ({
@@ -377,6 +380,86 @@ export async function examReplaceItem(req, res, sql, userId) {
     replacedItemId: old.id,
     sameLevel: replaced.sameLevel,
   });
+}
+
+/**
+ * POST ?action=exam-edit-item  (веб-кабинет, plan/new/web_cabinet.md, Web 15)
+ * Body: { sessionId, itemId, distractors?: string[], sentence?: string, source?: 'ai', doubtful?: boolean }
+ * Учитель правит неверные варианты («выбор», «вставь слово») и предложение «вставь слово» в
+ * черновике. Правильный ответ и баллы не меняются. Правка живёт только в этом экзамене —
+ * карточки набора не трогаем. `source: 'ai'` — предложение пришло от ИИ и принято учителем;
+ * `doubtful` — код или ИИ усомнились (экран спросит подтверждение перед открытием экзамена).
+ */
+export async function examEditItem(req, res, sql, userId) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const { sessionId, itemId, distractors, sentence, source, doubtful } = req.body || {};
+  const session = await loadOwnExam(res, sql, userId, sessionId);
+  if (!session) return;
+  if (!['draft', 'waiting'].includes(session.status)) {
+    return res.status(409).json({ error: 'Test already started' });
+  }
+  const items = await loadItems(sql, session.id);
+  const item = items.find((i) => i.id === itemId);
+  if (!item) return res.status(404).json({ error: 'Item not found' });
+  if (!isEditable(item)) return res.status(400).json({ error: 'not_editable' });
+  if (distractors === undefined && sentence === undefined) {
+    return res.status(400).json({ error: 'nothing_to_change' });
+  }
+
+  let options = item.options;
+  let prompt = item.prompt;
+  if (distractors !== undefined) {
+    const v = validateDistractors(item, distractors);
+    if (!v.ok)
+      return res.status(400).json({ error: v.error, index: v.index, expected: v.expected });
+    options = v.options;
+  }
+  if (sentence !== undefined) {
+    if (item.format !== 'gap') return res.status(400).json({ error: 'not_editable' });
+    const v = validateSentence(item, sentence);
+    if (!v.ok) return res.status(400).json({ error: v.error });
+    prompt = v.sentence;
+  }
+
+  const edit = {
+    edited: true,
+    ...(source === 'ai' ? { source: 'ai', doubtful: doubtful === true } : { source: 'teacher' }),
+  };
+  await sql`
+    UPDATE test_items SET prompt = ${prompt}, options = ${JSON.stringify(options)}::jsonb,
+      extra = COALESCE(extra, '{}'::jsonb) || ${JSON.stringify({ edit })}::jsonb
+    WHERE id = ${item.id}::uuid AND session_id = ${session.id}::uuid
+  `;
+  const fresh = await loadItems(sql, session.id);
+  return res.status(200).json({ ...draftView(session, fresh), editedItemId: item.id });
+}
+
+/**
+ * GET ?action=exam-list[&courseId=…]  (веб-кабинет, Web 12)
+ * Экзамены учителя (движок 2) любого статуса: черновики, ожидание, идущие, завершённые — новые
+ * первыми, не больше 60. `history` показывает только завершённые, а черновик иначе не найти.
+ */
+export async function examList(req, res, sql, userId) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  const courseId = isUuid(req.query.courseId) ? req.query.courseId : null;
+  const rows = await sql`
+    SELECT ts.id AS "sessionId", ts.course_id AS "courseId", c.title AS "courseTitle",
+           cs.title AS "setTitle", ts.status AS "status", ts.code AS "code",
+           ts.question_count AS "questionCount", ts.duration_sec AS "durationSec",
+           ts.created_at AS "createdAt", ts.finished_at AS "finishedAt",
+           COUNT(tp.id)::int AS "participantCount",
+           COALESCE(ROUND(AVG(tp.score))::int, 0) AS "avgScore"
+    FROM test_sessions ts
+    LEFT JOIN courses c ON c.id = ts.course_id
+    LEFT JOIN card_sets cs ON cs.id = ts.set_id
+    LEFT JOIN test_participants tp ON tp.session_id = ts.id
+    WHERE ts.teacher_id = ${userId}::uuid AND ts.engine = 2
+      AND (${courseId}::uuid IS NULL OR ts.course_id = ${courseId}::uuid)
+    GROUP BY ts.id, c.title, cs.title
+    ORDER BY ts.created_at DESC
+    LIMIT 60
+  `;
+  return res.status(200).json(rows);
 }
 
 /**

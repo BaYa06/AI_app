@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
-import { LayoutDashboard, LogOut, Laptop } from 'lucide-react-native';
+import { LayoutDashboard, LogOut, Laptop, FileCheck2 } from 'lucide-react-native';
 import { useThemeColors } from '@/store';
 import { alpha, borderRadius, breakpoints, spacing } from '@/constants';
 import { Text } from '@/components/common/Text';
@@ -20,7 +20,10 @@ import { signOut } from './auth/AuthPages';
 type NavItem = { path: string; label: string; icon: IconComponent };
 
 // Пункты добавляются по мере готовности экранов (курсы — Web 6, экзамены — Web 12)
-const NAV: NavItem[] = [{ path: '/', label: 'Обзор', icon: LayoutDashboard }];
+const NAV: NavItem[] = [
+  { path: '/', label: 'Обзор', icon: LayoutDashboard },
+  { path: '/exams', label: 'Экзамены', icon: FileCheck2 },
+];
 
 function isActive(current: string, item: NavItem): boolean {
   const path = current.split('?')[0];

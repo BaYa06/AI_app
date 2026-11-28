@@ -167,3 +167,270 @@ export const PreviewData = {
     wait({ id: `c${Date.now()}`, title: title.trim(), createdAt: Date.now() }),
   invite: () => wait({ token: 'a'.repeat(64), joinCode: 'K7M2QX' }),
 };
+
+// ─── Экзамены (Web 12–17) ───────────────────────────────────────────────
+
+import type { DraftItem, ExamDraft, ExamListItem } from '@/services/exam';
+
+const WORDS: [string, string][] = [
+  ['reluctant', 'неохотный'],
+  ['although', 'хотя'],
+  ['achievement', 'достижение'],
+  ['suggest', 'предлагать'],
+  ['appointment', 'встреча'],
+  ['neighbour', 'сосед'],
+  ['improve', 'улучшать'],
+  ['protect', 'защищать'],
+  ['confident', 'уверенный'],
+  ['journey', 'путешествие'],
+  ['borrow', 'занимать'],
+  ['delicious', 'вкусный'],
+];
+
+function previewItems(): DraftItem[] {
+  const formats: DraftItem['format'][] = [
+    'choice',
+    'choice',
+    'choice',
+    'choice',
+    'write',
+    'write',
+    'gap',
+    'gap',
+    'scramble',
+    'match',
+    'match',
+    'match',
+  ];
+  return WORDS.map(([front, back], i) => {
+    const format = formats[i];
+    const base = {
+      itemId: `it${i}`,
+      cardId: `cd${i}`,
+      blockNo: format === 'match' ? 9 : i + 1,
+      format,
+      difficulty: (['easy', 'mid', 'hard'] as const)[i % 3],
+      points: 100 / WORDS.length,
+      extra: {} as Record<string, unknown>,
+    };
+    if (format === 'choice')
+      return {
+        ...base,
+        direction: 'forward',
+        prompt: front,
+        answer: back,
+        options: [back, 'щедрый', 'быстрый', 'тихий'],
+      };
+    if (format === 'gap')
+      return {
+        ...base,
+        direction: 'gap',
+        prompt: `She was _____ to leave the party early.`,
+        answer: front,
+        options: [front, 'eager', 'happy', 'ready'],
+        extra: { baseForm: front, gapKind: 'exact' },
+      };
+    if (format === 'write')
+      return { ...base, direction: 'back', prompt: back, answer: front, options: null };
+    if (format === 'scramble')
+      return { ...base, direction: 'back', prompt: back, answer: front, options: null };
+    return { ...base, direction: 'pair', prompt: front, answer: back, options: null };
+  });
+}
+
+let previewDraft: ExamDraft | null = null;
+function ensureDraft(): ExamDraft {
+  if (!previewDraft) {
+    previewDraft = {
+      sessionId: 'draft1',
+      status: 'draft',
+      durationSec: 7 * 60,
+      config: { setIds: ['s1'], backKind: 'translation' },
+      items: previewItems(),
+      recommended: { baseSec: 280, sec: 336, minutes: 6 },
+    };
+  }
+  return previewDraft;
+}
+
+const BUILD = {
+  steps: [
+    { key: 'pool', title: 'Берём слова набора', detail: 'В «Unit 4» 38 слов, из них подходят 36' },
+    {
+      key: 'levels',
+      title: 'Считаем сложность по классу',
+      detail: '14 учеников, 420 ответов: 12 лёгких, 14 средних, 10 сложных',
+    },
+    { key: 'pick', title: 'Подбираем 12 слов', detail: '4 лёгких, 4 средних, 4 сложных' },
+    {
+      key: 'formats',
+      title: 'Раскладываем по форматам',
+      detail: '4 выбор · 2 письмо · 2 вставь · 1 собери · 3 пары',
+    },
+    {
+      key: 'options',
+      title: 'Подбираем неверные варианты',
+      detail: 'Для 6 вопросов по 3 варианта',
+    },
+  ],
+  warnings: [
+    { code: 'few_gaps', text: 'У 4 слов нет примеров — «вставь слово» взяли только для 2.' },
+  ],
+};
+
+export const PreviewExam = {
+  list: (): Promise<ExamListItem[]> =>
+    wait([
+      {
+        sessionId: 'draft1',
+        courseId: 'c1',
+        courseTitle: COURSES[0].title,
+        setTitle: 'Unit 4',
+        status: 'draft',
+        code: null,
+        questionCount: 12,
+        durationSec: 420,
+        createdAt: new Date().toISOString(),
+        finishedAt: null,
+        participantCount: 0,
+        avgScore: 0,
+      },
+      {
+        sessionId: 'x1',
+        courseId: 'c1',
+        courseTitle: COURSES[0].title,
+        setTitle: 'Unit 4',
+        status: 'active',
+        code: '4821',
+        questionCount: 20,
+        durationSec: 600,
+        createdAt: new Date().toISOString(),
+        finishedAt: null,
+        participantCount: 31,
+        avgScore: 0,
+      },
+      {
+        sessionId: 'f1',
+        courseId: 'c1',
+        courseTitle: COURSES[0].title,
+        setTitle: 'Unit 3',
+        status: 'finished',
+        code: '1190',
+        questionCount: 20,
+        durationSec: 600,
+        createdAt: new Date(Date.now() - 9 * 86_400_000).toISOString(),
+        finishedAt: new Date(Date.now() - 9 * 86_400_000).toISOString(),
+        participantCount: 38,
+        avgScore: 74,
+      },
+      {
+        sessionId: 'f2',
+        courseId: 'c2',
+        courseTitle: COURSES[1].title,
+        setTitle: 'Unit 1',
+        status: 'finished',
+        code: '2210',
+        questionCount: 15,
+        durationSec: 480,
+        createdAt: new Date(Date.now() - 20 * 86_400_000).toISOString(),
+        finishedAt: new Date(Date.now() - 20 * 86_400_000).toISOString(),
+        participantCount: 11,
+        avgScore: 58,
+      },
+    ]),
+  setStats: () =>
+    wait([
+      { setId: 's1', title: 'Unit 4', totalCards: 38 },
+      { setId: 's2', title: 'Unit 3', totalCards: 24 },
+      { setId: 's3', title: 'Irregular verbs', totalCards: 60 },
+    ]),
+  build: () => {
+    previewDraft = null;
+    return wait({
+      ...ensureDraft(),
+      ...BUILD,
+      counts: { choice: 4, write: 2, scramble: 1, match: 3, gap: 2 },
+    });
+  },
+  draft: () => wait(ensureDraft()),
+  replace: (itemId: string) => {
+    const d = ensureDraft();
+    d.items = d.items.map((i) =>
+      i.itemId === itemId ? { ...i, prompt: i.format === 'choice' ? 'journey' : i.prompt } : i
+    );
+    return wait({ ...d, replacedItemId: itemId, sameLevel: true });
+  },
+  editItem: (
+    itemId: string,
+    patch: { distractors?: string[]; sentence?: string; source?: 'ai'; doubtful?: boolean }
+  ) => {
+    const d = ensureDraft();
+    d.items = d.items.map((i) =>
+      i.itemId !== itemId
+        ? i
+        : {
+            ...i,
+            prompt: patch.sentence ?? i.prompt,
+            options: patch.distractors ? [i.answer, ...patch.distractors] : i.options,
+            extra: {
+              ...i.extra,
+              edit: {
+                edited: true,
+                source: patch.source === 'ai' ? 'ai' : 'teacher',
+                doubtful: patch.doubtful === true,
+              },
+            },
+          }
+    );
+    return wait({ ...d, editedItemId: itemId });
+  },
+  create: () => {
+    if (previewDraft) previewDraft.status = 'waiting';
+    return wait({ sessionId: 'draft1', code: '4821', questionCount: 12, durationSec: 420 });
+  },
+  smart: () =>
+    new Promise<import('../exam/smartLogic').SmartResult>((resolve) =>
+      setTimeout(
+        () =>
+          resolve({
+            suggestions: [
+              {
+                itemId: 'it6',
+                kind: 'gap',
+                before: {
+                  prompt: 'She was _____ to leave the party early.',
+                  options: ['eager', 'happy', 'ready'],
+                },
+                after: {
+                  prompt: 'The boy was _____ to speak in front of the whole class.',
+                  options: ['careful', 'curious', 'jealous'],
+                },
+                doubtful: false,
+                reasons: [],
+              },
+              {
+                itemId: 'it0',
+                kind: 'choice',
+                before: { prompt: 'reluctant', options: ['щедрый', 'быстрый', 'тихий'] },
+                after: { prompt: 'reluctant', options: ['нерешительный', 'весёлый', 'суровый'] },
+                doubtful: true,
+                reasons: [
+                  { code: 'model', text: 'ИИ отметил: «нерешительный» тоже может подойти' },
+                ],
+              },
+              {
+                itemId: 'it1',
+                kind: 'choice',
+                before: { prompt: 'although', options: ['щедрый', 'быстрый', 'тихий'] },
+                after: { prompt: 'although', options: ['поэтому', 'потому что', 'вместо'] },
+                doubtful: false,
+                reasons: [],
+              },
+            ],
+            skipped: [{ itemId: 'it7', reason: 'long_answer' }],
+            usage: { used: 1, limit: 10, resetAt: new Date(Date.now() + 3_600_000).toISOString() },
+          }),
+        2500
+      )
+    ),
+};

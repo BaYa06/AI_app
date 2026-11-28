@@ -13,6 +13,7 @@ const HANDLERS = {
   'extract-pdf': () => import('./_ai/extract-pdf.js'),
   'extract-image': () => import('./_ai/extract-image.js'),
   'import-files': () => import('./_ai/import-files.js'),
+  'exam-smart': () => import('./_ai/exam-smart.js'),
   usage: () => import('./_ai/usage.js'),
   tts: () => import('./_ai/tts.js'),
 };

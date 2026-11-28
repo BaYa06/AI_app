@@ -75,6 +75,8 @@ export type BuildWarning = { code: string; text: string };
 export type ExamDraft = {
   sessionId: string;
   status: string;
+  /** Код входа: только у открытого экзамена (не у черновика) */
+  code?: string | null;
   durationSec: number;
   config: Record<string, unknown> | null;
   items: DraftItem[];
@@ -215,6 +217,22 @@ export type MyExam = {
   score: number | null;
 };
 
+/** Строка списка экзаменов учителя (веб-кабинет, Web 12): любой статус, в том числе черновик */
+export type ExamListItem = {
+  sessionId: string;
+  courseId: string | null;
+  courseTitle: string | null;
+  setTitle: string | null;
+  status: 'draft' | 'waiting' | 'active' | 'finished' | string;
+  code: string | null;
+  questionCount: number;
+  durationSec: number;
+  createdAt: string;
+  finishedAt: string | null;
+  participantCount: number;
+  avgScore: number;
+};
+
 export type ExamResult<T> = { ok: boolean; status: number; data: T; error?: string };
 
 async function callExam<T>(
@@ -259,6 +277,25 @@ export const ExamApi = {
   draft: (sessionId: string) => callExam<ExamDraft>('exam-draft', 'GET', { sessionId }),
   replace: (sessionId: string, itemId: string) =>
     callExam<ExamDraft>('exam-replace-item', 'POST', { sessionId, itemId }),
+  /** Веб-кабинет: все экзамены учителя (движок 2), новые первыми */
+  list: (courseId?: string) =>
+    callExam<ExamListItem[]>('exam-list', 'GET', courseId ? { courseId } : {}),
+  /** Веб-кабинет: правка неверных вариантов и предложения «вставь слово» в черновике */
+  editItem: (
+    sessionId: string,
+    itemId: string,
+    patch: {
+      distractors?: string[];
+      sentence?: string;
+      source?: 'ai';
+      doubtful?: boolean;
+    }
+  ) =>
+    callExam<ExamDraft & { editedItemId: string }>('exam-edit-item', 'POST', {
+      sessionId,
+      itemId,
+      ...patch,
+    }),
   create: (sessionId: string, durationSec?: number, exitControl?: boolean) =>
     callExam<{ sessionId: string; code: string; questionCount: number; durationSec: number }>(
       'exam-create',

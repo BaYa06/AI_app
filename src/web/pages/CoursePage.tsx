@@ -11,6 +11,7 @@ import {
   UserPlus,
 } from 'lucide-react-native';
 import { View } from 'react-native';
+import { spacing } from '@/constants';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { toast } from '@/components/ui/Toast';
@@ -23,6 +24,9 @@ import { studentsCountLabel } from '../teacherLogic';
 import { Centered, ErrorPage, LoadingPage, NotFoundPage } from '../ui/states';
 import { PageHeader, TabBar, type TabItem } from '../ui/kit';
 import { StudentsTab } from '../courses/StudentsTab';
+import { ExamData } from '../data/exam';
+import { ExamList } from '../exam/ExamList';
+import { NewExamButton } from './ExamsPage';
 import {
   CourseMenuDialog,
   DeleteCourseDialog,
@@ -38,11 +42,40 @@ const TABS: TabItem<TabKey>[] = [
   { key: 'report', label: 'Отчёт родителям' },
 ];
 
-const STUBS: Record<Exclude<TabKey, 'students'>, { icon: typeof FileText; title: string }> = {
+const STUBS: Record<
+  Exclude<TabKey, 'students' | 'exams'>,
+  { icon: typeof FileText; title: string }
+> = {
   homework: { icon: ClipboardList, title: 'Задания скоро будут в кабинете' },
-  exams: { icon: GraduationCap, title: 'Экзамены скоро будут в кабинете' },
   report: { icon: FileText, title: 'Отчёт родителям скоро будет в кабинете' },
 };
+
+/** Вкладка «Экзамены» курса: список этого курса и «Новый экзамен» */
+function CourseExams({ courseId }: { courseId: string }) {
+  const list = useLoad(() => ExamData.list(courseId), [courseId]);
+  if (list.error && !list.data) return <ErrorPage error={list.error} onRetry={list.reload} />;
+  if (!list.data) return <LoadingPage />;
+  return (
+    <View style={{ gap: spacing.m }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+        <NewExamButton courseId={courseId} />
+      </View>
+      <ExamList
+        items={list.data}
+        showCourse={false}
+        empty={
+          <Centered>
+            <EmptyState
+              icon={GraduationCap}
+              title="В этом курсе ещё не было экзаменов"
+              description="Нажми «Новый экзамен»: выбери набор, число слов и форматы — кабинет соберёт вопросы."
+            />
+          </Centered>
+        }
+      />
+    </View>
+  );
+}
 
 export function CoursePage({ courseId }: { courseId: string }) {
   const { courses, coursesError, reloadCourses } = useCourses();
@@ -101,11 +134,13 @@ export function CoursePage({ courseId }: { courseId: string }) {
       />
       {tab === 'students' ? (
         <StudentsTab course={course} members={members} />
+      ) : tab === 'exams' ? (
+        <CourseExams courseId={courseId} />
       ) : (
         <Centered>
           <EmptyState
-            icon={STUBS[tab].icon}
-            title={STUBS[tab].title}
+            icon={STUBS[tab as 'homework' | 'report'].icon}
+            title={STUBS[tab as 'homework' | 'report'].title}
             description="Пока это есть в приложении Flashly."
           />
         </Centered>
