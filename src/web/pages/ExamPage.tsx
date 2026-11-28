@@ -49,7 +49,18 @@ export function ExamPage({ sessionId }: { sessionId: string }) {
 
   if (loaded.error && !draft) return <ErrorPage error={loaded.error} onRetry={loaded.reload} />;
   if (!draft) return <LoadingPage />;
-  if (draft.status !== 'draft') return <LiveExam sessionId={sessionId} draft={draft} />;
+  if (draft.status !== 'draft')
+    return (
+      <LiveExam
+        sessionId={sessionId}
+        draft={draft}
+        onClosed={() => {
+          // Лобби закрыто — экзамен снова черновик: показываем превью со свежими данными
+          setLocal(null);
+          loaded.reload();
+        }}
+      />
+    );
   return <Preview sessionId={sessionId} draft={draft} setDraft={setLocal} />;
 }
 
@@ -372,7 +383,15 @@ function GapAiCard({
 }
 
 /** Открытый экзамен: лобби → монитор → итоги. Статус берём из опроса, а не из локальных догадок */
-function LiveExam({ sessionId, draft }: { sessionId: string; draft: ExamDraft }) {
+function LiveExam({
+  sessionId,
+  draft,
+  onClosed,
+}: {
+  sessionId: string;
+  draft: ExamDraft;
+  onClosed: () => void;
+}) {
   const [status, setStatus] = useState<string>(draft.status);
   // Имена на проекторе: по умолчанию нет (признак «младше 18» у курса пока не хранится)
   const [showNames, setShowNames] = useState(false);
@@ -385,8 +404,18 @@ function LiveExam({ sessionId, draft }: { sessionId: string; draft: ExamDraft })
         showNames={showNames}
         onShowNames={setShowNames}
         onStatus={setStatus}
+        onClosed={(how) => {
+          setStatus('closed');
+          toast.info(
+            how === 'auto'
+              ? '10 минут никто не зашёл — экзамен закрыт и вернулся в черновики'
+              : 'Экзамен отменён и вернулся в черновики'
+          );
+          onClosed();
+        }}
       />
     );
+  if (status === 'closed') return <LoadingPage />;
   if (status === 'active')
     return (
       <MonitorView

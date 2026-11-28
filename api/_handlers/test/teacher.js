@@ -5,6 +5,7 @@ import { broadcast, broadcastTestFinished, AWAY_GRACE_SEC, sessionCardStats } fr
 import { courseSetIdsSql } from '../../_course.js';
 import { finishExpired } from './exam.js';
 import { logExamEvent } from '../../_exam/events.js';
+import { closeIdleLobbies } from './lobby.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 /** Больше слов в одном тесте не бывает (защита от случайно огромного списка) */
@@ -191,6 +192,10 @@ export async function monitorTest(req, res, sql, userId) {
   if (!sessionId) {
     return res.status(400).json({ error: 'sessionId is required' });
   }
+
+  // Лобби, в которое 10 минут никто не зашёл, закрывается само (lobby.js): экзамен → черновик,
+  // быстрый тест удаляется (тогда ниже — 404)
+  await closeIdleLobbies(sql, { sessionId });
 
   const session = await sql`
     SELECT status, started_at, time_per_question, question_count, teacher_id, exit_control,
@@ -515,6 +520,8 @@ export const ACTIVE_RUNNING_MAX_HOURS = 12;
  */
 export async function getActiveSessions(req, res, sql, userId) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  // Пустые лобби старше 10 минут — не «идущие»: закрываем, прежде чем показать список
+  await closeIdleLobbies(sql, { teacherId: userId });
 
   const rows = await sql`
     SELECT

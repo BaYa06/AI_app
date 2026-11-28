@@ -8,7 +8,7 @@ import { log } from './_log.js';
  */
 // schema_039: в 038 (official_sets_guard) и 039 (set_kind) версию не подняли — миграции не выполнились,
 // и запросы с card_sets.kind падали на тестовом сервере (plan/new/set_kind.md, слабые места)
-const SCHEMA_VERSION = 'schema_056';
+const SCHEMA_VERSION = 'schema_057';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -1361,6 +1361,15 @@ async function applyMigrations(sql) {
     await sql`CREATE INDEX IF NOT EXISTS idx_exam_events_session ON exam_events(session_id, created_at DESC)`;
   } catch (e) {
     log.error('db-init', 'Migration 056_exam_events failed', e);
+  }
+
+  // Migration 057: когда экзамен/тест открыли (код выдан). По нему сервер сам закрывает лобби,
+  // в которое 10 минут никто не зашёл. Nullable: старые строки — по created_at.
+  // Тексты — как в database/migrations/057_test_opened_at.sql
+  try {
+    await sql`ALTER TABLE test_sessions ADD COLUMN IF NOT EXISTS opened_at TIMESTAMPTZ`;
+  } catch (e) {
+    log.error('db-init', 'Migration 057_test_opened_at failed', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)

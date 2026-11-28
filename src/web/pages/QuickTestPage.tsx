@@ -3,6 +3,8 @@
  * Те же компоненты, что у экзамена, но без паузы, «+минут» и журнала; время — на вопрос.
  */
 import React, { useState } from 'react';
+import { toast } from '@/components/ui/Toast';
+import { navigate } from '../router';
 import { cachedQuick } from '../exam/quickCache';
 import { LobbyView } from '../exam/LobbyView';
 import { MonitorView } from '../exam/MonitorView';
@@ -21,6 +23,12 @@ export function QuickTestPage({ sessionId }: { sessionId: string }) {
   const [status, setStatus] = useState<string | null>(null);
   const [showNames, setShowNames] = useState(false);
 
+  // Тест закрыт (отменён или 10 минут никто не зашёл) — строки больше нет, возвращаемся на обзор
+  const onClosed = (how: 'manual' | 'auto') => {
+    toast.info(how === 'auto' ? '10 минут никто не зашёл — тест закрыт' : 'Тест отменён');
+    navigate('/', { replace: true });
+  };
+
   if (monitor.error && !monitor.data)
     return <ErrorPage error={monitor.error} onRetry={monitor.reload} />;
   if (!monitor.data || info.loading) return <LoadingPage />;
@@ -38,6 +46,7 @@ export function QuickTestPage({ sessionId }: { sessionId: string }) {
         showNames={showNames}
         onShowNames={setShowNames}
         onStatus={setStatus}
+        onClosed={onClosed}
       />
     );
   if (current === 'active')

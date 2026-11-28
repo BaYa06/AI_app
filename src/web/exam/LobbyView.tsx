@@ -1,10 +1,12 @@
 /**
  * Ожидание учеников (plan/new/web_cabinet.md, Web 18; макет E5): код крупно, как войти, кто зашёл,
  * «Начать». Опрос раз в 3 секунды; опоздавшие могут войти, пока экзамен идёт.
+ * «Отменить» закрывает лобби (экзамен → черновики, быстрый тест удаляется). Пустое лобби сервер
+ * закрывает сам через 10 минут (api/_handlers/test/lobby.js) — опрос это замечает и зовёт onClosed.
  */
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Copy, MonitorPlay } from 'lucide-react-native';
+import { Copy, MonitorPlay, X } from 'lucide-react-native';
 import { useThemeColors } from '@/store';
 import { alpha, borderRadius, spacing } from '@/constants';
 import { Text } from '@/components/common/Text';
@@ -12,7 +14,8 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Switch } from '@/components/ui/Controls';
 import { toast } from '@/components/ui/Toast';
-import { describeApiError } from '../api';
+import { WebApiError, describeApiError } from '../api';
+import { ConfirmDialog } from '../ui/dialogs';
 import { LiveData } from '../data/live';
 import { useLoad } from '../useLoad';
 import { Avatar, PageHeader, SectionLabel } from '../ui/kit';
@@ -33,6 +36,7 @@ export function LobbyView({
   showNames,
   onShowNames,
   onStatus,
+  onClosed,
 }: {
   sessionId: string;
   code: string;
@@ -41,9 +45,15 @@ export function LobbyView({
   showNames: boolean;
   onShowNames: (v: boolean) => void;
   onStatus: (s: 'active' | 'finished') => void;
+  /** Лобби закрыто: учителем (manual) или само — 10 минут никто не зашёл (auto) */
+  onClosed: (how: 'manual' | 'auto') => void;
 }) {
   const colors = useThemeColors();
   const [starting, setStarting] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [canceling, setCanceling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const closed = React.useRef(false);
 
   const monitor = useLoad(() => LiveData.monitor(sessionId), [sessionId], { refreshMs: POLL_MS });
   const events = useLoad(() => LiveData.events(sessionId), [sessionId], { refreshMs: POLL_MS });
@@ -53,6 +63,35 @@ export function LobbyView({
   React.useEffect(() => {
     if (m && (m.status === 'active' || m.status === 'finished')) onStatus(m.status);
   }, [m?.status]);
+
+  // Сервер закрыл пустое лобби сам: экзамен снова черновик, быстрый тест удалён (404)
+  const gone =
+    m?.status === 'draft' ||
+    (monitor.error instanceof WebApiError && monitor.error.kind === 'not_found');
+  React.useEffect(() => {
+    if (gone && !closed.current && !canceling) {
+      closed.current = true;
+      onClosed('auto');
+    }
+  }, [gone]);
+
+  const cancel = async () => {
+    setCanceling(true);
+    setCancelError(null);
+    try {
+      await LiveData.cancel(sessionId);
+      closed.current = true;
+      setConfirmCancel(false);
+      onClosed('manual');
+    } catch (e) {
+      setCancelError(
+        e instanceof WebApiError && e.serverError === 'not_waiting'
+          ? 'Уже началось — заверши на экране монитора.'
+          : describeApiError(e)
+      );
+      setCanceling(false);
+    }
+  };
 
   const participants = m?.participants ?? [];
   const projectorState = useMemo(
@@ -107,6 +146,36 @@ export function LobbyView({
         back={
           kind === 'exam' ? { label: 'Экзамены', path: '/exams' } : { label: 'Обзор', path: '/' }
         }
+        actions={
+          <Button
+            variant="secondary"
+            size="s"
+            icon={X}
+            title={kind === 'exam' ? 'Отменить экзамен' : 'Отменить тест'}
+            onPress={() => {
+              setCancelError(null);
+              setConfirmCancel(true);
+            }}
+          />
+        }
+      />
+      <ConfirmDialog
+        visible={confirmCancel}
+        title={kind === 'exam' ? 'Отменить экзамен?' : 'Отменить тест?'}
+        message={
+          (participants.length > 0
+            ? `${studentsCountLabel(participants.length)} в ожидании вернутся на главную. `
+            : '') +
+          (kind === 'exam'
+            ? 'Код перестанет работать. Экзамен вернётся в черновики — его можно открыть снова с новым кодом.'
+            : 'Код перестанет работать, тест удалится. Новый можно создать в любой момент.')
+        }
+        confirmText={kind === 'exam' ? 'Вернуть в черновики' : 'Удалить тест'}
+        destructive
+        busy={canceling}
+        error={cancelError}
+        onConfirm={() => void cancel()}
+        onClose={() => setConfirmCancel(false)}
       />
       {monitor.error && m ? <Banner text="Нет связи, пробуем снова…" /> : null}
       <View style={styles.layout}>

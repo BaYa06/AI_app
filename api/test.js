@@ -14,6 +14,7 @@ import {
   reinstateParticipant,
 } from './_handlers/test/teacher.js';
 import { markAway, markBack, leaveTest } from './_handlers/test/exitControl.js';
+import { cancelTest } from './_handlers/test/lobby.js';
 import {
   examBuild,
   examDraft,
@@ -54,6 +55,7 @@ import { SUPABASE_URL } from './_handlers/test/_shared.js';
  * POST /api/test?action=answer        — ученик отправляет ответ
  * GET  /api/test?action=monitor       — учитель или участник получает прогресс
  * POST /api/test?action=finish        — учитель завершает тест
+ * POST /api/test?action=cancel        — учитель закрывает лобби (экзамен → черновик, тест удаляется)
  * GET  /api/test?action=results       — итоговые результаты (только учитель — владелец сессии)
  * POST /api/test?action=get-question  — ученик запрашивает вопрос с вариантами
  * GET  /api/test?action=history       — учитель получает историю тестов курса
@@ -115,6 +117,7 @@ export default async function handler(req, res) {
     if (action === 'answer') return await answerQuestion(req, res, sql, userId);
     if (action === 'monitor') return await monitorTest(req, res, sql, userId);
     if (action === 'finish') return await finishTest(req, res, sql, userId);
+    if (action === 'cancel') return await cancelTest(req, res, sql, userId);
     if (action === 'results') return await getResults(req, res, sql, userId);
     if (action === 'get-question') return await getQuestion(req, res, sql, userId);
     if (action === 'history') return await getHistory(req, res, sql, userId);

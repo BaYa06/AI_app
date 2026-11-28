@@ -15,6 +15,7 @@ import { generateUniqueCode, mainSetId } from './teacher.js';
 import { rejectIfLeft } from './student.js';
 import { finishParticipantEarly, attemptSummary } from './_shared.js';
 import { courseSetIdsSql } from '../../_course.js';
+import { closeIdleLobbies } from './lobby.js';
 import { detectBackKind } from '../../_exam/prepare.js';
 import { classifyDifficulty, LEARNED_STEP } from '../../_exam/difficulty.js';
 import { buildExam, replaceItem, LIMITS } from '../../_exam/build.js';
@@ -325,6 +326,7 @@ async function insertItems(sql, sessionId, items) {
  */
 export async function examDraft(req, res, sql, userId) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  if (isUuid(req.query.sessionId)) await closeIdleLobbies(sql, { sessionId: req.query.sessionId });
   const session = await loadOwnExam(res, sql, userId, req.query.sessionId);
   if (!session) return;
   const items = await loadItems(sql, session.id);
@@ -448,6 +450,8 @@ export async function examEditItem(req, res, sql, userId) {
  */
 export async function examList(req, res, sql, userId) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  // Пустые лобби старше 10 минут возвращаются в черновики (lobby.js) — не висят в «Идут сейчас»
+  await closeIdleLobbies(sql, { teacherId: userId });
   const courseId = isUuid(req.query.courseId) ? req.query.courseId : null;
   const rows = await sql`
     SELECT ts.id AS "sessionId", ts.course_id AS "courseId", c.title AS "courseTitle",
@@ -534,7 +538,7 @@ export async function examCreate(req, res, sql, userId) {
   const code = await generateUniqueCode(sql);
   await sql`
     UPDATE test_sessions SET status = 'waiting', code = ${code}, duration_sec = ${durationSec},
-      exit_control = ${exitControl}
+      exit_control = ${exitControl}, opened_at = NOW()
     WHERE id = ${session.id}::uuid AND status = 'draft'
   `;
   return res.status(201).json({

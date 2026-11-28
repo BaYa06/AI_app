@@ -9,7 +9,10 @@ const ME = '11111111-1111-4111-8111-111111111111';
 let mockQueries = [];
 let mockRows = [];
 function mockSql(strings, ...values) {
-  mockQueries.push({ text: strings.join('?').replace(/\s+/g, ' ').trim(), values });
+  const text = strings.join('?').replace(/\s+/g, ' ').trim();
+  mockQueries.push({ text, values });
+  // Поиск пустых лобби для авто-закрытия (lobby.js) — в этих тестах их нет
+  if (/FROM test_sessions ts WHERE ts.status = 'waiting'/.test(text)) return Promise.resolve([]);
   return Promise.resolve(mockRows);
 }
 
@@ -62,7 +65,9 @@ describe('test?action=active (LiveReturn 1)', () => {
     const res = await call('GET');
     expect(res.statusCode).toBe(200);
     expect(res.body).toEqual(mockRows);
-    const q = mockQueries[0];
+    // Сначала закрываются пустые лобби старше 10 минут, затем — сам список
+    expect(mockQueries[0].text).toMatch(/NOT EXISTS \(SELECT 1 FROM test_participants/);
+    const q = mockQueries[mockQueries.length - 1];
     expect(q.values[0]).toBe(ME);
     expect(q.text).toMatch(/teacher_id = \?::uuid/);
     expect(q.text).toMatch(/status = 'waiting'/);

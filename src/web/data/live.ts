@@ -64,6 +64,13 @@ export const LiveData = {
     await testCall('finish', { method: 'POST', body: { sessionId } });
   },
 
+  /** Закрыть лобби: экзамен вернётся в черновики, быстрый тест удалится. Ученики в ожидании — на главную */
+  async cancel(sessionId: string): Promise<void> {
+    const fake = preview();
+    if (fake) return;
+    await testCall('cancel', { method: 'POST', body: { sessionId } });
+  },
+
   async reinstate(sessionId: string, userId: string): Promise<void> {
     const fake = preview();
     if (fake) return fake.reinstate(sessionId, userId);

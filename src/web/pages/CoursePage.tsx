@@ -1,16 +1,9 @@
 /**
  * Страница курса (plan/new/web_cabinet.md, Web 7, 10): шапка, вкладки в адресе (?tab=), действия курса.
- * «Задания», «Экзамены» и «Отчёт родителям» — честные заглушки до своих этапов.
+ * «Задания» — список, новое задание и сдача (HomeworkTab); «Отчёт родителям» — пока заглушка.
  */
 import React, { useState } from 'react';
-import {
-  ClipboardList,
-  FileText,
-  GraduationCap,
-  MoreHorizontal,
-  UserPlus,
-  Zap,
-} from 'lucide-react-native';
+import { FileText, GraduationCap, MoreHorizontal, UserPlus, Zap } from 'lucide-react-native';
 import { View } from 'react-native';
 import { spacing } from '@/constants';
 import { Button } from '@/components/ui/Button';
@@ -25,6 +18,7 @@ import { studentsCountLabel } from '../teacherLogic';
 import { Centered, ErrorPage, LoadingPage, NotFoundPage } from '../ui/states';
 import { PageHeader, TabBar, type TabItem } from '../ui/kit';
 import { StudentsTab } from '../courses/StudentsTab';
+import { HomeworkTab } from '../courses/HomeworkTab';
 import { ExamData } from '../data/exam';
 import { ExamList } from '../exam/ExamList';
 import { NewExamButton } from './ExamsPage';
@@ -45,10 +39,9 @@ const TABS: TabItem<TabKey>[] = [
 ];
 
 const STUBS: Record<
-  Exclude<TabKey, 'students' | 'exams'>,
+  Exclude<TabKey, 'students' | 'exams' | 'homework'>,
   { icon: typeof FileText; title: string }
 > = {
-  homework: { icon: ClipboardList, title: 'Задания скоро будут в кабинете' },
   report: { icon: FileText, title: 'Отчёт родителям скоро будет в кабинете' },
 };
 
@@ -146,11 +139,13 @@ export function CoursePage({ courseId }: { courseId: string }) {
         <StudentsTab course={course} members={members} />
       ) : tab === 'exams' ? (
         <CourseExams courseId={courseId} />
+      ) : tab === 'homework' ? (
+        <HomeworkTab courseId={courseId} />
       ) : (
         <Centered>
           <EmptyState
-            icon={STUBS[tab as 'homework' | 'report'].icon}
-            title={STUBS[tab as 'homework' | 'report'].title}
+            icon={STUBS.report.icon}
+            title={STUBS.report.title}
             description="Пока это есть в приложении Flashly."
           />
         </Centered>

@@ -15,6 +15,8 @@ import { GuestPage, NotTeacherPage, ProfileErrorPage, SignInPage } from './auth/
 import { LoadingPage, NotFoundPage } from './ui/states';
 import { HomePage } from './pages/HomePage';
 import { CoursePage } from './pages/CoursePage';
+import { HomeworkNewPage } from './pages/HomeworkNewPage';
+import { HomeworkPage } from './pages/HomeworkPage';
 import { StudentPage } from './pages/StudentPage';
 import { CoursesProvider } from './data/CoursesContext';
 import { ExamsPage } from './pages/ExamsPage';
@@ -32,6 +34,8 @@ const ROUTES: RouteDef[] = [
   { name: 'home', pattern: '/' },
   { name: 'course', pattern: '/courses/:courseId' },
   { name: 'student', pattern: '/courses/:courseId/students/:studentId' },
+  { name: 'homeworkNew', pattern: '/courses/:courseId/homework/new' },
+  { name: 'homework', pattern: '/courses/:courseId/homework/:homeworkId' },
   { name: 'exams', pattern: '/exams' },
   { name: 'quickNew', pattern: '/courses/:courseId/tests/new' },
   { name: 'quick', pattern: '/tests/:sessionId' },
@@ -49,6 +53,16 @@ function Routes() {
   if (route.name === 'home') return <HomePage />;
   if (route.name === 'course')
     return <CoursePage key={route.params.courseId} courseId={route.params.courseId} />;
+  if (route.name === 'homeworkNew')
+    return <HomeworkNewPage key={route.params.courseId} courseId={route.params.courseId} />;
+  if (route.name === 'homework')
+    return (
+      <HomeworkPage
+        key={route.params.homeworkId}
+        courseId={route.params.courseId}
+        homeworkId={route.params.homeworkId}
+      />
+    );
   if (route.name === 'exams') return <ExamsPage />;
   if (route.name === 'quickNew')
     return <QuickSetupPage key={route.params.courseId} courseId={route.params.courseId} />;
