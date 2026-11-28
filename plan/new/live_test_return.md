@@ -31,57 +31,58 @@
 
 ## Шаги
 
-### LiveReturn 1 — сервер: `action=active`
-- [ ] В `api/_handlers/test/teacher.js` добавить `getActiveSessions(req, res, sql, userId)`.
+### LiveReturn 1 — сервер: `action=active` (✅ 28.11.2026)
+- [x] В `api/_handlers/test/teacher.js` добавить `getActiveSessions(req, res, sql, userId)`.
   GET, возвращает незавершённые сессии этого учителя:
   `sessionId, courseId, courseTitle, setTitle, status, code, testMode, purpose, engine,
   startedAt, durationSec, participantCount`.
   Условие: `teacher_id = userId AND status IN ('waiting','active')`.
-- [ ] Отсечь «зависшие»: `waiting` старше 6 часов и `active` старше 12 часов не показывать
+- [x] Отсечь «зависшие»: `waiting` старше 6 часов и `active` старше 12 часов не показывать
   (учитель закрыл вкладку и забыл — вечная плашка не нужна).
-- [ ] Для экзамена (`engine = 2`) учесть срок из `monitor`: если время вышло, а статус ещё
+- [x] Для экзамена (`engine = 2`) учесть срок из `monitor`: если время вышло, а статус ещё
   `active`, всё равно показывать (учителю нужно нажать «Завершить»).
-- [ ] Подключить `if (action === 'active')` в `api/test.js`; экспорт в `_handlers/test/index`,
+- [x] Подключить `if (action === 'active')` в `api/test.js`; экспорт в `_handlers/test/index`,
   если он есть.
-- [ ] Старые версии приложения новый action не вызывают, совместимость не ломается
+- [x] Старые версии приложения новый action не вызывают, совместимость не ломается
   (см. `plan/new/release_safety.md`).
-- [ ] Юнит-тест в `api/__tests__/` (по образцу `lessonPrep.test.js`): чужой учитель не видит
+- [x] Юнит-тест в `api/__tests__/` (по образцу `lessonPrep.test.js`): чужой учитель не видит
   сессию, `finished` не виден, старая `waiting` отсекается.
 
-### LiveReturn 2 — клиент: сервис и хук
-- [ ] `src/services/activeTest.ts`: `ActiveTestApi.list()` и zustand-стор (или хук
+### LiveReturn 2 — клиент: сервис и хук (✅ 28.11.2026)
+- [x] `src/services/activeTest.ts`: `ActiveTestApi.list()` и zustand-стор (или хук
   `useActiveTest`) с запросом при фокусе главной / экрана курса и при возврате приложения из
   фона (`AppState`). Опрос раз в 30 с только пока плашка на экране.
-- [ ] Только для роли учителя: ученикам запрос не делаем.
-- [ ] Ошибки сети — тихо, плашку не показываем, без тоста.
+- [x] Только для роли учителя: ученикам запрос не делаем.
+- [x] Ошибки сети — тихо, плашку не показываем, без тоста.
 
-### LiveReturn 3 — плашка на главной
-- [ ] Компонент `src/components/teacher/ActiveTestBanner.tsx`: заголовок «Идёт тест»,
+### LiveReturn 3 — плашка на главной (✅ 28.11.2026)
+- [x] Компонент `src/components/teacher/ActiveTestBanner.tsx`: заголовок «Идёт тест»,
   строка «Набор · N учеников», кнопка «Вернуться». Токены из бренд-системы, без новых цветов.
-- [ ] Вставить в `HomeScreen` над карточкой урока для учителя (рядом с `TeacherBanner`).
+- [x] Вставить в `HomeScreen` над карточкой урока для учителя (рядом с `TeacherBanner`).
   Порядок главной учителя другие блоки не меняем.
-- [ ] Нажатие: `waiting` → `navigate('TestLobby', …)`, `active` → `navigate('LiveTest', …)`
+- [x] Нажатие: `waiting` → `navigate('TestLobby', …)`, `active` → `navigate('LiveTest', …)`
   с `courseId`, `courseTitle`, `sessionId`.
-- [ ] Если сессий несколько — одна плашка «Идёт тестов: 2», по нажатию список (лист снизу).
+- [x] Если сессий несколько — заголовок «Идёт тестов: N» и по строке на каждый (вместо листа снизу — проще и без лишнего нажатия).
 
-### LiveReturn 4 — плашка в курсе и в истории
-- [ ] Та же плашка вверху `TeacherCourseStatsScreen` (фильтр по `courseId`).
-- [ ] В `TestHistoryScreen` над списком показать идущий тест этого курса карточкой с пометкой
+### LiveReturn 4 — плашка в курсе и в истории (✅ 28.11.2026)
+- [x] Та же плашка вверху `TeacherCourseStatsScreen` (фильтр по `courseId`).
+- [x] В `TestHistoryScreen` над списком показать идущий тест этого курса карточкой с пометкой
   «Идёт сейчас».
 
-### LiveReturn 5 — экраны должны переживать повторный вход
-- [ ] Проверить `LiveTestScreen` и `TestLobbyScreen` при входе «с нуля» (не из лобби):
+### LiveReturn 5 — экраны должны переживать повторный вход (✅ 28.11.2026)
+- [x] Проверить `LiveTestScreen` и `TestLobbyScreen` при входе «с нуля» (не из лобби):
   монитор уже грузит данные через `monitor` каждые 4 с, значит, достаточно `sessionId`.
-- [ ] Лобби: при открытии для сессии `waiting` взять код и список участников с сервера, а не из
-  `route.params`. Если их там нет, дозагрузить.
-- [ ] Если сессия к моменту нажатия уже `finished` — сразу `replace` на экран итогов
+- [x] Лобби: код и параметры плашка передаёт из `action=active` (сервер отдаёт `code`, `testMode`,
+  `questionCount`, `timePerQuestion`); список учеников лобби и так грузит из `monitor`. Если тест уже
+  `active` — лобби само переходит на монитор, если `finished` — на итоги.
+- [x] Если сессия к моменту нажатия уже `finished` — сразу `replace` на экран итогов
   (`ExamResults` / `WarmupResults` / `TestResultsTeacher`, как в `goToResults`) без ошибки.
-- [ ] Кнопка «назад» с монитора ведёт на экран курса, а не на закрытое лобби.
+- [x] «Назад» с монитора возвращает туда, откуда открыли плашку (главная, курс или история); закрытого лобби в стеке нет.
 
-### LiveReturn 6 — аналитика и релиз
-- [ ] События `active_test_banner_shown`, `active_test_returned` (откуда: home / course /
+### LiveReturn 6 — аналитика и релиз (✅ 28.11.2026)
+- [x] События `active_test_banner_shown`, `active_test_returned` (откуда: home / course /
   history) в `src/services/analyticsEvents/teacher.ts`.
-- [ ] Проверка `npm test`, `npm run type-check` (0 ошибок).
+- [x] Проверка `npm test` (866), `npm run type-check` (0 ошибок), `brand:check` без новых нарушений.
 - [ ] Ручной сценарий на TestFlight Staging (ниже), потом dev → main по чек-листу релиза.
 
 ## Как проверять
@@ -103,5 +104,5 @@
 
 ## Открытые вопросы
 
-1. Лимиты «зависших» сессий (6 ч для `waiting`, 12 ч для `active`) — подходят?
-2. Нужна ли кнопка «Завершить» прямо на плашке или только вход в монитор (предложено: только вход).
+1. (решено по умолчанию: 6 ч и 12 ч, константы `ACTIVE_*_MAX_HOURS` в `teacher.js`) Лимиты «зависших» сессий (6 ч для `waiting`, 12 ч для `active`) — подходят?
+2. (решено по умолчанию: только вход в монитор) Нужна ли кнопка «Завершить» прямо на плашке или только вход в монитор (предложено: только вход).

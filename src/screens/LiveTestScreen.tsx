@@ -15,6 +15,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 
 import { log } from '@/utils/logger';
+import { dropActiveTest } from '@/services/activeTest';
 import { getAccessToken } from '@/services/auth/session';
 import { rawApiFetch } from '@/services/api/client';
 import { ExamApi } from '@/services/exam';
@@ -75,6 +76,7 @@ export function LiveTestScreen({ navigation, route }: Props) {
   const goToResults = useCallback(() => {
     if (hasNavigated.current) return;
     hasNavigated.current = true;
+    dropActiveTest(sessionId);
     // Разминка заканчивается своим экраном итогов (П4, Teacher 41)
     const target =
       engineRef.current === 2

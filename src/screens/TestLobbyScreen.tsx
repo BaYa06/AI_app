@@ -25,6 +25,7 @@ import type { RootStackParamList } from '@/types/navigation';
 import { describeTestError } from '@/utils/testApiErrors';
 import { BottomBar } from '@/components/ui';
 import { log } from '@/utils/logger';
+import { dropActiveTest } from '@/services/activeTest';
 import { getAccessToken } from '@/services/auth/session';
 import { rawApiFetch } from '@/services/api/client';
 import { markTeacherTask } from '@/services/teacherStart';
@@ -51,6 +52,9 @@ export function TestLobbyScreen({ navigation, route }: Props) {
   const [starting, setStarting] = useState(false);
   const [copied, setCopied] = useState(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
+  // Лобби открыли из плашки «Вернуться», а тест уже начат или закончен (с другого устройства
+  // или пока учитель был на главной) — переходим дальше один раз (plan/new/live_test_return.md)
+  const leftLobby = useRef(false);
 
   // Polling — синхронизация списка студентов каждые 3 сек
   useEffect(() => {
@@ -67,6 +71,28 @@ export function TestLobbyScreen({ navigation, route }: Props) {
         if (!resp.ok || cancelled) return;
         const data = await resp.json();
         if (cancelled) return;
+        if (!leftLobby.current && (data.status === 'active' || data.status === 'finished')) {
+          leftLobby.current = true;
+          const params = {
+            courseId: route.params.courseId,
+            courseTitle: route.params.courseTitle,
+            sessionId,
+          };
+          if (data.status === 'active') {
+            navigation.replace('LiveTest', params);
+          } else {
+            dropActiveTest(sessionId);
+            navigation.replace(
+              data.engine === 2
+                ? 'ExamResults'
+                : data.purpose === 'warmup'
+                  ? 'WarmupResults'
+                  : 'TestResultsTeacher',
+              params
+            );
+          }
+          return;
+        }
         setStudents(
           (data.participants || []).map((p: any) => ({
             id: p.userId,
@@ -140,6 +166,9 @@ export function TestLobbyScreen({ navigation, route }: Props) {
       const result = await resp.json();
       if (!resp.ok) throw new Error(result.error || 'Failed to start test');
 
+      // Опрос лобби уже увидел «идёт» и сам перешёл на монитор — второй раз не переходим
+      if (leftLobby.current) return;
+      leftLobby.current = true;
       navigation.replace('LiveTest', {
         courseId: route.params.courseId,
         courseTitle: route.params.courseTitle,
