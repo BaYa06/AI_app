@@ -530,6 +530,7 @@ export async function getActiveSessions(req, res, sql, userId) {
       ts.created_at     AS "createdAt",
       ts.duration_sec   AS "durationSec",
       ts.question_count AS "questionCount",
+      ts.time_per_question AS "timePerQuestion",
       (SELECT COUNT(*)::int FROM test_participants tp WHERE tp.session_id = ts.id)
                         AS "participantCount"
     FROM test_sessions ts
