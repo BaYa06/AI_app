@@ -2,12 +2,14 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './src/App';
 import { initSwRecovery } from './src/utils/swRecovery';
+import { initPostHog } from './src/services/posthog';
 import IoniconsFont from 'react-native-vector-icons/Fonts/Ionicons.ttf';
 
 // Инициализируем SW recovery ДО рендера приложения:
 // — слушаем controllerchange для auto-reload при обновлении SW
 // — ловим ChunkLoadError глобально и делаем аварийный recovery
 initSwRecovery();
+initPostHog();
 
 const container = document.getElementById('root');
 const root = createRoot(container);

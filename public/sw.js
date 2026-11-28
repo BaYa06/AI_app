@@ -203,6 +203,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // ===== PostHog (настройки, флаги, скрипты записи сессий) — только сеть, иначе кэш навсегда =====
+  if (url.hostname.endsWith('.posthog.com')) {
+    return;
+  }
+
   // ===== Navigation (HTML) — ВСЕГДА network-first =====
   if (request.mode === 'navigate') {
     event.respondWith(

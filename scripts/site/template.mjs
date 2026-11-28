@@ -191,6 +191,7 @@ ${noindex ? '' : hreflang(alternates)}
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="stylesheet" href="/site/site.css">
 ${PLATFORM_SCRIPT}
+<script src="/site/ph.js" defer></script>
 ${extra}`;
 }
 

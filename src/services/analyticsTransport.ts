@@ -2,14 +2,17 @@
  * Отправка событий аналитики в веб-версии (Firebase JS SDK).
  *
  * В нативном приложении Metro берёт analyticsTransport.native.ts с тем же API.
+ * Каждое событие, свойство и user_id дублируется в PostHog (services/posthog.ts).
  */
 import { logEvent, setUserId, setUserProperties } from 'firebase/analytics';
 import { analytics } from './firebase';
 import { log } from '@/utils/logger';
+import { phCapture, phIdentify, phSetPersonProps } from './posthog';
 
 type Params = Record<string, string | number | boolean>;
 
 export function sendEvent(event: string, params?: Params) {
+  phCapture(event, params);
   if (!analytics) {
     log.debug('Analytics', `${event}`, params);
     return;
@@ -22,6 +25,7 @@ export function sendEvent(event: string, params?: Params) {
 }
 
 export function sendUserProperties(props: Record<string, string>) {
+  phSetPersonProps(props);
   if (!analytics) return;
   try {
     setUserProperties(analytics, props);
@@ -34,6 +38,7 @@ export function sendUserProperties(props: Record<string, string>) {
  * user_id для аналитики — UUID пользователя (не email!). null — сброс при выходе.
  */
 export function setAnalyticsUserId(userId: string | null) {
+  phIdentify(userId);
   if (!analytics) return;
   try {
     setUserId(analytics, userId);

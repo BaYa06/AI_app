@@ -9,6 +9,7 @@ import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { navigate, useRoute, usePath, type RouteDef } from './router';
 import { Shell } from './Shell';
 import { useTeacherSession } from './auth/useTeacherSession';
+import { phIdentify, phSetPersonProps } from '@/services/posthog';
 import { rememberReturnTo, takeReturnTo } from './auth/returnTo';
 import { GuestPage, NotTeacherPage, ProfileErrorPage, SignInPage } from './auth/AuthPages';
 import { LoadingPage, NotFoundPage } from './ui/states';
@@ -94,6 +95,17 @@ function Gate() {
   useEffect(() => {
     if (session.status === 'out') rememberReturnTo(path);
   }, [session.status, path]);
+
+  // PostHog: учитель — по UUID (не email), вышел — сбрасываем, чтобы не склеить с другим человеком
+  const teacherId = session.status === 'teacher' ? session.user.id : null;
+  useEffect(() => {
+    if (teacherId && teacherId !== 'preview') {
+      phIdentify(teacherId);
+      phSetPersonProps({ is_teacher: true });
+    } else if (session.status === 'out') {
+      phIdentify(null);
+    }
+  }, [teacherId, session.status]);
 
   // После входа браузер приходит на /auth-callback — отправляем обратно, откуда ушёл
   useEffect(() => {

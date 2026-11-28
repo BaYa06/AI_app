@@ -7,6 +7,7 @@ import { Linking, Platform } from 'react-native';
 import { triggerHaptic } from '@/utils/haptic';
 import { NavigationContainer, type LinkingOptions } from '@react-navigation/native';
 import { navigationRef } from './navigationRef';
+import { phScreen } from '@/services/posthog';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useThemeColors, useSettingsStore } from '@/store';
@@ -370,6 +371,16 @@ const NATIVE_LINKING: LinkingOptions<RootStackParamList> = {
   },
 };
 
+/** Экран для PostHog ($screen): шлём только при смене экрана, не на каждое изменение параметров */
+let lastScreen: string | undefined;
+function trackScreen() {
+  const name = navigationRef.getCurrentRoute()?.name;
+  if (name && name !== lastScreen) {
+    lastScreen = name;
+    phScreen(name);
+  }
+}
+
 export function AppNavigator() {
   const colors = useThemeColors();
 
@@ -409,6 +420,8 @@ export function AppNavigator() {
     <NavigationContainer
       ref={navigationRef}
       linking={Platform.OS !== 'web' ? NATIVE_LINKING : undefined}
+      onReady={trackScreen}
+      onStateChange={trackScreen}
     >
       <Stack.Navigator
         screenOptions={{

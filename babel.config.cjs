@@ -26,6 +26,8 @@ module.exports = {
           'GCLOUD_TTS_SA',
           'REACT_APP_GCLOUD_TTS_KEY',
           'REACT_APP_GCLOUD_TTS_SA',
+          // Публичный ключ PostHog (phc_…), запасной — в src/config/posthog.ts
+          'POSTHOG_KEY',
         ],
       },
     ],

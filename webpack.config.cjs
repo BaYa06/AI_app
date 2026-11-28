@@ -223,10 +223,12 @@ module.exports = (env, argv) => {
           FIREBASE_MEASUREMENT_ID:
             envVars.FIREBASE_MEASUREMENT_ID || process.env.FIREBASE_MEASUREMENT_ID || '',
           FIREBASE_VAPID_KEY: envVars.FIREBASE_VAPID_KEY || process.env.FIREBASE_VAPID_KEY || '',
+          POSTHOG_KEY: envVars.POSTHOG_KEY || process.env.POSTHOG_KEY || '',
         }),
       }),
       new webpack.ProvidePlugin({
-        process: 'process/browser',
+        // с .js: в .mjs-модулях (posthog-js) webpack требует полный путь
+        process: 'process/browser.js',
       }),
     ],
     devServer: isDev

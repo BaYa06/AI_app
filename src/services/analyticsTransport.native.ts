@@ -1,6 +1,8 @@
 /**
  * Отправка событий аналитики в нативном приложении (@react-native-firebase/analytics).
  *
+ * Каждое событие, свойство и user_id дублируется в PostHog (services/posthog.native.ts).
+ *
  * Тот же API, что у веб-версии в analyticsTransport.ts: Metro подхватывает этот файл на
  * iOS/Android вместо веб-модуля, webpack — наоборот, берёт analyticsTransport.ts.
  *
@@ -16,12 +18,14 @@ import {
   setUserProperties as fbSetUserProperties,
 } from '@react-native-firebase/analytics';
 import { log } from '@/utils/logger';
+import { phCapture, phIdentify, phSetPersonProps } from './posthog';
 
 type Params = Record<string, string | number | boolean>;
 
 const enabled = Platform.OS === 'ios';
 
 export function sendEvent(event: string, params?: Params) {
+  phCapture(event, params);
   log.debug('Analytics', `${event}`, params);
   if (!enabled) return;
   fbLogEvent(getAnalytics(), event, params).catch((e: unknown) => {
@@ -30,6 +34,7 @@ export function sendEvent(event: string, params?: Params) {
 }
 
 export function sendUserProperties(props: Record<string, string>) {
+  phSetPersonProps(props);
   if (!enabled) return;
   fbSetUserProperties(getAnalytics(), props).catch((e: unknown) => {
     log.debug('Analytics', 'setUserProperties error', e);
@@ -40,6 +45,7 @@ export function sendUserProperties(props: Record<string, string>) {
  * user_id для аналитики — UUID пользователя (не email!). null — сброс при выходе.
  */
 export function setAnalyticsUserId(userId: string | null) {
+  phIdentify(userId);
   if (!enabled) return;
   fbSetUserId(getAnalytics(), userId).catch((e: unknown) => {
     log.debug('Analytics', 'setUserId error', e);
