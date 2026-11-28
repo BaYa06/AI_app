@@ -14,6 +14,7 @@ import { Icon } from '@/components/ui/Icon';
 import { EmptyState } from '@/components/ui/EmptyState';
 import type { IconComponent } from '@/components/ui/types';
 import { navigate, usePath } from './router';
+import { useCourses } from './data/CoursesContext';
 import { signOut } from './auth/AuthPages';
 
 type NavItem = { path: string; label: string; icon: IconComponent };
@@ -30,6 +31,7 @@ export function Shell({ email, children }: { email: string | null; children: Rea
   const colors = useThemeColors();
   const path = usePath();
   const { width } = useWindowDimensions();
+  const { courses, activeTests } = useCourses();
 
   if (width < breakpoints.desktop) {
     return (
@@ -66,7 +68,7 @@ export function Shell({ email, children }: { email: string | null; children: Rea
           </View>
         </View>
 
-        <View style={styles.nav}>
+        <ScrollView style={styles.nav} contentContainerStyle={{ gap: spacing.xxs }}>
           {NAV.map((item) => {
             const active = isActive(path, item);
             return (
@@ -94,7 +96,48 @@ export function Shell({ email, children }: { email: string | null; children: Rea
               </Pressable>
             );
           })}
-        </View>
+
+          {courses && courses.length > 0 ? (
+            <View style={styles.courseLabel}>
+              <Text variant="overline" color="secondary">
+                КУРСЫ
+              </Text>
+            </View>
+          ) : null}
+          {(courses ?? []).map((course) => {
+            const active =
+              path === `/courses/${course.id}` ||
+              path.startsWith(`/courses/${course.id}/`) ||
+              path.startsWith(`/courses/${course.id}?`);
+            const live = activeTests.some((t) => t.courseId === course.id);
+            return (
+              <Pressable
+                key={course.id}
+                accessibilityRole="link"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={live ? `${course.title}, идёт тест` : course.title}
+                onPress={() => navigate(`/courses/${course.id}`)}
+                style={(state) => [
+                  styles.navItem,
+                  active && { backgroundColor: alpha(colors.primary, 10) },
+                  !active &&
+                    (state as { hovered?: boolean }).hovered && {
+                      backgroundColor: colors.surfaceMuted,
+                    },
+                ]}
+              >
+                <Text
+                  variant="label"
+                  numberOfLines={1}
+                  style={{ flex: 1, color: active ? colors.primary : colors.textPrimary }}
+                >
+                  {course.title}
+                </Text>
+                {live ? <View style={[styles.dot, { backgroundColor: colors.primary }]} /> : null}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
 
         <View style={[styles.account, { borderTopColor: colors.border }]}>
           {email ? (
@@ -146,6 +189,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.s,
     borderRadius: borderRadius.m,
   },
+  courseLabel: { paddingHorizontal: spacing.s, paddingTop: spacing.m, paddingBottom: spacing.xxs },
+  dot: { width: 8, height: 8, borderRadius: borderRadius.full },
   account: { borderTopWidth: 1, paddingTop: spacing.s, gap: spacing.xxs, alignItems: 'flex-start' },
   main: { flex: 1 },
   mainContent: { alignItems: 'center', padding: spacing.xl },

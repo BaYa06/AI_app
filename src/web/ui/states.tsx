@@ -13,6 +13,11 @@ import { EmptyState, ErrorState } from '@/components/ui/EmptyState';
 import { navigate } from '../router';
 import { describeApiError } from '../api';
 
+/** Пустое состояние на всю ширину ноутбука растягивало бы кнопку — держим колонку 480 */
+export function Centered({ children }: { children: React.ReactNode }) {
+  return <View style={{ width: '100%', maxWidth: 480, alignSelf: 'center' }}>{children}</View>;
+}
+
 export function LoadingPage() {
   return (
     <View style={styles.loading} accessibilityLabel="Загружаем">
@@ -25,22 +30,26 @@ export function LoadingPage() {
 
 export function ErrorPage({ error, onRetry }: { error?: unknown; onRetry?: () => void }) {
   return (
-    <ErrorState
-      title="Не получилось загрузить"
-      description={describeApiError(error)}
-      onRetry={onRetry}
-    />
+    <Centered>
+      <ErrorState
+        title="Не получилось загрузить"
+        description={describeApiError(error)}
+        onRetry={onRetry}
+      />
+    </Centered>
   );
 }
 
 export function NotFoundPage() {
   return (
-    <EmptyState
-      icon={SearchX}
-      title="Страница не найдена"
-      description="Возможно, ссылка устарела."
-      action={{ label: 'На главную', onPress: () => navigate('/') }}
-    />
+    <Centered>
+      <EmptyState
+        icon={SearchX}
+        title="Страница не найдена"
+        description="Возможно, ссылка устарела."
+        action={{ label: 'На главную', onPress: () => navigate('/') }}
+      />
+    </Centered>
   );
 }
 

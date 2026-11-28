@@ -1,15 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getCurrentUser, onAuthChange } from '@/services/auth/session';
 import { profileApi } from '@/services/neon/profile';
+import { previewMode } from '../preview';
 import { resolveSession, type TeacherSession } from './resolveSession';
 
-/**
- * Только в разработке: `?preview=teacher|guest|notTeacher|error` подменяет вход, чтобы смотреть экраны
- * без аккаунта и сервера. В боевой сборке (__DEV__ = false) этот код вырезается.
- */
+/** Только в разработке: подмена входа (см. ../preview.ts) */
 function devPreview(): TeacherSession | null {
-  if (!__DEV__ || typeof window === 'undefined') return null;
-  const mode = new URLSearchParams(window.location.search).get('preview');
+  const mode = previewMode();
   if (mode === 'teacher')
     return { status: 'teacher', user: { id: 'preview', email: 'teacher@example.com' } };
   if (mode === 'guest') return { status: 'guest' };

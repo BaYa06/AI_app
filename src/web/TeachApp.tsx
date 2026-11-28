@@ -13,10 +13,15 @@ import { rememberReturnTo, takeReturnTo } from './auth/returnTo';
 import { GuestPage, NotTeacherPage, ProfileErrorPage, SignInPage } from './auth/AuthPages';
 import { LoadingPage, NotFoundPage } from './ui/states';
 import { HomePage } from './pages/HomePage';
+import { CoursePage } from './pages/CoursePage';
+import { StudentPage } from './pages/StudentPage';
+import { CoursesProvider } from './data/CoursesContext';
 import { UiGalleryPage } from './pages/UiGalleryPage';
 
 const ROUTES: RouteDef[] = [
   { name: 'home', pattern: '/' },
+  { name: 'course', pattern: '/courses/:courseId' },
+  { name: 'student', pattern: '/courses/:courseId/students/:studentId' },
   ...(__DEV__ ? [{ name: 'ui', pattern: '/_ui' }] : []),
 ];
 
@@ -24,6 +29,16 @@ function Routes() {
   const route = useRoute(ROUTES);
   if (!route) return <NotFoundPage />;
   if (route.name === 'home') return <HomePage />;
+  if (route.name === 'course')
+    return <CoursePage key={route.params.courseId} courseId={route.params.courseId} />;
+  if (route.name === 'student')
+    return (
+      <StudentPage
+        key={route.params.studentId}
+        courseId={route.params.courseId}
+        studentId={route.params.studentId}
+      />
+    );
   if (route.name === 'ui') return <UiGalleryPage />;
   return <NotFoundPage />;
 }
@@ -57,9 +72,11 @@ function Gate() {
       return <ProfileErrorPage onRetry={reload} />;
     case 'teacher':
       return (
-        <Shell email={session.user.email}>
-          {path.startsWith('/auth-callback') ? <LoadingPage /> : <Routes />}
-        </Shell>
+        <CoursesProvider>
+          <Shell email={session.user.email}>
+            {path.startsWith('/auth-callback') ? <LoadingPage /> : <Routes />}
+          </Shell>
+        </CoursesProvider>
       );
   }
 }

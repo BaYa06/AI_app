@@ -75,8 +75,11 @@ module.exports = (env, argv) => {
       rules: [
         {
           test: /\.(js|jsx|ts|tsx)$/,
-          exclude:
+          exclude: [
             /node_modules\/(?!(@react-native|react-native-svg|lucide-react-native|@react-navigation|react-native-vector-icons|react-native-inappbrowser-reborn)\/).*/,
+            // Чужие готовые библиотеки (QR) babel не трогает: он ломал их модульную обёртку
+            /src\/web\/vendor\//,
+          ],
           use: {
             loader: 'babel-loader',
             options: {
