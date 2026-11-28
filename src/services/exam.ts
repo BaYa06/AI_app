@@ -91,6 +91,8 @@ export type ExamDraft = {
   difficultySource?: 'class' | 'exams' | 'text';
   replacedItemId?: string;
   sameLevel?: boolean;
+  /** Веб-кабинет: сколько вопросов «вставь слово» ждут ИИ (api/_ai/exam-gap.js) */
+  aiPending?: number;
 };
 
 export type ResultStudent = {

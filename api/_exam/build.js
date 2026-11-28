@@ -159,6 +159,14 @@ export function makeItem(card, format, ctx, { direction } = {}) {
     base.extra.layout = def ? 'stacked' : 'columns';
     return { ...base, direction: 'pair', prompt: card.front, answer: card.back, options: null };
   }
+  if (format === 'gap' && ctx.aiGap) {
+    // Предложение, форму слова и неверные варианты напишет ИИ (api/_ai/exam-gap.js) — здесь заготовка.
+    // Длинные фразы в пропуск не ставим: им место в выборе и письме.
+    if (!canWrite(card)) return null;
+    base.extra.baseForm = card.front.trim();
+    base.extra.ai = 'pending';
+    return { ...base, direction: 'gap', prompt: '', answer: card.front.trim(), options: null };
+  }
   if (format === 'gap') {
     const gap = ctx.gapOf(card);
     if (!gap) return null;
@@ -228,11 +236,13 @@ export function recommendedTime(counts) {
 // ─── Сборка ─────────────────────────────────────────────────
 
 /** Один раз на сборку: быстрые справочники по карточкам */
-export function makeContext({ cards, distractorPool, backKind, levels, seed }) {
+export function makeContext({ cards, distractorPool, backKind, levels, seed, aiGap = false }) {
   const gaps = new Map();
   const posCache = new Map();
   return {
     backKind,
+    /** «Вставь слово» пишет ИИ (веб-кабинет): пример в карточке не нужен, вопрос — заготовка */
+    aiGap,
     levels: levels || new Map(),
     rng: makeRng(seed ?? 1),
     /** Нормализованные слова письма / «собери» / «вставь» — не брать в варианты */
@@ -379,8 +389,11 @@ export function buildExam(input) {
   const total = chosen.length;
 
   // ── Форматы ──
-  const gapShare =
-    chosen.length > 0 ? chosen.filter((c) => ctx.gapOf(c)).length / chosen.length : 0;
+  const gapShare = ctx.aiGap
+    ? 1
+    : chosen.length > 0
+      ? chosen.filter((c) => ctx.gapOf(c)).length / chosen.length
+      : 0;
   const wanted = normalizeFormats(config.formats, total, { backKind, gapShare });
   const pairSize = Number(config.pairSize) || LIMITS.pairDefault;
 

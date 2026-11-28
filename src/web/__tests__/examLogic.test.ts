@@ -13,11 +13,12 @@ import {
   setupProblem,
 } from '../exam/setupLogic';
 import {
+  aiPendingItems,
+  aiState,
   describeEditError,
-  describeSkipped,
   describeSmartError,
+  gapAiSummary,
   isEdited,
-  pendingDoubtful,
 } from '../exam/smartLogic';
 import type { DraftItem } from '@/services/exam';
 
@@ -123,36 +124,43 @@ const item = (extra: Record<string, unknown>): DraftItem => ({
   extra,
 });
 
-describe('сомнительные вопросы', () => {
-  it('на подтверждение попадают только принятые предложения ИИ с сомнением', () => {
+describe('«вставь слово» от ИИ', () => {
+  it('заготовки, готовые и заменённые письмом различаются', () => {
     const items = [
       item({}),
-      item({ edit: { edited: true, source: 'teacher' } }),
-      item({ edit: { edited: true, source: 'ai', doubtful: false } }),
-      item({ edit: { edited: true, source: 'ai', doubtful: true } }),
+      item({ ai: 'pending' }),
+      item({ ai: 'done' }),
+      item({ ai: 'fallback' }),
+      item({ ai: 'что-то' }),
     ];
-    expect(pendingDoubtful(items)).toHaveLength(1);
-    expect(isEdited(items[0])).toBe(false);
-    expect(isEdited(items[1])).toBe(true);
+    expect(items.map(aiState)).toEqual([null, 'pending', 'done', 'fallback', null]);
+    expect(aiPendingItems(items)).toHaveLength(1);
   });
-  it('мусор в extra не ломает', () => {
-    expect(pendingDoubtful([item({ edit: 'x' }), item({ edit: null })])).toEqual([]);
+  it('итог ИИ по-русски с правильными окончаниями', () => {
+    expect(gapAiSummary(1, 1)).toBe(
+      'Готово: 1 вопрос. Для 1 слова ИИ не написал надёжный вопрос — там письменный ответ.'
+    );
+    expect(gapAiSummary(3, 0)).toMatch(/^Готово: 3 вопроса\. Проверь/);
+    expect(gapAiSummary(0, 5)).toBe(
+      'Для 5 слов ИИ не написал надёжный вопрос — там письменный ответ.'
+    );
+  });
+  it('правка учителя отмечается', () => {
+    expect(isEdited(item({ edit: { edited: true, source: 'teacher' } }))).toBe(true);
+    expect(isEdited(item({}))).toBe(false);
   });
 });
 
 describe('тексты ошибок', () => {
   it('лимит ИИ, чужой и начатый экзамен', () => {
     expect(describeSmartError(429, 'hourly_limit')).toMatch(/лимит/);
+    expect(describeSmartError(429, 'hourly_limit')).toMatch(/письменными/);
     expect(describeSmartError(409)).toMatch(/начался/);
     expect(describeSmartError(403)).toMatch(/не твой/);
     expect(describeSmartError(0)).toMatch(/связи/);
     expect(describeSmartError(502)).toMatch(/ИИ/);
   });
   it('причины пропуска и коды правки понятны', () => {
-    expect(describeSkipped('long_answer')).toMatch(/длинный/);
-    expect(describeSkipped('sentence_no_gap')).toMatch(/Предложение/);
-    expect(describeSkipped('distractors_duplicate')).toMatch(/Варианты/);
-    expect(describeSkipped('что-то новое')).toMatch(/не справился/);
     expect(describeEditError('same_as_answer', 1)).toMatch(/вариант 2/);
     expect(describeEditError('answer_in_sentence')).toMatch(/подсказка/);
     expect(describeEditError(undefined)).toMatch(/Не получилось/);

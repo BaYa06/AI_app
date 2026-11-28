@@ -13,6 +13,9 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { navigate } from '../router';
 import { takeBuild } from '../exam/buildCache';
+import { useGapAi } from '../exam/useGapAi';
+import { gapAiSummary } from '../exam/smartLogic';
+import { useUnloadGuard } from '../ui/useUnloadGuard';
 import { PageHeader } from '../ui/kit';
 
 const STEP_MS = 300;
@@ -21,6 +24,10 @@ export function ExamBuildPage({ sessionId }: { sessionId: string }) {
   const colors = useThemeColors();
   const info = takeBuild(sessionId);
   const [shown, setShown] = useState(0);
+  // «Вставь слово» дописывает ИИ — одновременно с показом шагов сборки
+  const aiPending = info?.aiPending ?? 0;
+  const gapAi = useGapAi(sessionId, aiPending, () => {});
+  useUnloadGuard(gapAi.state.status === 'running');
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // После перезагрузки страницы шагов нет — сразу к превью
@@ -48,7 +55,9 @@ export function ExamBuildPage({ sessionId }: { sessionId: string }) {
   }, []);
 
   if (!info) return null;
-  const ready = shown >= info.steps.length;
+  const stepsDone = shown >= info.steps.length;
+  const aiDone = aiPending === 0 || gapAi.state.status === 'done' || gapAi.state.status === 'error';
+  const ready = stepsDone && aiDone;
 
   return (
     <View style={{ maxWidth: 640 }}>
@@ -98,6 +107,58 @@ export function ExamBuildPage({ sessionId }: { sessionId: string }) {
           );
         })}
       </View>
+
+      {aiPending > 0 && stepsDone ? (
+        <View style={styles.step} accessibilityLiveRegion="polite">
+          <View style={styles.rail}>
+            <View
+              style={[
+                styles.dot,
+                {
+                  backgroundColor: gapAi.state.status === 'done' ? colors.success : colors.surface,
+                  borderColor:
+                    gapAi.state.status === 'done'
+                      ? colors.success
+                      : gapAi.state.status === 'error'
+                        ? colors.error
+                        : colors.primary,
+                },
+              ]}
+            >
+              {gapAi.state.status === 'done' ? (
+                <Check size={16} color={colors.onPrimary} />
+              ) : gapAi.state.status === 'error' ? null : (
+                <ActivityIndicator size="small" color={colors.primary} />
+              )}
+            </View>
+          </View>
+          <View style={styles.stepText}>
+            <Text variant="label">ИИ пишет «вставь слово»</Text>
+            <Text
+              variant="bodySmall"
+              color={gapAi.state.status === 'error' ? 'error' : 'secondary'}
+            >
+              {gapAi.state.status === 'done'
+                ? gapAiSummary(gapAi.state.written, gapAi.state.fallback)
+                : gapAi.state.status === 'error'
+                  ? gapAi.state.message
+                  : `Предложения, нужная форма слова и неверные варианты для ${aiPending} вопросов — обычно 15–40 секунд`}
+            </Text>
+            {gapAi.state.status === 'error' ? (
+              <View style={{ flexDirection: 'row', gap: spacing.xs, marginTop: spacing.xs }}>
+                <Button size="s" variant="secondary" title="Повторить" onPress={gapAi.retry} />
+                <Button
+                  size="s"
+                  variant="quiet"
+                  tone="secondary"
+                  title="Без ИИ: письменный ответ"
+                  onPress={gapAi.withoutAi}
+                />
+              </View>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
 
       {ready && info.warnings.length > 0 ? (
         <Card

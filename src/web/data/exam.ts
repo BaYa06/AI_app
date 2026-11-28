@@ -14,7 +14,6 @@ import { getAccessToken } from '@/services/auth/session';
 import { rawApiFetch } from '@/services/api/client';
 import { WebApiError, classifyStatus, unwrap } from '../api';
 import { previewMode } from '../preview';
-import type { SmartResult } from '../exam/smartLogic';
 
 function preview() {
   if (previewMode() !== 'teacher' || !__DEV__) return null;
@@ -84,34 +83,36 @@ export const ExamData = {
     return unwrap(await ExamApi.create(sessionId));
   },
 
-  /** «Умные варианты»: ИИ готовит предложения, ничего не записывает. Занимает 15–30 секунд. */
-  async smart(sessionId: string, kinds: ('gap' | 'choice')[]): Promise<SmartResult> {
+  /**
+   * «Вставь слово» пишет ИИ: предложение, форма слова, неверные варианты — сразу в черновик.
+   * fallback: true — без ИИ, такие вопросы становятся «письменным ответом». Занимает 15–40 секунд.
+   */
+  async gapAi(
+    sessionId: string,
+    fallback = false
+  ): Promise<{ written: number; fallback: number; pending: number }> {
     const fake = preview();
-    if (fake) return fake.smart();
+    if (fake) return fake.gapAi(fallback);
     const token = await getAccessToken();
     if (!token) throw new WebApiError('unauthorized', 401);
     let res: Response;
     try {
-      res = await rawApiFetch('ai?fn=exam-smart', {
+      res = await rawApiFetch('ai?fn=exam-gap', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: { sessionId, kinds },
+        body: { sessionId, ...(fallback ? { fallback: true } : {}) },
       });
     } catch {
       throw new WebApiError('network', 0);
     }
-    let data: { error?: string } & Partial<SmartResult> = {};
+    let data: { error?: string; written?: number; fallback?: number; pending?: number } = {};
     try {
       data = await res.json();
     } catch {
       // тело не JSON — ошибка ниже
     }
     if (!res.ok) throw new WebApiError(classifyStatus(res.status), res.status, data.error);
-    return {
-      suggestions: data.suggestions ?? [],
-      skipped: data.skipped ?? [],
-      usage: data.usage ?? null,
-    };
+    return { written: data.written ?? 0, fallback: data.fallback ?? 0, pending: data.pending ?? 0 };
   },
 
   // ─── Итоги и разбор (Web 23–25) ───

@@ -1,11 +1,12 @@
 /**
  * Экзамен по адресу /exams/:id (plan/new/web_cabinet.md, Web 14–17; макеты E3, E4).
- * Черновик → превью «Что увидят ученики» с заменой слов, правкой вопросов и «умными вариантами».
- * Открытый, идущий и завершённый — экран статуса (лобби, монитор и итоги — этапы 4–5).
+ * Черновик → превью «Что увидят ученики» с заменой слов и правкой вопросов. «Вставь слово» пишет ИИ
+ * сам сразу после сборки (решение пользователя 28.11.2026) — переключателя больше нет.
+ * Открытый → лобби, идущий → монитор, завершённый → итоги.
  */
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Pencil, RefreshCw } from 'lucide-react-native';
+import { Pencil, RefreshCw, Sparkles } from 'lucide-react-native';
 import { useThemeColors } from '@/store';
 import { borderRadius, spacing } from '@/constants';
 import { Text } from '@/components/common/Text';
@@ -13,7 +14,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Controls';
 import { toast } from '@/components/ui/Toast';
-import { hasAiConsent, setAiConsent } from '@/services/aiConsent';
+import { Skeleton } from '@/components/ui/Skeleton';
 import type { DraftItem, ExamDraft } from '@/services/exam';
 import { FORMAT_LABELS } from '@/screens/exam/examConfig';
 import { describeTestError } from '@/utils/testApiErrors';
@@ -22,13 +23,7 @@ import { ExamData } from '../data/exam';
 import { useLoad } from '../useLoad';
 import { takeBuild } from '../exam/buildCache';
 import { ItemEditDialog } from '../exam/ItemEditDialog';
-import {
-  SmartConsentDialog,
-  SmartSwitch,
-  SuggestionCard,
-  type SmartState,
-} from '../exam/SmartBlock';
-import { ConfirmDialog } from '../ui/dialogs';
+import { useGapAi, type GapAiState } from '../exam/useGapAi';
 import { ErrorPage, LoadingPage } from '../ui/states';
 import { useSingleFlight } from '../ui/useSingleFlight';
 import { useUnloadGuard } from '../ui/useUnloadGuard';
@@ -45,13 +40,7 @@ import {
   levelCounts,
   screensCount,
 } from '../exam/itemView';
-import {
-  describeSkipped,
-  describeSmartError,
-  editMark,
-  pendingDoubtful,
-  type SmartSuggestion,
-} from '../exam/smartLogic';
+import { aiPendingItems, aiState, editMark, gapAiSummary } from '../exam/smartLogic';
 
 export function ExamPage({ sessionId }: { sessionId: string }) {
   const loaded = useLoad(() => ExamData.draft(sessionId), [sessionId]);
@@ -78,23 +67,25 @@ function Preview({
   const [editing, setEditing] = useState<DraftItem | null>(null);
   const [opening, setOpening] = useState(false);
   const [openError, setOpenError] = useState<string | null>(null);
-  const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const [smart, setSmart] = useState<SmartState>({ status: 'off' });
-  const [consent, setConsent] = useState(false);
-  const [gone, setGone] = useState<Set<string>>(new Set());
-  const [applying, setApplying] = useState<string | null>(null);
-  const [confirmApply, setConfirmApply] = useState<SmartSuggestion | null>(null);
+  const items = draft.items;
+  const pending = useMemo(() => aiPendingItems(items).length, [items]);
+  // ИИ дописывает «вставь слово» сам: после сборки, после перезагрузки, после замены такого слова
+  const gapAi = useGapAi(sessionId, pending, async () => {
+    try {
+      setDraft(await ExamData.draft(sessionId));
+    } catch {
+      // не обновилось — останется прежний вид, следующая загрузка страницы покажет новое
+    }
+  });
 
   const once = useSingleFlight();
-  // Запрос к ИИ, применение и открытие нельзя прерывать закрытием вкладки
-  useUnloadGuard(smart.status === 'loading' || applying !== null || opening || replacing !== null);
+  // ИИ, открытие и замену нельзя прерывать закрытием вкладки
+  useUnloadGuard(gapAi.state.status === 'running' || opening || replacing !== null);
   const warnings = takeBuild(sessionId)?.warnings ?? [];
-  const items = draft.items;
   const groups = useMemo(() => groupItems(items), [items]);
   const levels = useMemo(() => levelCounts(items), [items]);
   const minutes = Math.round((draft.durationSec || 0) / 60);
-  const doubtful = useMemo(() => pendingDoubtful(items), [items]);
 
   const levelColor = {
     easy: colors.success,
@@ -102,15 +93,6 @@ function Preview({
     hard: colors.error,
     unstudied: colors.textTertiary,
   } as const;
-
-  const suggestionFor = (itemId: string): SmartSuggestion | null =>
-    smart.status === 'done' && !gone.has(itemId)
-      ? (smart.result.suggestions.find((s) => s.itemId === itemId) ?? null)
-      : null;
-  const skippedFor = (itemId: string): string | null =>
-    smart.status === 'done'
-      ? (smart.result.skipped.find((s) => s.itemId === itemId)?.reason ?? null)
-      : null;
 
   // ─── замена слова ───
   const replace = async (it: DraftItem) => {
@@ -134,58 +116,10 @@ function Preview({
     setReplacing(null);
   };
 
-  // ─── умные варианты ───
-  const runSmart = async () => {
-    setSmart({ status: 'loading' });
-    setGone(new Set());
-    try {
-      const result = await ExamData.smart(sessionId, ['gap', 'choice']);
-      setSmart({ status: 'done', result });
-    } catch (e) {
-      const err = e instanceof WebApiError ? e : null;
-      setSmart({
-        status: 'error',
-        message: describeSmartError(err?.status ?? 0, err?.serverError),
-      });
-    }
-  };
-  const toggleSmart = (on: boolean) => {
-    if (!on) {
-      setSmart({ status: 'off' });
-      setGone(new Set());
-    } else if (!hasAiConsent()) setConsent(true);
-    else void runSmart();
-  };
-
-  const doApply = async (s: SmartSuggestion) => {
-    setApplying(s.itemId);
-    try {
-      const next = await ExamData.editItem(sessionId, s.itemId, {
-        distractors: s.after.options,
-        ...(s.kind === 'gap' ? { sentence: s.after.prompt } : {}),
-        source: 'ai',
-        doubtful: s.doubtful,
-      });
-      setDraft(next);
-      setGone((cur) => new Set(cur).add(s.itemId));
-      toast.success('Предложение применено');
-    } catch {
-      toast.error(
-        'Не получилось применить. Предложение могло устареть — запусти умные варианты заново.'
-      );
-    }
-    setApplying(null);
-    setConfirmApply(null);
-  };
-
   // ─── открыть экзамен ───
-  const open = (force = false) => once(() => openOnce(force));
-  const openOnce = async (force = false) => {
-    if (doubtful.length > 0 && !force) {
-      setConfirmOpen(true);
-      return;
-    }
-    setConfirmOpen(false);
+  const open = () => once(openOnce);
+  const openOnce = async () => {
+    if (pending > 0) return;
     setOpening(true);
     setOpenError(null);
     try {
@@ -193,9 +127,11 @@ function Preview({
       setDraft({ ...draft, status: 'waiting', code: res.code });
     } catch (e) {
       setOpenError(
-        e instanceof WebApiError && e.serverError
-          ? describeTestError(e.serverError, 'Не удалось открыть экзамен.')
-          : describeApiError(e)
+        e instanceof WebApiError && e.serverError === 'ai_pending'
+          ? 'ИИ ещё пишет предложения для «вставь слово». Подожди или замени их письменным ответом.'
+          : e instanceof WebApiError && e.serverError
+            ? describeTestError(e.serverError, 'Не удалось открыть экзамен.')
+            : describeApiError(e)
       );
       setOpening(false);
     }
@@ -250,75 +186,65 @@ function Preview({
                 <Card padding="none">
                   {g.items.map((it, i) => {
                     const mark = editMark(it);
-                    const sug = suggestionFor(it.itemId);
-                    const skipped = skippedFor(it.itemId);
+                    const ai = aiState(it);
                     return (
                       <View
                         key={it.itemId}
-                        style={
-                          i > 0 ? { borderTopWidth: 1, borderTopColor: colors.border } : undefined
-                        }
+                        style={[
+                          styles.row,
+                          i > 0 ? { borderTopWidth: 1, borderTopColor: colors.border } : null,
+                        ]}
                       >
-                        <View style={styles.row}>
-                          <View
-                            style={[styles.dot, { backgroundColor: levelColor[it.difficulty] }]}
-                          />
-                          <View style={{ flex: 1, paddingVertical: spacing.xs, gap: spacing.xxs }}>
-                            <View style={styles.titleLine}>
-                              <Text variant="body" numberOfLines={1} style={{ flexShrink: 1 }}>
-                                {itemTitle(it)}
-                              </Text>
-                              {mark?.edited ? (
-                                <Badge
-                                  label={mark.source === 'ai' ? 'ИИ' : 'Изменён'}
-                                  tone="primary"
-                                />
-                              ) : null}
-                              {mark?.source === 'ai' && mark.doubtful ? (
-                                <Badge label="Проверь" tone="warning" />
-                              ) : null}
-                            </View>
+                        <View
+                          style={[styles.dot, { backgroundColor: levelColor[it.difficulty] }]}
+                        />
+                        <View style={{ flex: 1, paddingVertical: spacing.xs, gap: spacing.xxs }}>
+                          <View style={styles.titleLine}>
+                            <Text variant="body" numberOfLines={1} style={{ flexShrink: 1 }}>
+                              {itemTitle(it)}
+                            </Text>
+                            {ai === 'done' && !mark?.edited ? (
+                              <Badge label="ИИ" tone="primary" />
+                            ) : null}
+                            {ai === 'fallback' ? (
+                              <Badge label="ИИ не справился — письменный ответ" tone="neutral" />
+                            ) : null}
+                            {mark?.edited ? <Badge label="Изменён" tone="primary" /> : null}
+                          </View>
+                          {ai === 'pending' ? (
+                            <Text variant="caption" color="secondary">
+                              ИИ пишет предложение…
+                            </Text>
+                          ) : (
                             <Text variant="caption" color="secondary" numberOfLines={2}>
                               {itemSub(it)}
                             </Text>
-                            {it.options && it.options.length > 1 ? (
-                              <Text variant="caption" color="tertiary" numberOfLines={1}>
-                                Неверные: {it.options.slice(1).join(' · ')}
-                              </Text>
-                            ) : null}
-                            {skipped ? (
-                              <Text variant="caption" color="tertiary">
-                                ИИ: {describeSkipped(skipped)}
-                              </Text>
-                            ) : null}
-                          </View>
-                          {canEdit(it) ? (
-                            <Button
-                              variant="icon"
-                              background="none"
-                              icon={Pencil}
-                              accessibilityLabel={`Изменить вопрос ${itemTitle(it)}`}
-                              onPress={() => setEditing(it)}
-                            />
-                          ) : null}
-                          {it.format !== 'match' ? (
-                            <Button
-                              variant="icon"
-                              background="none"
-                              icon={RefreshCw}
-                              accessibilityLabel={`Заменить слово ${itemTitle(it)}`}
-                              onPress={() => replace(it)}
-                              loading={replacing === it.itemId}
-                              disabled={Boolean(replacing)}
-                            />
+                          )}
+                          {it.options && it.options.length > 1 ? (
+                            <Text variant="caption" color="tertiary" numberOfLines={1}>
+                              {it.format === 'gap' ? `Ответ: ${it.answer} · ` : ''}Неверные:{' '}
+                              {it.options.slice(1).join(' · ')}
+                            </Text>
                           ) : null}
                         </View>
-                        {sug ? (
-                          <SuggestionCard
-                            s={sug}
-                            busy={applying === it.itemId}
-                            onApply={() => (sug.doubtful ? setConfirmApply(sug) : doApply(sug))}
-                            onDismiss={() => setGone((cur) => new Set(cur).add(it.itemId))}
+                        {canEdit(it) && ai !== 'pending' ? (
+                          <Button
+                            variant="icon"
+                            background="none"
+                            icon={Pencil}
+                            accessibilityLabel={`Изменить вопрос ${itemTitle(it)}`}
+                            onPress={() => setEditing(it)}
+                          />
+                        ) : null}
+                        {it.format !== 'match' ? (
+                          <Button
+                            variant="icon"
+                            background="none"
+                            icon={RefreshCw}
+                            accessibilityLabel={`Заменить слово ${itemTitle(it)}`}
+                            onPress={() => replace(it)}
+                            loading={replacing === it.itemId}
+                            disabled={Boolean(replacing) || gapAi.state.status === 'running'}
                           />
                         ) : null}
                       </View>
@@ -331,7 +257,12 @@ function Preview({
         </View>
 
         <View style={styles.side}>
-          <SmartSwitch state={smart} onToggle={toggleSmart} />
+          <GapAiCard
+            state={gapAi.state}
+            pending={pending}
+            onRetry={gapAi.retry}
+            onWithoutAi={gapAi.withoutAi}
+          />
           <Card>
             <View style={{ gap: spacing.s }}>
               <SectionLabel>Открыть экзамен</SectionLabel>
@@ -344,11 +275,6 @@ function Preview({
                   {w.text}
                 </Text>
               ))}
-              {doubtful.length > 0 ? (
-                <Text variant="caption" style={{ color: colors.warningText }}>
-                  Сомнительных вопросов от ИИ: {doubtful.length}. Проверь их перед открытием.
-                </Text>
-              ) : null}
               {openError ? (
                 <Text variant="bodySmall" color="error" accessibilityRole="alert">
                   {openError}
@@ -358,12 +284,12 @@ function Preview({
                 title="Открыть экзамен"
                 fullWidth
                 loading={opening}
-                disabled={smart.status === 'loading'}
-                onPress={() => open()}
+                disabled={pending > 0}
+                onPress={open}
               />
-              {smart.status === 'loading' ? (
+              {pending > 0 ? (
                 <Text variant="caption" color="secondary">
-                  Дождись умных вариантов или выключи их — иначе предложения потеряются.
+                  Откроется, когда ИИ допишет «вставь слово».
                 </Text>
               ) : null}
             </View>
@@ -381,52 +307,67 @@ function Preview({
           toast.success('Вопрос сохранён');
         }}
       />
-      <SmartConsentDialog
-        visible={consent}
-        onClose={() => setConsent(false)}
-        onAllow={() => {
-          setAiConsent(true);
-          setConsent(false);
-          void runSmart();
-        }}
-      />
-      <ConfirmDialog
-        visible={confirmApply !== null}
-        title="Проверь вопрос"
-        message="Возможен второй верный ответ. Если применить, ученик может ответить верно и другим вариантом, а ответ засчитается неверным."
-        confirmText="Применить"
-        busy={applying !== null}
-        onConfirm={() => confirmApply && doApply(confirmApply)}
-        onClose={() => setConfirmApply(null)}
-      >
-        {confirmApply?.reasons.map((r) => (
-          <Text key={r.code + r.text} variant="bodySmall" style={{ color: colors.warningText }}>
-            {r.text}
-          </Text>
-        ))}
-      </ConfirmDialog>
-      <ConfirmDialog
-        visible={confirmOpen}
-        title="Есть сомнительные вопросы"
-        message={`В экзамене ${doubtful.length} вопрос(ов) от ИИ, где может подойти второй ответ. Проверь их или открой экзамен как есть.`}
-        confirmText="Открыть как есть"
-        busy={opening}
-        onConfirm={() => open(true)}
-        onClose={() => setConfirmOpen(false)}
-      >
-        {doubtful.map((d) => (
-          <Button
-            key={d.itemId}
-            variant="quiet"
-            title={`Проверить: ${itemTitle(d)}`}
-            onPress={() => {
-              setConfirmOpen(false);
-              setEditing(d);
-            }}
-          />
-        ))}
-      </ConfirmDialog>
     </View>
+  );
+}
+
+/** Состояние ИИ для «вставь слово»: пишет / готово / ошибка с «Повторить» и «Без ИИ» */
+function GapAiCard({
+  state,
+  pending,
+  onRetry,
+  onWithoutAi,
+}: {
+  state: GapAiState;
+  pending: number;
+  onRetry: () => void;
+  onWithoutAi: () => void;
+}) {
+  const colors = useThemeColors();
+  if (state.status === 'idle' && pending === 0) return null;
+  return (
+    <Card>
+      <View style={{ gap: spacing.s }} accessibilityLiveRegion="polite">
+        <View style={styles.titleLine}>
+          <Sparkles size={20} color={colors.primary} />
+          <Text variant="label">«Вставь слово» пишет ИИ</Text>
+        </View>
+        {state.status === 'running' || (state.status === 'idle' && pending > 0) ? (
+          <>
+            <Text variant="bodySmall" color="secondary">
+              Пишем предложения, ставим слово в нужную форму и подбираем неверные варианты, которые
+              по смыслу не подходят. Обычно 15–40 секунд.
+            </Text>
+            <Skeleton width="100%" height={8} />
+          </>
+        ) : state.status === 'error' ? (
+          <>
+            <Text variant="bodySmall" color="error" accessibilityRole="alert">
+              {state.message}
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
+              <Button size="s" variant="secondary" title="Повторить" onPress={onRetry} />
+              <Button
+                size="s"
+                variant="quiet"
+                tone="secondary"
+                title="Без ИИ: письменный ответ"
+                onPress={onWithoutAi}
+              />
+            </View>
+          </>
+        ) : state.status === 'done' ? (
+          <>
+            <Text variant="bodySmall" color="secondary">
+              {gapAiSummary(state.written, state.fallback)}
+            </Text>
+            {pending > 0 ? (
+              <Button size="s" variant="secondary" title="Дописать остальные" onPress={onRetry} />
+            ) : null}
+          </>
+        ) : null}
+      </View>
+    </Card>
   );
 }
 

@@ -4,7 +4,13 @@ import type { BuildStep, BuildWarning } from '@/services/exam';
  * Шаги сборки приходят один раз — в ответе exam-build. Хранимся в памяти вкладки, чтобы показать
  * экран «Собираем экзамен»; после перезагрузки страницы шагов нет, и мы сразу открываем превью.
  */
-export type BuildInfo = { steps: BuildStep[]; warnings: BuildWarning[]; courseId: string };
+export type BuildInfo = {
+  steps: BuildStep[];
+  warnings: BuildWarning[];
+  courseId: string;
+  /** Сколько «вставь слово» ждут ИИ сразу после сборки */
+  aiPending?: number;
+};
 
 const cache = new Map<string, BuildInfo>();
 

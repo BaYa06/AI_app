@@ -360,10 +360,18 @@ export const PreviewExam = {
     ]),
   build: () => {
     previewDraft = null;
+    const d = ensureDraft();
+    // Как на сервере с aiGap: «вставь слово» — заготовки, предложения допишет ИИ
+    d.items = d.items.map((i) =>
+      i.format === 'gap'
+        ? { ...i, prompt: '', options: null, extra: { ai: 'pending', baseForm: i.answer } }
+        : i
+    );
     return wait({
-      ...ensureDraft(),
+      ...d,
       ...BUILD,
       counts: { choice: 4, write: 2, scramble: 1, match: 3, gap: 2 },
+      aiPending: 2,
     });
   },
   draft: (sessionId?: string) => {
@@ -408,50 +416,37 @@ export const PreviewExam = {
     if (previewDraft) previewDraft.status = 'waiting';
     return wait({ sessionId: 'draft1', code: '4821', questionCount: 12, durationSec: 420 });
   },
-  smart: () =>
-    new Promise<import('../exam/smartLogic').SmartResult>((resolve) =>
-      setTimeout(
-        () =>
-          resolve({
-            suggestions: [
-              {
-                itemId: 'it6',
-                kind: 'gap',
-                before: {
-                  prompt: 'She was _____ to leave the party early.',
-                  options: ['eager', 'happy', 'ready'],
-                },
-                after: {
-                  prompt: 'The boy was _____ to speak in front of the whole class.',
-                  options: ['careful', 'curious', 'jealous'],
-                },
-                doubtful: false,
-                reasons: [],
-              },
-              {
-                itemId: 'it0',
-                kind: 'choice',
-                before: { prompt: 'reluctant', options: ['щедрый', 'быстрый', 'тихий'] },
-                after: { prompt: 'reluctant', options: ['нерешительный', 'весёлый', 'суровый'] },
-                doubtful: true,
-                reasons: [
-                  { code: 'model', text: 'ИИ отметил: «нерешительный» тоже может подойти' },
-                ],
-              },
-              {
-                itemId: 'it1',
-                kind: 'choice',
-                before: { prompt: 'although', options: ['щедрый', 'быстрый', 'тихий'] },
-                after: { prompt: 'although', options: ['поэтому', 'потому что', 'вместо'] },
-                doubtful: false,
-                reasons: [],
-              },
-            ],
-            skipped: [{ itemId: 'it7', reason: 'long_answer' }],
-            usage: { used: 1, limit: 10, resetAt: new Date(Date.now() + 3_600_000).toISOString() },
-          }),
-        2500
-      )
+  /** ИИ дописывает «вставь слово»: 2,5 с, потом заготовки становятся вопросами */
+  gapAi: (fallback: boolean) =>
+    new Promise((resolve) =>
+      setTimeout(() => {
+        const d = ensureDraft();
+        let written = 0;
+        let fb = 0;
+        d.items = d.items.map((i) => {
+          if (i.extra?.ai !== 'pending') return i;
+          if (fallback || i.answer === 'protect') {
+            fb++;
+            return {
+              ...i,
+              format: 'write' as const,
+              direction: 'back',
+              prompt: 'защищать',
+              options: null,
+              extra: { ai: 'fallback' },
+            };
+          }
+          written++;
+          return {
+            ...i,
+            prompt: 'The new rules will _____ the lives of many people in our city.',
+            answer: 'improve',
+            options: ['improve', 'borrow', 'whisper', 'paint'],
+            extra: { ai: 'done', baseForm: 'improve' },
+          };
+        });
+        resolve({ written, fallback: fb, pending: 0 });
+      }, 2500)
     ),
 };
 

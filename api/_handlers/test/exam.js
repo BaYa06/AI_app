@@ -245,6 +245,8 @@ export async function examBuild(req, res, sql, userId) {
     classSummary: { students: knowledge.students, reviews: knowledge.reviews },
     config,
     seed,
+    // Веб-кабинет: «вставь слово» пишет ИИ после сборки (api/_ai/exam-gap.js)
+    aiGap: body.aiGap === true,
   };
   const exam = buildExam(input);
   if (exam.items.length === 0) return res.status(400).json({ error: 'No cards in this set' });
@@ -261,6 +263,7 @@ export async function examBuild(req, res, sql, userId) {
     backKind,
     difficultySource: diff.source,
     recommendedMin: exam.recommended.minutes,
+    aiGap: body.aiGap === true,
   };
   const setId = mainSetId(cards.filter((c) => exam.items.some((i) => i.cardId === c.id)));
 
@@ -286,6 +289,7 @@ export async function examBuild(req, res, sql, userId) {
       screens: exam.screens,
       backKind,
       difficultySource: diff.source,
+      aiPending: exam.items.filter((i) => i.extra?.ai === 'pending').length,
     })
   );
 }
@@ -357,6 +361,8 @@ export async function examReplaceItem(req, res, sql, userId) {
       backKind: cfg.backKind || 'translation',
       levels: diff.levels,
       seed: `${cfg.seed}:${Date.now()}`,
+      // Замена «вставь слово» с ИИ — снова заготовка, предложение допишет ИИ
+      aiGap: cfg.aiGap === true,
     },
     items,
     old.cardId
@@ -510,6 +516,14 @@ export async function examCreate(req, res, sql, userId) {
       questionCount: session.question_count,
       durationSec: session.duration_sec,
     });
+  }
+  // Вопросы «вставь слово» без предложения (ИИ ещё не дописал) ученику показать нельзя
+  const pending = await sql`
+    SELECT COUNT(*)::int AS n FROM test_items
+    WHERE session_id = ${session.id}::uuid AND extra->>'ai' = 'pending'
+  `;
+  if (pending[0]?.n > 0) {
+    return res.status(409).json({ error: 'ai_pending', pending: pending[0].n });
   }
   const durationSec =
     Number(req.body.durationSec) > 0

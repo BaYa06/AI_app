@@ -28,6 +28,8 @@ import { useCourses } from '../data/CoursesContext';
 import { ExamData } from '../data/exam';
 import { useLoad } from '../useLoad';
 import { rememberBuild } from '../exam/buildCache';
+import { AiConsentDialog } from '../exam/AiConsentDialog';
+import { hasAiConsent, setAiConsent } from '@/services/aiConsent';
 import {
   MAX_MINUTES,
   MIN_WORDS,
@@ -67,6 +69,8 @@ export function ExamSetupPage({ courseId }: { courseId: string }) {
   const once = useSingleFlight();
   useUnloadGuard(building);
   const [error, setError] = useState<string | null>(null);
+  // «Вставь слово» пишет ИИ: перед первой такой сборкой спрашиваем согласие на передачу слов
+  const [askConsent, setAskConsent] = useState(false);
 
   // Первый набор выбираем сам, как в телефоне
   useEffect(() => {
@@ -131,8 +135,11 @@ export function ExamSetupPage({ courseId }: { courseId: string }) {
   const toggleSet = (id: string) =>
     setSelected((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
 
-  const build = () => once(buildOnce);
-  const buildOnce = async () => {
+  const build = () => {
+    if (formats.gap > 0 && !hasAiConsent()) setAskConsent(true);
+    else void once(() => buildOnce(formats.gap > 0));
+  };
+  const buildOnce = async (aiGap: boolean) => {
     if (problem) return;
     setBuilding(true);
     setError(null);
@@ -147,11 +154,13 @@ export function ExamSetupPage({ courseId }: { courseId: string }) {
         durationSec: minutes * 60,
         exitControl,
         revealMode: reveal,
+        aiGap,
       });
       rememberBuild(draft.sessionId, {
         steps: draft.steps ?? [],
         warnings: draft.warnings ?? [],
         courseId,
+        aiPending: draft.aiPending ?? 0,
       });
       navigate(`/exams/${draft.sessionId}/build`);
     } catch (e) {
@@ -392,13 +401,25 @@ export function ExamSetupPage({ courseId }: { courseId: string }) {
           </Card>
         </View>
       </View>
+      <AiConsentDialog
+        visible={askConsent}
+        onAllow={() => {
+          setAiConsent(true);
+          setAskConsent(false);
+          void once(() => buildOnce(true));
+        }}
+        onDecline={() => {
+          setAskConsent(false);
+          void once(() => buildOnce(false));
+        }}
+      />
     </View>
   );
 }
 
 const FORMAT_HINT: Partial<Record<(typeof FORMATS)[number], string>> = {
   choice: 'Остальные слова',
-  gap: 'Если у слов есть примеры',
+  gap: 'Предложение и варианты напишет ИИ',
   match: 'Один экран, от 3 пар',
 };
 

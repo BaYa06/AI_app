@@ -24,7 +24,6 @@ import {
   validateDistractors,
   validateSentence,
 } from '../_exam/edit.js';
-import { judge, pickItems } from '../_ai/exam-smart.js';
 
 const choice = {
   id: 'c1',
@@ -141,75 +140,5 @@ describe('suspicion', () => {
   });
   it('чисто — пусто', () => {
     expect(suspicion(gap, { distractors: ['eager', 'happy', 'ready'] })).toEqual([]);
-  });
-});
-
-describe('pickItems', () => {
-  it('берёт нужные форматы, пропускает без вариантов и с длинным ответом', () => {
-    const items = [
-      choice,
-      gap,
-      { id: 'w', format: 'write', options: null, answer: 'x', extra: {} },
-      { ...choice, id: 'c2', answer: 'x'.repeat(50) },
-      { ...gap, id: 'g2', options: null },
-    ];
-    const r = pickItems(items, ['gap', 'choice']);
-    expect(r.chosen.map((i) => i.id)).toEqual(['c1', 'g1']);
-    expect(r.skipped).toEqual([
-      { itemId: 'c2', reason: 'long_answer' },
-      { itemId: 'g2', reason: 'no_options' },
-    ]);
-  });
-  it('kinds ограничивает форматы', () => {
-    expect(pickItems([choice, gap], ['gap']).chosen.map((i) => i.id)).toEqual(['g1']);
-  });
-});
-
-describe('judge — разбор ответа ИИ', () => {
-  it('хороший ответ для «вставь слово»', () => {
-    const r = judge(gap, {
-      n: 1,
-      sentence: 'The boy was reluctant to speak in front of the class.',
-      wrong: ['careful', 'curious', 'jealous'],
-      alsoFits: '',
-    });
-    expect(r.suggestion).toMatchObject({
-      itemId: 'g1',
-      kind: 'gap',
-      doubtful: false,
-      after: {
-        prompt: 'The boy was _____ to speak in front of the class.',
-        options: ['careful', 'curious', 'jealous'],
-      },
-      before: { prompt: gap.prompt, options: ['eager', 'happy', 'ready'] },
-    });
-  });
-  it('ИИ сам отметил второй верный ответ — сомнительно, но не скрыто', () => {
-    const r = judge(choice, { wrong: ['добрый', 'шумный', 'новый'], alsoFits: 'добрый' });
-    expect(r.suggestion.doubtful).toBe(true);
-    expect(r.suggestion.reasons[0].code).toBe('model');
-  });
-  it('вариант другой письменности — отброшен', () => {
-    expect(
-      judge(gap, { sentence: 'The boy was reluctant to go home.', wrong: ['быстрый', 'b', 'c'] })
-    ).toEqual({
-      skip: 'wrong_language',
-    });
-  });
-  it('в предложении нет слова — отброшено', () => {
-    expect(
-      judge(gap, { sentence: 'The boy was unwilling to go home now.', wrong: ['a', 'b', 'c'] }).skip
-    ).toBe('no_word_in_sentence');
-  });
-  it('мало вариантов, повторы, равный ответу — отброшено', () => {
-    expect(judge(choice, { wrong: ['а', 'б'] }).skip).toBe('distractors_wrong_count');
-    expect(judge(choice, { wrong: ['а', 'а', 'б'] }).skip).toBe('distractors_duplicate');
-    expect(judge(choice, { wrong: ['неохотный', 'б', 'в'] }).skip).toBe(
-      'distractors_same_as_answer'
-    );
-  });
-  it('мусор вместо объекта — отброшено', () => {
-    expect(judge(choice, null).skip).toBe('bad_answer');
-    expect(judge(choice, 'text').skip).toBe('bad_answer');
   });
 });
