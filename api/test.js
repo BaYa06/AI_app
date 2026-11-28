@@ -14,7 +14,7 @@ import {
   reinstateParticipant,
 } from './_handlers/test/teacher.js';
 import { markAway, markBack, leaveTest } from './_handlers/test/exitControl.js';
-import { cancelTest } from './_handlers/test/lobby.js';
+import { cancelTest, examDelete } from './_handlers/test/lobby.js';
 import {
   examBuild,
   examDraft,
@@ -70,7 +70,7 @@ import { SUPABASE_URL } from './_handlers/test/_shared.js';
  * слово · POST exam-create — открыть черновик (код) · POST exam-state / exam-answer / exam-submit —
  * ученик · POST exam-pause / exam-extra-time — во время экзамена · GET exam-results / exam-question
  * — итоги и разбор · POST exam-decide / exam-override / exam-undo / exam-release — оценки ·
- * GET exam-my — мои экзамены ученика
+ * GET exam-my — мои экзамены ученика · POST exam-delete — удалить черновик
  */
 
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
@@ -150,6 +150,7 @@ export default async function handler(req, res) {
       'exam-student': examStudent,
       'exam-homework': examHomework,
       'exam-retake': examRetake,
+      'exam-delete': examDelete,
     }[action];
     if (exam) return await exam(req, res, sql, userId);
 

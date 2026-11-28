@@ -6,7 +6,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Pencil, RefreshCw, Sparkles } from 'lucide-react-native';
+import { Pencil, RefreshCw, Sparkles, Trash2 } from 'lucide-react-native';
 import { useThemeColors } from '@/store';
 import { borderRadius, spacing } from '@/constants';
 import { Text } from '@/components/common/Text';
@@ -25,6 +25,8 @@ import { takeBuild } from '../exam/buildCache';
 import { ItemEditDialog } from '../exam/ItemEditDialog';
 import { useGapAi, type GapAiState } from '../exam/useGapAi';
 import { ErrorPage, LoadingPage } from '../ui/states';
+import { ConfirmDialog } from '../ui/dialogs';
+import { navigate } from '../router';
 import { useSingleFlight } from '../ui/useSingleFlight';
 import { useUnloadGuard } from '../ui/useUnloadGuard';
 import { LobbyView } from '../exam/LobbyView';
@@ -78,6 +80,9 @@ function Preview({
   const [editing, setEditing] = useState<DraftItem | null>(null);
   const [opening, setOpening] = useState(false);
   const [openError, setOpenError] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const items = draft.items;
   const pending = useMemo(() => aiPendingItems(items).length, [items]);
@@ -127,6 +132,24 @@ function Preview({
     setReplacing(null);
   };
 
+  // ─── удалить черновик ───
+  const remove = async () => {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await ExamData.remove(sessionId);
+      toast.success('Черновик удалён');
+      navigate('/exams', { replace: true });
+    } catch (e) {
+      setDeleteError(
+        e instanceof WebApiError && e.serverError === 'not_draft'
+          ? 'Экзамен уже открыт — удалить можно только черновик.'
+          : describeApiError(e)
+      );
+      setDeleting(false);
+    }
+  };
+
   // ─── открыть экзамен ───
   const open = () => once(openOnce);
   const openOnce = async () => {
@@ -154,6 +177,31 @@ function Preview({
         title="Что увидят ученики"
         subtitle="Слова у всех одинаковые, порядок вопросов у каждого ученика свой."
         back={{ label: 'Экзамены', path: '/exams' }}
+        actions={
+          <Button
+            variant="quiet"
+            tone="secondary"
+            size="s"
+            icon={Trash2}
+            title="Удалить черновик"
+            disabled={opening}
+            onPress={() => {
+              setDeleteError(null);
+              setDeleteOpen(true);
+            }}
+          />
+        }
+      />
+      <ConfirmDialog
+        visible={deleteOpen}
+        title="Удалить черновик?"
+        message="Собранные вопросы и правки пропадут. Ученики этот экзамен не видели — у них ничего не изменится."
+        confirmText="Удалить"
+        destructive
+        busy={deleting}
+        error={deleteError}
+        onConfirm={() => void remove()}
+        onClose={() => setDeleteOpen(false)}
       />
       <View style={styles.layout}>
         <View style={styles.main}>

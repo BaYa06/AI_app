@@ -176,6 +176,11 @@ export const ExamData = {
     return { created: data.created.length, failed: data.failed.length };
   },
 
+  async remove(sessionId: string): Promise<void> {
+    if (preview()) return;
+    unwrap(await ExamApi.remove(sessionId));
+  },
+
   /** Пересдача: новый черновик с теми же словами и вариантами; возвращает его id */
   async retake(sessionId: string): Promise<string> {
     const fake = preview();

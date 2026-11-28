@@ -75,6 +75,11 @@ function GroupBlock({
           <Row key={it.sessionId} item={it} showCourse={showCourse} first={i === 0} />
         ))}
       </Card>
+      {group.key === 'draft' ? (
+        <Text variant="caption" color="secondary">
+          Черновик, который 30 дней не открывали, удаляется сам.
+        </Text>
+      ) : null}
       {more.hasMore ? (
         <Button
           variant="quiet"

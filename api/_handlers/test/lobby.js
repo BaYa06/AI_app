@@ -7,7 +7,8 @@
  * - лобби, в которое LOBBY_IDLE_SEC никто не зашёл, закрывается само при следующем обращении
  *   (monitor, список экзаменов, «идущие» тесты, черновик) — без cron, как autoFinishIfStale.
  *
- * Закрыть = экзамен (engine 2) возвращается в черновик: вопросы целы, его можно открыть снова
+ * Закрыть = экзамен (engine 2) возвращается в черновик (opened_at остаётся — по нему черновик
+ * считается «недавно открытым» и автоочистка его не трогает): вопросы целы, его можно открыть снова
  * с новым кодом. Быстрый тест (engine 1) черновика не имеет — строку удаляем (участники и ответы
  * удаляются каскадом). Ученикам в ожидании уходит test_finished — их экран возвращает на главную.
  */
@@ -28,13 +29,13 @@ export async function closeLobby(sql, sessionId, engine, { onlyEmpty = false } =
   if (engine === 2) {
     closed = onlyEmpty
       ? await sql`
-          UPDATE test_sessions SET status = 'draft', code = '0000', opened_at = NULL
+          UPDATE test_sessions SET status = 'draft', code = '0000'
           WHERE id = ${sessionId}::uuid AND status = 'waiting'
             AND NOT EXISTS (SELECT 1 FROM test_participants tp WHERE tp.session_id = ${sessionId}::uuid)
           RETURNING id
         `
       : await sql`
-          UPDATE test_sessions SET status = 'draft', code = '0000', opened_at = NULL
+          UPDATE test_sessions SET status = 'draft', code = '0000'
           WHERE id = ${sessionId}::uuid AND status = 'waiting'
           RETURNING id
         `;
@@ -112,4 +113,55 @@ export async function cancelTest(req, res, sql, userId) {
 
   await closeLobby(sql, sessionId, engine);
   return res.status(200).json({ ok: true, status: engine === 2 ? 'draft' : 'deleted' });
+}
+
+/** Черновик экзамена, который столько дней не создавали и не открывали, удаляется сам */
+export const DRAFT_TTL_DAYS = 30;
+
+/**
+ * Удалить старые черновики учителя: созданы и последний раз открыты больше DRAFT_TTL_DAYS назад.
+ * Вопросы, журнал и оценки удаляются каскадом. Сбой не ломает основной запрос.
+ */
+export async function deleteStaleDrafts(sql, teacherId) {
+  if (!teacherId) return 0;
+  try {
+    const rows = await sql`
+      DELETE FROM test_sessions
+      WHERE teacher_id = ${teacherId}::uuid AND engine = 2 AND status = 'draft'
+        AND GREATEST(created_at, COALESCE(opened_at, created_at))
+            < NOW() - make_interval(days => ${DRAFT_TTL_DAYS})
+      RETURNING id
+    `;
+    return rows.length;
+  } catch (error) {
+    log.warn('test-lobby', 'stale drafts cleanup failed', error?.message || error);
+    return 0;
+  }
+}
+
+/**
+ * POST ?action=exam-delete  Body: { sessionId }
+ * Учитель удаляет черновик экзамена. Открытый, идущий или прошедший так не удалить (409):
+ * у них есть ученики и оценки. Уже удалённый — ok.
+ */
+export async function examDelete(req, res, sql, userId) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const { sessionId } = req.body || {};
+  if (typeof sessionId !== 'string' || !UUID_RE.test(sessionId)) {
+    return res.status(400).json({ error: 'sessionId is required' });
+  }
+  const rows = await sql`
+    SELECT status, engine, teacher_id FROM test_sessions WHERE id = ${sessionId}::uuid
+  `;
+  if (rows.length === 0) return res.status(200).json({ ok: true });
+  const s = rows[0];
+  if (s.teacher_id !== userId || s.engine !== 2) {
+    return res.status(403).json({ error: 'Not authorized' });
+  }
+  if (s.status !== 'draft') return res.status(409).json({ error: 'not_draft', status: s.status });
+  await sql`
+    DELETE FROM test_sessions
+    WHERE id = ${sessionId}::uuid AND teacher_id = ${userId}::uuid AND status = 'draft'
+  `;
+  return res.status(200).json({ ok: true });
 }

@@ -15,7 +15,7 @@ import { generateUniqueCode, mainSetId } from './teacher.js';
 import { rejectIfLeft } from './student.js';
 import { finishParticipantEarly, attemptSummary } from './_shared.js';
 import { courseSetIdsSql } from '../../_course.js';
-import { closeIdleLobbies } from './lobby.js';
+import { closeIdleLobbies, deleteStaleDrafts } from './lobby.js';
 import { detectBackKind } from '../../_exam/prepare.js';
 import { classifyDifficulty, LEARNED_STEP } from '../../_exam/difficulty.js';
 import { buildExam, replaceItem, LIMITS } from '../../_exam/build.js';
@@ -452,6 +452,8 @@ export async function examList(req, res, sql, userId) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   // Пустые лобби старше 10 минут возвращаются в черновики (lobby.js) — не висят в «Идут сейчас»
   await closeIdleLobbies(sql, { teacherId: userId });
+  // Черновики, которые 30 дней не создавали и не открывали, удаляются сами (lobby.js)
+  await deleteStaleDrafts(sql, userId);
   const courseId = isUuid(req.query.courseId) ? req.query.courseId : null;
   const rows = await sql`
     SELECT ts.id AS "sessionId", ts.course_id AS "courseId", c.title AS "courseTitle",

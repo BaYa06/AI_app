@@ -369,6 +369,8 @@ export const ExamApi = {
     }>('exam-homework', 'POST', { sessionId, dueAt }),
   retake: (sessionId: string) =>
     callExam<{ sessionId: string }>('exam-retake', 'POST', { sessionId }),
+  /** Удалить черновик (открытый и прошедший так не удалить — 409 not_draft) */
+  remove: (sessionId: string) => callExam<{ ok: boolean }>('exam-delete', 'POST', { sessionId }),
   my: () => callExam<MyExam[]>('exam-my', 'GET'),
   myOne: (sessionId: string) => callExam<StudentReview>('exam-my', 'GET', { sessionId }),
 };

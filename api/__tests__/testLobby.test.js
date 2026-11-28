@@ -28,6 +28,9 @@ const {
   cancelTest,
   closeIdleLobbies,
   closeLobby,
+  deleteStaleDrafts,
+  examDelete,
+  DRAFT_TTL_DAYS,
   LOBBY_IDLE_SEC,
 } = require('../_handlers/test/lobby.js');
 
@@ -149,5 +152,56 @@ describe('авто-закрытие пустого лобби', () => {
     answer = (t) => (t.startsWith('DELETE FROM test_sessions') ? [{ id: SID }] : []);
     expect(await closeLobby(sql, SID, 1, { onlyEmpty: true })).toBe(true);
     expect(queries[0].text).toMatch(/NOT EXISTS/);
+  });
+});
+
+describe('exam-delete', () => {
+  const run = async (body) => {
+    const r = res();
+    await examDelete({ method: 'POST', body }, r, sql, ME);
+    return r;
+  };
+  const session = (row) => (t) => (t.startsWith('SELECT status') ? [row] : []);
+
+  it('удаляет свой черновик', async () => {
+    answer = session({ status: 'draft', engine: 2, teacher_id: ME });
+    const r = await run({ sessionId: SID });
+    expect(r.body).toEqual({ ok: true });
+    const del = queries.find((q) => q.text.startsWith('DELETE FROM test_sessions'));
+    expect(del.text).toMatch(/status = 'draft'/);
+    expect(del.text).toMatch(/teacher_id = \?::uuid/);
+  });
+
+  it('открытый или прошедший — 409, чужой или быстрый тест — 403', async () => {
+    answer = session({ status: 'finished', engine: 2, teacher_id: ME });
+    expect((await run({ sessionId: SID })).statusCode).toBe(409);
+    answer = session({ status: 'draft', engine: 2, teacher_id: OTHER });
+    expect((await run({ sessionId: SID })).statusCode).toBe(403);
+    answer = session({ status: 'draft', engine: 1, teacher_id: ME });
+    expect((await run({ sessionId: SID })).statusCode).toBe(403);
+    expect(queries.some((q) => q.text.startsWith('DELETE'))).toBe(false);
+  });
+
+  it('уже удалённый — ok', async () => {
+    expect((await run({ sessionId: SID })).body).toEqual({ ok: true });
+  });
+});
+
+describe('автоочистка старых черновиков', () => {
+  it('удаляет только черновики учителя старше 30 дней с учётом последнего открытия', async () => {
+    answer = () => [{ id: SID }];
+    expect(await deleteStaleDrafts(sql, ME)).toBe(1);
+    const q = queries[0];
+    expect(q.text).toMatch(/status = 'draft'/);
+    expect(q.text).toMatch(/engine = 2/);
+    expect(q.text).toMatch(/GREATEST\(created_at, COALESCE\(opened_at, created_at\)\)/);
+    expect(q.values).toEqual(expect.arrayContaining([ME, DRAFT_TTL_DAYS]));
+    expect(DRAFT_TTL_DAYS).toBe(30);
+  });
+
+  it('сбой базы не ломает список', async () => {
+    const broken = () => Promise.reject(new Error('boom'));
+    expect(await deleteStaleDrafts(broken, ME)).toBe(0);
+    expect(await deleteStaleDrafts(sql, null)).toBe(0);
   });
 });
