@@ -47,6 +47,7 @@ module.exports = (env, argv) => {
     resolve: {
       alias: {
         'react-native$': 'react-native-web',
+        'react-native-config$': false,
         '@invertase/react-native-apple-authentication': path.resolve(
           __dirname,
           'src/polyfills/apple-authentication.web.ts'
@@ -181,6 +182,9 @@ module.exports = (env, argv) => {
         'process.env': JSON.stringify({
           NODE_ENV: argv.mode || 'production',
           JEST_WORKER_ID: null,
+          POSTHOG_PROJECT_TOKEN:
+            envVars.POSTHOG_PROJECT_TOKEN || process.env.POSTHOG_PROJECT_TOKEN || '',
+          POSTHOG_HOST: envVars.POSTHOG_HOST || process.env.POSTHOG_HOST || '',
           SUPABASE_URL: envVars.SUPABASE_URL || process.env.SUPABASE_URL || '',
           SUPABASE_ANON_KEY: envVars.SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '',
           SUPABASE_REDIRECT_URI:

@@ -1,43 +1,31 @@
 /**
- * Отправка событий аналитики в веб-версии (Firebase JS SDK).
+ * Отправка событий аналитики в веб-версии через общий клиент PostHog.
  *
  * В нативном приложении Metro берёт analyticsTransport.native.ts с тем же API.
  */
-import { logEvent, setUserId, setUserProperties } from 'firebase/analytics';
-import { analytics } from './firebase';
+import { posthog } from '@/config/posthog';
 import { log } from '@/utils/logger';
 
 type Params = Record<string, string | number | boolean>;
 
 export function sendEvent(event: string, params?: Params) {
-  if (!analytics) {
-    log.debug('Analytics', `${event}`, params);
-    return;
-  }
   try {
-    logEvent(analytics, event, params);
+    posthog?.capture(event, params);
   } catch (e) {
-    log.debug('Analytics', 'logEvent error', e);
+    log.debug('Analytics', 'PostHog capture error', e);
   }
 }
 
 export function sendUserProperties(props: Record<string, string>) {
-  if (!analytics) return;
   try {
-    setUserProperties(analytics, props);
+    posthog?.setPersonProperties(props);
   } catch (e) {
-    log.debug('Analytics', 'setUserProperties error', e);
+    log.debug('Analytics', 'PostHog person-property error', e);
   }
 }
 
 /**
- * user_id для аналитики — UUID пользователя (не email!). null — сброс при выходе.
+ * Identity is established once at the shared Supabase session boundary in App.tsx.
+ * This legacy abstraction remains a no-op so existing callers do not re-identify users.
  */
-export function setAnalyticsUserId(userId: string | null) {
-  if (!analytics) return;
-  try {
-    setUserId(analytics, userId);
-  } catch (e) {
-    log.debug('Analytics', 'setUserId error', e);
-  }
-}
+export function setAnalyticsUserId(_userId: string | null) {}

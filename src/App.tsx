@@ -4,6 +4,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Linking, Platform, Alert } from 'react-native';
+import { PostHogProvider } from 'posthog-react-native';
 
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { StagingBadge } from '@/components/common/StagingBadge';
@@ -63,7 +64,19 @@ import type { AboutMeAnswers } from '@/screens/AboutMeOnboardingScreen';
 
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { log } from '@/utils/logger';
+import { posthogLog } from '@/utils/posthogLogger';
 import { type AuthStep, AppRoot } from './app/AppRoot';
+import { posthog } from './config/posthog';
+
+function PostHogAppProvider({ children }: { children: React.ReactNode }) {
+  if (!posthog) return <>{children}</>;
+
+  return (
+    <PostHogProvider client={posthog} autocapture={{ captureScreens: true, captureTouches: true }}>
+      {children}
+    </PostHogProvider>
+  );
+}
 
 // Метка сервера для отчётов о падениях (plan/done/release_safety.md, Release 4)
 initCrashReporting();
@@ -142,6 +155,9 @@ export default function App() {
   useEffect(() => onOpenShareRequest(openShareCode), [openShareCode]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const ensuredUserIdRef = useRef<string | null>(null);
+  // PostHog persists this identity across launches; this guard prevents duplicate identify calls
+  // from Supabase's initial-session and SIGNED_IN notifications within one app session.
+  const identifiedUserIdRef = useRef<string | null>(null);
   // Вход через Apple: шага «Как к тебе обращаться?» нет, «назад» с выбора роли — на приветствие
   const skipNameStepRef = useRef(false);
   // Первый урок в онбординге (plan/new/new_user_activation.md, Start 2.5): стартовый набор
@@ -243,8 +259,10 @@ export default function App() {
           } catch {}
           unsubscribe = setupAutoSave();
         }
+        posthogLog.info('app_data_initialized', { cache_hydrated: loaded });
       } catch (error) {
         log.error('App', 'Failed to initialize app', error);
+        posthogLog.error('app_data_initialization_failed', { component: 'app_bootstrap' });
       } finally {
         // Данные уже есть — держим заставку до SPLASH_MIN_MS от запуска (не дольше общего лимита)
         const rest = SPLASH_MIN_MS - (Date.now() - APP_STARTED_AT);
@@ -273,6 +291,23 @@ export default function App() {
   const handleSession = useCallback(
     async (user: { id: string; email?: string; user_metadata?: any }) => {
       setCurrentUserId(user.id);
+
+      // Supabase's immutable UUID is the app's stable distinct ID. Identify as soon as the
+      // session is known so lifecycle events and captured errors inherit the same person.
+      if (identifiedUserIdRef.current !== user.id) {
+        if (identifiedUserIdRef.current) posthog?.reset();
+
+        const personProperties: Record<string, string> = {};
+        if (user.email) personProperties.email = user.email;
+        const fullName = user.user_metadata?.full_name;
+        if (typeof fullName === 'string' && fullName.trim()) {
+          personProperties.name = fullName.trim();
+        }
+
+        posthog?.identify(user.id, { $set: personProperties });
+        identifiedUserIdRef.current = user.id;
+        posthogLog.info('app_session_identified');
+      }
 
       // Guest login — пропускаем NeonDB и онбординг
       const isAnonymous = (user as any).is_anonymous === true;
@@ -421,6 +456,9 @@ export default function App() {
         }, 0);
       } else {
         Analytics.logout();
+        // Clear the persisted distinct ID before another person can use this device.
+        posthog?.reset();
+        identifiedUserIdRef.current = null;
         // Виджет на экране блокировки не должен показывать слова прошлого аккаунта (plan/new/widgets.md, 1.2)
         resetWidget();
         // Отметки «добавлено» в каталоге библиотеки — этого пользователя
@@ -1050,77 +1088,79 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <SafeAreaProvider initialMetrics={webSafeAreaOverride}>
-        <AppRoot
-          isReady={appReady}
-          isAuthenticated={isAuthenticated}
-          needsOnboarding={needsOnboarding}
-          pendingInviteToken={pendingInviteToken}
-          onInviteAccepted={handleInviteAccepted}
-          onInviteDismiss={handleInviteDismiss}
-          pendingShareCode={pendingShareCode}
-          shareDeferred={shareDeferred}
-          shareAutoAdd={shareAutoAdd}
-          onShareRequestSignIn={handleShareRequestSignIn}
-          onShareClose={closeShare}
-          onShareOpenSet={handleShareOpenSet}
-          currentUserId={currentUserId}
-          onBackToWelcome={handleBackToWelcome}
-          onBackToName={handleBackToName}
-          onBackToRole={handleBackToRole}
-          onBackToNativeLanguage={handleBackToNativeLanguage}
-          onBackToTargetLanguages={handleBackToTargetLanguages}
-          onBackToGoal={handleBackToGoal}
-          onBackToTeacherSubject={handleBackToTeacherSubject}
-          onSubmitName={handleSubmitName}
-          onSubmitRole={handleSubmitRole}
-          onSubmitNativeLanguage={handleSubmitNativeLanguage}
-          onSubmitTargetLanguages={handleSubmitTargetLanguages}
-          onSwapLanguages={handleSwapLanguages}
-          courseJoin={courseJoin}
-          onHaveCode={handleHaveCode}
-          onCodeFound={handleCodeFound}
-          onCourseJoin={handleCourseJoin}
-          onCourseNotMine={handleCourseNotMine}
-          onCourseName={finishCourseJoin}
-          centerJoin={centerJoin}
-          onCenterFound={handleCenterFound}
-          onCenterActivate={handleCenterActivate}
-          onCenterNotMine={handleCenterNotMine}
-          pendingCenterCode={pendingCenterCode}
-          onCenterInviteJoined={(info) => {
-            setPendingCenterCode(null);
-            openCenterBooksWhenReady(info.organization.id);
-          }}
-          onCenterInviteDismiss={() => setPendingCenterCode(null)}
-          pendingTeacherInvite={pendingTeacherInvite}
-          onTeacherInviteJoined={handleTeacherInviteJoined}
-          onTeacherInviteDismiss={() => setPendingTeacherInvite(null)}
-          firstLesson={firstLesson}
-          starterReady={starterReady}
-          onStarterBuilt={handleStarterBuilt}
-          onFirstCardsDone={handleFirstCardsDone}
-          onFirstMatchDone={handleFirstMatchDone}
-          onFirstResultsDone={handleFirstResultsDone}
-          onSubmitWithTeacher={handleSubmitWithTeacher}
-          onBackToWithTeacher={handleBackToWithTeacher}
-          targetLanguages={onboardingData.targetLanguages}
-          onSubmitGoal={handleSubmitGoal}
-          onSubmitDaily={handleSubmitDaily}
-          onBackToDaily={handleBackToDaily}
-          onSubmitAboutMe={handleSubmitAboutMe}
-          onSubmitTeacherSubject={handleSubmitTeacherSubject}
-          onSubmitTeacherSize={handleSubmitTeacherSize}
-          authStep={authStep}
-          onboardingRole={onboardingData.role}
-          nameSkipped={skipNameStepRef.current}
-          authLoading={authLoading}
-          nativeLanguage={onboardingData.nativeLanguage}
-        />
-        <StagingBadge />
-        {Platform.OS === 'web' && <InstallFromLink />}
-        {Platform.OS === 'web' && <OldDomainNotice enabled={appReady} />}
-      </SafeAreaProvider>
+      <PostHogAppProvider>
+        <SafeAreaProvider initialMetrics={webSafeAreaOverride}>
+          <AppRoot
+            isReady={appReady}
+            isAuthenticated={isAuthenticated}
+            needsOnboarding={needsOnboarding}
+            pendingInviteToken={pendingInviteToken}
+            onInviteAccepted={handleInviteAccepted}
+            onInviteDismiss={handleInviteDismiss}
+            pendingShareCode={pendingShareCode}
+            shareDeferred={shareDeferred}
+            shareAutoAdd={shareAutoAdd}
+            onShareRequestSignIn={handleShareRequestSignIn}
+            onShareClose={closeShare}
+            onShareOpenSet={handleShareOpenSet}
+            currentUserId={currentUserId}
+            onBackToWelcome={handleBackToWelcome}
+            onBackToName={handleBackToName}
+            onBackToRole={handleBackToRole}
+            onBackToNativeLanguage={handleBackToNativeLanguage}
+            onBackToTargetLanguages={handleBackToTargetLanguages}
+            onBackToGoal={handleBackToGoal}
+            onBackToTeacherSubject={handleBackToTeacherSubject}
+            onSubmitName={handleSubmitName}
+            onSubmitRole={handleSubmitRole}
+            onSubmitNativeLanguage={handleSubmitNativeLanguage}
+            onSubmitTargetLanguages={handleSubmitTargetLanguages}
+            onSwapLanguages={handleSwapLanguages}
+            courseJoin={courseJoin}
+            onHaveCode={handleHaveCode}
+            onCodeFound={handleCodeFound}
+            onCourseJoin={handleCourseJoin}
+            onCourseNotMine={handleCourseNotMine}
+            onCourseName={finishCourseJoin}
+            centerJoin={centerJoin}
+            onCenterFound={handleCenterFound}
+            onCenterActivate={handleCenterActivate}
+            onCenterNotMine={handleCenterNotMine}
+            pendingCenterCode={pendingCenterCode}
+            onCenterInviteJoined={(info) => {
+              setPendingCenterCode(null);
+              openCenterBooksWhenReady(info.organization.id);
+            }}
+            onCenterInviteDismiss={() => setPendingCenterCode(null)}
+            pendingTeacherInvite={pendingTeacherInvite}
+            onTeacherInviteJoined={handleTeacherInviteJoined}
+            onTeacherInviteDismiss={() => setPendingTeacherInvite(null)}
+            firstLesson={firstLesson}
+            starterReady={starterReady}
+            onStarterBuilt={handleStarterBuilt}
+            onFirstCardsDone={handleFirstCardsDone}
+            onFirstMatchDone={handleFirstMatchDone}
+            onFirstResultsDone={handleFirstResultsDone}
+            onSubmitWithTeacher={handleSubmitWithTeacher}
+            onBackToWithTeacher={handleBackToWithTeacher}
+            targetLanguages={onboardingData.targetLanguages}
+            onSubmitGoal={handleSubmitGoal}
+            onSubmitDaily={handleSubmitDaily}
+            onBackToDaily={handleBackToDaily}
+            onSubmitAboutMe={handleSubmitAboutMe}
+            onSubmitTeacherSubject={handleSubmitTeacherSubject}
+            onSubmitTeacherSize={handleSubmitTeacherSize}
+            authStep={authStep}
+            onboardingRole={onboardingData.role}
+            nameSkipped={skipNameStepRef.current}
+            authLoading={authLoading}
+            nativeLanguage={onboardingData.nativeLanguage}
+          />
+          <StagingBadge />
+          {Platform.OS === 'web' && <InstallFromLink />}
+          {Platform.OS === 'web' && <OldDomainNotice enabled={appReady} />}
+        </SafeAreaProvider>
+      </PostHogAppProvider>
     </ErrorBoundary>
   );
 }
