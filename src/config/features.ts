@@ -42,3 +42,9 @@ export const TEACHER_LESSON_PREP_ENABLED = true;
  * в прод-сборку с true не выпускать, пока сервер этапа 4 не выкатан на прод.
  */
 export const TEACHER_INSIGHTS_ENABLED = true;
+
+/**
+ * Веб-кабинет учителя (plan/new/web_cabinet.md, Web 3): кнопка «Войти через Apple».
+ * false, пока в Apple Developer и Supabase не настроен веб-вход Apple (Services ID, ключ, Return URL).
+ */
+export const TEACH_APPLE_SIGNIN = false;

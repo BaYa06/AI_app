@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#FFFFFF">
+  <meta name="description" content="Кабинет учителя Flashly: курсы, ученики и экзамены на ноутбуке.">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <title>Flashly для учителей</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body, #root { height: 100%; margin: 0; padding: 0; }
+    body {
+      background: #FFFFFF;
+      color: #111827;
+      font-family: -apple-system, 'SF Pro Text', Roboto, system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    #root { display: flex; flex-direction: column; }
+    /* Видимое кольцо фокуса для клавиатуры (DESIGN.md: всё управляется с клавиатуры) */
+    :focus-visible { outline: 2px solid #6467F2; outline-offset: 2px; }
+    @media (prefers-color-scheme: dark) {
+      body { background: #101122; color: #FFFFFF; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <noscript>Для работы кабинета нужен JavaScript.</noscript>
+</body>
+</html>

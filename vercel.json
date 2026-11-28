@@ -44,6 +44,25 @@
       ]
     },
     {
+      "source": "/(teach|teach/(.*)|teach\\.html)",
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
+        { "key": "Cache-Control", "value": "no-cache" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Referrer-Policy", "value": "same-origin" }
+      ]
+    },
+    {
+      "source": "/((?!api|ai|assets|icons|fonts|sounds)[^.]*)",
+      "has": [{ "type": "host", "value": "teach.flashlycards.app" }],
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
+        { "key": "Cache-Control", "value": "no-cache" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Referrer-Policy", "value": "same-origin" }
+      ]
+    },
+    {
       "source": "/(center|site/center\\.html)",
       "headers": [
         { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
@@ -147,6 +166,9 @@
     }
   ],
   "rewrites": [
+    { "source": "/teach/:path*", "destination": "/teach.html" },
+    { "source": "/", "has": [{ "type": "host", "value": "teach.flashlycards.app" }], "destination": "/teach.html" },
+    { "source": "/:path((?!api|ai|assets|icons|fonts|sounds)[^.]*)", "has": [{ "type": "host", "value": "teach.flashlycards.app" }], "destination": "/teach.html" },
     { "source": "/api/push/subscribe",            "destination": "/api/push?action=subscribe" },
     { "source": "/api/push/unsubscribe",           "destination": "/api/push?action=unsubscribe" },
     { "source": "/api/library/check-published",    "destination": "/api/library?action=check-published" },

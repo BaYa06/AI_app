@@ -20,10 +20,11 @@ module.exports = (env, argv) => {
   return {
     mode: argv.mode || 'production',
     target: 'web',
-    entry: './index.web.jsx',
+    // Два входа: основное приложение и веб-кабинет учителя (plan/new/web_cabinet.md, Web 1)
+    entry: { main: './index.web.jsx', teach: './index.teach.jsx' },
     output: {
       path: path.resolve(__dirname, 'dist'),
-      filename: isDev ? 'bundle.js' : '[name].[contenthash].js',
+      filename: isDev ? '[name].bundle.js' : '[name].[contenthash].js',
       chunkFilename: isDev ? '[name].chunk.js' : '[name].[contenthash].chunk.js',
       publicPath: '/',
       clean: true,
@@ -38,7 +39,8 @@ module.exports = (env, argv) => {
               vendor: {
                 test: /[\\/]node_modules[\\/]/,
                 name: 'vendor',
-                chunks: 'all',
+                // Кабинет учителя не тянет общий vendor приложения (Firebase и др.) — свои чанки
+                chunks: (chunk) => chunk.name !== 'teach',
                 priority: 10,
               },
             },
@@ -137,6 +139,14 @@ module.exports = (env, argv) => {
       new HtmlWebpackPlugin({
         template: './public/index.html',
         inject: 'body',
+        chunks: ['main'],
+      }),
+      // Веб-кабинет учителя: отдельная страница без PWA-оболочки и service worker
+      new HtmlWebpackPlugin({
+        template: './public/teach.html',
+        filename: 'teach.html',
+        inject: 'body',
+        chunks: ['teach'],
       }),
       new CopyWebpackPlugin({
         patterns: [
@@ -223,7 +233,9 @@ module.exports = (env, argv) => {
           allowedHosts: 'all',
           hot: true,
           open: false,
-          historyApiFallback: true,
+          historyApiFallback: {
+            rewrites: [{ from: /^\/teach(\/|$)/, to: '/teach.html' }],
+          },
           static: {
             directory: path.join(__dirname, 'public'),
             publicPath: '/',
