@@ -9,6 +9,7 @@ import {
   GraduationCap,
   MoreHorizontal,
   UserPlus,
+  Zap,
 } from 'lucide-react-native';
 import { View } from 'react-native';
 import { spacing } from '@/constants';
@@ -27,6 +28,7 @@ import { StudentsTab } from '../courses/StudentsTab';
 import { ExamData } from '../data/exam';
 import { ExamList } from '../exam/ExamList';
 import { NewExamButton } from './ExamsPage';
+import { QuickHistory } from '../exam/QuickHistory';
 import {
   CourseMenuDialog,
   DeleteCourseDialog,
@@ -57,7 +59,14 @@ function CourseExams({ courseId }: { courseId: string }) {
   if (!list.data) return <LoadingPage />;
   return (
     <View style={{ gap: spacing.m }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.s }}>
+        <Button
+          variant="secondary"
+          size="s"
+          icon={Zap}
+          title="Быстрый тест"
+          onPress={() => navigate(`/courses/${courseId}/tests/new`)}
+        />
         <NewExamButton courseId={courseId} />
       </View>
       <ExamList
@@ -73,6 +82,7 @@ function CourseExams({ courseId }: { courseId: string }) {
           </Centered>
         }
       />
+      <QuickHistory courseId={courseId} />
     </View>
   );
 }

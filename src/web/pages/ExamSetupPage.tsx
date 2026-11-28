@@ -43,6 +43,8 @@ import {
   setupProblem,
   type MinutesChoice,
 } from '../exam/setupLogic';
+import { useSingleFlight } from '../ui/useSingleFlight';
+import { useUnloadGuard } from '../ui/useUnloadGuard';
 import { Centered, ErrorPage, LoadingPage, NotFoundPage } from '../ui/states';
 import { PageHeader, SectionLabel, Stepper } from '../ui/kit';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -62,6 +64,8 @@ export function ExamSetupPage({ courseId }: { courseId: string }) {
   const [reveal, setReveal] = useState<'teacher' | 'on_submit'>('teacher');
   const [exitControl, setExitControl] = useState(true);
   const [building, setBuilding] = useState(false);
+  const once = useSingleFlight();
+  useUnloadGuard(building);
   const [error, setError] = useState<string | null>(null);
 
   // Первый набор выбираем сам, как в телефоне
@@ -127,8 +131,9 @@ export function ExamSetupPage({ courseId }: { courseId: string }) {
   const toggleSet = (id: string) =>
     setSelected((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
 
-  const build = async () => {
-    if (problem || building) return;
+  const build = () => once(buildOnce);
+  const buildOnce = async () => {
+    if (problem) return;
     setBuilding(true);
     setError(null);
     try {

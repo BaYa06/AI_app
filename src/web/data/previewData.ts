@@ -162,6 +162,20 @@ export const PreviewData = {
         timePerQuestion: 20,
         participantCount: 31,
       },
+      {
+        sessionId: 'quick2',
+        courseId: 'c2',
+        courseTitle: COURSES[1].title,
+        setTitle: 'Unit 1',
+        status: 'active' as const,
+        code: '7305',
+        testMode: 'multiple',
+        purpose: null,
+        engine: 1,
+        questionCount: 12,
+        timePerQuestion: 20,
+        participantCount: 14,
+      },
     ]),
   createCourse: (title: string) =>
     wait({ id: `c${Date.now()}`, title: title.trim(), createdAt: Date.now() }),
@@ -446,9 +460,15 @@ export const PreviewExam = {
 const liveStatus: Record<string, 'waiting' | 'active' | 'finished'> = {
   wait1: 'waiting',
   act1: 'active',
+  quick1: 'waiting',
+  quick2: 'active',
+  quick3: 'finished',
 };
 const livePaused: Record<string, boolean> = {};
-const liveStart: Record<string, number> = { act1: Date.now() - 4 * 60_000 };
+const liveStart: Record<string, number> = {
+  act1: Date.now() - 4 * 60_000,
+  quick2: Date.now() - 2 * 60_000,
+};
 const liveLeft = new Set<string>(['s1-5']);
 
 const STUDENTS = makeMembers(14, 0).map((m, i) => ({ userId: m.id, name: m.displayName, i }));
@@ -482,8 +502,9 @@ export const PreviewLive = {
         status === 'waiting' ? null : new Date(liveStart[sessionId] ?? Date.now()).toISOString(),
       questionCount: 12,
       exitControl: true,
-      engine: 2,
-      durationSec: 420,
+      engine: sessionId.startsWith('quick') ? 1 : 2,
+      durationSec: sessionId.startsWith('quick') ? undefined : 420,
+      timePerQuestion: sessionId.startsWith('quick') ? 20 : undefined,
       paused: livePaused[sessionId] === true,
       pausedAt: livePaused[sessionId] ? new Date().toISOString() : null,
       pausedTotalSec: 0,
@@ -491,6 +512,95 @@ export const PreviewLive = {
       participants,
     });
   },
+  create: () => wait({ sessionId: 'quick1', code: '7305', questionCount: 12 }),
+  history: () =>
+    wait([
+      {
+        sessionId: 'quick3',
+        setTitle: 'Unit 3',
+        finishedAt: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+        participantCount: 9,
+        avgScore: 72,
+        questionCount: 15,
+        testMode: 'multiple',
+        purpose: null,
+      },
+      {
+        sessionId: 'fin1',
+        setTitle: 'Unit 4',
+        finishedAt: new Date(Date.now() - 86_400_000).toISOString(),
+        participantCount: 10,
+        avgScore: 67,
+        questionCount: 12,
+        testMode: 'exam',
+        purpose: null,
+      },
+    ]),
+  quickResults: () =>
+    wait({
+      setTitle: 'Unit 3',
+      date: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+      totalQuestions: 15,
+      avgScore: 72,
+      participants: [
+        {
+          userId: 'u1',
+          name: 'Айгерим Нурмухамбетова',
+          score: 100,
+          correct: 15,
+          total: 15,
+          finished: true,
+          leftReason: null,
+          awayCount: 0,
+        },
+        {
+          userId: 'u2',
+          name: 'Тимур Жумабаев',
+          score: 87,
+          correct: 13,
+          total: 15,
+          finished: true,
+          leftReason: null,
+          awayCount: 1,
+        },
+        {
+          userId: 'u3',
+          name: 'Алия Касымов',
+          score: 87,
+          correct: 13,
+          total: 15,
+          finished: true,
+          leftReason: null,
+          awayCount: 0,
+        },
+        {
+          userId: 'u4',
+          name: 'Данияр Сулейменов',
+          score: 60,
+          correct: 9,
+          total: 15,
+          finished: true,
+          leftReason: null,
+          awayCount: 0,
+        },
+        {
+          userId: 'u5',
+          name: 'Милана Ким',
+          score: 40,
+          correct: 6,
+          total: 15,
+          finished: false,
+          leftReason: 'background',
+          awayCount: 0,
+        },
+      ],
+      hardestCards: [
+        { word: 'reluctant', hint: 'неохотный', missed: 5, total: 5 },
+        { word: 'achievement', hint: 'достижение', missed: 4, total: 5 },
+        { word: 'appointment', hint: 'встреча', missed: 3, total: 5 },
+      ],
+      absent: [{ userId: 'a1', name: 'Мадина Ким' }],
+    }),
   start: (id: string) => {
     liveStatus[id] = 'active';
     liveStart[id] = Date.now();

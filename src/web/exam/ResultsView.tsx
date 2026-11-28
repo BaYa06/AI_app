@@ -22,6 +22,9 @@ import { useLoad } from '../useLoad';
 import { ConfirmDialog } from '../ui/dialogs';
 import { Avatar, PageHeader, TabBar } from '../ui/kit';
 import { ErrorPage, LoadingPage } from '../ui/states';
+import { downloadText } from './download';
+import { useShowMore } from '../ui/useShowMore';
+import { useSingleFlight } from '../ui/useSingleFlight';
 import {
   VERDICT_CHIP,
   VERDICT_ORDER,
@@ -43,18 +46,6 @@ const TABS = [
 ];
 const HOMEWORK_DAYS = 3;
 
-/** Скачать текст файлом (в браузере вместо «Поделиться» из приложения) */
-function download(filename: string, text: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
 export function ResultsView({ sessionId }: { sessionId: string }) {
   const colors = useThemeColors();
   const results = useLoad(() => ExamData.results(sessionId), [sessionId]);
@@ -62,6 +53,8 @@ export function ResultsView({ sessionId }: { sessionId: string }) {
   const list = useLoad(() => ExamData.list().catch(() => []), []);
   const tab = (useQuery().get('tab') === 'words' ? 'words' : 'students') as Tab;
 
+  const once = useSingleFlight();
+  const studentsMore = useShowMore(results.data?.students.length ?? 0);
   const [confirm, setConfirm] = useState<'release' | 'homework' | 'retake' | null>(null);
   const [busy, setBusy] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
@@ -77,7 +70,8 @@ export function ResultsView({ sessionId }: { sessionId: string }) {
   const withErrors = studentsWithErrors(data);
   const maxDist = distributionMax(data.distribution);
 
-  const run = async (kind: 'release' | 'homework' | 'retake') => {
+  const run = (kind: 'release' | 'homework' | 'retake') => once(() => runOnce(kind));
+  const runOnce = async (kind: 'release' | 'homework' | 'retake') => {
     setBusy(true);
     setDialogError(null);
     try {
@@ -112,7 +106,11 @@ export function ResultsView({ sessionId }: { sessionId: string }) {
   };
 
   const exportCsv = () => {
-    download(csvFilename(data.setTitle, data.date), resultsCsv(data, courseTitle));
+    downloadText(
+      csvFilename(data.setTitle, data.date),
+      resultsCsv(data, courseTitle),
+      'text/csv;charset=utf-8'
+    );
     toast.success('Таблица скачана');
   };
 
@@ -249,11 +247,26 @@ export function ResultsView({ sessionId }: { sessionId: string }) {
                 Никто не сдавал этот экзамен.
               </Text>
             ) : (
-              data.students.map((st, i) => (
-                <StudentRow key={st.participantId} st={st} first={i === 0} sessionId={sessionId} />
-              ))
+              data.students
+                .slice(0, studentsMore.shown)
+                .map((st, i) => (
+                  <StudentRow
+                    key={st.participantId}
+                    st={st}
+                    first={i === 0}
+                    sessionId={sessionId}
+                  />
+                ))
             )}
           </Card>
+          {studentsMore.hasMore ? (
+            <Button
+              variant="quiet"
+              size="s"
+              title={`Показать ещё ${studentsMore.next}`}
+              onPress={studentsMore.showMore}
+            />
+          ) : null}
           {data.absent.length > 0 ? (
             <Text variant="bodySmall" color="secondary">
               Не пришли: {data.absent.map((a) => a.name).join(', ')}

@@ -152,17 +152,17 @@ export function HomePage() {
                     {[t.setTitle, `код ${t.code}`, `${t.participantCount} в тесте`]
                       .filter(Boolean)
                       .join(' · ')}
-                    {t.engine === 2 ? '' : '. Управлять тестом пока можно в приложении Flashly.'}
                   </Text>
                 </View>
                 <Badge label={t.status === 'waiting' ? 'Ожидание' : 'Идёт'} tone="primary" />
-                {t.engine === 2 ? (
-                  <Button
-                    size="s"
-                    title="Вернуться"
-                    onPress={() => navigate(`/exams/${t.sessionId}`)}
-                  />
-                ) : null}
+                <Button
+                  variant="secondary"
+                  size="s"
+                  title="Вернуться"
+                  onPress={() =>
+                    navigate(t.engine === 2 ? `/exams/${t.sessionId}` : `/tests/${t.sessionId}`)
+                  }
+                />
               </View>
             </Card>
           ))}

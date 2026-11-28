@@ -15,6 +15,8 @@ import type { ExamListItem } from '@/services/exam';
 import { navigate } from '../router';
 import { SectionLabel } from '../ui/kit';
 import { Centered } from '../ui/states';
+import { useShowMore } from '../ui/useShowMore';
+import { Button } from '@/components/ui/Button';
 import { examGroups, examMeta, statusBadge } from './listLogic';
 
 const TONE: Record<string, BadgeTone> = {
@@ -51,15 +53,36 @@ export function ExamList({
   return (
     <View style={{ gap: spacing.l }}>
       {groups.map((g) => (
-        <View key={g.key} style={{ gap: spacing.s }}>
-          <SectionLabel>{g.title}</SectionLabel>
-          <Card padding="none">
-            {g.items.map((it, i) => (
-              <Row key={it.sessionId} item={it} showCourse={showCourse} first={i === 0} />
-            ))}
-          </Card>
-        </View>
+        <GroupBlock key={g.key} group={g} showCourse={showCourse} />
       ))}
+    </View>
+  );
+}
+
+function GroupBlock({
+  group,
+  showCourse,
+}: {
+  group: ReturnType<typeof examGroups>[number];
+  showCourse: boolean;
+}) {
+  const more = useShowMore(group.items.length);
+  return (
+    <View style={{ gap: spacing.s }}>
+      <SectionLabel>{group.title}</SectionLabel>
+      <Card padding="none">
+        {group.items.slice(0, more.shown).map((it, i) => (
+          <Row key={it.sessionId} item={it} showCourse={showCourse} first={i === 0} />
+        ))}
+      </Card>
+      {more.hasMore ? (
+        <Button
+          variant="quiet"
+          size="s"
+          title={`Показать ещё ${more.next}`}
+          onPress={more.showMore}
+        />
+      ) : null}
     </View>
   );
 }

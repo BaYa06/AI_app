@@ -26,7 +26,9 @@ export type Monitor = {
   questionCount: number;
   exitControl: boolean;
   engine?: number;
+  /** Экзамен: общий срок; быстрый тест — время на вопрос в timePerQuestion */
   durationSec?: number | null;
+  timePerQuestion?: number;
   paused?: boolean;
   pausedAt?: string | null;
   pausedTotalSec?: number;
@@ -48,6 +50,21 @@ export function timeLeftSec(
   const pausedNow = m.pausedAt ? now - new Date(m.pausedAt).getTime() : 0;
   const elapsed = Math.floor((now - started - pausedNow) / 1000 - (m.pausedTotalSec || 0));
   return Math.max(0, m.durationSec - elapsed);
+}
+
+/**
+ * Быстрый тест (движок 1): общее время = секунды на вопрос × число вопросов, считаем с момента старта.
+ * Пауз у такого теста нет. null — без лимита времени или тест ещё не начат.
+ */
+export function quickTimeLeftSec(
+  m: Pick<Monitor, 'timePerQuestion' | 'questionCount' | 'startedAt' | 'serverNow'>
+): number | null {
+  if (!m.timePerQuestion || !m.questionCount || !m.startedAt) return null;
+  const now = m.serverNow ? new Date(m.serverNow).getTime() : Date.now();
+  const started = new Date(m.startedAt).getTime();
+  if (Number.isNaN(now) || Number.isNaN(started)) return null;
+  const elapsed = Math.floor((now - started) / 1000);
+  return Math.max(0, m.timePerQuestion * m.questionCount - elapsed);
 }
 
 /** «6:54», «0:05», «12:00» — минуты без нуля впереди */

@@ -211,3 +211,111 @@ describe('проектор: что пропускаем через канал', 
     expect(visibleNames([{ name: 'Анна' }], true)).toBeNull();
   });
 });
+
+import {
+  clampQuestions,
+  historyTitle,
+  onlyQuick,
+  quickCsv,
+  quickMaxQuestions,
+  quickSetupProblem,
+  ranks,
+  totalTimeText,
+  type QuickResults,
+} from '../exam/quickLogic';
+import { quickTimeLeftSec } from '../exam/liveLogic';
+
+describe('быстрый тест: время', () => {
+  const m = { timePerQuestion: 20, questionCount: 15, startedAt: '2026-11-28T10:00:00Z' };
+  it('секунды на вопрос × число вопросов минус прошедшее', () => {
+    expect(quickTimeLeftSec({ ...m, serverNow: '2026-11-28T10:01:00Z' })).toBe(240);
+    expect(quickTimeLeftSec({ ...m, serverNow: '2026-11-28T10:10:00Z' })).toBe(0);
+  });
+  it('без лимита и до старта — null', () => {
+    expect(quickTimeLeftSec({ ...m, timePerQuestion: 0 })).toBeNull();
+    expect(quickTimeLeftSec({ ...m, startedAt: null })).toBeNull();
+    expect(quickTimeLeftSec({ ...m, questionCount: 0 })).toBeNull();
+  });
+});
+
+describe('быстрый тест: настройка', () => {
+  it('число вопросов', () => {
+    expect(quickMaxQuestions(30)).toBe(30);
+    expect(quickMaxQuestions(500)).toBe(50);
+    expect(quickMaxQuestions(2)).toBe(4);
+    expect(clampQuestions(99, 30)).toBe(30);
+    expect(clampQuestions(NaN, 30)).toBe(4);
+  });
+  it('общее время', () => {
+    expect(totalTimeText(0, 10)).toBe('Без лимита времени');
+    expect(totalTimeText(20, 15)).toBe('Всего 5 мин');
+    expect(totalTimeText(20, 8)).toBe('Всего 2 мин 40 с');
+    expect(totalTimeText(10, 3)).toBe('Всего 30 с');
+  });
+  it('что мешает создать', () => {
+    expect(quickSetupProblem({ setId: null, cards: 20 })).toMatch(/набор/);
+    expect(quickSetupProblem({ setId: 'a', cards: 3 })).toMatch(/меньше/);
+    expect(quickSetupProblem({ setId: 'a', cards: 20 })).toBeNull();
+  });
+});
+
+describe('быстрый тест: итоги', () => {
+  const data: QuickResults = {
+    setTitle: 'Unit 4',
+    date: '2026-11-28T10:00:00Z',
+    totalQuestions: 10,
+    avgScore: 70,
+    participants: [
+      { name: 'Анна', score: 90, correct: 9, total: 10, finished: true },
+      { name: 'Борис', score: 90, correct: 9, total: 10, finished: true },
+      {
+        name: '=Ким',
+        score: 50,
+        correct: 5,
+        total: 10,
+        finished: false,
+        leftReason: 'background',
+        awayCount: 1,
+      },
+    ],
+    hardestCards: [{ word: 'apple', hint: 'яблоко, плод', missed: 3, total: 5 }],
+    absent: [{ userId: 'x', name: 'Дана' }],
+  };
+  it('одинаковый балл — одинаковое место', () => {
+    expect(ranks(data.participants)).toEqual([1, 1, 3]);
+    expect(ranks([])).toEqual([]);
+  });
+  it('CSV: BOM, «;», защита от формул, трудные слова', () => {
+    const csv = quickCsv(data, 'A2');
+    expect(csv.startsWith('﻿')).toBe(true);
+    expect(csv).toContain('Место;Ученик;Результат (%)');
+    expect(csv).toContain("3;'=Ким;50;5;10;Нет;Вышел из приложения;1");
+    expect(csv).toContain('Дана;не пришёл');
+    expect(csv).toContain('apple;яблоко, плод;3;5');
+  });
+  it('история: только быстрые тесты, подпись', () => {
+    const items = [
+      {
+        sessionId: 'a',
+        setTitle: 'Unit 4',
+        finishedAt: '2026-11-12T10:00:00Z',
+        participantCount: 5,
+        avgScore: 80,
+        questionCount: 20,
+        testMode: 'multiple',
+      },
+      {
+        sessionId: 'b',
+        setTitle: 'Unit 3',
+        finishedAt: null,
+        participantCount: 5,
+        avgScore: 80,
+        questionCount: 20,
+        testMode: 'exam',
+      },
+    ];
+    expect(onlyQuick(items).map((i) => i.sessionId)).toEqual(['a']);
+    expect(historyTitle(items[0])).toMatch(/^Unit 4 · 20 слов · 12 ноября/);
+    expect(historyTitle({ ...items[0], setTitle: null, finishedAt: null })).toBe('Тест · 20 слов');
+  });
+});

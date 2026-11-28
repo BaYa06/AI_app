@@ -2,7 +2,7 @@
  * Мелкие блоки кабинета поверх компонентов брендбука (DESIGN.md): аватар-инициалы, шапка страницы,
  * вкладки, плитка с числом, подпись раздела. Только токены из src/constants, один фиолетовый.
  */
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { ChevronLeft, Minus, Plus } from 'lucide-react-native';
 import { useThemeColors } from '@/store';
@@ -69,6 +69,10 @@ export function PageHeader({
   leading?: React.ReactNode;
 }) {
   const colors = useThemeColors();
+  // Заголовок вкладки браузера = заголовок страницы: так находят нужную вкладку среди десятка открытых
+  useEffect(() => {
+    document.title = `${title} · Flashly для учителей`;
+  }, [title]);
   return (
     <View style={styles.header}>
       {back ? (
@@ -125,6 +129,14 @@ export function TabBar<K extends string>({
             role="tab"
             accessibilityState={{ selected }}
             onPress={() => onChange(tab.key)}
+            {...({
+              // Стрелки переключают вкладки, как в обычных табах (react-native-web пропускает onKeyDown в DOM)
+              onKeyDown: (e: { key: string }) => {
+                const i = tabs.findIndex((t) => t.key === active);
+                if (e.key === 'ArrowRight') onChange(tabs[(i + 1) % tabs.length].key);
+                if (e.key === 'ArrowLeft') onChange(tabs[(i - 1 + tabs.length) % tabs.length].key);
+              },
+            } as object)}
             style={[styles.tab, { borderBottomColor: selected ? colors.primary : 'transparent' }]}
           >
             <Text

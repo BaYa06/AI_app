@@ -16,6 +16,8 @@ import type { IconComponent } from '@/components/ui/types';
 import { navigate, usePath } from './router';
 import { useCourses } from './data/CoursesContext';
 import { signOut } from './auth/AuthPages';
+import { useOnline } from './ui/useOnline';
+import { Banner } from './ui/states';
 
 type NavItem = { path: string; label: string; icon: IconComponent };
 
@@ -34,6 +36,7 @@ export function Shell({ email, children }: { email: string | null; children: Rea
   const colors = useThemeColors();
   const path = usePath();
   const { width } = useWindowDimensions();
+  const online = useOnline();
   const { courses, activeTests } = useCourses();
 
   if (width < breakpoints.desktop) {
@@ -160,7 +163,17 @@ export function Shell({ email, children }: { email: string | null; children: Rea
       </View>
 
       <ScrollView style={styles.main} contentContainerStyle={styles.mainContent}>
-        <View style={styles.content}>{children}</View>
+        <View style={styles.content}>
+          {online ? null : (
+            <View style={{ marginBottom: spacing.m }}>
+              <Banner
+                text="Нет интернета. Данные не обновляются, а изменения не сохранятся, пока связь не вернётся."
+                tone="error"
+              />
+            </View>
+          )}
+          {children}
+        </View>
       </ScrollView>
     </View>
   );

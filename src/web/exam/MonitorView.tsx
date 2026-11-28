@@ -13,11 +13,11 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge, ProgressBar, Switch, type BadgeTone } from '@/components/ui/Controls';
 import { toast } from '@/components/ui/Toast';
-import type { ExamDraft } from '@/services/exam';
 import { describeApiError } from '../api';
 import { LiveData } from '../data/live';
 import { useLoad } from '../useLoad';
 import { useNow } from '../ui/useNow';
+import { useSingleFlight } from '../ui/useSingleFlight';
 import { ConfirmDialog } from '../ui/dialogs';
 import { Avatar, PageHeader, SectionLabel, StatTile } from '../ui/kit';
 import { Banner } from '../ui/states';
@@ -31,6 +31,7 @@ import {
   shouldAutoFinish,
   studentState,
   summarize,
+  quickTimeLeftSec,
   timeLeftSec,
   type Participant,
   type StudentState,
@@ -52,20 +53,29 @@ const TONE: Record<StudentState, BadgeTone> = {
 
 export function MonitorView({
   sessionId,
-  draft,
+  code,
+  wordsCount,
+  kind,
   showNames,
   onShowNames,
   onStatus,
 }: {
   sessionId: string;
-  draft: ExamDraft;
+  code: string;
+  wordsCount: number;
+  /** exam — экзамен, quick — быстрый тест: без паузы и «+минуты», время на вопрос */
+  kind: 'exam' | 'quick';
   showNames: boolean;
   onShowNames: (v: boolean) => void;
   onStatus: (s: 'finished') => void;
 }) {
   const colors = useThemeColors();
   const monitor = useLoad(() => LiveData.monitor(sessionId), [sessionId], { refreshMs: POLL_MS });
-  const events = useLoad(() => LiveData.events(sessionId), [sessionId], { refreshMs: EVENTS_MS });
+  const events = useLoad(() => LiveData.events(sessionId), [sessionId], {
+    refreshMs: EVENTS_MS,
+    // Журнал событий есть только у экзамена
+    skip: kind === 'quick',
+  });
   const m = monitor.data;
 
   const [pausing, setPausing] = useState(false);
@@ -78,7 +88,11 @@ export function MonitorView({
   const now = useNow(1000);
   const base = useRef<{ left: number | null; at: number }>({ left: null, at: Date.now() });
   useEffect(() => {
-    if (m) base.current = { left: timeLeftSec(m), at: Date.now() };
+    if (m)
+      base.current = {
+        left: kind === 'quick' ? quickTimeLeftSec(m) : timeLeftSec(m),
+        at: Date.now(),
+      };
   }, [m]);
   const left =
     base.current.left === null
@@ -96,9 +110,8 @@ export function MonitorView({
   );
 
   const projectorState = useMemo(
-    () =>
-      buildState(m ?? null, { code: draft.code ?? '', setTitle: '', showNames, timeLeftSec: left }),
-    [m, draft.code, showNames, left]
+    () => buildState(m ?? null, { code, setTitle: '', showNames, timeLeftSec: left }),
+    [m, code, showNames, left]
   );
   const projector = useProjector(sessionId, projectorState);
 
@@ -106,27 +119,38 @@ export function MonitorView({
     if (m?.status === 'finished') onStatus('finished');
   }, [m?.status]);
 
-  const finish = async (auto = false) => {
-    if (finishing) return;
-    setFinishing(true);
-    try {
-      await LiveData.finish(sessionId);
-      if (auto) toast.success('Все сдали — экзамен завершён');
-      onStatus('finished');
-    } catch (e) {
-      toast.error(describeApiError(e));
-      setFinishing(false);
-      setConfirmFinish(false);
-    }
-  };
+  const once = useSingleFlight();
+  const noun = kind === 'quick' ? 'тест' : 'экзамен';
+  const finish = (reason: 'manual' | 'all_done' | 'time' = 'manual') =>
+    once(async () => {
+      setFinishing(true);
+      try {
+        await LiveData.finish(sessionId);
+        if (reason === 'all_done') toast.success(`Все сдали — ${noun} завершён`);
+        if (reason === 'time') toast.success('Время вышло — тест завершён');
+        onStatus('finished');
+      } catch (e) {
+        toast.error(describeApiError(e));
+        setFinishing(false);
+        setConfirmFinish(false);
+      }
+    });
 
   // Все сдали и никто не вышел досрочно — закрываем сами (как в приложении)
   useEffect(() => {
     if (m?.status === 'active' && !autoDone.current && shouldAutoFinish(participants)) {
       autoDone.current = true;
-      void finish(true);
+      void finish('all_done');
     }
   }, [m]);
+
+  // Быстрый тест: время вышло — завершаем сами (у экзамена срок считает сервер)
+  useEffect(() => {
+    if (kind === 'quick' && m?.status === 'active' && left === 0 && !autoDone.current) {
+      autoDone.current = true;
+      void finish('time');
+    }
+  }, [left, m?.status]);
 
   const togglePause = async () => {
     if (pausing || !m || m.status !== 'active') return;
@@ -148,7 +172,10 @@ export function MonitorView({
     else if (!projector.open())
       toast.error('Браузер заблокировал окно. Разреши всплывающие окна для кабинета.');
   };
-  useHotkeys({ pause: togglePause, projector: openProjector });
+  useHotkeys({
+    ...(kind === 'exam' ? { pause: togglePause } : {}),
+    projector: openProjector,
+  });
 
   const addTime = async (p: Participant) => {
     setBusyUser(p.userId);
@@ -177,9 +204,11 @@ export function MonitorView({
   return (
     <View>
       <PageHeader
-        title={m?.paused ? 'Экзамен на паузе' : 'Экзамен идёт'}
-        subtitle={`Код ${draft.code ?? ''} · ${draft.items.length} слов`}
-        back={{ label: 'Экзамены', path: '/exams' }}
+        title={kind === 'quick' ? 'Тест идёт' : m?.paused ? 'Экзамен на паузе' : 'Экзамен идёт'}
+        subtitle={`Код ${code} · ${wordsCount} слов`}
+        back={
+          kind === 'exam' ? { label: 'Экзамены', path: '/exams' } : { label: 'Обзор', path: '/' }
+        }
         actions={
           <>
             <Button
@@ -189,15 +218,17 @@ export function MonitorView({
               title="Проектор (P)"
               onPress={openProjector}
             />
-            <Button
-              variant="secondary"
-              size="s"
-              icon={m?.paused ? Play : Pause}
-              title={m?.paused ? 'Продолжить (пробел)' : 'Пауза (пробел)'}
-              onPress={togglePause}
-              loading={pausing}
-              disabled={!m}
-            />
+            {kind === 'exam' ? (
+              <Button
+                variant="secondary"
+                size="s"
+                icon={m?.paused ? Play : Pause}
+                title={m?.paused ? 'Продолжить (пробел)' : 'Пауза (пробел)'}
+                onPress={togglePause}
+                loading={pausing}
+                disabled={!m}
+              />
+            ) : null}
             <Button
               variant="danger"
               size="s"
@@ -291,7 +322,7 @@ export function MonitorView({
                           loading={busyUser === p.userId}
                         />
                       ) : null}
-                      {st !== 'done' && st !== 'left' ? (
+                      {kind === 'exam' && st !== 'done' && st !== 'left' ? (
                         <Button
                           variant="icon"
                           background="none"
@@ -349,42 +380,44 @@ export function MonitorView({
               />
             </View>
           </Card>
-          <View style={{ gap: spacing.s }}>
-            <SectionLabel>Что происходило</SectionLabel>
-            <Card>
-              {(events.data ?? []).length === 0 ? (
-                <Text variant="bodySmall" color="secondary">
-                  Пока событий нет.
-                </Text>
-              ) : (
-                <View style={{ gap: spacing.xs }}>
-                  {(events.data ?? []).slice(0, 12).map((e) => (
-                    <Text key={e.id} variant="bodySmall">
-                      <Text variant="caption" color="tertiary">
-                        {new Date(e.at).toLocaleTimeString('ru-RU', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          second: '2-digit',
-                        })}{' '}
+          {kind === 'exam' ? (
+            <View style={{ gap: spacing.s }}>
+              <SectionLabel>Что происходило</SectionLabel>
+              <Card>
+                {(events.data ?? []).length === 0 ? (
+                  <Text variant="bodySmall" color="secondary">
+                    Пока событий нет.
+                  </Text>
+                ) : (
+                  <View style={{ gap: spacing.xs }}>
+                    {(events.data ?? []).slice(0, 12).map((e) => (
+                      <Text key={e.id} variant="bodySmall">
+                        <Text variant="caption" color="tertiary">
+                          {new Date(e.at).toLocaleTimeString('ru-RU', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                          })}{' '}
+                        </Text>
+                        {eventText(e)}
                       </Text>
-                      {eventText(e)}
-                    </Text>
-                  ))}
-                </View>
-              )}
-            </Card>
-          </View>
+                    ))}
+                  </View>
+                )}
+              </Card>
+            </View>
+          ) : null}
         </View>
       </View>
 
       <ConfirmDialog
         visible={confirmFinish}
-        title="Завершить экзамен для всех?"
+        title={`Завершить ${noun} для всех?`}
         message={`Не сдавшие получат баллы за то, что успели. ${summary.working > 0 ? `Сейчас пишут: ${summary.working}.` : ''} Отменить это нельзя.`}
         confirmText="Завершить"
         destructive
         busy={finishing}
-        onConfirm={() => finish(false)}
+        onConfirm={() => finish('manual')}
         onClose={() => setConfirmFinish(false)}
       />
     </View>

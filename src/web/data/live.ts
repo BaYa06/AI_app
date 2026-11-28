@@ -8,6 +8,7 @@ import { rawApiFetch } from '@/services/api/client';
 import { WebApiError, classifyStatus, unwrap } from '../api';
 import { previewMode } from '../preview';
 import type { Monitor } from '../exam/liveLogic';
+import { TeacherData } from './teacher';
 
 function preview() {
   return previewMode() === 'teacher' && __DEV__ ? require('./previewData').PreviewLive : null;
@@ -87,5 +88,45 @@ export const LiveData = {
     if (fake) return fake.events(sessionId);
     const res = await ExamApi.events(sessionId);
     return res.ok && Array.isArray(res.data.events) ? res.data.events : [];
+  },
+};
+
+// ─── Быстрый тест (Web 26) ──────────────────────────────────────────────
+
+import type { QuickHistoryItem, QuickResults } from '../exam/quickLogic';
+import type { ActiveTest } from '@/services/activeTest';
+
+export const QuickData = {
+  /** Создать тест по набору курса. Код и id нужны сразу — лобби показывает код */
+  async create(input: {
+    courseId: string;
+    setId: string;
+    questionCount: number;
+    timePerQuestion: number;
+    exitControl: boolean;
+  }): Promise<{ sessionId: string; code: string; questionCount: number }> {
+    const fake = preview();
+    if (fake) return fake.create();
+    return testCall('create', { method: 'POST', body: { ...input, testMode: 'multiple' } });
+  },
+
+  async results(sessionId: string): Promise<QuickResults> {
+    const fake = preview();
+    if (fake) return fake.quickResults();
+    return testCall<QuickResults>('results', { query: { sessionId } });
+  },
+
+  /** Завершённые тесты курса (экзамены в этом списке тоже есть — фильтрует экран) */
+  async history(courseId: string): Promise<QuickHistoryItem[]> {
+    const fake = preview();
+    if (fake) return fake.history();
+    const data = await testCall<QuickHistoryItem[]>('history', { query: { courseId } });
+    return Array.isArray(data) ? data : [];
+  },
+
+  /** Код и размер идущего теста для возврата на страницу (если страницу перезагрузили) */
+  async activeOne(sessionId: string): Promise<ActiveTest | null> {
+    const list = await TeacherData.activeTests();
+    return list.find((t) => t.sessionId === sessionId) ?? null;
   },
 };

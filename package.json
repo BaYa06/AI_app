@@ -12,6 +12,7 @@
     "site:build": "node scripts/build-site.mjs",
     "db:init": "node database/load-data.js",
     "db:check-migrations": "node scripts/check-migrations.mjs",
+    "teach:smoke": "node scripts/teach-smoke.mjs",
     "center:check": "tsx scripts/check-center-access.ts --staging",
     "exam:check": "tsx scripts/check-exam.ts --staging && tsx scripts/check-exam-flow.ts --staging",
     "test": "jest",

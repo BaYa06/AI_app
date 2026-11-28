@@ -23,6 +23,8 @@ import { ExamPage } from './pages/ExamPage';
 import { ExamQuestionPage } from './pages/ExamQuestionPage';
 import { ExamStudentPage } from './pages/ExamStudentPage';
 import { ProjectorPage } from './pages/ProjectorPage';
+import { QuickSetupPage } from './pages/QuickSetupPage';
+import { QuickTestPage } from './pages/QuickTestPage';
 import { UiGalleryPage } from './pages/UiGalleryPage';
 
 const ROUTES: RouteDef[] = [
@@ -30,6 +32,8 @@ const ROUTES: RouteDef[] = [
   { name: 'course', pattern: '/courses/:courseId' },
   { name: 'student', pattern: '/courses/:courseId/students/:studentId' },
   { name: 'exams', pattern: '/exams' },
+  { name: 'quickNew', pattern: '/courses/:courseId/tests/new' },
+  { name: 'quick', pattern: '/tests/:sessionId' },
   { name: 'examNew', pattern: '/courses/:courseId/exams/new' },
   { name: 'examBuild', pattern: '/exams/:sessionId/build' },
   { name: 'examQuestion', pattern: '/exams/:sessionId/questions/:itemId' },
@@ -45,6 +49,10 @@ function Routes() {
   if (route.name === 'course')
     return <CoursePage key={route.params.courseId} courseId={route.params.courseId} />;
   if (route.name === 'exams') return <ExamsPage />;
+  if (route.name === 'quickNew')
+    return <QuickSetupPage key={route.params.courseId} courseId={route.params.courseId} />;
+  if (route.name === 'quick')
+    return <QuickTestPage key={route.params.sessionId} sessionId={route.params.sessionId} />;
   if (route.name === 'examNew')
     return <ExamSetupPage key={route.params.courseId} courseId={route.params.courseId} />;
   if (route.name === 'examBuild') return <ExamBuildPage sessionId={route.params.sessionId} />;

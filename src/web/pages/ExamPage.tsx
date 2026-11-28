@@ -30,6 +30,8 @@ import {
 } from '../exam/SmartBlock';
 import { ConfirmDialog } from '../ui/dialogs';
 import { ErrorPage, LoadingPage } from '../ui/states';
+import { useSingleFlight } from '../ui/useSingleFlight';
+import { useUnloadGuard } from '../ui/useUnloadGuard';
 import { LobbyView } from '../exam/LobbyView';
 import { MonitorView } from '../exam/MonitorView';
 import { ResultsView } from '../exam/ResultsView';
@@ -84,6 +86,9 @@ function Preview({
   const [applying, setApplying] = useState<string | null>(null);
   const [confirmApply, setConfirmApply] = useState<SmartSuggestion | null>(null);
 
+  const once = useSingleFlight();
+  // Запрос к ИИ, применение и открытие нельзя прерывать закрытием вкладки
+  useUnloadGuard(smart.status === 'loading' || applying !== null || opening || replacing !== null);
   const warnings = takeBuild(sessionId)?.warnings ?? [];
   const items = draft.items;
   const groups = useMemo(() => groupItems(items), [items]);
@@ -174,8 +179,8 @@ function Preview({
   };
 
   // ─── открыть экзамен ───
-  const open = async (force = false) => {
-    if (opening) return;
+  const open = (force = false) => once(() => openOnce(force));
+  const openOnce = async (force = false) => {
     if (doubtful.length > 0 && !force) {
       setConfirmOpen(true);
       return;
@@ -434,7 +439,8 @@ function LiveExam({ sessionId, draft }: { sessionId: string; draft: ExamDraft })
     return (
       <LobbyView
         sessionId={sessionId}
-        draft={draft}
+        code={draft.code ?? ''}
+        kind="exam"
         showNames={showNames}
         onShowNames={setShowNames}
         onStatus={setStatus}
@@ -444,7 +450,9 @@ function LiveExam({ sessionId, draft }: { sessionId: string; draft: ExamDraft })
     return (
       <MonitorView
         sessionId={sessionId}
-        draft={draft}
+        code={draft.code ?? ''}
+        wordsCount={draft.items.length}
+        kind="exam"
         showNames={showNames}
         onShowNames={setShowNames}
         onStatus={setStatus}

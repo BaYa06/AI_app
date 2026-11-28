@@ -12,7 +12,6 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Switch } from '@/components/ui/Controls';
 import { toast } from '@/components/ui/Toast';
-import type { ExamDraft } from '@/services/exam';
 import { describeApiError } from '../api';
 import { LiveData } from '../data/live';
 import { useLoad } from '../useLoad';
@@ -23,25 +22,28 @@ import { oldVersionProblems } from './liveLogic';
 import { buildState } from './projector';
 import { useProjector } from './useProjector';
 import { useHotkeys } from './useHotkeys';
+import { useSingleFlight } from '../ui/useSingleFlight';
 
 const POLL_MS = 3000;
 
 export function LobbyView({
   sessionId,
-  draft,
+  code,
+  kind,
   showNames,
   onShowNames,
   onStatus,
 }: {
   sessionId: string;
-  draft: ExamDraft;
+  code: string;
+  /** exam — экзамен (движок 2), quick — быстрый тест (движок 1) */
+  kind: 'exam' | 'quick';
   showNames: boolean;
   onShowNames: (v: boolean) => void;
   onStatus: (s: 'active' | 'finished') => void;
 }) {
   const colors = useThemeColors();
   const [starting, setStarting] = useState(false);
-  const code = draft.code ?? '';
 
   const monitor = useLoad(() => LiveData.monitor(sessionId), [sessionId], { refreshMs: POLL_MS });
   const events = useLoad(() => LiveData.events(sessionId), [sessionId], { refreshMs: POLL_MS });
@@ -70,8 +72,10 @@ export function LobbyView({
   };
   useHotkeys({ projector: openProjector });
 
-  const start = async () => {
-    if (starting || participants.length === 0) return;
+  const once = useSingleFlight();
+  const start = () => once(startOnce);
+  const startOnce = async () => {
+    if (participants.length === 0) return;
     setStarting(true);
     try {
       await LiveData.start(sessionId);
@@ -95,8 +99,14 @@ export function LobbyView({
     <View>
       <PageHeader
         title="Ждём учеников"
-        subtitle="Экзамен открыт. Ученики входят в приложении Flashly."
-        back={{ label: 'Экзамены', path: '/exams' }}
+        subtitle={
+          kind === 'exam'
+            ? 'Экзамен открыт. Ученики входят в приложении Flashly.'
+            : 'Тест открыт. Ученики входят в приложении Flashly.'
+        }
+        back={
+          kind === 'exam' ? { label: 'Экзамены', path: '/exams' } : { label: 'Обзор', path: '/' }
+        }
       />
       {monitor.error && m ? <Banner text="Нет связи, пробуем снова…" /> : null}
       <View style={styles.layout}>
@@ -151,9 +161,11 @@ export function LobbyView({
                     <Text variant="body">{t}</Text>
                   </View>
                 ))}
-                <Text variant="caption" color="secondary">
-                  Нужна версия приложения 1.9.6 или новее.
-                </Text>
+                {kind === 'exam' ? (
+                  <Text variant="caption" color="secondary">
+                    Нужна версия приложения 1.9.6 или новее.
+                  </Text>
+                ) : null}
               </View>
             </Card>
           </View>
@@ -220,14 +232,14 @@ export function LobbyView({
                 </View>
               ) : null}
               <Button
-                title="Начать экзамен"
+                title={kind === 'exam' ? 'Начать экзамен' : 'Начать тест'}
                 fullWidth
                 loading={starting}
                 disabled={participants.length === 0}
                 onPress={start}
               />
               <Text variant="caption" color="secondary">
-                Опоздавшие смогут войти, пока экзамен идёт.
+                Опоздавшие смогут войти, пока {kind === 'exam' ? 'экзамен' : 'тест'} идёт.
               </Text>
             </View>
           </Card>
