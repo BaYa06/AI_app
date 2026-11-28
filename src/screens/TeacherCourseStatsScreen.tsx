@@ -33,6 +33,8 @@ import {
 import { StudentListModal } from './teacherCourseStats/StudentListModal';
 import { CourseSetsList } from './teacherCourseStats/CourseSetsList';
 import { ActivityChart } from './teacherCourseStats/ActivityChart';
+import { ActiveTestBanner } from '@/components/teacher/ActiveTestBanner';
+import { useActiveTests } from '@/services/activeTest';
 import { CourseActions, type CourseOverview } from './teacherCourseStats/CourseActions';
 import {
   activityInsight,
@@ -43,6 +45,8 @@ import {
 type Props = NativeStackScreenProps<RootStackParamList, 'TeacherCourseStats'>;
 
 export function TeacherCourseStatsScreen({ navigation, route }: Props) {
+  // Идущий тест этого курса — плашка «Вернуться» (plan/new/live_test_return.md, LiveReturn 4)
+  const activeTests = useActiveTests(true, route.params.courseId);
   // Первые шаги учителя (plan/new/new_user_activation.md, Start 6.3)
   React.useEffect(() => markTeacherTask('stats'), []);
   const { courseTitle } = route.params;
@@ -292,6 +296,12 @@ export function TeacherCourseStatsScreen({ navigation, route }: Props) {
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + spacing.xl }]}
         showsVerticalScrollIndicator={false}
       >
+        <ActiveTestBanner
+          tests={activeTests}
+          navigation={navigation}
+          place="course"
+          padded={false}
+        />
         {/* Действия курса — одним блоком, с плотным отступом (у ScrollView gap крупный, для секций) */}
         <CourseActions
           colors={colors}

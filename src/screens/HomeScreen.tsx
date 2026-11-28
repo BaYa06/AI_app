@@ -175,6 +175,8 @@ import type { HighlightId } from '@/services/dailyHighlight';
 import { closeJoinTeacherCard, shouldShowJoinTeacherCard } from '@/services/joinTeacherCard';
 import { WidgetHowToSheet } from '@/components/widget/WidgetHowToSheet';
 import { TeacherBanner } from './home/components/TeacherBanner';
+import { ActiveTestBanner } from '@/components/teacher/ActiveTestBanner';
+import { useActiveTests } from '@/services/activeTest';
 import { TeacherLessonCard } from './home/components/TeacherLessonCard';
 import { useTeacherCourseData } from './home/useTeacherCourseData';
 
@@ -277,6 +279,8 @@ export function HomeScreen({ navigation, route }: any) {
   );
   const [onlyHard, setOnlyHard] = useState(false);
   const isTeacher = useSettingsStore((s) => s.isTeacher);
+  // Идущий тест учителя — плашка «Вернуться» (plan/new/live_test_return.md)
+  const activeTests = useActiveTests(isTeacher === true);
   const fetchIsTeacher = useSettingsStore((s) => s.fetchIsTeacher);
   const [joinByCodeVisible, setJoinByCodeVisible] = useState(false);
   // Код учебного центра из «Ввести код» (plan/new/center_books.md, Center 5)
@@ -1936,6 +1940,7 @@ export function HomeScreen({ navigation, route }: any) {
     );
   const teacherBanner = (
     <>
+      <ActiveTestBanner tests={activeTests} navigation={navigation} place="home" />
       {teacherStart}
       {teacherBannerCard}
     </>

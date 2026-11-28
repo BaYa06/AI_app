@@ -23,6 +23,8 @@ import { describeError } from '@/utils/userErrors';
 import { getAccessToken } from '@/services/auth/session';
 import { rawApiFetch } from '@/services/api/client';
 
+import { ActiveTestBanner } from '@/components/teacher/ActiveTestBanner';
+import { useActiveTests } from '@/services/activeTest';
 import { historyTitle } from './examLobby/examLobbyText';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TestHistory'>;
@@ -57,6 +59,8 @@ export function TestHistoryScreen({ navigation, route }: Props) {
   const colors = useThemeColors();
 
   const { courseId, courseTitle } = route.params;
+  // Идущий сейчас тест курса сверху списка (plan/new/live_test_return.md, LiveReturn 4)
+  const activeTests = useActiveTests(true, courseId);
 
   const [items, setItems] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -124,6 +128,8 @@ export function TestHistoryScreen({ navigation, route }: Props) {
           </Text>
         </View>
       </View>
+
+      <ActiveTestBanner tests={activeTests} navigation={navigation} place="history" />
 
       {/* Loading */}
       {loading && (

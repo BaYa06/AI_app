@@ -59,6 +59,14 @@ export const teacherEvents = {
   examHomework: (students: number) => log('exam_homework', { students }),
   examRetake: () => log('exam_retake', {}),
 
+  // Вернуться к идущему тесту (plan/new/live_test_return.md, LiveReturn 6)
+  /** Плашка «Идёт тест» показана; place — где (home / course / history), count — сколько тестов */
+  activeTestBannerShown: (place: string, count: number) =>
+    log('active_test_banner_shown', { place, count }),
+  /** Учитель нажал плашку; status — waiting (лобби) или active (монитор) */
+  activeTestReturned: (place: string, status: string) =>
+    log('active_test_returned', { place, status }),
+
   // Первые шаги учителя (plan/new/new_user_activation.md, этап 6)
   teacherDemoStarted: () => log('teacher_demo_started'),
   teacherDemoFinished: () => log('teacher_demo_finished'),
