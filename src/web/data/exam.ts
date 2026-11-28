@@ -43,7 +43,7 @@ export const ExamData = {
 
   async draft(sessionId: string): Promise<ExamDraft> {
     const fake = preview();
-    if (fake) return fake.draft();
+    if (fake) return fake.draft(sessionId);
     return unwrap(await ExamApi.draft(sessionId));
   },
 

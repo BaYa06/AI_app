@@ -4,6 +4,7 @@
 import { broadcast, broadcastTestFinished, AWAY_GRACE_SEC, sessionCardStats } from './_shared.js';
 import { courseSetIdsSql } from '../../_course.js';
 import { finishExpired } from './exam.js';
+import { logExamEvent } from '../../_exam/events.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 /** Больше слов в одном тесте не бывает (защита от случайно огромного списка) */
@@ -594,6 +595,7 @@ export async function reinstateParticipant(req, res, sql, userId) {
   const p = rows[0];
   const total = p.question_order?.length || 0;
 
+  await logExamEvent(sql, { sessionId, userId: p.user_id, kind: 'reinstated' });
   await broadcast(sessionId, 'reinstated', { userId: p.user_id, answered: p.answer_count });
   await broadcast(sessionId, 'progress_update', {
     userId: p.user_id,

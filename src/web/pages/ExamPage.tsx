@@ -31,6 +31,8 @@ import {
 } from '../exam/SmartBlock';
 import { ConfirmDialog } from '../ui/dialogs';
 import { ErrorPage, LoadingPage } from '../ui/states';
+import { LobbyView } from '../exam/LobbyView';
+import { MonitorView } from '../exam/MonitorView';
 import { PageHeader, SectionLabel } from '../ui/kit';
 import {
   LEVEL_NAME,
@@ -56,7 +58,7 @@ export function ExamPage({ sessionId }: { sessionId: string }) {
 
   if (loaded.error && !draft) return <ErrorPage error={loaded.error} onRetry={loaded.reload} />;
   if (!draft) return <LoadingPage />;
-  if (draft.status !== 'draft') return <StatusView draft={draft} />;
+  if (draft.status !== 'draft') return <LiveExam sessionId={sessionId} draft={draft} />;
   return <Preview sessionId={sessionId} draft={draft} setDraft={setLocal} />;
 }
 
@@ -423,36 +425,44 @@ function Preview({
   );
 }
 
+/** Открытый экзамен: лобби → монитор → итоги. Статус берём из опроса, а не из локальных догадок */
+function LiveExam({ sessionId, draft }: { sessionId: string; draft: ExamDraft }) {
+  const [status, setStatus] = useState<string>(draft.status);
+  // Имена на проекторе: по умолчанию нет (признак «младше 18» у курса пока не хранится)
+  const [showNames, setShowNames] = useState(false);
+  if (status === 'waiting')
+    return (
+      <LobbyView
+        sessionId={sessionId}
+        draft={draft}
+        showNames={showNames}
+        onShowNames={setShowNames}
+        onStatus={setStatus}
+      />
+    );
+  if (status === 'active')
+    return (
+      <MonitorView
+        sessionId={sessionId}
+        draft={draft}
+        showNames={showNames}
+        onShowNames={setShowNames}
+        onStatus={setStatus}
+      />
+    );
+  return <StatusView draft={{ ...draft, status }} />;
+}
+
 function StatusView({ draft }: { draft: ExamDraft }) {
   const colors = useThemeColors();
-  const finished = draft.status === 'finished';
-  const waiting = draft.status === 'waiting';
   return (
     <View style={{ maxWidth: 640 }}>
-      <PageHeader
-        title={waiting ? 'Экзамен открыт' : finished ? 'Экзамен завершён' : 'Экзамен идёт'}
-        back={{ label: 'Экзамены', path: '/exams' }}
-      />
+      <PageHeader title="Экзамен завершён" back={{ label: 'Экзамены', path: '/exams' }} />
       <Card>
         <View style={{ gap: spacing.m, alignItems: 'center' }}>
-          {draft.code && !finished ? (
-            <>
-              <Text variant="caption" color="secondary">
-                Код для учеников
-              </Text>
-              <Text
-                variant="display"
-                selectable
-                accessibilityLabel={`Код ${draft.code.split('').join(' ')}`}
-              >
-                {draft.code}
-              </Text>
-            </>
-          ) : null}
           <Text variant="body" color="secondary" align="center">
-            {finished
-              ? 'Итоги и разбор вопросов скоро появятся в кабинете. Пока они — в приложении Flashly: Тест → История.'
-              : 'Ученики входят в приложении Flashly: вкладка «Тест», код из 4 цифр. Запустить экзамен и следить за ним пока можно в приложении — на главной появится плашка «Идёт тест — вернуться». Лобби и монитор в кабинете появятся позже.'}
+            Итоги и разбор вопросов скоро появятся в кабинете. Пока они — в приложении Flashly: Тест
+            → История.
           </Text>
           <Button
             variant="secondary"

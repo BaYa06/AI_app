@@ -233,6 +233,24 @@ export type ExamListItem = {
   avgScore: number;
 };
 
+/** Событие журнала экзамена (веб-кабинет, Web 22); сервер: api/_exam/events.js */
+export type ExamEvent = {
+  id: string;
+  kind:
+    | 'old_version'
+    | 'away'
+    | 'back'
+    | 'paused'
+    | 'resumed'
+    | 'extra_time'
+    | 'reinstated'
+    | string;
+  userId: string | null;
+  name: string;
+  detail: Record<string, unknown>;
+  at: string;
+};
+
 export type ExamResult<T> = { ok: boolean; status: number; data: T; error?: string };
 
 async function callExam<T>(
@@ -280,6 +298,9 @@ export const ExamApi = {
   /** Веб-кабинет: все экзамены учителя (движок 2), новые первыми */
   list: (courseId?: string) =>
     callExam<ExamListItem[]>('exam-list', 'GET', courseId ? { courseId } : {}),
+  /** Веб-кабинет: журнал событий (вход со старой версией, выходы, пауза, +время) */
+  events: (sessionId: string) =>
+    callExam<{ events: ExamEvent[] }>('exam-events', 'GET', { sessionId }),
   /** Веб-кабинет: правка неверных вариантов и предложения «вставь слово» в черновике */
   editItem: (
     sessionId: string,

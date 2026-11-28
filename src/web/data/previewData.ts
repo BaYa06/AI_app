@@ -352,7 +352,12 @@ export const PreviewExam = {
       counts: { choice: 4, write: 2, scramble: 1, match: 3, gap: 2 },
     });
   },
-  draft: () => wait(ensureDraft()),
+  draft: (sessionId?: string) => {
+    const d = ensureDraft();
+    if (sessionId === 'wait1') return wait({ ...d, sessionId, status: 'waiting', code: '4821' });
+    if (sessionId === 'act1') return wait({ ...d, sessionId, status: 'active', code: '4821' });
+    return wait(d);
+  },
   replace: (itemId: string) => {
     const d = ensureDraft();
     d.items = d.items.map((i) =>
@@ -433,4 +438,108 @@ export const PreviewExam = {
         2500
       )
     ),
+};
+
+// ─── Лобби и монитор (Web 18–22) ────────────────────────────────────────
+
+const liveStatus: Record<string, 'waiting' | 'active' | 'finished'> = {
+  wait1: 'waiting',
+  act1: 'active',
+};
+const livePaused: Record<string, boolean> = {};
+const liveStart: Record<string, number> = { act1: Date.now() - 4 * 60_000 };
+const liveLeft = new Set<string>(['s1-5']);
+
+const STUDENTS = makeMembers(14, 0).map((m, i) => ({ userId: m.id, name: m.displayName, i }));
+
+export const PreviewLive = {
+  monitor: (sessionId: string) => {
+    const status = liveStatus[sessionId] ?? 'waiting';
+    const t = Math.floor((Date.now() - (liveStart[sessionId] ?? Date.now())) / 1000);
+    const joined =
+      status === 'waiting'
+        ? Math.min(STUDENTS.length, 6 + Math.floor((Date.now() / 4000) % 6))
+        : STUDENTS.length;
+    const participants = STUDENTS.slice(0, joined).map((s) => {
+      const answered =
+        status === 'waiting' ? 0 : Math.min(12, Math.floor(t / (14 + (s.i % 6) * 6)));
+      const left = liveLeft.has(s.userId) && status !== 'waiting';
+      return {
+        userId: s.userId,
+        name: s.name,
+        answered,
+        total: 12,
+        done: answered >= 12,
+        leftReason: left ? 'background' : null,
+        awayCount: s.i === 2 ? 3 : 0,
+        away: s.i === 8 && status === 'active',
+      };
+    });
+    return wait({
+      status,
+      startedAt:
+        status === 'waiting' ? null : new Date(liveStart[sessionId] ?? Date.now()).toISOString(),
+      questionCount: 12,
+      exitControl: true,
+      engine: 2,
+      durationSec: 420,
+      paused: livePaused[sessionId] === true,
+      pausedAt: livePaused[sessionId] ? new Date().toISOString() : null,
+      pausedTotalSec: 0,
+      serverNow: new Date().toISOString(),
+      participants,
+    });
+  },
+  start: (id: string) => {
+    liveStatus[id] = 'active';
+    liveStart[id] = Date.now();
+    return wait(undefined);
+  },
+  finish: (id: string) => {
+    liveStatus[id] = 'finished';
+    return wait(undefined);
+  },
+  reinstate: (_id: string, userId: string) => {
+    liveLeft.delete(userId);
+    return wait(undefined);
+  },
+  pause: (id: string, paused: boolean) => {
+    livePaused[id] = paused;
+    return wait(paused);
+  },
+  events: (_id: string) =>
+    wait([
+      {
+        id: '5',
+        kind: 'old_version',
+        userId: 'late1',
+        name: 'Мадина Ким',
+        detail: {},
+        at: new Date(Date.now() - 60_000).toISOString(),
+      },
+      {
+        id: '4',
+        kind: 'away',
+        userId: STUDENTS[8].userId,
+        name: STUDENTS[8].name,
+        detail: { reason: 'background' },
+        at: new Date(Date.now() - 20_000).toISOString(),
+      },
+      {
+        id: '3',
+        kind: 'back',
+        userId: STUDENTS[2].userId,
+        name: STUDENTS[2].name,
+        detail: { sec: 2 },
+        at: new Date(Date.now() - 90_000).toISOString(),
+      },
+      {
+        id: '2',
+        kind: 'extra_time',
+        userId: STUDENTS[3].userId,
+        name: STUDENTS[3].name,
+        detail: { minutes: 2 },
+        at: new Date(Date.now() - 120_000).toISOString(),
+      },
+    ] as import('@/services/exam').ExamEvent[]),
 };

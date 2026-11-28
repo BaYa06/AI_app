@@ -19,6 +19,7 @@ import { detectBackKind } from '../../_exam/prepare.js';
 import { classifyDifficulty, LEARNED_STEP } from '../../_exam/difficulty.js';
 import { buildExam, replaceItem, LIMITS } from '../../_exam/build.js';
 import { checkAnswer } from '../../_exam/check.js';
+import { logExamEvent, logOldVersionAttempt } from '../../_exam/events.js';
 import { isEditable, validateDistractors, validateSentence } from '../../_exam/edit.js';
 import { studentScreens } from '../../_exam/deliver.js';
 import { scoreParticipant, averageScore } from '../../_exam/score.js';
@@ -463,6 +464,35 @@ export async function examList(req, res, sql, userId) {
 }
 
 /**
+ * GET ?action=exam-events&sessionId=…  (веб-кабинет, Web 22)
+ * Журнал событий экзамена для учителя: новые первыми, не больше 100. Видит только учитель экзамена.
+ * → { events: [{ id, kind, userId, name, detail, at }] }
+ */
+export async function examEvents(req, res, sql, userId) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  const session = await loadOwnExam(res, sql, userId, req.query.sessionId);
+  if (!session) return;
+  let rows = [];
+  try {
+    rows = await sql`
+      SELECT e.id, e.kind, e.user_id AS "userId", e.detail, e.created_at AS "at",
+             COALESCE(NULLIF(u.display_name, ''), 'Ученик') AS "name"
+      FROM exam_events e
+      LEFT JOIN users u ON u.id = e.user_id
+      WHERE e.session_id = ${session.id}::uuid
+      ORDER BY e.created_at DESC, e.id DESC
+      LIMIT 100
+    `;
+  } catch (error) {
+    // Миграция 056 ещё не применилась — журнал пуст, экзамен работает
+    log.warn('exam-events', 'read failed', error?.message || error);
+  }
+  return res.status(200).json({
+    events: rows.map((r) => ({ ...r, id: String(r.id), detail: r.detail || {} })),
+  });
+}
+
+/**
  * POST ?action=exam-create  Body: { sessionId, durationSec?, exitControl? }
  * Открывает черновик: код для входа, status = 'waiting'. Дальше — как обычный тест
  * (TestLobbyScreen → start).
@@ -513,6 +543,8 @@ export async function examCreate(req, res, sql, userId) {
 export async function joinExam(req, res, sql, userId, session) {
   const features = Array.isArray(req.body?.features) ? req.body.features : [];
   if (!features.includes(EXAM_FEATURE)) {
+    // Учитель увидит в журнале «не смог войти: старая версия» (веб-кабинет, Web 22)
+    await logOldVersionAttempt(sql, session, userId);
     // Текст показывает как есть старое приложение (1.8.6 и раньше) — поэтому по-русски
     return res
       .status(426)
@@ -877,6 +909,7 @@ export async function examPause(req, res, sql, userId) {
         WHERE id = ${session.id}::uuid RETURNING *
       `;
   const payload = { paused: Boolean(row.paused_at) };
+  await logExamEvent(sql, { sessionId: session.id, kind: payload.paused ? 'paused' : 'resumed' });
   await Promise.all([
     broadcast(session.id, 'exam_paused', payload),
     broadcast(session.id, 'exam_paused', payload, ':exam'),
@@ -898,6 +931,12 @@ export async function examExtraTime(req, res, sql, userId) {
     RETURNING extra_sec
   `;
   if (rows.length === 0) return res.status(404).json({ error: 'Participant not found' });
+  await logExamEvent(sql, {
+    sessionId: session.id,
+    userId: studentId,
+    kind: 'extra_time',
+    detail: { minutes },
+  });
   await broadcast(
     session.id,
     'exam_time',

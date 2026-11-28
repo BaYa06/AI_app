@@ -8,7 +8,7 @@ import { log } from './_log.js';
  */
 // schema_039: в 038 (official_sets_guard) и 039 (set_kind) версию не подняли — миграции не выполнились,
 // и запросы с card_sets.kind падали на тестовом сервере (plan/new/set_kind.md, слабые места)
-const SCHEMA_VERSION = 'schema_055';
+const SCHEMA_VERSION = 'schema_056';
 
 // Один прогон на экземпляр функции (параллельные запросы ждут один и тот же промис)
 let initPromise = null;
@@ -1342,6 +1342,25 @@ async function applyMigrations(sql) {
     await sql`CREATE INDEX IF NOT EXISTS idx_test_score_log_session ON test_score_log(session_id)`;
   } catch (e) {
     log.error('db-init', 'Migration 055_live_exam failed', e);
+  }
+
+  // Migration 056: журнал событий экзамена (plan/new/web_cabinet.md, Web 22) — вход со старой
+  // версией приложения, выход из приложения, пауза, +время, возврат. Тексты — как в
+  // database/migrations/056_exam_events.sql
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS exam_events (
+        id          BIGSERIAL PRIMARY KEY,
+        session_id  UUID NOT NULL REFERENCES test_sessions(id) ON DELETE CASCADE,
+        user_id     UUID,
+        kind        VARCHAR(24) NOT NULL,
+        detail      JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_exam_events_session ON exam_events(session_id, created_at DESC)`;
+  } catch (e) {
+    log.error('db-init', 'Migration 056_exam_events failed', e);
   }
 
   // Migration 019: daily challenge rewards (один claim на челлендж в день)

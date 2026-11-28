@@ -20,6 +20,7 @@ import { ExamsPage } from './pages/ExamsPage';
 import { ExamSetupPage } from './pages/ExamSetupPage';
 import { ExamBuildPage } from './pages/ExamBuildPage';
 import { ExamPage } from './pages/ExamPage';
+import { ProjectorPage } from './pages/ProjectorPage';
 import { UiGalleryPage } from './pages/UiGalleryPage';
 
 const ROUTES: RouteDef[] = [
@@ -95,11 +96,20 @@ function Gate() {
   }
 }
 
+const PROJECTOR_ROUTE: RouteDef[] = [{ name: 'projector', pattern: '/projector/:sessionId' }];
+
+/** Окно проектора живёт отдельно от входа: данные ему присылает окно учителя, токен и сервер не нужны */
+function Root() {
+  const projector = useRoute(PROJECTOR_ROUTE);
+  if (projector) return <ProjectorPage sessionId={projector.params.sessionId} />;
+  return <Gate />;
+}
+
 export function TeachApp() {
   return (
     <ErrorBoundary>
       <SafeAreaProvider>
-        <Gate />
+        <Root />
         <ToastHost />
       </SafeAreaProvider>
     </ErrorBoundary>

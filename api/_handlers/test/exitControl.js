@@ -2,6 +2,7 @@
  * api/test.js — контроль выхода из приложения во время теста (plan/done/exam_lockdown.md) (Clean 10 — перенесено без изменений).
  */
 import { broadcast, AWAY_GRACE_SEC, attemptSummary, finishParticipantEarly } from './_shared.js';
+import { logExamEvent } from '../../_exam/events.js';
 
 /**
  * Участник вызывающего + его сессия. Возвращает null и уже отправленный ответ при ошибке —
@@ -57,6 +58,12 @@ export async function markAway(req, res, sql, userId) {
   `;
   if (rows.length > 0) {
     const reason = req.body.reason === 'split' ? 'split' : 'background';
+    await logExamEvent(sql, {
+      sessionId: p.session_id,
+      userId: p.user_id,
+      kind: 'away',
+      detail: { reason },
+    });
     await broadcast(p.session_id, 'student_away', {
       userId: p.user_id,
       displayName: p.display_name,
@@ -95,6 +102,12 @@ export async function markBack(req, res, sql, userId) {
     RETURNING away_count, ROUND(EXTRACT(EPOCH FROM (NOW() - (SELECT away_at FROM old))))::int AS away_sec
   `;
   if (forgiven.length > 0) {
+    await logExamEvent(sql, {
+      sessionId: p.session_id,
+      userId: p.user_id,
+      kind: 'back',
+      detail: { sec: forgiven[0].away_sec },
+    });
     await broadcast(p.session_id, 'student_back', {
       userId: p.user_id,
       awaySec: forgiven[0].away_sec,
