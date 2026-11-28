@@ -10,6 +10,7 @@ import {
   finishTest,
   getResults,
   getHistory,
+  getActiveSessions,
   reinstateParticipant,
 } from './_handlers/test/teacher.js';
 import { markAway, markBack, leaveTest } from './_handlers/test/exitControl.js';
@@ -53,6 +54,7 @@ import { SUPABASE_URL } from './_handlers/test/_shared.js';
  * GET  /api/test?action=results       — итоговые результаты (только учитель — владелец сессии)
  * POST /api/test?action=get-question  — ученик запрашивает вопрос с вариантами
  * GET  /api/test?action=history       — учитель получает историю тестов курса
+ * GET  /api/test?action=active        — незавершённые тесты учителя (вернуться в лобби/монитор)
  * POST /api/test?action=away          — ученик ушёл в фон (контроль выхода, plan/done/exam_lockdown.md)
  * POST /api/test?action=back          — ученик вернулся: продолжить или завершить попытку
  * POST /api/test?action=leave         — ученик сам завершил тест досрочно
@@ -113,6 +115,7 @@ export default async function handler(req, res) {
     if (action === 'results') return await getResults(req, res, sql, userId);
     if (action === 'get-question') return await getQuestion(req, res, sql, userId);
     if (action === 'history') return await getHistory(req, res, sql, userId);
+    if (action === 'active') return await getActiveSessions(req, res, sql, userId);
     if (action === 'away') return await markAway(req, res, sql, userId);
     if (action === 'back') return await markBack(req, res, sql, userId);
     if (action === 'leave') return await leaveTest(req, res, sql, userId);
@@ -143,7 +146,7 @@ export default async function handler(req, res) {
 
     return res.status(400).json({
       error:
-        'Unknown action. Use: create, join, start, answer, monitor, finish, results, get-question, history, away, back, leave, reinstate',
+        'Unknown action. Use: create, join, start, answer, monitor, finish, results, get-question, history, active, away, back, leave, reinstate',
     });
   } catch (error) {
     log.error('test', 'Test API error', error);

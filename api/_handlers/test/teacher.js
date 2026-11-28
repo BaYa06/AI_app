@@ -500,6 +500,57 @@ export async function getHistory(req, res, sql, userId) {
 
 // ─── Контроль выхода из приложения (plan/done/exam_lockdown.md) ───
 
+/** Лобби без старта дольше этого — «забытая» сессия, плашку не показываем */
+export const ACTIVE_WAITING_MAX_HOURS = 6;
+/** Идущий тест дольше этого — тоже забытый (учитель закрыл приложение и не завершил) */
+export const ACTIVE_RUNNING_MAX_HOURS = 12;
+
+/**
+ * GET ?action=active
+ * Незавершённые тесты этого учителя (лобби и идущие) — чтобы вернуться в лобби или монитор,
+ * если учитель вышел на главную (plan/new/live_test_return.md, LiveReturn 1).
+ * Экзамен, у которого вышло время, но статус ещё active, остаётся в списке: учителю нужно
+ * нажать «Завершить».
+ */
+export async function getActiveSessions(req, res, sql, userId) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
+  const rows = await sql`
+    SELECT
+      ts.id             AS "sessionId",
+      ts.course_id      AS "courseId",
+      c.title           AS "courseTitle",
+      cs.title          AS "setTitle",
+      ts.status         AS "status",
+      ts.code           AS "code",
+      ts.test_mode      AS "testMode",
+      ts.purpose        AS "purpose",
+      ts.engine         AS "engine",
+      ts.started_at     AS "startedAt",
+      ts.created_at     AS "createdAt",
+      ts.duration_sec   AS "durationSec",
+      ts.question_count AS "questionCount",
+      (SELECT COUNT(*)::int FROM test_participants tp WHERE tp.session_id = ts.id)
+                        AS "participantCount"
+    FROM test_sessions ts
+    LEFT JOIN courses c ON c.id = ts.course_id
+    LEFT JOIN card_sets cs ON cs.id = ts.set_id
+    WHERE ts.teacher_id = ${userId}::uuid
+      AND (
+        (ts.status = 'waiting'
+          AND ts.created_at > NOW() - make_interval(hours => ${ACTIVE_WAITING_MAX_HOURS}::int))
+        OR
+        (ts.status = 'active'
+          AND COALESCE(ts.started_at, ts.created_at)
+              > NOW() - make_interval(hours => ${ACTIVE_RUNNING_MAX_HOURS}::int))
+      )
+    ORDER BY COALESCE(ts.started_at, ts.created_at) DESC
+    LIMIT 20
+  `;
+
+  return res.status(200).json(rows);
+}
+
 /**
  * POST ?action=reinstate
  * Body: { sessionId, userId }  — userId ученика (как в monitor/progress_update)
