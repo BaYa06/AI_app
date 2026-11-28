@@ -35,9 +35,16 @@ export function pickStarterTheme(learningGoal: string | null | undefined): Start
   return learningGoal === 'travel' ? 'travel' : 'first_words';
 }
 
-/** Перевод на родном и чтение изучаемого слова для zh/ja/ko: «Привет (nǐ hǎo)» */
-function backText(nativeWord: string, reading: string | undefined): string {
-  return reading ? `${nativeWord} (${reading})` : nativeWord;
+/** Родные языки с иероглифами или хангылем: латиница рядом с переводом читается как его транскрипция */
+const NO_READING_NATIVE: ReadonlySet<StarterLang> = new Set(['zh', 'ja', 'ko']);
+
+/**
+ * Перевод на родном и чтение изучаемого слова для zh/ja/ko: «Привет (nǐ hǎo)».
+ * Если родной сам zh/ja/ko, чтение не добавляем: «母 (eomeoni)» выглядит как
+ * латинская транскрипция японского слова, а не корейского (отзыв ученика, 28.11.2026).
+ */
+function backText(nativeWord: string, reading: string | undefined, native: StarterLang): string {
+  return reading && !NO_READING_NATIVE.has(native) ? `${nativeWord} (${reading})` : nativeWord;
 }
 
 /**
@@ -64,7 +71,7 @@ export function buildStarterSet(input: BuildStarterSetInput): StarterSet | null 
       id: newId(),
       setId,
       frontText: studied.word,
-      backText: backText(translation.word, studied.reading),
+      backText: backText(translation.word, studied.reading, native as StarterLang),
       example: studied.example,
       wordForm: studied.form,
       createdAt,

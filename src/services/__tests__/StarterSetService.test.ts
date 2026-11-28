@@ -77,6 +77,17 @@ describe('buildStarterSet', () => {
     expect(r!.cards[0]).toMatchObject({ frontText: 'Hello', backText: '你好' });
   });
 
+  it('родной — японский, изучает корейский: латиница не приклеивается к японскому переводу', () => {
+    const r = buildStarterSet({ ...base, nativeLanguage: 'ja', targetLanguages: ['ko'] });
+    expect(r!.cards[0]).toMatchObject({ frontText: '안녕하세요', backText: 'こんにちは' });
+    expect(r!.cards.every((c) => !/[a-z]/i.test(c.backText))).toBe(true);
+  });
+
+  it('родной — русский, изучает корейский: чтение остаётся', () => {
+    const r = buildStarterSet({ ...base, nativeLanguage: 'ru', targetLanguages: ['ko'] });
+    expect(r!.cards[0].backText).toBe('Привет (annyeonghaseyo)');
+  });
+
   it('форма слова в примере попадает в wordForm', () => {
     const r = buildStarterSet({ ...base, nativeLanguage: 'ru', targetLanguages: ['ko'] });
     const eat = r!.cards.find((c) => c.frontText === '먹다');
